@@ -51,10 +51,6 @@ minor_behavior_changes:
   change: |
     HTTP/3 alt-svc headers will now be respected from IP-address-based hostnames. This change is
     guarded by runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips``.
-- area: http3
-  change: |
-    Make upstream connections respond to default network change on mobile devices. This change is guarded
-    by runtime guard ``envoy.reloadable_features.quic_upstream_connection_handle_network_change``.
 - area: lua
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted

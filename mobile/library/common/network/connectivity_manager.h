@@ -14,10 +14,6 @@
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
-#ifdef ENVOY_ENABLE_QUIC
-#include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
-#endif
-
 /**
  * envoy_netconf_t identifies a snapshot of network configuration state. It's returned from calls
  * that may alter current state, and passed back as a parameter to this API to determine if calls
@@ -190,13 +186,6 @@ public:
    * @returns the default DNS cache set up in base configuration or nullptr.
    */
   virtual Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() PURE;
-
-  /**
-   * Called when OS changes the preferred network.
-   * @param network, the OS-preferred network.
-   * @returns configuration key of the latest snapshot of network configuration state.
-   */
-  virtual envoy_netconf_t onNetworkMadeDefault(NetworkType network) PURE;
 };
 
 class ConnectivityManagerImpl : public ConnectivityManager,
@@ -212,7 +201,8 @@ public:
   static envoy_netconf_t setPreferredNetwork(NetworkType network);
 
   ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
-                          DnsCacheManagerSharedPtr dns_cache_manager);
+                          DnsCacheManagerSharedPtr dns_cache_manager)
+      : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {}
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
   void onDnsHostAddOrUpdate(
@@ -242,7 +232,6 @@ public:
                                                     SocketMode socket_mode) override;
   envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) override;
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() override;
-  envoy_netconf_t onNetworkMadeDefault(NetworkType network) override;
 
 private:
   struct NetworkState {
@@ -263,14 +252,9 @@ private:
   Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
       dns_callbacks_handle_{nullptr};
   Upstream::ClusterManager& cluster_manager_;
-#ifdef ENVOY_ENABLE_QUIC
-  std::unique_ptr<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>
-      quic_observer_registry_factory_;
-#endif
   DnsCacheManagerSharedPtr dns_cache_manager_;
   ProxySettingsConstSharedPtr proxy_settings_;
   static NetworkState network_state_;
-  const bool quic_upstream_connection_handle_network_change_;
 };
 
 using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;

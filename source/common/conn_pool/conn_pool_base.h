@@ -251,7 +251,7 @@ public:
   void transitionActiveClientState(ActiveClient& client, ActiveClient::State new_state);
 
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
-                         Network::ConnectionEvent event, bool purge_pending_streams);
+                         Network::ConnectionEvent event);
 
   // Check if the pool has gone idle and invoke idle notification callbacks.
   void checkForIdleAndNotify();

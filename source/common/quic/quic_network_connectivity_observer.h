@@ -18,7 +18,10 @@ public:
   QuicNetworkConnectivityObserver& operator=(const QuicNetworkConnectivityObserver&) = delete;
 
   // Called when the device switches to a different network.
-  void onNetworkChanged();
+  void onNetworkChanged() {
+    // TODO(danzh) close the connection if it's idle, otherwise mark it as go away.
+    (void)session_;
+  }
 
 private:
   EnvoyQuicClientSession& session_;

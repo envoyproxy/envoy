@@ -283,7 +283,8 @@ envoy_status_t InternalEngine::resetConnectivityState() {
 
 envoy_status_t InternalEngine::setPreferredNetwork(NetworkType network) {
   return dispatcher_->post([&, network]() -> void {
-    envoy_netconf_t configuration_key = connectivity_manager_->onNetworkMadeDefault(network);
+    envoy_netconf_t configuration_key =
+        Network::ConnectivityManagerImpl::setPreferredNetwork(network);
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
       // The IP version to remove flag must be set first before refreshing the DNS cache so that

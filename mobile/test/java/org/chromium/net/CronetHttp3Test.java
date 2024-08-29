@@ -3,9 +3,6 @@ package org.chromium.net;
 import static org.chromium.net.testing.CronetTestRule.getContext;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.Matchers.anyOf;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import org.chromium.net.impl.CronvoyUrlRequestContext;
@@ -96,8 +93,6 @@ public class CronetHttp3Test {
     NativeCronvoyEngineBuilderImpl nativeCronetEngineBuilder =
         new NativeCronvoyEngineBuilderImpl(ApplicationProvider.getApplicationContext());
     nativeCronetEngineBuilder.addRuntimeGuard("reset_brokenness_on_nework_change", true);
-    nativeCronetEngineBuilder.addRuntimeGuard("quic_upstream_connection_handle_network_change",
-                                              true);
     if (setUpLogging) {
       nativeCronetEngineBuilder.setLogger(logger);
       nativeCronetEngineBuilder.setLogLevel(EnvoyEngine.LogLevel.TRACE);
@@ -292,105 +287,13 @@ public class CronetHttp3Test {
     String preStats = cronvoyEngine.getEnvoyEngine().dumpStats();
     assertTrue(preStats.contains("cluster.base.upstream_cx_http3_total: 1"));
 
-    // Even though there is HTTP/3 connection, the follow request should go over HTTP/2 because
-    // HTTP/3 is marked as broken.
-    TestUrlRequestCallback get_callback = doBasicGetRequest();
-    assertEquals(200, get_callback.mResponseInfo.getHttpStatusCode());
-    // Verify the request used HTTP/2.
-    assertEquals("h2", get_callback.mResponseInfo.getNegotiatedProtocol());
-
-    // This should change QUIC brokenness to "failed recently" and close the HTTP/3 connection
-    // asynchronously.
+    // This should change QUIC brokenness to "failed recently".
     cronvoyEngine.getEnvoyEngine().setPreferredNetwork(EnvoyNetworkType.WLAN);
 
-    // Send a new POST request which may re-use the HTTP/3 connection if it hasn't been closed yet.
-    TestUrlRequestCallback post_callback = doBasicPostRequest();
+    // The next request may go out over HTTP/2 or HTTP/3 (depends on who wins the race)
+    // but HTTP/3 will be tried.
+    doBasicGetRequest();
     String postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    if (postStats.contains("cluster.base.upstream_cx_http3_total: 2")) {
-      // The 1st HTTP/3 connection has been closed before processing the next request. The next
-      // request may go out over HTTP/2 or HTTP/3 (depends on who wins the race) but HTTP/3 will be
-      // tried.
-      assertTrue(
-          postStats,
-          postStats.contains(
-              "http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS: 1"));
-    } else {
-      // The 1st HTTP/3 connection has not been closed. And the next request will go over it.
-      assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
-      assertEquals("h3", post_callback.mResponseInfo.getNegotiatedProtocol());
-
-      // The network change will still drain the connection.
-      assertTrue(postStats,
-                 postStats.contains(
-                     "http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR: 1"));
-    }
-  }
-
-  @Test
-  @SmallTest
-  @Feature({"Cronet"})
-  public void ConnectionGoAwayUponNetworkChange() throws Exception {
-    setUp(true);
-    cronvoyEngine.getEnvoyEngine().setPreferredNetwork(EnvoyNetworkType.WWAN);
-
-    // Do the initial HTTP/2 request to get the alt-svc response.
-    doInitialHttp2Request();
-    // Set up a second request, which will hopefully go out over HTTP/3 due to alt-svc
-    // advertisement.
-    TestUrlRequestCallback callback = doBasicPostRequest();
-    // Verify the second request used HTTP/3
-    assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
-    assertEquals("h3", callback.mResponseInfo.getNegotiatedProtocol());
-
-    // From prior calls, there was one HTTP/3 connection established. Following requests should be
-    // able to use it. Send a POST request without waiting for response.
-    TestUrlRequestCallback post_callback = new TestUrlRequestCallback();
-    ExperimentalUrlRequest.Builder urlRequestBuilder = cronvoyEngine.newUrlRequestBuilder(
-        testServerUrl, post_callback, post_callback.getExecutor());
-    urlRequestBuilder.addHeader("content-type", "text");
-    urlRequestBuilder.addHeader("no_end_stream", "yes");
-    urlRequestBuilder.setHttpMethod("POST");
-    urlRequestBuilder.setIdempotency(ExperimentalUrlRequest.Builder.IDEMPOTENT);
-    TestUploadDataProvider dataProvider = new TestUploadDataProvider(
-        TestUploadDataProvider.SuccessCallbackMode.SYNC, post_callback.getExecutor());
-    dataProvider.addRead("test".getBytes());
-    urlRequestBuilder.setUploadDataProvider(dataProvider, post_callback.getExecutor());
-    urlRequestBuilder.build().start();
-
-    String preStats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(preStats, preStats.contains("cluster.base.upstream_cx_http3_total: 1"));
-
-    // Trigger a network change which may race with the on-going POST request which should by all
-    // means be able to finish.
-    cronvoyEngine.getEnvoyEngine().setPreferredNetwork(EnvoyNetworkType.WLAN);
-
-    // Finish the 2nd POST request.
-    post_callback.blockForDone();
-    assertEquals(200, post_callback.mResponseInfo.getHttpStatusCode());
-    // Verify the request used HTTP/3
-    assertEquals("h3", post_callback.mResponseInfo.getNegotiatedProtocol());
-
-    // Set up another 2 GET requests. At least the 2nd one should go over a new connection either H2
-    // or H3 as the brokenness status has been reset. The 1st one may race with the network change
-    // event.
-    for (int i = 0; i < 2; ++i) {
-      TestUrlRequestCallback get_callback = doBasicGetRequest();
-      assertEquals(200, get_callback.mResponseInfo.getHttpStatusCode());
-    }
-
-    String postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    // Another HTTP/3 connection should have been attempted in any case.
     assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 2"));
-    // The 1st connection should have been closed with QUIC_NO_ERROR if network change was
-    // propagated to the Envoy thread when the 2nd POST request or the following GET request was
-    // in-flight, with QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS if the network change was
-    // propagated to the Envoy thread after the POST request finished and before the follow GET was
-    // processed when the connection was idle.
-    assertThat(
-        postStats,
-        anyOf(
-            containsString("http3.upstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR: 1"),
-            containsString(
-                "http3.upstream.tx.quic_connection_close_error_code_QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS: 1")));
   }
 }

@@ -77,20 +77,6 @@ constexpr unsigned int InitialFaultThreshold = 1;
 // L7 bytes) before switching socket mode.
 constexpr unsigned int MaxFaultThreshold = 3;
 
-ConnectivityManagerImpl::ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
-                                                 DnsCacheManagerSharedPtr dns_cache_manager)
-    : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager),
-      quic_upstream_connection_handle_network_change_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_upstream_connection_handle_network_change")) {
-#ifdef ENVOY_ENABLE_QUIC
-  quic_observer_registry_factory_ =
-      std::make_unique<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>();
-  if (quic_upstream_connection_handle_network_change_) {
-    cluster_manager_.createNetworkObserverRegistries(*quic_observer_registry_factory_);
-  }
-#endif
-}
-
 ConnectivityManagerImpl::NetworkState ConnectivityManagerImpl::network_state_{
     1, NetworkType::Generic, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode,
     Thread::MutexBasicLockable{}};
@@ -114,18 +100,6 @@ envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(NetworkType network
   network_state_.socket_mode_ = SocketMode::DefaultPreferredNetworkMode;
 
   return network_state_.configuration_key_;
-}
-
-envoy_netconf_t ConnectivityManagerImpl::onNetworkMadeDefault(NetworkType network) {
-  ENVOY_LOG_MISC(trace, "Default network changed to {}", static_cast<int>(network));
-  envoy_netconf_t configuration_key = setPreferredNetwork(network);
-#ifdef ENVOY_ENABLE_QUIC
-  for (std::reference_wrapper<Quic::EnvoyMobileQuicNetworkObserverRegistry> registry :
-       quic_observer_registry_factory_->getCreatedObserverRegistries()) {
-    registry.get().onNetworkMadeDefault();
-  }
-#endif
-  return configuration_key;
 }
 
 void ConnectivityManagerImpl::setProxySettings(ProxySettingsConstSharedPtr new_proxy_settings) {
@@ -331,17 +305,16 @@ Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(Netwo
       network != NetworkType::Generic) {
     return getAlternateInterfaceSocketOptions(network);
   }
+
+  // Envoy uses the hash signature of overridden socket options to choose a connection pool.
+  // Setting a dummy socket option is a hack that allows us to select a different
+  // connection pool without materially changing the socket configuration.
   ASSERT(static_cast<int>(network) >= 0 && static_cast<int>(network) < 3);
+  int ttl_value = DEFAULT_IP_TTL + static_cast<int>(network);
   auto options = std::make_shared<Socket::Options>();
-  if (!quic_upstream_connection_handle_network_change_) {
-    // Envoy uses the hash signature of overridden socket options to choose a connection pool.
-    // Setting a dummy socket option is a hack that allows us to select a different
-    // connection pool without materially changing the socket configuration.
-    int ttl_value = DEFAULT_IP_TTL + static_cast<int>(network);
-    options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
-        envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TTL,
-        ENVOY_SOCKET_IPV6_UNICAST_HOPS, ttl_value));
-  }
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TTL,
+      ENVOY_SOCKET_IPV6_UNICAST_HOPS, ttl_value));
   return options;
 }
 

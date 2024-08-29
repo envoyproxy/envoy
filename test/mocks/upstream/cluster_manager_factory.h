@@ -2,6 +2,7 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/singleton/manager_impl.h"
 
 #include "test/mocks/secret/mocks.h"
@@ -9,10 +10,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
-#endif
 
 namespace Envoy {
 namespace Upstream {

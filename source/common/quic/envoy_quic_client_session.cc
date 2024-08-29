@@ -161,13 +161,9 @@ void EnvoyQuicClientSession::OnCanWrite() {
 void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
   ENVOY_CONN_LOG(debug, "HTTP/3 GOAWAY received", *this);
   quic::QuicSpdyClientSession::OnHttp3GoAway(stream_id);
-  notifyServerGoAway(Http::GoAwayErrorCode::NoError);
-}
-
-void EnvoyQuicClientSession::notifyServerGoAway(Http::GoAwayErrorCode error) {
   if (http_connection_callbacks_ != nullptr) {
     // HTTP/3 GOAWAY doesn't have an error code field.
-    http_connection_callbacks_->onGoAway(error);
+    http_connection_callbacks_->onGoAway(Http::GoAwayErrorCode::NoError);
   }
 }
 

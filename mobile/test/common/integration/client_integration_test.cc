@@ -1337,16 +1337,12 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
 // This test is simply to test the IPv6 connectivity check and DNS refresh and make sure the code
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChanged) {
-  builder_.addRuntimeGuard("quic_upstream_connection_handle_network_change", true);
+  builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
   initialize();
-  basicTest();
   internalEngine()->setPreferredNetwork(NetworkType::WLAN);
+  basicTest();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
-  } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    ASSERT_TRUE(waitForCounterGe("http3.upstream.tx.quic_connection_close_error_code_QUIC_"
-                                 "CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS",
-                                 1));
   }
 }
 

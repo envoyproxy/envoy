@@ -113,6 +113,7 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/router:context_lib",
         "//source/common/router:shadow_writer_lib",
@@ -129,7 +130,6 @@ envoy_cc_library(
     ] + envoy_select_enable_http3([
         "//source/common/http/http3:conn_pool_lib",
         "//source/common/http:conn_pool_grid",
-        "//source/common/quic:envoy_quic_client_session_lib",
     ]),
 )
 
