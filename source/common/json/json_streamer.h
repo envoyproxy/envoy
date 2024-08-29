@@ -98,13 +98,13 @@ public:
   public:
     Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
         : streamer_(streamer), closer_(closer) {
-      streamer_.addConstantString(opener);
+      streamer_.addDirectly(opener);
 #ifndef NDEBUG
       streamer_.push(this);
 #endif
     }
     virtual ~Level() {
-      streamer_.addConstantString(closer_);
+      streamer_.addDirectly(closer_);
 #ifndef NDEBUG
       streamer_.pop(this);
 #endif
@@ -171,7 +171,7 @@ public:
     void addString(absl::string_view str) {
       ASSERT_THIS_IS_TOP_LEVEL;
       nextField();
-      streamer_.addSanitized(Constants::Quote, str, Constants::Quote);
+      streamer_.addString(str);
     }
 
     /**
@@ -195,10 +195,9 @@ public:
       if (is_first_) {
         is_first_ = false;
       } else {
-        streamer_.addConstantString(Constants::Comma);
+        streamer_.addDirectly(Constants::Comma);
       }
     }
-
     /**
      * Renders a string or a number in json format. Doubles that are NaN are
      * rendered as 'null'. Strings are json-sanitized if needed, and surrounded
@@ -207,6 +206,8 @@ public:
      * @param Value the value to render.
      */
     void addValue(const Value& value) {
+      static_assert(absl::variant_size_v<Value> == 5, "variant size must be 5");
+
       switch (value.index()) {
       case 0:
         static_assert(std::is_same<decltype(absl::get<0>(value)), const absl::string_view&>::value,
@@ -233,11 +234,10 @@ public:
                       "value at index 4 must be a bool");
         addBool(absl::get<bool>(value));
         break;
-      default:
-        IS_ENVOY_BUG(absl::StrCat("addValue invalid index: ", value.index()));
-        break;
       }
     }
+
+
 
   private:
     friend Streamer;
@@ -349,11 +349,6 @@ public:
     return std::make_unique<Array>(*this);
   }
 
-private:
-  friend Level;
-  friend Map;
-  friend Array;
-
   /**
    * Takes a raw string, sanitizes it using JSON syntax, surrounds it
    * with a prefix and suffix, and streams it out.
@@ -366,6 +361,7 @@ private:
   void addString(absl::string_view str) {
     response_.add(Constants::Quote, Json::sanitize(sanitize_buffer_, str), Constants::Quote);
   }
+  void addString(const char* str) { addString(absl::string_view(str)); }
 
   /**
    * Serializes a number.
@@ -389,7 +385,12 @@ private:
    * Adds a constant string to the output stream. The string must outlive the
    * Streamer object, and is intended for literal strings such as punctuation.
    */
-  void addConstantString(absl::string_view str) { response_.add(str); }
+  void addDirectly(absl::string_view str) { response_.add(str); }
+
+private:
+  friend Level;
+  friend Map;
+  friend Array;
 
 #ifndef NDEBUG
   /**
