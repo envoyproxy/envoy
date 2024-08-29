@@ -1,9 +1,9 @@
+// swiftlint:disable type_body_length
 @_implementationOnly import EnvoyEngine
 import Foundation
 
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
-// swiftlint:disable:next type_body_length
 open class EngineBuilder: NSObject {
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
