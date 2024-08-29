@@ -15,6 +15,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Client-Side Weighted Round Robin Load Balancing Policy]
+// [#extension: envoy.load_balancing_policies.client_side_weighted_round_robin]
 // [#not-implemented-hide:]
 
 // Configuration for the client_side_weighted_round_robin LB policy.
@@ -68,8 +69,7 @@ message ClientSideWeightedRoundRobin {
   // The multiplier used to adjust endpoint weights with the error rate
   // calculated as eps/qps. Configuration is rejected if this value is negative.
   // Default is 1.0.
-  google.protobuf.FloatValue error_utilization_penalty = 6
-      [(validate.rules).float = { gte: 0.0 }];
+  google.protobuf.FloatValue error_utilization_penalty = 6 [(validate.rules).float = {gte: 0.0}];
 
   // By default, endpoint weight is computed based on the
   // :ref:`application_utilization
