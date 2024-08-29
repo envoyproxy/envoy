@@ -28,7 +28,7 @@ macro_rules! declare_program_init {
         #[no_mangle]
         pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
             if ($f()) {
-                // This magic number is the hash of the string "abi.h" which must match the
+                // This magic number is sha256 of the ABI headers which must match the
                 // value in abi_version.h
                 b"749b1e6bf97309b7d171009700a80e651ac61e35f9770c24a63460d765895a51\0".as_ptr()
                     as *const ::std::os::raw::c_char
