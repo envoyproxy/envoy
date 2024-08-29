@@ -34,7 +34,7 @@ pep8-naming
 ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
-protobuf<5.28.0
+protobuf<5.29.0
 pygithub
 pyreadline
 pyyaml
