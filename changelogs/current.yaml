@@ -39,6 +39,14 @@ behavior_changes:
   change: |
     Added new tag extraction so that scoped rds stats have their :ref:'scope_route_config_name
     <envoy_v3_api_msg_config/route/v3/scoped_route>' and stat prefix extracted.
+- area: wasm
+  change: |
+    Added prependAccessLogHandler in HTTP filter to be used by WASM in order to fix
+    `issue 30859 <https://github.com/envoyproxy/envoy/issues/30859>`_, which allows 
+    reversing adding the order of access loggers in order to provide correct dynamic metadata flow
+    without inheriting onStreamComplete(). This solution is exclusively used by WASM, and may be
+    changed to an updated WASM access logger if additional features deems it necessary. This behavior can 
+    be reverted by setting the runtime guard ``envoy.reloadable_features.prepend_access_log_handler`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
