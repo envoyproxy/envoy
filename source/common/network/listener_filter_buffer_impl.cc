@@ -105,6 +105,12 @@ absl::Status ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   if (state == PeekState::Done && !on_data_cb_disabled_) {
     // buffer_size_ will be set to 1 if the first listener filter in
     // filter chain has maxReadBytes() of 0. Bypass onData callback of it.
+    // The reason for setting it to 1 is that different platforms have
+    // different libevent implementation, e.g. on macOS the connection
+    // doesn't get early close notification and instead gets the close
+    // after reading the FIN, which means Event::FileReadyType::Read is
+    // required. But on macOS if Read is enabled with 0 buffer size, the
+    // connection will be closed when there is any data sent
     on_data_cb_(*this);
   } else if (state == PeekState::Error) {
     on_close_cb_(true);

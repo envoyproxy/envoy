@@ -129,7 +129,8 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
         } else {
           // There are two cases for returning StopIteration. One is listener filter
           // needs to wait for data. The other is listener filter with 0 maxReadBytes()
-          // doesn't inspect data, but needs to wait for some asynchronous callback.
+          // doesn't inspect data, but needs to wait for some asynchronous callback and
+          // listener filter buffer needs to listen for socket close event.
           if (listener_filter_buffer_ == nullptr) {
             createListenerFilterBuffer();
           }
