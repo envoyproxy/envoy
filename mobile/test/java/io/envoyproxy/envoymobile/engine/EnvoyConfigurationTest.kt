@@ -130,6 +130,7 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableCares,
+      forceV6,
       enableGro,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
