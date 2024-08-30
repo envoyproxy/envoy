@@ -310,7 +310,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // correctly but cause a race condition on future requests that have their location set
     // to the callback path.
 
-    //TODO: zhaohuabing handle nounce
+    // TODO: zhaohuabing handle nounce
     if (config_->redirectPathMatcher().match(path_str)) {
       Http::Utility::QueryParamsMulti query_parameters =
           Http::Utility::QueryParamsMulti::parseQueryString(path_str);
@@ -401,21 +401,22 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
   const auto state_parameters = Http::Utility::QueryParamsMulti::parseQueryString(state);
   // if the data we need is not present on the URL, stop execution
-  auto pathVal = query_parameters.getFirstValue("path");
+  auto urlVal = query_parameters.getFirstValue("url");
   auto nounceVal = query_parameters.getFirstValue("nounce");
-  if (!pathVal.has_value() || !nounceVal.has_value()) {
+  if (!urlVal.has_value() || !nounceVal.has_value()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   // if the URL in the state is not valid, stop execution
-  state_url_ = Http::Utility::PercentEncoding::urlDecodeQueryParameter(pathVal.value());
+  state_url_ = Http::Utility::PercentEncoding::urlDecodeQueryParameter(urlVal.value());
   Http::Utility::Url url;
-  if (!url.initialize(decoded_path, false)) {
+  if (!url.initialize(state_url_, false)) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // Validate the nounce TODO: zhaohuabing
   Formatter::FormatterImpl formatter(config_->redirectUri());
   const auto redirect_uri =
       formatter.formatWithContext({&headers}, decoder_callbacks_->streamInfo());
@@ -479,11 +480,11 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   }
 
   const std::string base_path = absl::StrCat(scheme, "://", host_);
-  const std::string full_path = absl::StrCat(base_path, headers.Path()->value().getStringView());
-  const std::string escaped_path =
-      Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_path);
+  const std::string full_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
+  const std::string escaped_url =
+      Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
 
-  const std::string state = absl::StrCat("path=", escaped_path, "&nounce=", nounce);
+  const std::string state = absl::StrCat("url=", escaped_path, "&nounce=", nounce);
   const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
@@ -503,6 +504,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string new_url = authorization_endpoint_url.toString();
 
   response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
+  // set the nounce cookie TODO: zhaohuabing
+  response_headers->addReferenceKey(Http::Headers::get().SetCookie,
+                                    fmt::format(CookieTailHttpOnlyFormatString, nounce));
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
   config_->stats().oauth_unauthorized_rq_.inc();
