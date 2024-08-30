@@ -203,6 +203,7 @@ paths:
     - source/common/protobuf/utility.cc
     - source/common/protobuf/protobuf.h
     - source/common/protobuf/yaml_utility.cc
+    - source/extensions/filters/http/proto_message_extraction/extraction_util/extraction_util.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
 
   namespace_check:
@@ -224,6 +225,7 @@ paths:
     - ci/prebuilt
     - source/common/protobuf
     - source/extensions/filters/http/grpc_field_extraction
+    - source/extensions/filters/http/proto_message_extraction/extraction_util
     - test/extensions/bootstrap/wasm/test_data
 
   # Files that are allowed to use try without main thread assertion.

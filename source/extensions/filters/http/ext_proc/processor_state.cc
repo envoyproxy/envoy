@@ -182,6 +182,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         } else {
           // StreamedBodyCallback state. There is pending body response.
           // Check whether there is buffered data. If there is, send them.
+          // Do not continue filter chain here so the pending body response have chance to be served.
           sendBufferedDataInStreamedMode(!trailers_available_);
           return absl::OkStatus();
         }
@@ -356,6 +357,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       filter_.sendTrailers(*this, *trailers_);
       return absl::OkStatus();
     }
+
     if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
       continueIfNecessary();
     }

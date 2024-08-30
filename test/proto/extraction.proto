@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package logging;
+package extraction;
 
 message TestBucket {
   string name = 1;
@@ -105,7 +105,7 @@ message TestResponse {
   SubMessage sub_message = 6;
 }
 
-service AuditLoggingUtilTestService {
-  // AuditTest Method.
-  rpc AuditTest(TestRequest) returns (TestResponse);
+service ExtractionUtilTestService {
+  // ExtractTest Method.
+  rpc ExtractTest(TestRequest) returns (TestResponse);
 }

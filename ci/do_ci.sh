@@ -591,6 +591,7 @@ case $CI_TARGET in
         else
             ENVOY_RELEASE_TARBALL="/build/release/arm64/bin/release.tar.zst"
         fi
+
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/zstd \
               -- --stdout \
@@ -899,7 +900,9 @@ case $CI_TARGET in
 
         # Build
         echo "Building with:"
+        echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
         echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+        echo "  binary dir:  ${ENVOY_BINARY_DIR}"
 
         # Build release binaries
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -939,12 +942,6 @@ case $CI_TARGET in
         setup_clang_toolchain
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
-        bazel run //tools/gcs:upload \
-              "${GCS_ARTIFACT_BUCKET}" \
-              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-              "${BUILD_DIR}/envoy" \
-              "release" \
-              "${GCS_REDIRECT_PATH}"
         ;;
 
     sizeopt)
@@ -1041,6 +1038,10 @@ case $CI_TARGET in
                  --trigger-ref="$ENVOY_BRANCH" \
                  --trigger-workflow="$WORKFLOW" \
                  --trigger-inputs="$INPUTS"
+        ;;
+
+    refresh_compdb)
+        "${CURRENT_SCRIPT_DIR}/../tools/vscode/refresh_compdb.sh"
         ;;
 
     *)

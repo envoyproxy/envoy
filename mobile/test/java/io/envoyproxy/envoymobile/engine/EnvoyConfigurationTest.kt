@@ -78,6 +78,7 @@ class EnvoyConfigurationTest {
     dnsPreresolveHostnames: MutableList<String> = mutableListOf("hostname1", "hostname2"),
     enableDNSCache: Boolean = false,
     dnsCacheSaveIntervalSeconds: Int = 101,
+    dnsNumRetries: Int? = 3,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
     enableCares: Boolean = false,
@@ -124,6 +125,7 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames,
       enableDNSCache,
       dnsCacheSaveIntervalSeconds,
+      dnsNumRetries ?: -1,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableCares,
@@ -161,6 +163,7 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
+    println(resolvedTemplate)
     assertThat(resolvedTemplate).contains("connect_timeout { seconds: 123 }")
 
     // DNS
@@ -173,6 +176,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("preresolve_hostnames")
     assertThat(resolvedTemplate).contains("hostname1")
     assertThat(resolvedTemplate).contains("hostname1")
+    assertThat(resolvedTemplate).contains("num_retries { value: 3 }")
 
     // Forcing IPv6
     assertThat(resolvedTemplate).contains("key: \"always_use_v6\" value { bool_value: true }")

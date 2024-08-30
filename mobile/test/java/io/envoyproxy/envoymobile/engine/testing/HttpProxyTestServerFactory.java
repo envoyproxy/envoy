@@ -13,12 +13,17 @@ public final class HttpProxyTestServerFactory {
   /** The instance of {@link HttpProxyTestServer}. */
   public static class HttpProxyTestServer {
     private final long handle; // Used by the native code.
+    private final String ipAddress;
     private final int port;
 
-    private HttpProxyTestServer(long handle, int port) {
+    private HttpProxyTestServer(long handle, String ipAddress, int port) {
       this.handle = handle;
+      this.ipAddress = ipAddress;
       this.port = port;
     }
+
+    /** Returns the server IP address. */
+    public String getIpAddress() { return ipAddress; }
 
     /** Returns the server port. */
     public int getPort() { return port; }

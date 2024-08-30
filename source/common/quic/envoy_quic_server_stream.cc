@@ -66,8 +66,7 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   std::unique_ptr<Http::ResponseHeaderMapImpl> modified_headers;
 #ifndef ENVOY_ENABLE_UHV
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      Http::Utility::isUpgrade(headers)) {
+  if (Http::Utility::isUpgrade(headers)) {
     modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
     Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
     header_map = modified_headers.get();
@@ -181,8 +180,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      Http::Utility::isH3UpgradeRequest(*headers)) {
+  if (Http::Utility::isH3UpgradeRequest(*headers)) {
     // Transform Request from H3 to H1
     Http::Utility::transformUpgradeRequestFromH3toH1(*headers);
   }
@@ -314,7 +312,8 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
 
 bool EnvoyQuicServerStream::OnStopSending(quic::QuicResetStreamError error) {
   // Only called in IETF Quic to close write side.
-  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this, error.internal_code());
+  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this,
+                   static_cast<int>(error.internal_code()));
   stats_.rx_reset_.inc();
   bool end_stream_encoded = local_end_stream_;
   // This call will close write.
@@ -339,7 +338,8 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicResetStreamError error) {
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
-  ENVOY_STREAM_LOG(debug, "received RESET_STREAM with reset code={}", *this, frame.error_code);
+  ENVOY_STREAM_LOG(debug, "received RESET_STREAM with reset code={}", *this,
+                   static_cast<int>(frame.error_code));
   stats_.rx_reset_.inc();
   bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
   // This closes read side in IETF Quic, but doesn't close write side.
@@ -357,7 +357,7 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
 }
 
 void EnvoyQuicServerStream::ResetWithError(quic::QuicResetStreamError error) {
-  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error.internal_code());
+  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, static_cast<int>(error.internal_code()));
   stats_.tx_reset_.inc();
   filterManagerConnection()->incrementSentQuicResetStreamErrorStats(error, /*from_self*/ true,
                                                                     /*is_upstream*/ false);

@@ -1137,7 +1137,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   default:
     // Any other message is considered spurious
     ENVOY_LOG(debug, "Received unknown stream message {} -- ignoring and marking spurious",
-              response->response_case());
+              static_cast<int>(response->response_case()));
     processing_status = absl::FailedPreconditionError("unhandled message");
     break;
   }
@@ -1152,7 +1152,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // ignore the stream for the rest of this filter instance's lifetime
     // to protect us from a malformed server.
     ENVOY_LOG(warn, "Spurious response message {} received on gRPC stream",
-              response->response_case());
+              static_cast<int>(response->response_case()));
     closeStream();
     clearAsyncState();
     processing_complete_ = true;
