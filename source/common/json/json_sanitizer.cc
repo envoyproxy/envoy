@@ -47,7 +47,7 @@ static constexpr uint32_t needs_slow_sanitizer[256] = {
 // SPELLCHECKER(on)
 // clang-format on
 
-bool needSlowSanitize(absl::string_view str) {
+inline bool needSlowSanitize(absl::string_view str) {
   // Fast-path to see whether any escapes or utf-encoding are needed. If str has
   // only unescaped ascii characters, we can simply return it.
   //
