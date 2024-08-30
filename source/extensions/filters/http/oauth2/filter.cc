@@ -418,7 +418,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   // Validate the nounce matches the one in the cookie to prevent CSRF attacks
   const auto nounce = nounceVal.value();
-  const auto nounce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
+  const auto nounce_cookie = Http::Utility::parseCookies(headers, [](absl::string_view key) {
     return key == "OauthNounce";
   });
   std::cout << "xxxxxx nounce state: " << nounce << std::endl;
