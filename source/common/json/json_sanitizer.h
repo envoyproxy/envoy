@@ -47,8 +47,14 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str);
 absl::string_view stripDoubleQuotes(absl::string_view str);
 
 /**
- * Sanitizes a string so it is suitable for JSON. Same as sanitize(), but
- * exception will be suppressed.
+ * Sanitizes a string so it is suitable for JSON. Almost same as sanitize(), except
+ * following points are different:
+ *
+ * - Exceptions will be suppressed.
+ * - If the input string contains invalid UTF-8 characters, this method will replace
+ *   invalid UTF-8 characters with `U+FFFD` but the sanitize() will escape all
+ *   non-ASCII characters to octal escape sequences.
+ *
  * @param buffer a string in which an escaped string can be written, if needed.
  * @param str the string to be translated
  * @return the translated string_view, valid as long as both buffer and str are

@@ -21,9 +21,14 @@ constexpr absl::string_view Omicron{"ό"};
 constexpr absl::string_view OmicronUtf8{"\341\275\271"};
 constexpr absl::string_view TrebleClefUtf8{"\360\235\204\236"};
 
-class JsonSanitizerTest : public testing::Test {
+class JsonSanitizerTest : public testing::TestWithParam<bool> {
 protected:
-  absl::string_view sanitize(absl::string_view str) { return Envoy::Json::sanitize(buffer_, str); }
+  JsonSanitizerTest() : exception_free_(GetParam()) {}
+
+  absl::string_view sanitize(absl::string_view str) {
+    return exception_free_ ? Envoy::Json::sanitizeExceptionFree(buffer_, str)
+                           : Envoy::Json::sanitize(buffer_, str);
+  }
 
   absl::string_view protoSanitize(absl::string_view str) {
     proto_serialization_buffer_ = MessageUtil::getJsonStringFromMessageOrError(
@@ -64,11 +69,17 @@ protected:
 
   std::string buffer_;
   std::string proto_serialization_buffer_;
+  const bool exception_free_{false};
 };
 
-TEST_F(JsonSanitizerTest, Empty) { expectUnchanged(""); }
+INSTANTIATE_TEST_SUITE_P(JsonSanitizer, JsonSanitizerTest, testing::Bool(),
+                         [](const testing::TestParamInfo<bool>& param) {
+                           return param.param ? "ExceptionFree" : "Default";
+                         });
 
-TEST_F(JsonSanitizerTest, NoEscape) {
+TEST_P(JsonSanitizerTest, Empty) { expectUnchanged(""); }
+
+TEST_P(JsonSanitizerTest, NoEscape) {
   expectUnchanged("abcdefghijklmnopqrstuvwxyz");
   expectUnchanged("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
   expectUnchanged("1234567890");
@@ -76,7 +87,7 @@ TEST_F(JsonSanitizerTest, NoEscape) {
   expectUnchanged("Hello world, Καλημέρα κόσμε, コンニチハ");
 }
 
-TEST_F(JsonSanitizerTest, SlashChars) {
+TEST_P(JsonSanitizerTest, SlashChars) {
   EXPECT_EQ("\\b", sanitizeAndCheckAgainstProtobufJson("\b"));
   EXPECT_EQ("\\f", sanitizeAndCheckAgainstProtobufJson("\f"));
   EXPECT_EQ("\\n", sanitizeAndCheckAgainstProtobufJson("\n"));
@@ -86,7 +97,7 @@ TEST_F(JsonSanitizerTest, SlashChars) {
   EXPECT_EQ("\\\"", sanitizeAndCheckAgainstProtobufJson("\""));
 }
 
-TEST_F(JsonSanitizerTest, ControlChars) {
+TEST_P(JsonSanitizerTest, ControlChars) {
   EXPECT_EQ("\\u0001", sanitizeAndCheckAgainstProtobufJson("\001"));
   EXPECT_EQ("\\u0002", sanitizeAndCheckAgainstProtobufJson("\002"));
   EXPECT_EQ("\\b", sanitizeAndCheckAgainstProtobufJson("\010"));
@@ -102,7 +113,7 @@ TEST_F(JsonSanitizerTest, ControlChars) {
   EXPECT_EQ(">", sanitize(">")); // protobuf serializes to \\u003e
 }
 
-TEST_F(JsonSanitizerTest, SevenBitAscii) {
+TEST_P(JsonSanitizerTest, SevenBitAscii) {
   // Cover all the 7-bit ascii values, calling sanitize so that it checks
   // our hand-rolled sanitizer vs protobuf. We ignore the return-value of
   // sanitize(); we are just calling for it to test against protobuf.
@@ -112,18 +123,21 @@ TEST_F(JsonSanitizerTest, SevenBitAscii) {
   }
 }
 
-TEST_F(JsonSanitizerTest, Utf8) {
+TEST_P(JsonSanitizerTest, Utf8) {
   // reference; https://www.charset.org/utf-8
   auto unicode = [](std::vector<uint8_t> chars) -> std::string {
-    return {reinterpret_cast<const char*>(&chars[0]), chars.size()};
+    return {reinterpret_cast<const char*>(chars.data()), chars.size()};
   };
 
   sanitizeAndCheckAgainstProtobufJson(unicode({0xc2, 0xa2})); // Cent.
   sanitizeAndCheckAgainstProtobufJson(unicode({0xc2, 0xa9})); // Copyright.
   sanitizeAndCheckAgainstProtobufJson(unicode({0xc3, 0xa0})); // 'a' with accent grave.
+
+  sanitizeAndCheckAgainstProtobufJson(
+      "👀🫅🔒🗝️🧫\u0088\u0088\u0088\u0088\u0088\u0088✅❓☑️😊🤔🛹🚅");
 }
 
-TEST_F(JsonSanitizerTest, Interspersed) {
+TEST_P(JsonSanitizerTest, Interspersed) {
   EXPECT_EQ("a\\bc", sanitizeAndCheckAgainstProtobufJson("a\bc"));
   EXPECT_EQ("a\\b\\fc", sanitizeAndCheckAgainstProtobufJson("a\b\fc"));
   EXPECT_EQ("\\bac", sanitizeAndCheckAgainstProtobufJson("\bac"));
@@ -133,7 +147,7 @@ TEST_F(JsonSanitizerTest, Interspersed) {
   EXPECT_EQ("\\ra\\f", sanitizeAndCheckAgainstProtobufJson("\ra\f"));
 }
 
-TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
+TEST_P(JsonSanitizerTest, AllTwoByteUtf8) {
   char buf[2];
   absl::string_view utf8(buf, 2);
   for (uint32_t byte1 = 2; byte1 < 32; ++byte1) {
@@ -148,7 +162,7 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
   }
 }
 
-TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
+TEST_P(JsonSanitizerTest, AllThreeByteUtf8) {
   std::string utf8("abc");
   for (uint32_t byte1 = 0; byte1 < 16; ++byte1) {
     utf8[0] = byte1 | Utf8::Pattern3Byte;
@@ -172,7 +186,7 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
   }
 }
 
-TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
+TEST_P(JsonSanitizerTest, AllFourByteUtf8) {
   std::string utf8("abcd");
 
   // This test takes 46 seconds without optimization and 46 seconds without,
@@ -207,7 +221,7 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
   }
 }
 
-TEST_F(JsonSanitizerTest, MultiByteUtf8) {
+TEST_P(JsonSanitizerTest, MultiByteUtf8) {
   EXPECT_EQ(Utf8::UnicodeSizePair(0x3bb, 2), decode(Lambda));
   EXPECT_EQ(Utf8::UnicodeSizePair(0x3bb, 2), decode(LambdaUtf8));
   EXPECT_EQ(Utf8::UnicodeSizePair(0x1f79, 3), decode(Omicron));
@@ -219,7 +233,7 @@ TEST_F(JsonSanitizerTest, MultiByteUtf8) {
   EXPECT_EQ(Utf8::UnicodeSizePair(0x1d11e, 4), decode(TrebleClefUtf8));
 }
 
-TEST_F(JsonSanitizerTest, Low8Bit) {
+TEST_P(JsonSanitizerTest, Low8Bit) {
   // The characters from 0 to 0xBF (191) inclusive are all rendered identically
   // to the protobuf JSON encoder.
   std::string x0_7f;
@@ -245,44 +259,81 @@ TEST_F(JsonSanitizerTest, Low8Bit) {
       sanitizeAndCheckAgainstProtobufJson(x0_7f));
 }
 
-TEST_F(JsonSanitizerTest, High8Bit) {
+TEST_P(JsonSanitizerTest, High8Bit) {
   std::string x80_ff;
   for (uint32_t i = 0x80; i <= 0xff; ++i) {
     char ch = i;
     x80_ff.push_back(ch);
   }
 
-  // Whenever there's an encoding error, the nlohmann JSON handler throws an
-  // exception, which Json::sanitizer catches and just escapes the characters so
-  // we don't lose information in the encoding. All bytes with the high-bit set
-  // are invalid utf-8 in isolation, so we fall through to escaping these.
-  EXPECT_EQ("\\200\\201\\202\\203\\204\\205\\206\\207\\210\\211\\212\\213\\214\\215\\216\\217"
-            "\\220\\221\\222\\223\\224\\225\\226\\227\\230\\231\\232\\233\\234\\235\\236\\237"
-            "\\240\\241\\242\\243\\244\\245\\246\\247\\250\\251\\252\\253\\254\\255\\256\\257"
-            "\\260\\261\\262\\263\\264\\265\\266\\267\\270\\271\\272\\273\\274\\275\\276\\277"
-            "\\300\\301\\302\\303\\304\\305\\306\\307\\310\\311\\312\\313\\314\\315\\316\\317"
-            "\\320\\321\\322\\323\\324\\325\\326\\327\\330\\331\\332\\333\\334\\335\\336\\337"
-            "\\340\\341\\342\\343\\344\\345\\346\\347\\350\\351\\352\\353\\354\\355\\356\\357"
-            "\\360\\361\\362\\363\\364\\365\\366\\367\\370\\371\\372\\373\\374\\375\\376\\377",
-            sanitize(x80_ff));
+  if (exception_free_) {
+    // The exception-free sanitizer just replaces the invalid bytes with the
+    // replacement character.
+    EXPECT_EQ("\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd"
+              "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd",
+              sanitize(x80_ff));
+  } else {
+    // Whenever there's an encoding error, the nlohmann JSON handler throws an
+    // exception, which Json::sanitizer catches and just escapes the characters so
+    // we don't lose information in the encoding. All bytes with the high-bit set
+    // are invalid utf-8 in isolation, so we fall through to escaping these.
+    EXPECT_EQ("\\200\\201\\202\\203\\204\\205\\206\\207\\210\\211\\212\\213\\214\\215\\216\\217"
+              "\\220\\221\\222\\223\\224\\225\\226\\227\\230\\231\\232\\233\\234\\235\\236\\237"
+              "\\240\\241\\242\\243\\244\\245\\246\\247\\250\\251\\252\\253\\254\\255\\256\\257"
+              "\\260\\261\\262\\263\\264\\265\\266\\267\\270\\271\\272\\273\\274\\275\\276\\277"
+              "\\300\\301\\302\\303\\304\\305\\306\\307\\310\\311\\312\\313\\314\\315\\316\\317"
+              "\\320\\321\\322\\323\\324\\325\\326\\327\\330\\331\\332\\333\\334\\335\\336\\337"
+              "\\340\\341\\342\\343\\344\\345\\346\\347\\350\\351\\352\\353\\354\\355\\356\\357"
+              "\\360\\361\\362\\363\\364\\365\\366\\367\\370\\371\\372\\373\\374\\375\\376\\377",
+              sanitize(x80_ff));
+  }
 }
 
-TEST_F(JsonSanitizerTest, InvalidUtf8) {
-  // 2 byte
-  EXPECT_EQ("\\316", sanitizeInvalid(truncate(LambdaUtf8)));
-  EXPECT_EQ("\\316\\373", sanitizeInvalid(corruptByte2(LambdaUtf8)));
+TEST_P(JsonSanitizerTest, InvalidUtf8) {
+  if (exception_free_) {
+    // 2 byte
+    EXPECT_EQ("\ufffd", sanitizeInvalid(truncate(LambdaUtf8)));
+    EXPECT_EQ("\ufffd\ufffd", sanitizeInvalid(corruptByte2(LambdaUtf8)));
 
-  // 3 byte
-  EXPECT_EQ("\\341\\275", sanitizeInvalid(truncate(OmicronUtf8)));
-  EXPECT_EQ("\\341\\375\\271", sanitizeInvalid(corruptByte2(OmicronUtf8)));
+    // 3 byte
+    EXPECT_EQ("\ufffd", sanitizeInvalid(truncate(OmicronUtf8)));
+    EXPECT_EQ("\ufffd\ufffd\ufffd", sanitizeInvalid(corruptByte2(OmicronUtf8)));
 
-  // 4 byte
-  EXPECT_EQ("\\360\\235\\204", sanitizeInvalid(truncate(TrebleClefUtf8)));
-  EXPECT_EQ("\\360\\375\\204\\236", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
+    // 4 byte
+    EXPECT_EQ("\ufffd", sanitizeInvalid(truncate(TrebleClefUtf8)));
+    EXPECT_EQ("\ufffd\ufffd\ufffd\ufffd", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
 
-  // Invalid input embedded in normal text.
-  EXPECT_EQ("Hello, \\360\\235\\204, World!",
-            sanitize(absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
+    // Invalid input embedded in normal text.
+    EXPECT_EQ("Hello, \ufffd, World!",
+              sanitize(absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
+  } else {
+    // 2 byte
+    EXPECT_EQ("\\316", sanitizeInvalid(truncate(LambdaUtf8)));
+    EXPECT_EQ("\\316\\373", sanitizeInvalid(corruptByte2(LambdaUtf8)));
+
+    // 3 byte
+    EXPECT_EQ("\\341\\275", sanitizeInvalid(truncate(OmicronUtf8)));
+    EXPECT_EQ("\\341\\375\\271", sanitizeInvalid(corruptByte2(OmicronUtf8)));
+
+    // 4 byte
+    EXPECT_EQ("\\360\\235\\204", sanitizeInvalid(truncate(TrebleClefUtf8)));
+    EXPECT_EQ("\\360\\375\\204\\236", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
+
+    // Invalid input embedded in normal text.
+    EXPECT_EQ("Hello, \\360\\235\\204, World!",
+              sanitize(absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
+  }
 
   // Replicate a few other cases that were discovered during initial fuzzing,
   // to ensure we see these as invalid utf8 and avoid them in comparisons.
