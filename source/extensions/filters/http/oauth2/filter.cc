@@ -399,10 +399,11 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   auth_code_ = codeVal.value();
   std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
+  std::cout << "xxxxxx  state: " << state << std::endl;
   const auto state_parameters = Http::Utility::QueryParamsMulti::parseQueryString(state);
   // if the data we need is not present on the URL, stop execution
-  auto urlVal = query_parameters.getFirstValue("url");
-  auto nounceVal = query_parameters.getFirstValue("nounce");
+  auto urlVal = state_parameters.getFirstValue("url");
+  auto nounceVal = state_parameters.getFirstValue("nounce");
   if (!urlVal.has_value() || !nounceVal.has_value()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
