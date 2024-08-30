@@ -277,6 +277,8 @@ private:
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void clearStreamingChunk() { chunk_queue_.clear(); }
+  CallbackState getCallbackStateAfterHeaderResp(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
 };
 
 class DecodingProcessorState : public ProcessorState {

@@ -282,10 +282,6 @@ message ExternalProcessor {
   // The server has two options upon receiving a header request:
   // 1. Instant Response: Send the header response as soon as the header request is received.
   // 2. Delayed Response: Wait for the body before sending any response.
-  // If the server chooses the second option, it has two further choices:
-  // 2.1 Separate Responses: Send the header response first, followed by separate body responses.
-  // 2.2 Combined Response: Include both the header response and the first chunk of the body response
-  // in a single body response message, followed by the remaining body responses.
   // In all scenarios, the header-body ordering must always be maintained.
   bool send_body_without_waiting_for_header_response = 21;
 }

@@ -108,10 +108,18 @@ absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_
   return mut_status;
 }
 
+ProcessorState::CallbackState
+ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_response) const {
+  if (bodyMode() == ProcessingMode::STREAMED &&
+      filter_.config().sendBodyWithoutWaitingForHeaderResponse() && !chunk_queue_.empty() &&
+      (common_response.status() != CommonResponse::CONTINUE_AND_REPLACE)) {
+    return ProcessorState::CallbackState::StreamedBodyCallback;
+  }
+  return ProcessorState::CallbackState::Idle;
+}
+
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
-  if ((callback_state_ == CallbackState::HeadersCallback) ||
-      ((callback_state_ == CallbackState::StreamedBodyCallback) &&
-       filter_.config().sendBodyWithoutWaitingForHeaderResponse() && send_headers_)) {
+  if (callback_state_ == CallbackState::HeadersCallback) {
     ENVOY_LOG(debug, "applying headers response. body mode = {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
     const auto& common_response = response.response();
@@ -123,13 +131,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
     }
 
     clearRouteCache(common_response);
-    if (callback_state_ == CallbackState::HeadersCallback ||
-        common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
-      onFinishProcessorCall(Grpc::Status::Ok);
-    } else {
-      // StreamedBodyCallback state. There is pending body response.
-      onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
-    }
+    onFinishProcessorCall(Grpc::Status::Ok, getCallbackStateAfterHeaderResp(common_response));
+
     if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
       ENVOY_LOG(debug, "Replacing complete message");
       // Completely replace the body that may already exist.
@@ -283,17 +286,6 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::Ok);
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      if (filter_.config().sendBodyWithoutWaitingForHeaderResponse()) {
-        // Apply header mutation if the body response contains it.
-        // Note, headers_ will be set into nullptr after the 1st body response is processed.
-        if (headers_ != nullptr && common_response.has_header_mutation()) {
-          const auto mut_status = processHeaderMutation(common_response);
-          if (!mut_status.ok()) {
-            return mut_status;
-          }
-        }
-      }
-
       Buffer::OwnedImpl chunk_data;
       auto chunk = dequeueStreamingChunk(chunk_data);
       ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");

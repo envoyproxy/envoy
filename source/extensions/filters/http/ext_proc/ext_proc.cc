@@ -473,6 +473,14 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   return status;
 }
 
+ProcessorState::CallbackState Filter::getCallbackStateWhenStreamBody(ProcessorState& state) const {
+  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+    return ProcessorState::CallbackState::HeadersCallback;
+  } else {
+    return ProcessorState::CallbackState::StreamedBodyCallback;
+  }
+}
+
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
@@ -577,7 +585,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     } else {
       result = FilterDataStatus::Continue;
     }
-    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
+    sendBodyChunk(state, getCallbackStateWhenStreamBody(state), req);
 
     break;
   }
