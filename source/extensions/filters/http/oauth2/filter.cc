@@ -399,16 +399,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   auth_code_ = codeVal.value();
   std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
-  std::cout << "xxxxxx  statexx: " << state << std::endl;
   const auto state_parameters = Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
-  // if the data we need is not present on the URL, stop execution
+  // if the data we need is not present on the state, stop execution
   auto urlVal = state_parameters.getFirstValue("url");
   auto nounceVal = state_parameters.getFirstValue("nounce");
   if (!urlVal.has_value() || !nounceVal.has_value()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
-
 
   // if the URL in the state is not valid, stop execution
   state_url_ = urlVal.value();
@@ -418,17 +416,20 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Validate the nounce matches the one in the cookie to prevent CSRF attacks
+  // Validate that the nounce in the callback URL matches the nounce in the cookie.
+  // This is to prevenrevent attackers from injecting their own access token into a victim's
+  // sessions via CSRF attack. The attack can result in victims saving their sensitive data
+  // in the attacker's account.
+  // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
   const auto nounce = nounceVal.value();
   const auto nounce_cookie = Http::Utility::parseCookies(
       headers, [](absl::string_view key) { return key == "OauthNounce"; });
+
   if (nounce_cookie.find("OauthNounce") == nounce_cookie.end() ||
       nounce != nounce_cookie.at("OauthNounce")) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
-  std::cout << "xxxxxx nounce state: " << nounce << std::endl;
-  std::cout << "xxxxxx nounce cookie: " << nounce_cookie.at("OauthNounce") << std::endl;
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
   const auto redirect_uri =
@@ -494,6 +495,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string full_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
   const std::string escaped_url = Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
 
+  // Generate a nounce to prevent CSRF attacks
   std::string nounce;
   bool nounce_cookie_exists = false;
   const auto nounce_cookie = Http::Utility::parseCookies(
@@ -505,6 +507,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     nounce = std::to_string(time_source_.systemTime().time_since_epoch().count());
   }
 
+  // Encode the original request URL and the nounce to the state parameter
   const std::string state = absl::StrCat("url=", escaped_url, "&nounce=", nounce);
   const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
 
@@ -526,10 +529,12 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
 
   response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
 
-  // set the nounce cookie if it does not exist
-  // TODO add expiration time to the nounce cookie
+  // Set the nounce cookie if it does not exist.
   if (!nounce_cookie_exists) {
-    std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
+    // Expire the nounce cookie in 10 minutes.
+    // This should be enough time for the user to complete the OAuth flow.
+    std::string expire_in = std::to_string(10 * 60);
+    std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat("OauthNounce", "=", nounce, cookie_tail_http_only));
@@ -784,4 +789,3 @@ void OAuth2Filter::sendUnauthorizedResponse() {
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-
