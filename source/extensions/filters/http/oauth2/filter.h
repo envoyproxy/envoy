@@ -279,7 +279,7 @@ private:
   std::string expires_id_token_in_;
   std::string new_expires_;
   absl::string_view host_;
-  std::string state_;
+  std::string state_url_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
 
