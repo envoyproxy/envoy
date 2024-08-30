@@ -53,7 +53,7 @@ def envoy_copts(repository, test = False):
                # Bazel adds an implicit -DNDEBUG for opt targets.
                repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
                repository + "//bazel:fastbuild_build": [],
-               repository + "//bazel:dbg_build": ["-g"],
+               repository + "//bazel:dbg_build": ["-ggdb3"],
                repository + "//bazel:windows_opt_build": [] if test else ["-Z7"],
                repository + "//bazel:windows_fastbuild_build": [],
                repository + "//bazel:windows_dbg_build": [],
