@@ -45,6 +45,7 @@ using TranscoderPtr = std::unique_ptr<Transcoder>;
 using google::grpc::transcoding::TranscoderInputStream;
 using TranscoderInputStreamPtr = std::unique_ptr<TranscoderInputStream>;
 using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams;
+using google::grpc::transcoding::VariableBinding;
 
 namespace Envoy {
 namespace Extensions {
