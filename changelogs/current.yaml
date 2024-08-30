@@ -173,6 +173,9 @@ removed_config_or_runtime:
 - area: dynamic forward proxy
   change: |
     Removed ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.use_http3_header_normalisation`` runtime flag and legacy code paths.
 
 new_features:
 - area: dns
