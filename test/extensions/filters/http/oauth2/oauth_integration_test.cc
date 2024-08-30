@@ -183,6 +183,12 @@ resources:
       result = fake_oauth2_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
     }
+    if (lds_connection_ != nullptr) {
+      AssertionResult result = lds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
     if (fake_upstream_connection_ != nullptr) {
       AssertionResult result = fake_upstream_connection_->close();
       RELEASE_ASSERT(result, result.message());
@@ -203,6 +209,11 @@ typed_config:
       cluster: oauth
       uri: oauth.com/token
       timeout: 3s
+    retry_policy:
+      retry_back_off:
+        base_interval: 1s
+        max_interval: 10s
+      num_retries: 5
     authorization_endpoint: https://oauth.com/oauth/authorize/
     redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
     redirect_path_matcher:

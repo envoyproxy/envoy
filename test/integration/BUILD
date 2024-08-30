@@ -781,6 +781,7 @@ envoy_cc_test(
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:local_reply_with_metadata_filter_lib",
         "//test/integration/filters:metadata_control_filter_lib",
+        "//test/integration/filters:non_terminal_encoding_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:remove_response_headers_lib",
         "//test/integration/filters:reset_stream_filter_config_lib",
