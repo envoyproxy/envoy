@@ -96,7 +96,6 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
     delegated_callbacks_.prependAccessLogHandler(std::move(handler));
   }
 
-
   Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks_;
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree_;
 };
