@@ -12,6 +12,13 @@ behavior_changes:
     headers and trailers when producing access log.
 - area: http
   change: |
+    Allow HTTP/2 (and HTTP/3) upstream servers to half close the stream before the downstream. This enables bidirectional
+    gRPC streams where server completes streaming before the client. Behavior of HTTP/1 or TCP proxy upstream servers is
+    unchanged and the stream is reset if the upstream server completes response before the downstream. The stream is also
+    reset if the upstream server responds with an error status before the downstream. This behavior is disabled by default
+    and can be enabled by setting the ``envoy.reloadable_features.allow_multiplexed_upstream_half_close`` runtime key to true.
+- area: http
+  change: |
     Added HTTP1-safe option for :ref:`max_connection_duration
     <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` in
     HttpConnectionManager. When enabled, ``max_connection_duration`` will only drain downstream
@@ -73,6 +80,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dispatcher
+  change: |
+    Update approximate now after polling instead of before polling. This is only used by QUIC.
+    The behavior can be reverted by setting ``envoy.restart_features.fix_dispatcher_approximate_now`` to false.
 - area: dns
   change: |
     The DNS filter no longer returns FORMERR if a message has an ID of 0.
@@ -249,6 +260,12 @@ new_features:
     :ref:`happy_eyeballs_config <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.happy_eyeballs_config>`.
     A default configuration will be used if not provided. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` to false.
+- area: getaddrinfo
+  change: |
+    Added :ref:`num_retries<envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_retries>`
+    to configure the number of retries. If this field is not provided, the ``getaddrinfo`` resolver will retry indefinitely until it
+    succeeds or the DNS query times out. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.getaddrinfo_num_retries`` to false.
 - area: geoip
   change: |
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.

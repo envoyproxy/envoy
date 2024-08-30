@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/filters/http/proto_message_logging/logging_util/proto_scrubber_interface.h"
+#include "source/extensions/filters/http/proto_message_extraction/extraction_util/proto_extractor_interface.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
@@ -18,6 +18,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "google/api/monitored_resource.pb.h"
+#include "grpc_transcoding/type_helper.h"
 #include "proto_field_extraction/field_extractor/field_extractor.h"
 #include "proto_field_extraction/message_data/message_data.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
@@ -26,24 +27,22 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace ProtoMessageLogging {
+namespace ProtoMessageExtraction {
 
 // The type property value that will be included into the converted Struct.
 constexpr char kTypeProperty[] = "@type";
 
 ABSL_CONST_INIT const char* const kTypeServiceBaseUrl = "type.googleapis.com";
 
-constexpr char kAuditRedact[] = "AUDIT_REDACT";
+constexpr char kExtractRedact[] = "EXTRACT_REDACT";
 
-constexpr char kAudit[] = "AUDIT";
+constexpr char kExtract[] = "EXTRACT";
 
 constexpr int kMaxRedactedPathDepth = 10;
 
 constexpr int kProtoTranslationMaxRecursionDepth = 64;
 
 ABSL_CONST_INIT const char* const kStructTypeUrl = "type.googleapis.com/google.protobuf.Struct";
-
-// class proto_processing_lib::proto_scrubber::ProtoScrubber;
 
 bool IsEmptyStruct(const ProtobufWkt::Struct& message_struct);
 
@@ -54,10 +53,11 @@ bool IsLabelName(absl::string_view value);
 // name, we just remove the brackets.
 std::string GetLabelName(absl::string_view value);
 
-// Singleton mapping of string to AuditDirective.
-const absl::flat_hash_map<std::string, AuditDirective>& StringToDirectiveMap();
+// Singleton mapping of string to ExtractedMessageDirective.
+const absl::flat_hash_map<std::string, ExtractedMessageDirective>& StringToDirectiveMap();
 
-absl::optional<AuditDirective> AuditDirectiveFromString(absl::string_view directive);
+absl::optional<ExtractedMessageDirective>
+ExtractedMessageDirectiveFromString(absl::string_view directive);
 
 // Returns a mapping of monitored resource label keys to their values.
 void GetMonitoredResourceLabels(absl::string_view label_extractor,
@@ -118,13 +118,27 @@ absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator pa
                                      std::vector<std::string>::const_iterator path_pieces_end,
                                      ProtobufWkt::Struct* message_struct);
 
-absl::StatusOr<bool>
-IsMessageFieldPathPresent(const Protobuf::Type& type,
-                          std::function<const Protobuf::Type*(const std::string&)> type_finder,
-                          const std::string& path,
-                          const Protobuf::field_extraction::MessageData& message);
+// Converts given proto message to Struct. It also adds
+// a "@type" property with proto type url to the generated Struct. Expects the
+// TypeResolver to handle types prefixed with "type.googleapis.com/".
+absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
+                             const Envoy::ProtobufWkt::Type& type,
+                             ::Envoy::Protobuf::util::TypeResolver* type_resolver,
+                             ::Envoy::ProtobufWkt::Struct* message_struct);
 
-} // namespace ProtoMessageLogging
+// Extracts given proto message and convert the extracted proto to Struct.
+//
+// Returns true if succeeds, otherwise, returns false in case of
+//  (1) `scrubber` is nullptr;
+//  (2) error during scrubbing/converting;
+//  (3) the message is empty after scrubbing;
+bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
+                   const Envoy::ProtobufWkt::Type& type,
+                   const ::google::grpc::transcoding::TypeHelper& type_helper,
+                   Protobuf::field_extraction::MessageData* message,
+                   Envoy::ProtobufWkt::Struct* message_struct);
+
+} // namespace ProtoMessageExtraction
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

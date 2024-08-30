@@ -1,9 +1,9 @@
 type: google.api.Service
 config_version: 3
-name: audit_logging_util_test.googleapis.com
-title: Audit Logging Util Test API
+name: extraction_util_test.googleapis.com
+title: Extraction Util Test API
 apis:
-- name: proto_processing_lib.proto_scrubber.testing.AuditLoggingUtilTestService
+- name: ExtractionUtilTestService
 
 documentation:
   overview: |
@@ -15,7 +15,7 @@ documentation:
     (== suppress_warning legacy-contacts ==)
     (== suppress_warning versioning-config ==)
   summary:
-    Audit Logging Util Test
+    Extraction Util Test
 
 backend:
   rules:

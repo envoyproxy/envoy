@@ -1195,12 +1195,13 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
                       jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
                       jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
-                      jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
-                      jboolean use_cares, jboolean use_gro, jstring http3_connection_options,
-                      jstring http3_client_connection_options, jobjectArray quic_hints,
-                      jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
-                      jboolean enable_brotli_decompression, jboolean enable_port_migration,
-                      jboolean enable_socket_tagging, jboolean enable_interface_binding,
+                      jint dns_num_retries, jboolean enable_drain_post_dns_refresh,
+                      jboolean enable_http3, jboolean use_cares, jboolean use_gro,
+                      jstring http3_connection_options, jstring http3_client_connection_options,
+                      jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
+                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
+                      jboolean enable_port_migration, jboolean enable_socket_tagging,
+                      jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
                       jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
@@ -1215,6 +1216,9 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.addDnsQueryTimeoutSeconds((dns_query_timeout_seconds));
   builder.addDnsMinRefreshSeconds((dns_min_refresh_seconds));
   builder.enableDnsCache(enable_dns_cache == JNI_TRUE, dns_cache_save_interval_seconds);
+  if (dns_num_retries >= 0) {
+    builder.setDnsNumRetries(dns_num_retries);
+  }
   builder.addMaxConnectionsPerHost((max_connections_per_host));
   builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       (h2_connection_keepalive_idle_interval_milliseconds));
@@ -1288,13 +1292,13 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-    jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
-    jboolean enable_http3, jboolean use_cares, jboolean use_gro, jstring http3_connection_options,
-    jstring http3_client_connection_options, jobjectArray quic_hints,
-    jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
-    jboolean enable_brotli_decompression, jboolean enable_port_migration,
-    jboolean enable_socket_tagging, jboolean enable_interface_binding,
-    jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jlong dns_cache_save_interval_seconds, jint dns_num_retries,
+    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean use_cares,
+    jboolean use_gro, jstring http3_connection_options, jstring http3_client_connection_options,
+    jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
+    jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
+    jboolean enable_port_migration, jboolean enable_socket_tagging,
+    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
@@ -1306,7 +1310,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   configureBuilder(
       jni_helper, connect_timeout_seconds, dns_refresh_seconds, dns_failure_refresh_seconds_base,
       dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
-      dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds,
+      dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
       enable_drain_post_dns_refresh, enable_http3, use_cares, use_gro, http3_connection_options,
       http3_client_connection_options, quic_hints, quic_canonical_suffixes,
       enable_gzip_decompression, enable_brotli_decompression, enable_port_migration,

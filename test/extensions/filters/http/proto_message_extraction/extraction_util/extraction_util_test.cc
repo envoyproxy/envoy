@@ -1,12 +1,13 @@
+#include <fstream>
 #include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "source/extensions/filters/http/proto_message_logging/logging_util/logging_util.h"
+#include "source/extensions/filters/http/proto_message_extraction/extraction_util/extraction_util.h"
 
-#include "test/proto/logging.pb.h"
+#include "test/proto/extraction.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
@@ -18,10 +19,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "ocpdiag/core/compat/status_macros.h"
+#include "ocpdiag/core/testing/parse_text_proto.h"
 #include "ocpdiag/core/testing/status_matchers.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 #include "proto_field_extraction/test_utils/utils.h"
-#include "proto_processing_lib/proto_scrubber/cloud_audit_log_field_checker.h"
+#include "proto_processing_lib/proto_scrubber/field_mask_path_checker.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
 #include "proto_processing_lib/proto_scrubber/proto_scrubber_enums.h"
 #include "proto_processing_lib/proto_scrubber/utility.h"
@@ -30,21 +32,22 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace ProtoMessageLogging {
+namespace ProtoMessageExtraction {
 namespace {
 
 using ::Envoy::Protobuf::Field;
 using ::Envoy::Protobuf::FieldMask;
+using Envoy::Protobuf::FileDescriptorSet;
 using ::Envoy::Protobuf::Type;
 using ::Envoy::Protobuf::field_extraction::CordMessageData;
-using ::Envoy::Protobuf::field_extraction::testing::TypeHelper;
 using ::Envoy::Protobuf::io::CodedInputStream;
 using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
-using ::logging::TestRequest;
-using ::logging::TestResponse;
-using ::proto_processing_lib::proto_scrubber::CloudAuditLogFieldChecker;
+using ::extraction::TestRequest;
+using ::extraction::TestResponse;
+using ::google::grpc::transcoding::TypeHelper;
+using ::proto_processing_lib::proto_scrubber::FieldMaskPathChecker;
 using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::testing::ValuesIn;
@@ -122,11 +125,11 @@ const char kTestResponse[] = R"pb(
   sub_message { bucket_present { name: "bucket_present" } }
 )pb";
 
-class AuditLoggingUtilTest : public ::testing::Test {
+class ExtractionUtilTest : public ::testing::Test {
 protected:
-  AuditLoggingUtilTest() = default;
+  ExtractionUtilTest() = default;
   const Protobuf::Type* FindType(const std::string& type_url) {
-    absl::StatusOr<const Protobuf::Type*> result = type_helper_->ResolveTypeUrl(type_url);
+    absl::StatusOr<const Protobuf::Type*> result = type_helper_->Info()->ResolveTypeUrl(type_url);
     if (!result.ok()) {
       return nullptr;
     }
@@ -135,25 +138,49 @@ protected:
 
   void SetUp() override {
     const std::string descriptor_path =
-        TestEnvironment::runfilesPath("test/proto/logging.descriptor");
-    absl::StatusOr<std::unique_ptr<TypeHelper>> status = TypeHelper::Create(descriptor_path);
-    type_helper_ = std::move(status.value());
+        TestEnvironment::runfilesPath("test/proto/extraction.descriptor");
 
-    type_finder_ = std::bind_front(&AuditLoggingUtilTest::FindType, this);
+    // Create an input file stream
+    std::ifstream file(descriptor_path, std::ios::in | std::ios::binary);
+    if (!file) {
+      LOG(ERROR) << "Failed to open the file: " << descriptor_path << std::endl;
+    }
+
+    // Read the file contents into a stringstream
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string file_contents = buffer.str();
+
+    FileDescriptorSet descriptor_set;
+    if (!descriptor_set.ParseFromString(file_contents)) {
+      LOG(ERROR) << "Unable to parse proto descriptor from file " << descriptor_path;
+    }
+
+    for (const auto& file : descriptor_set.file()) {
+      if (descriptor_pool_->BuildFile(file) == nullptr) {
+        LOG(ERROR) << "Unable to build proto descriptor pool";
+      }
+    }
+
+    type_helper_ = std::make_unique<google::grpc::transcoding::TypeHelper>(
+        Protobuf::util::NewTypeResolverForDescriptorPool("type.googleapis.com",
+                                                         descriptor_pool_.get()));
+
+    type_finder_ = std::bind_front(&ExtractionUtilTest::FindType, this);
 
     if (!Protobuf::TextFormat::ParseFromString(kTestRequest, &test_request_proto_)) {
       LOG(ERROR) << "Failed to parse textproto: " << kTestRequest;
     }
     test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
     request_type_ = type_finder_("type.googleapis.com/"
-                                 "logging.TestRequest");
+                                 "extraction.TestRequest");
 
     if (!Protobuf::TextFormat::ParseFromString(kTestResponse, &test_response_proto_)) {
       LOG(ERROR) << "Failed to parse textproto: " << kTestResponse;
     }
     test_response_raw_proto_ = CordMessageData(test_response_proto_.SerializeAsCord());
     response_type_ = type_finder_("type.googleapis.com/"
-                                  "logging.TestResponse");
+                                  "extraction.TestResponse");
 
     labels_.clear();
   }
@@ -179,6 +206,9 @@ protected:
   // A TypeHelper for testing.
   std::unique_ptr<TypeHelper> type_helper_ = nullptr;
 
+  std::unique_ptr<Protobuf::DescriptorPool> descriptor_pool_ =
+      std::make_unique<Protobuf::DescriptorPool>();
+
   std::function<const Type*(const std::string&)> type_finder_;
 
   TestRequest test_request_proto_;
@@ -194,34 +224,32 @@ protected:
   Envoy::Protobuf::Map<std::string, std::string> labels_;
 };
 
-TEST_F(AuditLoggingUtilTest, IsEmptyStruct_EmptyStruct) {
+TEST_F(ExtractionUtilTest, IsEmptyStruct_EmptyStruct) {
   ProtobufWkt::Struct message_struct;
   message_struct.mutable_fields()->insert({kTypeProperty, ProtobufWkt::Value()});
   EXPECT_TRUE(IsEmptyStruct(message_struct));
 }
 
-TEST_F(AuditLoggingUtilTest, IsEmptyStruct_NonEmptyStruct) {
+TEST_F(ExtractionUtilTest, IsEmptyStruct_NonEmptyStruct) {
   ProtobufWkt::Struct message_struct;
   message_struct.mutable_fields()->insert({kTypeProperty, ProtobufWkt::Value()});
   message_struct.mutable_fields()->insert({"another_field", ProtobufWkt::Value()});
   EXPECT_FALSE(IsEmptyStruct(message_struct));
 }
 
-TEST_F(AuditLoggingUtilTest, IsLabelName_ValidLabel) { EXPECT_TRUE(IsLabelName("{label}")); }
+TEST_F(ExtractionUtilTest, IsLabelName_ValidLabel) { EXPECT_TRUE(IsLabelName("{label}")); }
 
-TEST_F(AuditLoggingUtilTest, IsLabelName_EmptyString) { EXPECT_FALSE(IsLabelName("")); }
+TEST_F(ExtractionUtilTest, IsLabelName_EmptyString) { EXPECT_FALSE(IsLabelName("")); }
 
-TEST_F(AuditLoggingUtilTest, GetLabelName_RemovesCurlyBraces) {
+TEST_F(ExtractionUtilTest, GetLabelName_RemovesCurlyBraces) {
   EXPECT_EQ(GetLabelName("{test}"), "test");
 }
 
-TEST_F(AuditLoggingUtilTest, GetLabelName_NoCurlyBraces) {
-  EXPECT_EQ(GetLabelName("test"), "test");
-}
+TEST_F(ExtractionUtilTest, GetLabelName_NoCurlyBraces) { EXPECT_EQ(GetLabelName("test"), "test"); }
 
-TEST_F(AuditLoggingUtilTest, GetLabelName_EmptyString) { EXPECT_EQ(GetLabelName(""), ""); }
+TEST_F(ExtractionUtilTest, GetLabelName_EmptyString) { EXPECT_EQ(GetLabelName(""), ""); }
 
-TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_BasicExtraction) {
+TEST_F(ExtractionUtilTest, GetMonitoredResourceLabels_BasicExtraction) {
   GetMonitoredResourceLabels("project/*/bucket/{bucket}/object/{object}",
                              "project/myproject/bucket/mybucket/object/myobject", &labels_);
 
@@ -230,30 +258,30 @@ TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_BasicExtraction) {
   EXPECT_EQ(labels_["object"], "myobject");
 }
 
-TEST_F(AuditLoggingUtilTest, StringToDirectiveMap_CorrectMapping) {
+TEST_F(ExtractionUtilTest, StringToDirectiveMap_CorrectMapping) {
   const auto& map = StringToDirectiveMap();
 
   EXPECT_EQ(map.size(), 2);
-  EXPECT_EQ(map.at(kAuditRedact), AuditDirective::AUDIT_REDACT);
-  EXPECT_EQ(map.at(kAudit), AuditDirective::AUDIT);
+  EXPECT_EQ(map.at(kExtractRedact), ExtractedMessageDirective::EXTRACT_REDACT);
+  EXPECT_EQ(map.at(kExtract), ExtractedMessageDirective::EXTRACT);
 }
 
-TEST_F(AuditLoggingUtilTest, AuditDirectiveFromString_ValidDirective) {
-  auto directive = AuditDirectiveFromString(kAuditRedact);
+TEST_F(ExtractionUtilTest, ExtractedMessageDirectiveFromString_ValidDirective) {
+  auto directive = ExtractedMessageDirectiveFromString(kExtractRedact);
   ASSERT_TRUE(directive.has_value());
-  EXPECT_EQ(directive.value(), AuditDirective::AUDIT_REDACT);
+  EXPECT_EQ(directive.value(), ExtractedMessageDirective::EXTRACT_REDACT);
 
-  directive = AuditDirectiveFromString(kAudit);
+  directive = ExtractedMessageDirectiveFromString(kExtract);
   ASSERT_TRUE(directive.has_value());
-  EXPECT_EQ(directive.value(), AuditDirective::AUDIT);
+  EXPECT_EQ(directive.value(), ExtractedMessageDirective::EXTRACT);
 }
 
-TEST_F(AuditLoggingUtilTest, AuditDirectiveFromString_InvalidDirective) {
-  auto directive = AuditDirectiveFromString("invalid_directive");
+TEST_F(ExtractionUtilTest, ExtractedMessageDirectiveFromString_InvalidDirective) {
+  auto directive = ExtractedMessageDirectiveFromString("invalid_directive");
   EXPECT_FALSE(directive.has_value());
 }
 
-TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_MissingLabelsInResource) {
+TEST_F(ExtractionUtilTest, GetMonitoredResourceLabels_MissingLabelsInResource) {
   GetMonitoredResourceLabels("project/*/bucket/{bucket}/object/{object}",
                              "project/myproject/bucket/mybucket", &labels_);
 
@@ -262,7 +290,7 @@ TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_MissingLabelsInResource)
   EXPECT_EQ(labels_.find("object"), labels_.end());
 }
 
-TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_ExtraSegmentsInResource) {
+TEST_F(ExtractionUtilTest, GetMonitoredResourceLabels_ExtraSegmentsInResource) {
   GetMonitoredResourceLabels("project/*/bucket/{bucket}/object/{object}",
                              "project/myproject/bucket/mybucket/object/myobject/extra", &labels_);
 
@@ -271,25 +299,50 @@ TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_ExtraSegmentsInResource)
   EXPECT_EQ(labels_["object"], "myobject");
 }
 
-TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_WithNoLabels) {
+TEST_F(ExtractionUtilTest, GetMonitoredResourceLabels_WithNoLabels) {
   GetMonitoredResourceLabels("project/*/bucket/*/object/*",
                              "project/myproject/bucket/mybucket/object/myobject", &labels_);
 
   EXPECT_EQ(labels_.size(), 0);
 }
 
-TEST_F(AuditLoggingUtilTest, GetMonitoredResourceLabels_EmptyLabelExtractor) {
+TEST_F(ExtractionUtilTest, GetMonitoredResourceLabels_EmptyLabelExtractor) {
   GetMonitoredResourceLabels("", "project/myproject/bucket/mybucket/object/myobject", &labels_);
 
   EXPECT_EQ(labels_.size(), 0);
 }
 
-TEST_F(AuditLoggingUtilTest, RedactStructRecursively_EmptyPath) {
+TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_EmptyLastValue) {
+  Field field;
+  field.set_name("id");
+  field.set_number(1);
+  field.set_kind(Field::TYPE_INT64);
+
+  absl::StatusOr<std::string> st = SingularFieldUseLastValue(
+      "first_value", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  EXPECT_TRUE(st.ok());
+  EXPECT_EQ(st.value(), "first_value");
+}
+
+TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_NonEmptyLastValue) {
+  Field field;
+  field.set_name("repeated_strings");
+  field.set_number(3);
+  field.set_kind(Field::TYPE_STRING);
+  field.set_cardinality(Field::CARDINALITY_REPEATED);
+
+  absl::StatusOr<std::string> st = SingularFieldUseLastValue(
+      "", &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
+  EXPECT_TRUE(st.ok());
+  EXPECT_EQ(st.value(), "repeated-string-0");
+}
+
+TEST_F(ExtractionUtilTest, RedactStructRecursively_EmptyPath) {
   Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
   EXPECT_TRUE(RedactStructRecursively({}, {}, &message_struct).ok());
 }
 
-TEST_F(AuditLoggingUtilTest, RedactStructRecursively_InvalidPath) {
+TEST_F(ExtractionUtilTest, RedactStructRecursively_InvalidPath) {
   Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"invalid", "path_end"};
   EXPECT_TRUE(
@@ -302,7 +355,7 @@ TEST_F(AuditLoggingUtilTest, RedactStructRecursively_InvalidPath) {
   EXPECT_TRUE(level2_field.has_struct_value());
 }
 
-TEST_F(AuditLoggingUtilTest, RedactStructRecursively_ValidPath) {
+TEST_F(ExtractionUtilTest, RedactStructRecursively_ValidPath) {
   Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"level1", "level2"};
   EXPECT_TRUE(
@@ -315,7 +368,7 @@ TEST_F(AuditLoggingUtilTest, RedactStructRecursively_ValidPath) {
   EXPECT_TRUE(level2_field.has_struct_value());
 }
 
-TEST_F(AuditLoggingUtilTest, RedactStructRecursively_MissingIntermediateField) {
+TEST_F(ExtractionUtilTest, RedactStructRecursively_MissingIntermediateField) {
   Struct message_struct = CreateNestedStruct({"level1"}, "value");
   std::vector<std::string> path_pieces = {"level1", "level2"};
   EXPECT_TRUE(
@@ -328,94 +381,56 @@ TEST_F(AuditLoggingUtilTest, RedactStructRecursively_MissingIntermediateField) {
   EXPECT_TRUE(level2_field.has_struct_value());
 }
 
-TEST_F(AuditLoggingUtilTest, RedactStructRecursively_EmptyPathPiece) {
+TEST_F(ExtractionUtilTest, RedactStructRecursively_EmptyPathPiece) {
   Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"level1", ""};
   EXPECT_EQ(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct),
             absl::InvalidArgumentError("path piece cannot be empty."));
 }
 
-TEST_F(AuditLoggingUtilTest, RedactStructRecursively_NullptrMessageStruct) {
+TEST_F(ExtractionUtilTest, RedactStructRecursively_NullptrMessageStruct) {
   std::vector<std::string> path_pieces = {"level1"};
   EXPECT_EQ(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), nullptr),
             absl::InvalidArgumentError("message_struct cannot be nullptr."));
 }
 
-TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_EmptyPath) {
-  EXPECT_EQ(
-      IsMessageFieldPathPresent(*request_type_, type_finder_, "", test_request_raw_proto_).status(),
-      absl::InvalidArgumentError("Field path cannot be empty."));
-}
-
-TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_EmptyType) {
-  Type empty_type;
-  EXPECT_EQ(
-      IsMessageFieldPathPresent(empty_type, type_finder_, "id", test_request_raw_proto_).status(),
-      absl::InvalidArgumentError("Cannot find field 'id' in '' message."));
-}
-
-TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_InvalidPath) {
-  EXPECT_EQ(IsMessageFieldPathPresent(*request_type_, type_finder_, "invalid_path",
-                                      test_request_raw_proto_)
-                .status(),
-            absl::InvalidArgumentError(
-                "Cannot find field 'invalid_path' in 'logging.TestRequest' message."));
-}
-
-TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_ValidPath) {
-  EXPECT_TRUE(
-      IsMessageFieldPathPresent(*request_type_, type_finder_, "bucket", test_request_raw_proto_)
-          .status()
-          .ok());
-}
-
-TEST_F(AuditLoggingUtilTest, IsMessageFieldPathPresent_NotMessageField) {
-  EXPECT_EQ(IsMessageFieldPathPresent(*request_type_, type_finder_, "repeated_strings",
-                                      test_request_raw_proto_)
-                .status(),
-            absl::InvalidArgumentError("Field 'repeated_strings' is not a message type field."));
-}
-
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_bytes) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_bytes) {
   EXPECT_EQ(3,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("bucket.objects"), test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, FindSingularLastValue_SingleStringField) {
+TEST_F(ExtractionUtilTest, FindSingularLastValue_SingleStringField) {
   Field field;
   field.set_name("id");
   field.set_number(1);
   field.set_kind(Field::TYPE_INT64);
 
-  std::string data = "123445";
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
   ASSERT_TRUE(result.ok());
   EXPECT_EQ(result.value(), "");
 }
 
-TEST_F(AuditLoggingUtilTest, FindSingularLastValue_RepeatedStringField) {
+TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedStringField) {
   Field field;
   field.set_name("repeated_strings");
   field.set_number(3);
   field.set_kind(Field::TYPE_STRING);
   field.set_cardinality(Field::CARDINALITY_REPEATED);
 
-  std::string data = "repeated-string-0";
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(result.value(), "repeated-string-0");
 }
 
-TEST_F(AuditLoggingUtilTest, FindSingularLastValue_RepeatedMessageField) {
+TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedMessageField) {
   Field field;
   field.set_name("bucket");
   field.set_number(2);
   field.set_kind(Field::TYPE_STRING);
 
-  std::string data = "test-bucket";
   auto result = FindSingularLastValue(
       &field, &test_request_raw_proto_.CreateCodedInputStreamWrapper()->Get());
   ASSERT_TRUE(result.ok());
@@ -424,7 +439,7 @@ TEST_F(AuditLoggingUtilTest, FindSingularLastValue_RepeatedMessageField) {
       "\n\vtest-bucket\x15\xCD\xCCL?\x1A\rtest-object-1\x1A\rtest-object-2\x1A\rtest-object-3");
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_string) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_string) {
   EXPECT_EQ(1, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_strings"),
                                         test_request_raw_proto_));
@@ -433,17 +448,17 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_string) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_message) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_message) {
   EXPECT_EQ(2, ExtractRepeatedFieldSize(*response_type_, type_finder_, GetFieldMaskWith("buckets"),
                                         test_response_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_map) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_map) {
   EXPECT_EQ(2, ExtractRepeatedFieldSize(*response_type_, type_finder_,
                                         GetFieldMaskWith("sub_buckets"), test_response_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_enum) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_enum) {
   EXPECT_EQ(4,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_enum"), test_request_raw_proto_));
@@ -452,7 +467,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_enum) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_double) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_double) {
   EXPECT_EQ(1,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_double"), test_request_raw_proto_));
@@ -461,7 +476,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_double) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_float) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_float) {
   EXPECT_EQ(2,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_float"), test_request_raw_proto_));
@@ -470,7 +485,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_float) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_int64) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_int64) {
   EXPECT_EQ(3,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_int64"), test_request_raw_proto_));
@@ -479,7 +494,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_int64) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_uint64) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_uint64) {
   EXPECT_EQ(4,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_uint64"), test_request_raw_proto_));
@@ -488,7 +503,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_uint64) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_int32) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_int32) {
   EXPECT_EQ(5,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_int32"), test_request_raw_proto_));
@@ -497,7 +512,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_int32) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_fixed64) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_fixed64) {
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_fixed64"),
                                         test_request_raw_proto_));
@@ -506,7 +521,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_fixed64) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_fixed32) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_fixed32) {
   EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_fixed32"),
                                         test_request_raw_proto_));
@@ -515,7 +530,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_fixed32) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_bool) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_bool) {
   EXPECT_EQ(5,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_bool"), test_request_raw_proto_));
@@ -525,7 +540,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_bool) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_uint32) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_uint32) {
   EXPECT_EQ(8,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_uint32"), test_request_raw_proto_));
@@ -534,7 +549,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_uint32) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sfixed64) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_sfixed64) {
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_sfixed64"),
                                         test_request_raw_proto_));
@@ -543,7 +558,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sfixed64) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sfixed32) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_sfixed32) {
   EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                         GetFieldMaskWith("repeated_sfixed32"),
                                         test_request_raw_proto_));
@@ -552,7 +567,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sfixed32) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sint32) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_sint32) {
   EXPECT_EQ(5,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_sint32"), test_request_raw_proto_));
@@ -561,7 +576,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sint32) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sint64) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_sint64) {
   EXPECT_EQ(6,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("repeated_sint64"), test_request_raw_proto_));
@@ -570,7 +585,7 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_sint64) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_DefaultValue) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_DefaultValue) {
   test_request_proto_.clear_repeated_strings();
   test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
   EXPECT_EQ(0, ExtractRepeatedFieldSize(*request_type_, type_finder_,
@@ -578,19 +593,19 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_OK_DefaultValue) {
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_EmptyPath) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_EmptyPath) {
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, GetFieldMaskWith(""),
                                      test_request_raw_proto_),
             0);
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonRepeatedField) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NonRepeatedField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, GetFieldMaskWith("bucket.ratio"),
                                      test_request_raw_proto_),
             0);
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_UnknownField) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_UnknownField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("bucket.unknown"), test_request_raw_proto_),
             0);
@@ -603,21 +618,21 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_UnknownField) {
             0);
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonLeafPrimitiveTypeField) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NonLeafPrimitiveTypeField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
                                      GetFieldMaskWith("bucket.name.unknown"),
                                      test_request_raw_proto_),
             0);
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonLeafMapField) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NonLeafMapField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*response_type_, type_finder_,
                                      GetFieldMaskWith("sub_buckets.objects"),
                                      test_response_raw_proto_),
             0);
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonLeafRepeatedField) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NonLeafRepeatedField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*response_type_, type_finder_,
                                      GetFieldMaskWith("buckets.name"), test_response_raw_proto_),
             0);
@@ -626,24 +641,24 @@ TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NonLeafRepeatedField
             0);
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_Error_NullptrFieldMask) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NullptrFieldMask) {
   EXPECT_GT(
       0, ExtractRepeatedFieldSize(*request_type_, type_finder_, nullptr, test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractRepeatedFieldSize_EmptyFieldMask) {
+TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_EmptyFieldMask) {
   FieldMask field_mask;
   EXPECT_GT(0, ExtractRepeatedFieldSize(*request_type_, type_finder_, &field_mask_,
                                         test_request_raw_proto_));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_OK) {
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK) {
   EXPECT_THAT(
       ExtractStringFieldValue(*request_type_, type_finder_, "bucket.name", test_request_raw_proto_),
       IsOkAndHolds("test-bucket"));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
   test_request_proto_.mutable_bucket()->clear_name();
   test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
   EXPECT_THAT(
@@ -657,12 +672,12 @@ TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_OK_DefaultValue) {
       IsOkAndHolds(""));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_EmptyPath) {
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_EmptyPath) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "", test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_UnknownField) {
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_UnknownField) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "bucket.unknown",
                                       test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
@@ -676,13 +691,13 @@ TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_UnknownField) {
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_RepeatedStringLeafNode) {
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_RepeatedStringLeafNode) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "repeated_strings",
                                       test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_NonStringLeafNode) {
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_NonStringLeafNode) {
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, type_finder_, "bucket.ratio",
                                       test_request_raw_proto_),
               StatusIs(absl::StatusCode::kInvalidArgument));
@@ -692,7 +707,7 @@ TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_NonStringLeafNode) {
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
+TEST_F(ExtractionUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
   auto invalid_type_finder = [](absl::string_view /*type_url*/) { return nullptr; };
 
   EXPECT_THAT(ExtractStringFieldValue(*request_type_, invalid_type_finder, "bucket.ratio",
@@ -700,7 +715,120 @@ TEST_F(AuditLoggingUtilTest, ExtractStringFieldValue_Error_InvalidTypeFinder) {
               StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST(StructUtilTest, RedactPaths_Basic) {
+TEST_F(ExtractionUtilTest, ScrubToStruct_Success) {
+  TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
+    id: 123445
+    bucket {
+      ratio: 0.8
+      objects: "test-object-1"
+      objects: "test-object-2"
+      objects: "test-object-3"
+    }
+  )pb");
+
+  std::vector<std::string> paths = {"bucket.name", "bucket.ratio"};
+
+  FieldMaskPathChecker field_checker(request_type_, type_finder_);
+  ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
+  ProtoScrubber proto_scrubber(request_type_, type_finder_, {&field_checker},
+                               ScrubberContext::kTestScrubbing);
+
+  CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
+  Struct actual_struct;
+
+  EXPECT_TRUE(
+      ScrubToStruct(&proto_scrubber, *request_type_, *type_helper_, &raw_proto, &actual_struct));
+}
+
+TEST_F(ExtractionUtilTest, ScrubToStruct_NullptrScrubber) {
+  TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
+    id: 123445
+    bucket {
+      ratio: 0.8
+      objects: "test-object-1"
+      objects: "test-object-2"
+      objects: "test-object-3"
+    }
+  )pb");
+
+  CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
+  Struct actual_struct;
+
+  EXPECT_FALSE(ScrubToStruct(nullptr /*scrubber*/, *request_type_, *type_helper_, &raw_proto,
+                             &actual_struct));
+}
+
+TEST_F(ExtractionUtilTest, ScrubToStruct_InvalidMessageData) {
+  std::vector<std::string> paths = {"bucket.name", "bucket.ratio"};
+
+  FieldMaskPathChecker field_checker(request_type_, type_finder_);
+  ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
+  ProtoScrubber proto_scrubber(request_type_, type_finder_, {&field_checker},
+                               ScrubberContext::kTestScrubbing);
+
+  absl::Cord cord("some_data");
+  CordMessageData raw_proto = CordMessageData(cord);
+  Struct actual_struct;
+
+  EXPECT_FALSE(
+      ScrubToStruct(&proto_scrubber, *request_type_, *type_helper_, &raw_proto, &actual_struct));
+}
+
+TEST_F(ExtractionUtilTest, ScrubToStruct_Failure) {
+  TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
+    id: 123445
+    bucket {
+      ratio: 0.8
+      objects: "test-object-1"
+      objects: "test-object-2"
+      objects: "test-object-3"
+    }
+  )pb");
+
+  std::vector<std::string> paths = {"bucket.ratio"};
+
+  FieldMaskPathChecker field_checker(request_type_, type_finder_);
+  ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
+
+  ProtoScrubber proto_scrubber(response_type_, type_finder_, {&field_checker},
+                               ScrubberContext::kTestScrubbing);
+
+  CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
+  Struct actual_struct;
+
+  EXPECT_FALSE(
+      ScrubToStruct(&proto_scrubber, *request_type_, *type_helper_, &raw_proto, &actual_struct));
+}
+
+TEST_F(ExtractionUtilTest, ScrubToStruct_InvalidTypeHelper) {
+  TestRequest expected_proto = ::ocpdiag::testing::ParseTextProtoOrDie(R"pb(
+    id: 123445
+    bucket {
+      ratio: 0.8
+      objects: "test-object-1"
+      objects: "test-object-2"
+      objects: "test-object-3"
+    }
+  )pb");
+
+  std::vector<std::string> paths = {"bucket.name", "bucket.ratio"};
+
+  FieldMaskPathChecker field_checker(request_type_, type_finder_);
+  ASSERT_OK(field_checker.AddOrIntersectFieldPaths(paths));
+  ProtoScrubber proto_scrubber(request_type_, type_finder_, {&field_checker},
+                               ScrubberContext::kTestScrubbing);
+
+  CordMessageData raw_proto = CordMessageData(expected_proto.SerializeAsCord());
+  Struct actual_struct;
+
+  std::unique_ptr<TypeHelper> type_helper = std::make_unique<google::grpc::transcoding::TypeHelper>(
+      Protobuf::util::NewTypeResolverForDescriptorPool("", descriptor_pool_.get()));
+
+  EXPECT_FALSE(
+      ScrubToStruct(&proto_scrubber, *request_type_, *type_helper, &raw_proto, &actual_struct));
+}
+
+TEST(ExtractUtilTest, RedactPaths_Basic) {
   std::string proto_struct_string = "fields {"
                                     "  key: \"nested\""
                                     "  value {"
@@ -745,7 +873,7 @@ TEST(StructUtilTest, RedactPaths_Basic) {
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }
 
-TEST(StructUtilTest, RedactPaths_HandlesOneOfFields) {
+TEST(ExtractUtilTest, RedactPaths_HandlesOneOfFields) {
   std::string proto_struct_string = "fields {"
                                     "  key: \"nested_value\""
                                     "  value {"
@@ -776,7 +904,7 @@ TEST(StructUtilTest, RedactPaths_HandlesOneOfFields) {
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }
 
-TEST(StructUtilTest, RedactPaths_AllowsRepeatedLeafMessageType) {
+TEST(ExtractUtilTest, RedactPaths_AllowsRepeatedLeafMessageType) {
   std::string proto_struct_string = "fields {"
                                     "  key: \"repeated_message_field\""
                                     "  value {"
@@ -828,7 +956,7 @@ TEST(StructUtilTest, RedactPaths_AllowsRepeatedLeafMessageType) {
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }
 
-TEST(StructUtilTest, RedactPaths_AllowsRepeatedNonLeafMessageType) {
+TEST(ExtractUtilTest, RedactPaths_AllowsRepeatedNonLeafMessageType) {
   std::string proto_struct_string = "fields {"
                                     "  key: \"repeated_message_field\""
                                     "  value {"
@@ -955,7 +1083,7 @@ INSTANTIATE_TEST_SUITE_P(
     });
 
 } // namespace
-} // namespace ProtoMessageLogging
+} // namespace ProtoMessageExtraction
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

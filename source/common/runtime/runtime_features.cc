@@ -47,6 +47,7 @@ RUNTIME_GUARD(envoy_reloadable_features_exclude_host_in_eds_status_draining);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_timeout_error);
 RUNTIME_GUARD(envoy_reloadable_features_extend_h3_accept_untrusted);
 RUNTIME_GUARD(envoy_reloadable_features_gcp_authn_use_fixed_url);
+RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_num_retries);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_extension);
@@ -103,6 +104,7 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
 RUNTIME_GUARD(envoy_restart_features_allow_client_socket_creation_failure);
 RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
+RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
 RUNTIME_GUARD(envoy_restart_features_quic_handle_certs_with_shared_tls_code);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
@@ -151,6 +153,11 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change)
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
+
+// TODO(yanavlasov): Flip to true after prod testing.
+// Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
+// before downstream.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
