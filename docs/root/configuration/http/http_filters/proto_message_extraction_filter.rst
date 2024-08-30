@@ -1,6 +1,6 @@
 .. _config_http_filters_proto_message_extraction:
 
-Proto Message Extraction
+Proto message extraction
 ========================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
@@ -8,8 +8,8 @@ Proto Message Extraction
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig>`.
 
 ProtoMessageExtraction filter supports extracting gRPC
-requests/responses (proto messages) into google.protobuf.Struct and storing
-results in the dynamic metadata `envoy.filters.http.proto_message_extraction`
+requests/responses (proto messages) into ``google.protobuf.Struct`` and storing
+results in the dynamic metadata ``envoy.filters.http.proto_message_extraction``
 for later access.
 
 Use Case
@@ -17,7 +17,7 @@ Use Case
 
 The ProtoMessageExtraction filter is particularly useful in scenarios where
 sensitive or detailed logging of gRPC requests and responses is required.
-In Client-Side Streaming or Server-Side Streaming, the filter can store the
+In client-side streaming or server-side Streaming, the filter can store the
 first and last messages, which can later be used for logging or for obtaining
 a comprehensive view of the data flow.
 
@@ -51,8 +51,8 @@ Config Requirements
 Here are config requirements
 
 1. the extract target field should be among the following primitive types:
-`string`, `uint32`, `uint64`, `int32`, `int64`, `sint32`, `sint64`,
-`fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `float`, `double`.
+``string``, ``uint32``, ``uint64``, ``int32``, ``int64``, ``sint32``, ``sint64``,
+``fixed32``, ``fixed64``, ``sfixed32``, ``sfixed64``, ``float``, ``double``.
 
 2. the target field could be repeated.
 
@@ -64,21 +64,24 @@ Output Format
 The extracted requests and responses will be  will be added in the dynamic
 ``metadata<google.protobuf.Struct>`` with the same layout of the message.
 
-For the default `FIRST_AND_LAST` mode, the output will be like:
+For the default ``FIRST_AND_LAST`` mode, the output will be like:
 
 Case: Non-Streaming requests/response
 
 .. code-block:: json
+   :force:
 
   {
     "requests":{
        "first":{
           "foo": "val_foo1",
+          ...
        }
     },
     "responses":{
        "first":{
           "baz": "val_baz1",
+          ...
        }
     }
   }
@@ -87,22 +90,27 @@ Case: Non-Streaming requests/response
 Case: Streaming requests/response
 
 .. code-block:: json
+   :force:
 
   {
     "requests":{
        "first":{
           "foo": "val_foo1",
+          ...
        }
        "last":{
           "foo": "val_foo3",
+          ...
        }
     },
     "responses":{
        "first":{
           "baz": "val_baz1",
+          ...
        }
        "last":{
           "baz": "val_foo3",
+          ...
        }
     }
   }
