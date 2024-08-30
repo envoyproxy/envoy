@@ -12,7 +12,7 @@ requests/responses (proto messages) into ``google.protobuf.Struct`` and storing
 results in the dynamic metadata ``envoy.filters.http.proto_message_extraction``
 for later access.
 
-Use Case
+Use case
 --------
 
 The ProtoMessageExtraction filter is particularly useful in scenarios where
@@ -26,7 +26,7 @@ Assumptions
 
 This filter assumes it is only applicable for gRPC with Protobuf as payload.
 
-Process Flow
+Process flow
 ------------
 
 On the request and response path, it will check
@@ -45,7 +45,7 @@ modify the request or response. The filter extracts the specified fields,
 writes them to dynamic metadata, and then passes the request/response
 through without modification.
 
-Config Requirements
+Config requirements
 -------------------
 
 Here are config requirements
@@ -58,7 +58,7 @@ Here are config requirements
 
 3. the intermediate type could also be repeated.
 
-Output Format
+Output format
 -------------
 
 The extracted requests and responses will be  will be added in the dynamic
@@ -71,20 +71,20 @@ Case: Non-Streaming requests/response
 .. code-block:: json
    :force:
 
-  {
-    "requests":{
-       "first":{
-          "foo": "val_foo1",
-          ...
-       }
-    },
-    "responses":{
-       "first":{
-          "baz": "val_baz1",
-          ...
-       }
+    {
+      "requests":{
+         "first":{
+            "foo": "val_foo1",
+            ...
+         }
+      },
+      "responses":{
+         "first":{
+            "baz": "val_baz1",
+            ...
+         }
+      }
     }
-  }
 
 
 Case: Streaming requests/response
@@ -92,28 +92,28 @@ Case: Streaming requests/response
 .. code-block:: json
    :force:
 
-  {
-    "requests":{
-       "first":{
-          "foo": "val_foo1",
-          ...
-       }
-       "last":{
-          "foo": "val_foo3",
-          ...
-       }
-    },
-    "responses":{
-       "first":{
-          "baz": "val_baz1",
-          ...
-       }
-       "last":{
-          "baz": "val_foo3",
-          ...
-       }
+    {
+      "requests":{
+         "first":{
+            "foo": "val_foo1",
+            ...
+         }
+         "last":{
+            "foo": "val_foo3",
+            ...
+         }
+      },
+      "responses":{
+         "first":{
+            "baz": "val_baz1",
+            ...
+         }
+         "last":{
+            "baz": "val_foo3",
+            ...
+         }
+      }
     }
-  }
 
 For more details, please refer to the
 :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.proto_message_extraction.v3.ProtoMessageExtractionConfig>`.
