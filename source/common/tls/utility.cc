@@ -384,6 +384,31 @@ absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,
   return absl::nullopt;
 }
 
+std::vector<std::string> Utility::getCertificateExtensionOids(X509& cert) {
+  std::vector<std::string> extension_oids;
+
+  int count = X509_get_ext_count(&cert);
+  for (int pos = 0; pos < count; pos++) {
+    X509_EXTENSION* extension = X509_get_ext(&cert, pos);
+    if (extension == nullptr) {
+      continue;
+    }
+
+    ASN1_OBJECT* obj = X509_EXTENSION_get_object(extension);
+    if (extension == nullptr) {
+      continue;
+    }
+
+    char oid[256];
+    int len = OBJ_obj2txt(oid, sizeof(oid), obj, 1); // Use 1 for always_return_oid
+    if (len <= 0) {
+      continue;
+    }
+    extension_oids.push_back(oid);
+  }
+  return extension_oids;
+}
+
 absl::string_view Utility::getCertificateExtensionValue(X509& cert,
                                                         absl::string_view extension_name) {
   bssl::UniquePtr<ASN1_OBJECT> oid(

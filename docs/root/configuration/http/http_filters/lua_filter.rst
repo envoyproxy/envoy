@@ -1100,6 +1100,26 @@ dnsSansLocalCertificate()
 Returns the DNS entries (as a table) in the SAN field of the local certificate. Returns an empty
 table if there is no local certificate, or no SAN field, or no DNS SAN entries.
 
+oidsPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:oidsPeerCertificate()
+
+Returns the OIDs (ASN.1 Object Identifiers) of the peer certificate. Returns an empty table if
+there is no peer certificate or no OIDs.
+
+oidsLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:oidsLocalCertificate()
+
+Returns the OIDs (ASN.1 Object Identifiers) of the peer certificate. Returns an empty table if
+there is no peer certificate or no OIDs.
+
 validFromPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 

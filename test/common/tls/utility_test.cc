@@ -171,6 +171,33 @@ TEST(UtilityTest, GetLastCryptoError) {
   EXPECT_FALSE(Utility::getLastCryptoError().has_value());
 }
 
+TEST(UtilityTest, TestGetCertificateExtensionOids) {
+  const std::string test_data_path = "{{ test_rundir }}/test/common/tls/test_data/";
+  const std::vector<std::pair<std::string, int>> test_set = {
+      {"unittest_cert.pem", 1},
+      {"san_wildcard_dns_cert.pem", 6},
+      {"extensions_cert.pem", 7},
+  };
+
+  for (const auto& test_case : test_set) {
+    bssl::UniquePtr<X509> cert =
+        readCertFromFile(TestEnvironment::substitute(test_data_path + test_case.first));
+    const auto& extension_oids = Utility::getCertificateExtensionOids(*cert);
+    EXPECT_EQ(test_case.second, extension_oids.size());
+  }
+
+  bssl::UniquePtr<X509> cert =
+      readCertFromFile(TestEnvironment::substitute(test_data_path + "extensions_cert.pem"));
+  // clang-format off
+  std::vector<std::string> expected_oids{
+      "2.5.29.14", "2.5.29.15", "2.5.29.19",
+      "2.5.29.35", "2.5.29.37",
+      "1.2.3.4.5.6.7.8", "1.2.3.4.5.6.7.9"};
+  // clang-format on
+  const auto& extension_oids = Utility::getCertificateExtensionOids(*cert);
+  EXPECT_THAT(extension_oids, testing::UnorderedElementsAreArray(expected_oids));
+}
+
 TEST(UtilityTest, TestGetCertificationExtensionValue) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/tls/test_data/extensions_cert.pem"));
