@@ -339,7 +339,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       return absl::OkStatus();
     }
 
-    if (should_continue) {
+    if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
       continueIfNecessary();
     }
     return absl::OkStatus();
