@@ -50,6 +50,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mUseCares = false;
+  private boolean mForceV6 = true;
   private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
@@ -94,6 +95,16 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setUseCares(boolean enable) {
     mUseCares = enable;
+    return this;
+  }
+
+  /**
+   * Set whether to map v4 address to v6.
+   *
+   * @param enable If true, map v4 address to v6.
+   */
+  public NativeCronvoyEngineBuilderImpl setForceV6(boolean enable) {
+    mForceV6 = enable;
     return this;
   }
 
@@ -265,8 +276,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro,
-        quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
+        mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mForceV6,
+        mUseGro, quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
         quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(),
         mEnableSocketTag, mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
