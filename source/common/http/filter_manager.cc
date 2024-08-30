@@ -1334,7 +1334,6 @@ void FilterManager::encodeMetadata(ActiveStreamEncoderFilter* filter,
     //   // the client.
     //   return;
     // }
-
     if (stopEncoderFilterChain()) {
       return;
     }
