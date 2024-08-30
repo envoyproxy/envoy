@@ -484,7 +484,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string escaped_url =
       Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
 
-  const std::string state = absl::StrCat("url=", escaped_path, "&nounce=", nounce);
+  const std::string state = absl::StrCat("url=", escaped_url, "&nounce=", nounce);
   const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
