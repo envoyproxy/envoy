@@ -399,8 +399,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   auth_code_ = codeVal.value();
   std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
-  std::cout << "xxxxxx  state: " << state << std::endl;
-  const auto state_parameters = Http::Utility::QueryParamsMulti::parseQueryString(state);
+  std::cout << "xxxxxx  statexx: " << state << std::endl;
+  const auto state_parameters = Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
   // if the data we need is not present on the URL, stop execution
   auto urlVal = state_parameters.getFirstValue("url");
   auto nounceVal = state_parameters.getFirstValue("nounce");
@@ -409,8 +409,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+
   // if the URL in the state is not valid, stop execution
-  state_url_ = Http::Utility::PercentEncoding::urlDecodeQueryParameter(urlVal.value());
+  state_url_ = urlVal.value();
   Http::Utility::Url url;
   if (!url.initialize(state_url_, false)) {
     sendUnauthorizedResponse();
@@ -421,13 +422,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const auto nounce = nounceVal.value();
   const auto nounce_cookie = Http::Utility::parseCookies(
       headers, [](absl::string_view key) { return key == "OauthNounce"; });
-  std::cout << "xxxxxx nounce state: " << nounce << std::endl;
-  std::cout << "xxxxxx nounce cookie: " << nounce_cookie.at("OauthNounce") << std::endl;
   if (nounce_cookie.find("OauthNounce") == nounce_cookie.end() ||
       nounce != nounce_cookie.at("OauthNounce")) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
+  std::cout << "xxxxxx nounce state: " << nounce << std::endl;
+  std::cout << "xxxxxx nounce cookie: " << nounce_cookie.at("OauthNounce") << std::endl;
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
   const auto redirect_uri =
@@ -494,12 +495,13 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string escaped_url = Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
 
   std::string nounce;
+  bool nounce_cookie_exists = false;
   const auto nounce_cookie = Http::Utility::parseCookies(
       headers, [](absl::string_view key) { return key == "OauthNounce"; });
-  std::cout << "xxxxxx nounce cookie: " << nounce_cookie.at("OauthNounce") << std::endl;
-  if (nounce_cookie.find("OauthNounce") != nounce_cookie.end()){
+  if (nounce_cookie.find("OauthNounce") != nounce_cookie.end()) {
     nounce = nounce_cookie.at("OauthNounce");
-  }else{
+    nounce_cookie_exists = true;
+  } else {
     nounce = std::to_string(time_source_.systemTime().time_since_epoch().count());
   }
 
@@ -524,11 +526,14 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
 
   response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
 
-  // set the nounce cookie
-  std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat("OauthNounce", "=", nounce, cookie_tail_http_only));
+  // set the nounce cookie if it does not exist
+  // TODO add expiration time to the nounce cookie
+  if (!nounce_cookie_exists) {
+    std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
+    response_headers->addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat("OauthNounce", "=", nounce, cookie_tail_http_only));
+  }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
