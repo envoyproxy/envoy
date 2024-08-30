@@ -60,7 +60,12 @@ private:
         return;
       }
       callbacks.addStreamFilter(filter);
-      callbacks.addAccessLogHandler(filter);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prepend_access_log_handler")) {
+        callbacks.prependAccessLogHandler(filter);
+      }
+      else {
+        callbacks.addAccessLogHandler(filter);
+      }
     };
   }
 };
