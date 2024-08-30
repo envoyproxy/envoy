@@ -498,7 +498,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenRetryPolicy) {
   client_ = std::make_shared<OAuth2ClientImpl>(cm_, uri, retry_policy, 2000s);
 
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(Invoke(
+      .WillOnce(Invoke(
           [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_TRUE(options.retry_policy.has_value());
