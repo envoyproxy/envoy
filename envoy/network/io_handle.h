@@ -66,6 +66,12 @@ public:
   virtual bool isOpen() const PURE;
 
   /**
+   * Return true if the socket has had connect() successfully called on it.
+   * Use isOpen() to check if the socket is still connected or not.
+   */
+  virtual bool wasConnected() const PURE;
+
+  /**
    * Read data into given slices.
    * @param max_length supplies the maximum length to read.
    * @param slices points to the output location.

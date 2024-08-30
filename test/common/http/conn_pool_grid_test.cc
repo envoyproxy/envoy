@@ -1413,24 +1413,8 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   ASSERT_TRUE(pool != nullptr);
   EXPECT_EQ("HTTP/3", pool->protocolDescription());
 
-  const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
-  Api::InterfaceAddressVector interfaces{};
-  if (supports_getifaddrs) {
-    ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
-  }
-
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(supports_getifaddrs));
-  if (supports_getifaddrs) {
-    EXPECT_CALL(os_sys_calls, getifaddrs(_))
-        .WillOnce(
-            Invoke([&](Api::InterfaceAddressVector& interface_vector) -> Api::SysCallIntResult {
-              interface_vector.insert(interface_vector.begin(), interfaces.begin(),
-                                      interfaces.end());
-              return {0, 0};
-            }));
-  }
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
 #if defined(__APPLE__) || defined(WIN32)
   EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
@@ -1439,7 +1423,16 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
       .Times(testing::AtLeast(0u))
       .WillRepeatedly(Return(0));
-  EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
+  EXPECT_CALL(os_sys_calls, connect(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+        sockaddr_in* addr_in = reinterpret_cast<sockaddr_in*>(addr);
+        addr_in->sin_family = AF_INET;
+        addr_in->sin_port = 0;
+        inet_pton(AF_INET, "127.0.0.1", &addr_in->sin_addr.s_addr);
+        *addrlen = sizeof(sockaddr_in);
+        return Api::SysCallIntResult{0, 0};
+      }));
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
 
@@ -1448,7 +1441,8 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
                                                          /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancel);
 
-  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
+  // When there is only 1 slice, the IoHandle's writev method will call the `send` system call.
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
   EXPECT_CALL(callbacks_.pool_failure_, ready());
   async_connect_callback->invokeCallback();
 }

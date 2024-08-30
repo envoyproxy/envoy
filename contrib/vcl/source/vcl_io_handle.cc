@@ -166,6 +166,8 @@ Api::IoCallUint64Result VclIoHandle::close() {
 
 bool VclIoHandle::isOpen() const { return VCL_SH_VALID(sh_); }
 
+bool VclIoHandle::wasConnected() const { return false; }
+
 Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                            uint64_t num_slice) {
   if (!VCL_SH_VALID(sh_)) {

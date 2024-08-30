@@ -2101,7 +2101,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   }
   auto listener_port = lookupPort("http");
 
-  // Setup DNAT for 0.0.0.0:12345-->127.0.0.2:listener_port
+  // Setup DNAT for 1.2.3.4:12345-->127.0.0.2:listener_port
   socket_swap.write_matcher_->setDnat(
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 12345),
       Network::Utility::parseInternetAddressNoThrow("127.0.0.2", listener_port));
