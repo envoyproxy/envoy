@@ -517,7 +517,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
 
   // set the nounce cookie
   std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
-  response_headers.addReferenceKey(Http::Headers::get().SetCookie,
+  response_headers->addReferenceKey(Http::Headers::get().SetCookie,
                           absl::StrCat("OauthNounce", "=", nounce, cookie_tail_http_only));
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
