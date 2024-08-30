@@ -423,10 +423,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
   const auto nounce = nounceVal.value();
   const auto nounce_cookie = Http::Utility::parseCookies(
-      headers, [](absl::string_view key) { return key == "OauthNounce"; });
+      headers, [](absl::string_view key) { return key == "Oauthnounce"; });
 
-  if (nounce_cookie.find("OauthNounce") == nounce_cookie.end() ||
-      nounce != nounce_cookie.at("OauthNounce")) {
+  if (nounce_cookie.find("Oauthnounce") == nounce_cookie.end() ||
+      nounce != nounce_cookie.at("Oauthnounce")) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -499,9 +499,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   std::string nounce;
   bool nounce_cookie_exists = false;
   const auto nounce_cookie = Http::Utility::parseCookies(
-      headers, [](absl::string_view key) { return key == "OauthNounce"; });
-  if (nounce_cookie.find("OauthNounce") != nounce_cookie.end()) {
-    nounce = nounce_cookie.at("OauthNounce");
+      headers, [](absl::string_view key) { return key == "Oauthnounce"; });
+  if (nounce_cookie.find("Oauthnounce") != nounce_cookie.end()) {
+    nounce = nounce_cookie.at("Oauthnounce");
     nounce_cookie_exists = true;
   } else {
     nounce = std::to_string(time_source_.systemTime().time_since_epoch().count());
@@ -537,7 +537,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat("OauthNounce", "=", nounce, cookie_tail_http_only));
+        absl::StrCat("Oauthnounce", "=", nounce, cookie_tail_http_only));
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
