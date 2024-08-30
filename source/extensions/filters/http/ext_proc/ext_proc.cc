@@ -570,16 +570,15 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = setupBodyChunk(state, data, end_stream);
     state.enqueueStreamingChunk(data, end_stream);
-    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
 
-    // At this point we will continue, but with no data, because that will come later
-    if (end_stream) {
-      // But we need to stop iteration for the last chunk because it's our last chance to do stuff
+    if (end_stream || state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
       result = FilterDataStatus::Continue;
     }
+    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
+
     break;
   }
   case ProcessingMode::BUFFERED_PARTIAL:

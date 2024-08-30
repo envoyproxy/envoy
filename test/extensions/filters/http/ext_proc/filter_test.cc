@@ -4069,7 +4069,7 @@ TEST_F(HttpFilterTest, HeaderRespReceivedAfterBodySent) {
   for (int i = 0; i < 5; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
   // Header response arrives after some amount of body data sent.
@@ -4158,7 +4158,7 @@ TEST_F(HttpFilterTest, HeaderMutationInBodyResp) {
   for (int i = 0; i < 7; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
   // Send the 1st body response which include header response.
@@ -4237,7 +4237,7 @@ TEST_F(HttpFilterTest, HeaderRespWithStatusContinueAndReplace) {
   for (int i = 0; i < 5; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
   // Header response arrives after some amount of body data sent with status CONTINUE_AND_REPLACE.
@@ -4288,7 +4288,7 @@ TEST_F(HttpFilterTest, StreamedTestInBothDirection) {
   for (int i = 0; i < 5; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(resp_chunk, false));
   }
   // Send the last empty request chunk.
   Buffer::OwnedImpl last_req_chunk;
@@ -4315,7 +4315,7 @@ TEST_F(HttpFilterTest, StreamedTestInBothDirection) {
   for (int i = 0; i < 7; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
+    EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
   auto resp_response = std::make_unique<ProcessingResponse>();
