@@ -416,7 +416,19 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Validate the nounce TODO: zhaohuabing
+  // Validate the nounce matches the one in the cookie to prevent CSRF attacks
+  const auto nounce = nounceVal.value();
+  const auto nounce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
+    return key == "OauthNounce";
+  });
+  std::cout << "xxxxxx nounce state: " << nounce << std::endl;
+  std::cout << "xxxxxx nounce cookie: " <<  nounce_cookie.at("OauthNounce") << std::endl;
+  if (nounce_cookie.find("OauthNounce") == nounce_cookie.end() ||
+      nounce != nounce_cookie.at("OauthNounce")) {
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
   Formatter::FormatterImpl formatter(config_->redirectUri());
   const auto redirect_uri =
       formatter.formatWithContext({&headers}, decoder_callbacks_->streamInfo());
@@ -465,8 +477,6 @@ bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) con
 }
 
 void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const {
-  std::string nounce = std::to_string(time_source_.systemTime().time_since_epoch().count());
-
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
@@ -481,9 +491,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
 
   const std::string base_path = absl::StrCat(scheme, "://", host_);
   const std::string full_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
-  const std::string escaped_url =
-      Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
+  const std::string escaped_url = Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
 
+  std::string nounce = std::to_string(time_source_.systemTime().time_since_epoch().count());
   const std::string state = absl::StrCat("url=", escaped_url, "&nounce=", nounce);
   const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
 
@@ -504,9 +514,12 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string new_url = authorization_endpoint_url.toString();
 
   response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
-  // set the nounce cookie TODO: zhaohuabing
-  response_headers->addReferenceKey(Http::Headers::get().SetCookie,
-                                    fmt::format(CookieTailHttpOnlyFormatString, nounce));
+
+  // set the nounce cookie
+  std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expires_in_);
+  headers.addReferenceKey(Http::Headers::get().SetCookie,
+                          absl::StrCat("OauthNounce", "=", nounce, cookie_tail_http_only));
+
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
   config_->stats().oauth_unauthorized_rq_.inc();
