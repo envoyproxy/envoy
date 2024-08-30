@@ -62,8 +62,7 @@ private:
       callbacks.addStreamFilter(filter);
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prepend_access_log_handler")) {
         callbacks.prependAccessLogHandler(filter);
-      }
-      else {
+      } else {
         callbacks.addAccessLogHandler(filter);
       }
     };
