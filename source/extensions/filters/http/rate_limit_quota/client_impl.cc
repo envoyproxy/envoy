@@ -130,7 +130,8 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
         break;
       }
       default: {
-        ENVOY_LOG_EVERY_POW_2(error, "Unset bucket action type {}", action.bucket_action_case());
+        ENVOY_LOG_EVERY_POW_2(error, "Unset bucket action type {}",
+                              static_cast<int>(action.bucket_action_case()));
         break;
       }
       }

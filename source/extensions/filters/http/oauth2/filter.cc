@@ -208,6 +208,11 @@ FilterConfig::FilterConfig(
         fmt::format("OAuth2 filter: invalid authorization endpoint URL '{}' in config.",
                     authorization_endpoint_));
   }
+
+  if (proto_config.has_retry_policy()) {
+    retry_policy_ = Http::Utility::convertCoreToRouteRetryPolicy(
+        proto_config.retry_policy(), "5xx,gateway-error,connect-failure,reset");
+  }
 }
 
 FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
