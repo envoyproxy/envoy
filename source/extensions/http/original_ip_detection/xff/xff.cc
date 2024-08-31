@@ -14,8 +14,7 @@ XffIPDetection::XffIPDetection(
     : xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, skip_xff_append, true)) {
   if (config.has_xff_trusted_cidrs() && config.xff_num_trusted_hops() > 0) {
-    ENVOY_LOG(warn, "Both xff_num_trusted_hops and xff_trusted_cidrs are configured; only "
-                    "xff_trusted_cidrs will be used");
+    throwEnvoyExceptionOrPanic("Cannot set both xff_num_trusted_hops and xff_trusted_cidrs");
   }
   if (config.has_xff_trusted_cidrs()) {
     xff_trusted_cidrs_.reserve(config.xff_trusted_cidrs().cidrs().size());
