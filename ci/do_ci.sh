@@ -303,6 +303,7 @@ function bazel_envoy_api_go_build() {
 
 CI_TARGET=$1
 shift
+CI_PARAMS=("$@")
 
 if [[ "$CI_TARGET" =~ bazel.* ]]; then
     ORIG_CI_TARGET="$CI_TARGET"
@@ -1041,7 +1042,13 @@ case $CI_TARGET in
         ;;
 
     refresh_compdb)
-        "${CURRENT_SCRIPT_DIR}/../tools/vscode/refresh_compdb.sh"
+        if [[ -z "${SKIP_PROTO_FORMAT}" ]]; then
+            "${CURRENT_SCRIPT_DIR}/../tools/proto_format/proto_format.sh" fix
+        fi
+
+        "${CURRENT_SCRIPT_DIR}/../tools/gen_compilation_database.py" "${CI_PARAMS[@]}"
+        # Kill clangd to reload the compilation database
+        pkill clangd || :
         ;;
 
     *)
