@@ -16,6 +16,7 @@ configure_make(
         "nocompdb",
         "skip_on_windows",
     ],
+    targets = ["library", "install"],
 )
 
 envoy_cc_library(
