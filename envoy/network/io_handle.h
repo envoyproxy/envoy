@@ -5,6 +5,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls_common.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/file_event.h"
@@ -63,6 +64,12 @@ public:
    * Return true if close() hasn't been called.
    */
   virtual bool isOpen() const PURE;
+
+  /**
+   * Return true if the socket has had connect() successfully called on it.
+   * Use isOpen() to check if the socket is still connected or not.
+   */
+  virtual bool wasConnected() const PURE;
 
   /**
    * Read data into given slices.
@@ -134,6 +141,8 @@ public:
     bool truncated_and_dropped_{false};
     // The contents of the TOS byte in the IP header.
     uint8_t tos_{0};
+    // UDP control message specified by save_cmsg_config in QUIC config.
+    Buffer::RawSlice saved_cmsg_;
   };
 
   /**
@@ -160,6 +169,15 @@ public:
     absl::FixedArray<RecvMsgPerPacketInfo> msg_;
   };
 
+  // Struct representation of QuicProtocolOptions::SaveCmsgConfig config proto.
+  struct UdpSaveCmsgConfig {
+    absl::optional<uint32_t> level;
+    absl::optional<uint32_t> type;
+    uint32_t expected_size = 0;
+
+    bool hasConfig() const { return (level.has_value() && type.has_value()); }
+  };
+
   /**
    * Receive a message into given slices, output overflow, source/destination
    * addresses via passed-in parameters upon success.
@@ -167,12 +185,15 @@ public:
    * @param num_slice indicates number of slices |slices| contains.
    * @param self_port the port this handle is assigned to. This is used to populate
    * local_address because local port can't be retrieved from control message.
+   * @param save_cmsg_config config that determines whether cmsg is saved to output.
    * @param output modified upon each call to return fields requested in it.
    * @return a Api::IoCallUint64Result with err_ = an Api::IoError instance or
    * err_ = nullptr and rc_ = the bytes received for success.
    */
   virtual Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                          uint32_t self_port, RecvMsgOutput& output) PURE;
+                                          uint32_t self_port,
+                                          const UdpSaveCmsgConfig& save_cmsg_config,
+                                          RecvMsgOutput& output) PURE;
 
   /**
    * If the platform supports, receive multiple messages into given slices, output overflow,
@@ -180,9 +201,11 @@ public:
    * @param slices are the receive buffers for the messages. Each message
    * received are stored in an individual entry of |slices|.
    * @param self_port is the same as the one in recvmsg().
+   * @param save_cmsg_config config that determines whether cmsg is saved to output.
    * @param output is modified upon each call and each message received.
    */
   virtual Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                           const UdpSaveCmsgConfig& save_cmsg_config,
                                            RecvMsgOutput& output) PURE;
 
   /**

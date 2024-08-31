@@ -61,11 +61,12 @@ public:
         control_plane_stats_(Utility::generateControlPlaneStats(*stats_.rootScope())),
         control_plane_connected_state_(
             stats_.gauge("control_plane.connected_state", Stats::Gauge::ImportMode::NeverImport)),
-        should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified) {
+        should_use_unified_(legacy_or_unified == LegacyOrUnified::Unified),
+        using_xds_failover_(std::get<1>(GetParam())) {
     // Once "envoy.restart_features.xds_failover_support" is deprecated, the
     // test should no longer be parameterized on the bool value.
-    scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support",
-                                  std::get<1>(GetParam()) ? "true" : "false"}});
+    scoped_runtime_.mergeValues(
+        {{"envoy.restart_features.xds_failover_support", using_xds_failover_ ? "true" : "false"}});
   }
 
   void setup() {
@@ -186,6 +187,7 @@ public:
   Stats::Gauge& control_plane_connected_state_;
   bool should_use_unified_;
   MockEdsResourcesCache* eds_resources_cache_{nullptr};
+  const bool using_xds_failover_;
 };
 
 class NewGrpcMuxImplTest : public NewGrpcMuxImplTestBase {
@@ -264,9 +266,19 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
   EXPECT_CALL(*grpc_stream_retry_timer, enableTimer(_, _))
       .WillOnce(Invoke(grpc_stream_retry_timer_cb));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  // initial_resource_versions should contain client side all resource:version info.
-  expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                    {{"x", "2000"}, {"y", "3000"}});
+
+  // initial_resource_versions should contain client side all resource:version info
+  // if xds_failover isn't used.
+  if (using_xds_failover_) {
+    // The test suite doesn't invoke the grpc-stream/xds-failover discovery
+    // response path, and so the failover isn't aware that the test suite
+    // passed a valid response back to the mux. Thus, the xds-failover will not set
+    // the flag that triggers the initial-resource-versions population.
+    expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "");
+  } else {
+    expectSendMessage(type_url, {"x", "y"}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                      {{"x", "2000"}, {"y", "3000"}});
+  }
   remoteClose();
 
   expectSendMessage(type_url, {}, {"x", "y"});
@@ -351,9 +363,17 @@ TEST_P(NewGrpcMuxImplTest, ReconnectionResetsWildcardSubscription) {
       .WillOnce(Invoke(grpc_stream_retry_timer_cb));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // initial_resource_versions should contain client side all resource:version info, and no
-  // added resources because this is a wildcard request.
-  expectSendMessage(type_url, {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                    {{"x", "1000"}, {"y", "2000"}});
+  // added resources because this is a wildcard request, if xds_failover isn't used.
+  if (using_xds_failover_) {
+    // The test suite doesn't invoke the grpc-stream/xds-failover discovery
+    // response path, and so the failover isn't aware that the test suite
+    // passed a valid response back to the mux. Thus, the xds-failover will not set
+    // the flag that triggers the initial-resource-versions population.
+    expectSendMessage(type_url, {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "");
+  } else {
+    expectSendMessage(type_url, {}, {}, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                      {{"x", "1000"}, {"y", "2000"}});
+  }
   remoteClose();
   // Destruction of wildcard will not issue unsubscribe requests for the resources.
 }

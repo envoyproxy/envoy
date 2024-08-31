@@ -58,7 +58,7 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     const auto& google_async_tag = *reinterpret_cast<GoogleAsyncTag*>(tag);
     const GoogleAsyncTag::Operation op = google_async_tag.op_;
     GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
-    ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
+    ENVOY_LOG(trace, "completionThread CQ event {} {}", static_cast<int>(op), ok);
     Thread::LockGuard lock(stream.completed_ops_lock_);
 
     // It's an invariant that there must only be one pending post for arbitrary
@@ -336,7 +336,8 @@ void GoogleAsyncStreamImpl::onCompletedOps() {
 }
 
 void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, bool ok) {
-  ENVOY_LOG(trace, "handleOpCompletion op={} ok={} inflight={}", op, ok, inflight_tags_);
+  ENVOY_LOG(trace, "handleOpCompletion op={} ok={} inflight={}", static_cast<int>(op), ok,
+            inflight_tags_);
   ASSERT(inflight_tags_ > 0);
   --inflight_tags_;
   if (draining_cq_) {
@@ -414,7 +415,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   }
   case GoogleAsyncTag::Operation::Finish: {
     ASSERT(finish_pending_);
-    ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
+    ENVOY_LOG(debug, "Finish with grpc-status code {}", static_cast<int>(status_.error_code()));
     Http::ResponseTrailerMapPtr trailing_metadata = Http::ResponseTrailerMapImpl::create();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
     notifyRemoteClose(static_cast<Status::GrpcStatus>(status_.error_code()),

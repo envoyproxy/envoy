@@ -1797,7 +1797,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   default:
     return absl::InvalidArgumentError(fmt::format(
         "Cluster drop_overloads config denominator setting is invalid : {}. Valid range 0~2.",
-        drop_percentage.denominator()));
+        static_cast<int>(drop_percentage.denominator())));
   }
 
   // If DropOverloadRuntimeKey is not enabled, honor the EDS drop_overload config.

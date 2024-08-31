@@ -29,7 +29,8 @@
 namespace Envoy {
 namespace {
 
-std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool http, int port) {
+std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
+baseProxyConfig(Network::Address::IpVersion version, bool http, int port) {
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
       std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
@@ -39,7 +40,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool ht
   listener->set_name("base_api_listener");
   auto* base_address = listener->mutable_address();
   base_address->mutable_socket_address()->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
-  base_address->mutable_socket_address()->set_address("127.0.0.1");
+  base_address->mutable_socket_address()->set_address(
+      version == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1");
   base_address->mutable_socket_address()->set_port_value(port);
 
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
@@ -55,7 +57,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool ht
     route->mutable_match()->set_prefix("/");
   } else {
     route->mutable_match()->mutable_connect_matcher();
-    route->mutable_route()->add_upgrade_configs()->set_upgrade_type("CONNECT");
+    auto* upgrade_config = route->mutable_route()->add_upgrade_configs();
+    upgrade_config->set_upgrade_type("CONNECT");
+    upgrade_config->mutable_connect_config();
   }
 
   auto* header_value_option = route->mutable_response_headers_to_add()->Add();
@@ -179,9 +183,9 @@ void TestServer::start(TestServerType type, int port) {
     registerMobileProtoDescriptors();
 #endif
     test_server_ = IntegrationTestServer::create(
-        "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
-        absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
-        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(true, port_));
+        "", version_, nullptr, nullptr, {}, time_system_, *api_, false, absl::nullopt,
+        Server::FieldValidationConfig(), 1, std::chrono::seconds(1), Server::DrainStrategy::Gradual,
+        nullptr, false, false, baseProxyConfig(version_, true, port_));
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Http proxy is now running");
     return;
@@ -194,9 +198,9 @@ void TestServer::start(TestServerType type, int port) {
     registerMobileProtoDescriptors();
 #endif
     test_server_ = IntegrationTestServer::create(
-        "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
-        absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
-        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(false, port_));
+        "", version_, nullptr, nullptr, {}, time_system_, *api_, false, absl::nullopt,
+        Server::FieldValidationConfig(), 1, std::chrono::seconds(1), Server::DrainStrategy::Gradual,
+        nullptr, false, false, baseProxyConfig(version_, false, port_));
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Https proxy is now running");
     return;
@@ -246,8 +250,12 @@ std::string TestServer::getAddress() const {
 }
 
 std::string TestServer::getIpAddress() const {
-  ASSERT(upstream_);
-  return upstream_->localAddress()->ip()->addressAsString();
+  if (upstream_) {
+    return upstream_->localAddress()->ip()->addressAsString();
+  }
+  // Return the proxy server IP address.
+  ASSERT(test_server_);
+  return version_ == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
 }
 
 int TestServer::getPort() const {

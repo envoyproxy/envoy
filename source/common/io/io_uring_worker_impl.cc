@@ -327,7 +327,7 @@ IoUringServerSocket::~IoUringServerSocket() {
 }
 
 void IoUringServerSocket::close(bool keep_fd_open, IoUringSocketOnClosedCb cb) {
-  ENVOY_LOG(trace, "close the socket, fd = {}, status = {}", fd_, status_);
+  ENVOY_LOG(trace, "close the socket, fd = {}, status = {}", fd_, static_cast<int>(status_));
 
   IoUringSocketEntry::close(keep_fd_open, cb);
   keep_fd_open_ = keep_fd_open;
@@ -455,7 +455,7 @@ void IoUringServerSocket::onRead(Request* req, int32_t result, bool injected) {
 
   ENVOY_LOG(trace,
             "onRead with result {}, fd = {}, injected = {}, status_ = {}, enable_close_event = {}",
-            result, fd_, injected, status_, enable_close_event_);
+            result, fd_, injected, static_cast<int>(status_), enable_close_event_);
   if (!injected) {
     read_req_ = nullptr;
     // If the socket is going to close, discard all results.
@@ -560,7 +560,7 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
   IoUringSocketEntry::onWrite(req, result, injected);
 
   ENVOY_LOG(trace, "onWrite with result {}, fd = {}, injected = {}, status_ = {}", result, fd_,
-            injected, status_);
+            injected, static_cast<int>(status_));
   if (!injected) {
     write_or_shutdown_req_ = nullptr;
   }
@@ -657,7 +657,7 @@ void IoUringClientSocket::onConnect(Request* req, int32_t result, bool injected)
   IoUringSocketEntry::onConnect(req, result, injected);
   ASSERT(!injected);
   ENVOY_LOG(trace, "onConnect with result {}, fd = {}, injected = {}, status_ = {}", result, fd_,
-            injected, status_);
+            injected, static_cast<int>(status_));
 
   read_req_ = nullptr;
   // Socket may be closed on connecting like binding error. In this situation we may not callback
