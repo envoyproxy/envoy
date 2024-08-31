@@ -207,6 +207,8 @@ public:
      * @param Value the value to render.
      */
     void addValue(const Value& value) {
+      static_assert(absl::variant_size_v<Value> == 5, "Value must be a variant with 5 types");
+
       switch (value.index()) {
       case 0:
         static_assert(std::is_same<decltype(absl::get<0>(value)), const absl::string_view&>::value,
@@ -232,9 +234,6 @@ public:
         static_assert(std::is_same<decltype(absl::get<4>(value)), const bool&>::value,
                       "value at index 4 must be a bool");
         addBool(absl::get<bool>(value));
-        break;
-      default:
-        IS_ENVOY_BUG(absl::StrCat("addValue invalid index: ", value.index()));
         break;
       }
     }
