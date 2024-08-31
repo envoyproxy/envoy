@@ -1195,8 +1195,9 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
                       jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
                       jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
-                      jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
-                      jboolean use_cares, jboolean use_gro, jstring http3_connection_options,
+                      jint dns_num_retries, jboolean enable_drain_post_dns_refresh,
+                      jboolean enable_http3, jboolean use_cares, jboolean force_v6,
+                      jboolean use_gro, jstring http3_connection_options,
                       jstring http3_client_connection_options, jobjectArray quic_hints,
                       jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
                       jboolean enable_brotli_decompression, jboolean enable_port_migration,
@@ -1215,6 +1216,9 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.addDnsQueryTimeoutSeconds((dns_query_timeout_seconds));
   builder.addDnsMinRefreshSeconds((dns_min_refresh_seconds));
   builder.enableDnsCache(enable_dns_cache == JNI_TRUE, dns_cache_save_interval_seconds);
+  if (dns_num_retries >= 0) {
+    builder.setDnsNumRetries(dns_num_retries);
+  }
   builder.addMaxConnectionsPerHost((max_connections_per_host));
   builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       (h2_connection_keepalive_idle_interval_milliseconds));
@@ -1251,7 +1255,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
   builder.enablePlatformCertificatesValidation(enable_platform_certificates_validation == JNI_TRUE);
   builder.setUpstreamTlsSni(Envoy::JNI::javaStringToCppString(jni_helper, upstream_tls_sni));
-  builder.setForceAlwaysUsev6(true);
+  builder.setForceAlwaysUsev6(force_v6 == JNI_TRUE);
 
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {
@@ -1288,8 +1292,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
-    jlong dns_cache_save_interval_seconds, jboolean enable_drain_post_dns_refresh,
-    jboolean enable_http3, jboolean use_cares, jboolean use_gro, jstring http3_connection_options,
+    jlong dns_cache_save_interval_seconds, jint dns_num_retries,
+    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean use_cares,
+    jboolean force_v6, jboolean use_gro, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
     jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
     jboolean enable_brotli_decompression, jboolean enable_port_migration,
@@ -1306,11 +1311,11 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   configureBuilder(
       jni_helper, connect_timeout_seconds, dns_refresh_seconds, dns_failure_refresh_seconds_base,
       dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
-      dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds,
-      enable_drain_post_dns_refresh, enable_http3, use_cares, use_gro, http3_connection_options,
-      http3_client_connection_options, quic_hints, quic_canonical_suffixes,
-      enable_gzip_decompression, enable_brotli_decompression, enable_port_migration,
-      enable_socket_tagging, enable_interface_binding,
+      dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
+      enable_drain_post_dns_refresh, enable_http3, use_cares, force_v6, use_gro,
+      http3_connection_options, http3_client_connection_options, quic_hints,
+      quic_canonical_suffixes, enable_gzip_decompression, enable_brotli_decompression,
+      enable_port_migration, enable_socket_tagging, enable_interface_binding,
       h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
       max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
       app_version, app_id, trust_chain_verification, filter_chain,

@@ -46,11 +46,14 @@ public:
   // Network::UdpPacketProcessor
   void processPacket(Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-                     MonotonicTime receive_time, uint8_t tos) override;
+                     MonotonicTime receive_time, uint8_t tos, Buffer::RawSlice saved_cmsg) override;
   uint64_t maxDatagramSize() const override { return config_.max_rx_datagram_size_; }
   void onDatagramsDropped(uint32_t dropped) override { cb_.onDatagramsDropped(dropped); }
   size_t numPacketsExpectedPerEventLoop() const override {
     return cb_.numPacketsExpectedPerEventLoop();
+  }
+  const IoHandle::UdpSaveCmsgConfig& saveCmsgConfig() const override {
+    return cb_.udpSaveCmsgConfig();
   }
 
 protected:
