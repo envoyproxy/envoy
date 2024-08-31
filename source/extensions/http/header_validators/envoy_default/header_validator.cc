@@ -282,8 +282,6 @@ HeaderValidator::validateHostHeader(const HeaderString& value) {
   //
   // Host       = uri-host [ ":" port ]
   // uri-host   = IP-literal / IPv4address / reg-name
-  //
-  // TODO(#22859, #23314) - Fully implement IPv6 address validation
   const auto host = value.getStringView();
   if (host.empty()) {
     return {HeaderValueValidationResult::Action::Reject, UhvResponseCodeDetail::get().InvalidHost};
@@ -352,8 +350,43 @@ HeaderValidator::validateHostHeaderIPv6(absl::string_view host) {
   const auto port_string = host.substr(closing_bracket + 1);
   // Validate the IPv6 address characters
   bool is_valid = !address.empty();
-  for (auto iter = address.begin(); iter != address.end() && is_valid; ++iter) {
-    is_valid &= testCharInTable(kHostIPv6AddressCharTable, *iter);
+
+  // Split address by (:) and validate:
+  // 1. there are no more than 8 parts
+  // 2. each part has only hex digit and is 16-bit
+  // 3. only one double colon is allowed
+  std::vector<std::string> address_components = absl::StrSplit(address, ':');
+  if (address_components.size() > 8) {
+    return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
+  }
+  uint32_t empty_string_count = 0;
+  for (auto & cur_component : address_components) {
+    // each part must be 16 bits
+    if (cur_component.size() > 4) {
+      return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
+    }
+    if (cur_component.empty()) {
+      empty_string_count++;
+      continue;
+    }
+    // Validate each char is hex digit
+    for (auto iter = cur_component.begin(); iter != cur_component.end() && is_valid; ++iter) {
+      is_valid &= testCharInTable(kHostIPv6AddressCharTable, *iter);
+    }
+  }
+  // The address should never have more than 3 empty parts
+  if (empty_string_count > 3) {
+    return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
+  }
+  // "::" is valid
+  // Otherwise, the address shouldn't have 3 empty parts
+  if (empty_string_count == 3 && address != "::") {
+    return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
+  }
+  // Double colon is allowed at the beginning or end
+  // Otherwise the address shouldn't have two empty parts
+  if (empty_string_count == 2 && !(absl::StartsWith(address, "::") || absl::EndsWith(address, "::"))) {
+    return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
   }
 
   if (!is_valid) {
