@@ -55,9 +55,7 @@ message XffConfig {
   // .. attention::
   //
   //   For proper proxy behaviour it is not recommended to set this option.
-  //   For backwards compatibility, if this option is unset and
-  //   ``xff_num_trusted_hops`` is set, it defaults to true. When
-  //   ``xff_trusted_cidrs`` is set, it defaults to false.
+  //   For backwards compatibility, if this option is unset it defaults to true.
   //
   // This only applies when :ref:`use_remote_address
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
