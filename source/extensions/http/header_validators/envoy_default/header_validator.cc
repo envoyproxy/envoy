@@ -360,7 +360,7 @@ HeaderValidator::validateHostHeaderIPv6(absl::string_view host) {
     return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
   }
   uint32_t empty_string_count = 0;
-  for (auto & cur_component : address_components) {
+  for (auto& cur_component : address_components) {
     // each part must be 16 bits
     if (cur_component.size() > 4) {
       return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
@@ -385,7 +385,8 @@ HeaderValidator::validateHostHeaderIPv6(absl::string_view host) {
   }
   // Double colon is allowed at the beginning or end
   // Otherwise the address shouldn't have two empty parts
-  if (empty_string_count == 2 && !(absl::StartsWith(address, "::") || absl::EndsWith(address, "::"))) {
+  if (empty_string_count == 2 &&
+      !(absl::StartsWith(address, "::") || absl::EndsWith(address, "::"))) {
     return HostHeaderValidationResult::reject(UhvResponseCodeDetail::get().InvalidHost);
   }
 
