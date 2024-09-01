@@ -41,17 +41,17 @@ namespace Json {
 class Constants {
 public:
   // Constants for common JSON values.
-  static constexpr absl::string_view True = R"(true)";
-  static constexpr absl::string_view False = R"(false)";
-  static constexpr absl::string_view Null = R"(null)";
+  static constexpr absl::string_view True = "true";
+  static constexpr absl::string_view False = "false";
+  static constexpr absl::string_view Null = "null";
 
   // Constants for JSON delimiters.
-  static constexpr absl::string_view MapBeg = R"({)";
-  static constexpr absl::string_view MapEnd = R"(})";
-  static constexpr absl::string_view ArrayBeg = R"([)";
-  static constexpr absl::string_view ArrayEnd = R"(])";
-  static constexpr absl::string_view Quote = R"(")";
-  static constexpr absl::string_view Comma = R"(,)";
+  static constexpr absl::string_view MapBegin = "{";
+  static constexpr absl::string_view MapEnd = "}";
+  static constexpr absl::string_view ArrayBegin = "[";
+  static constexpr absl::string_view ArrayEnd = "]";
+  static constexpr absl::string_view DoubleQuote = R"(")";
+  static constexpr absl::string_view Comma = ",";
 };
 
 // Simple abstraction that provide a output buffer for streaming JSON output.
@@ -256,7 +256,7 @@ public:
     using NameValue = std::pair<const absl::string_view, Value>;
     using Entries = absl::Span<const NameValue>;
 
-    Map(Streamer& streamer) : Level(streamer, Constants::MapBeg, Constants::MapEnd) {}
+    Map(Streamer& streamer) : Level(streamer, Constants::MapBegin, Constants::MapEnd) {}
 
     /**
      * Initiates a new map key. This must be followed by rendering a value,
@@ -271,7 +271,7 @@ public:
       ASSERT_THIS_IS_TOP_LEVEL;
       ASSERT(!expecting_value_);
       nextField();
-      this->streamer_.addSanitized(Constants::Quote, key, R"(":)");
+      this->streamer_.addSanitized(Constants::DoubleQuote, key, R"(":)");
       expecting_value_ = true;
     }
 
@@ -307,7 +307,7 @@ public:
    */
   class Array : public Level {
   public:
-    Array(Streamer& streamer) : Level(streamer, Constants::ArrayBeg, Constants::ArrayEnd) {}
+    Array(Streamer& streamer) : Level(streamer, Constants::ArrayBegin, Constants::ArrayEnd) {}
     using Entries = absl::Span<const Value>;
 
     /**
@@ -363,7 +363,8 @@ private:
   }
 
   void addString(absl::string_view str) {
-    response_.add(Constants::Quote, Json::sanitize(sanitize_buffer_, str), Constants::Quote);
+    response_.add(Constants::DoubleQuote, Json::sanitize(sanitize_buffer_, str),
+                  Constants::DoubleQuote);
   }
 
   /**
