@@ -171,7 +171,7 @@ public:
     void addString(absl::string_view str) {
       ASSERT_THIS_IS_TOP_LEVEL;
       nextField();
-      streamer_.addSanitized(Constants::Quote, str, Constants::Quote);
+      streamer_.addString(str);
     }
 
     /**
