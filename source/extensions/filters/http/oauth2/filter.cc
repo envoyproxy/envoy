@@ -537,6 +537,10 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     // This should be enough time for the user to complete the OAuth flow.
     std::string expire_in = std::to_string(10 * 60);
     std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
+    if (!config_->cookieDomain().empty()) {
+      cookie_tail_http_only = absl::StrCat(
+          fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
+    }
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
