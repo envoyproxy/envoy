@@ -542,6 +542,21 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     nonce = std::to_string(time_source_.systemTime().time_since_epoch().count());
   }
 
+  // Set the nonce cookie if it does not exist.
+  if (!nonce_cookie_exists) {
+    // Expire the nonce cookie in 10 minutes.
+    // This should be enough time for the user to complete the OAuth flow.
+    std::string expire_in = std::to_string(10 * 60);
+    std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
+    if (!config_->cookieDomain().empty()) {
+      cookie_tail_http_only = absl::StrCat(
+          fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
+    }
+    response_headers->addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
+  }
+
   // Encode the original request URL and the nonce to the state parameter
   const std::string state = absl::StrCat("url=", escaped_url, "&nonce=", nonce);
   const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
@@ -563,21 +578,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string new_url = authorization_endpoint_url.toString();
 
   response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
-
-  // Set the nonce cookie if it does not exist.
-  if (!nonce_cookie_exists) {
-    // Expire the nonce cookie in 10 minutes.
-    // This should be enough time for the user to complete the OAuth flow.
-    std::string expire_in = std::to_string(10 * 60);
-    std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
-    if (!config_->cookieDomain().empty()) {
-      cookie_tail_http_only = absl::StrCat(
-          fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
-    }
-    response_headers->addReferenceKey(
-        Http::Headers::get().SetCookie,
-        absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
-  }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
