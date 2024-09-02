@@ -94,7 +94,7 @@ struct CookieNames {
         oauth_expires_(oauth_expires.empty() ? OauthExpires : oauth_expires),
         id_token_(id_token.empty() ? IdToken : id_token),
         refresh_token_(refresh_token.empty() ? RefreshToken : refresh_token),
-        oauth_nonce_(oauth_nonce.empth() ? OauthNonce : oauth_nonce) {}
+        oauth_nonce_(oauth_nonce.empty() ? OauthNonce : oauth_nonce) {}
 
   const std::string bearer_token_;
   const std::string oauth_hmac_;

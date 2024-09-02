@@ -424,7 +424,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const auto nonce = nonceVal.value();
   const CookieNames& cookie_names = config_->cookieNames();
   const auto nonce_cookie = Http::Utility::parseCookies(
-      headers, [](absl::string_view key) { return key == cookie_names.oauth_nonce_; });
+      headers, [cookie_names](absl::string_view key) { return key == cookie_names.oauth_nonce_; });
 
   if (nonce_cookie.find(cookie_names.oauth_nonce_) == nonce_cookie.end() ||
       nonce != nonce_cookie.at(cookie_names.oauth_nonce_)) {
@@ -501,7 +501,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   bool nonce_cookie_exists = false;
   const CookieNames& cookie_names = config_->cookieNames();
   const auto nonce_cookie = Http::Utility::parseCookies(
-      headers, [](absl::string_view key) { return key == cookie_names.oauth_nonce_; });
+      headers, [cookie_names](absl::string_view key) { return key == cookie_names.oauth_nonce_; });
   if (nonce_cookie.find(cookie_names.oauth_nonce_) != nonce_cookie.end()) {
     nonce = nonce_cookie.at(cookie_names.oauth_nonce_);
     nonce_cookie_exists = true;
