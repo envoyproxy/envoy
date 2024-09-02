@@ -44,14 +44,6 @@ public:
   static constexpr absl::string_view True = "true";
   static constexpr absl::string_view False = "false";
   static constexpr absl::string_view Null = "null";
-
-  // Constants for JSON delimiters.
-  static constexpr absl::string_view MapBegin = "{";
-  static constexpr absl::string_view MapEnd = "}";
-  static constexpr absl::string_view ArrayBegin = "[";
-  static constexpr absl::string_view ArrayEnd = "]";
-  static constexpr absl::string_view DoubleQuote = R"(")";
-  static constexpr absl::string_view Comma = ",";
 };
 
 // Simple abstraction that provide a output buffer for streaming JSON output.
@@ -195,7 +187,7 @@ public:
       if (is_first_) {
         is_first_ = false;
       } else {
-        streamer_.addConstantString(Constants::Comma);
+        streamer_.addConstantString(",");
       }
     }
 
@@ -256,7 +248,7 @@ public:
     using NameValue = std::pair<const absl::string_view, Value>;
     using Entries = absl::Span<const NameValue>;
 
-    Map(Streamer& streamer) : Level(streamer, Constants::MapBegin, Constants::MapEnd) {}
+    Map(Streamer& streamer) : Level(streamer, "{", "}") {}
 
     /**
      * Initiates a new map key. This must be followed by rendering a value,
@@ -271,7 +263,7 @@ public:
       ASSERT_THIS_IS_TOP_LEVEL;
       ASSERT(!expecting_value_);
       nextField();
-      this->streamer_.addSanitized(Constants::DoubleQuote, key, R"(":)");
+      this->streamer_.addSanitized("\"", key, "\":");
       expecting_value_ = true;
     }
 
@@ -307,7 +299,7 @@ public:
    */
   class Array : public Level {
   public:
-    Array(Streamer& streamer) : Level(streamer, Constants::ArrayBegin, Constants::ArrayEnd) {}
+    Array(Streamer& streamer) : Level(streamer, "[", "]") {}
     using Entries = absl::Span<const Value>;
 
     /**
@@ -363,8 +355,7 @@ private:
   }
 
   void addString(absl::string_view str) {
-    response_.add(Constants::DoubleQuote, Json::sanitize(sanitize_buffer_, str),
-                  Constants::DoubleQuote);
+    response_.add("\"", Json::sanitize(sanitize_buffer_, str), "\"");
   }
 
   /**
