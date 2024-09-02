@@ -460,7 +460,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) == nonce_cookie.end() ||
       nonce != nonce_cookie.at(config_->cookieNames().oauth_nonce_)) {
-    ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonce);
+        
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }

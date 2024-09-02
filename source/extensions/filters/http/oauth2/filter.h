@@ -106,7 +106,7 @@ struct CookieNames {
   static constexpr absl::string_view OauthExpires = "OauthExpires";
   static constexpr absl::string_view BearerToken = "BearerToken";
   static constexpr absl::string_view OauthHMAC = "OauthHMAC";
-  static constexpr absl::string_view OauthNonce = "OAuthNonce";
+  static constexpr absl::string_view OauthNonce = "OauthNonce";
   static constexpr absl::string_view IdToken = "IdToken";
   static constexpr absl::string_view RefreshToken = "RefreshToken";
 };
