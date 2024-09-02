@@ -366,8 +366,13 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
       {Http::Headers::get().Scheme.get(), "http"},
   };
 
+  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
+
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -377,7 +382,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
            "&scope=" +
            TEST_DEFAULT_SCOPE +
            "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D1725248938559826"},
+           "3D123456789000000"},
   };
 
   // explicitly tell the validator to fail the validation.
@@ -424,9 +429,13 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
+  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
   // Verify that the foo=bar query parameter is preserved in the redirect.
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -437,7 +446,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
            "&scope=" +
            TEST_DEFAULT_SCOPE +
            "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D1725248938559826"},
+           "3D123456789000000"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -478,9 +487,14 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
+  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
+
   // Verify that the foo=bar query parameter is preserved in the redirect.
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -491,7 +505,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
            "&scope=" +
            TEST_DEFAULT_SCOPE +
            "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D1725248938559826"},
+           "3D123456789000000"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -899,8 +913,8 @@ TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
 // Validates the behavior of the cookie validator when the combination of some fields could be same.
 TEST_F(OAuth2Test, CookieValidatorSame) {
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-  auto cookie_names =
-      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken","OauthNonce"};
+  auto cookie_names = CookieNames{"BearerToken", "OauthHMAC",    "OauthExpires",
+                                  "IdToken",     "RefreshToken", "OauthNonce"};
   const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 5;
 
   // Host name is `traffic.example.com:101` and the expire time is 5.
@@ -971,8 +985,8 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
-      test_time_,
-      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken","OauthNonce"});
+      test_time_, CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken",
+                              "OauthNonce"});
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->hmacIsValid());
@@ -991,8 +1005,8 @@ TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
-      test_time_,
-      CookieNames("BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken", "OauthNonce"));
+      test_time_, CookieNames("BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken",
+                              "OauthNonce"));
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->canUpdateTokenByRefreshToken());
@@ -1993,8 +2007,8 @@ TEST_F(OAuth2Test, CookieValidatorInTransition) {
   };
 
   auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
-      test_time_,
-      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken","OauthNonce"});
+      test_time_, CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken",
+                              "OauthNonce"});
   cookie_validator->setParams(request_headers_base64only, "mock-secret");
   EXPECT_TRUE(cookie_validator->hmacIsValid());
 
@@ -2432,4 +2446,3 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
-

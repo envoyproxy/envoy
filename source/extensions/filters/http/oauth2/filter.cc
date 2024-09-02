@@ -342,7 +342,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       }
 
       // Validate that the nonce in the callback URL matches the nonce in the cookie.
-      // This is to prevenrevent attackers from injecting their own access token into a victim's
+      // This is to prevent attackers from injecting their own access token into a victim's
       // sessions via CSRF attack. The attack can result in victims saving their sensitive data
       // in the attacker's account.
       // More information can be found at
@@ -449,7 +449,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   }
 
   // Validate that the nonce in the callback URL matches the nonce in the cookie.
-  // This is to prevenrevent attackers from injecting their own access token into a victim's
+  // This is to prevent attackers from injecting their own access token into a victim's
   // sessions via CSRF attack. The attack can result in victims saving their sensitive data
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
@@ -460,7 +460,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) == nonce_cookie.end() ||
       nonce != nonce_cookie.at(config_->cookieNames().oauth_nonce_)) {
-        
+
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
