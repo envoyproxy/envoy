@@ -84,24 +84,29 @@ struct CookieNames {
                   cookie_names)
       : CookieNames(cookie_names.bearer_token(), cookie_names.oauth_hmac(),
                     cookie_names.oauth_expires(), cookie_names.id_token(),
-                    cookie_names.refresh_token()) {}
+                    cookie_names.refresh_token(), cookie_names.oauth_nonce()) {}
 
   CookieNames(const std::string& bearer_token, const std::string& oauth_hmac,
               const std::string& oauth_expires, const std::string& id_token,
-              const std::string& refresh_token)
-      : bearer_token_(bearer_token.empty() ? "BearerToken" : bearer_token),
-        oauth_hmac_(oauth_hmac.empty() ? "OauthHMAC" : oauth_hmac),
+              const std::string& refresh_token, const std::string& oauth_nonce)
+      : bearer_token_(bearer_token.empty() ? BearerToken : bearer_token),
+        oauth_hmac_(oauth_hmac.empty() ? OauthHMAC : oauth_hmac),
         oauth_expires_(oauth_expires.empty() ? OauthExpires : oauth_expires),
         id_token_(id_token.empty() ? IdToken : id_token),
-        refresh_token_(refresh_token.empty() ? RefreshToken : refresh_token) {}
+        refresh_token_(refresh_token.empty() ? RefreshToken : refresh_token),
+        oauth_nonce_(oauth_nonce.empth() ? OauthNonce : oauth_nonce) {}
 
   const std::string bearer_token_;
   const std::string oauth_hmac_;
   const std::string oauth_expires_;
   const std::string id_token_;
   const std::string refresh_token_;
+  const std::string oauth_nonce_;
 
   static constexpr absl::string_view OauthExpires = "OauthExpires";
+  static constexpr absl::string_view BearerToken = "BearerToken";
+  static constexpr absl::string_view OauthHMAC = "OauthHMAC";
+  static constexpr absl::string_view OauthNonce = "OAuthNonce";
   static constexpr absl::string_view IdToken = "IdToken";
   static constexpr absl::string_view RefreshToken = "RefreshToken";
 };

@@ -310,7 +310,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // correctly but cause a race condition on future requests that have their location set
     // to the callback path.
 
-    // TODO: zhaohuabing handle nounce
+    // TODO: zhaohuabing handle nonce
     if (config_->redirectPathMatcher().match(path_str)) {
       Http::Utility::QueryParamsMulti query_parameters =
           Http::Utility::QueryParamsMulti::parseQueryString(path_str);
@@ -402,8 +402,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const auto state_parameters = Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
   // if the data we need is not present on the state, stop execution
   auto urlVal = state_parameters.getFirstValue("url");
-  auto nounceVal = state_parameters.getFirstValue("nounce");
-  if (!urlVal.has_value() || !nounceVal.has_value()) {
+  auto nonceVal = state_parameters.getFirstValue("nonce");
+  if (!urlVal.has_value() || !nonceVal.has_value()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -416,17 +416,18 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Validate that the nounce in the callback URL matches the nounce in the cookie.
+  // Validate that the nonce in the callback URL matches the nonce in the cookie.
   // This is to prevenrevent attackers from injecting their own access token into a victim's
   // sessions via CSRF attack. The attack can result in victims saving their sensitive data
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
-  const auto nounce = nounceVal.value();
-  const auto nounce_cookie = Http::Utility::parseCookies(
-      headers, [](absl::string_view key) { return key == "Oauthnounce"; });
+  const auto nonce = nonceVal.value();
+  const CookieNames& cookie_names = config_->cookieNames();
+  const auto nonce_cookie = Http::Utility::parseCookies(
+      headers, [](absl::string_view key) { return key == cookie_names.oauth_nonce_; });
 
-  if (nounce_cookie.find("Oauthnounce") == nounce_cookie.end() ||
-      nounce != nounce_cookie.at("Oauthnounce")) {
+  if (nonce_cookie.find(cookie_names.oauth_nonce_) == nonce_cookie.end() ||
+      nonce != nonce_cookie.at(cookie_names.oauth_nonce_)) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -495,20 +496,21 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string full_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
   const std::string escaped_url = Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
 
-  // Generate a nounce to prevent CSRF attacks
-  std::string nounce;
-  bool nounce_cookie_exists = false;
-  const auto nounce_cookie = Http::Utility::parseCookies(
-      headers, [](absl::string_view key) { return key == "Oauthnounce"; });
-  if (nounce_cookie.find("Oauthnounce") != nounce_cookie.end()) {
-    nounce = nounce_cookie.at("Oauthnounce");
-    nounce_cookie_exists = true;
+  // Generate a nonce to prevent CSRF attacks
+  std::string nonce;
+  bool nonce_cookie_exists = false;
+  const CookieNames& cookie_names = config_->cookieNames();
+  const auto nonce_cookie = Http::Utility::parseCookies(
+      headers, [](absl::string_view key) { return key == cookie_names.oauth_nonce_; });
+  if (nonce_cookie.find(cookie_names.oauth_nonce_) != nonce_cookie.end()) {
+    nonce = nonce_cookie.at(cookie_names.oauth_nonce_);
+    nonce_cookie_exists = true;
   } else {
-    nounce = std::to_string(time_source_.systemTime().time_since_epoch().count());
+    nonce = std::to_string(time_source_.systemTime().time_since_epoch().count());
   }
 
-  // Encode the original request URL and the nounce to the state parameter
-  const std::string state = absl::StrCat("url=", escaped_url, "&nounce=", nounce);
+  // Encode the original request URL and the nonce to the state parameter
+  const std::string state = absl::StrCat("url=", escaped_url, "&nonce=", nonce);
   const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
@@ -529,15 +531,15 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
 
   response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
 
-  // Set the nounce cookie if it does not exist.
-  if (!nounce_cookie_exists) {
-    // Expire the nounce cookie in 10 minutes.
+  // Set the nonce cookie if it does not exist.
+  if (!nonce_cookie_exists) {
+    // Expire the nonce cookie in 10 minutes.
     // This should be enough time for the user to complete the OAuth flow.
     std::string expire_in = std::to_string(10 * 60);
     std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat("Oauthnounce", "=", nounce, cookie_tail_http_only));
+        absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
   }
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
