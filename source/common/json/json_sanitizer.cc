@@ -5,6 +5,7 @@
 #include "source/common/json/json_internal.h"
 
 #include "absl/strings/str_format.h"
+#include "utf8_validity.h"
 
 namespace Envoy {
 namespace Json {
@@ -65,34 +66,25 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
   if (need_slow == 0) {
     return str; // Fast path, should be executed most of the time.
   }
-  TRY_ASSERT_MAIN_THREAD {
-    // The Nlohmann JSON library supports serialization and is not too slow. A
-    // hand-rolled sanitizer can be a little over 2x faster at the cost of added
-    // production complexity. The main drawback is that this code cannot be used
-    // in the data plane as it throws exceptions. Should this become an issue,
-    // #20428 can be revived which is faster and doesn't throw exceptions, but
-    // adds complexity to the production code base.
+
+  // Slow path.
+
+  // If the input is valid utf-8, we can serialize it with Nlohmann.
+  if (utf8_range::IsStructurallyValid(str)) {
     buffer = Nlohmann::Factory::serialize(str);
     return stripDoubleQuotes(buffer);
   }
-  END_TRY
-  catch (std::exception&) {
-    // If Nlohmann throws an error, emit an octal escape for any character
-    // requiring it. This can occur for invalid utf-8 sequences, and we don't
-    // want to crash the server if such a sequence makes its way into a string
-    // we need to serialize. For example, if admin endpoint /stats?format=json
-    // is called, and a stat name was synthesized from dynamic content such as a
-    // gRPC method.
-    buffer.clear();
-    for (char c : str) {
-      if (needs_slow_sanitizer[static_cast<uint8_t>(c)]) {
-        buffer.append(absl::StrFormat("\\%03o", c));
-      } else {
-        buffer.append(1, c);
-      }
+
+  // If the input contains any invalid utf-8, escape all non-ascii characters
+  // as octal escape sequences.
+  buffer.clear();
+  for (char c : str) {
+    if (needs_slow_sanitizer[static_cast<uint8_t>(c)]) {
+      buffer.append(absl::StrFormat("\\%03o", c));
+    } else {
+      buffer.append(1, c);
     }
   }
-
   return buffer;
 }
 
