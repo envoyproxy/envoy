@@ -1047,6 +1047,7 @@ case $CI_TARGET in
 
         read -ra ENVOY_GEN_COMPDB_OPTIONS <<< "${ENVOY_GEN_COMPDB_OPTIONS:-}"
 
+        # Setting TEST_TMPDIR here so the compdb headers won't be overwritten by another bazel run.
         TEST_TMPDIR="${BUILD_DIR}/envoy-compdb" \
             "${CURRENT_SCRIPT_DIR}/../tools/gen_compilation_database.py" \
             "${ENVOY_GEN_COMPDB_OPTIONS[@]}"
