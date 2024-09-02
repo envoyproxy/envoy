@@ -1047,7 +1047,9 @@ case $CI_TARGET in
 
         read -ra ENVOY_GEN_COMPDB_OPTIONS <<< "${ENVOY_GEN_COMPDB_OPTIONS:-}"
 
-        "${CURRENT_SCRIPT_DIR}/../tools/gen_compilation_database.py" "${ENVOY_GEN_COMPDB_OPTIONS[@]}"
+        TEST_TMPDIR="${BUILD_DIR}/envoy-compdb" \
+            "${CURRENT_SCRIPT_DIR}/../tools/gen_compilation_database.py" \
+            "${ENVOY_GEN_COMPDB_OPTIONS[@]}"
         # Kill clangd to reload the compilation database
         pkill clangd || :
         ;;
