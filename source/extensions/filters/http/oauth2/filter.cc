@@ -369,7 +369,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::ResponseHeaderMapPtr response_headers{
           Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
-               {Http::Headers::get().Location, state}})};
+               {Http::Headers::get().Location, urlVal.value()}})};
       decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_RACE);
       return Http::FilterHeadersStatus::StopIteration;
     }
@@ -460,7 +460,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) == nonce_cookie.end() ||
       nonce != nonce_cookie.at(config_->cookieNames().oauth_nonce_)) {
-
+    ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonce);
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
