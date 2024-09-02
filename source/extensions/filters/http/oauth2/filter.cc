@@ -422,12 +422,12 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
   const auto nonce = nonceVal.value();
-  const CookieNames& cookie_names = config_->cookieNames();
-  const auto nonce_cookie = Http::Utility::parseCookies(
-      headers, [cookie_names](absl::string_view key) { return key == cookie_names.oauth_nonce_; });
+  const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
+    return key == config_->cookieNames().oauth_nonce_;
+  });
 
-  if (nonce_cookie.find(cookie_names.oauth_nonce_) == nonce_cookie.end() ||
-      nonce != nonce_cookie.at(cookie_names.oauth_nonce_)) {
+  if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) == nonce_cookie.end() ||
+      nonce != nonce_cookie.at(config_->cookieNames().oauth_nonce_)) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -499,11 +499,11 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   // Generate a nonce to prevent CSRF attacks
   std::string nonce;
   bool nonce_cookie_exists = false;
-  const CookieNames& cookie_names = config_->cookieNames();
-  const auto nonce_cookie = Http::Utility::parseCookies(
-      headers, [cookie_names](absl::string_view key) { return key == cookie_names.oauth_nonce_; });
-  if (nonce_cookie.find(cookie_names.oauth_nonce_) != nonce_cookie.end()) {
-    nonce = nonce_cookie.at(cookie_names.oauth_nonce_);
+  const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
+    return key == config_->cookieNames().oauth_nonce_;
+  });
+  if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) != nonce_cookie.end()) {
+    nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
     nonce_cookie_exists = true;
   } else {
     nonce = std::to_string(time_source_.systemTime().time_since_epoch().count());
