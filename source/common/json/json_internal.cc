@@ -787,9 +787,13 @@ ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& proto
 
 std::string Factory::serialize(absl::string_view str) {
   nlohmann::json j(str);
+#ifdef NDEBUG
   // Call with defaults except in the case of UTF-8 errors which we may replace
   // invalid UTF-8 characters instead of throwing an exception.
   return j.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+#else
+  return j.dump();
+#endif
 }
 
 std::vector<uint8_t> Factory::jsonToMsgpack(const std::string& json_string) {

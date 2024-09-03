@@ -75,8 +75,12 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
     return stripDoubleQuotes(buffer);
   }
 
-  // If the input contains any invalid utf-8, escape all non-ascii characters
-  // as octal escape sequences.
+  // If the input string contains invalid utf-8, emit an octal escape for any
+  // character requiring it. This can occur for invalid utf-8 sequences, and we
+  // don't want to crash the server if such a sequence makes its way into a string
+  // we need to serialize. For example, if admin endpoint /stats?format=json
+  // is called, and a stat name was synthesized from dynamic content such as a
+  // gRPC method.
   buffer.clear();
   for (char c : str) {
     if (needs_slow_sanitizer[static_cast<uint8_t>(c)]) {
