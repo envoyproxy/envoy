@@ -1339,7 +1339,7 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
 TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
   initialize();
-  internalEngine()->onNetworkAvailable();
+  internalEngine()->onDefaultNetworkChanged(NetworkType::WLAN);
   basicTest();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
