@@ -71,7 +71,7 @@ You can `find instructions for installing Git on various operating systems here 
 .. _start_sandboxes_setup_envoy:
 
 Clone the Envoy examples repository
---------------------------
+-----------------------------------
 
 If you have not cloned the `Envoy examples repository <https://github.com/envoyproxy/examples>`_ already,
 clone it with:
