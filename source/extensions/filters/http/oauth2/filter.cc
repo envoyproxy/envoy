@@ -384,13 +384,17 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         return Http::FilterHeadersStatus::StopIteration;
       }
 
-      // Avoid infinite redirect storm
+      // Return 401 unauthorized if the state URL matches the redirect config to avoid infinite
+      // redirect loops.
       if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
-        ENVOY_LOG(debug, "state url query params {} does not match redirect config",
+        ENVOY_LOG(debug, "state url query params {} matches the redirect path matcher",
                   state_url.pathAndQueryParams());
+        // TODO(zhaohuabing): Should the filter return 401 unauthorized or 400 bad request?
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
+
+      // Redirect to the state URL as the user is already logged in.
       Http::ResponseHeaderMapPtr response_headers{
           Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
