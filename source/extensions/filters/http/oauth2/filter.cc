@@ -136,25 +136,25 @@ Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
   return query_params;
 }
 
-std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string_view host,
+std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string_view domain,
                                 absl::string_view expires, absl::string_view token = "",
                                 absl::string_view id_token = "",
                                 absl::string_view refresh_token = "") {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hmac_payload =
-      absl::StrJoin({host, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
+      absl::StrJoin({domain, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
   std::string encoded_hmac;
   absl::Base64Escape(Hex::encode(crypto_util.getSha256Hmac(secret, hmac_payload)), &encoded_hmac);
   return encoded_hmac;
 }
 
-std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_view host,
+std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_view domain,
                              absl::string_view expires, absl::string_view token = "",
                              absl::string_view id_token = "",
                              absl::string_view refresh_token = "") {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hmac_payload =
-      absl::StrJoin({host, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
+      absl::StrJoin({domain, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
 
   std::string base64_encoded_hmac;
   std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, hmac_payload);
@@ -163,10 +163,10 @@ std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_vi
   return base64_encoded_hmac;
 }
 
-std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view host,
+std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view domain,
                        absl::string_view expires, absl::string_view token = "",
                        absl::string_view id_token = "", absl::string_view refresh_token = "") {
-  return encodeHmacBase64(secret, host, expires, token, id_token, refresh_token);
+  return encodeHmacBase64(secret, domain, expires, token, id_token, refresh_token);
 }
 
 } // namespace
@@ -240,9 +240,14 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
 bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const { return !refresh_token_.empty(); }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
-  return (
-      (encodeHmacBase64(secret_, host_, expires_, token_, id_token_, refresh_token_) == hmac_) ||
-      (encodeHmacHexBase64(secret_, host_, expires_, token_, id_token_, refresh_token_) == hmac_));
+  absl::string_view cookie_domain = host_;
+  if (!cookie_domain_.empty()) {
+    cookie_domain = cookie_domain_;
+  }
+  return ((encodeHmacBase64(secret_, cookie_domain, expires_, token_, id_token_, refresh_token_) ==
+           hmac_) ||
+          (encodeHmacHexBase64(secret_, cookie_domain, expires_, token_, id_token_,
+                               refresh_token_) == hmac_));
 }
 
 bool OAuth2CookieValidator::timestampIsValid() const {
@@ -259,7 +264,8 @@ bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampI
 
 OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
                            std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source)
-    : validator_(std::make_shared<OAuth2CookieValidator>(time_source, config->cookieNames())),
+    : validator_(std::make_shared<OAuth2CookieValidator>(time_source, config->cookieNames(),
+                                                         config->cookieDomain())),
       oauth_client_(std::move(oauth_client)), config_(std::move(config)),
       time_source_(time_source) {
 
@@ -505,18 +511,28 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
   const std::string new_path = absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
+
+  std::string cookie_domain;
+  if (!config_->cookieDomain().empty()) {
+    cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
+  }
+
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_hmac_));
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_hmac_),
+                   cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_));
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+                   cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_));
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+                   cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_));
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+                   cookie_domain));
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
@@ -547,11 +563,17 @@ std::string OAuth2Filter::getEncodedToken() const {
   auto token_secret = config_->tokenSecret();
   std::vector<uint8_t> token_secret_vec(token_secret.begin(), token_secret.end());
   std::string encoded_token;
+
+  absl::string_view domain = host_;
+  if (!config_->cookieDomain().empty()) {
+    domain = config_->cookieDomain();
+  }
+
   if (config_->forwardBearerToken()) {
-    encoded_token =
-        encodeHmac(token_secret_vec, host_, new_expires_, access_token_, id_token_, refresh_token_);
+    encoded_token = encodeHmac(token_secret_vec, domain, new_expires_, access_token_, id_token_,
+                               refresh_token_);
   } else {
-    encoded_token = encodeHmac(token_secret_vec, host_, new_expires_);
+    encoded_token = encodeHmac(token_secret_vec, domain, new_expires_);
   }
   return encoded_token;
 }
