@@ -675,9 +675,9 @@ public:
 
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
     if (std::dynamic_pointer_cast<AccessLog::FilterPtr>(handler)) {
-        access_log_handlers_.push_front(std::move(handler));
+      access_log_handlers_.push_front(std::move(handler));
     } else {
-        access_log_handlers_.push_back(std::move(handler));
+      access_log_handlers_.push_back(std::move(handler));
     }
   }
   void addStreamDecoderFilter(ActiveStreamDecoderFilterPtr filter) {

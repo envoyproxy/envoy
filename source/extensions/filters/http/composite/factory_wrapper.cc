@@ -41,9 +41,9 @@ void FactoryCallbacksWrapper::addStreamFilter(Http::StreamFilterSharedPtr filter
 
 void FactoryCallbacksWrapper::addAccessLogHandler(AccessLog::InstanceSharedPtr access_log) {
   if (std::dynamic_pointer_cast<AccessLog::FilterPtr>(access_log)) {
-        access_loggers_.push_front(std::move(access_log));
+    access_loggers_.push_front(std::move(access_log));
   } else {
-        access_loggers_.push_back(std::move(access_log));
+    access_loggers_.push_back(std::move(access_log));
   }
 }
 } // namespace Composite
