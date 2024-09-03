@@ -1704,6 +1704,8 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
   } else if (parent_.state_.filter_call_state_ & FilterManager::FilterCallState::IsEncodingMask) {
     parent_.state_.encoder_filter_chain_aborted_ = true;
   }
+  parent_.state_.recreated_stream_ = true;
+
   parent_.streamInfo().setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
 
@@ -1770,7 +1772,7 @@ void ActiveStreamEncoderFilter::drainSavedResponseMetadata() {
 }
 
 void ActiveStreamEncoderFilter::handleMetadataAfterHeadersCallback() {
-  if (parent_.state_.encoder_filter_chain_aborted_) {
+  if (parent_.state_.recreated_stream_) {
     // The encoder filter chain has been aborted, possibly due to a local reply. In this case,
     // there's no reason to decode saved metadata.
     getSavedResponseMetadata()->clear();
