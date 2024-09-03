@@ -16,11 +16,11 @@ namespace Tracers {
 namespace SkyWalking {
 
 using cpp2sky::createSpanContext;
-using cpp2sky::SpanContextPtr;
+using cpp2sky::SpanContextSharedPtr;
 using cpp2sky::TracerConfig;
 using cpp2sky::TracingContextFactory;
-using cpp2sky::TracingContextPtr;
-using cpp2sky::TracingSpanPtr;
+using cpp2sky::TracingContextSharedPtr;
+using cpp2sky::TracingSpanSharedPtr;
 
 /*
  * A simple helper class for auxiliary testing. Contains some simple static functions, such as
@@ -59,21 +59,21 @@ public:
     return tracing_context->createSW8HeaderValue(seed + "#ENDPOINT").value();
   }
 
-  static TracingContextPtr createSegmentContext(bool sampled, std::string seed,
-                                                std::string prev_seed) {
+  static TracingContextSharedPtr createSegmentContext(bool sampled, std::string seed,
+                                                      std::string prev_seed) {
     TracerConfig config;
     config.set_service_name(seed + "#SERVICE");
     config.set_instance_name(seed + "#INSTANCE");
     auto tracing_context_factory = std::make_unique<TracingContextFactory>(config);
 
-    SpanContextPtr previous_span_context;
+    SpanContextSharedPtr previous_span_context;
     if (!prev_seed.empty()) {
       std::string header_value = createPropagatedSW8HeaderValue(sampled, prev_seed);
       previous_span_context = createSpanContext(header_value);
       ASSERT(previous_span_context);
     }
 
-    TracingContextPtr tracing_context;
+    TracingContextSharedPtr tracing_context;
     if (previous_span_context) {
       tracing_context = tracing_context_factory->create(previous_span_context);
     } else {
@@ -86,9 +86,9 @@ public:
     return tracing_context;
   }
 
-  static TracingSpanPtr createSpanStore(TracingContextPtr tracing_context,
-                                        TracingSpanPtr parent_span_store, std::string seed,
-                                        bool sample = true) {
+  static TracingSpanSharedPtr createSpanStore(TracingContextSharedPtr tracing_context,
+                                              TracingSpanSharedPtr parent_span_store,
+                                              std::string seed, bool sample = true) {
     auto span_store = parent_span_store ? tracing_context->createExitSpan(parent_span_store)
                                         : tracing_context->createEntrySpan();
 

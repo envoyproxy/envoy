@@ -55,6 +55,7 @@
 #include "source/common/http/http3/codec_stats.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/orca/orca_load_metrics.h"
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/edf_scheduler.h"
@@ -1023,6 +1024,13 @@ public:
     return *happy_eyeballs_config_;
   }
 
+  OptRef<const Envoy::Orca::LrsReportMetricNames> lrsReportMetricNames() const override {
+    if (lrs_report_metric_names_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *lrs_report_metric_names_;
+  }
+
 protected:
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
   // budget message is specified, defaults will be filled in if either params are unspecified.
@@ -1111,6 +1119,7 @@ private:
   UpstreamFactoryContextImpl upstream_context_;
   std::unique_ptr<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
+  const std::unique_ptr<Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
 
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment

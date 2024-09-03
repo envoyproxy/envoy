@@ -61,9 +61,9 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
       SessionTicketKeysTypeCase::SESSION_TICKET_KEYS_TYPE_NOT_SET:
     return nullptr;
   default:
-    creation_status =
-        absl::InvalidArgumentError(fmt::format("Unexpected case for oneof session_ticket_keys: {}",
-                                               config.session_ticket_keys_type_case()));
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("Unexpected case for oneof session_ticket_keys: {}",
+                    static_cast<int>(config.session_ticket_keys_type_case())));
     return nullptr;
   }
 }

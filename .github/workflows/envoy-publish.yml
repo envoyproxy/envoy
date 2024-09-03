@@ -50,6 +50,25 @@ jobs:
       check-name: publish
       head-sha: ${{ inputs.sha }}
 
+  build:
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      gpg-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_GPG_MAINTAINER_KEY || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
+      gpg-key-password: >-
+        ${{ fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
+    if: ${{ fromJSON(needs.load.outputs.request).run.publish || fromJSON(needs.load.outputs.request).run.verify }}
+    needs:
+    - load
+    uses: ./.github/workflows/_publish_build.yml
+    name: Build
+    with:
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+
   publish:
     secrets:
       ENVOY_CI_SYNC_APP_ID: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_CI_SYNC_APP_ID || '' }}
@@ -62,7 +81,8 @@ jobs:
     if: ${{ fromJSON(needs.load.outputs.request).run.publish }}
     needs:
     - load
-    uses: ./.github/workflows/_stage_publish.yml
+    - build
+    uses: ./.github/workflows/_publish_publish.yml
     name: Publish
     with:
       request: ${{ needs.load.outputs.request }}
@@ -75,7 +95,8 @@ jobs:
     if: ${{ fromJSON(needs.load.outputs.request).run.verify }}
     needs:
     - load
-    uses: ./.github/workflows/_stage_verify.yml
+    - build
+    uses: ./.github/workflows/_publish_verify.yml
     name: Verify
     with:
       request: ${{ needs.load.outputs.request }}
@@ -95,6 +116,7 @@ jobs:
               || fromJSON(needs.load.outputs.request).run.verify) }}
     needs:
     - load
+    - build
     - publish
     - verify
     uses: ./.github/workflows/_finish.yml

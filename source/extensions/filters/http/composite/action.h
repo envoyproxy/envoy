@@ -11,8 +11,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
-using HttpExtensionConfigProviderSharedPtr = std::shared_ptr<
-    Config::DynamicExtensionConfigProvider<Envoy::Filter::NamedHttpFilterFactoryCb>>;
+using HttpExtensionConfigProviderSharedPtr =
+    std::shared_ptr<Config::DynamicExtensionConfigProvider<Envoy::Filter::HttpFilterFactoryCb>>;
 
 class ExecuteFilterAction
     : public Matcher::ActionBase<
@@ -80,14 +80,11 @@ private:
             return nullptr;
           }
 
-          auto config_value = provider->config();
-          if (config_value.has_value()) {
-            auto factory_cb = config_value.value().get().factory_cb;
-            return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+          if (auto config_value = provider->config(); config_value.has_value()) {
+            return std::make_unique<ExecuteFilterAction>(config_value.ref(), n);
           }
           // There is no dynamic config available. Apply missing config filter.
-          auto factory_cb = Envoy::Http::MissingConfigFilterFactory;
-          return std::make_unique<ExecuteFilterAction>(factory_cb, n);
+          return std::make_unique<ExecuteFilterAction>(Envoy::Http::MissingConfigFilterFactory, n);
         };
   }
 

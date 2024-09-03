@@ -139,7 +139,8 @@ absl::StatusOr<Event::ScaledTimerType> parseTimerType(
   case Config::TRANSPORT_SOCKET_CONNECT:
     return Event::ScaledTimerType::TransportSocketConnectTimeout;
   default:
-    return absl::InvalidArgumentError(fmt::format("Unknown timer type {}", config_timer_type));
+    return absl::InvalidArgumentError(
+        fmt::format("Unknown timer type {}", static_cast<int>(config_timer_type)));
   }
 }
 

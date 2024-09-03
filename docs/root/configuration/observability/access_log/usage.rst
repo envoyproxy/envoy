@@ -428,6 +428,10 @@ The following command operators are supported:
     * ``us``: Microsecond precision.
     * ``ns``: Nanosecond precision.
 
+    NOTE: enabling independent half-close behavior for H/2 and H/3 protocols can produce
+    ``*_TX_END`` values lower than ``*_RX_END`` values, in cases where upstream peer has half-closed
+    its stream before downstream peer. In these cases ``COMMON_DURATION`` value will become negative.
+
   TCP/UDP
     Not implemented ("-").
 
@@ -1108,6 +1112,24 @@ UDP
 %DOWNSTREAM_PEER_SERIAL%
   HTTP/TCP/THRIFT
     The serial number of the client certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256%
+  HTTP/TCP/THRIFT
+    The comma-separated hex-encoded SHA256 fingerprints of all client certificates used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1%
+  HTTP/TCP/THRIFT
+    The comma-separated hex-encoded SHA1 fingerprints of all client certificates used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_CHAIN_SERIALS%
+  HTTP/TCP/THRIFT
+    The comma-separated wserial numbers of all client certificates used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 

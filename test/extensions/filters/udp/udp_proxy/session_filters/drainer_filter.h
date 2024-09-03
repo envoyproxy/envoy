@@ -5,7 +5,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.validate.h"
@@ -23,6 +22,14 @@ using WriteDrainerConfig =
     test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionWriteFilterConfig;
 using DrainerConfig =
     test::extensions::filters::udp::udp_proxy::session_filters::DrainerUdpSessionFilterConfig;
+
+using Filter = Network::UdpSessionFilter;
+using ReadFilter = Network::UdpSessionReadFilter;
+using WriteFilter = Network::UdpSessionWriteFilter;
+using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
+using WriteFilterStatus = Network::UdpSessionWriteFilterStatus;
+using ReadFilterCallbacks = Network::UdpSessionReadFilterCallbacks;
+using WriteFilterCallbacks = Network::UdpSessionWriteFilterCallbacks;
 
 class DrainerUdpSessionReadFilter : public virtual ReadFilter {
 public:
@@ -92,7 +99,7 @@ private:
   FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ReadDrainerConfig& config,
                                     Server::Configuration::FactoryContext&) override {
-    return [config](FilterChainFactoryCallbacks& callbacks) -> void {
+    return [config](Network::UdpSessionFilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addReadFilter(std::make_unique<DrainerUdpSessionReadFilter>(
           config.downstream_bytes_to_drain(), config.stop_iteration_on_new_session(),
           config.stop_iteration_on_first_read(), config.continue_filter_chain()));
@@ -135,10 +142,10 @@ public:
   DrainerUdpSessionWriteFilterConfigFactory() : FactoryBase("test.udp_session.drainer_write") {}
 
 private:
-  FilterFactoryCb
+  Network::UdpSessionFilterFactoryCb
   createFilterFactoryFromProtoTyped(const WriteDrainerConfig& config,
                                     Server::Configuration::FactoryContext&) override {
-    return [config](FilterChainFactoryCallbacks& callbacks) -> void {
+    return [config](Network::UdpSessionFilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addWriteFilter(std::make_unique<DrainerUdpSessionWriteFilter>(
           config.upstream_bytes_to_drain(), config.stop_iteration_on_first_write()));
     };
@@ -166,10 +173,10 @@ public:
   DrainerUdpSessionFilterConfigFactory() : FactoryBase("test.udp_session.drainer") {}
 
 private:
-  FilterFactoryCb
+  Network::UdpSessionFilterFactoryCb
   createFilterFactoryFromProtoTyped(const DrainerConfig& config,
                                     Server::Configuration::FactoryContext&) override {
-    return [config](FilterChainFactoryCallbacks& callbacks) -> void {
+    return [config](Network::UdpSessionFilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addFilter(std::make_shared<DrainerUdpSessionFilter>(
           config.downstream_bytes_to_drain(), config.upstream_bytes_to_drain(),
           config.stop_iteration_on_new_session(), config.stop_iteration_on_first_read(),

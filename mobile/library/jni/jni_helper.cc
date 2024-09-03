@@ -19,44 +19,19 @@ thread_local JNIEnv* jni_env_cache_ = nullptr;
 // `jclass_cache_map` contains `jclass` references that are statically populated. This field is
 // used by `FindClass` to find the `jclass` reference from a given class name.
 absl::flat_hash_map<absl::string_view, jclass> jclass_cache_map;
-// The `jclass_cache_set` is a superset of `jclass_cache_map`. It contains `jclass` objects that are
-// retrieve dynamically via `GetObjectClass`.
-//
-// The `jclass_cache_set` owns the `jclass` global refs, wrapped in `GlobalRefUniquePtr` to allow
-// automatic `GlobalRef` destruction. The other fields, such as `jmethod_id_cache_map`,
-// `static_jmethod_id_cache_map`, `jfield_id_cache_map`, and `static_jfield_id_cache_map` only
-// borrow the `jclass` references.
-//
-// Note: all these fields are `thread_local` to avoid locking.
-thread_local absl::flat_hash_set<GlobalRefUniquePtr<jclass>> jclass_cache_set;
-thread_local absl::flat_hash_map<
+absl::flat_hash_map<
     std::tuple<jclass, absl::string_view /* method */, absl::string_view /* signature */>,
     jmethodID>
     jmethod_id_cache_map;
-thread_local absl::flat_hash_map<
-    std::tuple<jclass, absl::string_view /* method */, absl::string_view>,
-    jmethodID /* signature */>
+absl::flat_hash_map<std::tuple<jclass, absl::string_view /* method */, absl::string_view>,
+                    jmethodID /* signature */>
     static_jmethod_id_cache_map;
-thread_local absl::flat_hash_map<
-    std::tuple<jclass, absl::string_view /* field */, absl::string_view>, jfieldID /* signature */>
+absl::flat_hash_map<std::tuple<jclass, absl::string_view /* field */, absl::string_view>,
+                    jfieldID /* signature */>
     jfield_id_cache_map;
-thread_local absl::flat_hash_map<
-    std::tuple<jclass, absl::string_view /* field */, absl::string_view>, jfieldID /* signature */>
+absl::flat_hash_map<std::tuple<jclass, absl::string_view /* field */, absl::string_view>,
+                    jfieldID /* signature */>
     static_jfield_id_cache_map;
-
-/**
- * This function checks if the `clazz` already exists in the `jclass` `GlobalRef` cache and creates
- * a new `GlobalRef` if it does not already exist. This functions returns the `GlobalRef` of the
- * specified `clazz`.
- */
-jclass addClassToCacheIfNotExist(JNIEnv* env, jclass clazz) {
-  jclass java_class_global_ref = clazz;
-  if (auto it = jclass_cache_set.find(clazz); it == jclass_cache_set.end()) {
-    java_class_global_ref = reinterpret_cast<jclass>(env->NewGlobalRef(clazz));
-    jclass_cache_set.emplace(java_class_global_ref, GlobalRefDeleter());
-  }
-  return java_class_global_ref;
-}
 } // namespace
 
 void GlobalRefDeleter::operator()(jobject object) const {
@@ -99,21 +74,67 @@ void JniHelper::finalize() {
   jfield_id_cache_map.clear();
   static_jfield_id_cache_map.clear();
   jclass_cache_map.clear();
-  for (const auto& clazz : jclass_cache_set) {
-    env->DeleteGlobalRef(clazz.get());
+  for (const auto& [_, clazz] : jclass_cache_map) {
+    env->DeleteGlobalRef(clazz);
   }
-  jclass_cache_set.clear();
 }
 
-void JniHelper::addClassToCache(const char* class_name) {
+void JniHelper::addToCache(absl::string_view class_name, const std::vector<Method>& methods,
+                           const std::vector<Method>& static_methods,
+                           const std::vector<Field>& fields,
+                           const std::vector<Field>& static_fields) {
   JNIEnv* env;
   jint result = getJavaVm()->GetEnv(reinterpret_cast<void**>(&env), getVersion());
   ASSERT(result == JNI_OK, "Unable to get JNIEnv from the JavaVM.");
-  jclass java_class = env->FindClass(class_name);
+  jclass java_class = env->FindClass(class_name.data());
   ASSERT(java_class != nullptr, absl::StrFormat("Unable to find class '%s'.", class_name));
   jclass java_class_global_ref = reinterpret_cast<jclass>(env->NewGlobalRef(java_class));
   jclass_cache_map.emplace(class_name, java_class_global_ref);
-  jclass_cache_set.emplace(java_class_global_ref, GlobalRefDeleter());
+
+  for (const auto& [method_name, signature] : methods) {
+    jmethodID method_id =
+        env->GetMethodID(java_class_global_ref, method_name.data(), signature.data());
+    ASSERT(method_id != nullptr,
+           absl::StrFormat("Unable to find method ID for class '%s', method '%s', signature '%s'.",
+                           class_name, method_name, signature));
+    jmethod_id_cache_map.emplace(std::tuple<jclass, absl::string_view, absl::string_view>(
+                                     java_class_global_ref, method_name, signature),
+                                 method_id);
+  }
+
+  for (const auto& [method_name, signature] : static_methods) {
+    jmethodID method_id =
+        env->GetStaticMethodID(java_class_global_ref, method_name.data(), signature.data());
+    ASSERT(method_id != nullptr,
+           absl::StrFormat(
+               "Unable to find static method ID for class '%s', method '%s', signature '%s'.",
+               class_name, method_name, signature));
+    static_jmethod_id_cache_map.emplace(std::tuple<jclass, absl::string_view, absl::string_view>(
+                                            java_class_global_ref, method_name, signature),
+                                        method_id);
+  }
+
+  for (const auto& [field_name, signature] : fields) {
+    jfieldID field_id = env->GetFieldID(java_class_global_ref, field_name.data(), signature.data());
+    ASSERT(field_id != nullptr,
+           absl::StrFormat("Unable to find field ID for class '%s', field '%s', signature '%s'.",
+                           class_name, field_name, signature));
+    jfield_id_cache_map.emplace(std::tuple<jclass, absl::string_view, absl::string_view>(
+                                    java_class_global_ref, field_name, signature),
+                                field_id);
+  }
+
+  for (const auto& [field_name, signature] : static_fields) {
+    jfieldID field_id =
+        env->GetStaticFieldID(java_class_global_ref, field_name.data(), signature.data());
+    ASSERT(field_id != nullptr,
+           absl::StrFormat(
+               "Unable to find static field ID for class '%s', field '%s', signature '%s'.",
+               class_name, field_name, signature));
+    static_jfield_id_cache_map.emplace(std::tuple<jclass, absl::string_view, absl::string_view>(
+                                           java_class_global_ref, field_name, signature),
+                                       field_id);
+  }
 }
 
 JavaVM* JniHelper::getJavaVm() { return java_vm_cache_.load(std::memory_order_acquire); }
@@ -141,33 +162,45 @@ JNIEnv* JniHelper::getThreadLocalEnv() {
 JNIEnv* JniHelper::getEnv() { return env_; }
 
 jfieldID JniHelper::getFieldId(jclass clazz, const char* name, const char* signature) {
+  jfieldID field_id = env_->GetFieldID(clazz, name, signature);
+  rethrowException();
+  return field_id;
+}
+
+jfieldID JniHelper::getFieldIdFromCache(jclass clazz, const char* name, const char* signature) {
   if (auto it = jfield_id_cache_map.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
       it != jfield_id_cache_map.end()) {
     return it->second;
   }
-  jfieldID field_id = env_->GetFieldID(clazz, name, signature);
-  jclass clazz_global_ref = addClassToCacheIfNotExist(env_, clazz);
-  jfield_id_cache_map.emplace(
-      std::tuple<jclass, absl::string_view, absl::string_view>(clazz_global_ref, name, signature),
-      field_id);
+  // In the debug mode, the code will fail if the field ID is not in the cache since this is most
+  // likely due to a bug in the code. In the release mode, the code will use the non-caching field
+  // ID.
+  ASSERT(false, absl::StrFormat("Unable to find field ID '%s', signature '%s' from the cache.",
+                                name, signature));
+  return getFieldId(clazz, name, signature);
+}
+
+jfieldID JniHelper::getStaticFieldId(jclass clazz, const char* name, const char* signature) {
+  jfieldID field_id = env_->GetStaticFieldID(clazz, name, signature);
   rethrowException();
   return field_id;
 }
 
-jfieldID JniHelper::getStaticFieldId(jclass clazz, const char* name, const char* signature) {
+jfieldID JniHelper::getStaticFieldIdFromCache(jclass clazz, const char* name,
+                                              const char* signature) {
   if (auto it = static_jfield_id_cache_map.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
       it != static_jfield_id_cache_map.end()) {
     return it->second;
   }
-  jfieldID field_id = env_->GetStaticFieldID(clazz, name, signature);
-  jclass clazz_global_ref = addClassToCacheIfNotExist(env_, clazz);
-  static_jfield_id_cache_map.emplace(
-      std::tuple<jclass, absl::string_view, absl::string_view>(clazz_global_ref, name, signature),
-      field_id);
-  rethrowException();
-  return field_id;
+  // In the debug mode, the code will fail if the static field ID is not in the cache since this is
+  // most likely due to a bug in the code. In the release mode, the code will use the non-caching
+  // static field ID.
+  ASSERT(false,
+         absl::StrFormat("Unable to find static field ID '%s', signature '%s' from the cache.",
+                         name, signature));
+  return getStaticFieldId(clazz, name, signature);
 }
 
 #define DEFINE_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                      \
@@ -185,41 +218,55 @@ DEFINE_GET_FIELD(Double, jdouble)
 DEFINE_GET_FIELD(Boolean, jboolean)
 
 jmethodID JniHelper::getMethodId(jclass clazz, const char* name, const char* signature) {
+  jmethodID method_id = env_->GetMethodID(clazz, name, signature);
+  rethrowException();
+  return method_id;
+}
+
+jmethodID JniHelper::getMethodIdFromCache(jclass clazz, const char* name, const char* signature) {
   if (auto it = jmethod_id_cache_map.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
       it != jmethod_id_cache_map.end()) {
     return it->second;
   }
-  jmethodID method_id = env_->GetMethodID(clazz, name, signature);
-  jclass clazz_global_ref = addClassToCacheIfNotExist(env_, clazz);
-  jmethod_id_cache_map.emplace(
-      std::tuple<jclass, absl::string_view, absl::string_view>(clazz_global_ref, name, signature),
-      method_id);
+  // In the debug mode, the code will fail if the method ID is not in the cache since this is most
+  // likely due to a bug in the code. In the release mode, the code will use the non-caching method
+  // ID.
+  ASSERT(false, absl::StrFormat("Unable to find method ID '%s', signature '%s' from the cache.",
+                                name, signature));
+  return getMethodId(clazz, name, signature);
+}
+
+jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const char* signature) {
+  jmethodID method_id = env_->GetStaticMethodID(clazz, name, signature);
   rethrowException();
   return method_id;
 }
 
-jmethodID JniHelper::getStaticMethodId(jclass clazz, const char* name, const char* signature) {
+jmethodID JniHelper::getStaticMethodIdFromCache(jclass clazz, const char* name,
+                                                const char* signature) {
   if (auto it = static_jmethod_id_cache_map.find(
           std::tuple<jclass, absl::string_view, absl::string_view>(clazz, name, signature));
       it != static_jmethod_id_cache_map.end()) {
     return it->second;
   }
-  jmethodID method_id = env_->GetStaticMethodID(clazz, name, signature);
-  jclass clazz_global_ref = addClassToCacheIfNotExist(env_, clazz);
-  static_jmethod_id_cache_map.emplace(
-      std::tuple<jclass, absl::string_view, absl::string_view>(clazz_global_ref, name, signature),
-      method_id);
-  rethrowException();
-  return method_id;
+  // In the debug mode, the code will fail if the static method ID is not in the cache since this is
+  // most likely due to a bug in the code. In the release mode, the code will use the non-caching
+  // static method ID.
+  ASSERT(false,
+         absl::StrFormat("Unable to find static method ID '%s', signature '%s' from the cache.",
+                         name, signature));
+  return getStaticMethodId(clazz, name, signature);
 }
 
-jclass JniHelper::findClass(const char* class_name) {
+jclass JniHelper::findClassFromCache(const char* class_name) {
   if (auto i = jclass_cache_map.find(class_name); i != jclass_cache_map.end()) {
     return i->second;
   }
+  // In the debug mode, the code will fail if the class is not in the cache since this is most
+  // likely due to a bug in the code. In the release mode, the code will use the non-caching class.
   ASSERT(false, absl::StrFormat("Unable to find class '%s'.", class_name));
-  return nullptr;
+  return env_->FindClass(class_name);
 }
 
 LocalRefUniquePtr<jclass> JniHelper::getObjectClass(jobject object) {
@@ -227,7 +274,7 @@ LocalRefUniquePtr<jclass> JniHelper::getObjectClass(jobject object) {
 }
 
 void JniHelper::throwNew(const char* java_class_name, const char* message) {
-  jclass java_class = findClass(java_class_name);
+  jclass java_class = findClassFromCache(java_class_name);
   if (java_class != nullptr) {
     jint error = env_->ThrowNew(java_class, message);
     ASSERT(error == JNI_OK, "Failed calling ThrowNew.");

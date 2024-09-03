@@ -962,3 +962,39 @@ envoy_cc_test_library(
         "//source/extensions/filters/network/common:factory_base_lib",
     ],
 )
+
+envoy_proto_library(
+    name = "non_terminal_encoding_filter_proto",
+    srcs = ["non_terminal_encoding_filter.proto"],
+)
+
+envoy_cc_test_library(
+    name = "non_terminal_encoding_filter_lib",
+    srcs = [
+        "non_terminal_encoding_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        ":non_terminal_encoding_filter_proto_cc_proto",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/integration:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "stop_in_headers_continue_in_data_filter_lib",
+    srcs = ["stop_in_headers_continue_in_data_filter.cc"],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/protobuf",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)

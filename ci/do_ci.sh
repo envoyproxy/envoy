@@ -8,8 +8,10 @@ set -e
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 
+CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+
 # shellcheck source=ci/build_setup.sh
-. "$(dirname "$0")"/build_setup.sh
+. "${CURRENT_SCRIPT_DIR}"/build_setup.sh
 
 echo "building using ${NUM_CPUS} CPUs"
 echo "building for ${ENVOY_BUILD_ARCH}"
@@ -54,6 +56,8 @@ FETCH_FORMAT_TARGETS+=(
 FETCH_PROTO_TARGETS=(
     @com_github_bufbuild_buf//:bin/buf
     //tools/proto_format/...)
+
+GCS_REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
 
 retry () {
     local n wait iterations
@@ -233,6 +237,70 @@ function bazel_contrib_binary_build() {
   bazel_binary_build "$1" "${ENVOY_CONTRIB_BUILD_TARGET}" "${ENVOY_CONTRIB_BUILD_DEBUG_INFORMATION}" envoy-contrib
 }
 
+function bazel_envoy_api_build() {
+    # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
+    # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
+    ENVOY_STDLIB="libstdc++"
+    setup_clang_toolchain
+    export CLANG_TOOLCHAIN_SETUP=1
+    export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
+    echo "Run protoxform test"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
+        //tools/protoprint:protoprint_test
+    echo "Validating API structure..."
+    "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
+    echo "Testing API..."
+    bazel_with_collection \
+        test "${BAZEL_BUILD_OPTIONS[@]}" \
+        --remote_download_minimal \
+        -c fastbuild \
+        @envoy_api//test/... \
+        @envoy_api//tools/... \
+        @envoy_api//tools:tap2pcap_test
+    echo "Building API..."
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+        -c fastbuild @envoy_api//envoy/...
+}
+
+function bazel_envoy_api_go_build() {
+    if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
+        setup_clang_toolchain
+    fi
+    GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
+    GO_TARGETS=(@envoy_api//...)
+    read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
+    echo "${GO_PROTOS[@]}" | grep -q envoy_api || echo "No go proto targets found"
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+            --experimental_proto_descriptor_sets_include_source_info \
+            --remote_download_outputs=all \
+            "${GO_PROTOS[@]}"
+    rm -rf build_go
+    mkdir -p build_go
+    echo "Copying go protos -> build_go"
+    BAZEL_BIN="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)"
+    for GO_PROTO in "${GO_PROTOS[@]}"; do
+            # strip @envoy_api//
+        RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
+        PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
+        INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
+        OUTPUT_DIR="build_go/${RULE_DIR}"
+        mkdir -p "$OUTPUT_DIR"
+        if [[ ! -e "$INPUT_DIR" ]]; then
+            echo "Unable to find input ${INPUT_DIR}" >&2
+            exit 1
+        fi
+        # echo "Copying go files ${INPUT_DIR} -> ${OUTPUT_DIR}"
+        while read -r GO_FILE; do
+            cp -a "$GO_FILE" "$OUTPUT_DIR"
+            if [[ "$GO_FILE" = *.validate.go ]]; then
+                sed -i '1s;^;//go:build !disable_pgv\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+            fi
+        done <<< "$(find "$INPUT_DIR" -name "*.go")"
+    done
+}
+
 CI_TARGET=$1
 shift
 
@@ -259,70 +327,15 @@ fi
 
 case $CI_TARGET in
     api)
-        # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
-        # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
-        ENVOY_STDLIB="libstdc++"
-        setup_clang_toolchain
-        export CLANG_TOOLCHAIN_SETUP=1
-        export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
-        echo "Run protoxform test"
-        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
-              --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
-              --//tools/api_proto_plugin:extra_args=api_version:3.7 \
-              //tools/protoprint:protoprint_test
-        echo "Validating API structure..."
-        "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
-        echo "Testing API..."
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            --remote_download_minimal \
-            -c fastbuild \
-            @envoy_api//test/... \
-            @envoy_api//tools/... \
-            @envoy_api//tools:tap2pcap_test
-        echo "Building API..."
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-              -c fastbuild @envoy_api//envoy/...
+        bazel_envoy_api_build
         if [[ -n "$ENVOY_API_ONLY" ]]; then
             exit 0
         fi
-        ;&
+        bazel_envoy_api_go_build
+        ;;
 
     api.go)
-        if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
-            setup_clang_toolchain
-        fi
-        GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
-        GO_TARGETS=(@envoy_api//...)
-        read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
-        echo "${GO_PROTOS[@]}" | grep -q envoy_api || echo "No go proto targets found"
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
-              --experimental_proto_descriptor_sets_include_source_info \
-              --remote_download_outputs=all \
-              "${GO_PROTOS[@]}"
-        rm -rf build_go
-        mkdir -p build_go
-        echo "Copying go protos -> build_go"
-        BAZEL_BIN="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)"
-        for GO_PROTO in "${GO_PROTOS[@]}"; do
-             # strip @envoy_api//
-            RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
-            PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
-            INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
-            OUTPUT_DIR="build_go/${RULE_DIR}"
-            mkdir -p "$OUTPUT_DIR"
-            if [[ ! -e "$INPUT_DIR" ]]; then
-                echo "Unable to find input ${INPUT_DIR}" >&2
-                exit 1
-            fi
-            # echo "Copying go files ${INPUT_DIR} -> ${OUTPUT_DIR}"
-            while read -r GO_FILE; do
-                cp -a "$GO_FILE" "$OUTPUT_DIR"
-                if [[ "$GO_FILE" = *.validate.go ]]; then
-                    sed -i '1s;^;//go:build !disable_pgv\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
-                fi
-            done <<< "$(find "$INPUT_DIR" -name "*.go")"
-        done
+        bazel_envoy_api_go_build
         ;;
 
     api_compat)
@@ -481,7 +494,16 @@ case $CI_TARGET in
         else
             TARGET=coverage
         fi
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "/source/generated/${TARGET}" "$TARGET"
+        GCS_LOCATION=$(
+            bazel run //tools/gcs:upload \
+                  "${GCS_ARTIFACT_BUCKET}" \
+                  "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+                  "/source/generated/${TARGET}" \
+                  "$TARGET" \
+                  "${GCS_REDIRECT_PATH}")
+        if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
+            echo "##vso[task.logissue type=error]Coverage failed, check artifact at: ${GCS_LOCATION}"
+        fi
         ;;
 
     debug)
@@ -569,6 +591,7 @@ case $CI_TARGET in
         else
             ENVOY_RELEASE_TARBALL="/build/release/arm64/bin/release.tar.zst"
         fi
+
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/zstd \
               -- --stdout \
@@ -642,7 +665,12 @@ case $CI_TARGET in
 
     docker-upload)
         setup_clang_toolchain
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/build_images" docker
+        bazel run //tools/gcs:upload \
+              "${GCS_ARTIFACT_BUCKET}" \
+              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+              "${BUILD_DIR}/build_images" \
+              "docker" \
+              "${GCS_REDIRECT_PATH}"
         ;;
 
     dockerhub-publish)
@@ -684,7 +712,12 @@ case $CI_TARGET in
 
     docs-upload)
         setup_clang_toolchain
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" /source/generated/docs docs
+        bazel run //tools/gcs:upload \
+              "${GCS_ARTIFACT_BUCKET}" \
+              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
+              /source/generated/docs \
+              docs \
+              "${GCS_REDIRECT_PATH}"
         ;;
 
     fetch|fetch-*)
@@ -867,7 +900,9 @@ case $CI_TARGET in
 
         # Build
         echo "Building with:"
+        echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
         echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+        echo "  binary dir:  ${ENVOY_BINARY_DIR}"
 
         # Build release binaries
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -907,7 +942,6 @@ case $CI_TARGET in
         setup_clang_toolchain
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
-        "${ENVOY_SRCDIR}/ci/upload_gcs_artifact.sh" "${BUILD_DIR}/envoy" release
         ;;
 
     sizeopt)
@@ -1004,6 +1038,21 @@ case $CI_TARGET in
                  --trigger-ref="$ENVOY_BRANCH" \
                  --trigger-workflow="$WORKFLOW" \
                  --trigger-inputs="$INPUTS"
+        ;;
+
+    refresh_compdb)
+        if [[ -z "${SKIP_PROTO_FORMAT}" ]]; then
+            "${CURRENT_SCRIPT_DIR}/../tools/proto_format/proto_format.sh" fix
+        fi
+
+        read -ra ENVOY_GEN_COMPDB_OPTIONS <<< "${ENVOY_GEN_COMPDB_OPTIONS:-}"
+
+        # Setting TEST_TMPDIR here so the compdb headers won't be overwritten by another bazel run.
+        TEST_TMPDIR="${BUILD_DIR}/envoy-compdb" \
+            "${CURRENT_SCRIPT_DIR}/../tools/gen_compilation_database.py" \
+            "${ENVOY_GEN_COMPDB_OPTIONS[@]}"
+        # Kill clangd to reload the compilation database
+        pkill clangd || :
         ;;
 
     *)

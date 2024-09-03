@@ -126,9 +126,7 @@ public:
   const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
     return deny_redirect_header_matchers_;
   }
-  const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
-    return oauth_token_endpoint_;
-  }
+  const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
@@ -141,6 +139,7 @@ public:
   FilterStats& stats() { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
+  const std::string& cookieDomain() const { return cookie_domain_; }
   const AuthType& authType() const { return auth_type_; }
   bool useRefreshToken() const { return use_refresh_token_; }
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
@@ -148,11 +147,17 @@ public:
     return default_refresh_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
+  const OptRef<const RouteRetryPolicy> retryPolicy() const {
+    if (!retry_policy_.has_value()) {
+      return absl::nullopt;
+    }
+    return makeOptRef(retry_policy_.value());
+  }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
-  const envoy::config::core::v3::HttpUri oauth_token_endpoint_;
+  const HttpUri oauth_token_endpoint_;
   // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
@@ -168,6 +173,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
   const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
+  const std::string cookie_domain_;
   const AuthType auth_type_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
@@ -175,6 +181,7 @@ private:
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
   const bool disable_id_token_set_cookie_ : 1;
+  absl::optional<RouteRetryPolicy> retry_policy_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -202,8 +209,9 @@ public:
 
 class OAuth2CookieValidator : public CookieValidator {
 public:
-  explicit OAuth2CookieValidator(TimeSource& time_source, const CookieNames& cookie_names)
-      : time_source_(time_source), cookie_names_(cookie_names) {}
+  explicit OAuth2CookieValidator(TimeSource& time_source, const CookieNames& cookie_names,
+                                 const std::string& cookie_domain)
+      : time_source_(time_source), cookie_names_(cookie_names), cookie_domain_(cookie_domain) {}
 
   const std::string& token() const override { return token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
@@ -224,6 +232,7 @@ private:
   absl::string_view host_;
   TimeSource& time_source_;
   const CookieNames cookie_names_;
+  const std::string cookie_domain_;
 };
 
 /**

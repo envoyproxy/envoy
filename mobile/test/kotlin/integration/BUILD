@@ -1,6 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:envoy_mobile_android_test.bzl", "envoy_mobile_android_test")
-load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -354,9 +353,6 @@ envoy_mobile_android_test(
     srcs = [
         "FilterThrowingExceptionTest.kt",
     ],
-    exec_properties = {
-        "dockerNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
@@ -370,16 +366,6 @@ envoy_mobile_android_test(
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
-    ],
-)
-
-kt_android_library(
-    name = "test_utilities",
-    srcs = [
-        "TestUtilities.kt",
-    ],
-    deps = [
-        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
-        "@maven//:junit_junit",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )

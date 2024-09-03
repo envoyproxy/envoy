@@ -64,10 +64,14 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 // This function covers both periodical report and immediate report case, with the difference that
 // bucked id in periodical report case is empty.
 void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
-  ASSERT(stream_ != nullptr);
-  // Build the report and then send the report to RLQS server.
-  // `end_stream` should always be set to false as we don't want to close the stream locally.
-  stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
+  if (stream_ != nullptr) {
+    // Build the report and then send the report to RLQS server.
+    // `end_stream` should always be set to false as we don't want to close the stream locally.
+    stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
+  } else {
+    // Don't send any reports if stream has already been closed.
+    ENVOY_LOG(debug, "The stream has already been closed; no reports will be sent.");
+  }
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
@@ -126,7 +130,8 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
         break;
       }
       default: {
-        ENVOY_LOG_EVERY_POW_2(error, "Unset bucket action type {}", action.bucket_action_case());
+        ENVOY_LOG_EVERY_POW_2(error, "Unset bucket action type {}",
+                              static_cast<int>(action.bucket_action_case()));
         break;
       }
       }
@@ -143,20 +148,18 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
-  if (stream_ != nullptr && !stream_closed_) {
+  if (stream_ != nullptr) {
     ENVOY_LOG(debug, "Closing gRPC stream");
     stream_->closeStream();
-    stream_closed_ = true;
     stream_->resetStream();
+    stream_ = nullptr;
   }
 }
 
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                         const std::string& message) {
-  // TODO(tyxia) Revisit later, maybe add some logging.
-  stream_closed_ = true;
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  closeStream();
+  stream_ = nullptr;
 }
 
 absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {

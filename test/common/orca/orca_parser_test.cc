@@ -67,6 +67,23 @@ TEST(OrcaParserUtilTest, InvalidBinaryHeader) {
                   testing::HasSubstr("unable to parse binaryheader to OrcaLoadReport")));
 }
 
+TEST(OrcaParserUtilTest, BinaryHeaderPopulatedWithReadableString) {
+  Http::TestRequestHeaderMapImpl headers{
+      {std::string(kEndpointLoadMetricsHeaderBin), "not-a-valid-binary-proto"}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::HasStatus(
+                  absl::StatusCode::kInvalidArgument,
+                  testing::HasSubstr(
+                      "unable to decode ORCA binary header value: not-a-valid-binary-proto")));
+}
+
+TEST(OrcaParserUtilTest, EmptyBinaryHeader) {
+  Http::TestRequestHeaderMapImpl headers{{std::string(kEndpointLoadMetricsHeaderBin), ""}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                       testing::HasSubstr("ORCA binary header value is empty")));
+}
+
 } // namespace
 } // namespace Orca
 } // namespace Envoy

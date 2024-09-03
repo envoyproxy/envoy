@@ -182,6 +182,9 @@ protected:
         test::integration::filters::LoggingTestFilterConfig logging_filter_config;
         logging_filter_config.set_logging_id(ext_proc_filter_name);
         logging_filter_config.set_upstream_cluster_name(valid_grpc_cluster_name);
+        // No need to check the bytes received for observability mode because it is a
+        // "send and go" mode.
+        logging_filter_config.set_check_received_bytes(!proto_config_.observability_mode());
         envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
         logging_filter.set_name("logging-test-filter");
         logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
@@ -4646,6 +4649,19 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
                                  "paused_reading_total",
                                  2);
 
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBodyAndTrailer("hello world");
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  handleUpstreamRequest(100);
   verifyDownstreamResponse(*response, 200);
 }
 

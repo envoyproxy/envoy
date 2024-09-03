@@ -51,6 +51,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& 
     : ClusterImplBase(cluster, context, creation_status), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
+      dns_jitter_ms_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter, 0))),
       respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
           [this]() -> void { startResolve(); })),
@@ -148,6 +149,9 @@ void LogicalDnsCluster::startResolve() {
 
           if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
             final_refresh_rate = addrinfo.ttl_;
+          }
+          if (dns_jitter_ms_.count() != 0) {
+            final_refresh_rate += std::chrono::milliseconds(random_.random()) % dns_jitter_ms_;
           }
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());

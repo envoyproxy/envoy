@@ -61,6 +61,29 @@ public:
   virtual const std::string& serialNumberPeerCertificate() const PURE;
 
   /**
+   * @return absl::Span<const std::string> the SHA256 digests of all peer certificates.
+   *         Returns an empty vector if there is no peer certificate which can happen in
+   *         TLS (non mTLS) connections.
+   */
+  virtual absl::Span<const std::string> sha256PeerCertificateChainDigests() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the SHA1 digest of all peer certificates.
+   *         Returns an empty vector if there is no peer certificate which can happen in
+   *         TLS (non mTLS) connections.
+   */
+  virtual absl::Span<const std::string> sha1PeerCertificateChainDigests() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the serial numbers of all peer certificates.
+   *         An empty vector indicates that there were no peer certificates which can happen
+   *         in TLS (non mTLS) connections.
+   *         A vector element with a "" value indicates that the certificate at that index in
+   *         the cert chain did not have a serial number.
+   **/
+  virtual absl::Span<const std::string> serialNumbersPeerCertificates() const PURE;
+
+  /**
    * @return std::string the issuer field of the peer certificate in RFC 2253 format. Returns "" if
    *         there is no peer certificate, or no issuer.
    **/

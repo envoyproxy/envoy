@@ -1235,6 +1235,11 @@ public:
   virtual OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const PURE;
 
+  /**
+   * @return Reference to the optional config for LRS endpoint metric reporting.
+   */
+  virtual OptRef<const std::vector<std::string>> lrsReportMetricNames() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.
@@ -1328,7 +1333,7 @@ namespace fmt {
 // fmt formatter class for Host
 template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_view> {
   template <typename FormatContext>
-  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) -> decltype(ctx.out()) {
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) const -> decltype(ctx.out()) {
     absl::string_view out = !host.hostname().empty() ? host.hostname()
                             : host.address()         ? host.address()->asStringView()
                                                      : "<empty>";

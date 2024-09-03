@@ -11,8 +11,29 @@
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
   Envoy::JNI::JniHelper::initialize(vm);
-  Envoy::JNI::JniHelper::addClassToCache("java/lang/Exception");
-  Envoy::JNI::JniHelper::addClassToCache("java/lang/RuntimeException");
+  Envoy::JNI::JniHelper::addToCache("java/lang/Exception", /* methods= */ {},
+                                    /* static_methods= */ {}, /* fields= */ {},
+                                    /* static_fields= */ {});
+  Envoy::JNI::JniHelper::addToCache("java/lang/RuntimeException", /* methods= */ {},
+                                    /* static_methods= */ {}, /* fields= */ {},
+                                    /* static_fields= */ {});
+  Envoy::JNI::JniHelper::addToCache(
+      "io/envoyproxy/envoymobile/jni/JniHelperTest$Foo", /* methods= */
+      {
+          {"<init>", "()V"},
+      },
+      /* static_methods= */
+      {
+          {"staticMethod", "()V"},
+      },
+      /* fields= */
+      {
+          {"field", "I"},
+      },
+      /* static_fields= */
+      {
+          {"staticField", "I"},
+      });
   return Envoy::JNI::JniHelper::getVersion();
 }
 
@@ -28,12 +49,38 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTe
   jni_helper.getFieldId(clazz, name_ptr.get(), sig_ptr.get());
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getFieldIdFromCache(JNIEnv* env, jclass,
+                                                                     jstring class_name,
+                                                                     jstring field_name,
+                                                                     jstring signature) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr class_name_ptr = jni_helper.getStringUtfChars(class_name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr field_name_ptr = jni_helper.getStringUtfChars(field_name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  auto clazz = jni_helper.findClassFromCache(class_name_ptr.get());
+  jni_helper.getFieldIdFromCache(clazz, field_name_ptr.get(), sig_ptr.get());
+}
+
 extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getStaticFieldId(
     JNIEnv* env, jclass, jclass clazz, jstring name, jstring signature) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr name_ptr = jni_helper.getStringUtfChars(name, nullptr);
   Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
   jni_helper.getStaticFieldId(clazz, name_ptr.get(), sig_ptr.get());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getStaticFieldIdFromCache(JNIEnv* env, jclass,
+                                                                           jstring class_name,
+                                                                           jstring field_name,
+                                                                           jstring signature) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr class_name_ptr = jni_helper.getStringUtfChars(class_name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr field_name_ptr = jni_helper.getStringUtfChars(field_name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  auto clazz = jni_helper.findClassFromCache(class_name_ptr.get());
+  jni_helper.getStaticFieldIdFromCache(clazz, field_name_ptr.get(), sig_ptr.get());
 }
 
 #define DEFINE_JNI_GET_FIELD(JAVA_TYPE, JNI_TYPE)                                                  \
@@ -76,6 +123,20 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTe
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getMethodIdFromCache(JNIEnv* env, jclass,
+                                                                      jstring class_name,
+                                                                      jstring method_name,
+                                                                      jstring signature) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr class_name_ptr = jni_helper.getStringUtfChars(class_name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr method_name_ptr =
+      jni_helper.getStringUtfChars(method_name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  auto clazz = jni_helper.findClassFromCache(class_name_ptr.get());
+  jni_helper.getMethodIdFromCache(clazz, method_name_ptr.get(), sig_ptr.get());
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getStaticMethodId(JNIEnv* env, jclass,
                                                                    jclass clazz, jstring name,
                                                                    jstring signature) {
@@ -85,11 +146,26 @@ Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getStaticMethodId(JNIEnv* env, 
   jni_helper.getStaticMethodId(clazz, name_ptr.get(), sig_ptr.get());
 }
 
-extern "C" JNIEXPORT jclass JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_findClass(
-    JNIEnv* env, jclass, jstring class_name) {
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getStaticMethodIdFromCache(JNIEnv* env, jclass,
+                                                                            jstring class_name,
+                                                                            jstring method_name,
+                                                                            jstring signature) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::JNI::StringUtfUniquePtr class_name_ptr = jni_helper.getStringUtfChars(class_name, nullptr);
-  return jni_helper.findClass(class_name_ptr.get());
+  Envoy::JNI::StringUtfUniquePtr method_name_ptr =
+      jni_helper.getStringUtfChars(method_name, nullptr);
+  Envoy::JNI::StringUtfUniquePtr sig_ptr = jni_helper.getStringUtfChars(signature, nullptr);
+  auto clazz = jni_helper.findClassFromCache(class_name_ptr.get());
+  jni_helper.getStaticMethodIdFromCache(clazz, method_name_ptr.get(), sig_ptr.get());
+}
+
+extern "C" JNIEXPORT jclass JNICALL
+Java_io_envoyproxy_envoymobile_jni_JniHelperTest_findClassFromCache(JNIEnv* env, jclass,
+                                                                    jstring class_name) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  Envoy::JNI::StringUtfUniquePtr class_name_ptr = jni_helper.getStringUtfChars(class_name, nullptr);
+  return jni_helper.findClassFromCache(class_name_ptr.get());
 }
 
 extern "C" JNIEXPORT jclass JNICALL Java_io_envoyproxy_envoymobile_jni_JniHelperTest_getObjectClass(

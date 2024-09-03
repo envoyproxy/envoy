@@ -1208,6 +1208,11 @@ ClusterInfoImpl::ClusterInfoImpl(
                     envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>(
                     config.upstream_connection_options().happy_eyeballs_config())
               : nullptr),
+      lrs_report_metric_names_(!config.lrs_report_endpoint_metrics().empty()
+                                   ? std::make_unique<Envoy::Orca::LrsReportMetricNames>(
+                                         config.lrs_report_endpoint_metrics().begin(),
+                                         config.lrs_report_endpoint_metrics().end())
+                                   : nullptr),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       max_response_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -1792,7 +1797,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   default:
     return absl::InvalidArgumentError(fmt::format(
         "Cluster drop_overloads config denominator setting is invalid : {}. Valid range 0~2.",
-        drop_percentage.denominator()));
+        static_cast<int>(drop_percentage.denominator())));
   }
 
   // If DropOverloadRuntimeKey is not enabled, honor the EDS drop_overload config.
