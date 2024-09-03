@@ -571,9 +571,12 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
 
     len = value.length();
     go_strs[i].n = len;
-    go_strs[i].p = go_buf;
-    memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
-    go_buf += len;
+    // go_buf may be an invalid pointer in Golang side when len is 0.
+    if (len > 0) {
+      go_strs[i].p = go_buf;
+      memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
+      go_buf += len;
+    }
     i++;
     return Http::HeaderMap::Iterate::Continue;
   });
