@@ -529,7 +529,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-        "ACCESS_LOG_TYPE=%ACCESS_LOG_TYPE%");
+        "%ACCESS_LOG_TYPE%-%UPSTREAM_CONNECTION_ID%\n");
     access_log->mutable_typed_config()->PackFrom(access_log_config);
     config_blob->PackFrom(tcp_proxy_config);
   });
@@ -541,9 +541,12 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
 
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   auto log_result = waitForAccessLog(access_log_path);
-  EXPECT_EQ(absl::StrCat("ACCESS_LOG_TYPE=",
-                         AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected)),
-            log_result);
+  std::vector<std::string> access_log_parts = absl::StrSplit(log_result, '-');
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected),
+            access_log_parts[0]);
+  uint32_t upstream_connection_id;
+  ASSERT_TRUE(absl::SimpleAtoi(access_log_parts[1], &upstream_connection_id));
+  EXPECT_GT(upstream_connection_id, 0);
 
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(tcp_client->write("", true));
@@ -552,12 +555,13 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForDisconnect();
   test_server_.reset();
-  log_result = waitForAccessLog(access_log_path);
-  EXPECT_EQ(
-      absl::StrCat(
-          "ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpUpstreamConnected),
-          "ACCESS_LOG_TYPE=", AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd)),
-      log_result);
+
+  log_result = waitForAccessLog(access_log_path, 1);
+  access_log_parts = absl::StrSplit(log_result, '-');
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd),
+            access_log_parts[0]);
+  ASSERT_TRUE(absl::SimpleAtoi(access_log_parts[1], &upstream_connection_id));
+  EXPECT_GT(upstream_connection_id, 0);
 }
 
 TEST_P(TcpProxyIntegrationTest, PeriodicAccessLog) {
