@@ -558,8 +558,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLogOnUpstreamConnect) {
 
   log_result = waitForAccessLog(access_log_path, 1);
   access_log_parts = absl::StrSplit(log_result, '-');
-  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd),
-            access_log_parts[0]);
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd), access_log_parts[0]);
   ASSERT_TRUE(absl::SimpleAtoi(access_log_parts[1], &upstream_connection_id));
   EXPECT_GT(upstream_connection_id, 0);
 }
