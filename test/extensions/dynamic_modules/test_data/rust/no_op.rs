@@ -1,5 +1,5 @@
 use envoy_proxy_dynamic_modules_rust_sdk::declare_program_init;
-use std::sync::{LazyLock, Mutex};
+use std::sync::atomic::{AtomicI32, Ordering};
 
 declare_program_init!(init);
 
@@ -7,11 +7,9 @@ fn init() -> bool {
     true
 }
 
-static SOME_VARIABLE: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0));
+static SOME_VARIABLE: AtomicI32 = AtomicI32::new(1);
 
 #[no_mangle]
 pub extern "C" fn getSomeVariable() -> i32 {
-    let mut v = SOME_VARIABLE.lock().unwrap();
-    *v += 1;
-    *v
+    SOME_VARIABLE.fetch_add(1, Ordering::SeqCst)
 }
