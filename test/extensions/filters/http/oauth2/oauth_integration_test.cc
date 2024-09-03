@@ -209,6 +209,11 @@ typed_config:
       cluster: oauth
       uri: oauth.com/token
       timeout: 3s
+    retry_policy:
+      retry_back_off:
+        base_interval: 1s
+        max_interval: 10s
+      num_retries: 5
     authorization_endpoint: https://oauth.com/oauth/authorize/
     redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
     redirect_path_matcher:
@@ -266,7 +271,7 @@ typed_config:
         Http::Headers::get().Cookie,
         absl::StrCat(default_cookie_names_.refresh_token_, "=", refreshToken));
 
-    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_};
+    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_, ""};
     validator.setParams(validate_headers, std::string(hmac_secret));
     return validator.isValid();
   }

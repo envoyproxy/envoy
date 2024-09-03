@@ -100,13 +100,16 @@ public:
         self_addr_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0]),
             54321)),
-        peer_socket_(createConnectionSocket(self_addr_, peer_addr_, nullptr)),
+        peer_socket_(std::make_unique<Network::UdpListenSocket>(peer_addr_, /*options=*/nullptr,
+                                                                /*bind=*/true)),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
         transport_socket_options_(std::make_shared<Network::TransportSocketOptionsImpl>()),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}) {
+    // After binding the listen peer socket, set the bound IP address of the peer.
+    peer_addr_ = peer_socket_->connectionInfoProvider().localAddress();
     http3_options_.mutable_quic_protocol_options()
         ->mutable_num_timeouts_to_trigger_port_migration()
         ->set_value(1);
@@ -187,7 +190,7 @@ protected:
   Network::Address::InstanceConstSharedPtr self_addr_;
   // Used in some tests to trigger a read event on the connection to test its full interaction with
   // socket read utility functions.
-  Network::ConnectionSocketPtr peer_socket_;
+  Network::UdpListenSocketPtr peer_socket_;
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   TestEnvoyQuicClientConnection* quic_connection_;
