@@ -77,7 +77,6 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers;
-  quic_headers.OnHeaderBlockStart();
   quic_headers.OnHeader(":authority", "www.google.com");
   quic_headers.OnHeader(":path", "/index.hml");
   quic_headers.OnHeader(":scheme", "https");
@@ -101,7 +100,6 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers2;
-  quic_headers2.OnHeaderBlockStart();
   quic_headers2.OnHeader(":authority", "www.google.com");
   quic_headers2.OnHeader(":path", "/index.hml");
   quic_headers2.OnHeader(":scheme", "https");
@@ -226,7 +224,6 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   absl::string_view details;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   quic::QuicHeaderList quic_headers;
-  quic_headers.OnHeaderBlockStart();
   quic_headers.OnHeader(":authority", "www.google.com");
   quic_headers.OnHeader(":path", "/index.hml");
   quic_headers.OnHeader(":scheme", "https");

@@ -3897,6 +3897,7 @@ envoy_quic_cc_library(
     srcs = [
         "quiche/quic/core/chlo_extractor.cc",
         "quiche/quic/core/quic_buffered_packet_store.cc",
+        "quiche/quic/core/quic_dispatcher_stats.cc",
         "quiche/quic/core/quic_dispatcher.cc",
         "quiche/quic/core/tls_chlo_extractor.cc",
     ],
@@ -3904,6 +3905,7 @@ envoy_quic_cc_library(
         "quiche/quic/core/chlo_extractor.h",
         "quiche/quic/core/quic_buffered_packet_store.h",
         "quiche/quic/core/quic_dispatcher.h",
+        "quiche/quic/core/quic_dispatcher_stats.h",
         "quiche/quic/core/tls_chlo_extractor.h",
     ],
     deps = [
