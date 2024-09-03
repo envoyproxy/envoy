@@ -3,9 +3,7 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-mod abi {
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
+mod abi;
 
 /// Declare the init function for the dynamic module. This function is called when the dynamic module is loaded.
 /// The function must return true on success, and false on failure. When it returns false,

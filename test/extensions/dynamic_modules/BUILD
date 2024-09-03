@@ -33,7 +33,6 @@ envoy_cc_test(
     srcs = ["abi_version_test.cc"],
     data = [
         "//source/extensions/dynamic_modules:abi.h",
-        "//source/extensions/dynamic_modules/sdk/rust:abi.h",
     ],
     deps = [
         "//source/common/common:hex_lib",
