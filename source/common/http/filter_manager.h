@@ -674,7 +674,11 @@ public:
   }
 
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
-    access_log_handlers_.push_back(std::move(handler));
+    if (std::dynamic_pointer_cast<AccessLog::FilterPtr>(handler)) {
+        access_log_handlers_.push_front(std::move(handler));
+    } else {
+        access_log_handlers_.push_back(std::move(handler));
+    }
   }
   void addStreamDecoderFilter(ActiveStreamDecoderFilterPtr filter) {
     // Note: configured decoder filters are appended to decoder_filters_.
@@ -1071,6 +1075,8 @@ private:
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
   std::list<StreamFilterBase*> filters_;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_filter_loggers_;
+  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_access_loggers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata
