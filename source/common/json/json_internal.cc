@@ -26,6 +26,10 @@ namespace Nlohmann {
 
 namespace {
 
+// Nlohmann JSON library will replace the invalid UTF-8 characters with this if the
+// `replace` handler is set.
+constexpr absl::string_view UnexpectedChar = "\xEF\xBF\xBD";
+
 /**
  * Internal representation of Object.
  */
@@ -787,13 +791,11 @@ ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& proto
 
 std::string Factory::serialize(absl::string_view str) {
   nlohmann::json j(str);
-#ifdef NDEBUG
   // Call with defaults except in the case of UTF-8 errors which we may replace
   // invalid UTF-8 characters instead of throwing an exception.
-  return j.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
-#else
-  return j.dump();
-#endif
+  std::string ret = j.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+  ASSERT(ret.find(UnexpectedChar) == std::string::npos, "invalid UTF-8 is not allowed");
+  return ret;
 }
 
 std::vector<uint8_t> Factory::jsonToMsgpack(const std::string& json_string) {
