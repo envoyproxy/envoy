@@ -10,7 +10,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req) {
+void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, const uint64_t stream_id) {
   // Cancel any active requests.
   cancel();
 
@@ -40,6 +40,7 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
            {Envoy::Http::Headers::get().Scheme, "http"},
            {Envoy::Http::Headers::get().Path, std::string(path)},
            {Envoy::Http::Headers::get().ContentType, "application/json"},
+           {Envoy::Http::Headers::get().RequestId, std::to_string(stream_id)},
            {Envoy::Http::Headers::get().Host, std::string(host)}});
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));

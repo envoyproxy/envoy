@@ -23,6 +23,7 @@ using envoy::service::ext_proc::v3::HttpHeaders;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
+using Extensions::HttpFilters::ExternalProcessing::HasHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 
@@ -138,6 +139,7 @@ protected:
     EXPECT_THAT(processor_stream_->headers(),
                 SingleHeaderValueIs("content-type", "application/json"));
     EXPECT_THAT(processor_stream_->headers(), SingleHeaderValueIs(":method", "POST"));
+    EXPECT_THAT(processor_stream_->headers(), HasHeader("x-request-id"));
 
     if (send_bad_resp) {
       processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);

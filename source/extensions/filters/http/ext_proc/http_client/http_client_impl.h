@@ -24,7 +24,7 @@ public:
 
   ~ExtProcHttpClient() { cancel(); }
 
-  void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req);
+  void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, const uint64_t stream_id);
   void cancel();
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
