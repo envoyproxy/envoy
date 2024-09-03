@@ -275,6 +275,7 @@ public:
   void finishRefreshAccessTokenFlow();
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
+  bool validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce);
 
 private:
   friend class OAuth2Test;

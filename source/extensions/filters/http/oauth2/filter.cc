@@ -340,6 +340,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::Utility::QueryParamsMulti query_parameters =
           Http::Utility::QueryParamsMulti::parseQueryString(path_str);
 
+      // Return 401 unauthorized if the query parameters do not contain the code and state.
       auto stateVal = query_parameters.getFirstValue(queryParamsState());
       if (!stateVal.has_value()) {
         ENVOY_LOG(error, "state query param does not exist: \n{}", query_parameters.data());
@@ -347,10 +348,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         return Http::FilterHeadersStatus::StopIteration;
       }
 
+      // Return 401 unauthorized if the state query parameter does not contain the URL and nonce.
+      // state is an HTTP URL encoded string that contains the url and nonce,
+      // for example:
+      // state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%3D1234567890000000".
       std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
       const auto state_parameters =
           Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
-      // if the data we need is not present on the state, stop execution
       auto urlVal = state_parameters.getFirstValue("url");
       auto nonceVal = state_parameters.getFirstValue("nonce");
       if (!urlVal.has_value() || !nonceVal.has_value()) {
@@ -359,7 +363,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         return Http::FilterHeadersStatus::StopIteration;
       }
 
-      // if the URL in the state is not valid, stop execution
+      // Return 401 unauthorized if the URL in the state is not valid.
       Http::Utility::Url state_url;
       if (!state_url.initialize(urlVal.value(), false)) {
         ENVOY_LOG(error, "state url {} can not be initialized", state_url.toString());
@@ -367,20 +371,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         return Http::FilterHeadersStatus::StopIteration;
       }
 
-      // Validate that the nonce in the callback URL matches the nonce in the cookie.
+      // Return 401 unauthorized if the nonce cookie does not match the nonce in the state.
+      //
       // This is to prevent attackers from injecting their own access token into a victim's
       // sessions via CSRF attack. The attack can result in victims saving their sensitive data
       // in the attacker's account.
       // More information can be found at
       // https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
-      const auto nonce = nonceVal.value();
-      const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
-        return key == config_->cookieNames().oauth_nonce_;
-      });
-
-      if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) == nonce_cookie.end() ||
-          nonce != nonce_cookie.at(config_->cookieNames().oauth_nonce_)) {
-        ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonce);
+      if (!validateNonce(headers, nonceVal.value())) {
+        ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonceVal.value());
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -437,14 +436,16 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   // At this point, we *are* on /_oauth. We believe this request comes from the authorization
   // server and we expect the query strings to contain the information required to get the access
-  // token
+  // token.
+
+  // Return 401 unauthorized if the query parameters contain an error response.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
   if (query_parameters.getFirstValue(queryParamsError()).has_value()) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // if the data we need is not present on the URL, stop execution
+  // Return 401 unauthorized if the query parameters do not contain the code and state.
   auto codeVal = query_parameters.getFirstValue(queryParamsCode());
   auto stateVal = query_parameters.getFirstValue(queryParamsState());
   if (!codeVal.has_value() || !stateVal.has_value()) {
@@ -453,10 +454,12 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  auth_code_ = codeVal.value();
+  // Return 401 unauthorized if the state query parameter does not contain the URL and nonce.
+  // state is an HTTP URL encoded string that contains the url and nonce,
+  // for example:
+  // state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%3D1234567890000000".
   std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
   const auto state_parameters = Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
-  // if the data we need is not present on the state, stop execution
   auto urlVal = state_parameters.getFirstValue("url");
   auto nonceVal = state_parameters.getFirstValue("nonce");
   if (!urlVal.has_value() || !nonceVal.has_value()) {
@@ -465,7 +468,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // if the URL in the state is not valid, stop execution
+  // Return 401 unauthorized if the URL in the state is not valid.
   state_url_ = urlVal.value();
   Http::Utility::Url url;
   if (!url.initialize(state_url_, false)) {
@@ -474,23 +477,19 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Validate that the nonce in the callback URL matches the nonce in the cookie.
+  // Return 401 unauthorized if the nonce cookie does not match the nonce in the state.
+  //
   // This is to prevent attackers from injecting their own access token into a victim's
   // sessions via CSRF attack. The attack can result in victims saving their sensitive data
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
-  const auto nonce = nonceVal.value();
-  const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
-    return key == config_->cookieNames().oauth_nonce_;
-  });
-
-  if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) == nonce_cookie.end() ||
-      nonce != nonce_cookie.at(config_->cookieNames().oauth_nonce_)) {
-    ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonce);
+  if (!validateNonce(headers, nonceVal.value())) {
+    ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonceVal.value());
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  auth_code_ = codeVal.value();
   Formatter::FormatterImpl formatter(config_->redirectUri());
   const auto redirect_uri =
       formatter.formatWithContext({&headers}, decoder_callbacks_->streamInfo());
@@ -864,6 +863,18 @@ void OAuth2Filter::sendUnauthorizedResponse() {
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
                                      absl::nullopt, EMPTY_STRING);
+}
+
+bool OAuth2Filter::validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce) {
+  const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
+    return key == config_->cookieNames().oauth_nonce_;
+  });
+
+  if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) != nonce_cookie.end() &&
+      nonce_cookie.at(config_->cookieNames().oauth_nonce_) == nonce) {
+    return true;
+  }
+  return false;
 }
 
 } // namespace Oauth2
