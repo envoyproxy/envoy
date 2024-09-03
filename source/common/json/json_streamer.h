@@ -9,6 +9,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/buffer/buffer_util.h"
+#include "source/common/json/constants.h"
 #include "source/common/json/json_sanitizer.h"
 
 #include "absl/strings/string_view.h"
@@ -37,14 +38,6 @@ namespace Json {
 #define ASSERT_THIS_IS_TOP_LEVEL ASSERT(this->streamer_.topLevel() == this)
 #define ASSERT_LEVELS_EMPTY ASSERT(this->levels_.empty())
 #endif
-
-class Constants {
-public:
-  // Constants for common JSON values.
-  static constexpr absl::string_view True = "true";
-  static constexpr absl::string_view False = "false";
-  static constexpr absl::string_view Null = "null";
-};
 
 // Simple abstraction that provide a output buffer for streaming JSON output.
 class BufferOutput {
