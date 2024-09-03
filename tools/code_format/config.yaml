@@ -381,7 +381,6 @@ replacements:
     # Well-known types should be referenced from the ProtobufWkt namespace.
     "Protobuf::Any": "ProtobufWkt::Any"
     "Protobuf::Empty": "ProtobufWkt::Empty"
-    "Protobuf::Field": "ProtobufWkt::Field"
     "Protobuf::ListValue": "ProtobufWkt::ListValue"
     "Protobuf::NULL_VALUE": "ProtobufWkt::NULL_VALUE"
     "Protobuf::StringValue": "ProtobufWkt::StringValue"
