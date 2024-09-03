@@ -52,7 +52,7 @@ public:
 
     lb_ = std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
         priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-        client_side_weighted_round_robin_config_, simTime(), &dispatcher_);
+        client_side_weighted_round_robin_config_, simTime(), dispatcher_);
   }
 
   // Updates priority 0 with the given hosts and hosts_per_locality.
@@ -555,7 +555,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, WeightedInitializationPicks
     EXPECT_CALL(random_, random()).Times(2).WillRepeatedly(Return(i));
     ClientSideWeightedRoundRobinLoadBalancer lb(
         priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-        client_side_weighted_round_robin_config_, simTime(), &dispatcher_);
+        client_side_weighted_round_robin_config_, simTime(), dispatcher_);
     const auto& host = lb.chooseHost(nullptr);
     host_picked_count_map[host]++;
   }

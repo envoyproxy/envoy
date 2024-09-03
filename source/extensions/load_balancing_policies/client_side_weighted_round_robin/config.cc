@@ -19,16 +19,10 @@ Upstream::LoadBalancerPtr ClientSideWeightedRoundRobinCreator::operator()(
   const auto typed_lb_config =
       dynamic_cast<const ClientSideWeightedRoundRobinLbConfig*>(lb_config.ptr());
 
-  ENVOY_LOG_MISC(error,
-                 "ClientSideWeightedRoundRobinCreator::operator() "
-                 "main_thread_dispatcher {} IsMainThread {}",
-                 reinterpret_cast<int64_t>(&typed_lb_config->main_thread_dispatcher_),
-                 Envoy::Thread::MainThread::isMainThread());
-
   return std::make_unique<Upstream::ClientSideWeightedRoundRobinLoadBalancer>(
       params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
       cluster_info.lbConfig(), typed_lb_config->lb_config_, time_source,
-      &typed_lb_config->main_thread_dispatcher_);
+      typed_lb_config->main_thread_dispatcher_);
 }
 
 /**

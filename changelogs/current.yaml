@@ -287,5 +287,10 @@ new_features:
   change: |
     Added :ref:`external_auth_provider <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
     external authentication for redis proxy.
+- area: load_balancing
+  change: |
+    Added implementation of :ref:`client_side_weighted_round_robin
+    <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
+    load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
 
 deprecated:

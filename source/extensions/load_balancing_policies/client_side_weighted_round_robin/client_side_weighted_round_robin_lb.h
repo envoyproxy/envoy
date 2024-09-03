@@ -44,7 +44,7 @@ public:
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
       const envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
           ClientSideWeightedRoundRobin& client_side_weighted_round_robin_config,
-      TimeSource& time_source, Event::Dispatcher* main_thread_dispatcher);
+      TimeSource& time_source, Event::Dispatcher& main_thread_dispatcher);
 
   // {LoadBalancer} Interface implementation.
   void refreshHostSource(const HostsSource& source) override;
@@ -68,7 +68,7 @@ public:
           ClientSideWeightedRoundRobin& client_side_weighted_round_robin_config);
 
   // Start weight updates on main thread only.
-  void startWeightUpdatesOnMainThread(Event::Dispatcher* main_thread_dispatcher);
+  void startWeightUpdatesOnMainThread(Event::Dispatcher& main_thread_dispatcher);
 
   // Update weights using client side host LB policy data for all priority sets.
   // Executed on the main thread.
@@ -106,6 +106,7 @@ public:
       const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
       ClientSideHostLbPolicyData& client_side_data);
 
+private:
   uint64_t peekahead_index_{};
   absl::flat_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
   std::vector<std::string> utilization_from_metric_names_;

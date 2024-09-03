@@ -70,11 +70,8 @@ message ClientSideWeightedRoundRobin {
   // Default is 1.0.
   google.protobuf.FloatValue error_utilization_penalty = 6 [(validate.rules).float = {gte: 0.0}];
 
-  // By default, endpoint weight is computed based on the
-  // "application_utilization" field reported by the endpoint.  If that field is not set, then utilization
-  // will instead be computed by taking the max of the values of the metric
-  // names specified here.  If none of the specified metrics are present, then
-  // "cpu_utilization" is
-  // used instead.
+  // By default, endpoint weight is computed based on the `application_utilization <https://github.com/cncf/xds/blob/88aa3b3c978aa0d37c1df3b075f791855df80203/xds/data/orca/v3/orca_load_report.proto#L57>` field reported by the endpoint.  If that field is not set, then utilization
+  // will instead be computed by taking the max of the values of the metric names (e.g. "foo", "bar") specified here.  If none of the specified metrics are present in the `named_metrics <https://github.com/cncf/xds/blob/88aa3b3c978aa0d37c1df3b075f791855df80203/xds/data/orca/v3/orca_load_report.proto#L49>` map, then
+  // `cpu_utilization <https://github.com/cncf/xds/blob/88aa3b3c978aa0d37c1df3b075f791855df80203/xds/data/orca/v3/orca_load_report.proto#L20>` is used instead.
   repeated string utilization_from_metric_names = 7;
 }

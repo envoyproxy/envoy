@@ -38,7 +38,7 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     const envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
         ClientSideWeightedRoundRobin& client_side_weighted_round_robin_config,
-    TimeSource& time_source, Event::Dispatcher* main_thread_dispatcher)
+    TimeSource& time_source, Event::Dispatcher& main_thread_dispatcher)
     : EdfLoadBalancerBase(
           priority_set, local_priority_set, stats, runtime, random,
           PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
@@ -49,7 +49,9 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
             client_side_weighted_round_robin_config.DebugString());
   initialize();
   initFromConfig(client_side_weighted_round_robin_config);
-  startWeightUpdatesOnMainThread(main_thread_dispatcher);
+  if (Envoy::Thread::MainThread::isMainThread()) {
+    startWeightUpdatesOnMainThread(main_thread_dispatcher);
+  }
 }
 
 // {LoadBalancer} Interface implementation.
@@ -126,10 +128,6 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::onOrcaLoadReport(
     return absl::NotFoundError("Host does not have ClientSideLbPolicyData");
   }
   auto status = updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data);
-  // ENVOY_LOG(trace,
-  //           "LoadBalancerContext::OrcaLoadReportCb "
-  //           "orca_load_report for {} status = {} weight = {}",
-  //           getHostAddress(host), status.ToString(), client_side_data->weight_);
   return status;
 }
 
@@ -150,14 +148,15 @@ void ClientSideWeightedRoundRobinLoadBalancer::initFromConfig(
 }
 
 void ClientSideWeightedRoundRobinLoadBalancer::startWeightUpdatesOnMainThread(
-    Event::Dispatcher* main_thread_dispatcher) {
-  if (main_thread_dispatcher != nullptr && Envoy::Thread::MainThread::isMainThread()) {
-    weight_calculation_timer_ = main_thread_dispatcher->createTimer([this]() -> void {
-      updateWeightsOnMainThread();
-      weight_calculation_timer_->enableTimer(weight_update_period_);
-    });
-    weight_calculation_timer_->enableTimer(weight_update_period_);
+    Event::Dispatcher& main_thread_dispatcher) {
+  if (!Envoy::Thread::MainThread::isMainThread()) {
+    return;
   }
+  weight_calculation_timer_ = main_thread_dispatcher.createTimer([this]() -> void {
+    updateWeightsOnMainThread();
+    weight_calculation_timer_->enableTimer(weight_update_period_);
+  });
+  weight_calculation_timer_->enableTimer(weight_update_period_);
 }
 
 void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnMainThread() {
@@ -210,9 +209,7 @@ void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
 void ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(
     const HostVector& hosts) {
   for (const auto& host_ptr : hosts) {
-    if (host_ptr->lbPolicyData() != nullptr) {
-      ENVOY_LOG(trace, "Host {} already has LB policy data", getHostAddress(host_ptr.get()));
-    } else {
+    if (host_ptr->lbPolicyData() == nullptr) {
       ENVOY_LOG(trace, "Adding LB policy data to Host {}", getHostAddress(host_ptr.get()));
       host_ptr->setLbPolicyData(std::make_shared<ClientSideHostLbPolicyData>());
     }
@@ -254,9 +251,9 @@ ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
 double ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(
     const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
     const std::vector<std::string>& utilization_from_metric_names) {
-  // If application_utilization is set, use it as the utilization metric.
+  // If application_utilization is valid, use it as the utilization metric.
   double utilization = orca_load_report.application_utilization();
-  if (utilization != 0) {
+  if (utilization > 0) {
     return utilization;
   }
   // Otherwise, find the most constrained utilization metric.
@@ -266,10 +263,10 @@ double ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(
       utilization = std::max(utilization, metric_it->second);
     }
   }
-  if (utilization != 0) {
+  if (utilization > 0) {
     return utilization;
   }
-  // If utilization is 0, use cpu_utilization.
+  // If utilization is <= 0, use cpu_utilization.
   return orca_load_report.cpu_utilization();
 }
 
@@ -303,7 +300,7 @@ absl::StatusOr<uint32_t> ClientSideWeightedRoundRobinLoadBalancer::calculateWeig
 absl::Status ClientSideWeightedRoundRobinLoadBalancer::updateClientSideDataFromOrcaLoadReport(
     const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
     ClientSideHostLbPolicyData& client_side_data) {
-  absl::StatusOr<uint32_t> weight = calculateWeightFromOrcaReport(
+  const absl::StatusOr<uint32_t> weight = calculateWeightFromOrcaReport(
       orca_load_report, utilization_from_metric_names_, error_utilization_penalty_);
   if (!weight.ok()) {
     return weight.status();
