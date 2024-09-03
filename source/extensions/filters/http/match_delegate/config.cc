@@ -89,11 +89,7 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
   }
 
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
-    if (std::dynamic_pointer_cast<AccessLog::FilterPtr>(handler)) {
-        delegated_callbacks_.push_front(std::move(handler));
-    } else {
-        delegated_callbacks_.push_back(std::move(handler));
-    }
+    delegated_callbacks_.addAccessLogHandler(std::move(handler));
   }
 
   Envoy::Http::FilterChainFactoryCallbacks& delegated_callbacks_;
