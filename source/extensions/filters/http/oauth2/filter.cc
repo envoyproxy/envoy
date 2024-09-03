@@ -454,7 +454,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   state_url_ = urlVal.value();
   Http::Utility::Url url;
   if (!url.initialize(state_url_, false)) {
-    ENVOY_LOG(error, "state url {} can not be initialized", url.toString());
+    ENVOY_LOG(error, "state url {} can not be initialized", state_url_);
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
