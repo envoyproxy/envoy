@@ -107,7 +107,9 @@ bug_fixes:
 - area: http3
   change: |
     Fixed a bug where an empty trailers block could be sent. This would occur if a filter removed
-    the last trailer - a likely occurrence with the ``grpc_web_filter``.
+    the last trailer - a likely occurrence with the ``grpc_web_filter``. This change makes http3 codec
+    behave the same way http2 codec does, converting an empty trailers block to no trailers.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` to false.
 - area: http
   change: |
     Fixed a bug where an incomplete request (missing body or trailers) may be proxied to the upstream when the limit on
