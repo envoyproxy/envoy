@@ -21,7 +21,7 @@ load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_regi
 GO_VERSION = "1.22.5"
 
 # Rust version for rules_rust.
-RUST_VERSION = "1.80.1"
+RUST_VERSION = "1.80.0"
 
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
@@ -49,7 +49,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     )
     rules_rust_dependencies()
     rust_register_toolchains(
-        versions = [RUST_VERSION],
+        versions = ["1.80.1"],
         extra_target_triples = [
             "wasm32-unknown-unknown",
             "wasm32-wasi",
