@@ -68,7 +68,7 @@ public:
   const absl::string_view outbound_frame_flood = "http2.outbound_frames_flood";
   // Envoy detected an inbound HTTP/2 frame flood.
   const absl::string_view inbound_empty_frame_flood = "http2.inbound_empty_frames_flood";
-  // Envoy was configured to drop requests with header keys beginning with underscores.
+  // Envoy was configured to drop requests with header keys containing underscores.
   const absl::string_view invalid_underscore = "http2.unexpected_underscore";
   // The peer refused the stream.
   const absl::string_view remote_refused = "http2.remote_refuse";
@@ -2350,7 +2350,7 @@ absl::optional<int> ServerConnectionImpl::checkHeaderNameForUnderscores(
     ENVOY_CONN_LOG(debug, "Rejecting request due to header name with underscores: {}", connection_,
                    header_name);
     stats_.incRequestsRejectedWithUnderscoresInHeaders();
-    return ERR_TEMPORAL_CALLBACK_FAILURE;
+    return absl::nullopt;
   }
 #else
   // Workaround for gcc not understanding [[maybe_unused]] for class members.

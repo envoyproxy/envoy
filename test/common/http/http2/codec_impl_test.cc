@@ -2865,8 +2865,9 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.addCopy("bad_header", "something");
-
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  TestRequestHeaderMapImpl expected_headers(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
   EXPECT_EQ(
@@ -2889,6 +2890,9 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAllowed) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
   EXPECT_EQ(0, server_stats_store_.counter("http2.dropped_headers_with_underscores").value());
+  EXPECT_EQ(
+      0,
+      server_stats_store_.counter("http2.requests_rejected_with_underscores_in_headers").value());
 }
 
 // This is the HTTP/2 variant of the HTTP/1 regression test for CVE-2019-18801.
