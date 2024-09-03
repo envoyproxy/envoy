@@ -223,23 +223,19 @@ public class JniLibrary {
   protected static native int resetConnectivityState(long engine);
 
   /**
-   * Update the network interface to the preferred network for opening new
-   * streams. Note that this state is shared by all engines.
-   *
-   * @param engine  Handle to the engine whose preferred network will be set.
-   * @param networkType the network type to be preferred for new streams.
+   * A callback into the Envoy Engine when the default network is available.
    */
-  protected static native void setPreferredNetwork(long engine, int networkType);
+  protected static native void onDefaultNetworkAvailable(long engine);
 
   /**
-   * A callback into the Envoy Engine when the network is available.
+   * A callback into the Envoy Engine when the default network configuration was changed.
    */
-  protected static native void onNetworkAvailable(long engine);
+  protected static native void onDefaultNetworkChanged(long engine, int networkType);
 
   /**
-   * A callback into the Envoy Engine when the network is unavailable.
+   * A callback into the Envoy Engine when the default network is unavailable.
    */
-  protected static native void onNetworkUnavailable(long engine);
+  protected static native void onDefaultNetworkUnavailable(long engine);
 
   /**
    * Update the proxy settings.

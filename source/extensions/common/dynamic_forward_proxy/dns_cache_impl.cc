@@ -349,9 +349,9 @@ void DnsCacheImpl::stop() {
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
       primary_host.second->active_query_ = nullptr;
-      primary_host.second->timeout_timer_->disableTimer();
     }
 
+    primary_host.second->timeout_timer_->disableTimer();
     ASSERT(!primary_host.second->timeout_timer_->enabled());
     primary_host.second->refresh_timer_->disableTimer();
     ENVOY_LOG_EVENT(debug, "stop_host", "stop host='{}'", primary_host.first);

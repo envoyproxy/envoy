@@ -73,18 +73,18 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void setPreferredNetwork(EnvoyNetworkType network) {
-    envoyEngine.setPreferredNetwork(network);
+  public void onDefaultNetworkAvailable() {
+    envoyEngine.onDefaultNetworkAvailable();
   }
 
   @Override
-  public void onNetworkAvailable() {
-    envoyEngine.onNetworkAvailable();
+  public void onDefaultNetworkChanged(EnvoyNetworkType network) {
+    envoyEngine.onDefaultNetworkChanged(network);
   }
 
   @Override
-  public void onNetworkUnavailable() {
-    envoyEngine.onNetworkUnavailable();
+  public void onDefaultNetworkUnavailable() {
+    envoyEngine.onDefaultNetworkUnavailable();
   }
 
   public void setProxySettings(String host, int port) { envoyEngine.setProxySettings(host, port); }

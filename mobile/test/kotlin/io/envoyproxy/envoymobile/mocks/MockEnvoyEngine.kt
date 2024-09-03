@@ -40,11 +40,11 @@ class MockEnvoyEngine : EnvoyEngine {
 
   override fun resetConnectivityState() = Unit
 
-  override fun setPreferredNetwork(network: EnvoyNetworkType) = Unit
+  override fun onDefaultNetworkAvailable() = Unit
 
-  override fun onNetworkAvailable() = Unit
+  override fun onDefaultNetworkChanged(network: EnvoyNetworkType) = Unit
 
-  override fun onNetworkUnavailable() = Unit
+  override fun onDefaultNetworkUnavailable() = Unit
 
   override fun setProxySettings(host: String, port: Int) = Unit
 

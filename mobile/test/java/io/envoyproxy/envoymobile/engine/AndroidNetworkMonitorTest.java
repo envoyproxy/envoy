@@ -72,25 +72,25 @@ public class AndroidNetworkMonitorTest {
   //=====================================================================================
 
   @Test
-  public void testOnNetworkAvailable() {
+  public void testOnDefaultNetworkAvailable() {
     shadowOf(connectivityManager)
         .getNetworkCallbacks()
         .forEach(callback -> callback.onAvailable(ShadowNetwork.newInstance(0)));
 
-    verify(mockEnvoyEngine).onNetworkAvailable();
+    verify(mockEnvoyEngine).onDefaultNetworkAvailable();
   }
 
   @Test
-  public void testOnNetworkUnavailable() {
+  public void testOnDefaultNetworkUnavailable() {
     shadowOf(connectivityManager)
         .getNetworkCallbacks()
         .forEach(callback -> callback.onLost(ShadowNetwork.newInstance(0)));
 
-    verify(mockEnvoyEngine).onNetworkUnavailable();
+    verify(mockEnvoyEngine).onDefaultNetworkUnavailable();
   }
 
   @Test
-  public void testSetWlanPreferredNetwork() {
+  public void testOnDefaultNetworkChangedWlan() {
     shadowOf(connectivityManager).getNetworkCallbacks().forEach(callback -> {
       NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
       shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
@@ -98,11 +98,11 @@ public class AndroidNetworkMonitorTest {
       callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
     });
 
-    verify(mockEnvoyEngine).setPreferredNetwork(EnvoyNetworkType.WLAN);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
   }
 
   @Test
-  public void testSetWwanPreferredNetwork() {
+  public void testOnDefaultNetworkChangedWwan() {
     shadowOf(connectivityManager).getNetworkCallbacks().forEach(callback -> {
       NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
       shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
@@ -110,17 +110,17 @@ public class AndroidNetworkMonitorTest {
       callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
     });
 
-    verify(mockEnvoyEngine).setPreferredNetwork(EnvoyNetworkType.WWAN);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.WWAN);
   }
 
   @Test
-  public void testSetGenericPreferredNetwork() {
+  public void testOnDefaultNetworkChangedGeneric() {
     shadowOf(connectivityManager).getNetworkCallbacks().forEach(callback -> {
       NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
       shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
       callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
     });
 
-    verify(mockEnvoyEngine).setPreferredNetwork(EnvoyNetworkType.GENERIC);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.GENERIC);
   }
 }

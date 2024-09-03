@@ -135,21 +135,21 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void setPreferredNetwork(EnvoyNetworkType network) {
+  public void onDefaultNetworkAvailable() {
     checkIsTerminated();
-    JniLibrary.setPreferredNetwork(engineHandle, network.getValue());
+    JniLibrary.onDefaultNetworkAvailable(engineHandle);
   }
 
   @Override
-  public void onNetworkAvailable() {
+  public void onDefaultNetworkChanged(EnvoyNetworkType network) {
     checkIsTerminated();
-    JniLibrary.onNetworkAvailable(engineHandle);
+    JniLibrary.onDefaultNetworkChanged(engineHandle, network.getValue());
   }
 
   @Override
-  public void onNetworkUnavailable() {
+  public void onDefaultNetworkUnavailable() {
     checkIsTerminated();
-    JniLibrary.onNetworkUnavailable(engineHandle);
+    JniLibrary.onDefaultNetworkUnavailable(engineHandle);
   }
 
   public void setProxySettings(String host, int port) {

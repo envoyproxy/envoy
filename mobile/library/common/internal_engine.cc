@@ -281,12 +281,14 @@ envoy_status_t InternalEngine::resetConnectivityState() {
   return dispatcher_->post([&]() -> void { connectivity_manager_->resetConnectivityState(); });
 }
 
-void InternalEngine::setPreferredNetwork(NetworkType network) {
-  Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+void InternalEngine::onDefaultNetworkAvailable() {
+  ENVOY_LOG_MISC(trace, "Calling the default network available callback");
 }
 
-void InternalEngine::onNetworkAvailable() {
-  dispatcher_->post([&]() -> void {
+void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
+  ENVOY_LOG_MISC(trace, "Calling the default network changed callback");
+  dispatcher_->post([&, network]() -> void {
+    envoy_netconf_t configuration = Network::ConnectivityManagerImpl::setPreferredNetwork(network);
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
       // The IP version to remove flag must be set first before refreshing the DNS cache so that
@@ -307,11 +309,12 @@ void InternalEngine::onNetworkAvailable() {
           [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
       cache_manager.forEachThreadLocalCache(clear_brokenness);
     }
-    connectivity_manager_->refreshDns(connectivity_manager_->getConfigurationKey(), true);
+    connectivity_manager_->refreshDns(configuration, true);
   });
 }
 
-void InternalEngine::onNetworkUnavailable() {
+void InternalEngine::onDefaultNetworkUnavailable() {
+  ENVOY_LOG_MISC(trace, "Calling the default network unavailable callback");
   dispatcher_->post([&]() -> void { connectivity_manager_->dnsCache()->stop(); });
 }
 
