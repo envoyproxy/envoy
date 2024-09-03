@@ -318,12 +318,12 @@ typed_config:
     Http::TestRequestHeaderMapImpl headers{
         {":method", "GET"},
         {":path", "/callback?code=foo&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%"
-                  "252F_oauth%26nonce%3D123456789000000"},
+                  "252F_oauth%26nonce%3D1234567890000000"},
         {":scheme", "http"},
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},
         {"authority", "Bearer token"},
-        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=123456789000000")}};
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=1234567890000000")}};
 
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
@@ -351,14 +351,14 @@ typed_config:
     Http::TestRequestHeaderMapImpl headersWithCookie{
         {":method", "GET"},
         {":path", "/callback?code=foo&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%"
-                  "252F_oauth%26nonce%3D123456789000000"},
+                  "252F_oauth%26nonce%3D1234567890000000"},
         {":scheme", "http"},
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},
         {"authority", "Bearer token"},
         {"cookie", absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac)},
         {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
-        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=123456789000000")},
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=1234567890000000")},
     };
     auto encoder_decoder2 = codec_client_->startRequest(headersWithCookie, true);
     response = std::move(encoder_decoder2.second);

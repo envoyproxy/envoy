@@ -373,7 +373,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -383,7 +383,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
            "&scope=" +
            TEST_DEFAULT_SCOPE +
            "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D123456789000000"},
+           "3D1234567890000000"},
   };
 
   // explicitly tell the validator to fail the validation.
@@ -436,7 +436,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -447,7 +447,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
            "&scope=" +
            TEST_DEFAULT_SCOPE +
            "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D123456789000000"},
+           "3D1234567890000000"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -495,7 +495,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -506,7 +506,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
            "&scope=" +
            TEST_DEFAULT_SCOPE +
            "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D123456789000000"},
+           "3D1234567890000000"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -709,7 +709,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -719,7 +719,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
            "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D123456789000000"
+           "2526level%253Dtrace%26nonce%3D1234567890000000"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
@@ -740,9 +740,9 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Path.get(),
        "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D123456789000000"},
+       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -835,9 +835,9 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
 TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf%26nonce%3D123456789000000"},
+       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf%26nonce%3D1234567890000000"},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -866,7 +866,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoNonce) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf"},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -894,7 +894,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidNonce) {
       {Http::Headers::get().Path.get(),
        "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf%26nonce%3D123456788000000"},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -924,7 +924,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationMalformedState) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=https%253A%252F%252Fasdf"},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1244,14 +1244,14 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
            "&state=url%3Dhttps%3A%2F%2Ftraffic.example.com%2Foriginal_path%3Fvar1%3D1%2526var2%3D2%"
-           "26nonce%3D123456789000000"},
+           "26nonce%3D1234567890000000"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=123456789000000"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=1234567890000000"},
   };
 
   Http::TestRequestHeaderMapImpl expected_response_headers{
@@ -1278,14 +1278,14 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
            "&state=url%3Dhttps%3A%2F%2Ftraffic.example.com%2Foriginal_path%3Fvar1%3D1%2526var2%3D2%"
-           "26nonce%3D123456789000000"},
+           "26nonce%3D1234567890000000"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=123456789000000"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=1234567890000000"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -1318,7 +1318,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1328,7 +1328,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
            "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D123456789000000"
+           "2526level%253Dtrace%26nonce%3D1234567890000000"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%"
            "3Dbar%"
@@ -1349,10 +1349,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D123456789000000"},
+       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -1407,7 +1407,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1417,7 +1417,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
            "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D123456789000000"
+           "2526level%253Dtrace%26nonce%3D1234567890000000"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
@@ -1437,10 +1437,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D123456789000000"},
+       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -1518,7 +1518,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=123456789000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1528,7 +1528,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
            "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D123456789000000"
+           "2526level%253Dtrace%26nonce%3D1234567890000000"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%"
            "3Dbar%"
@@ -1549,10 +1549,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=123456789000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D123456789000000"},
+       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2216,7 +2216,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -2226,7 +2226,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
            "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D123456789000000"
+           "2526level%253Dtrace%26nonce%3D1234567890000000"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
@@ -2248,10 +2248,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=123456789000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D123456789000000"},
+       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2408,7 +2408,7 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
   Http::TestResponseHeaderMapImpl redirect_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=123456789000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -2418,7 +2418,7 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
            "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D123456789000000"
+           "2526level%253Dtrace%26nonce%3D1234567890000000"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},

@@ -169,6 +169,21 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
   return encodeHmacBase64(secret, domain, expires, token, id_token, refresh_token);
 }
 
+// Generates a nonce based on the current time
+std::string generateFixedLengthNonce(TimeSource& time_source) {
+  constexpr size_t length = 16;
+
+  std::string nonce = std::to_string(time_source.systemTime().time_since_epoch().count());
+
+  if (nonce.length() < length) {
+    nonce.append(length - nonce.length(), '0');
+  } else if (nonce.length() > length) {
+    nonce = nonce.substr(0, length);
+  }
+
+  return nonce;
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -550,7 +565,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
     nonce_cookie_exists = true;
   } else {
-    nonce = std::to_string(time_source_.systemTime().time_since_epoch().count());
+    nonce = generateFixedLengthNonce(time_source_);
   }
 
   // Set the nonce cookie if it does not exist.
