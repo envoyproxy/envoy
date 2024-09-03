@@ -929,7 +929,7 @@ TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
 TEST_F(OAuth2Test, CookieValidatorWithCookieDomain) {
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
   auto cookie_names =
-      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken"};
+      CookieNames{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken", "RefreshToken", "OauthNonce"};
   const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 5;
 
   Http::TestRequestHeaderMapImpl request_headers{
@@ -953,7 +953,6 @@ TEST_F(OAuth2Test, CookieValidatorWithCookieDomain) {
   EXPECT_TRUE(cookie_validator->hmacIsValid());
   EXPECT_TRUE(cookie_validator->timestampIsValid());
   EXPECT_TRUE(cookie_validator->isValid());
->>>>>>> origin/main
 }
 
 // Validates the behavior of the cookie validator when the combination of some fields could be same.
