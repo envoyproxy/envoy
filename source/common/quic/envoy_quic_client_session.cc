@@ -111,6 +111,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
   network_connection_ = nullptr;
+  if (registry_.has_value()) {
+    registry_->unregisterObserver(*network_connectivity_observer_);
+  }
 }
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
@@ -299,6 +302,14 @@ void EnvoyQuicClientSession::OnServerPreferredAddressAvailable(
 std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
   return configured_alpns_.empty() ? quic::QuicSpdyClientSession::GetAlpnsToOffer()
                                    : configured_alpns_;
+}
+
+void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry) {
+  if (network_connectivity_observer_ == nullptr) {
+    network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserver>(*this);
+  }
+  registry.registerObserver(*network_connectivity_observer_);
+  registry_ = makeOptRef(registry);
 }
 
 } // namespace Quic

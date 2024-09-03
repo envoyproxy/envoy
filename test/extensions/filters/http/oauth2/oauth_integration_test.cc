@@ -271,7 +271,7 @@ typed_config:
         Http::Headers::get().Cookie,
         absl::StrCat(default_cookie_names_.refresh_token_, "=", refreshToken));
 
-    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_};
+    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_, ""};
     validator.setParams(validate_headers, std::string(hmac_secret));
     return validator.isValid();
   }
