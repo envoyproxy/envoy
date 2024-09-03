@@ -49,7 +49,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     )
     rules_rust_dependencies()
     rust_register_toolchains(
-        versions = ["1.80.1"],
+        versions = [RUST_VERSION],
         extra_target_triples = [
             "wasm32-unknown-unknown",
             "wasm32-wasi",
