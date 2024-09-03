@@ -44,11 +44,7 @@
 namespace Envoy {
 namespace Platform {
 
-EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>()) {
-#ifndef ENVOY_ENABLE_QUIC
-  enable_http3_ = false;
-#endif
-}
+EngineBuilder::EngineBuilder() : callbacks_(std::make_unique<EngineCallbacks>()) {}
 
 EngineBuilder& EngineBuilder::setNetworkThreadPriority(int thread_priority) {
   network_thread_priority_ = thread_priority;
@@ -61,7 +57,6 @@ EngineBuilder& EngineBuilder::setUseCares(bool use_cares) {
   return *this;
 }
 #endif
-
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
   return *this;
@@ -115,6 +110,11 @@ EngineBuilder& EngineBuilder::addDnsFailureRefreshSeconds(int base, int max) {
 
 EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds) {
   dns_query_timeout_seconds_ = dns_query_timeout_seconds;
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::setDnsNumRetries(uint32_t dns_num_retries) {
+  dns_num_retries_ = dns_num_retries;
   return *this;
 }
 
@@ -192,7 +192,6 @@ EngineBuilder& EngineBuilder::enableSocketTagging(bool socket_tagging_on) {
   return *this;
 }
 
-#ifdef ENVOY_ENABLE_QUIC
 EngineBuilder& EngineBuilder::enableHttp3(bool http3_on) {
   enable_http3_ = http3_on;
   return *this;
@@ -222,8 +221,6 @@ EngineBuilder& EngineBuilder::enablePortMigration(bool enable_port_migration) {
   enable_port_migration_ = enable_port_migration;
   return *this;
 }
-
-#endif
 
 EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
   always_use_v6_ = value;
@@ -284,7 +281,13 @@ EngineBuilder& EngineBuilder::addStringAccessor(std::string name,
 }
 
 EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string typed_config) {
-  native_filter_chain_.emplace_back(std::move(name), std::move(typed_config));
+  native_filter_chain_.emplace_back(NativeFilterConfig(std::move(name), std::move(typed_config)));
+  return *this;
+}
+
+EngineBuilder& EngineBuilder::addNativeFilter(const std::string& name,
+                                              const ProtobufWkt::Any& typed_config) {
+  native_filter_chain_.push_back(NativeFilterConfig(name, typed_config));
   return *this;
 }
 
@@ -369,27 +372,28 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
        ++filter) {
     auto* native_filter = hcm->add_http_filters();
     native_filter->set_name(filter->name_);
+    if (!filter->textproto_typed_config_.empty()) {
 #ifdef ENVOY_ENABLE_FULL_PROTOS
-    Protobuf::TextFormat::ParseFromString((*filter).typed_config_,
-                                          native_filter->mutable_typed_config());
-    RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
-                   "Failed to parse: " + (*filter).typed_config_);
+      Protobuf::TextFormat::ParseFromString((*filter).textproto_typed_config_,
+                                            native_filter->mutable_typed_config());
+      RELEASE_ASSERT(!native_filter->typed_config().DebugString().empty(),
+                     "Failed to parse: " + (*filter).textproto_typed_config_);
 #else
-    RELEASE_ASSERT(native_filter->mutable_typed_config()->ParseFromString((*filter).typed_config_),
-                   "Failed to parse binary proto: " + (*filter).typed_config_);
+      RELEASE_ASSERT(
+          native_filter->mutable_typed_config()->ParseFromString((*filter).textproto_typed_config_),
+          "Failed to parse binary proto: " + (*filter).textproto_typed_config_);
 #endif // !ENVOY_ENABLE_FULL_PROTOS
+    } else {
+      *native_filter->mutable_typed_config() = filter->typed_config_;
+    }
   }
 
   // Set up the optional filters
   if (enable_http3_) {
-#ifdef ENVOY_ENABLE_QUIC
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig cache_config;
     auto* cache_filter = hcm->add_http_filters();
     cache_filter->set_name("alternate_protocols_cache");
     cache_filter->mutable_typed_config()->PackFrom(cache_config);
-#else
-    throw std::runtime_error("http3 functionality was not compiled in this build of Envoy Mobile");
-#endif
   }
 
   if (gzip_decompression_filter_) {
@@ -489,6 +493,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   } else {
     envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
         resolver_config;
+    if (dns_num_retries_.has_value()) {
+      resolver_config.mutable_num_retries()->set_value(*dns_num_retries_);
+    }
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.getaddrinfo");
     dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(

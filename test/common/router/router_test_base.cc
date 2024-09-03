@@ -407,5 +407,14 @@ void RouterTestBase::expectNewStreamWithImmediateEncoder(Http::RequestEncoder& e
       }));
 }
 
+void RouterTestBase::recreateFilter() {
+  router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
+  router_->setDecoderFilterCallbacks(callbacks_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(host_address_);
+  router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
+}
+
 } // namespace Router
 } // namespace Envoy

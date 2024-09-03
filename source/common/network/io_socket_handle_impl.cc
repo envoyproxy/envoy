@@ -282,11 +282,13 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
+                                                    const UdpSaveCmsgConfig& save_cmsg_config,
                                                     RecvMsgOutput& output) {
   ASSERT(!output.msg_.empty());
 
-  absl::FixedArray<char> cbuf(cmsg_space_);
-  memset(cbuf.begin(), 0, cmsg_space_);
+  size_t cmsg_space = cmsg_space_ + save_cmsg_config.expected_size;
+  absl::FixedArray<char> cbuf(cmsg_space);
+  memset(cbuf.begin(), 0, cmsg_space);
 
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_for_read = 0;
@@ -334,6 +336,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     // Get overflow, local address and gso_size from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+      if (save_cmsg_config.hasConfig() &&
+          cmsg->cmsg_type == static_cast<int>(save_cmsg_config.type.value()) &&
+          cmsg->cmsg_level == static_cast<int>(save_cmsg_config.level.value())) {
+        Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+        output.msg_[0].saved_cmsg_ = cmsg_slice;
+      }
       if (output.msg_[0].local_address_ == nullptr) {
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         if (addr != nullptr) {
@@ -370,6 +378,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                                     const UdpSaveCmsgConfig& save_cmsg_config,
                                                      RecvMsgOutput& output) {
   ASSERT(output.msg_.size() == slices.size());
   if (slices.empty()) {
@@ -380,8 +389,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   absl::FixedArray<absl::FixedArray<struct iovec>> iovs(
       num_packets_per_mmsg_call, absl::FixedArray<struct iovec>(slices[0].size()));
   absl::FixedArray<sockaddr_storage> raw_addresses(num_packets_per_mmsg_call);
+  size_t cmsg_space = cmsg_space_ + save_cmsg_config.expected_size;
   absl::FixedArray<absl::FixedArray<char>> cbufs(num_packets_per_mmsg_call,
-                                                 absl::FixedArray<char>(cmsg_space_));
+                                                 absl::FixedArray<char>(cmsg_space));
 
   for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
     memset(&raw_addresses[i], 0, sizeof(sockaddr_storage));
@@ -438,6 +448,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+        if (save_cmsg_config.hasConfig() &&
+            cmsg->cmsg_type == static_cast<int>(save_cmsg_config.type.value()) &&
+            cmsg->cmsg_level == static_cast<int>(save_cmsg_config.level.value())) {
+          Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+          output.msg_[0].saved_cmsg_ = cmsg_slice;
+        }
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         if (receive_ecn_ &&
 #ifdef __APPLE__
@@ -523,7 +539,11 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
   }
 #endif
 
-  return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
+  auto result = Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
+  if (result.return_value_ != -1) {
+    was_connected_ = true;
+  }
+  return result;
 }
 
 IoHandlePtr IoSocketHandleImpl::duplicate() {

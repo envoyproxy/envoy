@@ -41,6 +41,7 @@ public:
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
+  EngineBuilder& setDnsNumRetries(uint32_t dns_num_retries);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       int h2_connection_keepalive_idle_interval_milliseconds);
@@ -56,14 +57,12 @@ public:
   EngineBuilder& enableGzipDecompression(bool gzip_decompression_on);
   EngineBuilder& enableBrotliDecompression(bool brotli_decompression_on);
   EngineBuilder& enableSocketTagging(bool socket_tagging_on);
-#ifdef ENVOY_ENABLE_QUIC
   EngineBuilder& enableHttp3(bool http3_on);
   EngineBuilder& setHttp3ConnectionOptions(std::string options);
   EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
   EngineBuilder& addQuicHint(std::string host, int port);
   EngineBuilder& addQuicCanonicalSuffix(std::string suffix);
   EngineBuilder& enablePortMigration(bool enable_port_migration);
-#endif
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   // Sets whether to use GRO for upstream UDP sockets (QUIC/HTTP3).
@@ -83,6 +82,7 @@ public:
   // E.g. addDnsPreresolveHost(std::string host, uint32_t port);
   EngineBuilder& addDnsPreresolveHostnames(const std::vector<std::string>& hostnames);
   EngineBuilder& addNativeFilter(std::string name, std::string typed_config);
+  EngineBuilder& addNativeFilter(const std::string& name, const ProtobufWkt::Any& typed_config);
 
   EngineBuilder& addPlatformFilter(const std::string& name);
   // Adds a runtime guard for the `envoy.reloadable_features.<guard>`.
@@ -119,10 +119,14 @@ public:
 private:
   struct NativeFilterConfig {
     NativeFilterConfig(std::string name, std::string typed_config)
-        : name_(std::move(name)), typed_config_(std::move(typed_config)) {}
+        : name_(std::move(name)), textproto_typed_config_(std::move(typed_config)) {}
+
+    NativeFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config)
+        : name_(name), typed_config_(typed_config) {}
 
     std::string name_;
-    std::string typed_config_;
+    std::string textproto_typed_config_{};
+    ProtobufWkt::Any typed_config_{};
   };
 
   Logger::Logger::Levels log_level_ = Logger::Logger::Levels::info;
@@ -135,6 +139,7 @@ private:
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
   int dns_query_timeout_seconds_ = 5;
+  absl::optional<uint32_t> dns_num_retries_ = absl::nullopt;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
   std::string app_version_ = "unspecified";

@@ -416,6 +416,7 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_bytes_meter_ = info.getUpstreamBytesMeter();
     bytes_sent_ = info.bytesSent();
     is_shadow_ = info.isShadow();
+    parent_stream_info_ = info.parentStreamInfo();
   }
 
   void setIsShadow(bool is_shadow) { is_shadow_ = is_shadow; }
@@ -440,6 +441,14 @@ struct StreamInfoImpl : public StreamInfo {
   void setShouldDrainConnectionUponCompletion(bool should_drain) override {
     should_drain_connection_ = should_drain;
   }
+
+  void setParentStreamInfo(const StreamInfo& parent_stream_info) override {
+    parent_stream_info_ = parent_stream_info;
+  }
+
+  OptRef<const StreamInfo> parentStreamInfo() const override { return parent_stream_info_; }
+
+  void clearParentStreamInfo() override { parent_stream_info_.reset(); }
 
   TimeSource& time_source_;
   SystemTime start_time_;
@@ -489,6 +498,7 @@ private:
   std::string downstream_transport_failure_reason_;
   bool should_scheme_match_upstream_{false};
   bool should_drain_connection_{false};
+  OptRef<const StreamInfo> parent_stream_info_;
 };
 
 } // namespace StreamInfo

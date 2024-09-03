@@ -1575,6 +1575,21 @@ envoy::config::listener::v3::Filter* ConfigHelper::getFilterFromListener(const s
   return nullptr;
 }
 
+envoy::config::listener::v3::ListenerFilter*
+ConfigHelper::getListenerFilterFromListener(const std::string& name) {
+  RELEASE_ASSERT(!finalized_, "");
+  if (bootstrap_.mutable_static_resources()->listeners_size() == 0) {
+    return nullptr;
+  }
+  auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
+  for (ssize_t i = 0; i < listener->listener_filters_size(); i++) {
+    if (listener->mutable_listener_filters(i)->name() == name) {
+      return listener->mutable_listener_filters(i);
+    }
+  }
+  return nullptr;
+}
+
 void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
   RELEASE_ASSERT(!finalized_, "");
   auto* filter_chain =
@@ -1639,6 +1654,14 @@ void ConfigHelper::storeHttpConnectionManager(
       "http", hcm);
 }
 
+bool ConfigHelper::loadUdpProxyFilter(UdpProxyConfig& udp_proxy) {
+  return loadListenerFilter<UdpProxyConfig>("udp_proxy", udp_proxy);
+}
+
+void ConfigHelper::storeUdpProxyFilter(const UdpProxyConfig& udp_proxy) {
+  return storeListenerFilter<UdpProxyConfig>("udp_proxy", udp_proxy);
+}
+
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {
   RELEASE_ASSERT(!finalized_, "");
   config_modifiers_.push_back(std::move(function));
@@ -1653,6 +1676,17 @@ void ConfigHelper::addConfigModifier(HttpModifierFunction function) {
     }
     function(hcm_config);
     storeHttpConnectionManager(hcm_config);
+  });
+}
+
+void ConfigHelper::addConfigModifier(UdpProxyModifierFunction function) {
+  addConfigModifier([function, this](envoy::config::bootstrap::v3::Bootstrap&) -> void {
+    UdpProxyConfig udp_proxy_config;
+    if (!loadUdpProxyFilter(udp_proxy_config)) {
+      return;
+    }
+    function(udp_proxy_config);
+    storeUdpProxyFilter(udp_proxy_config);
   });
 }
 

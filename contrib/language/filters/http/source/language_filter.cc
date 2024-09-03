@@ -123,10 +123,12 @@ std::string LanguageFilter::matchValue(icu::Locale& locale) {
     if (U_SUCCESS(errorCode)) {
       return language_tag;
     } else {
-      ENVOY_LOG(error, "ICU error code icu::LocaleMatcher toLanguageTag: {}", errorCode);
+      ENVOY_LOG(error, "ICU error code icu::LocaleMatcher toLanguageTag: {}",
+                static_cast<int>(errorCode));
     }
   } else {
-    ENVOY_LOG(error, "ICU error code icu::LocaleMatcher getBestMatch: {}", errorCode);
+    ENVOY_LOG(error, "ICU error code icu::LocaleMatcher getBestMatch: {}",
+              static_cast<int>(errorCode));
   }
 
   return EMPTY_STRING;

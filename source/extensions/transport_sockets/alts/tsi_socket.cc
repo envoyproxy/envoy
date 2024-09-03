@@ -187,7 +187,7 @@ Network::IoResult TsiSocket::repeatReadAndUnprotect(Buffer::Instance& buffer,
       tsi_result status = frame_protector_->unprotect(raw_read_buffer_, buffer);
       if (status != TSI_OK) {
         ENVOY_CONN_LOG(debug, "TSI: unprotect failed: status: {}", callbacks_->connection(),
-                       status);
+                       tsi_result_to_string(status));
         result.action_ = Network::PostIoAction::Close;
         break;
       }

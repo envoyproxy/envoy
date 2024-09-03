@@ -197,6 +197,9 @@ TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) 
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
+TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseWithErrorBeforeRequestComplete) {
+  testRouterUpstreamResponseBeforeRequestComplete(500);
+}
 TEST_P(MultiplexedIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(MultiplexedIntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
@@ -2002,6 +2005,8 @@ public:
     }
     return v;
   }
+
+  void sendRequestsAndResponses(uint32_t num_requests);
 };
 
 TEST_P(Http2FrameIntegrationTest, UpstreamRemoteMalformedFrameEndstreamWith1xxHeader) {
@@ -2441,7 +2446,6 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
   )EOF");
 
   const int kRequestsSentPerIOCycle = 20;
-  autonomous_upstream_ = true;
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   beginSession();
 
@@ -2467,6 +2471,17 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
   }
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  std::vector<FakeStreamPtr> upstream_requests(kRequestsSentPerIOCycle);
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    FakeStreamPtr upstream_request;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+    ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+    ASSERT_TRUE(upstream_request->receivedData());
+    upstream_request->encodeHeaders(default_response_headers_, true);
+    upstream_requests.push_back(std::move(upstream_request));
+  }
 
   for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
     auto frame = readFrame();
@@ -2513,43 +2528,72 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
   tcp_client_->close();
 }
 
-TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailers) {
-  const int kRequestsSentPerIOCycle = 20;
-  autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+void Http2FrameIntegrationTest::sendRequestsAndResponses(uint32_t num_requests) {
   beginSession();
 
   std::string buffer;
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
-    auto request =
-        Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
-                                    {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                               {{"request_no", absl::StrCat(i)}});
     absl::StrAppend(&buffer, std::string(request));
   }
 
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+  for (uint32_t i = 0; i < num_requests; ++i) {
     auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a");
     absl::StrAppend(&buffer, std::string(data));
   }
 
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+  for (uint32_t i = 0; i < num_requests; ++i) {
     auto trailers = Http2Frame::makeEmptyHeadersFrame(
         Http2Frame::makeClientStreamId(i),
         static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
             Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
-    trailers.appendHeaderWithoutIndexing({"k", "v"});
+    trailers.appendHeaderWithoutIndexing({"k", absl::StrCat("v", i)});
     trailers.adjustPayloadSize();
     absl::StrAppend(&buffer, std::string(trailers));
   }
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
 
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  std::vector<FakeStreamPtr> upstream_requests(num_requests);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    FakeStreamPtr upstream_request;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+    ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+    ASSERT_TRUE(upstream_request->receivedData());
+    ASSERT_FALSE(upstream_request->trailers()
+                     ->get(Http::LowerCaseString("k"))[0]
+                     ->value()
+                     .getStringView()
+                     .empty());
+    upstream_request->encodeHeaders(default_response_headers_, true);
+    upstream_requests.push_back(std::move(upstream_request));
+  }
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
     auto frame = readFrame();
     EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
     EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
   }
   tcp_client_->close();
+}
+
+// Validate that processing of deferred requests with body and trailers is handled correctly
+// when there is a filter that pauses and resumes iteration.
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersWithFilterChainPause) {
+  const int kRequestsSentPerIOCycle = 20;
+  // Add filter that stops iteration in the decodeHeaders and resumes in
+  // decodeData to verify that downstream end_stream is handled correctly by the filter manager.
+  config_helper_.addFilter("name: stop-in-headers-continue-in-body-filter");
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+  sendRequestsAndResponses(kRequestsSentPerIOCycle);
+}
+
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersNoPauseInFilterChain) {
+  const int kRequestsSentPerIOCycle = 20;
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+  sendRequestsAndResponses(kRequestsSentPerIOCycle);
 }
 
 // Validate the request completion during processing of headers in the deferred requests,
