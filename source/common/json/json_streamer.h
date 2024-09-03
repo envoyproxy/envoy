@@ -354,9 +354,12 @@ private:
     response_.add(prefix, sanitized, suffix);
   }
 
-  void addString(absl::string_view str) {
-    response_.add("\"", Json::sanitize(sanitize_buffer_, str), "\"");
-  }
+  /**
+   * Serializes a string to the output stream. The input string value will be sanitized and
+   * surrounded by quotes.
+   * @param str the string to be serialized.
+   */
+  void addString(absl::string_view str) { addSanitized("\"", str, "\""); }
 
   /**
    * Serializes a number.
