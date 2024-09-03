@@ -3,14 +3,40 @@
 #include <memory>
 #include <stack>
 #include <string>
+#include <type_traits>
+#include <variant>
 
 #include "envoy/buffer/buffer.h"
+
+#include "source/common/buffer/buffer_util.h"
+#include "source/common/json/json_sanitizer.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Json {
+
+// To ensure the streamer is being used correctly, we use assertions to enforce
+// that only the topmost map/array in the stack is being written to. To make
+// this easier to do from the Level classes, we provider Streamer::topLevel() as
+// a member function, but this is only needed when compiled for debug.
+//
+// We only compile Streamer::topLevel in debug to avoid having it be a coverage
+// gap. However, assertions fail to compile in release mode if they reference
+// non-existent functions or member variables, so we only compile the assertions
+// in debug mode.
+#ifdef NDEBUG
+#define ASSERT_THIS_IS_TOP_LEVEL                                                                   \
+  do {                                                                                             \
+  } while (0)
+#define ASSERT_LEVELS_EMPTY                                                                        \
+  do {                                                                                             \
+  } while (0)
+#else
+#define ASSERT_THIS_IS_TOP_LEVEL ASSERT(this->streamer_.topLevel() == this)
+#define ASSERT_LEVELS_EMPTY ASSERT(this->levels_.empty())
+#endif
 
 /**
  * Provides an API for streaming JSON output, as an alternative to populating a
@@ -42,8 +68,19 @@ public:
    */
   class Level {
   public:
-    Level(Streamer& streamer, absl::string_view opener, absl::string_view closer);
-    virtual ~Level();
+    Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
+        : streamer_(streamer), closer_(closer) {
+      streamer_.addConstantString(opener);
+#ifndef NDEBUG
+      streamer_.push(this);
+#endif
+    }
+    virtual ~Level() {
+      streamer_.addConstantString(closer_);
+#ifndef NDEBUG
+      streamer_.pop(this);
+#endif
+    }
 
     /**
      * This must be called on the top level map or array. It's a programming
@@ -53,7 +90,11 @@ public:
      *
      * @return a newly created subordinate map, which becomes the new top level until destroyed.
      */
-    MapPtr addMap();
+    MapPtr addMap() {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      nextField();
+      return std::make_unique<Map>(streamer_);
+    }
 
     /**
      * This must be called on the top level map or array. It's a programming
@@ -63,7 +104,11 @@ public:
      *
      * @return a newly created subordinate array, which becomes the new top level until destroyed.
      */
-    ArrayPtr addArray();
+    ArrayPtr addArray() {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      nextField();
+      return std::make_unique<Array>(streamer_);
+    }
 
     /**
      * Adds a numeric value to the current array or map. It's a programming
@@ -71,9 +116,21 @@ public:
      * It's also a programming error to call this on map that isn't expecting
      * a value. You must call Map::addKey prior to calling this.
      */
-    void addNumber(double d);
-    void addNumber(uint64_t u);
-    void addNumber(int64_t i);
+    void addNumber(double number) {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      nextField();
+      streamer_.addNumber(number);
+    }
+    void addNumber(uint64_t number) {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      nextField();
+      streamer_.addNumber(number);
+    }
+    void addNumber(int64_t number) {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      nextField();
+      streamer_.addNumber(number);
+    }
 
     /**
      * Adds a string constant value to the current array or map. The string
@@ -83,7 +140,11 @@ public:
      * the top level. It's also a programming error to call this on map that
      * isn't expecting a value. You must call Map::addKey prior to calling this.
      */
-    void addString(absl::string_view str);
+    void addString(absl::string_view str) {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      nextField();
+      streamer_.addSanitized("\"", str, "\"");
+    }
 
     /**
      * Adds a bool constant value to the current array or map. It's a programming
@@ -91,14 +152,24 @@ public:
      * It's also a programming error to call this on map that isn't expecting
      * a value. You must call Map::addKey prior to calling this.
      */
-    void addBool(bool b);
+    void addBool(bool b) {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      nextField();
+      streamer_.addBool(b);
+    }
 
   protected:
     /**
      * Initiates a new field, serializing a comma separator if this is not the
      * first one.
      */
-    virtual void nextField();
+    virtual void nextField() {
+      if (is_first_) {
+        is_first_ = false;
+      } else {
+        streamer_.addConstantString(",");
+      }
+    }
 
     /**
      * Renders a string or a number in json format. Doubles that are NaN are
@@ -107,7 +178,37 @@ public:
      *
      * @param Value the value to render.
      */
-    void addValue(const Value& value);
+    void addValue(const Value& value) {
+      static_assert(absl::variant_size_v<Value> == 5, "Value must be a variant with 5 types");
+
+      switch (value.index()) {
+      case 0:
+        static_assert(std::is_same<decltype(absl::get<0>(value)), const absl::string_view&>::value,
+                      "value at index 0 must be an absl::string_vlew");
+        addString(absl::get<absl::string_view>(value));
+        break;
+      case 1:
+        static_assert(std::is_same<decltype(absl::get<1>(value)), const double&>::value,
+                      "value at index 1 must be a double");
+        addNumber(absl::get<double>(value));
+        break;
+      case 2:
+        static_assert(std::is_same<decltype(absl::get<2>(value)), const uint64_t&>::value,
+                      "value at index 2 must be a uint64_t");
+        addNumber(absl::get<uint64_t>(value));
+        break;
+      case 3:
+        static_assert(std::is_same<decltype(absl::get<3>(value)), const int64_t&>::value,
+                      "value at index 3 must be an int64_t");
+        addNumber(absl::get<int64_t>(value));
+        break;
+      case 4:
+        static_assert(std::is_same<decltype(absl::get<4>(value)), const bool&>::value,
+                      "value at index 4 must be a bool");
+        addBool(absl::get<bool>(value));
+        break;
+      }
+    }
 
   private:
     friend Streamer;
@@ -138,7 +239,13 @@ public:
      * See also addEntries, which directly populates a list of name/value
      * pairs in a single call.
      */
-    void addKey(absl::string_view key);
+    void addKey(absl::string_view key) {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      ASSERT(!expecting_value_);
+      nextField();
+      this->streamer_.addSanitized(R"(")", key, R"(":)");
+      expecting_value_ = true;
+    }
 
     /**
      * Populates a list of name/value pairs in a single call. This function
@@ -146,10 +253,21 @@ public:
      * programming error to call this method on a map that's not the current top
      * level.
      */
-    void addEntries(const Entries& entries);
+    void addEntries(const Entries& entries) {
+      for (const NameValue& entry : entries) {
+        addKey(entry.first);
+        this->addValue(entry.second);
+      }
+    }
 
   protected:
-    void nextField() override;
+    void nextField() override {
+      if (expecting_value_) {
+        expecting_value_ = false;
+      } else {
+        Level::nextField();
+      }
+    }
 
   private:
     bool expecting_value_{false};
@@ -171,7 +289,11 @@ public:
      *
      * @param entries the array of numeric or string values.
      */
-    void addEntries(const Entries& entries);
+    void addEntries(const Entries& entries) {
+      for (const Value& value : entries) {
+        this->addValue(value);
+      }
+    }
   };
 
   /**
@@ -181,7 +303,10 @@ public:
    * functions can be called, as those are only available on Map and Array
    * objects.
    */
-  MapPtr makeRootMap();
+  MapPtr makeRootMap() {
+    ASSERT_LEVELS_EMPTY;
+    return std::make_unique<Map>(*this);
+  }
 
   /**
    * Makes a root array for the streamer.
@@ -190,7 +315,10 @@ public:
    * functions can be called, as those are only available on Map and Array
    * objects.
    */
-  ArrayPtr makeRootArray();
+  ArrayPtr makeRootArray() {
+    ASSERT_LEVELS_EMPTY;
+    return std::make_unique<Array>(*this);
+  }
 
 private:
   friend Level;
@@ -201,20 +329,28 @@ private:
    * Takes a raw string, sanitizes it using JSON syntax, surrounds it
    * with a prefix and suffix, and streams it out.
    */
-  void addSanitized(absl::string_view prefix, absl::string_view token, absl::string_view suffix);
+  void addSanitized(absl::string_view prefix, absl::string_view token, absl::string_view suffix) {
+    absl::string_view sanitized = Json::sanitize(sanitize_buffer_, token);
+    response_.addFragments({prefix, sanitized, suffix});
+  }
 
   /**
    * Serializes a number.
    */
-  void addNumber(double d);
-  void addNumber(uint64_t u);
-  void addNumber(int64_t i);
-  void addBool(bool b);
+  void addNumber(double d) {
+    if (std::isnan(d)) {
+      response_.addFragments({"null"});
+    } else {
+      Buffer::Util::serializeDouble(d, response_);
+    }
+  }
+  void addNumber(uint64_t u) { response_.addFragments({absl::StrCat(u)}); }
+  void addNumber(int64_t i) { response_.addFragments({absl::StrCat(i)}); }
 
   /**
-   * Flushes out any pending fragments.
+   * Serializes a bool to the output stream.
    */
-  void flush();
+  void addBool(bool b) { response_.addFragments({b ? "true" : "false"}); }
 
   /**
    * Adds a constant string to the output stream. The string must outlive the
@@ -231,12 +367,16 @@ private:
   /**
    * Pushes a new level onto the stack.
    */
-  void push(Level* level);
+  void push(Level* level) { levels_.push(level); }
 
   /**
    * Pops a level off of a stack, asserting that it matches.
    */
-  void pop(Level* level);
+  void pop(Level* level) {
+    ASSERT(levels_.top() == level);
+    levels_.pop();
+  }
+
 #endif
 
   Buffer::Instance& response_;

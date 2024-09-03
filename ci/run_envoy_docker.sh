@@ -158,6 +158,7 @@ docker run --rm \
        -e ENVOY_PUBLISH_DRY_RUN \
        -e ENVOY_REPO \
        -e ENVOY_TARBALL_DIR \
+       -e ENVOY_GEN_COMPDB_OPTIONS \
        -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
        -e GITHUB_REF_NAME \

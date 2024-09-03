@@ -31,6 +31,7 @@ public:
   os_fd_t fdDoNotUse() const override { return fd_; }
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
+  bool wasConnected() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,

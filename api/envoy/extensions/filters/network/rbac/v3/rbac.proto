@@ -4,8 +4,6 @@ package envoy.extensions.filters.network.rbac.v3;
 
 import "envoy/config/rbac/v3/rbac.proto";
 
-import "google/protobuf/duration.proto";
-
 import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
@@ -28,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Header should not be used in rules/shadow_rules in RBAC network filter as
 // this information is only available in :ref:`RBAC http filter <config_http_filters_rbac>`.
-// [#next-free-field: 9]
+// [#next-free-field: 8]
 message RBAC {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.rbac.v2.RBAC";
@@ -89,10 +87,4 @@ message RBAC {
   // every payload (e.g., Mongo, MySQL, Kafka) set the enforcement type to
   // CONTINUOUS to enforce RBAC policies on every message boundary.
   EnforcementType enforcement_type = 4;
-
-  // Delay the specified duration before closing the connection when the policy evaluation
-  // result is ``DENY``. If this is not present, the connection will be closed immediately.
-  // This is useful to provide a better protection for Envoy against clients that retries
-  // aggressively when the connection is rejected by the RBAC filter.
-  google.protobuf.Duration delay_deny = 8;
 }

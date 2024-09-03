@@ -45,7 +45,6 @@ public:
   ABSL_MUST_USE_RESULT AssertionResult
   write(const std::string& data, bool end_stream = false, bool verify = true,
         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
   // clear up to the `count` number of bytes of received data
