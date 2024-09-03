@@ -3897,8 +3897,8 @@ envoy_quic_cc_library(
     srcs = [
         "quiche/quic/core/chlo_extractor.cc",
         "quiche/quic/core/quic_buffered_packet_store.cc",
-        "quiche/quic/core/quic_dispatcher_stats.cc",
         "quiche/quic/core/quic_dispatcher.cc",
+        "quiche/quic/core/quic_dispatcher_stats.cc",
         "quiche/quic/core/tls_chlo_extractor.cc",
     ],
     hdrs = [
