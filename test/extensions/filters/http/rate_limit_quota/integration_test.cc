@@ -129,6 +129,9 @@ protected:
               ->mutable_fallback_rate_limit()
               ->set_blanket_rule(envoy::type::v3::RateLimitStrategy::DENY_ALL);
         }
+        mutable_bucket_settings.mutable_expired_assignment_behavior()
+            ->mutable_expired_assignment_behavior_timeout()
+            ->set_seconds(15);
       }
 
       mutable_config->PackFrom(mutable_bucket_settings);
@@ -176,12 +179,35 @@ protected:
 
   void TearDown() override { cleanUp(); }
 
+  bool expectAllowedRequest() {
+    if (!fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_))
+      return false;
+    if (!fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_))
+      return false;
+    if (!upstream_request_->waitForEndStream(*dispatcher_))
+      return false;
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeData(100, true);
+
+    // Verify the response to downstream.
+    if (!response_->waitForEndStream())
+      return false;
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ(response_->headers().getStatusValue(), "200");
+
+    // Clean up the upstream and downstream resource but keep the gRPC
+    // connection to RLQS server open.
+    cleanupUpstreamAndDownstream();
+    return true;
+  }
+
   envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig
       proto_config_{};
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr rlqs_connection_;
   FakeStreamPtr rlqs_stream_;
   IntegrationStreamDecoderPtr response_;
+  int report_interval_sec = 60;
 };
 
 INSTANTIATE_TEST_SUITE_P(
@@ -683,9 +709,6 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReport) {
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ(response_->headers().getStatusValue(), "200");
 
-  // TODO(tyxia) Make interval configurable in the test. It is currently 60s in
-  // ValidMatcherConfig.
-  int report_interval_sec = 60;
   // Trigger the report periodically, 10 times.
   for (int i = 0; i < 10; ++i) {
     // Advance the time by report_interval.
@@ -764,8 +787,6 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReportWithStreamClosed)
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ(response_->headers().getStatusValue(), "200");
 
-  // ValidMatcherConfig.
-  int report_interval_sec = 60;
   // Trigger the report periodically.
   for (int i = 0; i < 6; ++i) {
     if (i == 2) {
@@ -1128,8 +1149,10 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentDeny)
         strategy->set_blanket_rule(envoy::type::v3::RateLimitStrategy::ALLOW_ALL);
       }
 
-      // Send the response from RLQS server.
-      rlqs_stream_->sendGrpcMessage(rlqs_response);
+      // Send the response from RLQS server and wait for response processing to
+      // finish for test consistency.
+      WAIT_FOR_LOG_CONTAINS("debug", "Assignment cached for bucket id",
+                            { rlqs_stream_->sendGrpcMessage(rlqs_response); });
     }
 
     // 2nd request is throttled because the assignment has expired and
@@ -1172,8 +1195,9 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
     // Send downstream client request to upstream.
     sendClientRequest(&custom_headers);
 
-    // 2nd downstream client request will not trigger the reports to RLQS server since it is
-    // same as first request, which will find the entry in the cache.
+    // 2nd downstream client request will not trigger the reports to RLQS server
+    // since it is same as first request, which will find the entry in the
+    // cache.
     if (i != 1) {
       // 1st request will start the gRPC stream.
       if (i == 0) {
@@ -1185,8 +1209,8 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
         ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
         rlqs_stream_->startGrpcStream();
       } else {
-        // 3rd request won't start gRPC stream again since it is kept open and the usage will be
-        // aggregated instead of spawning an immediate report.
+        // 3rd request won't start gRPC stream again since it is kept open and
+        // the usage will be aggregated instead of spawning an immediate report.
         envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
         ASSERT_FALSE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
       }
@@ -1205,12 +1229,14 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
         strategy->set_blanket_rule(envoy::type::v3::RateLimitStrategy::ALLOW_ALL);
       }
 
-      // Send the response from RLQS server.
-      rlqs_stream_->sendGrpcMessage(rlqs_response);
+      // Send the response from RLQS server and wait for response processing to
+      // finish for test consistency.
+      WAIT_FOR_LOG_CONTAINS("debug", "Assignment cached for bucket id",
+                            { rlqs_stream_->sendGrpcMessage(rlqs_response); });
     }
 
-    // Even though assignment was expired on 2nd request, the request is still allowed because the
-    // expired assignment behavior is ALLOW_ALL.
+    // Even though assignment was expired on 2nd request, the request is still
+    // allowed because the expired assignment behavior is ALLOW_ALL.
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
@@ -1222,8 +1248,8 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithExpiredAssignmentAllow
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(response_->headers().getStatusValue(), "200");
 
-    // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
-    // open.
+    // Clean up the upstream and downstream resource but keep the gRPC
+    // connection to RLQS server open.
     cleanupUpstreamAndDownstream();
   }
 }
@@ -1375,68 +1401,53 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestWithAbandonAction) {
 
   absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
   custom_headers_cpy.insert({"name", "prod"});
-  for (int i = 0; i < 3; ++i) {
-    // Send downstream client request to upstream.
-    sendClientRequest(&custom_headers);
 
-    // 3rd downstream  request will not trigger the reports to RLQS server since it is
-    // same as 2nd request, which will find the entry in the cache.
-    if (i != 2) {
-      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+  // Send first request & expect a new RLQS stream.
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+  ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
 
-      // 1st request will start the gRPC stream.
-      if (i == 0) {
-        // Start the gRPC stream to RLQS server on the first request.
-        ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
-        ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+  // Expect an initial report.
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  rlqs_stream_->startGrpcStream();
+  EXPECT_EQ(reports.bucket_quota_usages_size(), 1);
+  EXPECT_EQ(reports.bucket_quota_usages(0).num_requests_allowed(), 1);
+  EXPECT_EQ(reports.bucket_quota_usages(0).num_requests_denied(), 0);
 
-        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
-        ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
-        rlqs_stream_->startGrpcStream();
+  // Expect the first request to be allowed.
+  ASSERT_TRUE(expectAllowedRequest());
 
-        // Build the response.
-        auto* bucket_action = rlqs_response.add_bucket_action();
-
-        for (const auto& [key, value] : custom_headers_cpy) {
-          (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
-        }
-
-        // Set up the abandon action.
-        bucket_action->mutable_abandon_action();
-      } else {
-        // 2nd request will still send report to RLQS server as the previous abandon
-        // action has removed the cache entry. but it won't start gRPC stream
-        // again since it is kept open.
-        envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports reports;
-        ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
-
-        // Build the rlqs server response.
-        auto* bucket_action = rlqs_response.add_bucket_action();
-
-        for (const auto& [key, value] : custom_headers_cpy) {
-          (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
-        }
-      }
-
-      // Send the response from RLQS server.
-      rlqs_stream_->sendGrpcMessage(rlqs_response);
-    }
-
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-    upstream_request_->encodeData(100, true);
-
-    // Verify the response to downstream.
-    ASSERT_TRUE(response_->waitForEndStream());
-    EXPECT_TRUE(response_->complete());
-    EXPECT_EQ(response_->headers().getStatusValue(), "200");
-
-    // Clean up the upstream and downstream resource but keep the gRPC connection to RLQS server
-    // open.
-    cleanupUpstreamAndDownstream();
+  // Build an abandon-action response.
+  envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response;
+  auto* bucket_action = rlqs_response.add_bucket_action();
+  for (const auto& [key, value] : custom_headers_cpy) {
+    (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
   }
+  bucket_action->mutable_abandon_action();
+  // Send the response from RLQS server.
+  rlqs_stream_->sendGrpcMessage(rlqs_response);
+
+  // Expect the next report to be empty, since the cache entry was removed, but
+  // allow for retries in case the response hasn't processed yet.
+  bool empty_report = false;
+  for (int i = 0; i < 5 && !empty_report; ++i) {
+    simTime().advanceTimeWait(std::chrono::seconds(report_interval_sec));
+    ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+    empty_report = reports.bucket_quota_usages().empty();
+  }
+  ASSERT_TRUE(empty_report);
+
+  // Send a second request & expect an immediate report for the new bucket, but
+  // no new stream.
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  EXPECT_EQ(reports.bucket_quota_usages_size(), 1);
+  EXPECT_EQ(reports.bucket_quota_usages(0).num_requests_allowed(), 1);
+  EXPECT_EQ(reports.bucket_quota_usages(0).num_requests_denied(), 0);
+
+  // Expect the second request to be allowed.
+  ASSERT_TRUE(expectAllowedRequest());
 }
 
 } // namespace

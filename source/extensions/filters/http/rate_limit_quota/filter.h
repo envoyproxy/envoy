@@ -93,14 +93,26 @@ private:
   Http::FilterHeadersStatus sendImmediateReport(const size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
 
-  Http::FilterHeadersStatus getStatusFromAction(const BucketAction& action, size_t bucket_id);
+  Http::FilterHeadersStatus setUsageAndResponseFromAction(const BucketAction& action,
+                                                          size_t bucket_id);
 
   Http::FilterHeadersStatus processCachedBucket(size_t bucket_id,
                                                 const RateLimitOnMatchAction& match_action);
   // TODO(tyxia) Build the customized response based on `DenyResponseSettings`.
-  void sendDenyResponse() {
+  // Send a deny response and update quota usage if provided.
+  Http::FilterHeadersStatus sendDenyResponse(QuotaUsage* quota_usage = nullptr) {
     callbacks_->sendLocalReply(Envoy::Http::Code::TooManyRequests, "", nullptr, absl::nullopt, "");
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
+    if (quota_usage)
+      quota_usage->num_requests_denied++;
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  // Send an allow response and update quota usage if provided.
+  Http::FilterHeadersStatus sendAllowResponse(QuotaUsage* quota_usage = nullptr) {
+    if (quota_usage)
+      quota_usage->num_requests_allowed++;
+    return Http::FilterHeadersStatus::Continue;
   }
 
   // Get the FilterHeadersStatus to return when a selected bucket has an expired
