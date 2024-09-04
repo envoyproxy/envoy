@@ -77,7 +77,7 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
   }
   END_TRY
   catch (std::exception&) {
-    // If Nlohmann throws an error, emit an hex escape for any character
+    // If Nlohmann throws an error, emit a hex escape for any character
     // requiring it. This can occur for invalid utf-8 sequences, and we don't
     // want to crash the server if such a sequence makes its way into a string
     // we need to serialize. For example, if admin endpoint /stats?format=json
