@@ -335,9 +335,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     // auth server. A cached login on the authorization server side will set cookies
     // correctly but cause a race condition on future requests that have their location set
     // to the callback path.
-
     if (config_->redirectPathMatcher().match(path_str)) {
-      const CallbackValidatResult result = validateCallbackFromOAuthServer(headers, path_str);
+      // Even though we're already logged in and don't technically need to validate the presence
+      // of the auth code, we still perform the validation to ensure consistency and reuse the
+      // validateOAuthCallback method. This is acceptable because the auth code is always present
+      // in the query string of the callback path according to the OAuth2 spec.
+      // More information can be found here:
+      // https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2
+      const CallbackValidationResult result = validateOAuthCallback(headers, path_str);
       if (!result.is_valid_) {
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
@@ -355,7 +360,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         return Http::FilterHeadersStatus::StopIteration;
       }
 
-      // Redirect to the state URL as the user is already logged in.
+      // Redirect to the original request URL in this callback as the user is already logged in.
       Http::ResponseHeaderMapPtr response_headers{
           Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
@@ -402,13 +407,13 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // At this point, we *are* on /_oauth. We believe this request comes from the authorization
   // server and we expect the query strings to contain the information required to get the access
   // token.
-  const CallbackValidatResult result = validateCallbackFromOAuthServer(headers, path_str);
+  const CallbackValidationResult result = validateOAuthCallback(headers, path_str);
   if (!result.is_valid_) {
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  state_url_ = result.original_request_url_;
+  original_request_url_ = result.original_request_url_;
   auth_code_ = result.auth_code_;
   Formatter::FormatterImpl formatter(config_->redirectUri());
   const auto redirect_uri =
@@ -684,7 +689,7 @@ void OAuth2Filter::finishGetAccessTokenFlow() {
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
 
   addResponseCookies(*response_headers, getEncodedToken());
-  response_headers->setLocation(state_url_);
+  response_headers->setLocation(original_request_url_);
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_LOGGED_IN);
   config_->stats().oauth_success_.inc();
@@ -785,9 +790,13 @@ void OAuth2Filter::sendUnauthorizedResponse() {
                                      absl::nullopt, EMPTY_STRING);
 }
 
-CallbackValidatResult
-OAuth2Filter::validateCallbackFromOAuthServer(const Http::RequestHeaderMap& headers,
-                                              const absl::string_view path_str) {
+// Validates the OAuth callback request.
+// * Does the query parameters contain an error response?
+// * Does the query parameters contain the code and state?
+// * Does the state contain the original request URL and nonce?
+// * Does the nonce in the state match the nonce in the cookie?
+CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
+                                                             const absl::string_view path_str) {
   // Return 401 unauthorized if the query parameters contain an error response.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
   if (query_parameters.getFirstValue(queryParamsError()).has_value()) {

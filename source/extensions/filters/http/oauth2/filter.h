@@ -240,7 +240,7 @@ private:
   const std::string cookie_domain_;
 };
 
-struct CallbackValidatResult {
+struct CallbackValidationResult {
   bool is_valid_;
   std::string auth_code_;
   std::string original_request_url_;
@@ -298,7 +298,7 @@ private:
   std::string expires_id_token_in_;
   std::string new_expires_;
   absl::string_view host_;
-  std::string state_url_;
+  std::string original_request_url_;
   Http::RequestHeaderMap* request_headers_{nullptr};
   bool was_refresh_token_flow_{false};
 
@@ -321,8 +321,8 @@ private:
                                        const std::chrono::seconds& expires_in) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
-  CallbackValidatResult validateCallbackFromOAuthServer(const Http::RequestHeaderMap& headers,
-                                                        const absl::string_view path_str);
+  CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
+                                                 const absl::string_view path_str);
 };
 
 } // namespace Oauth2
