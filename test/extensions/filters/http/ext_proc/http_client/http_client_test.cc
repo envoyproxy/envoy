@@ -76,6 +76,16 @@ TEST_F(ExtProcHttpClientTest, Basic) {
   client_->onSuccess(async_request_, std::move(response_foo));
 }
 
+TEST_F(ExtProcHttpClientTest, JsonDecodingErrorTest) {
+  Http::ResponseHeaderMapPtr resp_headers_new(new Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Http::ResponseMessagePtr response_ok_with_bad_body(
+      new Http::ResponseMessageImpl(std::move(resp_headers_new)));
+  response_ok_with_bad_body->body().add("foo-bar");
+  client_->onSuccess(async_request_, std::move(response_ok_with_bad_body));
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

@@ -17,45 +17,39 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
 
   // Transcode req message into JSON string.
   auto req_in_json = MessageUtil::getJsonStringFromMessage(req);
-  if (!req_in_json.ok()) {
-    ENVOY_LOG(error,
-              "The ProcessingRequest proto message can not be encoded into a JSON string: {}",
-              req_in_json.status().ToString());
-    onError();
-    return;
+  if (req_in_json.ok()) {
+    const auto http_uri = config_.http_service().http_service().http_uri();
+    const std::string cluster = http_uri.cluster();
+    const std::string uri = http_uri.uri();
+    absl::string_view host, path;
+    Envoy::Http::Utility::extractHostPathFromUri(uri, host, path);
+    ENVOY_LOG(debug, " Ext_Proc HTTP client send request to cluster {}, uri {}, host {}, path {}",
+              cluster, uri, host, path);
+
+    const auto thread_local_cluster = context().clusterManager().getThreadLocalCluster(cluster);
+
+    // Construct a HTTP POST message and sends to the ext_proc server cluster.
+    Http::RequestHeaderMapPtr headers =
+        Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
+            {{Envoy::Http::Headers::get().Method, "POST"},
+             {Envoy::Http::Headers::get().Scheme, "http"},
+             {Envoy::Http::Headers::get().Path, std::string(path)},
+             {Envoy::Http::Headers::get().ContentType, "application/json"},
+             {Envoy::Http::Headers::get().RequestId, std::to_string(stream_id)},
+             {Envoy::Http::Headers::get().Host, std::string(host)}});
+    Http::RequestMessagePtr message =
+        std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+    message->body().add(req_in_json.value());
+
+    auto options = Http::AsyncClient::RequestOptions()
+                       .setTimeout(std::chrono::milliseconds(
+                           DurationUtil::durationToMilliseconds(http_uri.timeout())))
+                       .setSampled(absl::nullopt)
+                       .setSendXff(false);
+
+    active_request_ =
+        thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
-
-  const auto http_uri = config_.http_service().http_service().http_uri();
-  const std::string cluster = http_uri.cluster();
-  const std::string uri = http_uri.uri();
-  absl::string_view host, path;
-  Envoy::Http::Utility::extractHostPathFromUri(uri, host, path);
-  ENVOY_LOG(debug, " Ext_Proc HTTP client send request to cluster {}, uri {}, host {}, path {}",
-            cluster, uri, host, path);
-
-  const auto thread_local_cluster = context().clusterManager().getThreadLocalCluster(cluster);
-
-  // Construct a HTTP POST message and sends to the ext_proc server cluster.
-  Http::RequestHeaderMapPtr headers =
-      Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
-          {{Envoy::Http::Headers::get().Method, "POST"},
-           {Envoy::Http::Headers::get().Scheme, "http"},
-           {Envoy::Http::Headers::get().Path, std::string(path)},
-           {Envoy::Http::Headers::get().ContentType, "application/json"},
-           {Envoy::Http::Headers::get().RequestId, std::to_string(stream_id)},
-           {Envoy::Http::Headers::get().Host, std::string(host)}});
-  Http::RequestMessagePtr message =
-      std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
-  message->body().add(req_in_json.value());
-
-  auto options = Http::AsyncClient::RequestOptions()
-                     .setTimeout(std::chrono::milliseconds(
-                         DurationUtil::durationToMilliseconds(http_uri.timeout())))
-                     .setSampled(absl::nullopt)
-                     .setSendXff(false);
-
-  active_request_ =
-      thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
 }
 
 void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
