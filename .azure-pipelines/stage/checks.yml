@@ -71,8 +71,6 @@ jobs:
       #   REPO_FETCH_TAGS: true
       #   PUBLISH_TEST_RESULTS: false
       #   PUBLISH_ENVOY: false
-      api:
-        CI_TARGET: "api"
   timeoutInMinutes: 180
   pool:
     vmImage: $(agentUbuntu)
