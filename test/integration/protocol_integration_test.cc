@@ -1718,6 +1718,35 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
   EXPECT_EQ("408", response->headers().getStatusValue());
 }
 
+// Verify that empty trailers are not sent as trailers.
+TEST_P(DownstreamProtocolIntegrationTest, EmptyTrailersAreNotEncoded) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  config_helper_.prependFilter(R"EOF(
+name: remove-response-trailers-filter
+)EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData("b", false);
+  Http::TestResponseTrailerMapImpl removed_trailers{{"some-trailer", "removed-by-filter"}};
+  upstream_request_->encodeTrailers(removed_trailers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->trailers(), testing::IsNull());
+}
+
 // Verify that headers with underscores in their names are dropped from client requests
 // but remain in upstream responses.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {

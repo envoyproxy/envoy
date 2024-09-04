@@ -89,6 +89,11 @@ public:
   // For example if the runtime guard is `envoy.reloadable_features.use_foo`, the guard name is
   // `use_foo`.
   EngineBuilder& addRuntimeGuard(std::string guard, bool value);
+  // Adds a runtime guard for the `envoy.restart_features.<guard>`. Restart features cannot be
+  // changed after the Envoy applicable has started and initialized.
+  // For example if the runtime guard is `envoy.restart_features.use_foo`, the guard name is
+  // `use_foo`.
+  EngineBuilder& addRestartRuntimeGuard(std::string guard, bool value);
 
   // These functions don't affect the Bootstrap configuration but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
@@ -183,6 +188,7 @@ private:
   std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
+  std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool use_gro_if_available_ = false;
 
