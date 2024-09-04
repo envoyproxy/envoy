@@ -105,6 +105,10 @@ bool parseUnicode(absl::string_view str, uint32_t& hex_value) {
   return false;
 }
 
+void removePrefix(absl::string_view& str, uint32_t prefix_size) {
+  str = str.substr(prefix_size, str.size() - prefix_size);
+}
+
 // Compares a string that's possibly an escaped Unicode, e.g. \u1234, to
 // one that is utf8-encoded.
 bool compareUnicodeEscapeAgainstUtf8(absl::string_view& escaped, absl::string_view& utf8) {
@@ -113,8 +117,8 @@ bool compareUnicodeEscapeAgainstUtf8(absl::string_view& escaped, absl::string_vi
     // If one side of the comparison is a Unicode escape,
     auto [unicode, consumed] = Utf8::decode(utf8);
     if (consumed != 0 && unicode == escaped_unicode) {
-      utf8 = utf8.substr(consumed, utf8.size() - consumed);
-      escaped = escaped.substr(UnicodeEscapeLength, escaped.size() - UnicodeEscapeLength);
+      removePrefix(utf8, consumed);
+      removePrefix(escaped, UnicodeEscapeLength);
       return true;
     }
   }
@@ -137,8 +141,8 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs
       diffs = absl::StrFormat("`%s' and `%s` have different lengths", a, b);
       return false;
     } else if (a[0] == b[0]) {
-      a = a.substr(1, a.size() - 1);
-      b = b.substr(1, b.size() - 1);
+      removePrefix(a, 1);
+      removePrefix(b, 1);
     } else if (!compareUnicodeEscapeAgainstUtf8(a, b) && !compareUnicodeEscapeAgainstUtf8(b, a)) {
       diffs = absl::StrFormat("%s != %s, [%d]%c(0x02%x, \\%03o) != [%d] %c(0x02%x, \\%03o)", all_a,
                               all_b, a.data() - all_a.data(), a[0], a[0], a[0],
@@ -150,13 +154,12 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs
 
 bool jsonEquivalentStrings(absl::string_view sanitized, absl::string_view original,
                            std::string& errmsg) {
-  for (uint32_t hex; !sanitized.empty() && !original.empty();
-       original = original.substr(1, original.size() - 1)) {
+  for (uint32_t hex; !sanitized.empty() && !original.empty(); removePrefix(original, 1)) {
     if (sanitized[0] == original[0]) {
-      sanitized = sanitized.substr(1, sanitized.size() - 1);
-    } else if (parseUnicode(sanitized.substr(0, 6), hex) &&
+      removePrefix(sanitized, 1);
+    } else if (parseUnicode(sanitized.substr(0, UnicodeEscapeLength), hex) &&
                hex == static_cast<const uint8_t>(original[0])) {
-      sanitized = sanitized.substr(6, sanitized.size() - 6);
+      removePrefix(sanitized, UnicodeEscapeLength);
     } else {
       errmsg = absl::StrFormat("%s != %s", sanitized, original);
       return false;
