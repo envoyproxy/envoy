@@ -1699,11 +1699,8 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
     return false;
   }
 
-  if (parent_.state_.filter_call_state_ & FilterManager::FilterCallState::IsDecodingMask) {
-    parent_.state_.decoder_filter_chain_aborted_ = true;
-  } else if (parent_.state_.filter_call_state_ & FilterManager::FilterCallState::IsEncodingMask) {
-    parent_.state_.encoder_filter_chain_aborted_ = true;
-  }
+  parent_.state_.decoder_filter_chain_aborted_ = true;
+  parent_.state_.encoder_filter_chain_aborted_ = true;
   parent_.state_.recreated_stream_ = true;
 
   parent_.streamInfo().setResponseCodeDetails(
