@@ -111,9 +111,11 @@ bool compareUnicodeEscapeAgainstUtf8(absl::string_view& escaped, absl::string_vi
   uint32_t escaped_unicode;
   if (parseUnicode(escaped, escaped_unicode)) {
     // If one side of the comparison is a Unicode escape,
-    auto [unicode, consumed] = Utf8::decode(utf8);
+    // for (uint32_t size = utf8.size(); size > 0; --size) {
+    const uint32_t size = utf8.size();
+    auto [unicode, consumed] = Utf8::decode(utf8.substr(0, size));
     if (consumed != 0 && unicode == escaped_unicode) {
-      utf8 = utf8.substr(consumed, utf8.size() - consumed);
+      utf8 = utf8.substr(consumed, size - consumed);
       escaped = escaped.substr(UnicodeEscapeLength, escaped.size() - UnicodeEscapeLength);
       return true;
     }
@@ -146,6 +148,28 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs
       return false;
     }
   }
+}
+
+bool jsonEquivalentStrings(absl::string_view sanitized, absl::string_view original,
+                           std::string& errmsg) {
+  for (uint32_t hex; !sanitized.empty() && !original.empty();
+       original = original.substr(1, original.size() - 1)) {
+    if (sanitized[0] == original[0]) {
+      sanitized = sanitized.substr(1, sanitized.size() - 1);
+    } else if (parseUnicode(sanitized.substr(0, 6), hex) &&
+               hex == static_cast<const uint8_t>(original[0])) {
+      sanitized = sanitized.substr(6, sanitized.size() - 6);
+    } else {
+      errmsg = absl::StrFormat("%s != %s", sanitized, original);
+      return false;
+    }
+  }
+
+  if (sanitized.empty() && original.empty()) {
+    return true;
+  }
+  errmsg = absl::StrFormat("`%s' and `%s` have different lengths", sanitized, original);
+  return false;
 }
 
 } // namespace TestUtil

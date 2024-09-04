@@ -5,6 +5,7 @@
 #include "source/common/json/json_internal.h"
 
 #include "absl/strings/str_format.h"
+#include "utf8_validity.h"
 
 namespace Envoy {
 namespace Json {
@@ -77,16 +78,20 @@ absl::string_view sanitize(std::string& buffer, absl::string_view str) {
   }
   END_TRY
   catch (std::exception&) {
-    // If Nlohmann throws an error, emit an octal escape for any character
+    // If Nlohmann throws an error, emit an hex escape for any character
     // requiring it. This can occur for invalid utf-8 sequences, and we don't
     // want to crash the server if such a sequence makes its way into a string
     // we need to serialize. For example, if admin endpoint /stats?format=json
     // is called, and a stat name was synthesized from dynamic content such as a
     // gRPC method.
+    //
+    // Note that JSON string escapes are always 4 digit hex. 3 digit octal would
+    // be more compact, and is legal JavaScript, but not legal JSON. See
+    // https://www.json.org/json-en.html for details.
     buffer.clear();
     for (char c : str) {
       if (needs_slow_sanitizer[static_cast<uint8_t>(c)]) {
-        buffer.append(absl::StrFormat("\\%03o", c));
+        buffer.append(absl::StrFormat("\\u%04x", c));
       } else {
         buffer.append(1, c);
       }

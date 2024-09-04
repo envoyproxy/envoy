@@ -1,6 +1,7 @@
 #include <ostream>
 
 #include "source/common/json/json_internal.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/protobuf/utility.h"
 
@@ -10,6 +11,7 @@
 #include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "utf8_validity.h"
 
 namespace Envoy {
 namespace Json {
@@ -140,6 +142,7 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
     buf[0] = byte1 | Utf8::Pattern2Byte;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
       buf[1] = byte2 | Utf8::ContinuePattern;
+      EXPECT_EQ(utf8_range::IsStructurallyValid(utf8), TestUtil::isProtoSerializableUtf8(utf8));
       auto [unicode, consumed] =
           Envoy::Json::Utf8::decode(reinterpret_cast<const uint8_t*>(buf), 2);
       ASSERT_EQ(2, consumed);
@@ -156,6 +159,7 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
       utf8[1] = byte2 | Utf8::ContinuePattern;
       for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
         utf8[2] = byte3 | Utf8::ContinuePattern;
+        EXPECT_EQ(utf8_range::IsStructurallyValid(utf8), TestUtil::isProtoSerializableUtf8(utf8));
         auto [unicode, num_consumed] = Utf8::decode(utf8);
         if (unicode >= 0x800) { // 3-byte unicode values start at 0x800.
           absl::string_view sanitized = sanitize(utf8);
@@ -173,7 +177,7 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
 }
 
 TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
-  std::string utf8("abcd");
+  std::string utf8("abcd"), errmsg;
 
   // This test takes 46 seconds without optimization and 46 seconds without,
   // so we'll just stride all loop by 2 in non-optimized mode to cover the
@@ -192,6 +196,7 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
         utf8[2] = byte3 | Utf8::ContinuePattern;
         for (uint32_t byte4 = 0; byte4 < 64; byte4 += inc) {
           utf8[3] = byte4 | Utf8::ContinuePattern;
+          EXPECT_EQ(utf8_range::IsStructurallyValid(utf8), TestUtil::isProtoSerializableUtf8(utf8));
           absl::string_view sanitized = sanitize(utf8);
           if (TestUtil::isProtoSerializableUtf8(utf8)) {
             auto [unicode, consumed] =
@@ -200,6 +205,10 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
             EXPECT_UTF8_EQ(
                 protoSanitize(utf8), sanitized,
                 absl::StrFormat("0x%x(%d,%d,%d,%d)", unicode, byte1, byte2, byte3, byte4));
+          } else {
+            bool equiv = TestUtil::jsonEquivalentStrings(sanitized, utf8, errmsg);
+            EXPECT_TRUE(equiv) << absl::StrFormat("%s: non-utf8(%d,%d,%d,%d)", errmsg, byte1, byte2,
+                                                  byte3, byte4);
           }
         }
       }
@@ -256,32 +265,36 @@ TEST_F(JsonSanitizerTest, High8Bit) {
   // exception, which Json::sanitizer catches and just escapes the characters so
   // we don't lose information in the encoding. All bytes with the high-bit set
   // are invalid utf-8 in isolation, so we fall through to escaping these.
-  EXPECT_EQ("\\200\\201\\202\\203\\204\\205\\206\\207\\210\\211\\212\\213\\214\\215\\216\\217"
-            "\\220\\221\\222\\223\\224\\225\\226\\227\\230\\231\\232\\233\\234\\235\\236\\237"
-            "\\240\\241\\242\\243\\244\\245\\246\\247\\250\\251\\252\\253\\254\\255\\256\\257"
-            "\\260\\261\\262\\263\\264\\265\\266\\267\\270\\271\\272\\273\\274\\275\\276\\277"
-            "\\300\\301\\302\\303\\304\\305\\306\\307\\310\\311\\312\\313\\314\\315\\316\\317"
-            "\\320\\321\\322\\323\\324\\325\\326\\327\\330\\331\\332\\333\\334\\335\\336\\337"
-            "\\340\\341\\342\\343\\344\\345\\346\\347\\350\\351\\352\\353\\354\\355\\356\\357"
-            "\\360\\361\\362\\363\\364\\365\\366\\367\\370\\371\\372\\373\\374\\375\\376\\377",
+  EXPECT_EQ("\\u0080\\u0081\\u0082\\u0083\\u0084\\u0085\\u0086\\u0087\\u0088\\u0089\\u008a"
+            "\\u008b\\u008c\\u008d\\u008e\\u008f\\u0090\\u0091\\u0092\\u0093\\u0094\\u0095"
+            "\\u0096\\u0097\\u0098\\u0099\\u009a\\u009b\\u009c\\u009d\\u009e\\u009f\\u00a0"
+            "\\u00a1\\u00a2\\u00a3\\u00a4\\u00a5\\u00a6\\u00a7\\u00a8\\u00a9\\u00aa\\u00ab"
+            "\\u00ac\\u00ad\\u00ae\\u00af\\u00b0\\u00b1\\u00b2\\u00b3\\u00b4\\u00b5\\u00b6"
+            "\\u00b7\\u00b8\\u00b9\\u00ba\\u00bb\\u00bc\\u00bd\\u00be\\u00bf\\u00c0\\u00c1"
+            "\\u00c2\\u00c3\\u00c4\\u00c5\\u00c6\\u00c7\\u00c8\\u00c9\\u00ca\\u00cb\\u00cc"
+            "\\u00cd\\u00ce\\u00cf\\u00d0\\u00d1\\u00d2\\u00d3\\u00d4\\u00d5\\u00d6\\u00d7"
+            "\\u00d8\\u00d9\\u00da\\u00db\\u00dc\\u00dd\\u00de\\u00df\\u00e0\\u00e1\\u00e2"
+            "\\u00e3\\u00e4\\u00e5\\u00e6\\u00e7\\u00e8\\u00e9\\u00ea\\u00eb\\u00ec\\u00ed"
+            "\\u00ee\\u00ef\\u00f0\\u00f1\\u00f2\\u00f3\\u00f4\\u00f5\\u00f6\\u00f7\\u00f8"
+            "\\u00f9\\u00fa\\u00fb\\u00fc\\u00fd\\u00fe\\u00ff",
             sanitize(x80_ff));
 }
 
 TEST_F(JsonSanitizerTest, InvalidUtf8) {
   // 2 byte
-  EXPECT_EQ("\\316", sanitizeInvalid(truncate(LambdaUtf8)));
-  EXPECT_EQ("\\316\\373", sanitizeInvalid(corruptByte2(LambdaUtf8)));
+  EXPECT_EQ("\\u00ce", sanitizeInvalid(truncate(LambdaUtf8)));
+  EXPECT_EQ("\\u00ce\\u00fb", sanitizeInvalid(corruptByte2(LambdaUtf8)));
 
   // 3 byte
-  EXPECT_EQ("\\341\\275", sanitizeInvalid(truncate(OmicronUtf8)));
-  EXPECT_EQ("\\341\\375\\271", sanitizeInvalid(corruptByte2(OmicronUtf8)));
+  EXPECT_EQ("\\u00e1\\u00bd", sanitizeInvalid(truncate(OmicronUtf8)));
+  EXPECT_EQ("\\u00e1\\u00fd\\u00b9", sanitizeInvalid(corruptByte2(OmicronUtf8)));
 
   // 4 byte
-  EXPECT_EQ("\\360\\235\\204", sanitizeInvalid(truncate(TrebleClefUtf8)));
-  EXPECT_EQ("\\360\\375\\204\\236", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
+  EXPECT_EQ("\\u00f0\\u009d\\u0084", sanitizeInvalid(truncate(TrebleClefUtf8)));
+  EXPECT_EQ("\\u00f0\\u00fd\\u0084\\u009e", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
 
   // Invalid input embedded in normal text.
-  EXPECT_EQ("Hello, \\360\\235\\204, World!",
+  EXPECT_EQ("Hello, \\u00f0\\u009d\\u0084, World!",
             sanitize(absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
 
   // Replicate a few other cases that were discovered during initial fuzzing,
