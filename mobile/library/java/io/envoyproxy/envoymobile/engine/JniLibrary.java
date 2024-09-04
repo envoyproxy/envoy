@@ -1,5 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
+import android.net.ConnectivityManager;
+
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
@@ -305,4 +307,11 @@ public class JniLibrary {
       long maxConnectionsPerHost, long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds,
       String appVersion, String appId, boolean trustChainVerification, byte[][] filterChain,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards);
+
+  /**
+   * Initializes c-ares.
+   * See <a
+   * href="https://c-ares.org/docs/ares_library_init_android.html">ares_library_init_android</a>.
+   */
+  public static native void initCares(ConnectivityManager connectivityManager);
 }
