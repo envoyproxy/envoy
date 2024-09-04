@@ -111,7 +111,7 @@ bool compareUnicodeEscapeAgainstUtf8(absl::string_view& escaped, absl::string_vi
   uint32_t escaped_unicode;
   if (parseUnicode(escaped, escaped_unicode)) {
     // If one side of the comparison is a Unicode escape,
-    auto [unicode, consumed] = Utf8::decode(utf8.substr(0, utf8.size()));
+    auto [unicode, consumed] = Utf8::decode(utf8);
     if (consumed != 0 && unicode == escaped_unicode) {
       utf8 = utf8.substr(consumed, utf8.size() - consumed);
       escaped = escaped.substr(UnicodeEscapeLength, escaped.size() - UnicodeEscapeLength);
