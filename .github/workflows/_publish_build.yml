@@ -117,6 +117,9 @@ jobs:
     permissions:
       contents: read
       packages: read
+    secrets:
+      dockerhub-username: ${{ secrets.dockerhub-username }}
+      dockerhub-password: ${{ secrets.dockerhub-password }}
     name: ${{ matrix.name || matrix.target }}
     needs:
     - binary
@@ -132,8 +135,6 @@ jobs:
       source: |
         export NO_BUILD_SETUP=1
         export ENVOY_DOCKER_IN_DOCKER=1
-        export DOCKERHUB_USERNAME=${{ secrets.dockerhub-username }}
-        export DOCKERHUB_PASSWORD=${{ secrets.dockerhub-password }}
       trusted: ${{ inputs.trusted }}
       upload-name: docker
       upload-path: build_images
