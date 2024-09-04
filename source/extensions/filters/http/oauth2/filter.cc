@@ -45,13 +45,13 @@ constexpr const char* CookieDomainFormatString = ";domain={}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
-const std::string queryParamsError = "error";
-const std::string queryParamsCode = "code";
-const std::string queryParamsState = "state";
-const std::string queryParamsRedirectUri = "redirect_uri";
+constexpr absl::string_view queryParamsError = "error";
+constexpr absl::string_view queryParamsCode = "code";
+constexpr absl::string_view queryParamsState = "state";
+constexpr absl::string_view queryParamsRedirectUri = "redirect_uri";
 
-const std::string stateParamsUrl = "url";
-const std::string stateParamsNonce = "nonce";
+constexpr absl::string_view stateParamsUrl = "url";
+constexpr absl::string_view stateParamsNonce = "nonce";
 
 constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
 constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
