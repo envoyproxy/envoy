@@ -823,8 +823,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
          "Either routeConfigProvider or (scopedRouteConfigProvider and scopeKeyBuilder) should be "
          "set in "
          "ConnectionManagerImpl.");
-  for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_->accessLogs()) {
-    filter_manager_.addAccessLogHandler(access_log);
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_separate_config_and_filter_access_loggers")) {
+    for (const AccessLog::InstanceSharedPtr& access_log :
+         connection_manager_.config_->accessLogs()) {
+      filter_manager_.addAccessLogHandler(access_log);
+    }
   }
 
   filter_manager_.streamInfo().setStreamIdProvider(

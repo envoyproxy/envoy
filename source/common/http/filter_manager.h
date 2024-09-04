@@ -555,6 +555,11 @@ public:
    * This is used for HTTP/1.1 codec.
    */
   virtual bool isHalfCloseEnabled() PURE;
+
+  /**
+   * Returns the loggers set in the connection manager configuration.
+   */
+  virtual std::list<AccessLog::InstanceSharedPtr> loggersFromConfiguration() const PURE;
 };
 
 /**
@@ -674,11 +679,7 @@ public:
   }
 
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
-    if (std::dynamic_pointer_cast<AccessLog::FilterPtr>(handler)) {
-      access_log_handlers_.push_front(std::move(handler));
-    } else {
-      access_log_handlers_.push_back(std::move(handler));
-    }
+    access_log_handlers_.push_back(std::move(handler));
   }
   void addStreamDecoderFilter(ActiveStreamDecoderFilterPtr filter) {
     // Note: configured decoder filters are appended to decoder_filters_.
@@ -718,6 +719,12 @@ public:
 
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());
+    }
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_separate_config_and_filter_access_loggers")) {
+      for (const auto& log_handler : filter_manager_callbacks_.loggersFromConfiguration()) {
+        log_handler->log(log_context, streamInfo());
+      }
     }
   }
 

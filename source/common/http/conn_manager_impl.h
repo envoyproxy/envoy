@@ -284,6 +284,9 @@ private:
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
     bool isHalfCloseEnabled() override { return connection_manager_.allow_upstream_half_close_; }
+    std::list<AccessLog::InstanceSharedPtr> loggersFromConfiguration() override {
+      return connection_manager_.config_->accessLogs();
+    }
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
