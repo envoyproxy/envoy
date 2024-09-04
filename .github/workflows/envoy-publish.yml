@@ -55,6 +55,14 @@ jobs:
       contents: read
       packages: read
     secrets:
+      dockerhub-username: >-
+        ${{ fromJSON(needs.load.outputs.trusted)
+            && secrets.DOCKERHUB_USERNAME
+            || '' }}
+      dockerhub-password: >-
+        ${{ fromJSON(needs.load.outputs.trusted)
+            && secrets.DOCKERHUB_PASSWORD
+            || '' }}
       gpg-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_GPG_MAINTAINER_KEY || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
       gpg-key-password: >-
         ${{ fromJSON(needs.load.outputs.trusted)
