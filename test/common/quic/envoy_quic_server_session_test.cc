@@ -309,7 +309,6 @@ TEST_F(EnvoyQuicServerSessionTest, NewStream) {
 
   // Receive a GET request on created stream.
   quic::QuicHeaderList headers;
-  headers.OnHeaderBlockStart();
   std::string host("www.abc.com");
   headers.OnHeader(":authority", host);
   headers.OnHeader(":method", "GET");
@@ -575,7 +574,6 @@ TEST_F(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
 
   // Receive a GET request on created stream.
   quic::QuicHeaderList request_headers;
-  request_headers.OnHeaderBlockStart();
   std::string host("www.abc.com");
   request_headers.OnHeader(":authority", host);
   request_headers.OnHeader(":method", "GET");
@@ -678,7 +676,6 @@ TEST_F(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
 
   // Receive a GET request on created stream.
   quic::QuicHeaderList request_headers;
-  request_headers.OnHeaderBlockStart();
   std::string host("www.abc.com");
   request_headers.OnHeader(":authority", host);
   request_headers.OnHeader(":method", "GET");
@@ -923,7 +920,6 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
 
   // Receive a GET request on created stream.
   quic::QuicHeaderList request_headers;
-  request_headers.OnHeaderBlockStart();
   std::string host("www.abc.com");
   request_headers.OnHeader(":authority", host);
   request_headers.OnHeader(":method", "GET");
