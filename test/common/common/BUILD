@@ -76,8 +76,6 @@ envoy_cc_fuzz_test(
     name = "base64_fuzz_test",
     srcs = ["base64_fuzz_test.cc"],
     corpus = "base64_corpus",
-    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
-    tags = ["no_fuzz"],
     deps = ["//source/common/common:base64_lib"],
 )
 
@@ -85,8 +83,6 @@ envoy_cc_fuzz_test(
     name = "utility_fuzz_test",
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
-    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
-    tags = ["no_fuzz"],
     deps = ["//source/common/common:utility_lib"],
 )
 
@@ -220,8 +216,6 @@ envoy_cc_fuzz_test(
     name = "logger_fuzz_test",
     srcs = ["logger_fuzz_test.cc"],
     corpus = "logger_corpus",
-    # TODO(github.com/envoyproxy/envoy#8893): Re-enable once more fuzz tests are added
-    tags = ["no_fuzz"],
     deps = ["//source/common/common:minimal_logger_lib"],
 )
 
