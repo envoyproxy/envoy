@@ -166,9 +166,8 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
             EXPECT_UTF8_EQ(protoSanitize(utf8), sanitized,
                            absl::StrFormat("0x%x(%d,%d,%d)", unicode, byte1, byte2, byte3));
           } else {
-            EXPECT_JSON_STREQ(
-                sanitized, utf8,
-                absl::StrFormat("%s: non-utf8(%d,%d,%d)", errmsg, byte1, byte2, byte3));
+            EXPECT_JSON_STREQ(sanitized, utf8,
+                              absl::StrFormat("non-utf8(%d,%d,%d)", byte1, byte2, byte3));
           }
         }
       }
@@ -177,7 +176,7 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
 }
 
 TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
-  std::string utf8("abcd"), errmsg;
+  std::string utf8("abcd");
 
   // This test takes 46 seconds without optimization and 46 seconds without,
   // so we'll just stride all loop by 2 in non-optimized mode to cover the
@@ -205,9 +204,8 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
                 protoSanitize(utf8), sanitized,
                 absl::StrFormat("0x%x(%d,%d,%d,%d)", unicode, byte1, byte2, byte3, byte4));
           } else {
-            EXPECT_JSON_STREQ(
-                sanitized, utf8,
-                absl::StrFormat("%s: non-utf8(%d,%d,%d,%d)", errmsg, byte1, byte2, byte3, byte4));
+            EXPECT_JSON_STREQ(sanitized, utf8,
+                              absl::StrFormat("non-utf8(%d,%d,%d,%d)", byte1, byte2, byte3, byte4));
           }
         }
       }
