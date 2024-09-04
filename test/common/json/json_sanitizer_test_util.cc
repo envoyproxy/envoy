@@ -105,7 +105,10 @@ bool parseUnicode(absl::string_view str, uint32_t& hex_value) {
   return false;
 }
 
+// Removes 'prefix_size' characters from the beginning of 'str'.
 void removePrefix(absl::string_view& str, uint32_t prefix_size) {
+  ASSERT(prefix_size > 0);
+  ASSERT(prefix_size <= str.size());
   str = str.substr(prefix_size, str.size() - prefix_size);
 }
 
