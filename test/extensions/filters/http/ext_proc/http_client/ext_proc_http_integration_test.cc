@@ -32,6 +32,7 @@ using Http::LowerCaseString;
 struct ConfigOptions {
   bool downstream_filter = true;
   bool failure_mode_allow = false;
+  int64_t timeout = 900000000;
 };
 
 struct ExtProcHttpTestParams {
@@ -61,19 +62,6 @@ public:
     }
     cleanupUpstreamAndDownstream();
   }
-
-  std::string default_http_config_ = R"EOF(
-  http_service:
-    http_service:
-      http_uri:
-        uri: "ext_proc_server_0:9000"
-        cluster: "ext_proc_server_0"
-        timeout:
-          seconds: 500
-  processing_mode:
-    request_header_mode: "SEND"
-    response_header_mode: "SKIP"
-  )EOF";
 
   void initializeConfig(ConfigOptions config_option = {},
                         const std::vector<std::pair<int, int>>& cluster_endpoints = {{0, 1},
@@ -106,7 +94,11 @@ public:
         }
       }
 
-      TestUtility::loadFromYaml(default_http_config_, proto_config_);
+      auto* http_uri = proto_config_.mutable_http_service()->mutable_http_service()->mutable_http_uri();
+      http_uri->set_uri("ext_proc_server_0:9000");
+      http_uri->set_cluster("ext_proc_server_0");
+      http_uri->mutable_timeout()->set_nanos(config_option.timeout);
+
       if (config_option.failure_mode_allow) {
         proto_config_.set_failure_mode_allow(true);
       }
@@ -228,6 +220,8 @@ INSTANTIATE_TEST_SUITE_P(
 
 // Side stream server does not mutate the header request.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerNoHeaderMutation) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(
@@ -246,6 +240,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoHeaderMutation) {
 
 // Side stream server adds and removes headers from the header request.
 TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(
@@ -278,6 +273,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
 
 // Side stream server does not send response trigger timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -288,25 +284,15 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
                                  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(400));
                                  return false;
                                });
-
-  // We should immediately have an error response now
+  // ext_proc filter timeouts sends a 504 local reply depending on runtime flag.
   verifyDownstreamResponse(*response, 504);
 }
 
 // Http timeout value set to 10ms. Test HTTP timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
-  default_http_config_ = R"EOF(
-  http_service:
-    http_service:
-      http_uri:
-        uri: "ext_proc_server_0:9000"
-        cluster: "ext_proc_server_0"
-        timeout:
-          nanos: 10000000
-  processing_mode:
-    request_header_mode: "SEND"
-    response_header_mode: "SKIP"
-  )EOF";
+  ConfigOptions config_option = {};
+  config_option.timeout = 10000000;
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -319,12 +305,13 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
                                  return true;
                                });
 
-  // We should immediately have an error response now
+  // HTTP client timeouts sends a 500 local reply.
   verifyDownstreamResponse(*response, 500);
 }
 
 // Side stream server sends back 400 with fail-mode-allow set to false.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerSendsBackBadRequestFailClose) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -339,6 +326,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerSendsBackBadRequestFailClose) {
 TEST_P(ExtProcHttpClientIntegrationTest, ServerSendsBackBadRequestFailOpen) {
   ConfigOptions config_option = {};
   config_option.failure_mode_allow = true;
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig(config_option);
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
@@ -351,5 +339,38 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerSendsBackBadRequestFailOpen) {
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
 }
+
+#if 0
+TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutationInBothDirection) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
+
+  processRequestHeadersMessage(
+      http_side_upstreams_[0], false,
+      [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
+            {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        response_header_mutation->add_remove_headers("x-remove-this");
+        return true;
+      });
+
+  // The request is sent to the upstream.
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 200);
+}
+#endif
 
 } // namespace Envoy
