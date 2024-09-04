@@ -758,10 +758,10 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
 }
 
 bool Utility::remoteAddressIsTrustedProxy(
-    const Envoy::Network::Address::InstanceConstSharedPtr remote,
+    const Envoy::Network::Address::Instance& remote,
     absl::Span<const Network::Address::CidrRange> trusted_cidrs) {
   for (const auto& cidr : trusted_cidrs) {
-    if (cidr.isInRange(*remote.get())) {
+    if (cidr.isInRange(remote)) {
       return true;
     }
   }

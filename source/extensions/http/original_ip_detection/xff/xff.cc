@@ -39,7 +39,7 @@ XffIPDetection::XffIPDetection(const std::vector<Network::Address::CidrRange> tr
 Envoy::Http::OriginalIPDetectionResult
 XffIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {
   if (!xff_trusted_cidrs_.empty()) {
-    if (!Envoy::Http::Utility::remoteAddressIsTrustedProxy(params.downstream_remote_address,
+    if (!Envoy::Http::Utility::remoteAddressIsTrustedProxy(*params.downstream_remote_address.get(),
                                                            xff_trusted_cidrs_)) {
       return {nullptr, false, absl::nullopt, false};
     }

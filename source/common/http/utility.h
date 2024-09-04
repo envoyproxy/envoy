@@ -396,7 +396,7 @@ struct GetLastAddressFromXffInfo {
  * @param trusted_cidrs the list of CIDRs which are considered trusted proxies
  * @return whether the remote address is a trusted proxy
  */
-bool remoteAddressIsTrustedProxy(const Envoy::Network::Address::InstanceConstSharedPtr remote,
+bool remoteAddressIsTrustedProxy(const Envoy::Network::Address::Instance& remote,
                                  absl::Span<const Network::Address::CidrRange> trusted_cidrs);
 
 /**
