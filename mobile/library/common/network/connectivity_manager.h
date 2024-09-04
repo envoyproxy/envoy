@@ -189,7 +189,7 @@ public:
   virtual Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() PURE;
 
   /**
-   * Called when OS changes the preferred network.
+   * Called when the OS changes the preferred network.
    * @param network, the OS-preferred network.
    * @returns configuration key of the latest snapshot of network configuration state.
    */
@@ -260,12 +260,13 @@ private:
   Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
       dns_callbacks_handle_{nullptr};
   Upstream::ClusterManager& cluster_manager_;
-  std::unique_ptr<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>
-      quic_observer_registry_factory_;
+  Quic::EnvoyMobileQuicNetworkObserverRegistryFactory quic_observer_registry_factory_;
   DnsCacheManagerSharedPtr dns_cache_manager_;
   ProxySettingsConstSharedPtr proxy_settings_;
   static NetworkState network_state_;
-  const bool quic_upstream_connection_handle_network_change_;
+  // If true, all QUIC connections will respond to network changes.
+  const bool quic_upstream_connection_handle_network_change_{Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.quic_upstream_connection_handle_network_change")};
 };
 
 using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;

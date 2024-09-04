@@ -140,6 +140,8 @@ public:
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   void onEvent(Network::ConnectionEvent event) override {
+    // If this is a connection close event caused by network change, do not regard it as pool
+    // failure and keep any existing pending streams waiting for newer connections.
     parent_.onConnectionEvent(*this, codec_client_->connectionFailureReason(),
                               event, /*purge_pending_streams*/
                               !close_after_network_change_);
@@ -149,6 +151,8 @@ public:
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;
+  // If true, the connection has been closed because of underlying network change. And any
+  // following connection close events shouldn't be regarded as pool failure.
   bool close_after_network_change_{false};
 };
 

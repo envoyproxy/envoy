@@ -21,16 +21,18 @@ private:
 class EnvoyMobileQuicNetworkObserverRegistryFactory
     : public EnvoyQuicNetworkObserverRegistryFactory {
 public:
+  EnvoyMobileQuicNetworkObserverRegistryFactory() { thread_local_observer_registries_.reserve(1); }
+
   EnvoyQuicNetworkObserverRegistryPtr
   createQuicNetworkObserverRegistry(Event::Dispatcher& dispatcher) override;
 
-  std::list<std::reference_wrapper<EnvoyMobileQuicNetworkObserverRegistry>>&
+  std::vector<std::reference_wrapper<EnvoyMobileQuicNetworkObserverRegistry>>&
   getCreatedObserverRegistries() {
     return thread_local_observer_registries_;
   }
 
 private:
-  std::list<std::reference_wrapper<EnvoyMobileQuicNetworkObserverRegistry>>
+  std::vector<std::reference_wrapper<EnvoyMobileQuicNetworkObserverRegistry>>
       thread_local_observer_registries_;
 };
 

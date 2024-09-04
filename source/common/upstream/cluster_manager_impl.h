@@ -43,10 +43,6 @@
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
 
-#ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
-#endif
-
 namespace Envoy {
 namespace Upstream {
 

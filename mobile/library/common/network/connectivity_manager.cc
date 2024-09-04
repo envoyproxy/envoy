@@ -79,13 +79,9 @@ constexpr unsigned int MaxFaultThreshold = 3;
 
 ConnectivityManagerImpl::ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
                                                  DnsCacheManagerSharedPtr dns_cache_manager)
-    : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager),
-      quic_upstream_connection_handle_network_change_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.quic_upstream_connection_handle_network_change")) {
-  quic_observer_registry_factory_ =
-      std::make_unique<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>();
+    : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {
   if (quic_upstream_connection_handle_network_change_) {
-    cluster_manager_.createNetworkObserverRegistries(*quic_observer_registry_factory_);
+    cluster_manager_.createNetworkObserverRegistries(quic_observer_registry_factory_);
   }
 }
 
@@ -118,7 +114,7 @@ envoy_netconf_t ConnectivityManagerImpl::onNetworkMadeDefault(NetworkType networ
   ENVOY_LOG_MISC(trace, "Default network changed to {}", static_cast<int>(network));
   envoy_netconf_t configuration_key = setPreferredNetwork(network);
   for (std::reference_wrapper<Quic::EnvoyMobileQuicNetworkObserverRegistry> registry :
-       quic_observer_registry_factory_->getCreatedObserverRegistries()) {
+       quic_observer_registry_factory_.getCreatedObserverRegistries()) {
     registry.get().onNetworkMadeDefault();
   }
   return configuration_key;

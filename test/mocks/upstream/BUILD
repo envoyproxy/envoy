@@ -2,7 +2,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_package",
-    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -247,9 +246,7 @@ envoy_cc_mock(
         "//source/common/singleton:manager_impl_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:thread_factory_for_test_lib",
-    ] + envoy_select_enable_http3([
-        "//source/common/quic:envoy_quic_client_session_lib",
-    ]),
+    ],
 )
 
 envoy_cc_mock(

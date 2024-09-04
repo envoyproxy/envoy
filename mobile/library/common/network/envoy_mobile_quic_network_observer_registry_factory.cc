@@ -9,13 +9,17 @@ void EnvoyMobileQuicNetworkObserverRegistry::onNetworkMadeDefault() {
   ENVOY_LOG_MISC(trace, "Default network changed.");
   ASSERT(Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.quic_upstream_connection_handle_network_change"));
+  // This is called from platform API which might be on a different thread other than the network
+  // thread.
   dispatcher_.post([this]() {
-    // Retain the existing observers in a list and iterate on the list.
-    std::list<QuicNetworkConnectivityObserver*> existing_observers;
+    // Retain the existing observers in a list and iterate on the list as new
+    // connections might be created and registered during iteration.
+    std::vector<QuicNetworkConnectivityObserver*> existing_observers;
+    existing_observers.reserve(registeredQuicObservers().size());
     for (QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
       existing_observers.push_back(observer);
     }
-    for (auto* observer : existing_observers) {
+    for (QuicNetworkConnectivityObserver* observer : existing_observers) {
       observer->onNetworkChanged();
     }
   });

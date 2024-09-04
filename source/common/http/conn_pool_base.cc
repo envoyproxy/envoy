@@ -103,7 +103,8 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode error_code) {
   if (state() != ActiveClient::State::Draining) {
     if (codec_client_->numActiveRequests() == 0) {
       if (codec_client_->protocol() == Protocol::Http3 && error_code == GoAwayErrorCode::Other) {
-        // This must be network change because QUIC GOAWAY frame doesn't have error code.
+        // This must be network change because QUIC GOAWAY frame doesn't have error code and always
+        // call this callback with NoError.
         close_after_network_change_ = true;
       }
       codec_client_->close();
