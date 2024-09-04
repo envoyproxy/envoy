@@ -240,6 +240,12 @@ private:
   const std::string cookie_domain_;
 };
 
+struct CallbackValidatResult {
+  bool is_valid_;
+  std::string auth_code_;
+  std::string original_request_url_;
+};
+
 /**
  * The filter is the primary entry point for the OAuth workflow. Its responsibilities are to
  * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
@@ -315,6 +321,8 @@ private:
                                        const std::chrono::seconds& expires_in) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
+  CallbackValidatResult validateCallbackFromOAuthServer(const Http::RequestHeaderMap& headers,
+                                                        const absl::string_view path_str);
 };
 
 } // namespace Oauth2
