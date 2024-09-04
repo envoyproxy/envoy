@@ -6,6 +6,10 @@ permissions:
 on:
   workflow_call:
     secrets:
+      dockerhub-username:
+        required: false
+      dockerhub-password:
+        required: false
       gpg-key:
         required: true
       gpg-key-password:
@@ -128,6 +132,8 @@ jobs:
       source: |
         export NO_BUILD_SETUP=1
         export ENVOY_DOCKER_IN_DOCKER=1
+        export DOCKERHUB_USERNAME=${{ secrets.dockerhub-username }}
+        export DOCKERHUB_PASSWORD=${{ secrets.dockerhub-password }}
       trusted: ${{ inputs.trusted }}
       upload-name: docker
       upload-path: build_images
