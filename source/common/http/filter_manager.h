@@ -890,7 +890,8 @@ protected:
           has_1xx_headers_(false), created_filter_chain_(false), is_head_request_(false),
           is_grpc_request_(false), non_100_response_headers_encoded_(false),
           under_on_local_reply_(false), decoder_filter_chain_aborted_(false),
-          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false) {}
+          encoder_filter_chain_aborted_(false), saw_downstream_reset_(false),
+          recreated_stream_(false) {}
     uint32_t filter_call_state_{0};
 
     // Set after decoder filter chain has completed iteration. Prevents further calls to decoder
