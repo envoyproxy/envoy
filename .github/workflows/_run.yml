@@ -292,7 +292,7 @@ jobs:
         BAZEL_FAKE_SCM_REVISION: ${{ github.event_name == 'pull_request' && 'e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9' || '' }}
         CI_BRANCH: >-
           ${{ inputs.trusted
-              && format('refs/heads/{0}, fromJSON(inputs.request).request.target-branch)
+              && format('refs/heads/{0}', fromJSON(inputs.request).request.target-branch)
               || '' }}
         CI_SHA1: ${{ github.sha }}
         CI_TARGET_BRANCH: ${{ fromJSON(inputs.request).request.target-branch }}
