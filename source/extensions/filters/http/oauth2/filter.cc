@@ -364,7 +364,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         return Http::FilterHeadersStatus::StopIteration;
       }
 
-      // Redirect to the original request URL in this callback as the user is already logged in.
+      // Since the user is already logged in, we don't need to exchange the auth code for tokens.
+      // Instead, we redirect the user back to the original request URL.
       Http::ResponseHeaderMapPtr response_headers{
           Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
               {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))},
