@@ -50,7 +50,6 @@ envoy_cc_test(
         "//source/common/json:json_internal_lib",
         "//source/common/json:json_sanitizer_lib",
         "//source/common/protobuf:utility_lib",
-        "@utf8_range//:utf8_validity",
     ],
 )
 

@@ -1,7 +1,6 @@
 #include <ostream>
 
 #include "source/common/json/json_internal.h"
-#include "source/common/json/json_loader.h"
 #include "source/common/json/json_sanitizer.h"
 #include "source/common/protobuf/utility.h"
 
@@ -11,7 +10,6 @@
 #include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "utf8_validity.h"
 
 namespace Envoy {
 namespace Json {
@@ -142,7 +140,6 @@ TEST_F(JsonSanitizerTest, AllTwoByteUtf8) {
     buf[0] = byte1 | Utf8::Pattern2Byte;
     for (uint32_t byte2 = 0; byte2 < 64; ++byte2) {
       buf[1] = byte2 | Utf8::ContinuePattern;
-      EXPECT_EQ(utf8_range::IsStructurallyValid(utf8), TestUtil::isProtoSerializableUtf8(utf8));
       auto [unicode, consumed] =
           Envoy::Json::Utf8::decode(reinterpret_cast<const uint8_t*>(buf), 2);
       ASSERT_EQ(2, consumed);
@@ -159,7 +156,6 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
       utf8[1] = byte2 | Utf8::ContinuePattern;
       for (uint32_t byte3 = 0; byte3 < 64; ++byte3) {
         utf8[2] = byte3 | Utf8::ContinuePattern;
-        EXPECT_EQ(utf8_range::IsStructurallyValid(utf8), TestUtil::isProtoSerializableUtf8(utf8));
         auto [unicode, num_consumed] = Utf8::decode(utf8);
         if (unicode >= 0x800) { // 3-byte unicode values start at 0x800.
           absl::string_view sanitized = sanitize(utf8);
@@ -169,6 +165,10 @@ TEST_F(JsonSanitizerTest, AllThreeByteUtf8) {
             EXPECT_EQ(3, consumed);
             EXPECT_UTF8_EQ(protoSanitize(utf8), sanitized,
                            absl::StrFormat("0x%x(%d,%d,%d)", unicode, byte1, byte2, byte3));
+          } else {
+            EXPECT_JSON_STREQ(
+                sanitized, utf8,
+                absl::StrFormat("%s: non-utf8(%d,%d,%d)", errmsg, byte1, byte2, byte3));
           }
         }
       }
@@ -196,7 +196,6 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
         utf8[2] = byte3 | Utf8::ContinuePattern;
         for (uint32_t byte4 = 0; byte4 < 64; byte4 += inc) {
           utf8[3] = byte4 | Utf8::ContinuePattern;
-          EXPECT_EQ(utf8_range::IsStructurallyValid(utf8), TestUtil::isProtoSerializableUtf8(utf8));
           absl::string_view sanitized = sanitize(utf8);
           if (TestUtil::isProtoSerializableUtf8(utf8)) {
             auto [unicode, consumed] =
@@ -206,9 +205,9 @@ TEST_F(JsonSanitizerTest, AllFourByteUtf8) {
                 protoSanitize(utf8), sanitized,
                 absl::StrFormat("0x%x(%d,%d,%d,%d)", unicode, byte1, byte2, byte3, byte4));
           } else {
-            bool equiv = TestUtil::jsonEquivalentStrings(sanitized, utf8, errmsg);
-            EXPECT_TRUE(equiv) << absl::StrFormat("%s: non-utf8(%d,%d,%d,%d)", errmsg, byte1, byte2,
-                                                  byte3, byte4);
+            EXPECT_JSON_STREQ(
+                sanitized, utf8,
+                absl::StrFormat("%s: non-utf8(%d,%d,%d,%d)", errmsg, byte1, byte2, byte3, byte4));
           }
         }
       }

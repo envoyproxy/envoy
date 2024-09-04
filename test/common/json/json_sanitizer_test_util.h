@@ -43,6 +43,12 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& errms
  */
 bool jsonEquivalentStrings(absl::string_view sanitized, absl::string_view original,
                            std::string& errmsg);
+#define EXPECT_JSON_STREQ(sanitized, original, context)                                            \
+  {                                                                                                \
+    std::string errmsg;                                                                            \
+    EXPECT_TRUE(TestUtil::jsonEquivalentStrings(sanitized, original, errmsg)) << context << "\n"   \
+                                                                              << errmsg;           \
+  }
 
 } // namespace TestUtil
 } // namespace Json
