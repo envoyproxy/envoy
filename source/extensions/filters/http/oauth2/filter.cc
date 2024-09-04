@@ -45,9 +45,13 @@ constexpr const char* CookieDomainFormatString = ";domain={}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
-const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
-const std::string& queryParamsCode() { CONSTRUCT_ON_FIRST_USE(std::string, "code"); }
-const std::string& queryParamsState() { CONSTRUCT_ON_FIRST_USE(std::string, "state"); }
+const std::string queryParamsError = "error";
+const std::string queryParamsCode = "code";
+const std::string queryParamsState = "state";
+const std::string queryParamsRedirectUri = "redirect_uri";
+
+const std::string stateParamsUrl = "url";
+const std::string stateParamsNonce = "nonce";
 
 constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
 constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
@@ -508,7 +512,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   }
 
   // Encode the original request URL and the nonce to the state parameter
-  const std::string state = absl::StrCat("url=", escaped_url, "&nonce=", nonce);
+  const std::string state =
+      absl::StrCat(stateParamsUrl, "=", escaped_url, "&", stateParamsNonce, "=", nonce);
   const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
 
   Formatter::FormatterImpl formatter(config_->redirectUri());
@@ -518,8 +523,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
       Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri);
 
   auto query_params = config_->authorizationQueryParams();
-  query_params.overwrite("redirect_uri", escaped_redirect_uri);
-  query_params.overwrite("state", escaped_state);
+  query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
+  query_params.overwrite(queryParamsState, escaped_state);
   // Copy the authorization endpoint URL to replace its query params.
   auto authorization_endpoint_url = config_->authorizationEndpointUrl();
   const std::string path_and_query_params = query_params.replaceQueryString(
@@ -799,14 +804,14 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
                                                              const absl::string_view path_str) {
   // Return 401 unauthorized if the query parameters contain an error response.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
-  if (query_parameters.getFirstValue(queryParamsError()).has_value()) {
+  if (query_parameters.getFirstValue(queryParamsError).has_value()) {
     ENVOY_LOG(debug, "OAuth server returned an error: \n{}", query_parameters.data());
     return {false, "", ""};
   }
 
   // Return 401 unauthorized if the query parameters do not contain the code and state.
-  auto codeVal = query_parameters.getFirstValue(queryParamsCode());
-  auto stateVal = query_parameters.getFirstValue(queryParamsState());
+  auto codeVal = query_parameters.getFirstValue(queryParamsCode);
+  auto stateVal = query_parameters.getFirstValue(queryParamsState);
   if (!codeVal.has_value() || !stateVal.has_value()) {
     ENVOY_LOG(error, "code or state query param does not exist: \n{}", query_parameters.data());
     return {false, "", ""};
@@ -817,8 +822,8 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%3D1234567890000000".
   std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
   const auto state_parameters = Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
-  auto urlVal = state_parameters.getFirstValue("url");
-  auto nonceVal = state_parameters.getFirstValue("nonce");
+  auto urlVal = state_parameters.getFirstValue(stateParamsUrl);
+  auto nonceVal = state_parameters.getFirstValue(stateParamsNonce);
   if (!urlVal.has_value() || !nonceVal.has_value()) {
     ENVOY_LOG(error, "state query param does not contain url or nonce: \n{}", state);
     return {false, "", ""};
