@@ -1,4 +1,4 @@
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package", "envoy_select_enable_http3")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
 
 licenses(["notice"])  # Apache 2
 
@@ -24,6 +24,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        ":envoy_mobile_quic_network_observer_registry_factory_lib",
         ":proxy_settings_lib",
         "//library/common:engine_types_lib",
         "//library/common/network:src_addr_socket_option_lib",
@@ -35,12 +36,7 @@ envoy_cc_library(
         "@envoy//source/common/network:addr_family_aware_socket_option_lib",
         "@envoy//source/common/network:socket_option_lib",
         "@envoy//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
-    ] + envoy_select_enable_http3(
-        [
-            ":envoy_mobile_quic_network_observer_registry_factory_lib",
-        ],
-        "@envoy",
-    ),
+    ],
 )
 
 envoy_cc_library(

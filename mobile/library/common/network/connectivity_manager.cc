@@ -82,13 +82,11 @@ ConnectivityManagerImpl::ConnectivityManagerImpl(Upstream::ClusterManager& clust
     : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager),
       quic_upstream_connection_handle_network_change_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_upstream_connection_handle_network_change")) {
-#ifdef ENVOY_ENABLE_QUIC
   quic_observer_registry_factory_ =
       std::make_unique<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>();
   if (quic_upstream_connection_handle_network_change_) {
     cluster_manager_.createNetworkObserverRegistries(*quic_observer_registry_factory_);
   }
-#endif
 }
 
 ConnectivityManagerImpl::NetworkState ConnectivityManagerImpl::network_state_{
@@ -119,12 +117,10 @@ envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(NetworkType network
 envoy_netconf_t ConnectivityManagerImpl::onNetworkMadeDefault(NetworkType network) {
   ENVOY_LOG_MISC(trace, "Default network changed to {}", static_cast<int>(network));
   envoy_netconf_t configuration_key = setPreferredNetwork(network);
-#ifdef ENVOY_ENABLE_QUIC
   for (std::reference_wrapper<Quic::EnvoyMobileQuicNetworkObserverRegistry> registry :
        quic_observer_registry_factory_->getCreatedObserverRegistries()) {
     registry.get().onNetworkMadeDefault();
   }
-#endif
   return configuration_key;
 }
 

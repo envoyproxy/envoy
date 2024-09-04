@@ -24,6 +24,7 @@ public:
     return Api::ioCallUint64ResultNoError();
   }
   bool isOpen() const override { return !closed_; }
+  bool wasConnected() const override { return io_handle_.wasConnected(); }
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override {
     if (closed_) {

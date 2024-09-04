@@ -18,7 +18,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -54,7 +53,6 @@ class ProxyInfoIntentPerformHTTPSRequestUsingAsyncProxyTest {
     httpProxyTestServer.shutdown()
   }
 
-  @Ignore("https://github.com/envoyproxy/envoy/issues/33014")
   @Test
   fun `performs an HTTPs request through a proxy using async DNS resolution`() {
     val context = ApplicationProvider.getApplicationContext<Context>()

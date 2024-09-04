@@ -74,7 +74,7 @@ void FilterConfig::initDescriptorPool(Api::Api& api) {
   default: {
     throw Envoy::EnvoyException(
         fmt::format("unsupported DataSource case `{}` for configuring `descriptor_set`",
-                    descriptor_config.specifier_case()));
+                    static_cast<int>(descriptor_config.specifier_case())));
   }
   }
 

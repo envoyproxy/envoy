@@ -2,6 +2,7 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/singleton/manager_impl.h"
 
 #include "test/mocks/secret/mocks.h"

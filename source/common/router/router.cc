@@ -768,9 +768,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // will never transition from false to true.
   bool can_use_http3 =
       !transport_socket_options_ || !transport_socket_options_->http11ProxyInfo().has_value();
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
-                                        can_use_http3, false /*enable_half_close*/);
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
+      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
+      allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
   if (streaming_shadows_) {
@@ -1469,6 +1469,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::CoreResponseFlag::UpstreamConnectionTermination;
   case Http::StreamResetReason::LocalReset:
   case Http::StreamResetReason::LocalRefusedStreamReset:
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
     return StreamInfo::CoreResponseFlag::LocalReset;
   case Http::StreamResetReason::Overflow:
     return StreamInfo::CoreResponseFlag::UpstreamOverflow;
@@ -1754,6 +1755,10 @@ void Filter::onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) {
 
 void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   if (!downstream_end_stream_) {
+    if (allow_multiplexed_upstream_half_close_) {
+      // Continue request if downstream is not done yet.
+      return;
+    }
     upstream_request.resetStream();
   }
   Event::Dispatcher& dispatcher = callbacks_->dispatcher();
@@ -2026,9 +2031,9 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     cleanup();
     return;
   }
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
-                                        can_use_http3, false /*enable_tcp_tunneling*/);
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
+      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
+      allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
@@ -2118,7 +2123,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   auto host = upstream_request.upstreamHost();
   const bool need_to_send_load_report =
       (host != nullptr) && cluster_->lrsReportMetricNames().has_value();
-  if (!need_to_send_load_report) {
+  if (!need_to_send_load_report && !orca_load_report_callbacks_.has_value()) {
     return;
   }
 
@@ -2132,10 +2137,19 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 
   orca_load_report_received_ = true;
 
-  ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
-                   orca_load_report->DebugString());
-  Envoy::Orca::addOrcaLoadReportToLoadMetricStats(
-      cluster_->lrsReportMetricNames().value(), orca_load_report.value(), host->loadMetricStats());
+  if (need_to_send_load_report) {
+    ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
+                     orca_load_report->DebugString());
+    Envoy::Orca::addOrcaLoadReportToLoadMetricStats(cluster_->lrsReportMetricNames().value(),
+                                                    orca_load_report.value(),
+                                                    host->loadMetricStats());
+  }
+  if (orca_load_report_callbacks_.has_value()) {
+    const absl::Status status = orca_load_report_callbacks_->onOrcaLoadReport(*orca_load_report);
+    if (!status.ok()) {
+      ENVOY_LOG_MISC(error, "Failed to invoke OrcaLoadReportCallbacks: {}", status.message());
+    }
+  }
 }
 
 RetryStatePtr

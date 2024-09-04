@@ -33,6 +33,7 @@
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
@@ -704,11 +705,7 @@ private:
     ClusterEntry* initializeClusterInlineIfExists(absl::string_view cluster);
 
     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> getNetworkObserverRegistry() {
-#ifdef ENVOY_ENABLE_QUIC
       return makeOptRefFromPtr(network_observer_registry_.get());
-#else
-      return {};
-#endif
     }
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -745,9 +742,7 @@ private:
     static ThreadLocalClusterManagerStats generateStats(Stats::Scope& scope,
                                                         const std::string& thread_name);
 
-#ifdef ENVOY_ENABLE_QUIC
     Quic::EnvoyQuicNetworkObserverRegistryPtr network_observer_registry_;
-#endif
   };
 
   struct ClusterData : public ClusterManagerCluster {

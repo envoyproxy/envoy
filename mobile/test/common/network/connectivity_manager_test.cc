@@ -49,7 +49,6 @@ TEST_F(ConnectivityManagerTest,
   EXPECT_EQ(original_key, connectivity_manager_->getConfigurationKey());
 }
 
-#ifdef ENVOY_ENABLE_QUIC
 TEST_F(ConnectivityManagerTest, OnNetworkMadeDefault) {
   Runtime::maybeSetRuntimeGuard(
       "envoy.reloadable_features.quic_upstream_connection_handle_network_change", true);
@@ -67,7 +66,6 @@ TEST_F(ConnectivityManagerTest, OnNetworkMadeDefault) {
   envoy_netconf_t new_key = connectivity_manager_->onNetworkMadeDefault(NetworkType::WWAN);
   EXPECT_NE(original_key, new_key);
 }
-#endif
 
 TEST_F(ConnectivityManagerTest, RefreshDnsForCurrentConfigurationTriggersDnsRefresh) {
   EXPECT_CALL(*dns_cache_, forceRefreshHosts());

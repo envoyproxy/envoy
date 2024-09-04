@@ -11,12 +11,9 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
 #include "library/common/engine_types.h"
+#include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
-
-#ifdef ENVOY_ENABLE_QUIC
-#include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
-#endif
 
 /**
  * envoy_netconf_t identifies a snapshot of network configuration state. It's returned from calls
@@ -263,10 +260,8 @@ private:
   Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
       dns_callbacks_handle_{nullptr};
   Upstream::ClusterManager& cluster_manager_;
-#ifdef ENVOY_ENABLE_QUIC
   std::unique_ptr<Quic::EnvoyMobileQuicNetworkObserverRegistryFactory>
       quic_observer_registry_factory_;
-#endif
   DnsCacheManagerSharedPtr dns_cache_manager_;
   ProxySettingsConstSharedPtr proxy_settings_;
   static NetworkState network_state_;

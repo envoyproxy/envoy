@@ -208,6 +208,7 @@ void Http3ConnPoolImplTest::createNewStream() {
   std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
       Http3ConnPoolImplPeer::connectingClients(*pool_);
   EXPECT_EQ(1u, clients.size());
+  EXPECT_EQ(1u, observers_.registeredQuicObservers().size());
   EXPECT_CALL(connect_result_callback_, onHandshakeComplete()).WillOnce(Invoke([cancellable]() {
     cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   }));

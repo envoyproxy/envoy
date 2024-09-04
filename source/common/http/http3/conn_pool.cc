@@ -150,17 +150,12 @@ Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
   auto upstream_local_address_selector = host()->cluster().getUpstreamLocalAddressSelector();
   auto upstream_local_address =
       upstream_local_address_selector->getUpstreamLocalAddress(address, socketOptions());
-  auto source_address = upstream_local_address.address_;
-
-  if (source_address == nullptr) {
-    source_address = Network::Utility::getLocalAddress(address->ip()->version());
-  }
 
   return Quic::createQuicNetworkConnection(
-      quic_info_, std::move(crypto_config), server_id_, dispatcher(), address, source_address,
-      quic_stat_names, rtt_cache, scope, upstream_local_address.socket_options_,
-      transportSocketOptions(), connection_id_generator_, host_->transportSocketFactory(),
-      network_observer_registry_.ptr());
+      quic_info_, std::move(crypto_config), server_id_, dispatcher(), address,
+      upstream_local_address.address_, quic_stat_names, rtt_cache, scope,
+      upstream_local_address.socket_options_, transportSocketOptions(), connection_id_generator_,
+      host_->transportSocketFactory(), network_observer_registry_.ptr());
 }
 
 std::unique_ptr<Http3ConnPoolImpl>

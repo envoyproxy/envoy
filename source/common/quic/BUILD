@@ -6,6 +6,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
+    "envoy_select_enable_http3",
     "envoy_select_enable_http_datagrams",
 )
 
@@ -338,6 +339,17 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_core_http_client_lib",
     ] + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
+    ]),
+)
+
+envoy_cc_library(
+    name = "envoy_quic_network_observer_registry_factory_lib",
+    hdrs = [
+        "envoy_quic_network_observer_registry_factory.h",
+    ],
+    tags = ["nofips"],
+    deps = envoy_select_enable_http3([
+        ":envoy_quic_client_session_lib",
     ]),
 )
 
