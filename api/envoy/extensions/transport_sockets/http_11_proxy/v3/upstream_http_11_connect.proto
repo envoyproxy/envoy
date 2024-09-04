@@ -22,22 +22,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // Behavior when proxying:
 // =======================
-// * Upstream connections to the proxy include a raw HTTP/1.1 CONNECT header before
-//   the payload. A 200 response is stripped if it's under 200 bytes.
-// * Plaintext HTTP/1.1 connections are sent with a fully qualified URL.
+// When an upstream connection is established, instead of connecting directly to the endpoint
+// address, the client will connect to the specified proxy address, send an HTTP/1.1 CONNECT request
+// indicating the endpoint address, and process the response. If the response has HTTP status 200,
+// the connection will be passed down to the underlying transport socket.
 //
 // Configuring proxy information:
 // ==============================
-// 1. An intermediate filter adds proxy-related stream info (similar to
-//    :repo:`test/integration/filters/header_to_proxy_filter.cc <test/integration/filters/header_to_proxy_filter.cc>`).
-// 2. Set "typed_filter_metadata" in :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.lbendpoint.metadata>` or :ref:`LocalityLbEndpoints.Metadata <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`.
-//    using the key "envoy.http11_proxy_transport_socket.proxy_address" and the
-//    proxy address in config::core::v3::Address format.
-//
-// Important considerations:
-// =========================
-// * Stream info configuration only proxies TLS connections to the proxy on port 443.
-//   This maintains the original behavior.
+// Set "typed_filter_metadata" in :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.lbendpoint.metadata>` or :ref:`LocalityLbEndpoints.Metadata <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`.
+// using the key "envoy.http11_proxy_transport_socket.proxy_address" and the
+// proxy address in config::core::v3::Address format.
 //
 message Http11ProxyUpstreamTransport {
   // The underlying transport socket being wrapped.
