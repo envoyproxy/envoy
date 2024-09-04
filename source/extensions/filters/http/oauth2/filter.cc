@@ -348,14 +348,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
         return Http::FilterHeadersStatus::StopIteration;
       }
 
-      // Return 401 unauthorized if the state URL matches the redirect config to avoid infinite
-      // redirect loops.
-      Http::Utility::Url state_url;
-      state_url.initialize(result.original_request_url_, false);
-      if (config_->redirectPathMatcher().match(state_url.pathAndQueryParams())) {
+      // Return 401 unauthorized if the original request URL in the state matches the redirect
+      // config to avoid infinite redirect loops.
+      Http::Utility::Url original_request_url;
+      original_request_url.initialize(result.original_request_url_, false);
+      if (config_->redirectPathMatcher().match(original_request_url.pathAndQueryParams())) {
         ENVOY_LOG(debug, "state url query params {} matches the redirect path matcher",
-                  state_url.pathAndQueryParams());
-        // TODO(zhaohuabing): Should the filter return 401 unauthorized or 400 bad request?
+                  original_request_url.pathAndQueryParams());
+        // TODO(zhaohuabing): Should return 401 unauthorized or 400 bad request?
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
