@@ -10,7 +10,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, const uint64_t stream_id) {
+void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req,
+                                    const uint64_t stream_id) {
   // Cancel any active requests.
   cancel();
 
@@ -24,12 +25,13 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
     return;
   }
 
-  const std::string cluster = config_.http_service().http_service().http_uri().cluster();
-  const std::string url = config_.http_service().http_service().http_uri().uri();
+  const auto http_uri = config_.http_service().http_service().http_uri();
+  const std::string cluster = http_uri.cluster();
+  const std::string uri = http_uri.uri();
   absl::string_view host, path;
-  Envoy::Http::Utility::extractHostPathFromUri(url, host, path);
-  ENVOY_LOG(debug, " Ext_Proc HTTP client send request to cluster {}, url {}, host {}, path {}",
-            cluster, url, host, path);
+  Envoy::Http::Utility::extractHostPathFromUri(uri, host, path);
+  ENVOY_LOG(debug, " Ext_Proc HTTP client send request to cluster {}, uri {}, host {}, path {}",
+            cluster, uri, host, path);
 
   const auto thread_local_cluster = context().clusterManager().getThreadLocalCluster(cluster);
 
@@ -46,7 +48,11 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
   message->body().add(req_in_json.value());
 
-  auto options = Http::AsyncClient::RequestOptions().setSampled(absl::nullopt).setSendXff(false);
+  auto options = Http::AsyncClient::RequestOptions()
+                     .setTimeout(std::chrono::milliseconds(
+                         DurationUtil::durationToMilliseconds(http_uri.timeout())))
+                     .setSampled(absl::nullopt)
+                     .setSendXff(false);
 
   active_request_ =
       thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);

@@ -22,8 +22,8 @@ using envoy::service::ext_proc::v3::HeadersResponse;
 using envoy::service::ext_proc::v3::HttpHeaders;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
-using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HasHeader;
+using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
 
@@ -54,7 +54,7 @@ protected:
     cleanupUpstreamAndDownstream();
   }
 
-  const std::string default_http_config_ = R"EOF(
+  std::string default_http_config_ = R"EOF(
   http_service:
     http_service:
       http_uri:
@@ -142,7 +142,7 @@ protected:
     EXPECT_THAT(processor_stream_->headers(), HasHeader("x-request-id"));
 
     if (send_bad_resp) {
-      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
+      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "400"}}, true);
       return;
     }
     // The ext_proc ProcessingRequest message is JSON encoded in the body of the HTTP message.
@@ -165,7 +165,7 @@ protected:
         processor_stream_->encodeData(response_str, true);
       }
     } else {
-      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
+      processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "400"}}, true);
     }
   }
 
@@ -247,20 +247,50 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
 }
 
 // Side stream server does not send response trigger timeout.
-TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseTimeout) {
+TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
   processRequestHeadersMessage(http_side_upstreams_[0], false,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Travel forward 400 ms
+                                 // Travel forward 400 ms exceeding 200ms filter timeout.
                                  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(400));
                                  return false;
                                });
 
   // We should immediately have an error response now
   verifyDownstreamResponse(*response, 504);
+}
+
+// Http timeout value set to 10ms. Test HTTP timeout.
+TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
+  default_http_config_ = R"EOF(
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          nanos: 10000000
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+  )EOF";
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(http_side_upstreams_[0], false,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 50 ms exceeding 10ms HTTP URI timeout setting.
+                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(50));
+                                 return true;
+                               });
+
+  // We should immediately have an error response now
+  verifyDownstreamResponse(*response, 500);
 }
 
 // Side stream server sends back 400 with fail-mode-allow set to false.
@@ -272,8 +302,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerSendsBackBadRequestFailClose) {
   processRequestHeadersMessage(http_side_upstreams_[0], true,
                                [](const HttpHeaders&, HeadersResponse&) { return true; });
 
-  // We should immediately have an error response now
-  verifyDownstreamResponse(*response, 504);
+  verifyDownstreamResponse(*response, 500);
 }
 
 // Side stream server sends back 400 with fail-mode-allow set to true.
