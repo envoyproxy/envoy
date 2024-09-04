@@ -34,9 +34,17 @@ struct ConfigOptions {
   bool failure_mode_allow = false;
 };
 
-class ExtProcHttpClientIntegrationTest : public HttpProtocolIntegrationTest {
+struct ExtProcHttpTestParams {
+  Network::Address::IpVersion version;
+  Http::CodecType downstream_protocol;
+  Http::CodecType upstream_protocol;
+};
 
-protected:
+class ExtProcHttpClientIntegrationTest : public testing::TestWithParam<ExtProcHttpTestParams>,
+                                         public HttpIntegrationTest {
+public:
+  ExtProcHttpClientIntegrationTest()
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version) {}
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
 
@@ -181,6 +189,30 @@ protected:
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }
 
+  static std::vector<ExtProcHttpTestParams> getValuesForExtProcHttpTest() {
+    std::vector<ExtProcHttpTestParams> ret;
+    for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+      for (auto downstream_protocol : {Http::CodecType::HTTP1, Http::CodecType::HTTP2}) {
+        for (auto upstream_protocol : {Http::CodecType::HTTP1, Http::CodecType::HTTP2}) {
+          ExtProcHttpTestParams params;
+          params.version = ip_version;
+          params.downstream_protocol = downstream_protocol;
+          params.upstream_protocol = upstream_protocol;
+          ret.push_back(params);
+        }
+      }
+    }
+    return ret;
+  }
+
+  static std::string
+  ExtProcHttpTestParamsToString(const ::testing::TestParamInfo<ExtProcHttpTestParams>& params) {
+    return absl::StrCat(
+        (params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
+        (params.param.downstream_protocol == Http::CodecType::HTTP1 ? "HTTP1_DS_" : "HTTP2_DS_"),
+        (params.param.upstream_protocol == Http::CodecType::HTTP1 ? "HTTP1_US" : "HTTP2_US"));
+  }
+
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   std::vector<FakeUpstream*> http_side_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
@@ -191,10 +223,8 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(
     Protocols, ExtProcHttpClientIntegrationTest,
-    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-        /*downstream_protocols=*/{Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2},
-        /*upstream_protocols=*/{Envoy::Http::CodecType::HTTP1, Envoy::Http::CodecType::HTTP2})),
-    HttpProtocolIntegrationTest::protocolTestParamsToString);
+    testing::ValuesIn(ExtProcHttpClientIntegrationTest::getValuesForExtProcHttpTest()),
+    ExtProcHttpClientIntegrationTest::ExtProcHttpTestParamsToString);
 
 // Side stream server does not mutate the header request.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerNoHeaderMutation) {
