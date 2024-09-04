@@ -555,11 +555,6 @@ public:
    * This is used for HTTP/1.1 codec.
    */
   virtual bool isHalfCloseEnabled() PURE;
-
-  /**
-   * Returns the loggers set in the connection manager configuration.
-   */
-  virtual std::list<AccessLog::InstanceSharedPtr> loggersFromConfiguration() const PURE;
 };
 
 /**
@@ -681,6 +676,9 @@ public:
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
     access_log_handlers_.push_back(std::move(handler));
   }
+  void addConfigLogHandler(AccessLog::InstanceSharedPtr handler) {
+    config_log_handlers_.push_back(std::move(handler));
+  }
   void addStreamDecoderFilter(ActiveStreamDecoderFilterPtr filter) {
     // Note: configured decoder filters are appended to decoder_filters_.
     // This means that if filters are configured in the following order (assume all three filters
@@ -722,7 +720,7 @@ public:
     }
     if (!Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_separate_config_and_filter_access_loggers")) {
-      for (const auto& log_handler : filter_manager_callbacks_.loggersFromConfiguration()) {
+      for (const auto& log_handler : config_log_handlers_) {
         log_handler->log(log_context, streamInfo());
       }
     }
@@ -1082,6 +1080,7 @@ private:
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
   std::list<StreamFilterBase*> filters_;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+  std::list<AccessLog::InstanceSharedPtr> config_log_handlers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata
