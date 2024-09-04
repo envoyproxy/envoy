@@ -24,7 +24,6 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& errms
   }
 
 /**
- * SPELLCHECKER(skip-block)
  * Determines whether `sanitized`is equivalent to `original`. `original` may be
  * in any encoding, e.g. ascii, binary, utf-8, gb2132. `sanitized` is valid JSON
  * with `\u` escapes for any characters are not allowed in JSON strings, per
