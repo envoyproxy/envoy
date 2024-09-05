@@ -33,7 +33,7 @@ protected:
 
   absl::string_view sanitizeAndCheckAgainstProtobufJson(absl::string_view str) {
     absl::string_view sanitized = sanitize(str);
-    EXPECT_TRUE(TestUtil::isProtoSerializableUtf8(str));
+    EXPECT_TRUE(TestUtil::isProtoSerializableUtf8(str)) << "str=" << str;
     EXPECT_UTF8_EQ(protoSanitize(str), sanitized, str);
     return sanitized;
   }
@@ -51,7 +51,7 @@ protected:
     return corrupt_second_byte;
   }
 
-  absl::string_view sanitizeInvalid(absl::string_view str) {
+  absl::string_view sanitizeInvalidAndCheckEscapes(absl::string_view str) {
     EXPECT_FALSE(TestUtil::isProtoSerializableUtf8(str));
     absl::string_view sanitized = sanitize(str);
     EXPECT_JSON_STREQ(sanitized, str, str);
@@ -279,24 +279,27 @@ TEST_F(JsonSanitizerTest, High8Bit) {
 
 TEST_F(JsonSanitizerTest, InvalidUtf8) {
   // 2 byte
-  EXPECT_EQ("\\u00ce", sanitizeInvalid(truncate(LambdaUtf8)));
-  EXPECT_EQ("\\u00ce\\u00fb", sanitizeInvalid(corruptByte2(LambdaUtf8)));
+  EXPECT_EQ("\\u00ce", sanitizeInvalidAndCheckEscapes(truncate(LambdaUtf8)));
+  EXPECT_EQ("\\u00ce\\u00fb", sanitizeInvalidAndCheckEscapes(corruptByte2(LambdaUtf8)));
 
   // 3 byte
-  EXPECT_EQ("\\u00e1\\u00bd", sanitizeInvalid(truncate(OmicronUtf8)));
-  EXPECT_EQ("\\u00e1\\u00fd\\u00b9", sanitizeInvalid(corruptByte2(OmicronUtf8)));
+  EXPECT_EQ("\\u00e1\\u00bd", sanitizeInvalidAndCheckEscapes(truncate(OmicronUtf8)));
+  EXPECT_EQ("\\u00e1\\u00fd\\u00b9", sanitizeInvalidAndCheckEscapes(corruptByte2(OmicronUtf8)));
 
   // 4 byte
-  EXPECT_EQ("\\u00f0\\u009d\\u0084", sanitizeInvalid(truncate(TrebleClefUtf8)));
-  EXPECT_EQ("\\u00f0\\u00fd\\u0084\\u009e", sanitizeInvalid(corruptByte2(TrebleClefUtf8)));
+  EXPECT_EQ("\\u00f0\\u009d\\u0084", sanitizeInvalidAndCheckEscapes(truncate(TrebleClefUtf8)));
+  EXPECT_EQ("\\u00f0\\u00fd\\u0084\\u009e",
+            sanitizeInvalidAndCheckEscapes(corruptByte2(TrebleClefUtf8)));
 
   // Invalid input embedded in normal text.
   EXPECT_EQ("Hello, \\u00f0\\u009d\\u0084, World!",
-            sanitizeInvalid(absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
+            sanitizeInvalidAndCheckEscapes(
+                absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
 
   // Invalid input with leading slash.
   EXPECT_EQ("\\u005cHello, \\u00f0\\u009d\\u0084, World!",
-            sanitizeInvalid(absl::StrCat("\\Hello, ", truncate(TrebleClefUtf8), ", World!")));
+            sanitizeInvalidAndCheckEscapes(
+                absl::StrCat("\\Hello, ", truncate(TrebleClefUtf8), ", World!")));
 
   // Replicate a few other cases that were discovered during initial fuzzing,
   // to ensure we see these as invalid utf8 and avoid them in comparisons.
