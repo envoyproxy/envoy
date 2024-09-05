@@ -429,10 +429,17 @@ envoy_cc_posix_library(
     name = "thread_impl_lib",
     srcs = ["posix/thread_impl.cc"],
     hdrs = ["posix/thread_impl.h"],
+    # Setting thread priorities via the Objective-C runtime for Apple platforms requires using
+    # C-style casting to use obj_msgSend.
+    copts = select({
+        "//bazel:apple": ["-Wno-old-style-cast"],
+        "//conditions:default": [],
+    }),
     include_prefix = "source/common/common",
     strip_include_prefix = "posix",
     deps = [
         ":assert_lib",
+        ":utility_lib",
         "//envoy/thread:thread_interface",
     ],
 )

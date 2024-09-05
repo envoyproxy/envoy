@@ -18,6 +18,12 @@ envoy_cc_test(
 envoy_cc_test(
     name = "internal_engine_test",
     srcs = ["internal_engine_test.cc"],
+    # Getting thread priorities via the Objective-C runtime for Apple platforms requires using
+    # C-style casting to use obj_msgSend.
+    copts = select({
+        "@envoy//bazel:apple": ["-Wno-old-style-cast"],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",

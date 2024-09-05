@@ -56,7 +56,12 @@ public:
    * Accessor for the provisional event dispatcher.
    * @return Event::ProvisionalDispatcher&, the engine dispatcher.
    */
-  Event::ProvisionalDispatcher& dispatcher();
+  Event::ProvisionalDispatcher& dispatcher() const;
+
+  /**
+   * Accessor for the thread factory.
+   */
+  Thread::PosixThreadFactory& threadFactory() const;
 
   envoy_stream_t initStream();
 
@@ -158,6 +163,7 @@ public:
   Stats::Store& getStatsStore();
 
 private:
+  // Needs access to the private constructor.
   GTEST_FRIEND_CLASS(InternalEngineTest, ThreadCreationFailed);
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
