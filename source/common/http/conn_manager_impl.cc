@@ -827,9 +827,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_separate_config_and_filter_access_loggers")) {
       filter_manager_.addConfigLogHandler(access_log);
-    } else {
-      filter_manager_.addAccessLogHandler(access_log);
     }
+    filter_manager_.addAccessLogHandler(access_log);
   }
 
   filter_manager_.streamInfo().setStreamIdProvider(

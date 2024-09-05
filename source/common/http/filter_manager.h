@@ -714,9 +714,14 @@ public:
         {},
         access_log_type,
         &filter_manager_callbacks_.activeSpan()};
-
+    std::unordered_set<AccessLog::InstanceSharedPtr> config_log_handlers_set(
+        config_log_handlers_.begin(), config_log_handlers_.end());
     for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(log_context, streamInfo());
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.http_separate_config_and_filter_access_loggers") ||
+          config_log_handlers_set.find(log_handler) == config_log_handlers_set.end()) {
+        log_handler->log(log_context, streamInfo());
+      }
     }
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_separate_config_and_filter_access_loggers")) {
