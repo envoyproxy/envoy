@@ -9,6 +9,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/buffer/buffer_util.h"
+#include "source/common/json/constants.h"
 #include "source/common/json/json_sanitizer.h"
 
 #include "absl/strings/string_view.h"
@@ -37,6 +38,18 @@ namespace Json {
 #define ASSERT_THIS_IS_TOP_LEVEL ASSERT(this->streamer_.topLevel() == this)
 #define ASSERT_LEVELS_EMPTY ASSERT(this->levels_.empty())
 #endif
+
+// Simple abstraction that provide a output buffer for streaming JSON output.
+class BufferOutput {
+public:
+  void add(absl::string_view a) { buffer_.addFragments({a}); }
+  void add(absl::string_view a, absl::string_view b, absl::string_view c) {
+    buffer_.addFragments({a, b, c});
+  }
+
+  explicit BufferOutput(Buffer::Instance& output) : buffer_(output) {}
+  Buffer::Instance& buffer_;
+};
 
 /**
  * Provides an API for streaming JSON output, as an alternative to populating a
@@ -143,7 +156,7 @@ public:
     void addString(absl::string_view str) {
       ASSERT_THIS_IS_TOP_LEVEL;
       nextField();
-      streamer_.addSanitized("\"", str, "\"");
+      streamer_.addString(str);
     }
 
     /**
@@ -243,7 +256,7 @@ public:
       ASSERT_THIS_IS_TOP_LEVEL;
       ASSERT(!expecting_value_);
       nextField();
-      this->streamer_.addSanitized(R"(")", key, R"(":)");
+      this->streamer_.addSanitized("\"", key, "\":");
       expecting_value_ = true;
     }
 
@@ -331,32 +344,39 @@ private:
    */
   void addSanitized(absl::string_view prefix, absl::string_view token, absl::string_view suffix) {
     absl::string_view sanitized = Json::sanitize(sanitize_buffer_, token);
-    response_.addFragments({prefix, sanitized, suffix});
+    response_.add(prefix, sanitized, suffix);
   }
+
+  /**
+   * Serializes a string to the output stream. The input string value will be sanitized and
+   * surrounded by quotes.
+   * @param str the string to be serialized.
+   */
+  void addString(absl::string_view str) { addSanitized("\"", str, "\""); }
 
   /**
    * Serializes a number.
    */
   void addNumber(double d) {
     if (std::isnan(d)) {
-      response_.addFragments({"null"});
+      response_.add(Constants::Null);
     } else {
-      Buffer::Util::serializeDouble(d, response_);
+      Buffer::Util::serializeDouble(d, response_.buffer_);
     }
   }
-  void addNumber(uint64_t u) { response_.addFragments({absl::StrCat(u)}); }
-  void addNumber(int64_t i) { response_.addFragments({absl::StrCat(i)}); }
+  void addNumber(uint64_t u) { response_.add(absl::StrCat(u)); }
+  void addNumber(int64_t i) { response_.add(absl::StrCat(i)); }
 
   /**
    * Serializes a bool to the output stream.
    */
-  void addBool(bool b) { response_.addFragments({b ? "true" : "false"}); }
+  void addBool(bool b) { response_.add(b ? Constants::True : Constants::False); }
 
   /**
    * Adds a constant string to the output stream. The string must outlive the
    * Streamer object, and is intended for literal strings such as punctuation.
    */
-  void addConstantString(absl::string_view str) { response_.addFragments({str}); }
+  void addConstantString(absl::string_view str) { response_.add(str); }
 
 #ifndef NDEBUG
   /**
@@ -379,7 +399,7 @@ private:
 
 #endif
 
-  Buffer::Instance& response_;
+  BufferOutput response_;
   std::string sanitize_buffer_;
 
 #ifndef NDEBUG
