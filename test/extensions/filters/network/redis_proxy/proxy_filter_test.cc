@@ -1216,63 +1216,6 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
-TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPendingRequest) {
-  InSequence s;
-
-  Buffer::OwnedImpl fake_data;
-  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    decoder_callbacks_->onRespValue(std::move(request));
-  }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
-      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
-                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
-        EXPECT_FALSE(callbacks.connectionAllowed());
-        EXPECT_CALL(*external_auth_client_,
-                    authenticateExternal(_, _, _, EMPTY_STRING, "password"));
-        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-        reply->type(Common::Redis::RespType::Error);
-        reply->asString() = "ERR an existing authentication request is pending";
-        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-        callbacks.onAuth("password");
-        // Call again (pending request will cause error)
-        callbacks.onAuth("password");
-        return nullptr;
-      }));
-
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
-}
-
-TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPendingRequestUsername) {
-  InSequence s;
-
-  Buffer::OwnedImpl fake_data;
-  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    decoder_callbacks_->onRespValue(std::move(request));
-  }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
-      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
-                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
-        EXPECT_FALSE(callbacks.connectionAllowed());
-        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, "username", "password"));
-        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-        reply->type(Common::Redis::RespType::Error);
-        reply->asString() = "ERR an existing authentication request is pending";
-        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-        callbacks.onAuth("username", "password");
-        // Call again (pending request will cause error)
-        callbacks.onAuth("username", "password");
-        return nullptr;
-      }));
-
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
-}
-
 TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthError) {
   InSequence s;
 

@@ -139,6 +139,8 @@ private:
     Common::Redis::Client::Transaction& transaction() override { return parent_.transaction(); }
 
     ProxyFilter& parent_;
+    // This value is set when the request is on hold, waiting for an external auth response.
+    Common::Redis::RespValuePtr pending_value_;
     Common::Redis::RespValuePtr pending_response_;
     CommandSplitter::SplitRequestPtr request_handle_;
   };
@@ -148,6 +150,7 @@ private:
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
   bool checkPassword(const std::string& password);
+  void processRespValue(Common::Redis::RespValuePtr&& value, PendingRequest& request);
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
