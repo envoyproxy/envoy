@@ -718,7 +718,7 @@ public:
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());
     }
-    if (!Runtime::runtimeFeatureEnabled(
+    if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_separate_config_and_filter_access_loggers")) {
       for (const auto& log_handler : config_log_handlers_) {
         log_handler->log(log_context, streamInfo());
