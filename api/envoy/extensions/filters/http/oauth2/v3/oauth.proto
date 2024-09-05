@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.oauth2.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
@@ -79,7 +80,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 18]
+// [#next-free-field: 19]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -92,6 +93,9 @@ message OAuth2Config {
 
   // Endpoint on the authorization server to retrieve the access token from.
   config.core.v3.HttpUri token_endpoint = 1;
+
+  // Specifies the retry policy for requests to the OAuth server. If not specified, then no retries will be performed.
+  config.core.v3.RetryPolicy retry_policy = 18;
 
   // The endpoint redirect to for authorization in response to unauthorized requests.
   string authorization_endpoint = 2 [(validate.rules).string = {min_len: 1}];

@@ -23,6 +23,8 @@ using testing::Return;
 namespace Envoy {
 namespace Quic {
 
+constexpr int PEER_PORT = 54321;
+
 class QuicNetworkConnectionTest : public Event::TestUsingSimulatedTime,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
@@ -60,8 +62,8 @@ protected:
     }
     EXPECT_EQ(quic_ccopts, "6RTOAKD4");
 
-    test_address_ = *Network::Utility::resolveUrl(
-        absl::StrCat("tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":30"));
+    test_address_ = *Network::Utility::resolveUrl(absl::StrCat(
+        "tcp://", Network::Test::getLoopbackAddressUrlString(GetParam()), ":", PEER_PORT));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _)).WillOnce(Return(context));
     factory_ = *Quic::QuicClientTransportSocketFactory::create(
@@ -94,10 +96,9 @@ protected:
 
 TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   initialize();
-  const int port = 30;
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
       nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
@@ -118,19 +119,38 @@ TEST_P(QuicNetworkConnectionTest, SocketOptions) {
   auto socket_option = std::make_shared<Network::MockSocketOption>();
   auto socket_options = std::make_shared<Network::ConnectionSocket::Options>();
   socket_options->push_back(socket_option);
-  const int port = 30;
   EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND));
   EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING));
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
       socket_options, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
   session->Initialize();
   client_connection->connect();
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
+TEST_P(QuicNetworkConnectionTest, LocalAddress) {
+  initialize();
+  Network::Address::InstanceConstSharedPtr local_addr =
+      (GetParam() == Network::Address::IpVersion::v6)
+          ? Network::Utility::getIpv6LoopbackAddress()
+          : Network::Utility::getCanonicalIpv4LoopbackAddress();
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      dispatcher_, test_address_, local_addr, quic_stat_names_, {}, *store_.rootScope(), nullptr,
+      nullptr, connection_id_generator_, *factory_);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_TRUE(client_connection->connecting());
+  EXPECT_EQ(Network::Connection::State::Open, client_connection->state());
+  EXPECT_THAT(client_connection->connectionInfoProvider().localAddress(), testing::NotNull());
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
@@ -142,10 +162,9 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
 
   EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
 
-  const int port = 30;
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       info, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), port, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, *store_.rootScope(),
       nullptr, nullptr, connection_id_generator_, *factory_);
 

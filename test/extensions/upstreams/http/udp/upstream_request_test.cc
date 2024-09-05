@@ -83,10 +83,9 @@ TEST_F(UdpUpstreamTest, ExchangeCapsules) {
                              "a1a2a3a4a5a6a7" // UDP Proxying Payload
       );
   Buffer::OwnedImpl sent_capsule(sent_capsule_fragment);
-  EXPECT_CALL(*mock_socket_->io_handle_, sendmsg(_, _, _, _, _))
-      .WillOnce([](const Buffer::RawSlice* slices, uint64_t num_slice, int /*flags*/,
-                   const Network::Address::Ip* /*self_ip*/,
-                   const Network::Address::Instance& /*peer_address*/) {
+  EXPECT_CALL(*mock_socket_->io_handle_, wasConnected()).WillOnce(Return(true));
+  EXPECT_CALL(*mock_socket_->io_handle_, writev(_, _))
+      .WillOnce([](const Buffer::RawSlice* slices, uint64_t num_slice) {
         Buffer::OwnedImpl buffer(absl::HexStringToBytes("a1a2a3a4a5a6a7"));
         EXPECT_TRUE(TestUtility::rawSlicesEqual(buffer.getRawSlices().data(), slices, num_slice));
         return Api::ioCallUint64ResultNoError();

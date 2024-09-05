@@ -146,7 +146,7 @@ private:
 
   void maybeMigratePort();
 
-  void probeWithNewPort(const quic::QuicSocketAddress& peer_address,
+  void probeWithNewPort(const quic::QuicSocketAddress& peer_addr,
                         quic::PathValidationReason reason);
 
   OptRef<PacketsToReadDelegate> delegate_;
