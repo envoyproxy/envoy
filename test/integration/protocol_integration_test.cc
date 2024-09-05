@@ -5096,8 +5096,9 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedR
     } else if (downstreamProtocol() == Http::CodecType::HTTP2) {
       ASSERT_TRUE(response->waitForReset());
     } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
-      // Unlike H/2, H/3 client codec only stops sending request but still attempts to finish
-      // receiving response, so resume reading.
+      // Unlike H/2, H/3 client codec only stops sending request upon STOP_SENDING frame but still
+      // attempts to finish receiving response. So resume reading in order to fully close the
+      // stream after receiving both STOP_SENDING and end stream.
       request_encoder_->getStream().readDisable(false);
       ASSERT_TRUE(response->waitForEndStream());
       // Following STOP_SENDING will be propagated via reset callback.
