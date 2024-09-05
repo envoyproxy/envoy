@@ -210,7 +210,11 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_build_tools")
-    external_http_archive(name = "envoy_examples")
+    external_http_archive(
+        name = "envoy_examples",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:envoy_examples.patch"],
+    )
 
     _com_github_maxmind_libmaxminddb()
 
