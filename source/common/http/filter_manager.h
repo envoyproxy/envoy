@@ -714,7 +714,7 @@ public:
         {},
         access_log_type,
         &filter_manager_callbacks_.activeSpan()};
-    std::unordered_set<AccessLog::InstanceSharedPtr> config_log_handlers_set(
+    absl::flat_hash_set<AccessLog::InstanceSharedPtr> config_log_handlers_set(
         config_log_handlers_.begin(), config_log_handlers_.end());
     for (const auto& log_handler : access_log_handlers_) {
       if (!Runtime::runtimeFeatureEnabled(
