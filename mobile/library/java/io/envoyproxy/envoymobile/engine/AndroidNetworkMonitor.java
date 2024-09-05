@@ -25,8 +25,8 @@ import java.util.Collections;
  * <li>When the internet is not available: call the
  * <code>InternalEngine::onDefaultNetworkUnavailable</code> callback.</li>
  *
- * <li>When the capabilities are changed: call the
- * <code>EnvoyEngine::onDefaultNetworkChanged</code>.</li>
+ * <li>When the network type is changed: call the
+ * <code>EnvoyEngine::onDefaultNetworkTypeChanged</code>.</li>
  * </ul>
  */
 public class AndroidNetworkMonitor {
@@ -57,10 +57,20 @@ public class AndroidNetworkMonitor {
     instance = null;
   }
 
-  private static class DefaultNetworkCallback extends NetworkCallback {
-    private final EnvoyEngine envoyEngine;
+  @VisibleForTesting
+  static class DefaultNetworkCallback extends NetworkCallback {
+    private static final int[] TRANSPORT_TYPES = new int[] {
+        NetworkCapabilities.TRANSPORT_CELLULAR,  NetworkCapabilities.TRANSPORT_WIFI,
+        NetworkCapabilities.TRANSPORT_BLUETOOTH, NetworkCapabilities.TRANSPORT_ETHERNET,
+        NetworkCapabilities.TRANSPORT_VPN,       NetworkCapabilities.TRANSPORT_WIFI_AWARE,
+        NetworkCapabilities.TRANSPORT_LOWPAN,
+    };
+    private static final int EMPTY_TRANSPORT_TYPE = -1;
 
-    private DefaultNetworkCallback(EnvoyEngine envoyEngine) { this.envoyEngine = envoyEngine; }
+    private final EnvoyEngine envoyEngine;
+    @VisibleForTesting int transportType = EMPTY_TRANSPORT_TYPE;
+
+    DefaultNetworkCallback(EnvoyEngine envoyEngine) { this.envoyEngine = envoyEngine; }
 
     @Override
     public void onAvailable(@NonNull Network network) {
@@ -70,20 +80,49 @@ public class AndroidNetworkMonitor {
     @Override
     public void onCapabilitiesChanged(@NonNull Network network,
                                       @NonNull NetworkCapabilities networkCapabilities) {
-      if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-        if (networkCapabilities.hasCapability(NetworkCapabilities.TRANSPORT_WIFI)) {
-          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
-        } else if (networkCapabilities.hasCapability(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.WWAN);
-        } else {
-          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.GENERIC);
+      // `onCapabilities` is guaranteed to be called immediately after `onAvailable`.
+      // https://developer.android.com/reference/android/net/ConnectivityManager.NetworkCallback#onCapabilitiesChanged(android.net.Network,%20android.net.NetworkCapabilities)
+      if (transportType == EMPTY_TRANSPORT_TYPE) {
+        // The network was lost previously, see `onLost`.
+        onDefaultNetworkTypeChanged(networkCapabilities);
+      } else {
+        // Only call the `onDefaultNetworkTypeChanged` callback when there is a change in the
+        // transport type.
+        for (int type : TRANSPORT_TYPES) {
+          if (networkCapabilities.hasTransport(type) && transportType != type) {
+            onDefaultNetworkTypeChanged(networkCapabilities);
+          }
         }
       }
+
+      transportType = getTransportType(networkCapabilities);
     }
 
     @Override
     public void onLost(@NonNull Network network) {
       envoyEngine.onDefaultNetworkUnavailable();
+      transportType = EMPTY_TRANSPORT_TYPE;
+    }
+
+    private static int getTransportType(NetworkCapabilities networkCapabilities) {
+      for (int type : TRANSPORT_TYPES) {
+        if (networkCapabilities.hasTransport(type)) {
+          return type;
+        }
+      }
+      return EMPTY_TRANSPORT_TYPE;
+    }
+
+    private void onDefaultNetworkTypeChanged(NetworkCapabilities networkCapabilities) {
+      if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+        if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+          envoyEngine.onDefaultNetworkTypeChanged(EnvoyNetworkType.WLAN);
+        } else if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+          envoyEngine.onDefaultNetworkTypeChanged(EnvoyNetworkType.WWAN);
+        } else {
+          envoyEngine.onDefaultNetworkTypeChanged(EnvoyNetworkType.GENERIC);
+        }
+      }
     }
   }
 

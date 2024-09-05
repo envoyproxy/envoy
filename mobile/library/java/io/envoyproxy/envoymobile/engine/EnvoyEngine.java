@@ -68,9 +68,9 @@ public interface EnvoyEngine {
   void onDefaultNetworkAvailable();
 
   /**
-   * A callback into the Envoy Engine when the default network configuration was changed.
+   * A callback into the Envoy Engine when the default network type was changed.
    */
-  void onDefaultNetworkChanged(EnvoyNetworkType network);
+  void onDefaultNetworkTypeChanged(EnvoyNetworkType network);
 
   /**
    * A callback into the Envoy Engine when the default network is unavailable.

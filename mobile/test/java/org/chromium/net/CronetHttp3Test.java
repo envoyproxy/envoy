@@ -285,7 +285,7 @@ public class CronetHttp3Test {
 
     // This should change QUIC brokenness to "failed recently".
     cronvoyEngine.getEnvoyEngine().onDefaultNetworkUnavailable();
-    cronvoyEngine.getEnvoyEngine().onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkTypeChanged(EnvoyNetworkType.WLAN);
     cronvoyEngine.getEnvoyEngine().onDefaultNetworkAvailable();
 
     // The next request may go out over HTTP/2 or HTTP/3 (depends on who wins the race)

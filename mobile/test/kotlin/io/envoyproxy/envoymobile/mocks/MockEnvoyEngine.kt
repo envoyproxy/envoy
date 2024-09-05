@@ -42,7 +42,7 @@ class MockEnvoyEngine : EnvoyEngine {
 
   override fun onDefaultNetworkAvailable() = Unit
 
-  override fun onDefaultNetworkChanged(network: EnvoyNetworkType) = Unit
+  override fun onDefaultNetworkTypeChanged(network: EnvoyNetworkType) = Unit
 
   override fun onDefaultNetworkUnavailable() = Unit
 

@@ -86,8 +86,8 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void onDefaultNetworkChanged(EnvoyNetworkType network) {
-    envoyEngine.onDefaultNetworkChanged(network);
+  public void onDefaultNetworkTypeChanged(EnvoyNetworkType network) {
+    envoyEngine.onDefaultNetworkTypeChanged(network);
   }
 
   @Override
