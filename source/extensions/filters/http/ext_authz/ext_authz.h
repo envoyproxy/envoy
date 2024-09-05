@@ -57,7 +57,7 @@ public:
       : filter_metadata_(filter_metadata) {}
 
   const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
-  std::chrono::microseconds latency() const { return latency_; };
+  absl::optional<std::chrono::microseconds> latency() const { return latency_; };
   absl::optional<uint64_t> bytesSent() const { return bytes_sent_; }
   absl::optional<uint64_t> bytesReceived() const { return bytes_received_; }
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
@@ -75,7 +75,7 @@ public:
 
 private:
   const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata_;
-  std::chrono::microseconds latency_;
+  absl::optional<std::chrono::microseconds> latency_;
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
   absl::optional<uint64_t> bytes_received_;

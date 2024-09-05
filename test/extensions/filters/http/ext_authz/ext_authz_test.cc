@@ -232,7 +232,7 @@ public:
     ASSERT_TRUE(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName));
     auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
 
-    EXPECT_EQ(actual->latency().count(), expected_output.latency().count());
+    EXPECT_EQ(actual->latency(), expected_output.latency());
     EXPECT_EQ(actual->upstreamHost(), expected_output.upstreamHost());
     EXPECT_EQ(actual->clusterInfo(), expected_output.clusterInfo());
     EXPECT_EQ(actual->bytesSent(), expected_output.bytesSent());
@@ -3114,7 +3114,7 @@ TEST_P(HttpFilterTestParam, EmitFilterStateStatsWithFilterMetadata) {
   testEmitFilterStateStatsCase(&stream_info, response, expected);
 }
 
-TEST_P(HttpFilterTestParam, EmitFilterMetadataNoStatus) {
+TEST_P(HttpFilterTestParam, EmitFilterMetadataNoStats) {
   auto proto_config = getFilterConfig(std::get<0>(GetParam()), std::get<1>(GetParam()), false);
   auto fields = *proto_config.mutable_filter_metadata()->mutable_fields();
   *fields["foo"].mutable_string_value() = "bar";
