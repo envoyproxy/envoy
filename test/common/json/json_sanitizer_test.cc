@@ -32,11 +32,9 @@ protected:
   }
 
   absl::string_view sanitizeAndCheckAgainstProtobufJson(absl::string_view str) {
-    EXPECT_TRUE(TestUtil::isProtoSerializableUtf8(str)) << "str=" << str;
     absl::string_view sanitized = sanitize(str);
-    if (TestUtil::isProtoSerializableUtf8(str)) {
-      EXPECT_UTF8_EQ(protoSanitize(str), sanitized, str);
-    }
+    EXPECT_TRUE(TestUtil::isProtoSerializableUtf8(str));
+    EXPECT_UTF8_EQ(protoSanitize(str), sanitized, str);
     return sanitized;
   }
 
@@ -54,8 +52,10 @@ protected:
   }
 
   absl::string_view sanitizeInvalid(absl::string_view str) {
-    EXPECT_EQ(Utf8::UnicodeSizePair(0, 0), decode(str));
-    return sanitize(str);
+    EXPECT_FALSE(TestUtil::isProtoSerializableUtf8(str));
+    absl::string_view sanitized = sanitize(str);
+    EXPECT_JSON_STREQ(sanitized, str, str);
+    return sanitized;
   }
 
   std::pair<uint32_t, uint32_t> decode(absl::string_view str) {
@@ -292,7 +292,11 @@ TEST_F(JsonSanitizerTest, InvalidUtf8) {
 
   // Invalid input embedded in normal text.
   EXPECT_EQ("Hello, \\u00f0\\u009d\\u0084, World!",
-            sanitize(absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
+            sanitizeInvalid(absl::StrCat("Hello, ", truncate(TrebleClefUtf8), ", World!")));
+
+  // Invalid input with leading slash.
+  EXPECT_EQ("\\u005cHello, \\u00f0\\u009d\\u0084, World!",
+            sanitizeInvalid(absl::StrCat("\\Hello, ", truncate(TrebleClefUtf8), ", World!")));
 
   // Replicate a few other cases that were discovered during initial fuzzing,
   // to ensure we see these as invalid utf8 and avoid them in comparisons.

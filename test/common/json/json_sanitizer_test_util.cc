@@ -157,19 +157,28 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs
 
 bool jsonEquivalentStrings(absl::string_view sanitized, absl::string_view original,
                            std::string& errmsg) {
-  for (uint32_t hex; !sanitized.empty() && !original.empty(); removePrefix(original, 1)) {
-    if (sanitized[0] == original[0]) {
-      removePrefix(sanitized, 1);
-    } else if (parseUnicode(sanitized.substr(0, UnicodeEscapeLength), hex) &&
-               hex == static_cast<const uint8_t>(original[0])) {
+  for (char c : original) {
+    uint32_t hex;
+    if (sanitized.empty()) {
+      errmsg = absl::StrFormat("`%s' and `%s` have different lengths", sanitized, original);
+      return false;
+    }
+    if (sanitized.size() >= UnicodeEscapeLength &&
+        parseUnicode(sanitized.substr(0, UnicodeEscapeLength), hex)) {
+      if (hex != static_cast<const uint8_t>(c)) {
+        errmsg = absl::StrFormat("%s != %d", sanitized.substr(0, UnicodeEscapeLength), c);
+        return false;
+      }
       removePrefix(sanitized, UnicodeEscapeLength);
+    } else if (sanitized[0] == c) {
+      removePrefix(sanitized, 1);
     } else {
       errmsg = absl::StrFormat("%s != %s", sanitized, original);
       return false;
     }
   }
 
-  if (sanitized.empty() && original.empty()) {
+  if (sanitized.empty()) {
     return true;
   }
   errmsg = absl::StrFormat("`%s' and `%s` have different lengths", sanitized, original);
