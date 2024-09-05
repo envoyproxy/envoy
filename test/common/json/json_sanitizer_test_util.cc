@@ -155,34 +155,23 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& diffs
   }
 }
 
-bool jsonEquivalentStrings(absl::string_view sanitized, absl::string_view original,
-                           std::string& errmsg) {
-  for (char c : original) {
+bool decodeEscapedJson(absl::string_view sanitized, std::string& decoded, std::string& errmsg) {
+  while (!sanitized.empty()) {
     uint32_t hex;
-    if (sanitized.empty()) {
-      errmsg = absl::StrFormat("`%s' and `%s` have different lengths", sanitized, original);
-      return false;
-    }
     if (sanitized.size() >= UnicodeEscapeLength &&
         parseUnicode(sanitized.substr(0, UnicodeEscapeLength), hex)) {
-      if (hex != static_cast<const uint8_t>(c)) {
-        errmsg = absl::StrFormat("%s != %d", sanitized.substr(0, UnicodeEscapeLength), c);
+      if ((hex & 0xff) != hex) {
+        errmsg = absl::StrFormat("Unexpected encoding >= 256: %u", hex);
         return false;
       }
+      decoded.append(1, hex);
       removePrefix(sanitized, UnicodeEscapeLength);
-    } else if (sanitized[0] == c) {
-      removePrefix(sanitized, 1);
     } else {
-      errmsg = absl::StrFormat("%s != %s", sanitized, original);
-      return false;
+      decoded.append(1, sanitized[0]);
+      removePrefix(sanitized, 1);
     }
   }
-
-  if (sanitized.empty()) {
-    return true;
-  }
-  errmsg = absl::StrFormat("`%s' and `%s` have different lengths", sanitized, original);
-  return false;
+  return true;
 }
 
 } // namespace TestUtil

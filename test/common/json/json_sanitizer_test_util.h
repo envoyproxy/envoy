@@ -40,13 +40,13 @@ bool utf8Equivalent(absl::string_view a, absl::string_view b, std::string& errms
  * @param errmsg
  * @param true if the strings are equivalent.
  */
-bool jsonEquivalentStrings(absl::string_view sanitized, absl::string_view original,
-                           std::string& errmsg);
+bool decodeEscapedJson(absl::string_view sanitized, std::string& escaped, std::string& errmsg);
 #define EXPECT_JSON_STREQ(sanitized, original, context)                                            \
   {                                                                                                \
-    std::string errmsg;                                                                            \
-    EXPECT_TRUE(TestUtil::jsonEquivalentStrings(sanitized, original, errmsg)) << context << "\n"   \
-                                                                              << errmsg;           \
+    std::string decoded, errmsg;                                                                   \
+    EXPECT_TRUE(TestUtil::decodeEscapedJson(sanitized, decoded, errmsg))                           \
+        << context << ": " << errmsg;                                                              \
+    EXPECT_EQ(decoded, original) << context;                                                       \
   }
 
 } // namespace TestUtil
