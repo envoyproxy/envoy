@@ -160,7 +160,7 @@ bool decodeEscapedJson(absl::string_view sanitized, std::string& decoded, std::s
     uint32_t hex;
     if (sanitized.size() >= UnicodeEscapeLength &&
         parseUnicode(sanitized.substr(0, UnicodeEscapeLength), hex)) {
-      if ((hex & 0xff) != hex) {
+      if (hex >= 256) {
         errmsg = absl::StrFormat("Unexpected encoding >= 256: %u", hex);
         return false;
       }
