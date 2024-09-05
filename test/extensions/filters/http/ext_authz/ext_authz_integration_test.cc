@@ -131,9 +131,8 @@ public:
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
       if (emitFilterStateStats()) {
-        *(*proto_config_.mutable_logging_options()
-               ->mutable_filter_metadata()
-               ->mutable_fields())["foo"]
+        proto_config_.set_emit_filter_state_stats(true);
+        *(*proto_config_.mutable_filter_metadata()->mutable_fields())["foo"]
              .mutable_string_value() = "bar";
       }
 

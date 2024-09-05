@@ -292,30 +292,21 @@ message ExtAuthz {
   // If unset, defaults to true.
   google.protobuf.BoolValue enable_dynamic_metadata_ingestion = 27;
 
-  // Deprecated in favor of
-  // :ref:`LoggingOptions.filter_metadata<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.LoggingOptions.filter_metadata>`.
-  google.protobuf.Struct filter_metadata = 28
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+  // Additional metadata to be added to the filter state for logging purposes. The metadata will be
+  // added to StreamInfo's filter state under the namespace corresponding to the ext_authz filter
+  // name.
+  google.protobuf.Struct filter_metadata = 28;
 
-  // When not empty, the filter will emit per-stream stats for access logging. The filter state key
-  // will be the same as the filter name.
+  // When set to true, the filter will emit per-stream stats for access logging. The filter state
+  // key will be the same as the filter name.
   //
   // If using Envoy GRPC, emits latency, bytes sent / received, upstream info, and upstream cluster
   // info. If not using Envoy GRPC, emits only latency. Note that stats are ONLY added to filter
   // state if a check request is actually made to an ext_authz service.
   //
-  // If this is empty the filter will not emit any filter state.
-  LoggingOptions logging_options = 29;
-}
-
-message LoggingOptions {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.http.ext_authz.v3.LoggingOptions";
-
-  // Additional metadata to be added to the filter state for logging purposes. The metadata will be
-  // added to StreamInfo's filter state under the namespace corresponding to the ext_authz filter
-  // name.
-  google.protobuf.Struct filter_metadata = 1;
+  // If this is false the filter will not emit stats, but filter_metadata will still be respected if
+  // it has a value.
+  bool emit_filter_state_stats = 29;
 }
 
 // Configuration for buffering the request data.

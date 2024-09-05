@@ -100,7 +100,7 @@ public:
     TestUtility::loadFromYaml(http_client ? http_config : grpc_config, proto_config);
     proto_config.set_failure_mode_allow(failure_mode_allow);
     if (emit_filter_state_stats) {
-      proto_config.mutable_logging_options();
+      proto_config.set_emit_filter_state_stats(true);
     }
     return proto_config;
   }
@@ -2317,7 +2317,7 @@ TEST_F(HttpFilterTest, FilterDisabled) {
     default_value:
       numerator: 0
       denominator: HUNDRED
-  logging_options: {}
+  emit_filter_state_stats: true
   )EOF");
 
   ON_CALL(factory_context_.runtime_loader_.snapshot_,
@@ -3078,8 +3078,7 @@ TEST_P(HttpFilterTestParam, EmitFilterStateStatsDenied) {
 
 TEST_P(HttpFilterTestParam, EmitFilterStateStatsWithFilterMetadata) {
   auto proto_config = getFilterConfig(std::get<0>(GetParam()), std::get<1>(GetParam()), true);
-  auto fields =
-      *proto_config.mutable_logging_options()->mutable_filter_metadata()->mutable_fields();
+  auto fields = *proto_config.mutable_filter_metadata()->mutable_fields();
   *fields["foo"].mutable_string_value() = "bar";
   initialize(proto_config);
 
@@ -3113,6 +3112,23 @@ TEST_P(HttpFilterTestParam, EmitFilterStateStatsWithFilterMetadata) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
 
   testEmitFilterStateStatsCase(&stream_info, response, expected);
+}
+
+TEST_P(HttpFilterTestParam, EmitFilterMetadataNoStatus) {
+  auto proto_config = getFilterConfig(std::get<0>(GetParam()), std::get<1>(GetParam()), false);
+  auto fields = *proto_config.mutable_filter_metadata()->mutable_fields();
+  *fields["foo"].mutable_string_value() = "bar";
+  initialize(proto_config);
+
+  Envoy::ProtobufWkt::Struct filter_metadata;
+  *(*filter_metadata.mutable_fields())["foo"].mutable_string_value() = "bar";
+
+  ExtAuthzLoggingInfo expected(filter_metadata);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  testEmitFilterStateStatsCase(nullptr, response, expected);
 }
 
 // Tests that if for whatever reason the client's stream info is null, it doesn't result in a null
@@ -3182,7 +3198,7 @@ TEST_P(HttpFilterTestParam, EmitFilterStateStatsNullUpstreamHost) {
   testEmitFilterStateStatsCase(&stream_info, response, expected);
 }
 
-// Test that when logging_options is empty, the logging info is not emitted.
+// By default the logging info is not emitted.
 TEST_F(HttpFilterTest, NoEmitFilterStateStats) {
   initialize(R"EOF(
   grpc_service:
