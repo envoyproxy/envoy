@@ -792,6 +792,10 @@ absl::optional<uint64_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::toInte
       *parent_.request_headers_);
 }
 
+namespace {
+static const std::string kRouteFactoryName = "envoy.route_config_update_requester.default";
+} // namespace
+
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
                                                   uint32_t buffer_limit,
                                                   Buffer::BufferMemoryAccountSharedPtr account)
@@ -834,9 +838,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       connection_manager.config_->shouldSchemeMatchUpstream());
 
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
-  static const std::string route_factory = "envoy.route_config_update_requester.default";
-  auto factory =
-      Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(route_factory);
+  auto factory = Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(
+      kRouteFactoryName);
   if (connection_manager_.config_->isRoutable() &&
       connection_manager.config_->routeConfigProvider() != nullptr && factory) {
     route_config_update_requester_ = factory->createRouteConfigUpdateRequester(
