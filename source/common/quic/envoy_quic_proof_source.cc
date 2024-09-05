@@ -12,8 +12,62 @@
 #include "openssl/bytestring.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
 
+#define ZLIB_CONST
+#include "zlib.h"
+
 namespace Envoy {
 namespace Quic {
+
+void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
+  auto ret = SSL_CTX_add_cert_compression_alg(
+      ssl_ctx, TLSEXT_cert_compression_zlib,
+      [](SSL*, CBB* out, const uint8_t* in, size_t in_len) -> int {
+        constexpr int success = 1;
+        constexpr int failure = 0;
+
+        class ScopedCompressor {
+        public:
+          ScopedCompressor(z_stream* z) : z_(z) { ASSERT(z != nullptr); }
+          ~ScopedCompressor() { deflateEnd(z_); }
+
+        private:
+          z_stream* z_;
+        };
+
+        z_stream z = {};
+        int rv = deflateInit(&z, Z_BEST_COMPRESSION);
+        if (rv != Z_OK) {
+          return failure;
+        }
+
+        ScopedCompressor deleter(&z);
+
+        const auto upper_bound = deflateBound(&z, in_len);
+
+        uint8_t* out_buf = nullptr;
+        if (!CBB_reserve(out, &out_buf, upper_bound)) {
+          return failure;
+        }
+
+        z.next_in = in;
+        z.avail_in = in_len;
+        z.next_out = out_buf;
+        z.avail_out = upper_bound;
+
+        rv = deflate(&z, Z_FINISH);
+        if (rv != Z_STREAM_END) {
+          return failure;
+        }
+
+        if (!CBB_did_write(out, z.total_out)) {
+          return failure;
+        }
+
+        return success;
+      },
+      nullptr /* decompress func */);
+  ASSERT(ret == 1);
+}
 
 quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain>
 EnvoyQuicProofSource::GetCertChain(const quic::QuicSocketAddress& server_address,

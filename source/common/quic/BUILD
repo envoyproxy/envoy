@@ -115,7 +115,10 @@ envoy_cc_library(
     name = "envoy_quic_proof_source_lib",
     srcs = ["envoy_quic_proof_source.cc"],
     hdrs = ["envoy_quic_proof_source.h"],
-    external_deps = ["ssl"],
+    external_deps = [
+        "ssl",
+        "zlib",
+    ],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_source_base_lib",
@@ -478,6 +481,7 @@ envoy_cc_library(
         "quic_transport_socket_factory.h",
     ],
     tags = ["nofips"],
+    external_deps = ["zlib"],
     deps = [
         ":envoy_quic_proof_verifier_lib",
         "//envoy/network:transport_socket_interface",
