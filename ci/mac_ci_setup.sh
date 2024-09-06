@@ -50,7 +50,7 @@ if ! retry "$HOMEBREW_RETRY_ATTEMPTS" "$HOMEBREW_RETRY_INTERVAL" brew update; th
   echo "Failed to update homebrew"
 fi
 
-DEPS="automake cmake coreutils libtool wget ninja"
+DEPS="automake cmake libtool wget ninja"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
