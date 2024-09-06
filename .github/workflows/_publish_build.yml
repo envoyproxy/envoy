@@ -6,6 +6,10 @@ permissions:
 on:
   workflow_call:
     secrets:
+      dockerhub-username:
+        required: false
+      dockerhub-password:
+        required: false
       gpg-key:
         required: true
       gpg-key-password:
@@ -113,6 +117,9 @@ jobs:
     permissions:
       contents: read
       packages: read
+    secrets:
+      dockerhub-username: ${{ secrets.dockerhub-username }}
+      dockerhub-password: ${{ secrets.dockerhub-password }}
     name: ${{ matrix.name || matrix.target }}
     needs:
     - binary

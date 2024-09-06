@@ -3975,9 +3975,10 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
 TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationBeforeResponse) {
   codec_->protocol_ = Protocol::Http11;
   setup();
-  expectUhvTrailerCheck(HeaderValidator::ValidationResult(
-                            HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
-                        HeaderValidator::TransformationResult::success());
+  expectUhvTrailerCheck(
+      HeaderValidator::ValidationResult::success(),
+      HeaderValidator::TransformationResult(HeaderValidator::TransformationResult::Action::Reject,
+                                            "bad_trailer_map"));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
