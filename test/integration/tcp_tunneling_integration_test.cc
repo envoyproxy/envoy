@@ -335,6 +335,40 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
                        expected_header_bytes_sent, expected_header_bytes_received);
 }
 
+TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
+  // When allow_multiplexed_upstream_half_close is enabled router and filter
+  // manager do not reset streams where upstream ended before downstream.
+  // Verify that stream with TCP proxy upstream is closed as soon as the upstream TCP
+  // connection is half closed even if the allow_multiplexed_upstream_half_close is enabled.
+  // In this case the stream is reset in the TcpUpstream::onUpstreamData
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  initialize();
+
+  setUpConnection();
+  sendBidirectionalData();
+
+  // Tear down by closing the upstream connection.
+  ASSERT_TRUE(fake_raw_upstream_connection_->close());
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    // In HTTP/3 end stream will be sent when the upstream connection is closed, and
+    // STOP_SENDING frame sent instead of reset.
+    ASSERT_TRUE(response_->waitForEndStream());
+    ASSERT_TRUE(response_->waitForReset());
+  } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
+    ASSERT_TRUE(response_->waitForReset());
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+  const int expected_wire_bytes_sent = 5;     // Envoy sends "hello".
+  const int expected_wire_bytes_received = 6; // Upstream sends "there!".
+  // expected_header_bytes_* is 0 as we do not use proxy protocol.
+  const int expected_header_bytes_sent = 0;
+  const int expected_header_bytes_received = 0;
+  checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
+                       expected_header_bytes_sent, expected_header_bytes_received);
+}
+
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
   enable_timeout_ = true;
   initialize();
@@ -948,10 +982,19 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFiltersPauseAndResume) {
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
+  bool verify_no_remote_close = true;
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // in HTTP1 case, the connection is closed on stream reset and therefore, it
+    // is possible to detect a remote close if remote FIN event gets processed before local close
+    // socket event. By sending verify_no_remote_close as false to the write function, we are
+    // allowing the test to pass even if remote close is detected.
+    verify_no_remote_close = false;
+  }
   // send some data to pause the filter
-  ASSERT_TRUE(tcp_client_->write("hello", false));
+  ASSERT_TRUE(tcp_client_->write("hello", false, verify_no_remote_close));
   // send end stream to resume the filter
-  ASSERT_TRUE(tcp_client_->write("hello", true));
+  ASSERT_TRUE(tcp_client_->write("hello", true, verify_no_remote_close));
+
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
 
   // Finally close and clean up.

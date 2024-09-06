@@ -120,6 +120,11 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   return dynamicContextChanged();
 }
 
+void DeltaSubscriptionState::markStreamFresh(bool should_send_initial_resource_versions) {
+  any_request_sent_yet_in_current_stream_ = false;
+  should_send_initial_resource_versions_ = should_send_initial_resource_versions;
+}
+
 bool DeltaSubscriptionState::isHeartbeatResource(
     const envoy::service::discovery::v3::Resource& resource) const {
   if (!supports_heartbeats_) {
@@ -244,21 +249,25 @@ DeltaSubscriptionState::getNextRequestInternal() {
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
     for (auto const& [resource_name, resource_state] : requested_resource_state_) {
-      // Populate initial_resource_versions with the resource versions we currently have.
-      // Resources we are interested in, but are still waiting to get any version of from the
-      // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-      if (!resource_state.isWaitingForServer()) {
-        (*request->mutable_initial_resource_versions())[resource_name] = resource_state.version();
+      if (should_send_initial_resource_versions_) {
+        // Populate initial_resource_versions with the resource versions we currently have.
+        // Resources we are interested in, but are still waiting to get any version of from the
+        // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
+        if (!resource_state.isWaitingForServer()) {
+          (*request->mutable_initial_resource_versions())[resource_name] = resource_state.version();
+        }
       }
       // We are going over a list of resources that we are interested in, so add them to
       // resource_names_subscribe.
       names_added_.insert(resource_name);
     }
-    for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
-      (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
-    }
-    for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
-      (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+    if (should_send_initial_resource_versions_) {
+      for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
+        (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+      }
+      for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
+        (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+      }
     }
     // If this is a legacy wildcard request, then make sure that the resource_names_subscribe is
     // empty.

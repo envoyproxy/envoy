@@ -19,6 +19,7 @@ public:
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   os_fd_t fdDoNotUse() const override { return fd_; }
   bool isOpen() const override;
+  bool wasConnected() const override;
   bool supportsMmsg() const override;
   bool supportsUdpGro() const override;
   Api::SysCallIntResult setOption(int level, int optname, const void* optval,
@@ -38,6 +39,7 @@ protected:
   os_fd_t fd_;
   int socket_v6only_;
   const absl::optional<int> domain_;
+  bool was_connected_ = false;
 };
 
 } // namespace Network

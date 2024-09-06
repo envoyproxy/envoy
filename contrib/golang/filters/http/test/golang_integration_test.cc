@@ -11,6 +11,8 @@
 
 namespace Envoy {
 
+using testing::HasSubstr;
+
 // helper function
 absl::string_view getHeader(const Http::HeaderMap& headers, absl::string_view key) {
   auto values = headers.get(Http::LowerCaseString(key));
@@ -888,6 +890,7 @@ TEST_P(GolangIntegrationTest, Property) {
 }
 
 TEST_P(GolangIntegrationTest, AccessLog) {
+  useAccessLog("%DYNAMIC_METADATA(golang:access_log_var)%");
   initializeBasicFilter(ACCESSLOG, "test.com");
 
   auto path = "/test";
@@ -923,6 +926,9 @@ TEST_P(GolangIntegrationTest, AccessLog) {
 
   ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();
+
+  std::string log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(log, HasSubstr("access_log_var written by Golang filter"));
 
   // use the second request to get the logged data
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

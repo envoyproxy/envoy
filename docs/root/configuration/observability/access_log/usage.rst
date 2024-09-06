@@ -428,6 +428,10 @@ The following command operators are supported:
     * ``us``: Microsecond precision.
     * ``ns``: Nanosecond precision.
 
+    NOTE: enabling independent half-close behavior for H/2 and H/3 protocols can produce
+    ``*_TX_END`` values lower than ``*_RX_END`` values, in cases where upstream peer has half-closed
+    its stream before downstream peer. In these cases ``COMMON_DURATION`` value will become negative.
+
   TCP/UDP
     Not implemented ("-").
 

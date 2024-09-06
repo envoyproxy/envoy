@@ -59,11 +59,12 @@ public:
 
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
-                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override {
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                     Buffer::RawSlice saved_cmsg) override {
     last_local_address_ = local_address;
     last_peer_address_ = peer_address;
     EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
-                                             receive_time, tos);
+                                             receive_time, tos, saved_cmsg);
     ++num_packets_received_;
   }
 
@@ -99,13 +100,16 @@ public:
         self_addr_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0]),
             54321)),
-        peer_socket_(createConnectionSocket(self_addr_, peer_addr_, nullptr)),
+        peer_socket_(std::make_unique<Network::UdpListenSocket>(peer_addr_, /*options=*/nullptr,
+                                                                /*bind=*/true)),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
         transport_socket_options_(std::make_shared<Network::TransportSocketOptionsImpl>()),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}) {
+    // After binding the listen peer socket, set the bound IP address of the peer.
+    peer_addr_ = peer_socket_->connectionInfoProvider().localAddress();
     http3_options_.mutable_quic_protocol_options()
         ->mutable_num_timeouts_to_trigger_port_migration()
         ->set_value(1);
@@ -186,7 +190,7 @@ protected:
   Network::Address::InstanceConstSharedPtr self_addr_;
   // Used in some tests to trigger a read event on the connection to test its full interaction with
   // socket read utility functions.
-  Network::ConnectionSocketPtr peer_socket_;
+  Network::UdpListenSocketPtr peer_socket_;
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   TestEnvoyQuicClientConnection* quic_connection_;
@@ -219,7 +223,6 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
   quic::QuicHeaderList headers;
-  headers.OnHeaderBlockStart();
   headers.OnHeader(":status", "200");
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
@@ -240,7 +243,6 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
   quic::QuicHeaderList headers;
-  headers.OnHeaderBlockStart();
   headers.OnHeader(":status", "200");
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
@@ -474,14 +476,14 @@ TEST_P(EnvoyQuicClientSessionTest, HandlePacketsWithoutDestinationAddress) {
     auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                       stateless_reset_packet->length());
     quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                    time_system_.monotonicTime(), /*tos=*/0);
+                                    time_system_.monotonicTime(), /*tos=*/0, /*saved_cmsg=*/{});
   }
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
       .Times(0);
   auto buffer = std::make_unique<Buffer::OwnedImpl>(stateless_reset_packet->data(),
                                                     stateless_reset_packet->length());
   quic_connection_->processPacket(nullptr, peer_addr_, std::move(buffer),
-                                  time_system_.monotonicTime(), /*tos=*/0);
+                                  time_system_.monotonicTime(), /*tos=*/0, /*saved_cmsg=*/{});
 }
 
 // Tests that receiving a STATELESS_RESET packet on the probing socket doesn't cause crash.

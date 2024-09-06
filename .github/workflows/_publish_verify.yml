@@ -23,7 +23,7 @@ concurrency:
 
 
 jobs:
-  verify-examples:
+  examples:
     permissions:
       contents: read
       packages: read
@@ -35,9 +35,10 @@ jobs:
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
+      downloads: ${{ matrix.downloads }}
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
-      runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
+      runs-on: ubuntu-24.04
       steps-pre: ${{ matrix.steps-pre }}
       source: ${{ matrix.source }}
       target: ${{ matrix.target }}
@@ -48,6 +49,8 @@ jobs:
         include:
         - name: examples
           target: verify_examples
+          downloads: |
+            docker: build_images
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
@@ -58,39 +61,24 @@ jobs:
                 sudo apt-get -qq update -y
                 sudo apt-get -qq install -y --no-install-recommends expect gettext yq whois
               shell: bash
-            - id: url
-              uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.35
-              with:
-                options: -Rr
-                input: >-
-                  ${{ inputs.trusted
-                      && fromJSON(inputs.request).request.sha
-                      || fromJSON(inputs.request).request.ref }}
-                filter: |
-                  .[:7] as $sha
-                  | if ${{ inputs.trusted }} then
-                      "envoy-postsubmit"
-                    else
-                      "envoy-pr"
-                    end
-                  | . as $bucket
-                  | "https://storage.googleapis.com/\($bucket)/\($sha)"
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.2.35
-              with:
-                url: %{{ steps.url.outputs.value }}/docker/envoy.tar
-                variant: dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.2.35
-              with:
-                url: %{{ steps.url.outputs.value }}/docker/envoy-contrib.tar
-                variant: contrib-dev
-            - uses: envoyproxy/toolshed/gh-actions/docker/fetch@actions-v0.2.35
-              with:
-                url: %{{ steps.url.outputs.value }}/docker/envoy-google-vrp.tar
-                variant: google-vrp-dev
+            - run: |
+                IMAGES=(
+                    envoy:dev
+                    envoy-contrib:contrib-dev
+                    envoy-google-vrp:google-vrp-dev)
+                for image in "${IMAGES[@]}"; do
+                    src_name="$(echo ${image} | cut -d: -f1)"
+                    dest_name="$(echo ${image} | cut -d: -f2)"
+                    src="oci-archive:%{{ runner.temp }}/build_images/${src_name}.tar"
+                    dest="docker-daemon:envoyproxy/envoy:${dest_name}"
+                    echo "Copy image: ${src} ${dest}"
+                    skopeo copy -q "${src}" "${dest}"
+                done
+              shell: bash
             - run: docker images | grep envoy
               shell: bash
 
-  verify-distro:
+  distro:
     permissions:
       contents: read
       packages: read
@@ -102,6 +90,8 @@ jobs:
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ./ci/run_envoy_docker.sh
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
+      downloads: |
+        release.signed: release.signed
       rbe: ${{ matrix.rbe && matrix.rbe || false }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
@@ -111,34 +101,13 @@ jobs:
       target: ${{ matrix.target }}
       trusted: ${{ inputs.trusted }}
       steps-pre: |
-        - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.30
-          id: url
-          with:
-            options: -Rr
-            input: >-
-              ${{ inputs.trusted
-                  && fromJSON(inputs.request).request.sha
-                  || fromJSON(inputs.request).request.ref }}
-            filter: |
-              .[:7] as $sha
-              | if ${{ inputs.trusted }} then
-                  "envoy-postsubmit"
-                else
-                  "envoy-pr"
-                end
-              | . as $bucket
-              | "https://storage.googleapis.com/\($bucket)/\($sha)/release/release.signed.tar.zst"
-        - uses: envoyproxy/toolshed/gh-actions/fetch@actions-v0.2.30
-          id: fetch
-          with:
-            url: %{{ steps.url.outputs.value }}
         - run: |
             echo ARCH=${{ matrix.arch || 'x64' }} >> $GITHUB_ENV
-            echo DEB_ARCH=${{ matrix.arch != 'arm64' && 'amd64' || 'arm64' }} >> $GITHUB_ENV
+            echo DEB_ARCH=${{ matrix.arch == 'arm64' && 'arm64' || 'amd64' }} >> $GITHUB_ENV
           shell: bash
         - run: |
             TEMP_DIR=$(mktemp -d)
-            zstd --stdout -d %{{ steps.fetch.outputs.path }} | tar --warning=no-timestamp -xf - -C "${TEMP_DIR}"
+            zstd --stdout -d %{{ runner.temp }}/release.signed/release.signed.tar.zst | tar --warning=no-timestamp -xf - -C "${TEMP_DIR}"
             mkdir ${TEMP_DIR}/debs
             tar xf ${TEMP_DIR}/bin/debs.tar.gz -C ${TEMP_DIR}/debs
             mkdir -p ${TEMP_DIR}/distribution/deb

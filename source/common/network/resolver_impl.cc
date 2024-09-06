@@ -37,8 +37,9 @@ public:
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort:
       break;
     }
-    return absl::InvalidArgumentError(fmt::format("IP resolver can't handle port specifier type {}",
-                                                  socket_address.port_specifier_case()));
+    return absl::InvalidArgumentError(
+        fmt::format("IP resolver can't handle port specifier type {}",
+                    static_cast<int>(socket_address.port_specifier_case())));
   }
 
   std::string name() const override { return Config::AddressResolverNames::get().IP; }

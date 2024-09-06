@@ -60,7 +60,7 @@ public:
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   virtual bool subscriptionUpdatePending() const PURE;
 
-  virtual void markStreamFresh() PURE;
+  virtual void markStreamFresh(bool should_send_initial_resource_versions) PURE;
 
   UpdateAck handleResponse(const RS& response) {
     // We *always* copy the response's nonce into the next request, even if we're going to make that

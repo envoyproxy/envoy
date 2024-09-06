@@ -328,6 +328,45 @@ TEST_F(DnsCacheImplTest, ForceRefresh) {
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 }
 
+TEST_F(DnsCacheImplTest, Stop) {
+  initialize();
+  InSequence s;
+
+  // No hosts so should not do anything other than reset the resolver.
+  EXPECT_CALL(*resolver_, resetNetworking());
+  dns_cache_->stop();
+  checkStats(0 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             0 /* added */, 0 /* removed */, 0 /* num hosts */);
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* resolve_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+  Event::MockTimer* timeout_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
+
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  // Query in progress so should reset and then cancel.
+  EXPECT_CALL(*resolver_, resetNetworking());
+  EXPECT_CALL(resolver_->active_query_,
+              cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(*timeout_timer, enabled()).Times(AtLeast(0));
+  EXPECT_CALL(*resolve_timer, disableTimer());
+  dns_cache_->stop();
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+}
+
 // Ipv4 address.
 TEST_F(DnsCacheImplTest, Ipv4Address) {
   initialize();
