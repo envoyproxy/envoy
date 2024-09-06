@@ -12,3 +12,18 @@
  void* New(size_t size) { return ::operator new(size); }
  
  void* AlignedNew(size_t size, std::align_val_t alignment) {
+
+--- a/common/BUILD
++++ b/common/BUILD
+@@ -795,7 +795,10 @@ cc_library(
+     # use the dynamic linker to find the symbols at runtime. This only works if they are exported as
+     # dynamic symbols. When static linking, our symbols are not exported as dynamic by default. We
+     # workaround this by explicitly passing our symbols to the linker for exporting.
+-    linkopts = ["-Wl,--export-dynamic-symbol=%s" % dynamic_symbol for dynamic_symbol in _DYNAMIC_SYMBOLS],
++    linkopts = select({
++        "//conditions:default": ["-Wl,--export-dynamic-symbol=%s" % dynamic_symbol for dynamic_symbol in _DYNAMIC_SYMBOLS],
++        "@platforms//os:macos": ["-Wl,-export_dynamic"],
++    }),
+     deps = [
+         ":casting",
+         ":json",
