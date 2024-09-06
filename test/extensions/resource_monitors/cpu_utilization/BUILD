@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = ["cpu_utilization_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.cpu_utilization"],
     external_deps = ["abseil_optional"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/resource_monitors/cpu_utilization:cpu_utilization_monitor",
         "//source/extensions/resource_monitors/cpu_utilization:linux_cpu_stats_reader",
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
     srcs = ["linux_cpu_stats_reader_test.cc"],
     extension_names = ["envoy.resource_monitors.cpu_utilization"],
     external_deps = ["abseil_optional"],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/resource_monitors/cpu_utilization:linux_cpu_stats_reader",
         "//test/test_common:environment_lib",
@@ -38,6 +40,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.cpu_utilization"],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
         "//source/common/stats:isolated_store_lib",

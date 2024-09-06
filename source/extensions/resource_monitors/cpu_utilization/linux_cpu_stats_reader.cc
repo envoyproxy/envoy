@@ -1,5 +1,8 @@
 #include "source/extensions/resource_monitors/cpu_utilization/linux_cpu_stats_reader.h"
 
+#include <algorithm>
+#include <vector>
+
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
@@ -20,10 +23,22 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
     return {false, 0, 0};
   }
 
-  cpu_stats_file.ignore(5, ' '); // Skip the 'cpu' prefix.
+  // The first 5 bytes should be 'cpu ' without a cpu index.
+  std::vector<char> buffer(5);
+  cpu_stats_file.read(buffer.data(), 5);
+  const std::string target = "cpu  ";
+  if (!cpu_stats_file || !std::equal(buffer.begin(), buffer.end(), target.begin())) {
+    ENVOY_LOG_MISC(error, "Unexpected format in linux cpu stats file {}", cpu_stats_filename_);
+    return {false, 0, 0};
+  }
+
   std::array<uint64_t, NUMBER_OF_CPU_TIMES_TO_PARSE> times;
   for (uint64_t time, i = 0; i < NUMBER_OF_CPU_TIMES_TO_PARSE; ++i) {
     cpu_stats_file >> time;
+    if (!cpu_stats_file) {
+      ENVOY_LOG_MISC(error, "Unexpected format in linux cpu stats file {}", cpu_stats_filename_);
+      return {false, 0, 0};
+    }
     times[i] = time;
   }
 

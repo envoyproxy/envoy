@@ -54,6 +54,40 @@ TEST(LinuxCpuStatsReader, CannotReadFile) {
   EXPECT_EQ(cpu_times.total_time, 0);
 }
 
+TEST(LinuxCpuStatsReader, UnexpectedFormatCpuLine) {
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_unexpected_format");
+  AtomicFileUpdater file_updater(temp_path);
+  const std::string contents = R"EOF(
+cpu0 1907532 599 369969 1398344 5970 0 121763 18 0 0
+cpu1 1883161 620 375962 1448133 5963 0 85914 10 0 0
+cpu  14987204 4857 3003536 11594988 53631 0 759314 2463 0 0
+)EOF";
+  file_updater.update(contents);
+
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  CpuTimes cpu_times = cpu_stats_reader.getCpuTimes();
+  EXPECT_FALSE(cpu_times.is_valid);
+  EXPECT_EQ(cpu_times.work_time, 0);
+  EXPECT_EQ(cpu_times.total_time, 0);
+}
+
+TEST(LinuxCpuStatsReader, UnexpectedFormatMissingTokens) {
+  const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_unexpected_format");
+  AtomicFileUpdater file_updater(temp_path);
+  const std::string contents = R"EOF(
+cpu  14987204 4857 3003536
+cpu0 1907532 599 369969 1398344 5970 0 121763 18 0 0
+cpu1 1883161 620 375962 1448133 5963 0 85914 10 0 0
+)EOF";
+  file_updater.update(contents);
+
+  LinuxCpuStatsReader cpu_stats_reader(temp_path);
+  CpuTimes cpu_times = cpu_stats_reader.getCpuTimes();
+  EXPECT_FALSE(cpu_times.is_valid);
+  EXPECT_EQ(cpu_times.work_time, 0);
+  EXPECT_EQ(cpu_times.total_time, 0);
+}
+
 } // namespace
 } // namespace CpuUtilizationMonitor
 } // namespace ResourceMonitors

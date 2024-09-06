@@ -16,6 +16,7 @@ envoy_cc_library(
         "cpu_stats_reader.h",
         "cpu_utilization_monitor.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/common:exception_lib",
         "//envoy/server:resource_monitor_config_interface",
@@ -32,6 +33,7 @@ envoy_cc_library(
         "cpu_utilization_monitor.h",
         "linux_cpu_stats_reader.h",
     ],
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:logger_lib",
         "@com_google_absl//absl/strings",
@@ -43,6 +45,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    tags = ["skip_on_windows"],
     deps = [
         ":cpu_utilization_monitor",
         ":linux_cpu_stats_reader",
