@@ -1151,6 +1151,14 @@ template <typename T> inline uint32_t EncodingContext::computeCompactSize(const 
 }
 
 /**
+ * Template overload for Uuid.
+ * This data type is not compacted, so we just point to non-compact implementation.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const Uuid& arg) const {
+  return computeSize(arg);
+}
+
+/**
  * Template overload for int32_t.
  * This data type is not compacted, so we just point to non-compact implementation.
  */
@@ -1397,6 +1405,14 @@ template <> inline uint32_t EncodingContext::encode(const Uuid& arg, Buffer::Ins
 template <typename T>
 inline uint32_t EncodingContext::encodeCompact(const T& arg, Buffer::Instance& dst) {
   return arg.encodeCompact(dst, *this);
+}
+
+/**
+ * Uuid is not encoded in compact fashion, so we just delegate to normal implementation.
+ */
+template <>
+inline uint32_t EncodingContext::encodeCompact(const Uuid& arg, Buffer::Instance& dst) {
+  return encode(arg, dst);
 }
 
 /**
