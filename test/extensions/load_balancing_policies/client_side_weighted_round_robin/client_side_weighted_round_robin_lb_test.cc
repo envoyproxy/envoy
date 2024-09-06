@@ -1734,7 +1734,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, DISABLED_chooseHostWithClie
   }
   // Update weights on hosts.
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
-  lb_->updateWeightsOnHosts(hostSet().hosts_);
+  lb_->updateWeightsOnMainThread();
   // All hosts have client side weights, so the weights should be updated.
   for (const auto& host_ptr : hostSet().hosts_) {
     EXPECT_EQ(host_ptr->weight(), 2000);

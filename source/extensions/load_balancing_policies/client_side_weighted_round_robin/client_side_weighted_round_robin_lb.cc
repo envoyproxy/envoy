@@ -18,6 +18,12 @@
 using Envoy::MonotonicTime;
 using Envoy::Upstream::Host;
 
+#if TEST_THREAD_SUPPORTED
+  #define IS_MAIN_OR_TEST_THREAD() (Envoy::Thread::MainThread::isMainOrTestThread())
+#else // !TEST_THREAD_SUPPORTED -- just check for the main thread.
+  #define IS_MAIN_OR_TEST_THREAD() (Envoy::Thread::MainThread::isMainThread())
+#endif // TEST_THREAD_SUPPORTED
+
 namespace {
 
 std::string getHostAddress(const Host* host) {
@@ -49,7 +55,7 @@ ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalanc
             client_side_weighted_round_robin_config.DebugString());
   initialize();
   initFromConfig(client_side_weighted_round_robin_config);
-  if (Envoy::Thread::MainThread::isMainThread()) {
+  if (IS_MAIN_OR_TEST_THREAD()) {
     startWeightUpdatesOnMainThread(main_thread_dispatcher);
   }
 }
@@ -64,7 +70,7 @@ void ClientSideWeightedRoundRobinLoadBalancer::refreshHostSource(const HostsSour
   // index.
   peekahead_index_ = 0;
 
-  if (!Envoy::Thread::MainThread::isMainThread()) {
+  if (!IS_MAIN_OR_TEST_THREAD()) {
     return;
   }
 
@@ -149,7 +155,7 @@ void ClientSideWeightedRoundRobinLoadBalancer::initFromConfig(
 
 void ClientSideWeightedRoundRobinLoadBalancer::startWeightUpdatesOnMainThread(
     Event::Dispatcher& main_thread_dispatcher) {
-  if (!Envoy::Thread::MainThread::isMainThread()) {
+  if (!IS_MAIN_OR_TEST_THREAD()) {
     return;
   }
   weight_calculation_timer_ = main_thread_dispatcher.createTimer([this]() -> void {
@@ -161,7 +167,7 @@ void ClientSideWeightedRoundRobinLoadBalancer::startWeightUpdatesOnMainThread(
 
 void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnMainThread() {
   ENVOY_LOG(trace, "updateWeightsOnMainThread");
-  ENVOY_BUG(Envoy::Thread::MainThread::isMainThread(), "Update Weights NOT on MainThread");
+  ENVOY_BUG(IS_MAIN_OR_TEST_THREAD(), "Update Weights NOT on MainThread");
   for (uint32_t priority = 0; priority < priority_set_.hostSetsPerPriority().size(); ++priority) {
     HostsSource source(priority, HostsSource::SourceType::AllHosts);
     updateWeightsOnHosts(hostSourceToHosts(source));
