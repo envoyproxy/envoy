@@ -88,14 +88,14 @@ public class AndroidNetworkMonitor {
       } else {
         // Only call the `onDefaultNetworkTypeChanged` callback when there is a change in the
         // transport type.
-        for (int type : TRANSPORT_TYPES) {
-          if (networkCapabilities.hasTransport(type) && transportType != type) {
-            onDefaultNetworkTypeChanged(networkCapabilities);
-          }
+        if (!networkCapabilities.hasTransport(transportType)) {
+          onDefaultNetworkTypeChanged(networkCapabilities);
         }
       }
 
-      transportType = getTransportType(networkCapabilities);
+      if (!networkCapabilities.hasTransport(transportType)) {
+        transportType = getTransportType(networkCapabilities);
+      }
     }
 
     @Override
