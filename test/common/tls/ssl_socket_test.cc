@@ -241,6 +241,13 @@ public:
 
   const std::vector<std::string>& expectedPeerOids() const { return expected_peer_oids_; }
 
+  TestUtilOptions& setExpectedLocalOids(const std::vector<std::string>& expected_local_oids) {
+    expected_local_oids_ = expected_local_oids;
+    return *this;
+  }
+
+  const std::vector<std::string>& expectedLocalOids() const { return expected_local_oids_; }
+
   TestUtilOptions& setExpectedPeerCert(const std::string& expected_peer_cert) {
     expected_peer_cert_ = expected_peer_cert;
     return *this;
@@ -351,6 +358,7 @@ private:
   std::string expected_peer_subject_;
   std::string expected_local_subject_;
   std::vector<std::string> expected_peer_oids_;
+  std::vector<std::string> expected_local_oids_;
   std::string expected_peer_cert_;
   std::string expected_peer_cert_chain_;
   std::string expected_valid_from_peer_cert_;
@@ -542,6 +550,15 @@ void testUtil(const TestUtilOptions& options) {
             options.expectedPeerOids(),
             testing::UnorderedElementsAreArray(server_connection->ssl()->oidsPeerCertificate()));
       }
+      if (!options.expectedLocalOids().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_THAT(
+            options.expectedLocalOids(),
+            testing::UnorderedElementsAreArray(server_connection->ssl()->oidsLocalCertificate()));
+        EXPECT_THAT(
+            options.expectedLocalOids(),
+            testing::UnorderedElementsAreArray(server_connection->ssl()->oidsLocalCertificate()));
+      }
       if (!options.expectedPeerCert().empty()) {
         std::string urlencoded = absl::StrReplaceAll(
             options.expectedPeerCert(),
@@ -581,7 +598,6 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->oidsPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansLocalCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansLocalCertificate());
-        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->oidsLocalCertificate());
       }
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,
@@ -1987,7 +2003,32 @@ TEST_P(SslSocketTest, GetPeerCertOids) {
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
   testUtil(test_options.setExpectedSerialNumber(TEST_EXTENSIONS_CERT_SERIAL)
                .setExpectedPeerOids({"2.5.29.14", "2.5.29.15", "2.5.29.19", "2.5.29.35",
-                                     "2.5.29.37", "1.2.3.4.5.6.7.8", "1.2.3.4.5.6.7.9"}));
+                                     "2.5.29.37", "1.2.3.4.5.6.7.8", "1.2.3.4.5.6.7.9"})
+               .setExpectedLocalOids({"2.5.29.14"}));
+}
+
+TEST_P(SslSocketTest, NoLocalCertOids) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_extension_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_extension_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedServerStats("ssl.no_certificate")
+               .setExpectNoCert()
+               .setExpectNoCertChain()
+               .setExpectedLocalOids({}));
 }
 
 TEST_P(SslSocketTest, GetPeerCert) {

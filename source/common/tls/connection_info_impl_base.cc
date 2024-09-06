@@ -258,7 +258,7 @@ absl::Span<const std::string> ConnectionInfoImplBase::oidsLocalCertificate() con
     return cached_oid_local_certificate_;
   }
 
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  X509* cert = SSL_get_certificate(ssl());
   if (!cert) {
     ASSERT(cached_oid_local_certificate_.empty());
     return cached_oid_local_certificate_;
