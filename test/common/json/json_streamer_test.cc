@@ -131,6 +131,22 @@ TEST_F(JsonStreamerTest, SubMap) {
   EXPECT_EQ(R"EOF({"a":{"one":1,"three.5":3.5}})EOF", buffer_.toString());
 }
 
+class JsonStreamerStringOutputTest : public testing::Test {
+protected:
+  std::string buffer_;
+  Json::StreamerBase<Json::StringOutput> streamer_{buffer_};
+};
+
+TEST_F(JsonStreamerStringOutputTest, Empty) { EXPECT_EQ("", buffer_); }
+
+TEST_F(JsonStreamerStringOutputTest, TopArray) {
+  {
+    StreamerBase<Json::StringOutput>::ArrayPtr array = streamer_.makeRootArray();
+    array->addEntries({1.0, "two", 3.5, true, false, std::nan("")});
+  }
+  EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null])EOF", buffer_);
+}
+
 } // namespace
 } // namespace Json
 } // namespace Envoy
