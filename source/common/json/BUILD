@@ -50,9 +50,18 @@ envoy_cc_library(
     name = "json_streamer_lib",
     hdrs = ["json_streamer.h"],
     deps = [
+        ":constants_lib",
         ":json_sanitizer_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_util_lib",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "constants_lib",
+    hdrs = ["constants.h"],
+    external_deps = [
+        "abseil_strings",
     ],
 )
