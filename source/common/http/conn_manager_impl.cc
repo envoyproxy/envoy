@@ -793,7 +793,7 @@ absl::optional<uint64_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::toInte
 }
 
 namespace {
-static constexpr std::string_view kRouteFactoryName = "envoy.route_config_update_requester.default";
+constexpr absl::string_view kRouteFactoryName = "envoy.route_config_update_requester.default";
 } // namespace
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
