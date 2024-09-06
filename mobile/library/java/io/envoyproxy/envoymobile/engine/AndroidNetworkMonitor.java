@@ -80,8 +80,6 @@ public class AndroidNetworkMonitor {
     @Override
     public void onCapabilitiesChanged(@NonNull Network network,
                                       @NonNull NetworkCapabilities networkCapabilities) {
-      // `onCapabilities` is guaranteed to be called immediately after `onAvailable`.
-      // https://developer.android.com/reference/android/net/ConnectivityManager.NetworkCallback#onCapabilitiesChanged(android.net.Network,%20android.net.NetworkCapabilities)
       if (transportType == EMPTY_TRANSPORT_TYPE) {
         // The network was lost previously, see `onLost`.
         onDefaultNetworkTypeChanged(networkCapabilities);
@@ -90,7 +88,6 @@ public class AndroidNetworkMonitor {
         // transport type.
         if (!networkCapabilities.hasTransport(transportType)) {
           onDefaultNetworkTypeChanged(networkCapabilities);
-          transportType = getTransportType(networkCapabilities);
         }
       }
     }
@@ -112,7 +109,8 @@ public class AndroidNetworkMonitor {
 
     private void onDefaultNetworkTypeChanged(NetworkCapabilities networkCapabilities) {
       if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-        if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+        if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+            networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI_AWARE)) {
           envoyEngine.onDefaultNetworkTypeChanged(EnvoyNetworkType.WLAN);
         } else if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
           envoyEngine.onDefaultNetworkTypeChanged(EnvoyNetworkType.WWAN);
@@ -120,6 +118,7 @@ public class AndroidNetworkMonitor {
           envoyEngine.onDefaultNetworkTypeChanged(EnvoyNetworkType.GENERIC);
         }
       }
+      transportType = getTransportType(networkCapabilities);
     }
   }
 
