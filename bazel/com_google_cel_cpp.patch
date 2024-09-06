@@ -1,0 +1,14 @@
+--- a/internal/new.cc
++++ b/internal/new.cc
+@@ -51,11 +51,6 @@ namespace {
+ 
+ }  // namespace
+ 
+-#ifdef __STDCPP_DEFAULT_NEW_ALIGNMENT__
+-static_assert(IsAligned(alignof(std::max_align_t),
+-                        __STDCPP_DEFAULT_NEW_ALIGNMENT__));
+-#endif
+-
+ void* New(size_t size) { return ::operator new(size); }
+ 
+ void* AlignedNew(size_t size, std::align_val_t alignment) {
