@@ -8,8 +8,9 @@ public final class HttpTestServerFactory {
   /** The supported {@link HttpTestServer} types. */
   public static class Type {
     public static final int HTTP1_WITHOUT_TLS = 0;
-    public static final int HTTP2_WITH_TLS = 1;
-    public static final int HTTP3 = 2;
+    public static final int HTTP1_WITH_TLS = 1;
+    public static final int HTTP2_WITH_TLS = 2;
+    public static final int HTTP3 = 3;
 
     private Type() {}
   }

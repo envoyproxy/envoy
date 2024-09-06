@@ -1718,6 +1718,35 @@ TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstrea
   EXPECT_EQ("408", response->headers().getStatusValue());
 }
 
+// Verify that empty trailers are not sent as trailers.
+TEST_P(DownstreamProtocolIntegrationTest, EmptyTrailersAreNotEncoded) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  config_helper_.prependFilter(R"EOF(
+name: remove-response-trailers-filter
+)EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "sni.lyft.com"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, 1, true);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData("b", false);
+  Http::TestResponseTrailerMapImpl removed_trailers{{"some-trailer", "removed-by-filter"}};
+  upstream_request_->encodeTrailers(removed_trailers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_THAT(response->trailers(), testing::IsNull());
+}
+
 // Verify that headers with underscores in their names are dropped from client requests
 // but remain in upstream responses.
 TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
@@ -5096,12 +5125,13 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedR
     } else if (downstreamProtocol() == Http::CodecType::HTTP2) {
       ASSERT_TRUE(response->waitForReset());
     } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
-      // Unlike H/2 codec H/3 codec attempts to send pending data before the reset
-      // So it needs window to push the data to the client and then the reset
-      // which just gets discarded since end_stream has been received just before
-      // reset.
+      // Unlike H/2, H/3 client codec only stops sending request upon STOP_SENDING frame but still
+      // attempts to finish receiving response. So resume reading in order to fully close the
+      // stream after receiving both STOP_SENDING and end stream.
       request_encoder_->getStream().readDisable(false);
       ASSERT_TRUE(response->waitForEndStream());
+      // Following STOP_SENDING will be propagated via reset callback.
+      ASSERT_TRUE(response->waitForReset());
     }
   } else if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP2 ||
              fake_upstreams_[0]->httpType() == Http::CodecType::HTTP3) {

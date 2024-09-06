@@ -223,7 +223,6 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
   quic::QuicHeaderList headers;
-  headers.OnHeaderBlockStart();
   headers.OnHeader(":status", "200");
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
@@ -244,7 +243,6 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
   quic::QuicHeaderList headers;
-  headers.OnHeaderBlockStart();
   headers.OnHeader(":status", "200");
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
