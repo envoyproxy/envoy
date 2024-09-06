@@ -1,6 +1,11 @@
 #pragma once
 
+#include <charconv>
+#include <cstddef>
+
 #include "envoy/buffer/buffer.h"
+
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Buffer {
