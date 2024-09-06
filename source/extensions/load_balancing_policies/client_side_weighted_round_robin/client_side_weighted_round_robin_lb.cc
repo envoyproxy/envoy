@@ -19,9 +19,9 @@ using Envoy::MonotonicTime;
 using Envoy::Upstream::Host;
 
 #if TEST_THREAD_SUPPORTED
-  #define IS_MAIN_OR_TEST_THREAD() (Envoy::Thread::MainThread::isMainOrTestThread())
+#define IS_MAIN_OR_TEST_THREAD() (Envoy::Thread::MainThread::isMainOrTestThread())
 #else // !TEST_THREAD_SUPPORTED -- just check for the main thread.
-  #define IS_MAIN_OR_TEST_THREAD() (Envoy::Thread::MainThread::isMainThread())
+#define IS_MAIN_OR_TEST_THREAD() (Envoy::Thread::MainThread::isMainThread())
 #endif // TEST_THREAD_SUPPORTED
 
 namespace {
