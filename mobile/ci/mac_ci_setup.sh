@@ -55,7 +55,7 @@ do
 done
 
 # https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
-sudo xcode-select --switch /Applications/Xcode_14.1.app
+sudo xcode-select --switch /Applications/Xcode_15.3.app
 
 retry ./bazelw version
 
