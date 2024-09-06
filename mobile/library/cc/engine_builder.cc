@@ -321,6 +321,11 @@ EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool value) {
+  restart_runtime_guards_.emplace_back(std::move(guard), value);
+  return *this;
+}
+
 #if defined(__APPLE__)
 EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
   respect_system_proxy_settings_ = value;
@@ -818,6 +823,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   // needed to be merged with the default off due to unresolved test issues. Once those are fixed,
   // and the default for `allow_client_socket_creation_failure` is true, we can remove this.
   (*restart_features.mutable_fields())["allow_client_socket_creation_failure"].set_bool_value(true);
+  for (auto& guard_and_value : restart_runtime_guards_) {
+    (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
+        guard_and_value.second);
+  }
 
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =

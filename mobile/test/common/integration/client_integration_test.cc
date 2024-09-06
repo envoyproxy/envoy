@@ -1341,7 +1341,7 @@ TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("quic_upstream_connection_handle_network_change", true);
   initialize();
   basicTest();
-  internalEngine()->setPreferredNetwork(NetworkType::WLAN);
+  internalEngine()->onDefaultNetworkChanged(NetworkType::WLAN);
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
   } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
