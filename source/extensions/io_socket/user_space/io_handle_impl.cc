@@ -90,6 +90,8 @@ Api::IoCallUint64Result IoHandleImpl::close() {
 
 bool IoHandleImpl::isOpen() const { return !closed_; }
 
+bool IoHandleImpl::wasConnected() const { return false; }
+
 Api::IoCallUint64Result IoHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                             uint64_t num_slice) {
   if (!isOpen()) {

@@ -268,7 +268,7 @@ protected:
       ConnectionCreationFunction* creator = nullptr);
   void testRouterDownstreamDisconnectBeforeResponseComplete(
       ConnectionCreationFunction* creator = nullptr);
-  void testRouterUpstreamResponseBeforeRequestComplete();
+  void testRouterUpstreamResponseBeforeRequestComplete(uint32_t status_code = 0);
 
   void testTwoRequests(bool force_network_backup = false);
   void testLargeHeaders(Http::TestRequestHeaderMapImpl request_headers,

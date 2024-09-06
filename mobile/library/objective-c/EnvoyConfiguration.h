@@ -22,6 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) UInt32 dnsRefreshSeconds;
 @property (nonatomic, assign) BOOL enableDNSCache;
 @property (nonatomic, assign) UInt32 dnsCacheSaveIntervalSeconds;
+@property (nonatomic, assign) NSInteger dnsNumRetries;
 @property (nonatomic, assign) BOOL enableHttp3;
 @property (nonatomic, strong) NSDictionary<NSString *, NSNumber *> *quicHints;
 @property (nonatomic, strong) NSArray<NSString *> *quicCanonicalSuffixes;
@@ -60,6 +61,7 @@ NS_ASSUME_NONNULL_BEGIN
                            dnsPreresolveHostnames:(NSArray<NSString *> *)dnsPreresolveHostnames
                                    enableDNSCache:(BOOL)enableDNSCache
                       dnsCacheSaveIntervalSeconds:(UInt32)dnsCacheSaveIntervalSeconds
+                                    dnsNumRetries:(NSInteger)dnsNumRetries
                                       enableHttp3:(BOOL)enableHttp3
                                         quicHints:(NSDictionary<NSString *, NSNumber *> *)quicHints
                             quicCanonicalSuffixes:(NSArray<NSString *> *)quicCanonicalSuffixes

@@ -41,6 +41,7 @@ public:
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
+  EngineBuilder& setDnsNumRetries(uint32_t dns_num_retries);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       int h2_connection_keepalive_idle_interval_milliseconds);
@@ -88,6 +89,11 @@ public:
   // For example if the runtime guard is `envoy.reloadable_features.use_foo`, the guard name is
   // `use_foo`.
   EngineBuilder& addRuntimeGuard(std::string guard, bool value);
+  // Adds a runtime guard for the `envoy.restart_features.<guard>`. Restart features cannot be
+  // changed after the Envoy applicable has started and initialized.
+  // For example if the runtime guard is `envoy.restart_features.use_foo`, the guard name is
+  // `use_foo`.
+  EngineBuilder& addRestartRuntimeGuard(std::string guard, bool value);
 
   // These functions don't affect the Bootstrap configuration but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
@@ -138,6 +144,7 @@ private:
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
   int dns_query_timeout_seconds_ = 5;
+  absl::optional<uint32_t> dns_num_retries_ = absl::nullopt;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
   std::string app_version_ = "unspecified";
@@ -181,6 +188,7 @@ private:
   std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
+  std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool use_gro_if_available_ = false;
 

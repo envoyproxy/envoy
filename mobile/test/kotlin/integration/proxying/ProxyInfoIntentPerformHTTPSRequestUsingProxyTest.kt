@@ -18,7 +18,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -54,9 +53,9 @@ class ProxyInfoIntentPerformHTTPSRequestUsingProxyTest {
     httpProxyTestServer.shutdown()
   }
 
-  @Ignore("https://github.com/envoyproxy/envoy/issues/33014")
   @Test
   fun `performs an HTTPs request through a proxy`() {
+    println("IP ADDRESS: ${httpProxyTestServer.ipAddress}")
     val context = ApplicationProvider.getApplicationContext<Context>()
     val connectivityManager =
       context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -64,7 +63,7 @@ class ProxyInfoIntentPerformHTTPSRequestUsingProxyTest {
     Shadows.shadowOf(connectivityManager)
       .setProxyForNetwork(
         connectivityManager.activeNetwork,
-        ProxyInfo.buildDirectProxy("127.0.0.1", httpProxyTestServer.port)
+        ProxyInfo.buildDirectProxy(httpProxyTestServer.ipAddress, httpProxyTestServer.port)
       )
 
     val onEngineRunningLatch = CountDownLatch(1)

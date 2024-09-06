@@ -20,10 +20,12 @@ class GetAddrInfoDnsImplTest : public testing::Test {
 public:
   GetAddrInfoDnsImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
+    initialize();
+  }
+
+  void initialize() {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
-        getaddrinfo;
-    typed_dns_resolver_config.mutable_typed_config()->PackFrom(getaddrinfo);
+    typed_dns_resolver_config.mutable_typed_config()->PackFrom(config_);
     typed_dns_resolver_config.set_name(std::string("envoy.network.dns_resolver.getaddrinfo"));
 
     Network::DnsResolverFactory& dns_resolver_factory =
@@ -101,6 +103,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   DnsResolverSharedPtr resolver_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
+  envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config_;
 };
 
 TEST_F(GetAddrInfoDnsImplTest, LocalhostResolve) {
@@ -189,7 +192,7 @@ TEST_F(GetAddrInfoDnsImplTest, NoName) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
-TEST_F(GetAddrInfoDnsImplTest, TryAgainAndSuccess) {
+TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccess) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 
   // 2 calls - one EAGAIN, one success.
@@ -226,6 +229,57 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainThenCancel) {
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   resolver_.reset();
+}
+
+TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccess) {
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
+
+  config_.mutable_num_retries()->set_value(3);
+  initialize();
+
+  // 4 calls - 3 EAGAIN, 1 success.
+  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+      .Times(4)
+      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
+      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
+      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  resolver_->resolve("localhost", DnsLookupFamily::All,
+                     [this](DnsResolver::ResolutionStatus status, absl::string_view,
+                            std::list<DnsResponse>&& response) {
+                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+                       EXPECT_TRUE(response.empty());
+
+                       dispatcher_->exit();
+                     });
+
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+}
+
+TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailure) {
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
+
+  config_.mutable_num_retries()->set_value(3);
+  initialize();
+
+  // 4 calls - 4 EAGAIN.
+  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
+      .Times(4)
+      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
+      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
+      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
+      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}));
+  resolver_->resolve("localhost", DnsLookupFamily::All,
+                     [this](DnsResolver::ResolutionStatus status, absl::string_view details,
+                            std::list<DnsResponse>&& response) {
+                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
+                       EXPECT_FALSE(details.empty());
+                       EXPECT_TRUE(response.empty());
+
+                       dispatcher_->exit();
+                     });
+
+  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
 TEST_F(GetAddrInfoDnsImplTest, All) {

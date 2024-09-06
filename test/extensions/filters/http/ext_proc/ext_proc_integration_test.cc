@@ -4652,4 +4652,17 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBodyAndTrailer("hello world");
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  handleUpstreamRequest(100);
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace Envoy
