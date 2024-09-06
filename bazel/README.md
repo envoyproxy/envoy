@@ -125,7 +125,7 @@ for how to update or override dependencies.
     ```console
     brew install coreutils wget libtool go bazelisk clang-format autoconf aspell
     ```
-    _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
+    _notes_: `coreutils` is used for `realpath` on macOS 12 and earlier
 
     _notes_: See Homebrew python setup notes: https://docs.brew.sh/Homebrew-and-Python.
 
