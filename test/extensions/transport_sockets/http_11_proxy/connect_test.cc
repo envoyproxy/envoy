@@ -39,10 +39,12 @@ class Http11ConnectTest : public testing::TestWithParam<Network::Address::IpVers
 public:
   Http11ConnectTest() = default;
 
-  void initialize(bool no_proxy_protocol = false) { initializeInternal(no_proxy_protocol, false); }
+  void initialize(bool no_proxy_protocol = false, absl::optional<uint32_t> target_port = {}) {
+    initializeInternal(no_proxy_protocol, false, target_port);
+  }
 
   // Initialize the test with the proxy address provided via endpoint metadata.
-  void initializeWithMetadataProxyAddr() { initializeInternal(false, true); }
+  void initializeWithMetadataProxyAddr() { initializeInternal(false, true, {}); }
 
   void setAddress() {
     std::string address_string =
@@ -86,13 +88,15 @@ public:
       std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>()};
 
 private:
-  void initializeInternal(bool no_proxy_protocol, bool use_metadata_proxy_addr) {
+  void initializeInternal(bool no_proxy_protocol, bool use_metadata_proxy_addr,
+                          absl::optional<uint32_t> target_port) {
     std::string address_string =
         absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
     Network::Address::InstanceConstSharedPtr address =
         Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
 
-    const std::string proxy_info_hostname = "www.foo.com";
+    const std::string port = target_port.has_value() ? absl::StrCat(":", *target_port) : "";
+    const std::string proxy_info_hostname = absl::StrCat("www.foo.com", port);
     auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
     std::unique_ptr<Network::TransportSocketOptions::Http11ProxyInfo> info;
 
@@ -141,6 +145,11 @@ private:
 // Test injects CONNECT only once. Configured via transport socket options.
 TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceTransportSocketOpts) {
   initialize();
+  injectHeaderOnceTest();
+}
+
+TEST_P(Http11ConnectTest, HostWithPort) {
+  initialize(false, 443);
   injectHeaderOnceTest();
 }
 
