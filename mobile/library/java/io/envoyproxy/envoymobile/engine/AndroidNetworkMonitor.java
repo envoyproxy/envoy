@@ -90,11 +90,8 @@ public class AndroidNetworkMonitor {
         // transport type.
         if (!networkCapabilities.hasTransport(transportType)) {
           onDefaultNetworkTypeChanged(networkCapabilities);
+          transportType = getTransportType(networkCapabilities);
         }
-      }
-
-      if (!networkCapabilities.hasTransport(transportType)) {
-        transportType = getTransportType(networkCapabilities);
       }
     }
 
