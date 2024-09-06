@@ -48,7 +48,8 @@ public:
                 filter_metadata_->DebugString());
     }
 
-    EXPECT_GT(ext_authz_logging_info->latency().count(), 0);
+    ASSERT_TRUE(ext_authz_logging_info->latency().has_value());
+    EXPECT_GT(ext_authz_logging_info->latency()->count(), 0);
     if (expect_envoy_grpc_specific_stats_) {
       // If the stats exist a request should always have been sent.
       EXPECT_GT(ext_authz_logging_info->bytesSent(), 0);
