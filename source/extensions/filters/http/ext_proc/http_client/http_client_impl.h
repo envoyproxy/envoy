@@ -36,7 +36,7 @@ public:
 
   Server::Configuration::ServerFactoryContext& context() const { return context_; }
 
-  void setCallbacks(RequestCallbacks* callbacks) { callbacks_ = callbacks; }
+  void setCallbacks(RequestCallbacks* callbacks);
 
 private:
   void onError();

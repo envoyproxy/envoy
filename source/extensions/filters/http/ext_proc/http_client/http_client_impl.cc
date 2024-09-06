@@ -10,6 +10,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+void ExtProcHttpClient::setCallbacks(RequestCallbacks* callbacks) {
+  callbacks_ = callbacks;
+  ENVOY_LOG(debug, "ext_proc http client callbacks_ == nullptr?  {}", (callbacks_==nullptr));
+}
+
 void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req,
                                     const uint64_t stream_id) {
   // Cancel any active requests.
@@ -59,8 +64,8 @@ void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
   if (status.has_value()) {
     uint64_t status_code = status.value();
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
-      ENVOY_LOG(debug, "Response status is OK");
       std::string msg_body = response->body().toString();
+      ENVOY_LOG(debug, "Response status is OK, message body length {}", msg_body.size());
       envoy::service::ext_proc::v3::ProcessingResponse response_msg;
       if (!msg_body.empty()) {
         bool has_unknown_field;
@@ -75,7 +80,6 @@ void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
       }
       if (callbacks_) {
         callbacks_->onComplete(response_msg);
-        callbacks_ = nullptr;
       }
     } else {
       ENVOY_LOG(error, "Response status is not OK, status: {}", status_code);
@@ -103,7 +107,6 @@ void ExtProcHttpClient::onError() {
   ENVOY_LOG(error, "ext_proc HTTP client error condition happens.");
   if (callbacks_) {
     callbacks_->onError();
-    callbacks_ = nullptr;
   }
 }
 
