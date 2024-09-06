@@ -70,7 +70,7 @@ public interface EnvoyEngine {
   /**
    * A callback into the Envoy Engine when the default network type was changed.
    */
-  void onDefaultNetworkTypeChanged(EnvoyNetworkType network);
+  void onDefaultNetworkChanged(EnvoyNetworkType network);
 
   /**
    * A callback into the Envoy Engine when the default network is unavailable.

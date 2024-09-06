@@ -141,9 +141,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void onDefaultNetworkTypeChanged(EnvoyNetworkType network) {
+  public void onDefaultNetworkChanged(EnvoyNetworkType network) {
     checkIsTerminated();
-    JniLibrary.onDefaultNetworkTypeChanged(engineHandle, network.getValue());
+    JniLibrary.onDefaultNetworkChanged(engineHandle, network.getValue());
   }
 
   @Override

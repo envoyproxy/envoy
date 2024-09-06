@@ -66,7 +66,7 @@
 
     if (network != previousNetworkType) {
       NSLog(@"[Envoy] setting preferred network to %d", network);
-      engine->onDefaultNetworkTypeChanged(network);
+      engine->onDefaultNetworkChanged(network);
       previousNetworkType = network;
     }
 
@@ -135,8 +135,8 @@ static void _reachability_callback(SCNetworkReachabilityRef target,
 
   NSLog(@"[Envoy] setting preferred network to %@", isUsingWWAN ? @"WWAN" : @"WLAN");
   EnvoyNetworkMonitor *monitor = (__bridge EnvoyNetworkMonitor *)info;
-  monitor->_engine->onDefaultNetworkTypeChanged(isUsingWWAN ? Envoy::NetworkType::WWAN
-                                                            : Envoy::NetworkType::WLAN);
+  monitor->_engine->onDefaultNetworkChanged(isUsingWWAN ? Envoy::NetworkType::WWAN
+                                                        : Envoy::NetworkType::WLAN);
 }
 
 @end

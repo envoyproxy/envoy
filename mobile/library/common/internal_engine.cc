@@ -285,7 +285,7 @@ void InternalEngine::onDefaultNetworkAvailable() {
   ENVOY_LOG_MISC(trace, "Calling the default network available callback");
 }
 
-void InternalEngine::onDefaultNetworkTypeChanged(NetworkType network) {
+void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
   ENVOY_LOG_MISC(trace, "Calling the default network changed callback");
   dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration = Network::ConnectivityManagerImpl::setPreferredNetwork(network);

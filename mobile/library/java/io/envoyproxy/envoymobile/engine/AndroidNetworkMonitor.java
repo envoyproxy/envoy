@@ -25,8 +25,8 @@ import java.util.Collections;
  * <li>When the internet is not available: call the
  * <code>InternalEngine::onDefaultNetworkUnavailable</code> callback.</li>
  *
- * <li>When the network type is changed: call the
- * <code>EnvoyEngine::onDefaultNetworkTypeChanged</code>.</li>
+ * <li>When the network is changed: call the
+ * <code>EnvoyEngine::onDefaultNetworkChanged</code>.</li>
  * </ul>
  */
 public class AndroidNetworkMonitor {
@@ -80,14 +80,17 @@ public class AndroidNetworkMonitor {
     @Override
     public void onCapabilitiesChanged(@NonNull Network network,
                                       @NonNull NetworkCapabilities networkCapabilities) {
+      // `onCapabilities` is guaranteed to be called immediately after `onAvailable`
+      // starting with Android O, so this logic may not work on older Android versions.
+      // https://developer.android.com/reference/android/net/ConnectivityManager.NetworkCallback#onCapabilitiesChanged(android.net.Network,%20android.net.NetworkCapabilities)
       if (transportType == EMPTY_TRANSPORT_TYPE) {
         // The network was lost previously, see `onLost`.
-        onDefaultNetworkTypeChanged(networkCapabilities);
+        onDefaultNetworkChanged(networkCapabilities);
       } else {
-        // Only call the `onDefaultNetworkTypeChanged` callback when there is a change in the
+        // Only call the `onDefaultNetworkChanged` callback when there is a change in the
         // transport type.
         if (!networkCapabilities.hasTransport(transportType)) {
-          onDefaultNetworkTypeChanged(networkCapabilities);
+          onDefaultNetworkChanged(networkCapabilities);
         }
       }
     }
@@ -107,15 +110,15 @@ public class AndroidNetworkMonitor {
       return EMPTY_TRANSPORT_TYPE;
     }
 
-    private void onDefaultNetworkTypeChanged(NetworkCapabilities networkCapabilities) {
+    private void onDefaultNetworkChanged(NetworkCapabilities networkCapabilities) {
       if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
         if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
             networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI_AWARE)) {
-          envoyEngine.onDefaultNetworkTypeChanged(EnvoyNetworkType.WLAN);
+          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
         } else if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-          envoyEngine.onDefaultNetworkTypeChanged(EnvoyNetworkType.WWAN);
+          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.WWAN);
         } else {
-          envoyEngine.onDefaultNetworkTypeChanged(EnvoyNetworkType.GENERIC);
+          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.GENERIC);
         }
       }
       transportType = getTransportType(networkCapabilities);

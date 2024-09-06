@@ -114,7 +114,7 @@ public:
   void onDefaultNetworkAvailable();
 
   /**
-   * This function does the following when the default network type was changed.
+   * This function does the following when the default network was changed.
    *
    * - Sets the preferred network.
    * - Check for IPv6 connectivity. If there is no IPv6 no connectivity, it will call
@@ -123,7 +123,7 @@ public:
    * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
    * - Optionally (if configured) clear HTTP/3 broken status.
    */
-  void onDefaultNetworkTypeChanged(NetworkType network);
+  void onDefaultNetworkChanged(NetworkType network);
 
   /**
    * This functions does the following when the default network is unavailable.
