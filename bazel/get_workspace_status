@@ -41,6 +41,17 @@ else
     echo "STABLE_BUILD_SCM_REVISION ${git_rev}"
 fi
 
+case "${OSTYPE}" in
+    darwin*)
+        which -s sha256sum
+        if [[ $? -eq 1 ]]; then
+            function sha256sum {
+                shasum -a 256 $@
+            }
+        fi
+        ;;
+esac
+
 # If BAZEL_VOLATILE_DIRTY is set then stamped builds will rebuild uncached when
 # either a tracked file changes or an untracked file is added or removed.
 # Otherwise this just tracks changes to tracked files.
