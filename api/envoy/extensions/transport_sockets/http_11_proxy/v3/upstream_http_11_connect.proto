@@ -16,30 +16,22 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Upstream HTTP/1.1 Proxy]
 // [#extension: envoy.transport_sockets.http_11_proxy]
 
-// The HTTP/1.1 proxy transport socket opens an upstream connection to a specified proxy address
-// rather than the target host's address. If this transport socket is configured and proxy
-// information is configured, then:
+// HTTP/1.1 proxy transport socket establishes an upstream connection to a proxy address
+// instead of the target host's address. This behavior is triggered when the transport
+// socket is configured and proxy information is provided.
 //
-// * Upstream connections to the proxy address will have a raw HTTP/1.1 CONNECT header prefaced to
-//   the payload, and 200 response stripped (if less than 200 bytes).
-// * Plaintext HTTP/1.1 connections will be sent with a fully qualified URL.
+// Behavior when proxying:
+// =======================
+// When an upstream connection is established, instead of connecting directly to the endpoint
+// address, the client will connect to the specified proxy address, send an HTTP/1.1 ``CONNECT`` request
+// indicating the endpoint address, and process the response. If the response has HTTP status 200,
+// the connection will be passed down to the underlying transport socket.
 //
-// There are two primary ways to configure proxy information:
-//
-// * An intermediate filter adds the stream info necessary for proxying to the stream info (as the
-//   test filter does :repo:`here <test/integration/filters/header_to_proxy_filter.cc>`).
-// * Setting the "typed_filter_metadata" in :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.lbendpoint.metadata>`
-//   or :ref:`LocalityLbEndpoints.Metadata
-//   <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>` using the key
-//   "envoy.http11_proxy_transport_socket.proxy_address" and the proxy address in
-//   config::core::v3::Address format.
-//
-// Some important notes regarding this transport socket:
-//
-// * Configuration via stream info (as opposed to endpoint/locality metadata) will only proxy TLS
-//   connections to the proxy address on port 443. This is to maintain the original behavior of the
-//   transport socket when using this method of configuration.
-// * The transport socket is not compatible with HTTP/3 or plaintext HTTP/2.
+// Configuring proxy information:
+// ==============================
+// Set ``typed_filter_metadata`` in :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.lbendpoint.metadata>` or :ref:`LocalityLbEndpoints.Metadata <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`.
+// using the key ``envoy.http11_proxy_transport_socket.proxy_address`` and the
+// proxy address in ``config::core::v3::Address`` format.
 //
 message Http11ProxyUpstreamTransport {
   // The underlying transport socket being wrapped.

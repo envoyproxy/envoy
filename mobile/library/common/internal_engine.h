@@ -114,7 +114,7 @@ public:
   void onDefaultNetworkAvailable();
 
   /**
-   * This function does the following when the default network configuration was changed.
+   * This function does the following when the default network was changed.
    *
    * - Sets the preferred network.
    * - Check for IPv6 connectivity. If there is no IPv6 no connectivity, it will call
