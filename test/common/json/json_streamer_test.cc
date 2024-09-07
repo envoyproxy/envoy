@@ -28,7 +28,7 @@ public:
       return underlying_buffer_.toString();
     }
   }
-  UnderlyingType<T>::Type underlying_buffer_;
+  typename UnderlyingType<T>::Type underlying_buffer_;
 };
 
 template <typename T> class JsonStreamerTest : public testing::Test {
