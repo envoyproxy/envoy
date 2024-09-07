@@ -175,7 +175,7 @@ TEST(UtilityTest, TestGetCertificateExtensionOids) {
   const std::string test_data_path = "{{ test_rundir }}/test/common/tls/test_data/";
   const std::vector<std::pair<std::string, int>> test_set = {
       {"unittest_cert.pem", 1},
-      {"san_wildcard_dns_cert.pem", 6},
+      {"no_extension_cert.pem", 0},
       {"extensions_cert.pem", 7},
   };
 
