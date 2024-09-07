@@ -982,10 +982,19 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFiltersPauseAndResume) {
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
+  bool verify_no_remote_close = true;
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // in HTTP1 case, the connection is closed on stream reset and therefore, it
+    // is possible to detect a remote close if remote FIN event gets processed before local close
+    // socket event. By sending verify_no_remote_close as false to the write function, we are
+    // allowing the test to pass even if remote close is detected.
+    verify_no_remote_close = false;
+  }
   // send some data to pause the filter
-  ASSERT_TRUE(tcp_client_->write("hello", false));
+  ASSERT_TRUE(tcp_client_->write("hello", false, verify_no_remote_close));
   // send end stream to resume the filter
-  ASSERT_TRUE(tcp_client_->write("hello", true));
+  ASSERT_TRUE(tcp_client_->write("hello", true, verify_no_remote_close));
+
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
 
   // Finally close and clean up.

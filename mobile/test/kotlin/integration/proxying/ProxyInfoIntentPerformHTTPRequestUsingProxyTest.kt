@@ -13,6 +13,7 @@ import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpProxyTestServerFactory
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -41,16 +42,19 @@ class ProxyInfoIntentPerformHTTPRequestUsingProxyTest {
   }
 
   private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
 
   @Before
   fun setUp() {
     httpProxyTestServer =
       HttpProxyTestServerFactory.start(HttpProxyTestServerFactory.Type.HTTP_PROXY)
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP1_WITHOUT_TLS)
   }
 
   @After
   fun tearDown() {
     httpProxyTestServer.shutdown()
+    httpTestServer.shutdown()
   }
 
   @Test
@@ -86,8 +90,8 @@ class ProxyInfoIntentPerformHTTPRequestUsingProxyTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "http",
-          authority = "api.lyft.com",
-          path = "/ping"
+          authority = httpTestServer.address,
+          path = "/"
         )
         .build()
 
@@ -96,7 +100,7 @@ class ProxyInfoIntentPerformHTTPRequestUsingProxyTest {
       .newStreamPrototype()
       .setOnResponseHeaders { responseHeaders, _, _ ->
         val status = responseHeaders.httpStatus ?: 0L
-        assertThat(status).isEqualTo(301)
+        assertThat(status).isEqualTo(200)
         assertThat(responseHeaders.value("x-proxy-response")).isEqualTo(listOf("true"))
         onResponseHeadersLatch.countDown()
       }
