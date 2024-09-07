@@ -49,7 +49,7 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12
+      runs-on: macos-14
       source: |
         source ./ci/mac_ci_setup.sh
       # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
