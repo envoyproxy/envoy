@@ -319,4 +319,9 @@ public class JniLibrary {
    * href="https://c-ares.org/docs/ares_library_init_android.html">ares_library_init_android</a>.
    */
   public static native void initCares(ConnectivityManager connectivityManager);
+
+  /**
+   * Returns true if the runtime feature is enabled.
+   */
+  public static native boolean isRuntimeFeatureEnabled(String featureName);
 }

@@ -215,6 +215,14 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
 #endif
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_runtimeFeatureEnabled(JNIEnv* env, jclass,
+                                                                       jstring feature_name) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  return Envoy::Runtime::runtimeFeatureEnabled(
+      Envoy::JNI::javaStringToCppString(jni_helper, feature_name));
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
     JNIEnv* env,
     jclass, // class
