@@ -12,7 +12,7 @@ namespace ExternalProcessing {
 
 void ExtProcHttpClient::setCallbacks(RequestCallbacks* callbacks) {
   callbacks_ = callbacks;
-  ENVOY_LOG(debug, "ext_proc http client callbacks_ == nullptr?  {}", (callbacks_==nullptr));
+  ENVOY_LOG(debug, "ext_proc http client set callbacks_ == nullptr? {}", (callbacks_ == nullptr));
 }
 
 void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req,

@@ -523,7 +523,49 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyInBothDirection) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  //  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBodyAndTrailer("foo");
+
+  processRequestHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
+  processRequestBodyMessage(http_side_upstreams_[0],
+                            [](const HttpBody& body, BodyResponse& body_resp) {
+                              EXPECT_EQ(body.body(), "foo");
+                              auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+                              body_mut->set_body("bar");
+                              return true;
+                            });
+
+  handleUpstreamRequestWithTrailer();
+  EXPECT_EQ(upstream_request_->body().toString(), "bar");
+  processResponseHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
+
+  processResponseBodyMessage(http_side_upstreams_[0],
+                             [](const HttpBody&, BodyResponse& body_resp) {
+                               auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+                               body_mut->set_body("Hello, World!");
+                               return true;
+                             });
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_EQ(response->body(), "Hello, World!");
+}
+
+// Send headers, body, trailers in both directions.
+TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyTrailerInBothDirection) {
+  // Only run this test if both US and DS are HTTP2.
+  if (GetParam().downstream_protocol != Http::CodecType::HTTP2 ||
+      GetParam().upstream_protocol != Http::CodecType::HTTP2) {
+    return;
+  }
+
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
 
   initializeConfig();
   HttpIntegrationTest::initialize();
@@ -531,57 +573,6 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyInBothDirection) {
 
   processRequestHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
   processRequestBodyMessage(http_side_upstreams_[0], absl::nullopt);
-  /*
-  http_side_upstreams_[0], [](const HttpBody& body, BodyResponse& body_resp) {
-        // EXPECT_FALSE(body.end_of_stream());
-        EXPECT_EQ(body.body(), "foo");
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body("bar");
-        return true;
-      });
-  */
-
-  handleUpstreamRequestWithTrailer();
-  EXPECT_EQ(upstream_request_->body().toString(), "bar");
-  processResponseHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
-
-  /*
-  processResponseBodyMessage(
-      http_side_upstreams_[0], [](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_FALSE(body.end_of_stream());
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body("Hello, World!");
-        return true;
-      });
-  */
-  verifyDownstreamResponse(*response, 200);
-  EXPECT_EQ(response->body(), "Hello, World!");
-}
-
-#if 0
-// Send headers, body, trailers in both directions.
-TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyTrailerInBothDirection) {
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
-  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
-  //  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
-  // proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
-
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequestWithBodyAndTrailer("foo");
-
-  processRequestHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
-  processRequestBodyMessage(
-      http_side_upstreams_[0], [](const HttpBody& body, BodyResponse& body_resp) {
-        EXPECT_FALSE(body.end_of_stream());
-        EXPECT_EQ(body.body(), "foo");
-        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-        body_mut->set_body("bar");
-        return true;
-      });
-#if 0
   processRequestTrailersMessage(
       http_side_upstreams_[0], [](const HttpTrailers& trailers, TrailersResponse& trailer_resp) {
         Http::TestResponseTrailerMapImpl expected_trailers{{"x-trailer-foo", "yes"}};
@@ -593,18 +584,13 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyTrailerInBothDirection) {
         headers->mutable_header()->set_raw_value("x-trailer-new-value");
         return true;
       });
-#endif
 
-  // The request is sent to the upstream.
   handleUpstreamRequestWithTrailer();
-  EXPECT_EQ(upstream_request_->body().toString(), "bar");
-  //  EXPECT_THAT(upstream_request_->trailers(), SingleHeaderValueIs("x-trailer-new", "x-trailer-new-value"));
-  // EXPECT_THAT(upstream_request_->trailers(), HasNoHeader("x-trailer-foo"));
-
+  EXPECT_EQ(upstream_request_->body().toString(), "foo");
+  EXPECT_THAT(*upstream_request_->trailers(), SingleHeaderValueIs("x-trailer-new", "x-trailer-new-value"));
+  EXPECT_THAT(*upstream_request_->trailers(), HasNoHeader("x-trailer-foo"));
 
   processResponseHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
-
-  #if 0
   processResponseBodyMessage(
       http_side_upstreams_[0], [](const HttpBody& body, BodyResponse& body_resp) {
         EXPECT_FALSE(body.end_of_stream());
@@ -613,12 +599,9 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyTrailerInBothDirection) {
         return true;
       });
   processResponseTrailersMessage(http_side_upstreams_[0], absl::nullopt);
-  #endif
-
   verifyDownstreamResponse(*response, 200);
-  // EXPECT_EQ(response->body(), "Hello, World!");
-  // EXPECT_THAT(response->trailers(), SingleHeaderValueIs("x-test-trailers", "Yes"));
+  EXPECT_EQ(response->body(), "Hello, World!");
+  EXPECT_THAT(*response->trailers(), SingleHeaderValueIs("x-test-trailers", "Yes"));
 }
-#endif
 
 } // namespace Envoy
