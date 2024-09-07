@@ -89,6 +89,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: upstream
+  change: |
+    Use previously calculated healthcheck when endpoints move priority levels repeatedly.
 - area: dispatcher
   change: |
     Update approximate now after polling instead of before polling. This is only used by QUIC.

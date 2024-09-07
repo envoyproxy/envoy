@@ -1041,15 +1041,24 @@ case $CI_TARGET in
         ;;
 
     refresh_compdb)
+        # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
+        # So the compdb headers won't be overwritten by another bazel run.
+        for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do
+            if [[ ${BAZEL_STARTUP_OPTIONS[i]} == "--output_base"* ]]; then
+                COMPDB_OUTPUT_BASE="${BAZEL_STARTUP_OPTIONS[i]}"-envoy-compdb
+                BAZEL_STARTUP_OPTIONS[i]="${COMPDB_OUTPUT_BASE}"
+                BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
+                export BAZEL_STARTUP_OPTION_LIST
+            fi
+        done
+
         if [[ -z "${SKIP_PROTO_FORMAT}" ]]; then
             "${CURRENT_SCRIPT_DIR}/../tools/proto_format/proto_format.sh" fix
         fi
 
         read -ra ENVOY_GEN_COMPDB_OPTIONS <<< "${ENVOY_GEN_COMPDB_OPTIONS:-}"
 
-        # Setting TEST_TMPDIR here so the compdb headers won't be overwritten by another bazel run.
-        TEST_TMPDIR="${BUILD_DIR}/envoy-compdb" \
-            "${CURRENT_SCRIPT_DIR}/../tools/gen_compilation_database.py" \
+        "${CURRENT_SCRIPT_DIR}/../tools/gen_compilation_database.py" \
             "${ENVOY_GEN_COMPDB_OPTIONS[@]}"
         # Kill clangd to reload the compilation database
         pkill clangd || :
