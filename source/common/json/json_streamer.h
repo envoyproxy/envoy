@@ -39,7 +39,9 @@ namespace Json {
 #define ASSERT_LEVELS_EMPTY ASSERT(this->levels_.empty())
 #endif
 
-// Simple abstraction that provide a output buffer for streaming JSON output.
+// Buffer wrapper that implements the necessary abstraction for the template
+// StreamerBase.
+// This could be used to stream JSON output of StreamerBase to a Buffer.
 class BufferOutput {
 public:
   void add(absl::string_view a) { buffer_.addFragments({a}); }
@@ -51,7 +53,9 @@ public:
   Buffer::Instance& buffer_;
 };
 
-// Simple abstraction that provide a output string for streaming JSON output.
+// String wrapper that implements the necessary abstraction for the template
+// StreamerBase.
+// This could be used to stream JSON output of StreamerBase to a single string.
 class StringOutput {
 public:
   void add(absl::string_view a) { buffer_.append(a); }
