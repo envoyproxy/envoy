@@ -48,7 +48,7 @@ void setThreadPriority(const int64_t tid, const int priority) {
 #elif defined(__APPLE__)
   UNREFERENCED_PARAMETER(tid);
   // Use NSThread via the Objective-C runtime to set the thread priority; it's the best way to set
-  // the thread priority on Apple platforms, and directly invoking setpriority() on iOS fails with
+  // the thread priority on Apple platforms, and directly invoking `setpriority()` on iOS fails with
   // permissions issues, as discovered through manual testing.
   Class nsthread = objc_getClass("NSThread");
   if (nsthread != nullptr) {
