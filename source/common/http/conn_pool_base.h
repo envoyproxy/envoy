@@ -207,7 +207,8 @@ protected:
  */
 class MultiplexedActiveClientBase : public CodecClientCallbacks,
                                     public Http::ConnectionCallbacks,
-                                    public Envoy::Http::ActiveClient {
+                                    public Envoy::Http::ActiveClient,
+                                    public Network::NetworkChangeCallbacks {
 public:
   MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
                               uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
@@ -227,6 +228,9 @@ public:
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
+
+  // Network::NetworkChangeCallbacks
+  void onConnectionNetworkChanged() override;
 
 private:
   bool closed_with_active_rq_{};

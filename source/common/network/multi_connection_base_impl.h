@@ -74,6 +74,7 @@ public:
 
   // Network::ClientConnection
   void connect() override;
+  void setNetworkChangeCallbacks(NetworkChangeCallbacks&) override{};
 
   // Methods which defer action until the final connection has been determined.
   void addWriteFilter(WriteFilterSharedPtr filter) override;

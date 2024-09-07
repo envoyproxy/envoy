@@ -27,8 +27,7 @@ void QuicNetworkConnectivityObserver::onNetworkChanged() {
       trace,
       "The default network changed. Drain the connection with in-flight requests or handshake.",
       session_);
-  // Use an error code other than NoError to distinguish from receiving GOAWAY for real.
-  session_.notifyServerGoAway(Http::GoAwayErrorCode::Other);
+  session_.notifyNetworkChange();
 }
 
 } // namespace Quic

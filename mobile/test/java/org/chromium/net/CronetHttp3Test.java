@@ -288,7 +288,7 @@ public class CronetHttp3Test {
     String preStats = cronvoyEngine.getEnvoyEngine().dumpStats();
     assertTrue(preStats.contains("cluster.base.upstream_cx_http3_total: 1"));
 
-    // Even though there is HTTP/3 connection, the follow request should go over HTTP/2 because
+    // Even though there is HTTP/3 connection, the following request should go over HTTP/2 because
     // HTTP/3 is marked as broken.
     TestUrlRequestCallback get_callback = doBasicGetRequest();
     assertEquals(200, get_callback.mResponseInfo.getHttpStatusCode());

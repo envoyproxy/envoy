@@ -97,16 +97,24 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
 // side we do 2^29.
 static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 
-void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode error_code) {
+void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().trafficStats()->upstream_cx_close_notify_.inc();
   if (state() != ActiveClient::State::Draining) {
     if (codec_client_->numActiveRequests() == 0) {
-      if (codec_client_->protocol() == Protocol::Http3 && error_code == GoAwayErrorCode::Other) {
-        // This must be network change because QUIC GOAWAY frame doesn't have error code and always
-        // call this callback with NoError.
-        close_after_network_change_ = true;
-      }
+      codec_client_->close();
+    } else {
+      parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
+    }
+  }
+}
+
+void MultiplexedActiveClientBase::onConnectionNetworkChanged() {
+  ENVOY_CONN_LOG(debug, "network changed", *codec_client_);
+  parent_.host()->cluster().trafficStats()->upstream_cx_close_notify_.inc();
+  if (state() != ActiveClient::State::Draining) {
+    if (codec_client_->numActiveRequests() == 0) {
+      close_after_network_change_ = true;
       codec_client_->close();
     } else {
       parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
@@ -200,6 +208,7 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(
           effective_concurrent_streams, max_configured_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
+  codec_client_->setNetworkChangeCallbacks(*this);
   cx_total.inc();
 }
 

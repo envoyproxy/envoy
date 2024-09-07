@@ -12,7 +12,7 @@ public:
   explicit EnvoyMobileQuicNetworkObserverRegistry(Event::Dispatcher& dispatcher)
       : dispatcher_(dispatcher) {}
 
-  // Called when the default network has changed to notify each registered observers.
+  // Called when the default network has changed to notify each registered observer.
   void onNetworkMadeDefault();
 
 private:
