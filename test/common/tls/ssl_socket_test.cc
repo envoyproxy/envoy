@@ -199,6 +199,20 @@ public:
 
   const std::vector<std::string>& expectedLocalUri() const { return expected_local_uri_; }
 
+  TestUtilOptions& setExpectedLocalDns(const std::string& expected_local_dns) {
+    expected_local_dns_ = {expected_local_dns};
+    return *this;
+  }
+
+  const std::vector<std::string>& expectedLocalDns() const { return expected_local_dns_; }
+
+  TestUtilOptions& setExpectedLocalIp(const std::string& expected_local_ip) {
+    expected_local_ip_ = {expected_local_ip};
+    return *this;
+  }
+
+  const std::vector<std::string>& expectedLocalIp() const { return expected_local_ip_; }
+
   TestUtilOptions& setExpectedSerialNumber(const std::string& expected_serial_number) {
     expected_serial_number_ = expected_serial_number;
     return *this;
@@ -352,6 +366,8 @@ private:
   std::string expected_sha1_digest_;
   std::vector<std::string> expected_sha1_digests_;
   std::vector<std::string> expected_local_uri_;
+  std::vector<std::string> expected_local_dns_;
+  std::vector<std::string> expected_local_ip_;
   std::string expected_serial_number_;
   std::vector<std::string> expected_serial_numbers_;
   std::string expected_peer_issuer_;
@@ -513,6 +529,18 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
       }
 
+      if (!options.expectedLocalDns().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedLocalDns(), server_connection->ssl()->dnsSansLocalCertificate());
+        EXPECT_EQ(options.expectedLocalDns(), server_connection->ssl()->dnsSansLocalCertificate());
+      }
+
+      if (!options.expectedLocalIp().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedLocalIp(), server_connection->ssl()->ipSansLocalCertificate());
+        EXPECT_EQ(options.expectedLocalIp(), server_connection->ssl()->ipSansLocalCertificate());
+      }
+
       EXPECT_EQ(options.expectedSerialNumber(),
                 server_connection->ssl()->serialNumberPeerCertificate());
       EXPECT_EQ(options.expectedSerialNumber(),
@@ -596,8 +624,6 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->oidsPeerCertificate());
-        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansLocalCertificate());
-        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansLocalCertificate());
       }
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,
@@ -1944,6 +1970,54 @@ TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
+TEST_P(SslSocketTest, GetDnsWithLocalDnsSan) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedServerStats("ssl.no_certificate")
+               .setExpectNoCert()
+               .setExpectNoCertChain()
+               .setExpectedLocalDns("server1.example.com"));
+}
+
+TEST_P(SslSocketTest, GetIpWithLocalIpSan) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_ip_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_ip_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedServerStats("ssl.no_certificate")
+               .setExpectNoCert()
+               .setExpectNoCertChain()
+               .setExpectedLocalIp("1.1.1.1"));
+}
+
 TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
@@ -1977,7 +2051,7 @@ TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
 }
 
-TEST_P(SslSocketTest, GetPeerCertOids) {
+TEST_P(SslSocketTest, GetOidsWithBothCerts) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
     tls_certificates:
@@ -2007,7 +2081,7 @@ TEST_P(SslSocketTest, GetPeerCertOids) {
                .setExpectedLocalOids({"2.5.29.14"}));
 }
 
-TEST_P(SslSocketTest, NoLocalCertOids) {
+TEST_P(SslSocketTest, GetOidsWithLocalNoExtensionCert) {
   const std::string client_ctx_yaml = R"EOF(
     common_tls_context:
   )EOF";
