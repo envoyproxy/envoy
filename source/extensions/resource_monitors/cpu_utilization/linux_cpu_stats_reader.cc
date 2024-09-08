@@ -10,7 +10,6 @@ namespace CpuUtilizationMonitor {
 
 constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE =
     4; // we are interested in user, nice, system and idle times.
-constexpr uint64_t MICROSECONDS = 1000 * 1000;
 
 LinuxCpuStatsReader::LinuxCpuStatsReader(const std::string& cpu_stats_filename)
     : cpu_stats_filename_(cpu_stats_filename) {}
