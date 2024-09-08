@@ -824,7 +824,12 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
          "set in "
          "ConnectionManagerImpl.");
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_->accessLogs()) {
-    filter_manager_.addAccessLogHandler(access_log);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_separate_config_and_filter_access_loggers")) {
+      filter_manager_.addConfigLogHandler(access_log);
+    } else {
+      filter_manager_.addAccessLogHandler(access_log);
+    }
   }
 
   filter_manager_.streamInfo().setStreamIdProvider(
