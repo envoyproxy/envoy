@@ -851,8 +851,9 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
                                               Upstream::HostDescriptionConstSharedPtr upstream_host,
                                               StreamInfo::StreamInfo& upstream_info,
                                               absl::optional<Http::Protocol>) {
+  auto upstream_connection_id = upstream_info.downstreamAddressProvider().connectionID().value();
   ENVOY_LOG(debug, "Upstream connection [C{}] ready, creating tunnel stream",
-            upstream_info.downstreamAddressProvider().connectionID().value());
+            upstream_connection_id);
 
   upstream_handle_ = nullptr;
   upstream_host_ = upstream_host;
@@ -863,6 +864,7 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   upstream_->setRequestEncoder(request_encoder, is_ssl);
   upstream_->setTunnelCreationCallbacks(*this);
   downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
+  downstream_info_.upstreamInfo()->setUpstreamConnectionId(upstream_connection_id);
   callbacks_->resetIdleTimer();
 }
 
