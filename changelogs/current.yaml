@@ -293,5 +293,9 @@ new_features:
   change: |
     Added :ref:`external_auth_provider <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
     external authentication for redis proxy.
+- area: udp_access_logs
+  change: |
+    Added support for %BYTES_RECEIVED%, %BYTES_SENT%, %UPSTREAM_HEADER_BYTES_SENT%, %UPSTREAM_HEADER_BYTES_RECEIVED%,
+    %UPSTREAM_WIRE_BYTES_SENT%, %UPSTREAM_WIRE_BYTES_RECEIVED% access log substitution strings for UDP tunneling flows.
 
 deprecated:

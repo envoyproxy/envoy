@@ -493,9 +493,7 @@ typed_config:
     expectRequestHeaders(upstream_request_->headers());
 
     // Send upgrade headers downstream, fully establishing the connection.
-    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
-                                                     {"capsule-protocol", "?1"}};
-    upstream_request_->encodeHeaders(response_headers, false);
+    upstream_request_->encodeHeaders(response_headers_, false);
 
     test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", tunnels_count);
     test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
@@ -509,7 +507,36 @@ typed_config:
     EXPECT_EQ(datagram, response_datagram.buffer_->toString());
   }
 
+  ssize_t getHpackDeflatedHeadersSize(const Http::HeaderMap& headers) {
+    nghttp2_hd_deflater* deflater = nullptr;
+    int rc = nghttp2_hd_deflate_new(&deflater, 4096);
+    ASSERT(rc == 0);
+
+    uint8_t buf[4096]; // Taking a buffer size that should be more than enough for current tests
+    std::vector<nghttp2_nv> nv_headers(headers.size());
+
+    size_t index = 0;
+    headers.iterate(
+        [&nv_headers, &index](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+          nv_headers[index++] = {const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(
+                                     header.key().getStringView().data())),
+                                 const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(
+                                     header.value().getStringView().data())),
+                                 header.key().size(), header.value().size(), 0};
+
+          return Http::HeaderMap::Iterate::Continue;
+        });
+
+    // Compress the headers using nghttp2 HPACK encoder.
+    auto deflated_size =
+        nghttp2_hd_deflate_hd(deflater, buf, sizeof(buf), nv_headers.data(), nv_headers.size());
+
+    nghttp2_hd_deflate_del(deflater);
+    return deflated_size;
+  }
+
   TestConfig config_;
+  Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"}, {"capsule-protocol", "?1"}};
   Network::Address::InstanceConstSharedPtr listener_address_;
   std::unique_ptr<Network::Test::UdpSyncPeer> client_;
 };
@@ -1239,6 +1266,77 @@ TEST_P(UdpTunnelingIntegrationTest, FlushAccessLogPeriodically) {
   sendCapsuleDownstream("response", false);
   EXPECT_THAT(waitForAccessLog(access_log_filename),
               testing::HasSubstr(AccessLogType_Name(AccessLog::AccessLogType::UdpPeriodic)));
+}
+
+TEST_P(UdpTunnelingIntegrationTest, BytesMeterAccessLog) {
+  // Using nghttp2 causes different header compression sizes which fails the test
+  // during wire bytes checks that include header streaming.
+  if (GetParam().http2_implementation == Http2Impl::Nghttp2) {
+    return;
+  }
+
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%ACCESS_LOG_TYPE%-%BYTES_RECEIVED%-%BYTES_SENT%-%UPSTREAM_HEADER_BYTES_SENT%-%UPSTREAM_HEADER_BYTES_RECEIVED%-%UPSTREAM_WIRE_BYTES_SENT%-%UPSTREAM_WIRE_BYTES_RECEIVED%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          1,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          ""};
+  setup(config);
+
+  const std::string request = "request";
+  const std::string response = "response";
+
+  establishConnection(request);
+
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({request})));
+  sendCapsuleDownstream(response, true);
+
+  auto access_log = waitForAccessLog(access_log_filename);
+  std::vector<std::string> access_log_parts = absl::StrSplit(access_log, '-');
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd), access_log_parts[0]);
+  EXPECT_EQ(std::to_string(request.length()), access_log_parts[1]);
+  EXPECT_EQ(std::to_string(response.length()), access_log_parts[2]);
+
+  Http::TestRequestHeaderMapImpl request_headers_copy(upstream_request_->headers());
+  Http::Utility::transformUpgradeRequestFromH1toH2(request_headers_copy);
+  auto hpack_request_headers_size = getHpackDeflatedHeadersSize(request_headers_copy);
+  auto expected_request_wire_size = hpack_request_headers_size + Http::Http2::H2_FRAME_HEADER_SIZE;
+  EXPECT_EQ(std::to_string(expected_request_wire_size), access_log_parts[3]);
+
+  Http::TestResponseHeaderMapImpl response_header_copy(response_headers_);
+  auto hpack_response_header_size = getHpackDeflatedHeadersSize(response_header_copy);
+  auto expected_response_wire_size = hpack_response_header_size + Http::Http2::H2_FRAME_HEADER_SIZE;
+  EXPECT_EQ(std::to_string(expected_response_wire_size), access_log_parts[4]);
+
+  auto request_capsule_size = encapsulate(request).size() + Http::Http2::H2_FRAME_HEADER_SIZE;
+  auto expected_sent_wire_bytes = expected_request_wire_size + request_capsule_size;
+  EXPECT_EQ(std::to_string(expected_sent_wire_bytes), access_log_parts[5]);
+
+  auto response_capsule_size = encapsulate(response).size() + Http::Http2::H2_FRAME_HEADER_SIZE;
+  auto expected_received_wire_bytes = expected_response_wire_size + response_capsule_size;
+  EXPECT_EQ(std::to_string(expected_received_wire_bytes), access_log_parts[6]);
+
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpAndHttpVersions, UdpTunnelingIntegrationTest,
