@@ -257,7 +257,7 @@ private:
   const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
     return nullptr;
   }
-  Router::RouteSpecificFilterConfigs perFilterConfigs() const override {}
+  Router::RouteSpecificFilterConfigs perFilterConfigs() const override { return {}; }
   Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
   OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }

@@ -963,7 +963,7 @@ public:
       return parent_->mostSpecificPerFilterConfig(name);
     }
     RouteSpecificFilterConfigs perFilterConfigs(absl::string_view filter_name) const override {
-      parent_->perFilterConfigs(filter_name);
+      return parent_->perFilterConfigs(filter_name);
     };
     const std::string& routeName() const override { return parent_->routeName(); }
 
