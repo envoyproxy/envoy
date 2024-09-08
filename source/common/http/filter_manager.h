@@ -926,14 +926,14 @@ private:
 
     void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
       manager_.addStreamFilterBase(filter.get());
-      manager_.addStreamDecoderFilter(std::make_unique<ActiveStreamDecoderFilter>(
-          manager_, std::move(filter), false, context_));
+      manager_.addStreamDecoderFilter(
+          std::make_unique<ActiveStreamDecoderFilter>(manager_, std::move(filter), context_));
     }
 
     void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
       manager_.addStreamFilterBase(filter.get());
-      manager_.addStreamEncoderFilter(std::make_unique<ActiveStreamEncoderFilter>(
-          manager_, std::move(filter), false, context_));
+      manager_.addStreamEncoderFilter(
+          std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), context_));
     }
 
     void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
@@ -941,9 +941,9 @@ private:
       manager_.addStreamFilterBase(decoder_filter);
 
       manager_.addStreamDecoderFilter(
-          std::make_unique<ActiveStreamDecoderFilter>(manager_, filter, true, context_));
+          std::make_unique<ActiveStreamDecoderFilter>(manager_, filter, context_));
       manager_.addStreamEncoderFilter(
-          std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), true, context_));
+          std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), context_));
     }
 
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
