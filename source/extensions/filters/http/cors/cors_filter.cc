@@ -53,14 +53,14 @@ CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope
 CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
 void CorsFilter::initializeCorsPolicies() {
-  decoder_callbacks_->traversePerFilterConfig([this](const Router::RouteSpecificFilterConfig& cfg) {
-    const auto* typed_cfg = dynamic_cast<const Router::CorsPolicy*>(&cfg);
+  for (const auto* cfg : decoder_callbacks_->perFilterConfigs()) {
+    const auto* typed_cfg = dynamic_cast<const Router::CorsPolicy*>(cfg);
     if (typed_cfg != nullptr) {
       policies_.push_back(typed_cfg);
     }
-  });
+  }
 
-  // The 'traversePerFilterConfig' will handle cors policy of virtual host first. So, we need
+  // The 'perFilterConfigs' will handle cors policy of virtual host first. So, we need
   // reverse the 'policies_' to make sure the cors policy of route entry to be first item in the
   // 'policies_'.
   if (policies_.size() >= 2) {

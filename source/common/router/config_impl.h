@@ -93,7 +93,7 @@ public:
     bool disabled_{};
   };
 
-  const RouteSpecificFilterConfig* get(const std::string& name) const;
+  const RouteSpecificFilterConfig* get(absl::string_view name) const;
 
   /**
    * @return true if the filter is explicitly disabled for this route or virtual host, false
@@ -148,13 +148,11 @@ public:
   const RouteEntry* routeEntry() const override { return nullptr; }
   const Decorator* decorator() const override { return nullptr; }
   const RouteTracing* tracingConfig() const override { return nullptr; }
-  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override {
+  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;
   }
   absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
-  void traversePerFilterConfig(
-      const std::string&,
-      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override { return {}; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const std::string& routeName() const override { return EMPTY_STRING; }
@@ -290,7 +288,7 @@ public:
     return DefaultRateLimitPolicy::get();
   }
   const CommonConfig& routeConfig() const override;
-  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(const std::string&) const override;
+  const RouteSpecificFilterConfig* mostSpecificPerFilterConfig(absl::string_view) const override;
   bool includeAttemptCountInRequest() const override { return include_attempt_count_in_request_; }
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   bool includeIsTimeoutRetryHeader() const override { return include_is_timeout_retry_header_; }
@@ -309,9 +307,7 @@ public:
   }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
 
-  void traversePerFilterConfig(
-      const std::string& filter_name,
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+  RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
@@ -831,13 +827,11 @@ public:
   const RouteTracing* tracingConfig() const override { return route_tracing_.get(); }
   absl::optional<bool> filterDisabled(absl::string_view config_name) const override;
   const RouteSpecificFilterConfig*
-  mostSpecificPerFilterConfig(const std::string& name) const override {
+  mostSpecificPerFilterConfig(absl::string_view name) const override {
     auto* config = per_filter_configs_->get(name);
     return config ? config : vhost_->mostSpecificPerFilterConfig(name);
   }
-  void traversePerFilterConfig(
-      const std::string& filter_name,
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+  RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override;
   const std::string& routeName() const override { return route_name_; }
 
   // Sanitizes the |path| before passing it to PathMatcher, if configured, this method makes the
@@ -965,13 +959,11 @@ public:
       return parent_->filterDisabled(config_name);
     }
     const RouteSpecificFilterConfig*
-    mostSpecificPerFilterConfig(const std::string& name) const override {
+    mostSpecificPerFilterConfig(absl::string_view name) const override {
       return parent_->mostSpecificPerFilterConfig(name);
     }
-    void traversePerFilterConfig(
-        const std::string& filter_name,
-        std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
-      parent_->traversePerFilterConfig(filter_name, cb);
+    RouteSpecificFilterConfigs perFilterConfigs(absl::string_view filter_name) const override {
+      parent_->perFilterConfigs(filter_name);
     };
     const std::string& routeName() const override { return parent_->routeName(); }
 
@@ -1058,14 +1050,11 @@ public:
       return DynamicRouteEntry::filterDisabled(config_name);
     }
     const RouteSpecificFilterConfig*
-    mostSpecificPerFilterConfig(const std::string& name) const override {
+    mostSpecificPerFilterConfig(absl::string_view name) const override {
       auto* config = per_filter_configs_->get(name);
       return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
     }
-
-    void traversePerFilterConfig(
-        const std::string& filter_name,
-        std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override;
+    RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override;
 
     const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
 
@@ -1613,7 +1602,7 @@ public:
     return HeaderParser::defaultParser();
   }
 
-  const RouteSpecificFilterConfig* perFilterConfig(const std::string& name) const {
+  const RouteSpecificFilterConfig* perFilterConfig(absl::string_view name) const {
     return per_filter_configs_->get(name);
   }
   absl::optional<bool> filterDisabled(absl::string_view config_name) const {

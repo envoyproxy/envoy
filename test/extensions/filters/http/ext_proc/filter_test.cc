@@ -3473,11 +3473,9 @@ TEST_F(HttpFilterTest, MetadataOptionsOverride) {
 
   FilterConfigPerRoute route_config(override_cfg);
 
-  EXPECT_CALL(decoder_callbacks_, traversePerFilterConfig(_))
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillOnce(
-          testing::Invoke([&](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-            cb(route_config);
-          }));
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -3537,11 +3535,9 @@ TEST_F(HttpFilterTest, MetadataOptionsNoOverride) {
 
   FilterConfigPerRoute route_config(override_cfg);
 
-  EXPECT_CALL(decoder_callbacks_, traversePerFilterConfig(_))
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillOnce(
-          testing::Invoke([&](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-            cb(route_config);
-          }));
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -4469,11 +4465,9 @@ TEST_F(HttpFilterTest, GrpcServiceMetadataOverride) {
   *route_proto.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
       makeHeaderValue("c", "c");
   FilterConfigPerRoute route_config(route_proto);
-  EXPECT_CALL(decoder_callbacks_, traversePerFilterConfig(_))
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillOnce(
-          testing::Invoke([&](std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-            cb(route_config);
-          }));
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
 
   // Build expected merged grpc_service configuration.
   {
