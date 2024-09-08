@@ -561,7 +561,7 @@ getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
     const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(config);
     if (typed_cfg == nullptr) {
       ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
-      return;
+      continue;
     }
     all_configs.push_back(typed_cfg);
   }
