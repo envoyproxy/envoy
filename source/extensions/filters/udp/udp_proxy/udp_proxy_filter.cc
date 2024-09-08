@@ -452,7 +452,7 @@ bool UdpProxyFilter::ActiveSession::onNewSession() {
 void UdpProxyFilter::ActiveSession::onData(Network::UdpRecvData& data) {
   const uint64_t rx_buffer_length = data.buffer_->length();
   ENVOY_LOG(trace, "received {} byte datagram from downstream: downstream={} local={} upstream={}",
-            data.buffer_->length(), addresses_.peer_->asStringView(),
+            rx_buffer_length, addresses_.peer_->asStringView(),
             addresses_.local_->asStringView(),
             host_ != nullptr ? host_->address()->asStringView() : "unknown");
 
