@@ -230,7 +230,7 @@ public class JniLibrary {
   protected static native void onDefaultNetworkAvailable(long engine);
 
   /**
-   * A callback into the Envoy Engine when the default network configuration was changed.
+   * A callback into the Envoy Engine when the default network was changed.
    */
   protected static native void onDefaultNetworkChanged(long engine, int networkType);
 
@@ -319,4 +319,9 @@ public class JniLibrary {
    * href="https://c-ares.org/docs/ares_library_init_android.html">ares_library_init_android</a>.
    */
   public static native void initCares(ConnectivityManager connectivityManager);
+
+  /**
+   * Returns true if the runtime feature is enabled.
+   */
+  public static native boolean isRuntimeFeatureEnabled(String featureName);
 }

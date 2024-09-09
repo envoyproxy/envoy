@@ -172,7 +172,7 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
   // method only.
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
 
-  ip_detection_extensions_.push_back(getXFFExtension(0));
+  ip_detection_extensions_.push_back(getXFFExtension(0, false));
 }
 
 HttpConnectionManagerImplMixin::~HttpConnectionManagerImplMixin() {
