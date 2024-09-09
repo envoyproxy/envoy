@@ -274,6 +274,10 @@ new_features:
   change: |
     Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
     the configured duration.
+- area: extension_discovery_service
+  change: |
+    added ECDS support for :ref:`UDP session filters
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>`.
 - area: http3
   change: |
     ``http3_protocol_options`` in ``HttpConnectionManager`` has been upgraded to general access.

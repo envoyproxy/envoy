@@ -176,7 +176,12 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithOpt
     new_session = std::make_unique<UdpActiveSession>(*this, std::move(addresses), host);
   }
 
-  new_session->createFilterChain();
+  if (!new_session->createFilterChain()) {
+    filter_.config_->stats().session_filter_config_missing_.inc();
+    new_session->onSessionComplete();
+    return nullptr;
+  }
+
   if (new_session->onNewSession()) {
     auto new_session_ptr = new_session.get();
     sessions_.emplace(std::move(new_session));
