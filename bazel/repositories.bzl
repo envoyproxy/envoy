@@ -4,7 +4,7 @@ load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":dev_binding.bzl", "envoy_dev_binding")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
 
-PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
+PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
 
 WINDOWS_SKIP_TARGETS = [
     "envoy.extensions.http.cache.file_system_http_cache",

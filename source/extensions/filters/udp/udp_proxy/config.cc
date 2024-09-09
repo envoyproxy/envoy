@@ -8,6 +8,9 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 
+using ConfigTypeCase =
+    envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig::SessionFilter::ConfigTypeCase;
+
 constexpr uint32_t DefaultMaxConnectAttempts = 1;
 constexpr uint32_t DefaultMaxBufferedDatagrams = 1024;
 constexpr uint64_t DefaultMaxBufferedBytes = 16384;
@@ -143,6 +146,16 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
 
   for (const auto& filter : config.session_filters()) {
     ENVOY_LOG(debug, "    UDP session filter #{}", filter_factories_.size());
+
+    if (filter.config_type_case() == ConfigTypeCase::kConfigDiscovery) {
+      ENVOY_LOG(debug, "      dynamic filter name: {}", filter.name());
+      filter_factories_.push_back(
+          udp_session_filter_config_provider_manager_->createDynamicFilterConfigProvider(
+              filter.config_discovery(), filter.name(), context.serverFactoryContext(), context,
+              context.serverFactoryContext().clusterManager(), false, "udp_session", nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "      name: {}", filter.name());
     ENVOY_LOG(debug, "    config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
