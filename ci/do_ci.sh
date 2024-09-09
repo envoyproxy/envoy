@@ -364,14 +364,6 @@ case $CI_TARGET in
         echo "bazel ASAN/UBSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
-        if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
-            echo "Building and testing envoy-filter-example tests..."
-            pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-            bazel_with_collection \
-                test "${BAZEL_BUILD_OPTIONS[@]}" \
-                "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
-            popd
-        fi
         # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
         # due to sandboxing issue. Debug and enable it again.
         # if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
@@ -429,7 +421,6 @@ case $CI_TARGET in
         setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
-        cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
         # Building all the dependencies from scratch to link them against libc++.
         echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
@@ -977,16 +968,6 @@ case $CI_TARGET in
              --build_tests_only \
              --remote_download_minimal \
              "${TEST_TARGETS[@]}"
-        if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
-            echo "Building and testing envoy-filter-example tests..."
-            pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-            bazel_with_collection \
-                test "${BAZEL_BUILD_OPTIONS[@]}" \
-                -c dbg \
-                --config=clang-tsan \
-                "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
-            popd
-        fi
         ;;
 
     verify_distro)
