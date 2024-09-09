@@ -92,7 +92,8 @@ int CertCompression::decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompress
 
   z.next_in = in;
   z.avail_in = in_len;
-  *out = CRYPTO_BUFFER_alloc(&z.next_out, uncompressed_len);
+  bssl::UniquePtr<CRYPTO_BUFFER> decompressed_data(
+      CRYPTO_BUFFER_alloc(&z.next_out, uncompressed_len));
   z.avail_out = uncompressed_len;
 
   rv = inflate(&z, Z_FINISH);
@@ -113,6 +114,7 @@ int CertCompression::decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompress
 
   ENVOY_LOG(trace, "Cert decompression successful");
 
+  *out = decompressed_data.release();
   return SUCCESS;
 }
 
