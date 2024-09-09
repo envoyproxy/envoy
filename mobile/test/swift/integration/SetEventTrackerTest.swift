@@ -24,6 +24,7 @@ final class SetEventTrackerTest: XCTestCase {
       }
       .setEventTracker { event in
         if event["foo"] == "bar" {
+          XCTFail("Test")
           eventExpectation.fulfill()
         }
       }
