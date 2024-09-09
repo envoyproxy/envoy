@@ -1102,6 +1102,7 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
     layer:
       foo: bar
       baz: meh
+      toggle: true
   )EOF");
   EXPECT_CALL(rtds_init_callback_, Call());
   doOnConfigUpdateVerifyNoThrow(runtime);
@@ -1109,10 +1110,11 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
   EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
   EXPECT_EQ("meh", loader_->snapshot().get("baz").value().get());
+  EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get()); // Expecting "true" as string representation
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(4, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 
   runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(

@@ -375,7 +375,8 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
     if (entry.raw_string_value_.empty()) {
-      entry.raw_string_value_ = absl::StrCat(value.bool_value());
+      // Convert boolean value to string representation ("true" or "false")
+      entry.raw_string_value_ = value.bool_value() ? "true" : "false";
     }
     break;
   case ProtobufWkt::Value::kStructValue:
