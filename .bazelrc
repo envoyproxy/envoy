@@ -272,8 +272,7 @@ build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
-# Do not inherit from "clang-asan" to avoid picking up flags from local clang.bazelrc.
-build:rbe-toolchain-asan --config=asan
+build:rbe-toolchain-asan --config=clang-asan
 build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
@@ -537,7 +536,7 @@ build:bes-envoy-engflow --bes_upload_mode=fully_async
 build:rbe-envoy-engflow --config=cache-envoy-engflow
 build:rbe-envoy-engflow --config=bes-envoy-engflow
 build:rbe-envoy-engflow --remote_executor=grpcs://morganite.cluster.engflow.com
-build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:f94a38f62220a2b017878b790b6ea98a0f6c5f9c@sha256:2dd96b6f43c08ccabd5f4747fce5854f5f96af509b32e5cf6493f136e9833649
+build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:7adc40c09508f957624c4d2e0f5aeecb73a59207ee6ded53b107eac828c091b2
 
 #############################################################################
 # debug: Various Bazel debugging flags

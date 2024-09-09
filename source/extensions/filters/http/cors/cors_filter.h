@@ -83,9 +83,7 @@ public:
     encoder_callbacks_ = &callbacks;
   };
 
-  const absl::InlinedVector<const Envoy::Router::CorsPolicy*, 2>& policiesForTest() const {
-    return policies_;
-  }
+  const auto& policiesForTest() const { return policies_; }
 
 private:
   friend class CorsFilterTest;
@@ -104,7 +102,7 @@ private:
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  absl::InlinedVector<const Envoy::Router::CorsPolicy*, 2> policies_;
+  absl::InlinedVector<const Envoy::Router::CorsPolicy*, 4> policies_;
   bool is_cors_request_{};
   std::string latched_origin_;
 

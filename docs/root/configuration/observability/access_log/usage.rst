@@ -818,11 +818,11 @@ UDP
     when NAMESPACE is set to "udp.proxy.session", optional KEYs are as follows:
 
     * ``cluster_name``: Name of the cluster.
-    * ``bytes_sent``: Total number of downstream bytes sent to the upstream in the session.
-    * ``bytes_received``: Total number of downstream bytes received from the upstream in the session.
-    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the upstream in the session.
-    * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in the session.
-    * ``datagrams_received``: Number of datagrams received from the upstream successfully in the session.
+    * ``bytes_sent``: Total number of bytes sent to the downstream in the session.
+    * ``bytes_received``: Total number of bytes received from the downstream in the session.
+    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in the session.
+    * ``datagrams_sent``: Number of datagrams sent to the downstream in the session.
+    * ``datagrams_received``: Number of datagrams received from the downstream in the session.
 
     Recommended session access log format for UDP proxy:
 
@@ -837,12 +837,12 @@ UDP
 
     when NAMESPACE is set to "udp.proxy.proxy", optional KEYs are as follows:
 
-    * ``bytes_sent``: Total number of downstream bytes sent to the upstream in UDP proxy.
-    * ``bytes_received``: Total number of downstream bytes received from the upstream in UDP proxy.
-    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the upstream in UDP proxy.
-    * ``errors_received``: Number of errors that have occurred when receiving datagrams from the upstream in UDP proxy.
-    * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in UDP proxy.
-    * ``datagrams_received``: Number of datagrams received from the upstream successfully in UDP proxy.
+    * ``bytes_sent``: Total number of bytes sent to the downstream in UDP proxy.
+    * ``bytes_received``: Total number of bytes received from the downstream in UDP proxy.
+    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in UDP proxy.
+    * ``errors_received``: Number of errors that have occurred when receiving datagrams from the downstream in UDP proxy.
+    * ``datagrams_sent``: Number of datagrams sent to the downstream in UDP proxy.
+    * ``datagrams_received``: Number of datagrams received from the downstream in UDP proxy.
     * ``no_route``: Number of times that no upstream cluster found in UDP proxy.
     * ``session_total``: Total number of sessions in UDP proxy.
     * ``idle_timeout``: Number of times that sessions idle timeout occurred in UDP proxy.

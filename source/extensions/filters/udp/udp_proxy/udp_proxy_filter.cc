@@ -176,7 +176,12 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithOpt
     new_session = std::make_unique<UdpActiveSession>(*this, std::move(addresses), host);
   }
 
-  new_session->createFilterChain();
+  if (!new_session->createFilterChain()) {
+    filter_.config_->stats().session_filter_config_missing_.inc();
+    new_session->onSessionComplete();
+    return nullptr;
+  }
+
   if (new_session->onNewSession()) {
     auto new_session_ptr = new_session.get();
     sessions_.emplace(std::move(new_session));
@@ -851,8 +856,9 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
                                               Upstream::HostDescriptionConstSharedPtr upstream_host,
                                               StreamInfo::StreamInfo& upstream_info,
                                               absl::optional<Http::Protocol>) {
+  auto upstream_connection_id = upstream_info.downstreamAddressProvider().connectionID().value();
   ENVOY_LOG(debug, "Upstream connection [C{}] ready, creating tunnel stream",
-            upstream_info.downstreamAddressProvider().connectionID().value());
+            upstream_connection_id);
 
   upstream_handle_ = nullptr;
   upstream_host_ = upstream_host;
@@ -863,6 +869,7 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   upstream_->setRequestEncoder(request_encoder, is_ssl);
   upstream_->setTunnelCreationCallbacks(*this);
   downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
+  downstream_info_.upstreamInfo()->setUpstreamConnectionId(upstream_connection_id);
   callbacks_->resetIdleTimer();
 }
 

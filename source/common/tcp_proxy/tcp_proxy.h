@@ -545,6 +545,7 @@ public:
     const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override {
       return nullptr;
     }
+    Router::RouteSpecificFilterConfigs perFilterConfigs() const override { return {}; }
     Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
     void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
     absl::optional<Upstream::LoadBalancerContext::OverrideHost>
@@ -555,8 +556,6 @@ public:
     void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
       tracked_object_stack.add(*this);
     }
-    void traversePerFilterConfig(
-        std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
     Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return {}; }
     OptRef<Http::DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return {}; }
     OptRef<Http::UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {}; }
