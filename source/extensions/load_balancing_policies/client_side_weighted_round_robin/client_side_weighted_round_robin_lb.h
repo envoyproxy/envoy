@@ -46,6 +46,9 @@ public:
           ClientSideWeightedRoundRobin& client_side_weighted_round_robin_config,
       TimeSource& time_source, Event::Dispatcher& main_thread_dispatcher);
 
+private:
+  friend class ClientSideWeightedRoundRobinLoadBalancerFriend;
+
   // {LoadBalancer} Interface implementation.
   void refreshHostSource(const HostsSource& source) override;
 
@@ -106,7 +109,6 @@ public:
       const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
       ClientSideHostLbPolicyData& client_side_data);
 
-private:
   uint64_t peekahead_index_{};
   absl::flat_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
   std::vector<std::string> utilization_from_metric_names_;

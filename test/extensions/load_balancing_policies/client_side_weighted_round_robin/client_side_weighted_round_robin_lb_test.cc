@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/load_balancer.h"
@@ -11,6 +12,62 @@
 
 namespace Envoy {
 namespace Upstream {
+
+// Friend ClientSideWeightedRoundRobinLoadBalancer to provide access to private methods.
+class ClientSideWeightedRoundRobinLoadBalancerFriend {
+public:
+  explicit ClientSideWeightedRoundRobinLoadBalancerFriend(
+      std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb)
+      : lb_(std::move(lb)) {}
+
+  ~ClientSideWeightedRoundRobinLoadBalancerFriend() = default;
+
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) { return lb_->chooseHost(context); }
+
+  HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) {
+    return lb_->peekAnotherHost(context);
+  }
+
+  void updateWeightsOnMainThread() { lb_->updateWeightsOnMainThread(); }
+
+  void updateWeightsOnHosts(const HostVector& hosts) { lb_->updateWeightsOnHosts(hosts); }
+
+  static void addClientSideLbPolicyDataToHosts(const HostVector& hosts) {
+    ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(hosts);
+  }
+
+  static absl::optional<uint32_t>
+  getClientSideWeightIfValidFromHost(const Host& host, const MonotonicTime& min_non_empty_since,
+                                     const MonotonicTime& max_last_update_time) {
+    return ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
+        host, min_non_empty_since, max_last_update_time);
+  }
+
+  static double
+  getUtilizationFromOrcaReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                               const std::vector<std::string>& utilization_from_metric_names) {
+    return ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(
+        orca_load_report, utilization_from_metric_names);
+  }
+
+  static absl::StatusOr<uint32_t>
+  calculateWeightFromOrcaReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                                const std::vector<std::string>& utilization_from_metric_names,
+                                double error_utilization_penalty) {
+    return ClientSideWeightedRoundRobinLoadBalancer::calculateWeightFromOrcaReport(
+        orca_load_report, utilization_from_metric_names, error_utilization_penalty);
+  }
+
+  absl::Status updateClientSideDataFromOrcaLoadReport(
+      const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+      ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData& client_side_data) {
+    return lb_->updateClientSideDataFromOrcaLoadReport(orca_load_report, client_side_data);
+  }
+
+private:
+  std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb_;
+};
+
 namespace {
 
 using testing::Return;
@@ -50,9 +107,10 @@ public:
     client_side_weighted_round_robin_config_.mutable_utilization_from_metric_names()->Add(
         "metric2");
 
-    lb_ = std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
-        priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-        client_side_weighted_round_robin_config_, simTime(), dispatcher_);
+    lb_ = std::make_shared<ClientSideWeightedRoundRobinLoadBalancerFriend>(
+        std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
+            priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
+            client_side_weighted_round_robin_config_, simTime(), dispatcher_));
   }
 
   // Updates priority 0 with the given hosts and hosts_per_locality.
@@ -77,7 +135,7 @@ public:
   envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
       ClientSideWeightedRoundRobin client_side_weighted_round_robin_config_;
   std::shared_ptr<PrioritySetImpl> local_priority_set_;
-  std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb_;
+  std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancerFriend> lb_;
   HostsPerLocalityConstSharedPtr empty_locality_;
   HostVector empty_host_vector_;
 
@@ -553,9 +611,10 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, WeightedInitializationPicks
   // Initiate 10 load-balancers with different random values.
   for (int i = 0; i < 10; ++i) {
     EXPECT_CALL(random_, random()).Times(2).WillRepeatedly(Return(i));
-    ClientSideWeightedRoundRobinLoadBalancer lb(
-        priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-        client_side_weighted_round_robin_config_, simTime(), dispatcher_);
+    ClientSideWeightedRoundRobinLoadBalancerFriend lb(
+        std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
+            priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
+            client_side_weighted_round_robin_config_, simTime(), dispatcher_));
     const auto& host = lb.chooseHost(nullptr);
     host_picked_count_map[host]++;
   }
@@ -1795,7 +1854,7 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew,
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
      getClientSideWeightIfValidFromHost_NoClientSideData) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
+  EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host, MonotonicTime::min(), MonotonicTime::max()));
 }
 
@@ -1807,7 +1866,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getClientSideWeightIfValidFro
           /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
   host.lb_policy_data_ = client_side_data;
   // Non empty since is too recent (5 > 2).
-  EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
+  EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
       /*min_non_empty_since=*/MonotonicTime(std::chrono::seconds(2)),
       /*max_last_update_time=*/MonotonicTime(std::chrono::seconds(8))));
@@ -1824,7 +1883,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getClientSideWeightIfValidFro
           /*last_update_time=*/MonotonicTime(std::chrono::seconds(7)));
   host.lb_policy_data_ = client_side_data;
   // Last update time is too stale (7 < 8).
-  EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
+  EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
       /*min_non_empty_since=*/MonotonicTime(std::chrono::seconds(2)),
       /*max_last_update_time=*/MonotonicTime(std::chrono::seconds(8))));
@@ -1844,7 +1903,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getClientSideWeightIfValidFro
   host.lb_policy_data_ = client_side_data;
   // Not empty since is not too recent (1 < 2) and last update time is not too
   // old (10 > 8).
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
                 host,
                 /*min_non_empty_since=*/MonotonicTime(std::chrono::seconds(2)),
                 /*max_last_update_time=*/MonotonicTime(std::chrono::seconds(8)))
@@ -1861,8 +1920,8 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
   orca_load_report.set_application_utilization(0.5);
   orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(orca_load_report,
-                                                                                   {"foo"}),
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"foo"}),
             0.5);
 }
 
@@ -1870,8 +1929,8 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getUtilizationFromOrcaReport_
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(orca_load_report,
-                                                                                   {"foo"}),
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"foo"}),
             0.3);
 }
 
@@ -1879,21 +1938,21 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getUtilizationFromOrcaReport_
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.mutable_named_metrics()->insert({"bar", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(orca_load_report,
-                                                                                   {"foo"}),
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"foo"}),
             0.6);
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getUtilizationFromOrcaReport_noUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(orca_load_report,
-                                                                                   {"foo"}),
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
+                orca_load_report, {"foo"}),
             0);
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport_noQps) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::calculateWeightFromOrcaReport(
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
                 orca_load_report, {"foo"}, 0.0)
                 .status(),
             absl::InvalidArgumentError("QPS must be positive"));
@@ -1902,7 +1961,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport_noUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_rps_fractional(1000);
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::calculateWeightFromOrcaReport(
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
                 orca_load_report, {"foo"}, 0.0)
                 .status(),
             absl::InvalidArgumentError("Utilization must be positive"));
@@ -1913,7 +1972,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.set_application_utilization(0.5);
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::calculateWeightFromOrcaReport(
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
                 orca_load_report, {"foo"}, 0.0)
                 .value(),
             2000);
@@ -1924,7 +1983,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport
   // High QPS and low utilization.
   orca_load_report.set_rps_fractional(10000000000000L);
   orca_load_report.set_application_utilization(0.0000001);
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::calculateWeightFromOrcaReport(
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
                 orca_load_report, {"foo"}, 0.0)
                 .value(),
             /*std::numeric_limits<uint32_t>::max() = */ 4294967295);
@@ -1936,7 +1995,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.set_eps(100);
   orca_load_report.set_application_utilization(0.5);
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::calculateWeightFromOrcaReport(
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
                 orca_load_report, {"foo"}, 0.0)
                 .value(),
             2000);
@@ -1948,7 +2007,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.set_eps(100);
   orca_load_report.set_application_utilization(0.5);
-  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancer::calculateWeightFromOrcaReport(
+  EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
                 orca_load_report, {"foo"}, 2.0)
                 .value(),
             1428);

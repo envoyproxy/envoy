@@ -133,8 +133,7 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::onOrcaLoadReport(
   if (client_side_data == nullptr) {
     return absl::NotFoundError("Host does not have ClientSideLbPolicyData");
   }
-  auto status = updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data);
-  return status;
+  return updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data);
 }
 
 void ClientSideWeightedRoundRobinLoadBalancer::initFromConfig(

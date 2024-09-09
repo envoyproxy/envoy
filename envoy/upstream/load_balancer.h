@@ -110,7 +110,12 @@ public:
   class OrcaLoadReportCallbacks {
   public:
     virtual ~OrcaLoadReportCallbacks() = default;
-    // Invoked when a new orca report is received for this LB context.
+    /**
+     * Invoked when a new orca report is received for this LB context.
+     * @param orca_load_report supplies the ORCA load report.
+     * @param host supplies the upstream host, which provided the load report.
+     * @return absl::Status the result of ORCA load report processing by the load balancer.
+     */
     virtual absl::Status
     onOrcaLoadReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
                      const HostDescription& host) PURE;
