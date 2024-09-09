@@ -12,6 +12,7 @@ final class SetEventTrackerTest: XCTestCase {
   }
 
   override static func tearDown() {
+    super.tearDown()
     fflush(stdout)
   }
 
