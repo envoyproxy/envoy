@@ -1200,7 +1200,7 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
   UnitFloat dropOverload() const override { return drop_overload_; }
-  const std::string dropCategory() const override { return drop_category_; }
+  const std::string& dropCategory() const override { return drop_category_; }
   void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
   void setDropCategory(const std::string& drop_category) override {
     drop_category_ = drop_category;

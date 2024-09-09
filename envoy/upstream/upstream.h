@@ -1318,7 +1318,7 @@ public:
   /**
    * @return the cluster drop_category_ configuration.
    */
-  virtual const std::string dropCategory() const PURE;
+  virtual const std::string& dropCategory() const PURE;
 
   /**
    * Set up the drop_overload value for the cluster.

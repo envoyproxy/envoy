@@ -151,7 +151,8 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
               hostname_for_healthcheck, "tcp://1.2.3.5:90", 5, 6);
   // Adding drop_overload config.
   ON_CALL(cluster, dropOverload()).WillByDefault(Return(UnitFloat(0.00035)));
-  ON_CALL(cluster, dropCategory()).WillByDefault(Return("drop_overload"));
+  const std::string drop_overload = "drop_overload";
+  ON_CALL(cluster, dropCategory()).WillByDefault(ReturnRef(drop_overload));
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));

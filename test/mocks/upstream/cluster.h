@@ -26,7 +26,7 @@ public:
   MOCK_METHOD(PrioritySet&, prioritySet, ());
   MOCK_METHOD(const PrioritySet&, prioritySet, (), (const));
   MOCK_METHOD(UnitFloat, dropOverload, (), (const));
-  MOCK_METHOD(const std::string, dropCategory, (), (const));
+  MOCK_METHOD(const std::string&, dropCategory, (), (const));
   MOCK_METHOD(void, setDropOverload, (UnitFloat));
   MOCK_METHOD(void, setDropCategory, (const std::string&));
 

@@ -160,7 +160,7 @@ public:
   /**
    * @return the thread local cluster drop_category configuration.
    */
-  virtual const std::string dropCategory() const PURE;
+  virtual const std::string& dropCategory() const PURE;
 
   /**
    * Set up the drop_overload value for the thread local cluster.
