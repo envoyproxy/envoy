@@ -20,7 +20,7 @@ final class SetEventTrackerTest: XCTestCase {
     let engine = EngineBuilder()
       .setLogLevel(.debug)
       .setLogger { _, msg in
-          NSLog(msg)
+          print(msg, delimiter="")
       }
       .setEventTracker { event in
         if event["foo"] == "bar" {
