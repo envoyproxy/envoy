@@ -18,8 +18,7 @@ namespace {
 TEST(LinuxCpuStatsReader, ReadsCpuStats) {
   const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats");
   AtomicFileUpdater file_updater(temp_path);
-  const std::string contents = R"EOF(
-cpu  14987204 4857 3003536 11594988 53631 0 759314 2463 0 0
+  const std::string contents = R"EOF(cpu  14987204 4857 3003536 11594988 53631 0 759314 2463 0 0
 cpu0 1907532 599 369969 1398344 5970 0 121763 18 0 0
 cpu1 1883161 620 375962 1448133 5963 0 85914 10 0 0
 cpu2 1877318 610 376223 1458160 5713 0 81227 10 0 0
@@ -57,8 +56,7 @@ TEST(LinuxCpuStatsReader, CannotReadFile) {
 TEST(LinuxCpuStatsReader, UnexpectedFormatCpuLine) {
   const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_unexpected_format");
   AtomicFileUpdater file_updater(temp_path);
-  const std::string contents = R"EOF(
-cpu0 1907532 599 369969 1398344 5970 0 121763 18 0 0
+  const std::string contents = R"EOF(cpu0 1907532 599 369969 1398344 5970 0 121763 18 0 0
 cpu1 1883161 620 375962 1448133 5963 0 85914 10 0 0
 cpu  14987204 4857 3003536 11594988 53631 0 759314 2463 0 0
 )EOF";
@@ -74,8 +72,7 @@ cpu  14987204 4857 3003536 11594988 53631 0 759314 2463 0 0
 TEST(LinuxCpuStatsReader, UnexpectedFormatMissingTokens) {
   const std::string temp_path = TestEnvironment::temporaryPath("cpu_stats_unexpected_format");
   AtomicFileUpdater file_updater(temp_path);
-  const std::string contents = R"EOF(
-cpu  14987204 4857 3003536
+  const std::string contents = R"EOF(cpu  14987204 4857 3003536
 cpu0 1907532 599 369969 1398344 5970 0 121763 18 0 0
 cpu1 1883161 620 375962 1448133 5963 0 85914 10 0 0
 )EOF";

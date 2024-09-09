@@ -23,10 +23,10 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
   }
 
   // The first 5 bytes should be 'cpu ' without a cpu index.
-  std::vector<char> buffer(5);
+  std::string buffer(5, '\0');
   cpu_stats_file.read(buffer.data(), 5);
   const std::string target = "cpu  ";
-  if (!cpu_stats_file || !std::equal(buffer.begin(), buffer.end(), target.begin())) {
+  if (!cpu_stats_file || !std::equal(buffer.begin(), buffer.end(), target.begin(), target.end())) {
     ENVOY_LOG_MISC(error, "Unexpected format in linux cpu stats file {}", cpu_stats_filename_);
     return {false, 0, 0};
   }
