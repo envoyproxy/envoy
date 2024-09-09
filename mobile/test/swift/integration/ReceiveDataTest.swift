@@ -11,6 +11,13 @@ final class ReceiveDataTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testReceiveData() {
     let directResponseBody = "response_body"
     EnvoyTestServer.startHttp1PlaintextServer()

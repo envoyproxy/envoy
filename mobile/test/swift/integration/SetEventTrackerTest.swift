@@ -13,6 +13,7 @@ final class SetEventTrackerTest: XCTestCase {
 
   override static func tearDown() {
     super.tearDown()
+    // Flush the stdout and stderror to show the print output.
     fflush(stdout)
     fflush(stderr)
   }
@@ -30,7 +31,6 @@ final class SetEventTrackerTest: XCTestCase {
       }
       .setEventTracker { event in
         if event["foo"] == "bar" {
-          XCTFail("Test")
           eventExpectation.fulfill()
         }
       }
