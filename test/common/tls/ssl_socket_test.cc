@@ -1551,6 +1551,38 @@ TEST_P(SslSocketTest, NoCert) {
                .setExpectNoCertChain());
 }
 
+TEST_P(SslSocketTest, NoLocalCert) {
+  ContextManagerImpl manager(factory_context_.serverFactoryContext());
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version_));
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
+  auto client_cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Stats::TestUtil::TestStore client_stats_store;
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                                   *client_stats_store.rootScope());
+  Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+  Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+
+  EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->uriSanLocalCertificate());
+  EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->dnsSansLocalCertificate());
+  EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->ipSansLocalCertificate());
+  EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->oidsLocalCertificate());
+  EXPECT_EQ(EMPTY_STRING, client_connection->ssl()->subjectLocalCertificate());
+
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+}
+
 // Prefer ECDSA certificate when multiple RSA certificates are present and the
 // client is RSA/ECDSA capable. We validate TLSv1.2 only here, since we validate
 // the e2e behavior on TLSv1.2/1.3 in ssl_integration_test.
