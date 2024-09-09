@@ -551,19 +551,19 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const Http::StreamFilterCal
  * and their lifetime is the same as the matched route.
  */
 template <class ConfigType>
-absl::InlinedVector<const ConfigType*, 3>
+absl::InlinedVector<const ConfigType*, 4>
 getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
   ASSERT(callbacks != nullptr);
 
-  absl::InlinedVector<const ConfigType*, 3> all_configs;
+  absl::InlinedVector<const ConfigType*, 4> all_configs;
 
   for (const auto* config : callbacks->perFilterConfigs()) {
-    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(config);
-    if (typed_cfg == nullptr) {
+    const ConfigType* typed_config = dynamic_cast<const ConfigType*>(config);
+    if (typed_config == nullptr) {
       ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
       continue;
     }
-    all_configs.push_back(typed_cfg);
+    all_configs.push_back(typed_config);
   }
 
   return all_configs;
