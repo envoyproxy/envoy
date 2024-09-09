@@ -276,12 +276,13 @@ TEST_F(FilterTest, OverrideAuthorizationHeaderProvided) {
   UserMap users;
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
 
-  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(std::move(users), "x-username", "x-authorization-override", "stats",
-                                           *stats_.rootScope());
+  FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
+      std::move(users), "x-username", "x-authorization-override", "stats", *stats_.rootScope());
   std::shared_ptr<BasicAuthFilter> filter = std::make_shared<BasicAuthFilter>(config);
   filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
-  Http::TestRequestHeaderMapImpl request_headers_user1{{"x-authorization-override", "Basic dXNlcjE6dGVzdDE="}};
+  Http::TestRequestHeaderMapImpl request_headers_user1{
+      {"x-authorization-override", "Basic dXNlcjE6dGVzdDE="}};
   request_headers_user1.setScheme("http");
   request_headers_user1.setHost("host");
   request_headers_user1.setPath("/");

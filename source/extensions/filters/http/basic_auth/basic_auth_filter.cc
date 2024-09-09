@@ -2,11 +2,11 @@
 
 #include <openssl/sha.h>
 
+#include "envoy/http/header_map.h"
 #include "source/common/common/base64.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "envoy/http/header_map.h"
 
 namespace Envoy {
 namespace Extensions {
