@@ -1410,8 +1410,7 @@ inline uint32_t EncodingContext::encodeCompact(const T& arg, Buffer::Instance& d
 /**
  * Uuid is not encoded in compact fashion, so we just delegate to normal implementation.
  */
-template <>
-inline uint32_t EncodingContext::encodeCompact(const Uuid& arg, Buffer::Instance& dst) {
+template <> inline uint32_t EncodingContext::encodeCompact(const Uuid& arg, Buffer::Instance& dst) {
   return encode(arg, dst);
 }
 

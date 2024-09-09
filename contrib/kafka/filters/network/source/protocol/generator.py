@@ -93,6 +93,7 @@ class MessageContext:
     """
     State kept during processing only one (request/response) message.
     """
+
     def __init__(self, message, versions, common_structs_el):
         # Name of parent message type that's being processed right now.
         self.message = message
@@ -190,14 +191,12 @@ class StatefulProcessor:
         self.context = MessageContext(spec.get('name'), versions, spec.get('commonStructs'))
 
         # Parse the type itself.
-        complex_type = self.parse_complex_type(
-            self.context.message, spec, versions)
+        complex_type = self.parse_complex_type(self.context.message, spec, versions)
         complex_type.register_flexible_versions(flexible_versions)
 
         # Request / response types need to carry api key version.
         result = complex_type.with_extra('api_key', spec['apiKey'])
         return result
-
 
     def parse_complex_type(self, type_name, field_spec, versions):
         """
@@ -226,7 +225,7 @@ class StatefulProcessor:
 
         # Some structures share the same name, use request/response as prefix.
         if cpp_name in ['EntityData', 'EntryData', 'PartitionData', 'PartitionSnapshot',
-                            'SnapshotId', 'TopicData', 'TopicPartitions', 'TopicSnapshot']:
+                        'SnapshotId', 'TopicData', 'TopicPartitions', 'TopicSnapshot']:
             cpp_name = self.type.capitalize() + type_name
 
         # Some of the types repeat multiple times (e.g. AlterableConfig).
@@ -241,7 +240,6 @@ class StatefulProcessor:
             self.known_types.add(cpp_name)
 
         return Complex(type_name, cpp_name, fields, versions)
-
 
     def parse_field(self, field_spec, highest_possible_version):
         """
@@ -276,7 +274,6 @@ class StatefulProcessor:
                 versions = Statics.parse_version_string(
                     field_spec['versions'], highest_possible_version)
                 return self.parse_complex_type(type_name, field_spec, versions)
-
 
     def parse_and_register_common_struct(self, common_struct):
         """
