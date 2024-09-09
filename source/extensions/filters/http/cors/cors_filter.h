@@ -83,9 +83,7 @@ public:
     encoder_callbacks_ = &callbacks;
   };
 
-  const absl::InlinedVector<const Envoy::Router::CorsPolicy*, 2>& policiesForTest() const {
-    return policies_;
-  }
+  const auto& policiesForTest() const { return policies_; }
 
 private:
   friend class CorsFilterTest;
