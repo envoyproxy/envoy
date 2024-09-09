@@ -45,10 +45,12 @@ using UserMap = absl::flat_hash_map<std::string, User>;
 class FilterConfig {
 public:
   FilterConfig(UserMap&& users, const std::string& forward_username_header,
+               const std::string& override_authorization_header,
                const std::string& stats_prefix, Stats::Scope& scope);
   const BasicAuthStats& stats() const { return stats_; }
   const std::string& forwardUsernameHeader() const { return forward_username_header_; }
   const UserMap& users() const { return users_; }
+  const std::string& overrideAuthorizationHeader() const { return override_authorization_header_; }
 
 private:
   static BasicAuthStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -57,6 +59,7 @@ private:
 
   const UserMap users_;
   const std::string forward_username_header_;
+  const std::string override_authorization_header_;
   BasicAuthStats stats_;
 };
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
