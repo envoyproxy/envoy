@@ -11,33 +11,27 @@ namespace Envoy {
 namespace Json {
 namespace {
 
-template <typename T> class UnderlyingType {
+class BufferOutputWrapper {
 public:
-  using Type = Buffer::OwnedImpl;
+  using Type = BufferOutput;
+  std::string toString() { return underlying_buffer_.toString(); }
+  Buffer::OwnedImpl underlying_buffer_;
 };
-template <> class UnderlyingType<StringOutput> {
+
+class StringOutputWrapper {
 public:
-  using Type = std::string;
-};
-template <class T> class BufferWrapper {
-public:
-  std::string toString() {
-    if constexpr (std::is_same_v<T, StringOutput>) {
-      return underlying_buffer_;
-    } else {
-      return underlying_buffer_.toString();
-    }
-  }
-  typename UnderlyingType<T>::Type underlying_buffer_;
+  using Type = StringOutput;
+  std::string toString() { return underlying_buffer_; }
+  std::string underlying_buffer_;
 };
 
 template <typename T> class JsonStreamerTest : public testing::Test {
 public:
-  BufferWrapper<T> buffer_;
-  Json::StreamerBase<T> streamer_{this->buffer_.underlying_buffer_};
+  T buffer_;
+  Json::StreamerBase<typename T::Type> streamer_{this->buffer_.underlying_buffer_};
 };
 
-using OutputBufferTypes = ::testing::Types<StringOutput, BufferOutput>;
+using OutputBufferTypes = ::testing::Types<BufferOutputWrapper, StringOutputWrapper>;
 TYPED_TEST_SUITE(JsonStreamerTest, OutputBufferTypes);
 
 TYPED_TEST(JsonStreamerTest, Empty) { EXPECT_EQ("", this->buffer_.toString()); }
