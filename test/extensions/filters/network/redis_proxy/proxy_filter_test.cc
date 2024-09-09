@@ -1203,7 +1203,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthWithPipelining
                   Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
                   reply->type(Common::Redis::RespType::SimpleString);
                   reply->asString() = "OK";
-                  EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _)).Times(1);
+                  EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
                   EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
 
                   // PING expectation, will be processed after AUTH.
@@ -1219,7 +1219,7 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthWithPipelining
                             Common::Redis::RespValuePtr reply_ping(new Common::Redis::RespValue());
                             reply_ping->type(Common::Redis::RespType::SimpleString);
                             reply_ping->asString() = "PONG";
-                            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply_ping)), _)).Times(1);
+                            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply_ping)), _));
                             EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
 
                             callbacks.onResponse(std::move(reply_ping));
