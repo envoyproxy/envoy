@@ -28,8 +28,8 @@ def generate_compilation_database(args):
     ] + source_dir_targets)
 
     execroot = subprocess.check_output(
-        ["bazel", *bazel_startup_options, "info", *bazel_options, "execution_root",
-         *bazel_options]).decode().strip()
+        ["bazel", *bazel_startup_options, "info", *bazel_options,
+         "execution_root"]).decode().strip()
 
     db_entries = []
     for db in Path(execroot).glob('**/*.compile_commands.json'):

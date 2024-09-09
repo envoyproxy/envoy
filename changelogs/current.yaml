@@ -89,6 +89,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: upstream
+  change: |
+    Use previously calculated healthcheck when endpoints move priority levels repeatedly.
 - area: dispatcher
   change: |
     Update approximate now after polling instead of before polling. This is only used by QUIC.
@@ -271,6 +274,10 @@ new_features:
   change: |
     Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
     the configured duration.
+- area: extension_discovery_service
+  change: |
+    added ECDS support for :ref:`UDP session filters
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>`.
 - area: http3
   change: |
     ``http3_protocol_options`` in ``HttpConnectionManager`` has been upgraded to general access.
@@ -289,9 +296,16 @@ new_features:
 - area: geoip
   change: |
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
+- area: access_logs
+  change: |
+    Added support for %UPSTREAM_CONNECTION_ID% access log substitution string in TCP and UDP tunneling flows.
 - area: redis_proxy
   change: |
     Added :ref:`external_auth_provider <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
     external authentication for redis proxy.
+- area: original_ip_detection extension
+  change: |
+    The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
+    original IP detection method now supports using a list of trusted CIDRs when parsing ``x-forwarded-for``.
 
 deprecated:
