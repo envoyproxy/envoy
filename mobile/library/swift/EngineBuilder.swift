@@ -529,7 +529,7 @@ open class EngineBuilder: NSObject {
                                         if let log = self.logger {
                                           if let lvl = LogLevel(rawValue: level) {
                                             log(lvl, message)
-                                            print(msg, terminator: "")
+                                            print(message, terminator: "")
                                           }
                                         }
                                       },
