@@ -21,12 +21,12 @@ using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::service::ext_proc::v3::BodyResponse;
 using envoy::service::ext_proc::v3::CommonResponse;
 using envoy::service::ext_proc::v3::HeadersResponse;
-using envoy::service::ext_proc::v3::TrailersResponse;
 using envoy::service::ext_proc::v3::HttpBody;
 using envoy::service::ext_proc::v3::HttpHeaders;
 using envoy::service::ext_proc::v3::HttpTrailers;
 using envoy::service::ext_proc::v3::ProcessingRequest;
 using envoy::service::ext_proc::v3::ProcessingResponse;
+using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::HasHeader;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
@@ -99,7 +99,8 @@ public:
         }
       }
 
-      auto* http_uri = proto_config_.mutable_http_service()->mutable_http_service()->mutable_http_uri();
+      auto* http_uri =
+          proto_config_.mutable_http_service()->mutable_http_service()->mutable_http_uri();
       http_uri->set_uri("ext_proc_server_0:9000");
       http_uri->set_cluster("ext_proc_server_0");
       http_uri->mutable_timeout()->set_nanos(config_option.timeout);
@@ -165,11 +166,9 @@ public:
 
   void sendHttpResponse(ProcessingResponse& response) {
     // Sending 200 response with the ProcessingResponse JSON encoded in the body.
-    std::string response_str =
-        MessageUtil::getJsonStringFromMessageOrError(response, true, true);
+    std::string response_str = MessageUtil::getJsonStringFromMessageOrError(response, true, true);
     processor_stream_->encodeHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                        {"content-type", "application/json"}},
+        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
         false);
     processor_stream_->encodeData(response_str, true);
   }
@@ -221,9 +220,9 @@ public:
     }
   }
 
-  void
-  processRequestBodyMessage(FakeUpstream* side_stream,
-                            absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
+  void processRequestBodyMessage(
+      FakeUpstream* side_stream,
+      absl::optional<std::function<bool(const HttpBody&, BodyResponse&)>> cb) {
     getAndCheckHttpRequest(side_stream);
 
     std::string body = processor_stream_->body().toString();
@@ -497,9 +496,11 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeadersInBothDirection) {
   processRequestHeadersMessage(
       http_side_upstreams_[0], false,
       [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
-        Http::TestRequestHeaderMapImpl expected_request_headers{
-          {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
-          {":path", "/"}, {"x-forwarded-proto", "http"}};
+        Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
+                                                                {":method", "GET"},
+                                                                {"host", "host"},
+                                                                {":path", "/"},
+                                                                {"x-forwarded-proto", "http"}};
         EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
@@ -530,24 +531,23 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyInBothDirection) {
   auto response = sendDownstreamRequestWithBodyAndTrailer("foo");
 
   processRequestHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
-  processRequestBodyMessage(http_side_upstreams_[0],
-                            [](const HttpBody& body, BodyResponse& body_resp) {
-                              EXPECT_EQ(body.body(), "foo");
-                              auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-                              body_mut->set_body("bar");
-                              return true;
-                            });
+  processRequestBodyMessage(
+      http_side_upstreams_[0], [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_EQ(body.body(), "foo");
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("bar");
+        return true;
+      });
 
   handleUpstreamRequestWithTrailer();
   EXPECT_EQ(upstream_request_->body().toString(), "bar");
   processResponseHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
 
-  processResponseBodyMessage(http_side_upstreams_[0],
-                             [](const HttpBody&, BodyResponse& body_resp) {
-                               auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-                               body_mut->set_body("Hello, World!");
-                               return true;
-                             });
+  processResponseBodyMessage(http_side_upstreams_[0], [](const HttpBody&, BodyResponse& body_resp) {
+    auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+    body_mut->set_body("Hello, World!");
+    return true;
+  });
   verifyDownstreamResponse(*response, 200);
   EXPECT_EQ(response->body(), "Hello, World!");
 }
@@ -577,7 +577,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyTrailerInBothDirection) {
       http_side_upstreams_[0], [](const HttpTrailers& trailers, TrailersResponse& trailer_resp) {
         Http::TestResponseTrailerMapImpl expected_trailers{{"x-trailer-foo", "yes"}};
         EXPECT_THAT(trailers.trailers(), HeaderProtosEqual(expected_trailers));
-        auto*  trailer_mut = trailer_resp.mutable_header_mutation();
+        auto* trailer_mut = trailer_resp.mutable_header_mutation();
         trailer_mut->add_remove_headers("x-trailer-foo");
         auto* headers = trailer_mut->add_set_headers();
         headers->mutable_header()->set_key("x-trailer-new");
@@ -587,7 +587,8 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyTrailerInBothDirection) {
 
   handleUpstreamRequestWithTrailer();
   EXPECT_EQ(upstream_request_->body().toString(), "foo");
-  EXPECT_THAT(*upstream_request_->trailers(), SingleHeaderValueIs("x-trailer-new", "x-trailer-new-value"));
+  EXPECT_THAT(*upstream_request_->trailers(),
+              SingleHeaderValueIs("x-trailer-new", "x-trailer-new-value"));
   EXPECT_THAT(*upstream_request_->trailers(), HasNoHeader("x-trailer-foo"));
 
   processResponseHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
