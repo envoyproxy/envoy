@@ -521,7 +521,7 @@ build:bes-envoy-engflow --bes_upload_mode=fully_async
 build:rbe-envoy-engflow --config=cache-envoy-engflow
 build:rbe-envoy-engflow --config=bes-envoy-engflow
 build:rbe-envoy-engflow --remote_executor=grpcs://morganite.cluster.engflow.com
-build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://docker.io/envoyproxy/envoy-build-ubuntu:0ca52447572ee105a4730da5e76fe47c9c5a7c64@sha256:d736c58f06f36848e7966752cc7e01519cc1b5101a178d5c6634807e8ac3deab
+build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:0434d2f6a65895a00f8936fba83b7ff14d21e149dc15c9ac25a31a6fa018234f
 
 #############################################################################
 # debug: Various Bazel debugging flags
