@@ -75,6 +75,7 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_receive_ecn);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
+RUNTIME_GUARD(envoy_reloadable_features_quic_support_certificate_compression);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
 RUNTIME_GUARD(envoy_reloadable_features_reject_invalid_yaml);

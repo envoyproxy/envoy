@@ -4,14 +4,12 @@
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
 
+#include "source/common/quic/cert_compression.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/context_config_impl.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
-
-#define ZLIB_CONST
-#include "zlib.h"
 
 namespace Envoy {
 namespace Quic {
@@ -90,50 +88,7 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted),
         std::make_unique<quic::QuicClientSessionCache>());
 
-    auto ret = SSL_CTX_add_cert_compression_alg(
-        tls_config.crypto_config_->ssl_ctx(), TLSEXT_cert_compression_zlib,
-        nullptr /* compress func */,
-        [](SSL*, CRYPTO_BUFFER** out, size_t uncompressed_len, const uint8_t* in,
-           size_t in_len) -> int {
-          constexpr int success = 1;
-          constexpr int failure = 0;
-
-          class ScopedCompressor {
-          public:
-            ScopedCompressor(z_stream* z) : z_(z) { ASSERT(z != nullptr); }
-            ~ScopedCompressor() { deflateEnd(z_); }
-
-          private:
-            z_stream* z_;
-          };
-
-          z_stream z = {};
-          int rv = inflateInit(&z);
-          if (rv != Z_OK) {
-            ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
-                               "Cert decompression failure in inflateInit: {}", rv);
-            return failure;
-          }
-
-          ScopedCompressor deleter(&z);
-
-          z.next_in = in;
-          z.avail_in = in_len;
-          *out = CRYPTO_BUFFER_alloc(&z.next_out, uncompressed_len);
-          z.avail_out = uncompressed_len;
-
-          rv = inflate(&z, Z_FINISH);
-          if (rv != Z_STREAM_END || z.total_out != uncompressed_len) {
-            ENVOY_LOG_PERIODIC(
-                error, std::chrono::seconds(10),
-                "Cert decompression failure in inflate: {}, z.total_out {}, uncompressed_len {}",
-                rv, z.total_out, uncompressed_len);
-            return failure;
-          }
-
-          return success;
-        });
-    ASSERT(ret == 1);
+    CertCompression::registerSslContext(tls_config.crypto_config_->ssl_ctx());
   }
   // Return the latest crypto config.
   return tls_config.crypto_config_;
