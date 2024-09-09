@@ -119,10 +119,12 @@ export BAZEL_STARTUP_OPTION_LIST
 export BAZEL_BUILD_OPTION_LIST
 export BAZEL_GLOBAL_OPTION_LIST
 
-if [[ -e "${LLVM_ROOT}" ]]; then
-    "${CURRENT_SCRIPT_DIR}/../bazel/setup_clang.sh" "${LLVM_ROOT}"
-else
-    echo "LLVM_ROOT not found, not setting up llvm."
+if [[ -z "${ENVOY_RBE}" ]]; then
+    if [[ -e "${LLVM_ROOT}" ]]; then
+        "${CURRENT_SCRIPT_DIR}/../bazel/setup_clang.sh" "${LLVM_ROOT}"
+    else
+        echo "LLVM_ROOT not found, not setting up llvm."
+    fi
 fi
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge

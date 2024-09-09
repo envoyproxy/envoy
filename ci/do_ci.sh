@@ -351,9 +351,14 @@ case $CI_TARGET in
 
     asan)
         setup_clang_toolchain
+        if [[ -n "$ENVOY_RBE" ]]; then
+            ASAN_CONFIG="--config=rbe-toolchain-asan"
+        else
+            ASAN_CONFIG="--config=clang-asan"
+        fi
         BAZEL_BUILD_OPTIONS+=(
             -c dbg
-            "--config=clang-asan"
+            "${ASAN_CONFIG}"
             "--build_tests_only"
             "--remote_download_minimal")
         echo "bazel ASAN/UBSAN debug build with tests"
