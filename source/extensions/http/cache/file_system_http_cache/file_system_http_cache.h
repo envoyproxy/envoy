@@ -137,9 +137,9 @@ public:
    *     if varied_key was added.
    */
   ABSL_MUST_USE_RESULT std::shared_ptr<Cleanup>
-  setCacheEntryToVary(const Key& key, const Http::ResponseHeaderMap& response_headers,
-                      const Key& varied_key, std::shared_ptr<Cleanup> cleanup)
-      ABSL_LOCKS_EXCLUDED(cache_mu_);
+  setCacheEntryToVary(Event::Dispatcher& dispatcher, const Key& key,
+                      const Http::ResponseHeaderMap& response_headers, const Key& varied_key,
+                      std::shared_ptr<Cleanup> cleanup) ABSL_LOCKS_EXCLUDED(cache_mu_);
 
   /**
    * Returns the extension name.
@@ -196,7 +196,8 @@ private:
    *     be extracted.
    * @param cleanup the cleanup operation to be performed when the write completes.
    */
-  void writeVaryNodeToDisk(const Key& key, const Http::ResponseHeaderMap& response_headers,
+  void writeVaryNodeToDisk(Event::Dispatcher& dispatcher, const Key& key,
+                           const Http::ResponseHeaderMap& response_headers,
                            std::shared_ptr<Cleanup> cleanup);
 
   // A shared_ptr to keep the cache singleton alive as long as any of its caches are in use.
