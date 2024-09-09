@@ -28,11 +28,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // The External Processing filter allows an external service to act on HTTP traffic in a flexible way.
 
-// **Current Implementation Status:**
-// All options and processing modes are implemented except for the following:
-//
-// * "async mode" is not implemented.
-
 // The filter communicates with an external gRPC service called an "external processor"
 // that can do a variety of things with the request and response:
 //

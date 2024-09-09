@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/regex.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
@@ -388,6 +389,26 @@ struct GetLastAddressFromXffInfo {
   // Whether this address can be used to determine if it's an internal request.
   bool allow_trusted_address_checks_;
 };
+
+/**
+ * Checks if the remote address is contained by one of the trusted proxy CIDRs.
+ * @param remote the remote address
+ * @param trusted_cidrs the list of CIDRs which are considered trusted proxies
+ * @return whether the remote address is a trusted proxy
+ */
+bool remoteAddressIsTrustedProxy(const Envoy::Network::Address::Instance& remote,
+                                 absl::Span<const Network::Address::CidrRange> trusted_cidrs);
+
+/**
+ * Retrieves the last address in the x-forwarded-header after removing all trusted proxy addresses.
+ * @param request_headers supplies the request headers
+ * @param trusted_cidrs the list of CIDRs which are considered trusted proxies
+ * @return GetLastAddressFromXffInfo information about the last address in the XFF header.
+ *         @see GetLastAddressFromXffInfo for more information.
+ */
+GetLastAddressFromXffInfo
+getLastNonTrustedAddressFromXFF(const Http::RequestHeaderMap& request_headers,
+                                absl::Span<const Network::Address::CidrRange> trusted_cidrs);
 
 /**
  * Retrieves the last IPv4/IPv6 address in the x-forwarded-for header.

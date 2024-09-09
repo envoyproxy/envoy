@@ -4,8 +4,8 @@ package io.envoyproxy.envoymobile.engine.testing;
 public final class HttpProxyTestServerFactory {
   /** The supported {@link HttpProxyTestServer} types. */
   public static class Type {
-    public static final int HTTP_PROXY = 3;
-    public static final int HTTPS_PROXY = 4;
+    public static final int HTTP_PROXY = 4;
+    public static final int HTTPS_PROXY = 5;
 
     private Type() {}
   }

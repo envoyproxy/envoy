@@ -1,12 +1,10 @@
 package io.envoyproxy.envoymobile.engine;
 
-import com.google.protobuf.Struct;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.regex.Pattern;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
@@ -25,36 +23,36 @@ public class EnvoyConfiguration {
     ACCEPT_UNTRUSTED
   }
 
-  public final Integer connectTimeoutSeconds;
-  public final Integer dnsRefreshSeconds;
-  public final Integer dnsFailureRefreshSecondsBase;
-  public final Integer dnsFailureRefreshSecondsMax;
-  public final Integer dnsQueryTimeoutSeconds;
-  public final Integer dnsMinRefreshSeconds;
+  public final int connectTimeoutSeconds;
+  public final int dnsRefreshSeconds;
+  public final int dnsFailureRefreshSecondsBase;
+  public final int dnsFailureRefreshSecondsMax;
+  public final int dnsQueryTimeoutSeconds;
+  public final int dnsMinRefreshSeconds;
   public final List<String> dnsPreresolveHostnames;
-  public final Boolean enableDNSCache;
-  public final Integer dnsCacheSaveIntervalSeconds;
+  public final boolean enableDNSCache;
+  public final int dnsCacheSaveIntervalSeconds;
   public final int dnsNumRetries;
-  public final Boolean enableDrainPostDnsRefresh;
-  public final Boolean enableHttp3;
-  public final Boolean useCares;
-  public final Boolean forceV6;
-  public final Boolean useGro;
+  public final boolean enableDrainPostDnsRefresh;
+  public final boolean enableHttp3;
+  public final boolean useCares;
+  public final boolean forceV6;
+  public final boolean useGro;
   public final String http3ConnectionOptions;
   public final String http3ClientConnectionOptions;
   public final Map<String, String> quicHints;
   public final List<String> quicCanonicalSuffixes;
-  public final Boolean enableGzipDecompression;
-  public final Boolean enableBrotliDecompression;
-  public final Boolean enablePortMigration;
-  public final Boolean enableSocketTagging;
-  public final Boolean enableInterfaceBinding;
-  public final Integer h2ConnectionKeepaliveIdleIntervalMilliseconds;
-  public final Integer h2ConnectionKeepaliveTimeoutSeconds;
-  public final Integer maxConnectionsPerHost;
+  public final boolean enableGzipDecompression;
+  public final boolean enableBrotliDecompression;
+  public final boolean enablePortMigration;
+  public final boolean enableSocketTagging;
+  public final boolean enableInterfaceBinding;
+  public final int h2ConnectionKeepaliveIdleIntervalMilliseconds;
+  public final int h2ConnectionKeepaliveTimeoutSeconds;
+  public final int maxConnectionsPerHost;
   public final List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories;
-  public final Integer streamIdleTimeoutSeconds;
-  public final Integer perTryIdleTimeoutSeconds;
+  public final int streamIdleTimeoutSeconds;
+  public final int perTryIdleTimeoutSeconds;
   public final String appVersion;
   public final String appId;
   public final TrustChainVerification trustChainVerification;
@@ -62,10 +60,8 @@ public class EnvoyConfiguration {
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final Map<String, String> runtimeGuards;
-  public final Boolean enablePlatformCertificatesValidation;
+  public final boolean enablePlatformCertificatesValidation;
   public final String upstreamTlsSni;
-
-  private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
 
   /**
    * Create a new instance of the configuration.
@@ -209,7 +205,7 @@ public class EnvoyConfiguration {
   }
 
   public long createBootstrap() {
-    Boolean enforceTrustChainVerification =
+    boolean enforceTrustChainVerification =
         trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
     List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
     Collections.reverse(reverseFilterChain);
@@ -231,11 +227,5 @@ public class EnvoyConfiguration {
         maxConnectionsPerHost, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
         appId, enforceTrustChainVerification, filterChain, enablePlatformCertificatesValidation,
         upstreamTlsSni, runtimeGuards);
-  }
-
-  static class ConfigurationException extends RuntimeException {
-    ConfigurationException(String unresolvedKey) {
-      super("Unresolved template key: " + unresolvedKey);
-    }
   }
 }
