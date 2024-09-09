@@ -1316,9 +1316,19 @@ public:
   virtual UnitFloat dropOverload() const PURE;
 
   /**
+   * @return the cluster drop_category_ configuration.
+   */
+  virtual const std::string dropCategory() const PURE;
+
+  /**
    * Set up the drop_overload value for the cluster.
    */
   virtual void setDropOverload(UnitFloat drop_overload) PURE;
+
+  /**
+   * Set up the drop_category value for the thread local cluster.
+   */
+  virtual void setDropCategory(const std::string& drop_category) PURE;
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;

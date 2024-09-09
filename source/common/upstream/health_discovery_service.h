@@ -73,7 +73,9 @@ public:
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
   std::vector<HostSharedPtr> hosts() { return *hosts_; };
   UnitFloat dropOverload() const override { return UnitFloat(0); }
+  const std::string dropCategory() const override { return ""; }
   void setDropOverload(UnitFloat) override {}
+  void setDropCategory(const std::string&) override {}
 
 protected:
   PrioritySetImpl priority_set_;

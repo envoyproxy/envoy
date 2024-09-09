@@ -275,6 +275,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
       false);
   auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
   EXPECT_EQ(0.000035f, cluster->dropOverload().value());
+  EXPECT_EQ("test", cluster->dropCategory());
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
@@ -290,7 +291,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
     load_assignment:
         policy:
           drop_overloads:
-            category: test
+            category: foo
             drop_percentage:
               numerator: 1000
               denominator: TEN_THOUSAND
@@ -301,6 +302,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
       false);
   auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
   EXPECT_EQ(0.1f, cluster->dropOverload().value());
+  EXPECT_EQ("foo", cluster->dropCategory());
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {

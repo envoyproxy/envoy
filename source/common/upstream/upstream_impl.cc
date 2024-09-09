@@ -1831,6 +1831,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
 
   drop_ratio = std::min(drop_ratio, float(drop_ratio_runtime) / float(MAX_DROP_OVERLOAD_RUNTIME));
   drop_overload_ = UnitFloat(drop_ratio);
+  drop_category_ = policy.drop_overloads(0).category();
   return absl::OkStatus();
 }
 

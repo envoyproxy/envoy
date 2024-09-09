@@ -16,9 +16,13 @@ MockCluster::MockCluster() {
         initialize_callback_ = callback;
       }));
   ON_CALL(*this, dropOverload()).WillByDefault(Return(drop_overload_));
+  ON_CALL(*this, dropCategory()).WillByDefault(Return(drop_category_));
   ON_CALL(*this, setDropOverload(_)).WillByDefault(Invoke([this](UnitFloat drop_overload) -> void {
     drop_overload_ = drop_overload;
   }));
+  ON_CALL(*this, setDropCategory(_))
+      .WillByDefault(Invoke(
+          [this](const std::string& drop_category) -> void { drop_category_ = drop_category; }));
 }
 
 MockCluster::~MockCluster() = default;
