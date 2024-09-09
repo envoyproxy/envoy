@@ -3,7 +3,7 @@
 This rule is a no-op unless the required android environment variables are set.
 """
 
-# Based on https://github.com/tensorflow/tensorflow/tree/34c03ed67692eb76cb3399cebca50ea8bcde064c/third_party/android
+# Based on https://github.com/tensorflow/tensorflow/blob/master/third_party/android/android_configure.bzl
 # Workaround for https://github.com/bazelbuild/bazel/issues/14260
 
 _ANDROID_NDK_HOME = "ANDROID_NDK_HOME"
@@ -31,7 +31,7 @@ def _android_autoconf_impl(repository_ctx):
     ndk_rule = ""
     if ndk_home:
         ndk_rule = """
-    native.android_ndk_repository(
+    android_ndk_repository(
         name="androidndk",
         path="{}",
         api_level={},
@@ -43,6 +43,8 @@ def _android_autoconf_impl(repository_ctx):
 
     repository_ctx.file("BUILD.bazel", "")
     repository_ctx.file("android_configure.bzl", """
+load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
+
 def android_workspace():
     {}
     {}
