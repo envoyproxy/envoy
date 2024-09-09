@@ -11,6 +11,10 @@ final class SetEventTrackerTest: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    fflush(stdout)
+  }
+
   func testSetEventTracker() throws {
     EnvoyTestServer.startHttp1PlaintextServer()
 
