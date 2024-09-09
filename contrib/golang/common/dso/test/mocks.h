@@ -25,6 +25,7 @@ public:
               (httpRequest * p0, int p1, processState* p2, processState* p3, GoUint64 p4,
                GoUint64 p5, GoUint64 p6, GoUint64 p7, GoUint64 p8, GoUint64 p9, GoUint64 p10,
                GoUint64 p11));
+  MOCK_METHOD(void, envoyGoFilterOnHttpStreamComplete, (httpRequest * p0));
   MOCK_METHOD(void, envoyGoFilterOnHttpDestroy, (httpRequest * p0, int p1));
   MOCK_METHOD(void, envoyGoRequestSemaDec, (httpRequest * p0));
   MOCK_METHOD(void, envoyGoFilterCleanUp, ());

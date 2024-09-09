@@ -1,11 +1,15 @@
 #include "source/extensions/filters/udp/udp_proxy/config.h"
 
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/formatter/substitution_format_string.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
+
+using ConfigTypeCase =
+    envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig::SessionFilter::ConfigTypeCase;
 
 constexpr uint32_t DefaultMaxConnectAttempts = 1;
 constexpr uint32_t DefaultMaxBufferedDatagrams = 1024;
@@ -88,6 +92,8 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
       stats_(generateStats(config.stat_prefix(), context.scope())),
       // Default prefer_gro to true for upstream client traffic.
       upstream_socket_config_(config.upstream_socket_config(), true),
+      udp_session_filter_config_provider_manager_(
+          createSingletonUdpSessionFilterConfigProviderManager(context.serverFactoryContext())),
       random_generator_(context.serverFactoryContext().api().randomGenerator()) {
   if (use_per_packet_load_balancing_ && config.has_tunneling_config()) {
     throw EnvoyException(
@@ -140,6 +146,16 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
 
   for (const auto& filter : config.session_filters()) {
     ENVOY_LOG(debug, "    UDP session filter #{}", filter_factories_.size());
+
+    if (filter.config_type_case() == ConfigTypeCase::kConfigDiscovery) {
+      ENVOY_LOG(debug, "      dynamic filter name: {}", filter.name());
+      filter_factories_.push_back(
+          udp_session_filter_config_provider_manager_->createDynamicFilterConfigProvider(
+              filter.config_discovery(), filter.name(), context.serverFactoryContext(), context,
+              context.serverFactoryContext().clusterManager(), false, "udp_session", nullptr));
+      continue;
+    }
+
     ENVOY_LOG(debug, "      name: {}", filter.name());
     ENVOY_LOG(debug, "    config: {}",
               MessageUtil::getJsonStringFromMessageOrError(
@@ -149,10 +165,23 @@ UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(
         Server::Configuration::NamedUdpSessionFilterConfigFactory>(filter);
     ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
         filter, context.messageValidationVisitor(), factory);
+
     Network::UdpSessionFilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, context);
-    filter_factories_.push_back(callback);
+    filter_factories_.push_back(
+        udp_session_filter_config_provider_manager_->createStaticFilterConfigProvider(
+            callback, filter.name()));
   }
+}
+
+SINGLETON_MANAGER_REGISTRATION(udp_session_filter_config_provider_manager);
+
+std::shared_ptr<UdpSessionFilterConfigProviderManager>
+UdpProxyFilterConfigImpl::createSingletonUdpSessionFilterConfigProviderManager(
+    Server::Configuration::ServerFactoryContext& context) {
+  return context.singletonManager().getTyped<UdpSessionFilterConfigProviderManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(udp_session_filter_config_provider_manager),
+      [] { return std::make_shared<Filter::UdpSessionFilterConfigProviderManagerImpl>(); });
 }
 
 static Registry::RegisterFactory<UdpProxyFilterConfigFactory,

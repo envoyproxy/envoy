@@ -1,10 +1,10 @@
+// swiftlint:disable type_body_length
 @_implementationOnly import EnvoyEngine
 import Foundation
 
 /// Builder used for creating and running a new Engine instance.
 @objcMembers
 open class EngineBuilder: NSObject {
-  // swiftlint:disable:previous type_body_length
   private var engineType: EnvoyEngine.Type = EnvoyEngineImpl.self
   private var logLevel: LogLevel = .info
   private var connectTimeoutSeconds: UInt32 = 30
@@ -16,13 +16,10 @@ open class EngineBuilder: NSObject {
   private var dnsRefreshSeconds: UInt32 = 60
   private var enableDNSCache: Bool = false
   private var dnsCacheSaveIntervalSeconds: UInt32 = 1
+  private var dnsNumRetries: Int = -1
   private var enableGzipDecompression: Bool = true
   private var enableBrotliDecompression: Bool = false
-#if ENVOY_ENABLE_QUIC
   private var enableHttp3: Bool = true
-#else
-  private var enableHttp3: Bool = false
-#endif
   private var quicHints: [String: Int] = [:]
   private var quicCanonicalSuffixes: [String] = []
   private var enableInterfaceBinding: Bool = false
@@ -152,6 +149,18 @@ open class EngineBuilder: NSObject {
     return self
   }
 
+  /// Specifies the number of retries before the resolver gives up. If not specified, the resolver
+  /// will retry indefinitely until it succeeds or the DNS query times out.
+  ///
+  /// - parameter dnsNumRetries: the number of retries
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func setDnsNumRetries(_ dnsNumRetries: Int) -> Self {
+    self.dnsNumRetries = dnsNumRetries
+    return self
+  }
+
   /// Specify whether to do gzip response decompression or not.  Defaults to true.
   ///
   /// - parameter enableGzipDecompression: whether or not to gunzip responses.
@@ -174,7 +183,6 @@ open class EngineBuilder: NSObject {
     return self
   }
 
-#if ENVOY_ENABLE_QUIC
   /// Specify whether to enable support for HTTP/3 or not.  Defaults to true.
   ///
   /// - parameter enableHttp3: whether or not to enable HTTP/3.
@@ -208,7 +216,6 @@ open class EngineBuilder: NSObject {
     self.quicCanonicalSuffixes.append(suffix)
     return self
   }
-#endif
 
   /// Specify whether sockets may attempt to bind to a specific interface, based on network
   /// conditions.
@@ -560,6 +567,7 @@ open class EngineBuilder: NSObject {
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
       enableDNSCache: self.enableDNSCache,
       dnsCacheSaveIntervalSeconds: self.dnsCacheSaveIntervalSeconds,
+      dnsNumRetries: self.dnsNumRetries,
       enableHttp3: self.enableHttp3,
       quicHints: self.quicHints.mapValues { NSNumber(value: $0) },
       quicCanonicalSuffixes: self.quicCanonicalSuffixes,

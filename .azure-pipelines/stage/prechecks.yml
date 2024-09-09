@@ -15,6 +15,15 @@ parameters:
 - name: authGCP
   type: string
   default: ""
+- name: authGithubWorkflow
+  type: string
+  default: ""
+- name: authGithubWorkflowAppId
+  type: string
+  default: ""
+- name: authGithubWorkflowInstallId
+  type: string
+  default: ""
 - name: authGPGPassphrase
   type: string
   default: ""
@@ -33,6 +42,11 @@ parameters:
   displayName: "Run prechecks"
   type: string
   default: true
+
+- name: publishGithubRelease
+  displayName: "Publish Github release"
+  type: string
+  default: false
 
 # Timeout/s
 - name: timeoutPrechecks
@@ -219,10 +233,51 @@ jobs:
   #  https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
   condition: |
     and(
-      eq(variables['Build.Reason'], 'PullRequest'),
       in(dependencies.prechecks.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
+      in(dependencies.precheck_release_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.precheck_release_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))
   steps:
-  - checkout: none
+  - task: DownloadSecureFile@1
+    name: WorkflowTriggerKey
+    displayName: 'Download workflow trigger key'
+    inputs:
+      secureFile: '${{ parameters.authGithubWorkflow }}'
   - bash: |
-      echo "Prechecked"
+      set -e
+      KEY="$(cat $(WorkflowTriggerKey.secureFilePath) | base64 -w0)"
+      echo "##vso[task.setvariable variable=value;isoutput=true]$KEY"
+    name: key
+  - template: ../ci.yml
+    parameters:
+      ciTarget: verify.trigger
+      cacheName: verify-trigger
+      authGithub: "$(key.value)"
+      cacheVersion: $(cacheKeyBazel)
+      publishEnvoy: false
+      publishTestResults: false
+      env:
+        ENVOY_REPO: $(Build.Repository.Name)
+        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          ENVOY_HEAD_REF: "$(Build.SourceBranch)"
+          ENVOY_BRANCH: "$(System.PullRequest.TargetBranch)"
+          ENVOY_COMMIT: "$(System.PullRequest.SourceCommitId)"
+        ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+          ENVOY_HEAD_REF: "$(Build.SourceBranchName)"
+          ENVOY_BRANCH: "$(Build.SourceBranch)"
+        # github auth
+        GITHUB_APP_ID: ${{ parameters.authGithubWorkflowAppId }}
+        GITHUB_INSTALL_ID: ${{ parameters.authGithubWorkflowInstallId }}
+        # rbe env
+        GCS_ARTIFACT_BUCKET: ${{ parameters.bucketGCP }}
+      stepsPre:
+      - bash: |
+          set -e
+          if [[ "$BUILD_REASON" == "PullRequest" ]]; then
+              DOWNLOAD_PATH="$(git rev-parse HEAD | head -c7)"
+          else
+              DOWNLOAD_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
+          fi
+          curl -sLO "https://storage.googleapis.com/${{ parameters.bucketGCP }}/${DOWNLOAD_PATH}/release/release.signed.tar.zst"
+          mkdir -p $(Build.StagingDirectory)/release.signed
+          mv release.signed.tar.zst $(Build.StagingDirectory)/release.signed
+        displayName: Fetch signed release

@@ -4,7 +4,7 @@ load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":dev_binding.bzl", "envoy_dev_binding")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
 
-PPC_SKIP_TARGETS = ["envoy.filters.http.lua"]
+PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
 
 WINDOWS_SKIP_TARGETS = [
     "envoy.extensions.http.cache.file_system_http_cache",
@@ -39,6 +39,8 @@ NO_HTTP3_SKIP_TARGETS = [
     "envoy.quic.deterministic_connection_id_generator",
     "envoy.quic.proof_source.filter_chain",
     "envoy.quic.server_preferred_address.fixed",
+    "envoy.quic.server_preferred_address.datasource",
+    "envoy.quic.connection_debug_visitor.basic",
 ]
 
 # Make all contents of an external repository accessible under a filegroup.  Used for external HTTP

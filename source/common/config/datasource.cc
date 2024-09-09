@@ -73,8 +73,8 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
   }
   default:
     if (!allow_empty) {
-      return absl::InvalidArgumentError(
-          fmt::format("Unexpected DataSource::specifier_case(): {}", source.specifier_case()));
+      return absl::InvalidArgumentError(fmt::format("Unexpected DataSource::specifier_case(): {}",
+                                                    static_cast<int>(source.specifier_case())));
     }
   }
   if (!allow_empty && data.empty()) {

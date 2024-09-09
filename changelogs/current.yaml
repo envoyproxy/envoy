@@ -12,6 +12,13 @@ behavior_changes:
     headers and trailers when producing access log.
 - area: http
   change: |
+    Allow HTTP/2 (and HTTP/3) upstream servers to half close the stream before the downstream. This enables bidirectional
+    gRPC streams where server completes streaming before the client. Behavior of HTTP/1 or TCP proxy upstream servers is
+    unchanged and the stream is reset if the upstream server completes response before the downstream. The stream is also
+    reset if the upstream server responds with an error status before the downstream. This behavior is disabled by default
+    and can be enabled by setting the ``envoy.reloadable_features.allow_multiplexed_upstream_half_close`` runtime key to true.
+- area: http
+  change: |
     Added HTTP1-safe option for :ref:`max_connection_duration
     <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` in
     HttpConnectionManager. When enabled, ``max_connection_duration`` will only drain downstream
@@ -55,14 +62,40 @@ minor_behavior_changes:
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
+- area: http
+  change: |
+    Modified the authority header value validator to allow the same characters as oghttp2
+    plus the "@" character. This is compliant with nghttp2, and supports the HTTP/1 use-cases
+    that allow user-info@ as part of the authority. This behavior can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.internal_authority_header_validator`` to false.
 - area: sni
   change: |
     When computing SNI and SAN value for the auto-sni and auto-san verification feature,
     route host manipulations are now taken into account. This behavior can be reverted
     by setting the runtime guard ``envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san`` to false.
+- area: aws
+  change: |
+    Aws request signing common code uses http async client by default, moving curl to deprecation path. This behavior change can be
+    reverted by setting the ``envoy_reloadable_features_use_http_client_to_fetch_aws_credentials`` runtime flag to ``false``.
+- area: quic
+  change: |
+    Connect the QUIC UDP client connection sockets before use and sockets will only bind if
+    the local address is specified. This behavior change can be reverted by setting the
+    ``envoy_reloadable_features_quic_connect_client_udp_sockets`` runtime flag to ``false``.
+- area: conn_handler
+  change: |
+    Enhanced listener filter chain execution to include the case that listener filter has maxReadBytes() of 0,
+    but may return StopIteration in onAccept to wait for asynchronous callback.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: upstream
+  change: |
+    Use previously calculated healthcheck when endpoints move priority levels repeatedly.
+- area: dispatcher
+  change: |
+    Update approximate now after polling instead of before polling. This is only used by QUIC.
+    The behavior can be reverted by setting ``envoy.restart_features.fix_dispatcher_approximate_now`` to false.
 - area: dns
   change: |
     The DNS filter no longer returns FORMERR if a message has an ID of 0.
@@ -83,6 +116,18 @@ bug_fixes:
   change: |
     RBAC will now allow stat prefixes configured in per-route config to override the base config's
     stat prefix.
+- area: http3
+  change: |
+    Fixed a bug where an empty trailers block could be sent. This would occur if a filter removed
+    the last trailer - a likely occurrence with the ``grpc_web_filter``. This change makes HTTP/3 codec
+    behave the same way HTTP/2 codec does, converting an empty trailers block to no trailers.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` to ``false``.
+- area: http
+  change: |
+    Fixed a bug where an incomplete request (missing body or trailers) may be proxied to the upstream when the limit on
+    the number of requests per I/O cycle is configured and an HTTP decoder filter that pauses filter chain is present. This behavior
+    can be reverted by setting the runtime guard ``envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream``
+    to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -141,8 +186,18 @@ removed_config_or_runtime:
 - area: dynamic forward proxy
   change: |
     Removed ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns`` runtime flag and legacy code paths.
+- area: http
+  change: |
+    Removed ``envoy.reloadable_features.use_http3_header_normalisation`` runtime flag and legacy code paths.
 
 new_features:
+- area: dns
+  change: |
+    for the :ref:`strict DNS <arch_overview_service_discovery_types_strict_dns>` and :ref:`logical DNS
+    <arch_overview_service_discovery_types_logical_dns>` cluster types,
+    the new :ref:`dns_jitter <envoy_v3_api_field_config.cluster.v3.Cluster.dns_jitter>` field, if
+    provided, will causes the cluster to refresh DNS entries later by a random amount of time as to
+    avoid stampedes of DNS requests. This field sets the upper bound (exclusive) for the random amount.
 - area: redis
   change: |
     Added support for publish.
@@ -186,6 +241,12 @@ new_features:
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.custom_tls_certificate_selector>`
     to allow overriding TLS certificate selection behavior.
     An extension can select certificate base on the incoming SNI, in both sync and async mode.
+- area: oauth
+  change: |
+    Added :ref:`retry_policy <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.retry_policy>` to reconnect to
+    the auth server when a connection fails to be established.
+    Added :ref:`cookie_domain <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_domain>`
+    field to OAuth2 filter to allow setting the domain of cookies.
 - area: access log
   change: |
     Added support for :ref:`%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1% <config_access_log_format_response_flags>`,
@@ -202,6 +263,11 @@ new_features:
   change: |
     Added new access log command operators ``%START_TIME_LOCAL%`` and ``%EMIT_TIME_LOCAL%``,
     similar to  ``%START_TIME%`` and ``%EMIT_TIME%``, but use local time zone.
+- area: quic
+  change: |
+    Added QUIC protocol option :ref:`save_cmsg_config
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.save_cmsg_config>` to optionally specify a CMSG header type to be
+    propagated from the first packet on the connection to QuicListenerFilter.
 - area: dns
   change: |
     Prefer using IPv6 address when addresses from both families are available.
@@ -213,5 +279,38 @@ new_features:
   change: |
     Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
     the configured duration.
+- area: extension_discovery_service
+  change: |
+    added ECDS support for :ref:`UDP session filters
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>`.
+- area: http3
+  change: |
+    ``http3_protocol_options`` in ``HttpConnectionManager`` has been upgraded to general access.
+- area: cluster
+  change: |
+    Customizing the happy eyeballs algorithm for an upstream cluster by configuring
+    :ref:`happy_eyeballs_config <envoy_v3_api_field_config.cluster.v3.UpstreamConnectionOptions.happy_eyeballs_config>`.
+    A default configuration will be used if not provided. This behavior can be reverted
+    by setting the runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` to false.
+- area: getaddrinfo
+  change: |
+    Added :ref:`num_retries<envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_retries>`
+    to configure the number of retries. If this field is not provided, the ``getaddrinfo`` resolver will retry indefinitely until it
+    succeeds or the DNS query times out. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.getaddrinfo_num_retries`` to false.
+- area: geoip
+  change: |
+    Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
+- area: access_logs
+  change: |
+    Added support for %UPSTREAM_CONNECTION_ID% access log substitution string in TCP and UDP tunneling flows.
+- area: redis_proxy
+  change: |
+    Added :ref:`external_auth_provider <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
+    external authentication for redis proxy.
+- area: original_ip_detection extension
+  change: |
+    The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
+    original IP detection method now supports using a list of trusted CIDRs when parsing ``x-forwarded-for``.
 
 deprecated:

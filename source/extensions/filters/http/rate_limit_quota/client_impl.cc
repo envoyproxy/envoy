@@ -85,7 +85,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 
     // Get the hash id value from BucketId in the response.
     const size_t bucket_id = MessageUtil::hash(action.bucket_id());
-    ENVOY_LOG(trace,
+    ENVOY_LOG(debug,
               "Received a response for bucket id proto :\n {}, and generated "
               "the associated hashed bucket id: {}",
               action.bucket_id().DebugString(), bucket_id);
@@ -97,10 +97,11 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
       switch (action.bucket_action_case()) {
       case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
           kQuotaAssignmentAction: {
-        quota_buckets_[bucket_id]->bucket_action = action;
-        if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
+        quota_buckets_[bucket_id]->cached_action = action;
+        quota_buckets_[bucket_id]->current_assignment_time = time_source_.monotonicTime();
+        if (quota_buckets_[bucket_id]->cached_action->has_quota_assignment_action()) {
           auto rate_limit_strategy = quota_buckets_[bucket_id]
-                                         ->bucket_action.quota_assignment_action()
+                                         ->cached_action->quota_assignment_action()
                                          .rate_limit_strategy();
 
           if (rate_limit_strategy.has_token_bucket()) {
@@ -127,14 +128,17 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
       case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
           kAbandonAction: {
         quota_buckets_.erase(bucket_id);
+        ENVOY_LOG(debug, "Bucket id {} removed from the cache by abandon action.", bucket_id);
         break;
       }
       default: {
-        ENVOY_LOG_EVERY_POW_2(error, "Unset bucket action type {}", action.bucket_action_case());
+        ENVOY_LOG_EVERY_POW_2(error, "Unset bucket action type {}",
+                              static_cast<int>(action.bucket_action_case()));
         break;
       }
       }
     }
+    ENVOY_LOG(debug, "Assignment cached for bucket id {}.", bucket_id);
   }
 
   // `rlqs_callback_` has been reset to nullptr for periodical report case.

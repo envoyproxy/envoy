@@ -981,6 +981,23 @@ public:
   virtual bool shouldDrainConnectionUponCompletion() const PURE;
 
   /**
+   * Set the parent for this StreamInfo. This is used to associate the
+   * stream info of an async client with the stream info of the downstream
+   * connection.
+   */
+  virtual void setParentStreamInfo(const StreamInfo& parent_stream_info) PURE;
+
+  /**
+   * Get the parent for this StreamInfo, if available.
+   */
+  virtual OptRef<const StreamInfo> parentStreamInfo() const PURE;
+
+  /**
+   * Clear the parent for this StreamInfo.
+   */
+  virtual void clearParentStreamInfo() PURE;
+
+  /**
    * Called if the connection decides to drain itself after serving this request.
    * @param should_drain true to close the connection once this stream has
    * finished sending and receiving.
