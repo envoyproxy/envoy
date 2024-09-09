@@ -1110,7 +1110,7 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   EXPECT_EQ("bar", loader_->snapshot().get("foo").value().get());
   EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
   EXPECT_EQ("meh", loader_->snapshot().get("baz").value().get());
-  EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get()); // Expecting "true" as string representation
+  EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get());
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
