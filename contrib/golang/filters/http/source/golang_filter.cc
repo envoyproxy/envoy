@@ -1376,7 +1376,7 @@ uint64_t Filter::getMergedConfigId() {
   Http::StreamFilterCallbacks* callbacks = decoding_state_.getFilterCallbacks();
 
   // get all of the per route config
-  Route::RouteSpecificFilterConfigs route_config_list = callbacks->perFilterConfigs();
+  Router::RouteSpecificFilterConfigs route_config_list = callbacks->perFilterConfigs();
 
   ENVOY_LOG(debug, "golang filter route config list length: {}.", route_config_list.size());
 
