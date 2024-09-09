@@ -177,7 +177,7 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
 std::string generateFixedLengthNonce(TimeSource& time_source) {
   constexpr size_t length = 16;
 
-  std::string nonce = std::to_string(time_source.systemTime().time_since_epoch().count());
+  std::string nonce = fmt::format("{}", time_source.systemTime().time_since_epoch().count());
 
   if (nonce.length() < length) {
     nonce.append(length - nonce.length(), '0');
