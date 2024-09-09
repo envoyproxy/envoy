@@ -201,18 +201,17 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
   request.onResponse(std::move(redis_response));
 
   // Resume processing of pending requests.
-  for (auto& pending_request : pending_requests_) {
-    if (pending_request.pending_value_ != nullptr) {
-      processRespValue(std::move(pending_request.pending_value_), pending_request);
-    }
+  while (!pending_requests_.empty() && pending_requests_.front().pending_value_) {
+    processRespValue(std::move(pending_requests_.front().pending_value_),
+                     pending_requests_.front());
   }
 }
 
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
   if (config_->external_auth_enabled_) {
+    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
     auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(),
                                        EMPTY_STRING, password);
-    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
     return;
   }
 
