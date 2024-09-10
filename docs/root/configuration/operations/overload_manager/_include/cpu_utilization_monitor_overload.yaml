@@ -11,36 +11,6 @@ static_resources:
           '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
           stat_prefix: ingress_http
           http_filters:
-              '@type': type.googleapis.com/envoy.extensions.filters.http.admission_control.v3.AdmissionControl
-              enabled:
-                default_value: true
-                runtime_key: admission_control.enabled
-              sampling_window: 60s
-              sr_threshold:
-                default_value:
-                  value: 95.0
-                runtime_key: admission_control.sr_threshold
-              aggression:
-                default_value: 1.0
-                runtime_key: admission_control.aggression
-              rps_threshold:
-                default_value: 1
-                runtime_key: admission_control.rps_threshold
-              max_rejection_probability:
-                default_value:
-                  value: 95.0
-                runtime_key: admission_control.max_rejection_probability
-              success_criteria:
-                http_criteria:
-                  http_success_status:
-                  - start: 100
-                    end: 400
-                  - start: 404
-                    end: 404
-                grpc_criteria:
-                  grpc_success_status:
-                  - 0
-                  - 1
           - name: envoy.filters.http.router
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -75,13 +45,13 @@ overload_manager:
     seconds: 0
     nanos: 250000000
   resource_monitors:
-    - name: "envoy.resource_monitors.cpu_utilization"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig
+  - name: "envoy.resource_monitors.cpu_utilization"
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig
   actions:
-    - name: "envoy.overload_actions.stop_accepting_requests"
-      triggers:
-        - name: "envoy.resource_monitors.cpu_utilization"
-          scaled:
-            scaling_threshold: 0.80
-            saturation_threshold: 0.95
+  - name: "envoy.overload_actions.stop_accepting_requests"
+    triggers:
+    - name: "envoy.resource_monitors.cpu_utilization"
+      scaled:
+        scaling_threshold: 0.80
+        saturation_threshold: 0.95

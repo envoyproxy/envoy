@@ -370,8 +370,8 @@ workload.
 
 .. literalinclude:: _include/cpu_utilization_monitor_overload.yaml
     :language: yaml
-    :lines: 73-87
-    :emphasize-lines: 77-87
+    :lines: 43-57
+    :emphasize-lines: 48-57
     :linenos:
     :caption: :download:`cpu_utilization_monitor_overload.yaml <_include/cpu_utilization_monitor_overload.yaml>`
 
