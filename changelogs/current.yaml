@@ -41,9 +41,10 @@ behavior_changes:
     <envoy_v3_api_msg_config/route/v3/scoped_route>' and stat prefix extracted.
 - area: http
   change: |
-    Maintain the order of the access and filter loggers via a runtime guard. 
-    When set ``true``, the access loggers run prior to filter loggers. This change 
-    can be disabled by setting the runtime guard flag ``envoy.reloadable_features.filter_access_loggers_first`` to ``false``.
+    Determine the order of the access and filter loggers, currently via a runtime guard.
+    When set ``true``, the filter loggers run before the access loggers to ensure any
+    dynamic metadata changes from filters are read properly. This change can be disabled
+    by setting the runtime guard flag ``envoy.reloadable_features.filter_access_loggers_first`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
