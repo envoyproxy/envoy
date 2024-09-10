@@ -12,13 +12,13 @@ namespace Thread {
 
 class ThreadHandle {
 public:
-  ThreadHandle(std::function<void()> thread_routine, const absl::optional<int>& thread_priority);
+  ThreadHandle(std::function<void()> thread_routine, absl::optional<int> thread_priority);
 
   /** Returns the thread routine. */
   std::function<void()>& routine();
 
   /** Returns the thread priority, if any. */
-  const absl::optional<int>& priority() const;
+  absl::optional<int> priority() const;
 
   /** Returns the thread handle. */
   pthread_t& handle();

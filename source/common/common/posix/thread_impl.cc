@@ -70,13 +70,13 @@ void setThreadPriority(const int64_t tid, const int priority) {
 #define PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE 16
 
 ThreadHandle::ThreadHandle(std::function<void()> thread_routine,
-                           const absl::optional<int>& thread_priority)
+                           absl::optional<int> thread_priority)
     : thread_routine_(thread_routine), thread_priority_(thread_priority) {}
 
 /** Returns the thread routine. */
 std::function<void()>& ThreadHandle::routine() { return thread_routine_; }
 
-const absl::optional<int>& ThreadHandle::priority() const { return thread_priority_; }
+absl::optional<int> ThreadHandle::priority() const { return thread_priority_; }
 
 /** Returns the thread handle. */
 pthread_t& ThreadHandle::handle() { return thread_handle_; }

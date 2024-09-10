@@ -96,9 +96,7 @@ envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
 // `std::function`.
 envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
   Thread::Options thread_options;
-  if (thread_priority_) {
-    thread_options.priority_ = *thread_priority_;
-  }
+  thread_options.priority_ = thread_priority_;
   main_thread_ = thread_factory_->createThread([this, options]() mutable -> void { main(options); },
                                                thread_options, /* crash_on_failure= */ false);
   return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
