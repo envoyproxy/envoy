@@ -22,6 +22,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/network/cidr_range.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -754,6 +755,62 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       prepareLocalReply(encode_functions, local_reply_data);
 
   encodeLocalReply(is_reset, std::move(prepared_local_reply));
+}
+
+bool Utility::remoteAddressIsTrustedProxy(
+    const Envoy::Network::Address::Instance& remote,
+    absl::Span<const Network::Address::CidrRange> trusted_cidrs) {
+  for (const auto& cidr : trusted_cidrs) {
+    if (cidr.isInRange(remote)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
+    const Http::RequestHeaderMap& request_headers,
+    absl::Span<const Network::Address::CidrRange> trusted_cidrs) {
+  const auto xff_header = request_headers.getForwardedForValue();
+  static constexpr size_t MAX_ALLOWED_XFF_ENTRIES = 20;
+
+  absl::InlinedVector<absl::string_view, 3> xff_entries = absl::StrSplit(xff_header, ',');
+  // If there are more than 20 entries in the XFF header, refuse to parse.
+  // There are very few valid use cases for this many entries and parsing too many has
+  // a performance impact.
+  if (xff_entries.size() > MAX_ALLOWED_XFF_ENTRIES) {
+    ENVOY_LOG_MISC(trace, "Too many entries in x-forwarded-for header");
+    return {nullptr, false};
+  }
+
+  Network::Address::InstanceConstSharedPtr last_valid_addr;
+
+  for (auto it = xff_entries.rbegin(); it != xff_entries.rend(); it++) {
+    const absl::string_view entry = StringUtil::trim(*it);
+    auto addr = Network::Utility::parseInternetAddressNoThrow(std::string(entry));
+    if (addr == nullptr) {
+      return {nullptr, false};
+    }
+    last_valid_addr = addr;
+
+    bool remote_address_is_trusted_proxy = false;
+    for (const auto& cidr : trusted_cidrs) {
+      if (cidr.isInRange(*addr.get())) {
+        remote_address_is_trusted_proxy = true;
+        break;
+      }
+    }
+
+    if (remote_address_is_trusted_proxy) {
+      continue;
+    }
+
+    // If we reach here we found a non-trusted address
+    return {addr, xff_entries.size() == 1};
+  }
+  // If we reach this point all addresses in XFF were considered trusted, so return
+  // first IP in XFF (the last in the reverse-evaluated chain).
+  return {last_valid_addr, xff_entries.size() == 1};
 }
 
 Utility::GetLastAddressFromXffInfo
