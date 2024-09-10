@@ -676,9 +676,6 @@ public:
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
     access_log_handlers_.push_back(std::move(handler));
   }
-  void addConfigLogHandler(AccessLog::InstanceSharedPtr handler) {
-    config_log_handlers_.push_back(std::move(handler));
-  }
   void addStreamDecoderFilter(ActiveStreamDecoderFilterPtr filter) {
     // Note: configured decoder filters are appended to decoder_filters_.
     // This means that if filters are configured in the following order (assume all three filters
