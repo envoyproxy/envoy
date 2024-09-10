@@ -23,11 +23,11 @@ TEST(CertCompressionZlibTest, DecompressBadData) {
 TEST(CertCompressionZlibTest, DecompressBadLength) {
   constexpr uint8_t the_data[] = {1, 2, 3, 4, 5, 6};
   constexpr size_t uncompressed_len = 6;
-  CBB compressed;
-  ASSERT_EQ(1, CBB_init(&compressed, 0));
+  bssl::ScopedCBB compressed;
+  ASSERT_EQ(1, CBB_init(compressed.get(), 0));
   ASSERT_EQ(CertCompression::SUCCESS,
-            CertCompression::compressZlib(nullptr, &compressed, the_data, uncompressed_len));
-  const auto compressed_len = CBB_len(&compressed);
+            CertCompression::compressZlib(nullptr, compressed.get(), the_data, uncompressed_len));
+  const auto compressed_len = CBB_len(compressed.get());
   EXPECT_NE(0, compressed_len);
 
   EXPECT_LOG_CONTAINS("error",
@@ -39,7 +39,7 @@ TEST(CertCompressionZlibTest, DecompressBadLength) {
                                   CertCompression::decompressZlib(
                                       nullptr, &out,
                                       uncompressed_len + 1 /* intentionally incorrect */,
-                                      CBB_data(&compressed), compressed_len));
+                                      CBB_data(compressed.get()), compressed_len));
                       });
 }
 } // namespace Quic
