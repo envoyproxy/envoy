@@ -64,7 +64,7 @@ struct Options {
   //
   // If no value is set, the thread will be created with the default thread priority for the
   // platform.
-  absl::optional<int> priority_;
+  absl::optional<int> priority_{absl::nullopt};
 };
 
 using OptionsOptConstRef = const absl::optional<Options>&;
