@@ -124,7 +124,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "execution_context",
     hdrs = ["execution_context.h"],
-    deps = [":pure_lib"],
+    deps = [
+        ":pure_lib",
+        "//source/common/common:cleanup_lib",
+    ],
 )
 
 envoy_cc_library(

@@ -24,6 +24,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/matcher/matcher.h"
+#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -664,6 +665,13 @@ public:
     DUMP_DETAILS(filter_manager_callbacks_.responseHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.responseTrailers());
     DUMP_DETAILS(&streamInfo());
+  }
+
+  ExecutionContext* executionContext() const override {
+    if (!connection_.has_value()) {
+      return nullptr;
+    }
+    return getConnectionExecutionContext(*connection_);
   }
 
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {

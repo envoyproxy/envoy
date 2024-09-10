@@ -24,6 +24,10 @@ public:
 
   bool cancelled() { return cancelled_; }
 
+  static Cleanup Noop() {
+    return Cleanup([] {});
+  }
+
 private:
   std::function<void()> f_;
   bool cancelled_{false};

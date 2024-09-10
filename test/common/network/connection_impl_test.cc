@@ -73,6 +73,11 @@ public:
   NoopConnectionExecutionContext() = default;
   ~NoopConnectionExecutionContext() override = default;
 
+  Envoy::Cleanup onScopeEnter(Envoy::Tracing::Span&) override { return Envoy::Cleanup::Noop(); }
+  Envoy::Cleanup onScopeEnter(const Envoy::Http::FilterContext&) override {
+    return Envoy::Cleanup::Noop();
+  }
+
 protected:
   void activate() override {}
   void deactivate() override {}
