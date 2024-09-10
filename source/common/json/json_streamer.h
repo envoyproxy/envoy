@@ -406,15 +406,13 @@ public:
    */
   void addNull() { response_.add(Constants::Null); }
 
+private:
   /**
-   * Adds a pre-sanitized string or which doesn't require sanitizing to the output stream.
-   * NOTE: use this with care as it bypasses the sanitization process and may result in
-   * invalid JSON. If you are not sure if the string is already sanitized, use addString()
-   * or addSanitized() instead.
+   * Adds a string to the output stream without sanitizing it. This is only used to push
+   * the delimeters to output buffer.
    */
   void addWithoutSanitizing(absl::string_view str) { response_.add(str); }
 
-private:
 #ifndef NDEBUG
   /**
    * @return the top Level*. This is used for asserts.
