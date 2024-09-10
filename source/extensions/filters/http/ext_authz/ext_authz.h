@@ -67,10 +67,10 @@ public:
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(Upstream::ClusterInfoConstSharedPtr cluster_info) {
-    cluster_info_ = cluster_info;
+    cluster_info_ = std::move(cluster_info);
   }
   void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr upstream_host) {
-    upstream_host_ = upstream_host;
+    upstream_host_ = std::move(upstream_host);
   }
 
   // For convenience in testing.
