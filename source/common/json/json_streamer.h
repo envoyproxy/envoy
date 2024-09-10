@@ -409,7 +409,7 @@ public:
 private:
   /**
    * Adds a string to the output stream without sanitizing it. This is only used to push
-   * the delimeters to output buffer.
+   * the delimiters to output buffer.
    */
   void addWithoutSanitizing(absl::string_view str) { response_.add(str); }
 
