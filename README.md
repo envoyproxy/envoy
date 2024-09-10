@@ -71,7 +71,7 @@ The Envoy team has a scheduled meeting time twice per month on Tuesday at 9am PT
 Google calendar is [here](https://goo.gl/PkDijT).  The meeting will only be held
 if there are agenda items listed in the [meeting
 minutes](https://goo.gl/5Cergb).  Any member of the community should be able to
-propose agenda items by adding to the minutes.  The maintaers will either confirm
+propose agenda items by adding to the minutes.  The maintainers will either confirm
 the additions to the agenda, or will cancel the meeting within 24 hours of the scheduled
 date if there is no confirmed agenda.
 
