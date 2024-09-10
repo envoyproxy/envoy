@@ -52,9 +52,10 @@ void setThreadPriority(const int64_t tid, const int priority) {
   // permissions issues, as discovered through manual testing.
   Class nsthread = objc_getClass("NSThread");
   if (nsthread != nullptr) {
-    id (*getCurrentNSThread)(Class, SEL) = (id(*)(Class, SEL))objc_msgSend;
+    id (*getCurrentNSThread)(Class, SEL) = reinterpret_cast<id (*)(Class, SEL)>(objc_msgSend);
     id current_thread = getCurrentNSThread(nsthread, sel_registerName("currentThread"));
-    void (*setNSThreadPriority)(id, SEL, double) = (void (*)(id, SEL, double))objc_msgSend;
+    void (*setNSThreadPriority)(id, SEL, double) =
+        reinterpret_cast<void (*)(id, SEL, double)>(objc_msgSend);
     setNSThreadPriority(current_thread, sel_registerName("setThreadPriority:"), priority);
   }
 #else
@@ -206,7 +207,9 @@ int PosixThreadFactory::currentThreadPriority() {
 #elif defined(__APPLE__)
   Class nsthread = objc_getClass("NSThread");
   SEL selector = sel_registerName("threadPriority");
-  double thread_priority = ((double (*)(Class, SEL))objc_msgSend)(nsthread, selector);
+  double (*getNSThreadPriority)(Class, SEL) =
+      reinterpret_cast<double (*)(Class, SEL)>(objc_msgSend);
+  double thread_priority = getNSThreadPriority(nsthread, selector);
   return static_cast<int>(std::round(thread_priority * 100.0));
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
