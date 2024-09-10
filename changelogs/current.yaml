@@ -230,6 +230,11 @@ new_features:
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
     <envoy_v3_api_msg_config.core.v3.SocketOption>`. If not specified, the socket option will be applied to all socket
     types.
+- area: quic
+  change: |
+    QUIC server and client support certificate compression, which can in some cases reduce the number of round trips
+    required to setup a connection. This change temporarily disabled by setting the runtime flag
+    ``envoy.reloadable_features.quic_support_certificate_compression`` to ``false``.
 - area: tls
   change: |
     Added an extension point :ref:`custom_tls_certificate_selector
