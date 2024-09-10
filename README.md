@@ -67,11 +67,13 @@ have prior experience. To get started:
 
 ## Community Meeting
 
-The Envoy team meets twice per month on Tuesday at 9am PT. The public
-Google calendar is here: https://goo.gl/PkDijT
-
-* Meeting minutes are [here](https://goo.gl/5Cergb)
-* Recorded videos are posted [here](https://www.youtube.com/channel/UC5z5mvPgqMs1xo5VuIWzYTA)
+The Envoy team has a scheduled meeting time twice per month on Tuesday at 9am PT. The public
+Google calendar is [here](https://goo.gl/PkDijT).  The meeting will only be held
+if there are agenda items listed in the [meeting
+minutes](https://goo.gl/5Cergb).  Any member of the community should be able to
+propose agenda items by adding to the minutes.  The maintaers will either confirm
+the additions to the agenda, or will cancel the meeting within 24 hours of the scheduled
+date if there is no confirmed agenda.
 
 ## Security
 
