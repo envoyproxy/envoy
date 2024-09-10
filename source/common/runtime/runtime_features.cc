@@ -1,6 +1,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/flags/commandlineflag.h"
+#include "absl/flags/declare.h"
 #include "absl/flags/flag.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
@@ -30,6 +31,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_allow_alt_svc_for_ips);
+RUNTIME_GUARD(envoy_reloadable_features_boolean_to_string_fix);
 RUNTIME_GUARD(envoy_reloadable_features_check_switch_protocol_websocket_handshake);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_consistent_header_validation);
@@ -222,7 +224,7 @@ bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
 }
 
-bool runtimeFeatureEnabled(absl::string_view feature) {
+bool      runtimeFeatureEnabled(absl::string_view feature) {
   absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));

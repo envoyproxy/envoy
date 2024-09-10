@@ -32,6 +32,7 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche/common/platform/api/quiche_flags.h"
 #endif
+ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_boolean_to_string_fix);
 ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_reject_invalid_yaml);
 
 using testing::_;
@@ -1102,7 +1103,6 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
     layer:
       foo: bar
       baz: meh
-      toggle: true
   )EOF");
   EXPECT_CALL(rtds_init_callback_, Call());
   doOnConfigUpdateVerifyNoThrow(runtime);
@@ -1114,7 +1114,7 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
 
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(4, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 
   runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
@@ -1314,6 +1314,54 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
 
   EXPECT_THROW_WITH_MESSAGE(loader.value()->initialize(cm_).IgnoreError(), EnvoyException,
                             "bad config");
+}
+
+TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
+  setup();
+
+  // Enable the runtime guard flag
+  absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, true);
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      toggle: true
+  )EOF");
+
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get());
+
+  // Metrics checks (adjust as per your actual metric names)
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+}
+
+TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagDisabled) {
+  setup();
+
+  // Disable the runtime guard flag
+  absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, false);
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      toggle: true
+  )EOF");
+
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_EQ("1", loader_->snapshot().get("toggle").value().get()); // Assuming previous behavior
+
+  // Metrics checks (adjust as per your actual metric names)
+  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
+  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
+  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 } // namespace
