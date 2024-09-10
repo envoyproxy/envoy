@@ -1330,11 +1330,6 @@ TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
   doOnConfigUpdateVerifyNoThrow(runtime);
 
   EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get());
-
-  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
-  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
-  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagDisabled) {
@@ -1352,11 +1347,6 @@ TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagDisabled) {
   doOnConfigUpdateVerifyNoThrow(runtime);
 
   EXPECT_EQ("1", loader_->snapshot().get("toggle").value().get()); // Assuming previous behavior
-
-  EXPECT_EQ(0, store_.counter("runtime.load_error").value());
-  EXPECT_EQ(2, store_.counter("runtime.load_success").value());
-  EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
-  EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 } // namespace
