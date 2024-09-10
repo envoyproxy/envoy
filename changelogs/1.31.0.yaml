@@ -537,7 +537,7 @@ new_features:
     to ``false``.
 - area: basic_auth
   change: |
-    Added support to provide override authorization header to load Basic Auth credential.
+    Added support to provide an override authorization header to load Basic Auth credential.
 
 deprecated:
 - area: tracing
