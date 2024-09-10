@@ -10,6 +10,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,14 +54,9 @@ CorsFilterConfig::CorsFilterConfig(const std::string& stats_prefix, Stats::Scope
 CorsFilter::CorsFilter(CorsFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
 void CorsFilter::initializeCorsPolicies() {
-  decoder_callbacks_->traversePerFilterConfig([this](const Router::RouteSpecificFilterConfig& cfg) {
-    const auto* typed_cfg = dynamic_cast<const Router::CorsPolicy*>(&cfg);
-    if (typed_cfg != nullptr) {
-      policies_.push_back(typed_cfg);
-    }
-  });
+  policies_ = Http::Utility::getAllPerFilterConfig<Router::CorsPolicy>(decoder_callbacks_);
 
-  // The 'traversePerFilterConfig' will handle cors policy of virtual host first. So, we need
+  // The 'perFilterConfigs' will handle cors policy of virtual host first. So, we need
   // reverse the 'policies_' to make sure the cors policy of route entry to be first item in the
   // 'policies_'.
   if (policies_.size() >= 2) {

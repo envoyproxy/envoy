@@ -1,3 +1,4 @@
+#include "ext_authz.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include <chrono>
@@ -190,11 +191,16 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
         filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
   }
 
-  auto&& maybe_merged_per_route_config =
-      Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
-          decoder_callbacks_, [](FilterConfigPerRoute& cfg_base, const FilterConfigPerRoute& cfg) {
-            cfg_base.merge(cfg);
-          });
+  absl::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
+  for (const auto* cfg :
+       Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
+    ASSERT(cfg != nullptr);
+    if (maybe_merged_per_route_config.has_value()) {
+      maybe_merged_per_route_config.value().merge(*cfg);
+    } else {
+      maybe_merged_per_route_config = *cfg;
+    }
+  }
 
   Protobuf::Map<std::string, std::string> context_extensions;
   if (maybe_merged_per_route_config) {

@@ -3,6 +3,7 @@ package io.envoyproxy.envoymobile.engine;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
@@ -63,7 +64,6 @@ public class AndroidNetworkMonitor {
         NetworkCapabilities.TRANSPORT_CELLULAR,  NetworkCapabilities.TRANSPORT_WIFI,
         NetworkCapabilities.TRANSPORT_BLUETOOTH, NetworkCapabilities.TRANSPORT_ETHERNET,
         NetworkCapabilities.TRANSPORT_VPN,       NetworkCapabilities.TRANSPORT_WIFI_AWARE,
-        NetworkCapabilities.TRANSPORT_LOWPAN,
     };
     private static final int EMPTY_TRANSPORT_TYPE = -1;
 
@@ -77,6 +77,7 @@ public class AndroidNetworkMonitor {
       envoyEngine.onDefaultNetworkAvailable();
     }
 
+    @SuppressLint("WrongConstant")
     @Override
     public void onCapabilitiesChanged(@NonNull Network network,
                                       @NonNull NetworkCapabilities networkCapabilities) {

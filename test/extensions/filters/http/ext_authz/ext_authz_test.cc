@@ -2726,11 +2726,9 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
 
   EXPECT_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&auth_per_route));
-  EXPECT_CALL(*decoder_filter_callbacks_.route_, traversePerFilterConfig(_, _))
-      .WillOnce(Invoke([&](const std::string&,
-                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-        cb(auth_per_vhost);
-        cb(auth_per_route);
+  EXPECT_CALL(*decoder_filter_callbacks_.route_, perFilterConfigs(_))
+      .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        return {&auth_per_vhost, &auth_per_route};
       }));
 
   prepareCheck();

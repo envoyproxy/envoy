@@ -19,6 +19,7 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/expr/context.h"
 
@@ -555,8 +556,9 @@ CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint6
 void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
   auto i = 0;
   m.iterate([&i, &go_strs, &go_buf](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    auto key = std::string(header.key().getStringView());
-    auto value = std::string(header.value().getStringView());
+    // It's safe to use StringView here, since we will copy them into Golang.
+    auto key = header.key().getStringView();
+    auto value = header.value().getStringView();
 
     auto len = key.length();
     // go_strs is the heap memory of go, and the length is twice the number of headers. So range it
@@ -1376,16 +1378,13 @@ uint64_t Filter::getMergedConfigId() {
   Http::StreamFilterCallbacks* callbacks = decoding_state_.getFilterCallbacks();
 
   // get all of the per route config
-  std::list<const FilterConfigPerRoute*> route_config_list;
-  callbacks->traversePerFilterConfig(
-      [&route_config_list](const Router::RouteSpecificFilterConfig& cfg) {
-        route_config_list.push_back(dynamic_cast<const FilterConfigPerRoute*>(&cfg));
-      });
+  auto route_config_list = Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(callbacks);
 
   ENVOY_LOG(debug, "golang filter route config list length: {}.", route_config_list.size());
 
   auto id = config_->getConfigId();
   for (auto it : route_config_list) {
+    ASSERT(it != nullptr, "route config should not be null");
     auto route_config = *it;
     id = route_config.getPluginConfigId(id, config_->pluginName());
   }
