@@ -41,9 +41,7 @@ admin:
       port_value: 9901
 
 overload_manager:
-  refresh_interval:
-    seconds: 0
-    nanos: 250000000
+  refresh_interval: 0.25s
   resource_monitors:
   - name: "envoy.resource_monitors.cpu_utilization"
     typed_config:
