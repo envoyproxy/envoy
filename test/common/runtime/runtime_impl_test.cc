@@ -1318,7 +1318,6 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
 TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
   setup();
 
-  // Enable the runtime guard flag
   absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, true);
 
   auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
@@ -1332,7 +1331,6 @@ TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
 
   EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get());
 
-  // Metrics checks (adjust as per your actual metric names)
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
@@ -1342,7 +1340,6 @@ TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
 TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagDisabled) {
   setup();
 
-  // Disable the runtime guard flag
   absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, false);
 
   auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
@@ -1356,7 +1353,6 @@ TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagDisabled) {
 
   EXPECT_EQ("1", loader_->snapshot().get("toggle").value().get()); // Assuming previous behavior
 
-  // Metrics checks (adjust as per your actual metric names)
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
