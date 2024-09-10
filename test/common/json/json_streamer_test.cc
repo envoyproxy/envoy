@@ -134,9 +134,9 @@ TYPED_TEST(JsonStreamerTest, SubArray) {
 TYPED_TEST(JsonStreamerTest, TopArray) {
   {
     auto array = this->streamer_.makeRootArray();
-    array->addEntries({1.0, "two", 3.5, true, false, std::nan("")});
+    array->addEntries({1.0, "two", 3.5, true, false, std::nan(""), absl::monostate{}});
   }
-  EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null])EOF", this->buffer_.toString());
+  EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null,null])EOF", this->buffer_.toString());
 }
 
 TYPED_TEST(JsonStreamerTest, SubMap) {
