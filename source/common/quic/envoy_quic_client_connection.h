@@ -71,6 +71,8 @@ public:
                             Network::ConnectionSocketPtr&& connection_socket,
                             quic::ConnectionIdGeneratorInterface& generator, bool prefer_gro);
 
+  virtual ~EnvoyQuicClientConnection();
+
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
@@ -149,6 +151,7 @@ private:
   void probeWithNewPort(const quic::QuicSocketAddress& peer_addr,
                         quic::PathValidationReason reason);
 
+  Event::TimerPtr poll_timer_;
   OptRef<PacketsToReadDelegate> delegate_;
   uint32_t packets_dropped_{0};
   Event::Dispatcher& dispatcher_;
