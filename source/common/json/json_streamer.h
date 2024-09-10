@@ -102,13 +102,13 @@ public:
   public:
     Level(StreamerBase& streamer, absl::string_view opener, absl::string_view closer)
         : streamer_(streamer), closer_(closer) {
-      streamer_.addDirectly(opener);
+      streamer_.addWithoutSanitizing(opener);
 #ifndef NDEBUG
       streamer_.push(this);
 #endif
     }
     virtual ~Level() {
-      streamer_.addDirectly(closer_);
+      streamer_.addWithoutSanitizing(closer_);
 #ifndef NDEBUG
       streamer_.pop(this);
 #endif
@@ -199,7 +199,7 @@ public:
       if (is_first_) {
         is_first_ = false;
       } else {
-        streamer_.addDirectly(",");
+        streamer_.addWithoutSanitizing(",");
       }
     }
 
@@ -390,7 +390,7 @@ public:
    * invalid JSON. If you are not sure if the string is already sanitized, use addString()
    * or addSanitized() instead.
    */
-  void addDirectly(absl::string_view str) { response_.add(str); }
+  void addWithoutSanitizing(absl::string_view str) { response_.add(str); }
 
 private:
 #ifndef NDEBUG
