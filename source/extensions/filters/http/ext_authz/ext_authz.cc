@@ -90,7 +90,6 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
                                                     : absl::nullopt),
       emit_filter_state_stats_(config.emit_filter_state_stats()),
-      client_is_envoy_grpc_(config.has_grpc_service() && config.grpc_service().has_envoy_grpc()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -407,9 +406,6 @@ void Filter::updateLoggingInfo() {
         decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
   }
 
-  if (!config_->clientIsEnvoyGrpc()) {
-    return;
-  }
   auto const* stream_info = client_->streamInfo();
   if (stream_info == nullptr) {
     return;

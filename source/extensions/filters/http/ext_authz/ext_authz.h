@@ -73,6 +73,13 @@ public:
     upstream_host_ = upstream_host;
   }
 
+  // For convenience in testing.
+  void clearLatency() { latency_ = absl::nullopt; };
+  void clearBytesSent() { bytes_sent_ = absl::nullopt; }
+  void clearBytesReceived() { bytes_received_ = absl::nullopt; }
+  void clearClusterInfo() { cluster_info_ = nullptr; }
+  void clearUpstreamHost() { upstream_host_ = nullptr; }
+
 private:
   const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata_;
   absl::optional<std::chrono::microseconds> latency_;
@@ -174,7 +181,6 @@ public:
   const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
 
   bool emitFilterStateStats() const { return emit_filter_state_stats_; }
-  bool clientIsEnvoyGrpc() const { return client_is_envoy_grpc_; }
 
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
@@ -228,7 +234,6 @@ private:
   LabelsMap destination_labels_;
   const absl::optional<ProtobufWkt::Struct> filter_metadata_;
   const bool emit_filter_state_stats_;
-  const bool client_is_envoy_grpc_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
