@@ -39,7 +39,9 @@ namespace Json {
 #define ASSERT_LEVELS_EMPTY ASSERT(this->levels_.empty())
 #endif
 
-// Simple abstraction that provide a output buffer for streaming JSON output.
+// Buffer wrapper that implements the necessary abstraction for the template
+// StreamerBase.
+// This could be used to stream JSON output of StreamerBase to a Buffer.
 class BufferOutput {
 public:
   void add(absl::string_view a) { buffer_.addFragments({a}); }
@@ -51,24 +53,41 @@ public:
   Buffer::Instance& buffer_;
 };
 
+// String wrapper that implements the necessary abstraction for the template
+// StreamerBase.
+// This could be used to stream JSON output of StreamerBase to a single string.
+class StringOutput {
+public:
+  void add(absl::string_view a) { buffer_.append(a); }
+  void add(absl::string_view a, absl::string_view b, absl::string_view c) {
+    absl::StrAppend(&buffer_, a, b, c);
+  }
+  explicit StringOutput(std::string& output) : buffer_(output) {}
+
+  std::string& buffer_;
+};
+
 /**
  * Provides an API for streaming JSON output, as an alternative to populating a
  * JSON structure with an image of what you want to serialize, or using a
  * protobuf with reflection. The advantage of this approach is that it does not
  * require building an intermediate data structure with redundant copies of all
  * strings, maps, and arrays.
+ *
+ * NOTE: This template take a type that can be used to stream output. This is either
+ * BufferOutput, StringOutput or any other types that have implemented
+ * add(absl::string_view) and
+ * add(absl::string_view, absl::string_view, absl::string_view) methods.
  */
-class Streamer {
+template <class OutputBufferType> class StreamerBase {
 public:
   using Value = absl::variant<absl::string_view, double, uint64_t, int64_t, bool>;
 
   /**
-   * @param response The buffer in which to stream output. Note: this buffer can
-   *                 be flushed during population; it is not necessary to hold
-   *                 the entire json structure in memory before streaming it to
-   *                 the network.
+   * @param response The buffer in which to stream output.
+   * NOTE: The response must could be used to construct instance of OutputBufferType.
    */
-  explicit Streamer(Buffer::Instance& response) : response_(response) {}
+  template <class T> explicit StreamerBase(T& response) : response_(response) {}
 
   class Array;
   using ArrayPtr = std::unique_ptr<Array>;
@@ -81,15 +100,15 @@ public:
    */
   class Level {
   public:
-    Level(Streamer& streamer, absl::string_view opener, absl::string_view closer)
+    Level(StreamerBase& streamer, absl::string_view opener, absl::string_view closer)
         : streamer_(streamer), closer_(closer) {
-      streamer_.addConstantString(opener);
+      streamer_.addWithoutSanitizing(opener);
 #ifndef NDEBUG
       streamer_.push(this);
 #endif
     }
     virtual ~Level() {
-      streamer_.addConstantString(closer_);
+      streamer_.addWithoutSanitizing(closer_);
 #ifndef NDEBUG
       streamer_.pop(this);
 #endif
@@ -180,7 +199,7 @@ public:
       if (is_first_) {
         is_first_ = false;
       } else {
-        streamer_.addConstantString(",");
+        streamer_.addWithoutSanitizing(",");
       }
     }
 
@@ -223,11 +242,9 @@ public:
       }
     }
 
-  private:
-    friend Streamer;
-
+  protected:
     bool is_first_{true}; // Used to control whether a comma-separator is added for a new entry.
-    Streamer& streamer_;
+    StreamerBase& streamer_;
     absl::string_view closer_;
   };
   using LevelPtr = std::unique_ptr<Level>;
@@ -241,7 +258,7 @@ public:
     using NameValue = std::pair<const absl::string_view, Value>;
     using Entries = absl::Span<const NameValue>;
 
-    Map(Streamer& streamer) : Level(streamer, "{", "}") {}
+    Map(StreamerBase& streamer) : Level(streamer, "{", "}") {}
 
     /**
      * Initiates a new map key. This must be followed by rendering a value,
@@ -292,7 +309,7 @@ public:
    */
   class Array : public Level {
   public:
-    Array(Streamer& streamer) : Level(streamer, "[", "]") {}
+    Array(StreamerBase& streamer) : Level(streamer, "[", "]") {}
     using Entries = absl::Span<const Value>;
 
     /**
@@ -333,11 +350,6 @@ public:
     return std::make_unique<Array>(*this);
   }
 
-private:
-  friend Level;
-  friend Map;
-  friend Array;
-
   /**
    * Takes a raw string, sanitizes it using JSON syntax, surrounds it
    * with a prefix and suffix, and streams it out.
@@ -361,7 +373,7 @@ private:
     if (std::isnan(d)) {
       response_.add(Constants::Null);
     } else {
-      Buffer::Util::serializeDouble(d, response_.buffer_);
+      Buffer::Util::serializeDouble(d, response_);
     }
   }
   void addNumber(uint64_t u) { response_.add(absl::StrCat(u)); }
@@ -373,11 +385,14 @@ private:
   void addBool(bool b) { response_.add(b ? Constants::True : Constants::False); }
 
   /**
-   * Adds a constant string to the output stream. The string must outlive the
-   * Streamer object, and is intended for literal strings such as punctuation.
+   * Adds a pre-sanitized string or which doesn't require sanitizing to the output stream.
+   * NOTE: use this with care as it bypasses the sanitization process and may result in
+   * invalid JSON. If you are not sure if the string is already sanitized, use addString()
+   * or addSanitized() instead.
    */
-  void addConstantString(absl::string_view str) { response_.add(str); }
+  void addWithoutSanitizing(absl::string_view str) { response_.add(str); }
 
+private:
 #ifndef NDEBUG
   /**
    * @return the top Level*. This is used for asserts.
@@ -399,7 +414,7 @@ private:
 
 #endif
 
-  BufferOutput response_;
+  OutputBufferType response_;
   std::string sanitize_buffer_;
 
 #ifndef NDEBUG
@@ -408,6 +423,11 @@ private:
   std::stack<Level*> levels_;
 #endif
 };
+
+/**
+ * A Streamer that streams to a Buffer::Instance.
+ */
+using Streamer = StreamerBase<BufferOutput>;
 
 } // namespace Json
 } // namespace Envoy
