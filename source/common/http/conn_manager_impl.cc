@@ -357,7 +357,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.deferHeadersAndTrailers();
   } else {
     // For HTTP/1 and HTTP/2, log here as usual.
-    stream.filter_manager_.log(AccessLog::AccessLogType::DownstreamEnd);
+    stream.log(AccessLog::AccessLogType::DownstreamEnd);
   }
 
   stream.filter_manager_.destroyFilters();
@@ -823,14 +823,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
          "Either routeConfigProvider or (scopedRouteConfigProvider and scopeKeyBuilder) should be "
          "set in "
          "ConnectionManagerImpl.");
-  for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_->accessLogs()) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_separate_config_and_filter_access_loggers")) {
-      filter_manager_.addConfigLogHandler(access_log);
-    } else {
-      filter_manager_.addAccessLogHandler(access_log);
-    }
-  }
 
   filter_manager_.streamInfo().setStreamIdProvider(
       std::make_shared<HttpStreamIdProviderImpl>(*this));
@@ -902,7 +894,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       // If the request is complete, we've already done the stream-end access-log, and shouldn't
       // do the periodic log.
       if (!streamInfo().requestComplete().has_value()) {
-        filter_manager_.log(AccessLog::AccessLogType::DownstreamPeriodic);
+        log(AccessLog::AccessLogType::DownstreamPeriodic);
         refreshAccessLogFlushTimer();
       }
       const SystemTime now = connection_manager_.timeSource().systemTime();
@@ -917,6 +909,29 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       }
     });
     refreshAccessLogFlushTimer();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
+  const Formatter::HttpFormatterContext log_context{
+      request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,
+      active_span_.get()};
+
+  const bool filter_access_loggers_first =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.filter_access_loggers_first");
+
+  if (!filter_access_loggers_first) {
+    for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
+      access_logger->log(log_context, filter_manager_.streamInfo());
+    }
+  }
+
+  filter_manager_.log(log_context);
+
+  if (filter_access_loggers_first) {
+    for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
+      access_logger->log(log_context, filter_manager_.streamInfo());
+    }
   }
 }
 
@@ -1372,7 +1387,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
 
   if (connection_manager_.config_->flushAccessLogOnNewRequest()) {
-    filter_manager_.log(AccessLog::AccessLogType::DownstreamStart);
+    log(AccessLog::AccessLogType::DownstreamStart);
   }
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
@@ -1848,7 +1863,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   if (state_.is_tunneling_ &&
       connection_manager_.config_->flushAccessLogOnTunnelSuccessfullyEstablished()) {
-    filter_manager_.log(AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
+    log(AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
   }
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
