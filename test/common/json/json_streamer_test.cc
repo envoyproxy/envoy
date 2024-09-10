@@ -15,6 +15,7 @@ class BufferOutputWrapper {
 public:
   using Type = BufferOutput;
   std::string toString() { return underlying_buffer_.toString(); }
+  void clear() { underlying_buffer_.drain(underlying_buffer_.length()); }
   Buffer::OwnedImpl underlying_buffer_;
 };
 
@@ -22,6 +23,7 @@ class StringOutputWrapper {
 public:
   using Type = StringOutput;
   std::string toString() { return underlying_buffer_; }
+  void clear() { underlying_buffer_.clear(); }
   std::string underlying_buffer_;
 };
 
@@ -134,9 +136,9 @@ TYPED_TEST(JsonStreamerTest, SubArray) {
 TYPED_TEST(JsonStreamerTest, TopArray) {
   {
     auto array = this->streamer_.makeRootArray();
-    array->addEntries({1.0, "two", 3.5, true, false, std::nan("")});
+    array->addEntries({1.0, "two", 3.5, true, false, std::nan(""), absl::monostate{}});
   }
-  EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null])EOF", this->buffer_.toString());
+  EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null,null])EOF", this->buffer_.toString());
 }
 
 TYPED_TEST(JsonStreamerTest, SubMap) {
@@ -147,6 +149,45 @@ TYPED_TEST(JsonStreamerTest, SubMap) {
   sub_map.reset();
   map.reset();
   EXPECT_EQ(R"EOF({"a":{"one":1,"three.5":3.5}})EOF", this->buffer_.toString());
+}
+
+TYPED_TEST(JsonStreamerTest, SimpleDirectCall) {
+  {
+    this->streamer_.addBool(true);
+    EXPECT_EQ("true", this->buffer_.toString());
+    this->buffer_.clear();
+  }
+
+  {
+    this->streamer_.addBool(false);
+    EXPECT_EQ("false", this->buffer_.toString());
+    this->buffer_.clear();
+  }
+
+  {
+    this->streamer_.addString("hello");
+    EXPECT_EQ(R"EOF("hello")EOF", this->buffer_.toString());
+    this->buffer_.clear();
+  }
+
+  {
+    uint64_t value = 1;
+    this->streamer_.addNumber(value);
+    EXPECT_EQ("1", this->buffer_.toString());
+    this->buffer_.clear();
+  }
+
+  {
+    this->streamer_.addNumber(1.5);
+    EXPECT_EQ("1.5", this->buffer_.toString());
+    this->buffer_.clear();
+  }
+
+  {
+    this->streamer_.addNull();
+    EXPECT_EQ("null", this->buffer_.toString());
+    this->buffer_.clear();
+  }
 }
 
 } // namespace

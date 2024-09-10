@@ -81,7 +81,7 @@ public:
  */
 template <class OutputBufferType> class StreamerBase {
 public:
-  using Value = absl::variant<absl::string_view, double, uint64_t, int64_t, bool>;
+  using Value = absl::variant<absl::string_view, double, uint64_t, int64_t, bool, absl::monostate>;
 
   /**
    * @param response The buffer in which to stream output.
@@ -190,6 +190,18 @@ public:
       streamer_.addBool(b);
     }
 
+    /**
+     * Adds a null constant value to the current array or map. It's a programming
+     * error to call this method on a map or array that's not the top level.
+     * It's also a programming error to call this on map that isn't expecting
+     * a value. You must call Map::addKey prior to calling this.
+     */
+    void addNull() {
+      ASSERT_THIS_IS_TOP_LEVEL;
+      nextField();
+      streamer_.addNull();
+    }
+
   protected:
     /**
      * Initiates a new field, serializing a comma separator if this is not the
@@ -211,33 +223,38 @@ public:
      * @param Value the value to render.
      */
     void addValue(const Value& value) {
-      static_assert(absl::variant_size_v<Value> == 5, "Value must be a variant with 5 types");
+      static_assert(absl::variant_size_v<Value> == 6, "Value must be a variant with 6 types");
 
       switch (value.index()) {
       case 0:
-        static_assert(std::is_same<decltype(absl::get<0>(value)), const absl::string_view&>::value,
+        static_assert(std::is_same_v<absl::variant_alternative_t<0, Value>, absl::string_view>,
                       "value at index 0 must be an absl::string_vlew");
         addString(absl::get<absl::string_view>(value));
         break;
       case 1:
-        static_assert(std::is_same<decltype(absl::get<1>(value)), const double&>::value,
+        static_assert(std::is_same_v<absl::variant_alternative_t<1, Value>, double>,
                       "value at index 1 must be a double");
         addNumber(absl::get<double>(value));
         break;
       case 2:
-        static_assert(std::is_same<decltype(absl::get<2>(value)), const uint64_t&>::value,
+        static_assert(std::is_same_v<absl::variant_alternative_t<2, Value>, uint64_t>,
                       "value at index 2 must be a uint64_t");
         addNumber(absl::get<uint64_t>(value));
         break;
       case 3:
-        static_assert(std::is_same<decltype(absl::get<3>(value)), const int64_t&>::value,
+        static_assert(std::is_same_v<absl::variant_alternative_t<3, Value>, int64_t>,
                       "value at index 3 must be an int64_t");
         addNumber(absl::get<int64_t>(value));
         break;
       case 4:
-        static_assert(std::is_same<decltype(absl::get<4>(value)), const bool&>::value,
+        static_assert(std::is_same_v<absl::variant_alternative_t<4, Value>, bool>,
                       "value at index 4 must be a bool");
         addBool(absl::get<bool>(value));
+        break;
+      case 5:
+        static_assert(std::is_same_v<absl::variant_alternative_t<5, Value>, absl::monostate>,
+                      "value at index 5 must be an absl::monostate");
+        addNull();
         break;
       }
     }
@@ -385,14 +402,17 @@ public:
   void addBool(bool b) { response_.add(b ? Constants::True : Constants::False); }
 
   /**
-   * Adds a pre-sanitized string or which doesn't require sanitizing to the output stream.
-   * NOTE: use this with care as it bypasses the sanitization process and may result in
-   * invalid JSON. If you are not sure if the string is already sanitized, use addString()
-   * or addSanitized() instead.
+   * Serializes a null to the output stream.
+   */
+  void addNull() { response_.add(Constants::Null); }
+
+private:
+  /**
+   * Adds a string to the output stream without sanitizing it. This is only used to push
+   * the delimiters to output buffer.
    */
   void addWithoutSanitizing(absl::string_view str) { response_.add(str); }
 
-private:
 #ifndef NDEBUG
   /**
    * @return the top Level*. This is used for asserts.
