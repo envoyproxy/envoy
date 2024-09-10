@@ -1,7 +1,6 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/flags/commandlineflag.h"
-#include "absl/flags/declare.h"
 #include "absl/flags/flag.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
@@ -224,7 +223,7 @@ bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
 }
 
-bool      runtimeFeatureEnabled(absl::string_view feature) {
+bool runtimeFeatureEnabled(absl::string_view feature) {
   absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
