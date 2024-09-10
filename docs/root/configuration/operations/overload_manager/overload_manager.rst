@@ -368,22 +368,13 @@ Some platform owners may choose to install this overload action by default to pr
 since it is easier to configure a target CPU utilization percentage than to configure a request rate per
 workload.
 
-.. code-block:: yaml
+.. literalinclude:: _include/cpu_utilization_monitor_overload.yaml
+    :language: yaml
+    :lines: 73-87
+    :emphasize-lines: 77-87
+    :linenos:
+    :caption: :download:`cpu_utilization_monitor_overload.yaml <_include/cpu_utilization_monitor_overload.yaml>`
 
-  refresh_interval:
-    seconds: 0
-    nanos: 250000000
-  resource_monitors:
-    - name: "envoy.resource_monitors.cpu_utilization"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig
-  actions:
-    - name: "envoy.overload_actions.stop_accepting_requests"
-      triggers:
-        - name: "envoy.resource_monitors.cpu_utilization"
-          scaled:
-            scaling_threshold: 0.80
-            saturation_threshold: 0.95
 
 Statistics
 ----------
