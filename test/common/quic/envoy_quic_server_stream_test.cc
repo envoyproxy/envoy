@@ -912,7 +912,6 @@ TEST_F(EnvoyQuicServerStreamTest, RegularHeaderBeforePseudoHeader) {
 
 TEST_F(EnvoyQuicServerStreamTest, DuplicatedPathHeader) {
   quic::QuicHeaderList header_list;
-  header_list.OnHeaderBlockStart();
   header_list.OnHeader(":authority", "www.google.com:4433");
   header_list.OnHeader(":method", "GET");
   header_list.OnHeader(":scheme", "https");

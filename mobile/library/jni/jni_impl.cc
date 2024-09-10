@@ -3,6 +3,7 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "ares.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/bridge/utility.h"
@@ -199,6 +200,27 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   Envoy::InternalEngine* internal_engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
   internal_engine->terminate();
   delete internal_engine;
+}
+
+extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initCares(
+    JNIEnv* env, jclass, jobject connectivity_manager) {
+#if defined(__ANDROID_API__)
+  Envoy::JNI::JniHelper jni_helper(env);
+  ares_library_init_jvm(jni_helper.getJavaVm());
+  ares_library_init_android(connectivity_manager);
+#else
+  // For suppressing unused parameters.
+  (void)env;
+  (void)connectivity_manager;
+#endif
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_runtimeFeatureEnabled(JNIEnv* env, jclass,
+                                                                       jstring feature_name) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  return Envoy::Runtime::runtimeFeatureEnabled(
+      Envoy::JNI::javaStringToCppString(jni_helper, feature_name));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_recordCounterInc(
@@ -1196,12 +1218,12 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
                       jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
                       jint dns_num_retries, jboolean enable_drain_post_dns_refresh,
-                      jboolean enable_http3, jboolean use_cares, jboolean use_gro,
-                      jstring http3_connection_options, jstring http3_client_connection_options,
-                      jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
-                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-                      jboolean enable_port_migration, jboolean enable_socket_tagging,
-                      jboolean enable_interface_binding,
+                      jboolean enable_http3, jboolean use_cares, jboolean force_v6,
+                      jboolean use_gro, jstring http3_connection_options,
+                      jstring http3_client_connection_options, jobjectArray quic_hints,
+                      jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
+                      jboolean enable_brotli_decompression, jboolean enable_port_migration,
+                      jboolean enable_socket_tagging, jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
                       jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
@@ -1255,7 +1277,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
   builder.enablePlatformCertificatesValidation(enable_platform_certificates_validation == JNI_TRUE);
   builder.setUpstreamTlsSni(Envoy::JNI::javaStringToCppString(jni_helper, upstream_tls_sni));
-  builder.setForceAlwaysUsev6(true);
+  builder.setForceAlwaysUsev6(force_v6 == JNI_TRUE);
 
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {
@@ -1294,11 +1316,12 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jint dns_num_retries,
     jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean use_cares,
-    jboolean use_gro, jstring http3_connection_options, jstring http3_client_connection_options,
-    jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
-    jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
-    jboolean enable_port_migration, jboolean enable_socket_tagging,
-    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jboolean force_v6, jboolean use_gro, jstring http3_connection_options,
+    jstring http3_client_connection_options, jobjectArray quic_hints,
+    jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
+    jboolean enable_brotli_decompression, jboolean enable_port_migration,
+    jboolean enable_socket_tagging, jboolean enable_interface_binding,
+    jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
@@ -1311,10 +1334,10 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       jni_helper, connect_timeout_seconds, dns_refresh_seconds, dns_failure_refresh_seconds_base,
       dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
       dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
-      enable_drain_post_dns_refresh, enable_http3, use_cares, use_gro, http3_connection_options,
-      http3_client_connection_options, quic_hints, quic_canonical_suffixes,
-      enable_gzip_decompression, enable_brotli_decompression, enable_port_migration,
-      enable_socket_tagging, enable_interface_binding,
+      enable_drain_post_dns_refresh, enable_http3, use_cares, force_v6, use_gro,
+      http3_connection_options, http3_client_connection_options, quic_hints,
+      quic_canonical_suffixes, enable_gzip_decompression, enable_brotli_decompression,
+      enable_port_migration, enable_socket_tagging, enable_interface_binding,
       h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
       max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
       app_version, app_id, trust_chain_verification, filter_chain,
@@ -1334,12 +1357,24 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_resetConnectivityState(JNIEnv* 
   return reinterpret_cast<Envoy::InternalEngine*>(engine)->resetConnectivityState();
 }
 
-extern "C" JNIEXPORT jint JNICALL
-Java_io_envoyproxy_envoymobile_engine_JniLibrary_setPreferredNetwork(JNIEnv* /*env*/,
-                                                                     jclass, // class
-                                                                     jlong engine, jint network) {
-  return reinterpret_cast<Envoy::InternalEngine*>(engine)->setPreferredNetwork(
-      static_cast<Envoy::NetworkType>(network));
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkAvailable(JNIEnv*, jclass,
+                                                                           jlong engine) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkAvailable();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChanged(JNIEnv*, jclass,
+                                                                         jlong engine,
+                                                                         jint network_type) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChanged(
+      static_cast<Envoy::NetworkType>(network_type));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkUnavailable(JNIEnv*, jclass,
+                                                                             jlong engine) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkUnavailable();
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_setProxySettings(

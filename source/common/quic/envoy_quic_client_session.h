@@ -5,7 +5,9 @@
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_network_connectivity_observer.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
 
@@ -87,6 +89,9 @@ public:
   void OnServerPreferredAddressAvailable(
       const quic::QuicSocketAddress& server_preferred_address) override;
 
+  // Register this session to the given registry for receiving network change events.
+  void registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry);
+
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
 protected:
@@ -122,6 +127,8 @@ private:
   OptRef<QuicTransportSocketFactoryBase> transport_socket_factory_;
   std::vector<std::string> configured_alpns_;
   quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
+  QuicNetworkConnectivityObserverPtr network_connectivity_observer_;
+  OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
 };
 
 } // namespace Quic

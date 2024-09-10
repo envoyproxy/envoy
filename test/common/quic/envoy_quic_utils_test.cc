@@ -77,7 +77,6 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers;
-  quic_headers.OnHeaderBlockStart();
   quic_headers.OnHeader(":authority", "www.google.com");
   quic_headers.OnHeader(":path", "/index.hml");
   quic_headers.OnHeader(":scheme", "https");
@@ -101,7 +100,6 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers2;
-  quic_headers2.OnHeaderBlockStart();
   quic_headers2.OnHeader(":authority", "www.google.com");
   quic_headers2.OnHeader(":path", "/index.hml");
   quic_headers2.OnHeader(":scheme", "https");
@@ -226,7 +224,6 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   absl::string_view details;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   quic::QuicHeaderList quic_headers;
-  quic_headers.OnHeaderBlockStart();
   quic_headers.OnHeader(":authority", "www.google.com");
   quic_headers.OnHeader(":path", "/index.hml");
   quic_headers.OnHeader(":scheme", "https");
@@ -283,6 +280,40 @@ TEST(EnvoyQuicUtilsTest, QuicResetErrorToEnvoyResetReason) {
             Http::StreamResetReason::ConnectionTermination);
   EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECT_ERROR),
             Http::StreamResetReason::ConnectError);
+}
+
+TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
+  Network::Address::InstanceConstSharedPtr local_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  Network::Address::InstanceConstSharedPtr peer_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321, nullptr);
+  auto connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  connection_socket->close();
+
+  Network::Address::InstanceConstSharedPtr no_local_addr = nullptr;
+  connection_socket = createConnectionSocket(peer_addr, no_local_addr, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_EQ("127.0.0.1", no_local_addr->ip()->addressAsString());
+  connection_socket->close();
+
+  Network::Address::InstanceConstSharedPtr local_addr_v6 =
+      std::make_shared<Network::Address::Ipv6Instance>("::1");
+  Network::Address::InstanceConstSharedPtr peer_addr_v6 =
+      std::make_shared<Network::Address::Ipv6Instance>("::1", 54321, nullptr);
+  connection_socket = createConnectionSocket(peer_addr_v6, local_addr_v6, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  connection_socket->close();
+
+  Network::Address::InstanceConstSharedPtr no_local_addr_v6 = nullptr;
+  connection_socket = createConnectionSocket(peer_addr_v6, no_local_addr_v6, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_EQ("::1", no_local_addr_v6->ip()->addressAsString());
+  connection_socket->close();
 }
 
 } // namespace Quic

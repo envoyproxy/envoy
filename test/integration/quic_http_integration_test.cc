@@ -671,6 +671,26 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
   test_server_->waitForCounterEq("http3.quic_version_h3_29", 1u);
 }
 
+TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.quic_support_certificate_compression", "true");
+  initialize();
+
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"trace", "Cert compression successful"}, {"trace", "Cert decompression successful"}}),
+      { testRouterHeaderOnlyRequestAndResponse(); });
+}
+
+TEST_P(QuicHttpIntegrationTest, CertCompressionDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.quic_support_certificate_compression", "false");
+  initialize();
+
+  EXPECT_LOG_NOT_CONTAINS("trace", "Cert compression successful",
+                          { testRouterHeaderOnlyRequestAndResponse(); });
+}
+
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
@@ -2101,7 +2121,7 @@ TEST_P(QuicHttpIntegrationSPATest, UsesPreferredAddressDNAT) {
   }
   auto listener_port = lookupPort("http");
 
-  // Setup DNAT for 0.0.0.0:12345-->127.0.0.2:listener_port
+  // Setup DNAT for 1.2.3.4:12345-->127.0.0.2:listener_port
   socket_swap.write_matcher_->setDnat(
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 12345),
       Network::Utility::parseInternetAddressNoThrow("127.0.0.2", listener_port));
