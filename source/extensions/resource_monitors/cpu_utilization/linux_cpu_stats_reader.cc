@@ -26,7 +26,7 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
   std::string buffer(5, '\0');
   cpu_stats_file.read(buffer.data(), 5);
   const std::string target = "cpu  ";
-  if (!cpu_stats_file || !std::equal(buffer.begin(), buffer.end(), target.begin(), target.end())) {
+  if (!cpu_stats_file || buffer != target) {
     ENVOY_LOG_MISC(error, "Unexpected format in linux cpu stats file {}", cpu_stats_filename_);
     return {false, 0, 0};
   }
