@@ -4392,7 +4392,135 @@ TEST(SubstitutionFormatterTest, StructFormatterTypedTest) {
 
 TEST(SubstitutionFormatterTest, JsonFormatterTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestRequestHeaderMapImpl request_header{{"key_1", "value_1"},
+                                                {"key_2", R"(value_with_quotes_"_)"}};
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                         body);
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    raw_bool_value: true
+    raw_nummber_value: 6
+    nested_list:
+      - 14
+      - "3.14"
+      - false
+      - "ok"
+      - '%REQ(key_1)%'
+      - '%REQ(error)%'
+    request_duration: '%REQUEST_DURATION%'
+    nested_level:
+      plain_string: plain_string_value
+      protocol: '%PROTOCOL%'
+    request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
+  )EOF",
+                            key_mapping);
+
+  const std::string expected = R"EOF({
+    "raw_bool_value": "true",
+    "raw_nummber_value": "6",
+    "nested_list": [
+      "14",
+      "3.14",
+      "false",
+      "ok",
+      "value_1",
+      "-"
+    ],
+    "request_duration": "5",
+    "nested_level": {
+      "plain_string": "plain_string_value",
+      "protocol": "HTTP/1.1"
+    },
+    "request_key": "value_1_@!!!_\"_value_with_quotes_\"_"
+  })EOF";
+
+  JsonFormatterImpl formatter(key_mapping, false, false);
+  const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+}
+
+TEST(SubstitutionFormatterTest, JsonFormatterKeepValueTypeTest) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"key_1", "value_1"},
+                                                {"key_2", R"(value_with_quotes_"_)"}};
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                         body);
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    raw_bool_value: true
+    raw_nummber_value: 6
+    nested_list:
+      - 14
+      - "3.14"
+      - false
+      - "ok"
+      - '%REQ(key_1)%'
+      - '%REQ(error)%'
+    request_duration: '%REQUEST_DURATION%'
+    nested_level:
+      plain_string: plain_string_value
+      protocol: '%PROTOCOL%'
+    request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
+  )EOF",
+                            key_mapping);
+
+  const std::string expected = R"EOF({
+    "raw_bool_value": true,
+    "raw_nummber_value": 6,
+    "nested_list": [
+      14,
+      "3.14",
+      false,
+      "ok",
+      "value_1",
+      null
+    ],
+    "request_duration": 5,
+    "nested_level": {
+      "plain_string": "plain_string_value",
+      "protocol": "HTTP/1.1"
+    },
+    "request_key": "value_1_@!!!_\"_value_with_quotes_\"_"
+  })EOF";
+
+  JsonFormatterImpl formatter(key_mapping, true, false);
+  const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
+  std::cout << out_json << std::endl;
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+}
+
+TEST(SubstitutionFormatterTest, LegacyJsonFormatterTest) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"key_1", "value_1"},
+                                                {"key_2", R"(value_with_quotes_"_)"}};
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
@@ -4415,20 +4543,23 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
     nested_level:
       plain_string: plain_string_value
       protocol: '%PROTOCOL%'
+    request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false, false);
 
   const std::string expected = R"EOF({
     "request_duration": "5",
     "nested_level": {
       "plain_string": "plain_string_value",
       "protocol": "HTTP/1.1"
-    }
+    },
+    "request_key": "value_1_@!!!_\"_value_with_quotes_\"_"
   })EOF";
 
-  const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
-  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+  LegacyJsonFormatterImpl legacy_formatter(key_mapping, false, false, false);
+  const std::string legacy_out_json =
+      legacy_formatter.formatWithContext(formatter_context, stream_info);
+  EXPECT_TRUE(TestUtility::jsonStringEqual(legacy_out_json, expected));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
@@ -4461,17 +4592,23 @@ TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
       protocol: '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false, true);
 
   const std::string expected =
       "{\"afield\":\"vala\",\"bfield\":\"valb\",\"nested_level\":"
       "{\"cfield\":\"valc\",\"plain_string\":\"plain_string_value\",\"protocol\":\"HTTP/1.1\"},"
       "\"request_duration\":\"5\"}\n";
 
+  // The formatter will always order the properties alphabetically.
+  JsonFormatterImpl formatter(key_mapping, false, false);
   const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
-
   // Check string equality to verify the order.
   EXPECT_EQ(out_json, expected);
+
+  // The legacy formatter needs a flag to tell it to order the properties.
+  LegacyJsonFormatterImpl legacy_formatter(key_mapping, false, false, true);
+  const std::string legacy_out_json =
+      legacy_formatter.formatWithContext(formatter_context, stream_info);
+  EXPECT_EQ(legacy_out_json, expected);
 }
 
 TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {

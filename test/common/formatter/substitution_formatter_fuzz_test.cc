@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "source/common/formatter/substitution_formatter.h"
 
 #include "test/common/formatter/substitution_formatter_fuzz.pb.validate.h"
@@ -9,29 +11,90 @@ namespace Fuzz {
 namespace {
 
 DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
+  // Create formatter context.
+  Http::RequestHeaderMapPtr request_headers;
+  Http::ResponseHeaderMapPtr response_headers;
+  Http::ResponseTrailerMapPtr response_trailers;
+  std::unique_ptr<StreamInfo::StreamInfo> stream_info;
+  MockTimeSystem time_system;
+
   try {
     TestUtility::validate(input);
-    std::vector<Formatter::FormatterProviderPtr> formatters =
-        Formatter::SubstitutionFormatParser::parse(input.format());
-    const auto request_headers =
-        Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.request_headers());
-    const auto response_headers =
-        Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(input.response_headers());
-    const auto response_trailers =
-        Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(input.response_trailers());
-    MockTimeSystem time_system;
-    const std::unique_ptr<TestStreamInfo> stream_info =
-        Fuzz::fromStreamInfo(input.stream_info(), time_system);
-
-    const Formatter::HttpFormatterContext formatter_context{&request_headers, &response_headers,
-                                                            &response_trailers};
-
-    for (const auto& it : formatters) {
-      it->formatWithContext(formatter_context, *stream_info);
-    }
-    ENVOY_LOG_MISC(trace, "Success");
+    request_headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
+        Fuzz::fromHeaders<Http::TestRequestHeaderMapImpl>(input.request_headers()));
+    response_headers = std::make_unique<Http::TestResponseHeaderMapImpl>(
+        Fuzz::fromHeaders<Http::TestResponseHeaderMapImpl>(input.response_headers()));
+    response_trailers = std::make_unique<Http::TestResponseTrailerMapImpl>(
+        Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(input.response_trailers()));
+    stream_info = Fuzz::fromStreamInfo(input.stream_info(), time_system);
   } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    ENVOY_LOG_MISC(debug, "Creating formatter context failed, EnvoyException: {}", e.what());
+    return;
+  }
+
+  const Formatter::HttpFormatterContext formatter_context{
+      request_headers.get(), response_headers.get(), response_trailers.get()};
+
+  // Text formatter.
+  {
+    Formatter::FormatterPtr formatter;
+    try {
+      formatter = std::make_unique<Formatter::FormatterImpl>(input.format());
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG_MISC(debug, "TEXT formatter failed, EnvoyException: {}", e.what());
+      return;
+    }
+
+    // This should never throw.
+    formatter->formatWithContext(formatter_context, *stream_info);
+    ENVOY_LOG_MISC(trace, "TEXT formatter Success");
+  }
+
+  // JSON formatter.
+  {
+
+    Formatter::FormatterPtr formatter;
+    Formatter::FormatterPtr typed_formatter;
+
+    try {
+      // Create struct for JSON formatter.
+      ProtobufWkt::Struct struct_for_json_formatter;
+      TestUtility::loadFromYaml(fmt::format(R"EOF(
+      raw_bool_value: true
+      raw_nummber_value: 6
+      nested_list:
+        - 14
+        - "3.14"
+        - false
+        - "ok"
+        - '%REQ(key_1)%'
+        - '%REQ(error)%'
+        - {}
+      request_duration: '%REQUEST_DURATION%'
+      nested_level:
+        plain_string: plain_string_value
+        protocol: '%PROTOCOL%'
+        fuzz_format: {}
+      request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
+      )EOF",
+                                            input.format(), input.format()),
+                                struct_for_json_formatter);
+
+      // Create JSON formatter.
+      formatter =
+          std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, false, false);
+      typed_formatter =
+          std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, true, false);
+
+    } catch (const EnvoyException& e) {
+      ENVOY_LOG_MISC(debug, "JSON formatter failed, EnvoyException: {}", e.what());
+      return;
+    }
+
+    // This should never throw.
+    formatter->formatWithContext(formatter_context, *stream_info);
+    typed_formatter->formatWithContext(formatter_context, *stream_info);
+    ENVOY_LOG_MISC(trace, "JSON formatter Success");
   }
 }
 
