@@ -69,7 +69,8 @@ Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
       std::string));
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
       std::move(users), proto_config.forward_username_header(),
-      proto_config.override_authorization_header(), stats_prefix, context.scope());
+      proto_config.authentication_header(),
+      stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<BasicAuthFilter>(config));
   };

@@ -42,10 +42,10 @@ message BasicAuth {
   string forward_username_header = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
-  // This field specifies the header name to load basic authorization credentials.
+  // This field specifies the header name to load basic authentication credentials.
   //
   // If it is not specified, the filter loads credential from :Authorization header
-  string override_authorization_header = 3
+  string authentication_header = 3
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
 
