@@ -461,24 +461,18 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
   EXPECT_EQ(nullptr, decoder_filter->callbacks_->mostSpecificPerFilterConfig());
 
   // Get a valid config by the custom filter name.
-  EXPECT_CALL(*route, traversePerFilterConfig(testing::Eq("custom-name"), _))
-      .WillOnce(Invoke([&](const std::string&,
-                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-        cb(*route_config);
+  EXPECT_CALL(*route, perFilterConfigs(testing::Eq("custom-name")))
+      .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        return {route_config.get()};
       }));
-  decoder_filter->callbacks_->traversePerFilterConfig(
-      [&](const Router::RouteSpecificFilterConfig& config) {
-        EXPECT_EQ(route_config.get(), &config);
-      });
+  auto route_config_result = decoder_filter->callbacks_->perFilterConfigs();
+  EXPECT_EQ(route_config.get(), route_config_result[0]);
 
   // Get nothing by the custom filter name.
-  EXPECT_CALL(*route, traversePerFilterConfig(testing::Eq("custom-name"), _))
-      .WillOnce(Invoke([&](const std::string&,
-                           std::function<void(const Router::RouteSpecificFilterConfig&)>) {}));
-  decoder_filter->callbacks_->traversePerFilterConfig(
-      [&](const Router::RouteSpecificFilterConfig& config) {
-        EXPECT_EQ(route_config.get(), &config);
-      });
+  EXPECT_CALL(*route, perFilterConfigs(testing::Eq("custom-name")))
+      .WillOnce(Invoke([](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; }));
+  route_config_result = decoder_filter->callbacks_->perFilterConfigs();
+  EXPECT_TRUE(route_config_result.empty());
 
   filter_manager_->destroyFilters();
 };
@@ -507,8 +501,7 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigForNullRoute) {
   decoder_filter->callbacks_->mostSpecificPerFilterConfig();
 
   EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
-  decoder_filter->callbacks_->traversePerFilterConfig(
-      [](const Router::RouteSpecificFilterConfig&) {});
+  decoder_filter->callbacks_->perFilterConfigs();
 
   filter_manager_->destroyFilters();
 }

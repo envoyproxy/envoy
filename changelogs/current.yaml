@@ -128,6 +128,11 @@ bug_fixes:
     the number of requests per I/O cycle is configured and an HTTP decoder filter that pauses filter chain is present. This behavior
     can be reverted by setting the runtime guard ``envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream``
     to false.
+- area: runtime
+  change: |
+    Fixed an inconsistency in how boolean values are loaded in RTDS, where they were previously converted to "1"/"0"
+    instead of "true"/"false". The correct string representation ("true"/"false") will now be used. This change can be
+    reverted by setting the runtime guard ``envoy.reloadable_features.boolean_to_string_fix`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -230,6 +235,11 @@ new_features:
     Added socket ``type`` field for specifying a socket type to apply the socket option to under :ref:`SocketOption
     <envoy_v3_api_msg_config.core.v3.SocketOption>`. If not specified, the socket option will be applied to all socket
     types.
+- area: quic
+  change: |
+    QUIC server and client support certificate compression, which can in some cases reduce the number of round trips
+    required to setup a connection. This change temporarily disabled by setting the runtime flag
+    ``envoy.reloadable_features.quic_support_certificate_compression`` to ``false``.
 - area: tls
   change: |
     Added an extension point :ref:`custom_tls_certificate_selector
@@ -307,6 +317,10 @@ new_features:
   change: |
     The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
     original IP detection method now supports using a list of trusted CIDRs when parsing ``x-forwarded-for``.
+- area: resource_monitors
+  change: |
+    Added possibility to monitor CPU utilization in Linux based systems via :ref:`cpu utilization monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>` in overload manager.
 - area: lua
   change: |
       Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL

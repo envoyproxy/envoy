@@ -395,6 +395,15 @@ envoy_cc_test(
     ]),
 )
 
+envoy_cc_test(
+    name = "cert_compression_test",
+    srcs = ["cert_compression_test.cc"],
+    deps = [
+        "//source/common/quic:cert_compression_lib",
+        "//test/test_common:logging_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "envoy_quic_h3_fuzz_proto",
     srcs = ["envoy_quic_h3_fuzz.proto"],

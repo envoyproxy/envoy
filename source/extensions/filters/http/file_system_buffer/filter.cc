@@ -1,3 +1,4 @@
+#include "filter.h"
 #include "source/extensions/filters/http/file_system_buffer/filter.h"
 
 namespace Envoy {
@@ -20,12 +21,13 @@ bool FileSystemBufferFilter::initPerRouteConfig() {
   auto route = request_callbacks_->route();
   FilterConfigVector config_chain;
   if (route) {
-    route->traversePerFilterConfig(
-        FileSystemBufferFilter::filterName(),
-        [&config_chain](const Router::RouteSpecificFilterConfig& route_cfg) {
-          auto cfg = dynamic_cast<const FileSystemBufferFilterConfig*>(&route_cfg);
-          config_chain.emplace_back(*cfg);
-        });
+    // TODO(wbpcode): fix this to use the callbacks to get the route specific configs.
+    for (const auto* cfg : route->perFilterConfigs(FileSystemBufferFilter::filterName())) {
+      auto typed_cfg = dynamic_cast<const FileSystemBufferFilterConfig*>(cfg);
+      if (typed_cfg) {
+        config_chain.emplace_back(*typed_cfg);
+      }
+    }
   }
   config_chain.emplace_back(*base_config_);
   config_.emplace(config_chain);
