@@ -60,7 +60,6 @@ private:
   const UserMap users_;
   const std::string forward_username_header_;
   const Http::LowerCaseString authentication_header_;
-  const std::string override_authorization_header_;
   BasicAuthStats stats_;
 };
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
