@@ -45,7 +45,7 @@ public:
 };
 
 TEST(EnvoyQuicUtilsTest, HeadersConversion) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -118,7 +118,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
 }
 
 TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -139,7 +139,7 @@ TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
 }
 
 TEST(EnvoyQuicUtilsTest, TrailersSizeBounds) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -158,7 +158,7 @@ TEST(EnvoyQuicUtilsTest, TrailersSizeBounds) {
 }
 
 TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -244,7 +244,7 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   EXPECT_EQ(response_header->maxHeadersCount(), 100);
   EXPECT_EQ(response_header->maxHeadersKb(), 60);
 
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";

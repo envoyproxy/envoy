@@ -4,6 +4,7 @@
 
 #include "envoy/ssl/tls_certificate_config.h"
 
+#include "source/common/quic/cert_compression.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 #include "source/common/runtime/runtime_features.h"
@@ -209,6 +210,10 @@ EnvoyQuicProofSource::getTransportSocketAndFilterChain(
 void EnvoyQuicProofSource::updateFilterChainManager(
     Network::FilterChainManager& filter_chain_manager) {
   filter_chain_manager_ = &filter_chain_manager;
+}
+
+void EnvoyQuicProofSource::OnNewSslCtx(SSL_CTX* ssl_ctx) {
+  CertCompression::registerSslContext(ssl_ctx);
 }
 
 } // namespace Quic

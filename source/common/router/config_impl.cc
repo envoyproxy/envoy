@@ -1510,15 +1510,15 @@ absl::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config
   return vhost_->filterDisabled(config_name);
 }
 
-void RouteEntryImplBase::traversePerFilterConfig(
-    const std::string& filter_name,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
-  vhost_->traversePerFilterConfig(filter_name, cb);
+RouteSpecificFilterConfigs
+RouteEntryImplBase::perFilterConfigs(absl::string_view filter_name) const {
+  auto result = vhost_->perFilterConfigs(filter_name);
 
-  auto maybe_route_config = per_filter_configs_->get(filter_name);
+  const auto* maybe_route_config = per_filter_configs_->get(filter_name);
   if (maybe_route_config != nullptr) {
-    cb(*maybe_route_config);
+    result.push_back(maybe_route_config);
   }
+  return result;
 }
 
 const envoy::config::core::v3::Metadata& RouteEntryImplBase::metadata() const {
@@ -1598,15 +1598,15 @@ Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderT
   return transforms;
 }
 
-void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
-    const std::string& filter_name,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
-  DynamicRouteEntry::traversePerFilterConfig(filter_name, cb);
+RouteSpecificFilterConfigs
+RouteEntryImplBase::WeightedClusterEntry::perFilterConfigs(absl::string_view filter_name) const {
 
+  auto result = DynamicRouteEntry::perFilterConfigs(filter_name);
   const auto* cfg = per_filter_configs_->get(filter_name);
-  if (cfg) {
-    cb(*cfg);
+  if (cfg != nullptr) {
+    result.push_back(cfg);
   }
+  return result;
 }
 
 UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
@@ -1910,23 +1910,25 @@ absl::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view con
 }
 
 const RouteSpecificFilterConfig*
-CommonVirtualHostImpl::mostSpecificPerFilterConfig(const std::string& name) const {
+CommonVirtualHostImpl::mostSpecificPerFilterConfig(absl::string_view name) const {
   auto* per_filter_config = per_filter_configs_->get(name);
   return per_filter_config != nullptr ? per_filter_config
                                       : global_route_config_->perFilterConfig(name);
 }
-void CommonVirtualHostImpl::traversePerFilterConfig(
-    const std::string& filter_name,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+RouteSpecificFilterConfigs
+CommonVirtualHostImpl::perFilterConfigs(absl::string_view filter_name) const {
+  RouteSpecificFilterConfigs result;
+
   // Parent first.
   if (auto* maybe_rc_config = global_route_config_->perFilterConfig(filter_name);
       maybe_rc_config != nullptr) {
-    cb(*maybe_rc_config);
+    result.push_back(maybe_rc_config);
   }
   if (auto* maybe_vhost_config = per_filter_configs_->get(filter_name);
       maybe_vhost_config != nullptr) {
-    cb(*maybe_vhost_config);
+    result.push_back(maybe_vhost_config);
   }
+  return result;
 }
 
 const envoy::config::core::v3::Metadata& CommonVirtualHostImpl::metadata() const {
@@ -2491,7 +2493,7 @@ PerFilterConfigs::PerFilterConfigs(
   }
 }
 
-const RouteSpecificFilterConfig* PerFilterConfigs::get(const std::string& name) const {
+const RouteSpecificFilterConfig* PerFilterConfigs::get(absl::string_view name) const {
   auto it = configs_.find(name);
   return it == configs_.end() ? nullptr : it->second.config_.get();
 }

@@ -96,7 +96,7 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
     // operations, but this implementation provides a reference for later optimization while we
     // adopt xdstp://.
     auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
-    THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+    THROW_IF_NOT_OK_REF(resource_or_error.status());
     xdstp_resource = resource_or_error.value();
   }
   auto watches_interested = watch_interest_.find(

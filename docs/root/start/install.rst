@@ -10,54 +10,44 @@ If you are :ref:`installing on Mac OSX <start_install_macosx>`, you can install 
 Once you have installed Envoy, check out the :ref:`quick start <start_quick_start>` guide for more information on
 getting your Envoy proxy up and running.
 
-Install Envoy on Debian GNU/Linux
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Install Envoy on Debian-based Linux
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can `install Envoy on Debian using packages created by Tetrate <https://cloudsmith.io/~tetrate/repos/getenvoy-deb-stable/setup/#formats-deb>`_
-until `official packages exist <https://github.com/envoyproxy/envoy/issues/16867>`_.
+ If you are using a different deb-based distribution to the ones shown below, you may still be able to use one of them.
 
-.. code-block:: console
+.. tabs::
 
-   $ sudo apt update
-   $ sudo apt install debian-keyring debian-archive-keyring apt-transport-https curl lsb-release
-   $ curl -sL 'https://deb.dl.getenvoy.io/public/gpg.8115BA8E629CC074.key' | sudo gpg --dearmor -o /usr/share/keyrings/getenvoy-keyring.gpg
-   # Verify the keyring - this should yield "OK"
-   $ echo a077cb587a1b622e03aa4bf2f3689de14658a9497a9af2c427bba5f4cc3c4723 /usr/share/keyrings/getenvoy-keyring.gpg | sha256sum --check
-   $ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/getenvoy-keyring.gpg] https://deb.dl.getenvoy.io/public/deb/debian $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/getenvoy.list
-   $ sudo apt update
-   $ sudo apt install getenvoy-envoy
+   .. code-tab:: console Debian bookworm
 
-Install Envoy on Ubuntu Linux
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      $ wget https://apt.envoyproxy.io/signing.key  | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
+      $ echo "deb[signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bookworm main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ sudo apt-get update
+      $ sudo apt-get install envoy
+      $ envoy --version
 
-You can `install Envoy on Ubuntu using packages created by Tetrate <https://cloudsmith.io/~tetrate/repos/getenvoy-deb-stable/setup/#formats-deb>`_
-until `official packages exist <https://github.com/envoyproxy/envoy/issues/16867>`_.
+   .. code-tab:: console Debian bullseye
 
-.. code-block:: console
+      $ wget https://apt.envoyproxy.io/signing.key  | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
+      $ echo "deb[signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bullseye main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ sudo apt-get update
+      $ sudo apt-get install envoy
+      $ envoy --version
 
-   $ sudo apt update
-   $ sudo apt install apt-transport-https gnupg2 curl lsb-release
-   $ curl -sL 'https://deb.dl.getenvoy.io/public/gpg.8115BA8E629CC074.key' | sudo gpg --dearmor -o /usr/share/keyrings/getenvoy-keyring.gpg
-   # Verify the keyring - this should yield "OK"
-   $ echo a077cb587a1b622e03aa4bf2f3689de14658a9497a9af2c427bba5f4cc3c4723 /usr/share/keyrings/getenvoy-keyring.gpg | sha256sum --check
-   $ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/getenvoy-keyring.gpg] https://deb.dl.getenvoy.io/public/deb/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/getenvoy.list
-   $ sudo apt update
-   $ sudo apt install -y getenvoy-envoy
+   .. code-tab:: console Ubuntu focal
 
-Install Envoy on RPM-based distros
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      $ wget https://apt.envoyproxy.io/signing.key  | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
+      $ echo "deb[signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io focal main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ sudo apt-get update
+      $ sudo apt-get install envoy
+      $ envoy --version
 
-You can install Envoy on Centos/Redhat Enterprise Linux (RHEL) using `packages created by Tetrate <https://cloudsmith.io/~tetrate/repos/getenvoy-rpm-stable/setup/#formats-rpm>`_
-until `official packages exist <https://github.com/envoyproxy/envoy/issues/16867>`_.
+   .. code-tab:: console Ubuntu jammy
 
-.. code-block:: console
-
-   $ sudo yum install yum-utils
-   $ sudo rpm --import 'https://rpm.dl.getenvoy.io/public/gpg.CF716AF503183491.key'
-   $ curl -sL 'https://rpm.dl.getenvoy.io/public/config.rpm.txt?distro=el&codename=7' > /tmp/tetrate-getenvoy-rpm-stable.repo
-   $ sudo yum-config-manager --add-repo '/tmp/tetrate-getenvoy-rpm-stable.repo'
-   $ sudo yum makecache --disablerepo='*' --enablerepo='tetrate-getenvoy-rpm-stable'
-   $ sudo yum install getenvoy-envoy
+      $ wget https://apt.envoyproxy.io/signing.key  | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
+      $ echo "deb[signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io jammy main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ sudo apt-get update
+      $ sudo apt-get install envoy
+      $ envoy --version
 
 .. _start_install_macosx:
 

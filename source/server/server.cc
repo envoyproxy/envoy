@@ -828,7 +828,7 @@ void InstanceBase::onRuntimeReady() {
       // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
           *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
-      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+      THROW_IF_NOT_OK_REF(factory_or_error.status());
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
           factory_or_error.value()->createUncachedRawAsyncClient(), stats_store_,

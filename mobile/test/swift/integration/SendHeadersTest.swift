@@ -11,6 +11,13 @@ final class SendHeadersTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testSendHeaders() {
     EnvoyTestServer.startHttp1PlaintextServer()
 

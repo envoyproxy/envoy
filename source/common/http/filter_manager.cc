@@ -284,16 +284,13 @@ ActiveStreamFilterBase::mostSpecificPerFilterConfig() const {
   return current_route->mostSpecificPerFilterConfig(filter_context_.config_name);
 }
 
-void ActiveStreamFilterBase::traversePerFilterConfig(
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+Router::RouteSpecificFilterConfigs ActiveStreamFilterBase::perFilterConfigs() const {
   Router::RouteConstSharedPtr current_route = getRoute();
   if (current_route == nullptr) {
-    return;
+    return {};
   }
 
-  current_route->traversePerFilterConfig(
-      filter_context_.config_name,
-      [&cb](const Router::RouteSpecificFilterConfig& config) { cb(config); });
+  return current_route->perFilterConfigs(filter_context_.config_name);
 }
 
 Http1StreamEncoderOptionsOptRef ActiveStreamFilterBase::http1StreamEncoderOptions() {

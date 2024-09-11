@@ -236,7 +236,7 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
     return absl::StrCat("envoy_internal_", config.name());
   }
   auto address_or_error = Network::Address::resolveProtoAddress(config.address());
-  THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+  THROW_IF_NOT_OK_REF(address_or_error.status());
   return address_or_error.value()->asString();
 }
 } // namespace
@@ -324,7 +324,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     // All the addresses should be same socket type, so get the first address's socket type is
     // enough.
     auto address_or_error = Network::Address::resolveProtoAddress(config.address());
-    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    THROW_IF_NOT_OK_REF(address_or_error.status());
     auto address = std::move(address_or_error.value());
     checkIpv4CompatAddress(address, config.address());
     addresses_.emplace_back(address);
@@ -340,7 +340,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       }
       auto addresses_or_error =
           Network::Address::resolveProtoAddress(config.additional_addresses(i).address());
-      THROW_IF_STATUS_NOT_OK(addresses_or_error, throw);
+      THROW_IF_NOT_OK_REF(addresses_or_error.status());
       auto additional_address = std::move(addresses_or_error.value());
       checkIpv4CompatAddress(address, config.additional_addresses(i).address());
       addresses_.emplace_back(additional_address);

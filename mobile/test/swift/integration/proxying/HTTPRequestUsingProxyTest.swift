@@ -12,6 +12,13 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   private func executeRequest(engine: Engine, scheme: String, authority: String) -> String? {
     let responseHeadersExpectation =
         self.expectation(description: "Successful response headers received")
