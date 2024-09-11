@@ -353,6 +353,7 @@ public:
   std::vector<FakeUpstream*> http_side_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
+  TestScopedRuntime scoped_runtime_;
   // Number of side stream servers in the test.
   int side_stream_count_ = 2;
 };
@@ -521,6 +522,12 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeadersInBothDirection) {
 
 // Send headers and body in both directions.
 TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyInBothDirection) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
+  // Only run this test if both US and DS are HTTP2.
+  if (GetParam().downstream_protocol != Http::CodecType::HTTP2 ||
+      GetParam().upstream_protocol != Http::CodecType::HTTP2) {
+    return;
+  }
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
@@ -554,6 +561,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyInBothDirection) {
 
 // Send headers, body, trailers in both directions.
 TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyTrailerInBothDirection) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_oghttp2", "false"}});
   // Only run this test if both US and DS are HTTP2.
   if (GetParam().downstream_protocol != Http::CodecType::HTTP2 ||
       GetParam().upstream_protocol != Http::CodecType::HTTP2) {
