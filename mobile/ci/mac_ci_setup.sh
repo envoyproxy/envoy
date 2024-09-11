@@ -6,7 +6,7 @@ set -e
 # Installs the dependencies required for a macOS build via homebrew.
 # Tools are not upgraded to new versions.
 # See:
-# https://github.com/actions/virtual-environments/blob/main/images/macos/macos-12-Readme.md for
+# https://github.com/actions/virtual-environments/blob/main/images/macos/macos-14-Readme.md for
 # a list of pre-installed tools in the macOS image.
 
 export HOMEBREW_NO_AUTO_UPDATE=1
@@ -54,7 +54,7 @@ do
     install "${DEP}"
 done
 
-# https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
+# https://github.com/actions/runner-images/blob/main/images/macos/macos-14-Readme.md#xcode
 sudo xcode-select --switch /Applications/Xcode_14.1.app
 
 retry ./bazelw version

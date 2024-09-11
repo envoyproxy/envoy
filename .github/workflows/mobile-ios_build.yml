@@ -42,7 +42,7 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12-large
+      runs-on: macos-14-large
       source: |
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
@@ -81,7 +81,7 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12-large
+      runs-on: macos-14-large
       source: |
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
@@ -126,7 +126,7 @@ jobs:
       command: ./bazelw
       container-command:
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12-large
+      runs-on: macos-14-large
       source: |
         source ./ci/mac_ci_setup.sh
       steps-post: |
