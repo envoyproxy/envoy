@@ -51,13 +51,12 @@ void setThreadPriority(const int64_t tid, const int priority) {
   // the thread priority on Apple platforms, and directly invoking `setpriority()` on iOS fails with
   // permissions issues, as discovered through manual testing.
   Class nsthread = objc_getClass("NSThread");
-  if (nsthread != nullptr) {
-    id (*getCurrentNSThread)(Class, SEL) = reinterpret_cast<id (*)(Class, SEL)>(objc_msgSend);
-    id current_thread = getCurrentNSThread(nsthread, sel_registerName("currentThread"));
-    void (*setNSThreadPriority)(id, SEL, double) =
-        reinterpret_cast<void (*)(id, SEL, double)>(objc_msgSend);
-    setNSThreadPriority(current_thread, sel_registerName("setThreadPriority:"), priority);
-  }
+  id (*getCurrentNSThread)(Class, SEL) = reinterpret_cast<id (*)(Class, SEL)>(objc_msgSend);
+  id current_thread = getCurrentNSThread(nsthread, sel_registerName("currentThread"));
+  void (*setNSThreadPriority)(id, SEL, double) =
+      reinterpret_cast<void (*)(id, SEL, double)>(objc_msgSend);
+  double ns_priority = static_cast<double>(priority) / 100.0;
+  setNSThreadPriority(current_thread, sel_registerName("setThreadPriority:"), ns_priority);
 #else
 #error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
 #endif
