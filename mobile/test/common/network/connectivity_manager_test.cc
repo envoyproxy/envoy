@@ -62,7 +62,7 @@ TEST_F(ConnectivityManagerTest, OnNetworkMadeDefault) {
   connectivity_manager_ = std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_);
   EXPECT_NE(nullptr, registry);
   envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  EXPECT_CALL(dispatcher, post(_));
+  EXPECT_CALL(dispatcher, isThreadSafe());
   envoy_netconf_t new_key = connectivity_manager_->onNetworkMadeDefault(NetworkType::WWAN);
   EXPECT_NE(original_key, new_key);
 }
