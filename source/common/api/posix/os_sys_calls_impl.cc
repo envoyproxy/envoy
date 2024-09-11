@@ -109,9 +109,6 @@ bool OsSysCallsImpl::supportsUdpGro() const {
 #else
   static const bool is_supported = [] {
     int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
     int val = 1;
     bool result = (0 == ::setsockopt(fd, IPPROTO_UDP, UDP_GRO, &val, sizeof(val)));
     ::close(fd);
@@ -127,9 +124,6 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 #else
   static const bool is_supported = [] {
     int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
     int optval;
     socklen_t optlen = sizeof(optval);
     bool result = (0 <= ::getsockopt(fd, IPPROTO_UDP, UDP_SEGMENT, &optval, &optlen));
@@ -160,9 +154,6 @@ bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion ip_versio
   static constexpr auto transparent_supported = [](int family) {
     auto opt_tp = family == AF_INET ? ENVOY_SOCKET_IP_TRANSPARENT : ENVOY_SOCKET_IPV6_TRANSPARENT;
     int fd = ::socket(family, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
     int val = 1;
     bool result = (0 == ::setsockopt(fd, opt_tp.level(), opt_tp.option(), &val, sizeof(val)));
     ::close(fd);
