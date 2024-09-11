@@ -22,16 +22,18 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
   const auto filter_config = std::make_shared<FilterConfig>(
       proto_config, std::chrono::milliseconds(message_timeout_ms), max_message_timeout_ms,
       dual_info.scope, stats_prefix, dual_info.is_upstream,
-      Envoy::Extensions::qFilters::Common::Expr::getBuilder(context), context);
+      Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context);
   if (proto_config.has_grpc_service()) {
-    return [filter_config = std::move(filter_config), &context, dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
+    return [filter_config = std::move(filter_config), &context,
+            dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<ExternalProcessorClientImpl>(
           context.clusterManager().grpcAsyncClientManager(), dual_info.scope);
       callbacks.addStreamFilter(
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
     };
   } else {
-    return [&proto_config, filter_config = std::move(filter_config), &context](Http::FilterChainFactoryCallbacks& callbacks) {
+    return [proto_config = std::move(proto_config), filter_config = std::move(filter_config),
+            &context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<ExtProcHttpClient>(proto_config, context);
       callbacks.addStreamFilter(
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
@@ -60,14 +62,22 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyp
       server_context.scope(), stats_prefix, false,
       Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context);
 
-  return [filter_config = std::move(filter_config), &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
-          &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
-    auto client = std::make_unique<ExternalProcessorClientImpl>(
-        server_context.clusterManager().grpcAsyncClientManager(), server_context.scope());
-
-    callbacks.addStreamFilter(
-        Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
-  };
+  if (proto_config.has_grpc_service()) {
+    return [filter_config = std::move(filter_config),
+            &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
+      auto client = std::make_unique<ExternalProcessorClientImpl>(
+          server_context.clusterManager().grpcAsyncClientManager(), server_context.scope());
+      callbacks.addStreamFilter(
+          Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
+    };
+  } else {
+    return [proto_config = std::move(proto_config), filter_config = std::move(filter_config),
+            &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
+      auto client = std::make_unique<ExtProcHttpClient>(proto_config, server_context);
+      callbacks.addStreamFilter(
+          Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
+    };
+  }
 }
 
 LEGACY_REGISTER_FACTORY(ExternalProcessingFilterConfig,
