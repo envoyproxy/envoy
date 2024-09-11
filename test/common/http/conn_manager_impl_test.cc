@@ -4493,5 +4493,48 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
             "SomeCDN, custom_server_name; error=http_response_timeout; details=\"baz; UT\"");
 }
 
+TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
+  setup();
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        FilterFactoryCb filter_factory = createDecoderFilterFactoryCb(filter);
+        FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
+
+        manager.applyFilterFactoryCb({}, filter_factory);
+        manager.applyFilterFactoryCb({}, handler_factory);
+        return true;
+      }));
+
+  flush_access_log_on_new_request_ = true;
+
+  EXPECT_CALL(*handler, log(_, _))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        // First call to log() is made when a new HTTP request has been received
+        // On the first call it is expected that there is no response code.
+        EXPECT_EQ(AccessLog::AccessLogType::DownstreamStart, log_context.accessLogType());
+        EXPECT_FALSE(stream_info.responseCode());
+      }))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        // Second call to log() is made when filter is destroyed, so it is expected
+        // that the response code is available and matches the response headers.
+        EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
+        EXPECT_TRUE(stream_info.responseCode());
+        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
+      }))
+      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                          const StreamInfo::StreamInfo& stream_info) {
+        EXPECT_EQ(conn_manager_.config_->accessLogs().front().AccessLogType, log_context.accessLogType());
+        EXPECT_FALSE(stream_info.responseCode());
+      }));
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
 } // namespace Http
 } // namespace Envoy
