@@ -59,10 +59,9 @@ JsonFormatBuilder::fromStruct(const ProtobufWkt::Struct& struct_format) {
   output_.clear();
 
   formatValueToFormatElements(struct_format.fields());
-  std::string json_piece = std::move(buffer_);
-  if (!json_piece.empty()) {
-    output_.push_back(JsonString{std::move(json_piece)});
-  }
+  output_.push_back(FormatElement{std::move(buffer_), false});
+  ASSERT(buffer_.empty(), "buffer_ should be consumed");
+
   return std::move(output_);
 };
 
@@ -73,11 +72,15 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& va
     serializer_.addNull();
     break;
   case ProtobufWkt::Value::kNumberValue:
-    // TODO(wbpcode): may use Buffer::Util::serializeDouble for best performance.
-    // But this function only be executed when the configuration is loading. So,
-    // it's fine to use the fmt::to_string.
-    keep_value_type_ ? serializer_.addNumber(value.number_value())
-                     : serializer_.addString(fmt::to_string(value.number_value()));
+    if (keep_value_type_) {
+      serializer_.addNumber(value.number_value());
+    } else {
+      // TODO(wbpcode): may use Buffer::Util::serializeDouble for best performance.
+      // But this function only be executed when the configuration is loading. So,
+      // it's fine to use the fmt::to_string.
+      serializer_.addString(fmt::to_string(value.number_value()));
+    }
+
     break;
   case ProtobufWkt::Value::kStringValue: {
     absl::string_view string_format = value.string_value();
@@ -88,20 +91,20 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& va
 
     // The string contains a formatter, we need to push the current raw string
     // into the output list first.
-    std::string json_piece = std::move(buffer_);
-    if (!json_piece.empty()) {
-      output_.push_back(JsonString{std::move(json_piece)});
-    }
+    output_.push_back(FormatElement{std::move(buffer_), false});
+    ASSERT(buffer_.empty(), "buffer_ should be consumed");
 
     // Now a formatter is coming, we need to push the current raw string into
     // the output list.
-    output_.push_back(TmplString{std::string(string_format)});
+    output_.push_back(FormatElement{std::string(string_format), true});
     break;
   }
   case ProtobufWkt::Value::kBoolValue:
-    keep_value_type_ ? serializer_.addBool(value.bool_value())
-                     : serializer_.addString(value.bool_value() ? Json::Constants::True
-                                                                : Json::Constants::False);
+    if (keep_value_type_) {
+      serializer_.addBool(value.bool_value());
+    } else {
+      serializer_.addString(value.bool_value() ? Json::Constants::True : Json::Constants::False);
+    }
 
     break;
   case ProtobufWkt::Value::kStructValue: {

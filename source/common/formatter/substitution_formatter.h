@@ -249,13 +249,15 @@ using JsonSerializer = Envoy::Json::StreamerBase<Envoy::Json::StringOutput>;
 // Helper class to parse the Json format configuration.
 class JsonFormatBuilder {
 public:
-  struct JsonString {
+  struct FormatElement {
+    // Pre-sanitized JSON piece or a format template string that contains
+    // substitution commands.
     std::string value_;
+    // Whether the value is a template string.
+    // If true, the value is a format template string that contains substitution commands.
+    // If false, the value is a pre-sanitized JSON piece.
+    bool is_template_;
   };
-  struct TmplString {
-    std::string value_;
-  };
-  using FormatElement = absl::variant<JsonString, TmplString>;
   using FormatElements = std::vector<FormatElement>;
 
   /**
@@ -280,7 +282,7 @@ public:
    * For example given the following proto struct format configuration:
    *
    *   json_format:
-   *     text: "text"
+   *     name: "value"
    *     template: "%START_TIME%"
    *     number: 2
    *     bool: true
@@ -289,15 +291,15 @@ public:
    *       - false
    *       - "%EMIT_TIME%"
    *     nested:
-   *       text: "nested_text"
+   *       nested_name: "nested_value"
    *
    * It will be parsed to the following pieces:
    *
-   *   - '{"text":"text","template":'                               # Raw JSON piece.
-   *   - '%START_TIME%'                                             # Format template piece.
-   *   - ',"number":2,"bool":true,"list":["list_raw_value",false,'  # Raw JSON piece.
-   *   - '%EMIT_TIME%'                                              # Format template piece.
-   *   - '],"nested":{"text":"nested_text"}}'                       # Raw JSON piece.
+   *   - '{"name":"value","template":'                                      # Raw JSON piece.
+   *   - '%START_TIME%'                                                     # Format template piece.
+   *   - ',"number":2,"bool":true,"list":["list_raw_value",false,'          # Raw JSON piece.
+   *   - '%EMIT_TIME%'                                                      # Format template piece.
+   *   - '],"nested":{"nested_name":"nested_value"}}'                       # Raw JSON piece.
    *
    * Finally, join the raw JSON pieces and output of substitution formatters in order
    * to construct the final JSON output.
@@ -314,7 +316,7 @@ private:
   void formatValueToFormatElements(const ProtobufWkt::Value& value);
   void formatValueToFormatElements(const ProtoList& list_value);
 
-  const bool keep_value_type_{};
+  const bool keep_value_type_;
 
   std::string buffer_;                 // JSON writer buffer.
   JsonSerializer serializer_{buffer_}; // JSON streamer.
@@ -338,12 +340,11 @@ public:
         JsonFormatBuilder(keep_value_type).fromStruct(struct_format);
 
     for (JsonFormatBuilder::FormatElement& element : elements) {
-      if (absl::holds_alternative<JsonFormatBuilder::TmplString>(element)) {
-        parsed_elements_.emplace_back(SubstitutionFormatParser::parse<FormatterContext>(
-            absl::get<JsonFormatBuilder::TmplString>(element).value_, commands));
-      } else {
+      if (element.is_template_) {
         parsed_elements_.emplace_back(
-            std::move(absl::get<JsonFormatBuilder::JsonString>(element).value_));
+            SubstitutionFormatParser::parse<FormatterContext>(element.value_, commands));
+      } else {
+        parsed_elements_.emplace_back(std::move(element.value_));
       }
     }
   }
