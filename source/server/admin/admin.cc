@@ -282,8 +282,8 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   // Pass in the null overload manager so that the admin interface is accessible even when Envoy
   // is overloaded.
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
-      shared_from_this(), server_.drainManager(), server_.api().randomGenerator(),
-      server_.httpContext(), server_.runtime(), server_.localInfo(), server_.clusterManager(),
+      *this, server_.drainManager(), server_.api().randomGenerator(), server_.httpContext(),
+      server_.runtime(), server_.localInfo(), server_.clusterManager(),
       server_.nullOverloadManager(), server_.timeSource())});
   return true;
 }
