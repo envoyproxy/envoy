@@ -17,10 +17,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-// OpenSSL caps OBJ_obj2txt for to support size of Object Identifier up to 586 bytes.
-// Here we are limiting the length of canonical numeric text form of OID to 256.
-// Ref:
-// https://github.com/openssl/openssl/blob/master/CHANGES.md#changes-between-310-and-311-30-may-2023
 static constexpr int MAX_OID_LENGTH = 256;
 
 static constexpr absl::string_view SSL_ERROR_UNKNOWN_ERROR_MESSAGE = "UNKNOWN_ERROR";
