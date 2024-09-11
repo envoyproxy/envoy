@@ -936,7 +936,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                                ProtobufMessage::ValidationVisitor& validation_visitor,
                                Api::Api& api) {
   auto file_or_error = api.fileSystem().fileReadToEnd(path);
-  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  THROW_IF_NOT_OK_REF(file_or_error.status());
   const std::string contents = file_or_error.value();
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
