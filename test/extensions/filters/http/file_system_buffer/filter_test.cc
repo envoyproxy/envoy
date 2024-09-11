@@ -774,13 +774,11 @@ TEST_F(FileSystemBufferFilterTest, MergesRouteConfig) {
   )");
   auto mock_route = std::make_shared<Router::MockRoute>();
   EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(mock_route));
-  EXPECT_CALL(*mock_route, traversePerFilterConfig(_, _))
-      .WillOnce([vhost_config, route_config](
-                    const std::string&,
-                    std::function<void(const Router::RouteSpecificFilterConfig&)> add_config) {
-        add_config(*vhost_config);
-        add_config(*route_config);
-      });
+  EXPECT_CALL(*mock_route, perFilterConfigs(_))
+      .WillOnce(
+          [vhost_config, route_config](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+            return {vhost_config.get(), route_config.get()};
+          });
   // The default config would return Continue, so these returning StopIteration shows that
   // both route_configs were applied.
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,

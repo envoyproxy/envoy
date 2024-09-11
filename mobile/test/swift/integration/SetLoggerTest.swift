@@ -11,6 +11,13 @@ final class LoggerTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testSetLogger() throws {
     let engineExpectation = self.expectation(description: "Run started engine")
     let loggingExpectation = self.expectation(description: "Run used platform logger")
@@ -24,16 +31,14 @@ final class LoggerTests: XCTestCase {
       .setLogLevel(.debug)
       .setLogger { _, msg in
         print(msg, terminator: "")
+        if msg.contains("starting main dispatch loop") {
+          loggingExpectation.fulfill()
+        }
       }
       .addNativeFilter(
         name: "test_logger",
         // swiftlint:disable:next line_length
         typedConfig: "[type.googleapis.com/envoymobile.extensions.filters.http.test_logger.TestLogger]{}")
-      .setLogger { _, msg in
-        if msg.contains("starting main dispatch loop") {
-          loggingExpectation.fulfill()
-        }
-      }
       .setOnEngineRunning {
         engineExpectation.fulfill()
       }

@@ -1279,20 +1279,15 @@ void Filter::mergePerRouteConfig() {
   route_config_merged_ = true;
 
   absl::optional<FilterConfigPerRoute> merged_config;
-
-  decoder_callbacks_->traversePerFilterConfig([&merged_config](
-                                                  const Router::RouteSpecificFilterConfig& cfg) {
-    const FilterConfigPerRoute* typed_cfg = dynamic_cast<const FilterConfigPerRoute*>(&cfg);
-    if (typed_cfg == nullptr) {
-      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
-      return;
-    }
+  for (const auto* typed_cfg :
+       Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
+    ASSERT(typed_cfg != nullptr);
     if (!merged_config.has_value()) {
       merged_config.emplace(*typed_cfg);
     } else {
       merged_config.emplace(FilterConfigPerRoute(merged_config.value(), *typed_cfg));
     }
-  });
+  }
 
   if (!merged_config.has_value()) {
     return;

@@ -11,6 +11,13 @@ final class CancelGRPCStreamTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testCancelGRPCStream() {
     let filterName = "cancel_validation_filter"
 

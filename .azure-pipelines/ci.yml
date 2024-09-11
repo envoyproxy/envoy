@@ -64,9 +64,6 @@ parameters:
   displayName: "Upload bazel run data to BES"
   type: boolean
   default: true
-- name: envoyBuildFilterExample
-  type: string
-  default: ""
 - name: cacheTestResults
   displayName: "Cache test results"
   type: boolean
@@ -224,7 +221,6 @@ steps:
     echo "##vso[task.setvariable variable=BAZEL_FAKE_SCM_REVISION]${BAZEL_FAKE_SCM_REVISION}"
     echo "##vso[task.setvariable variable=BAZEL_STARTUP_EXTRA_OPTIONS]${{ parameters.bazelStartupExtraOptions }}"
     echo "##vso[task.setvariable variable=CI_TARGET_BRANCH]${CI_TARGET_BRANCH}"
-    echo "##vso[task.setvariable variable=ENVOY_BUILD_FILTER_EXAMPLE]${{ parameters.envoyBuildFilterExample }}"
     echo "##vso[task.setvariable variable=ENVOY_DOCKER_BUILD_DIR]$(Build.StagingDirectory)"
     echo "##vso[task.setvariable variable=ENVOY_RBE]${ENVOY_RBE}"
     echo "##vso[task.setvariable variable=ENVOY_SHARED_TMP_DIR]${ENVOY_SHARED_TMP_DIR}"
@@ -275,7 +271,6 @@ steps:
 - script: ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ parameters.ciTarget }}'
   workingDirectory: $(Build.SourcesDirectory)
   env:
-    ENVOY_BUILD_FILTER_EXAMPLE: ${{ parameters.envoyBuildFilterExample }}
     ${{ each var in parameters.env }}:
       ${{ var.key }}: ${{ var.value }}
   displayName: "Run CI script ${{ parameters.ciTarget }}"
