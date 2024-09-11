@@ -1107,8 +1107,9 @@ oidsPeerCertificate()
 
   downstreamSslConnection:oidsPeerCertificate()
 
-Returns the OIDs (ASN.1 Object Identifiers) of the peer certificate. Returns an empty table if
-there is no peer certificate or no OIDs.
+Returns the string representation of OIDs (as a table) from the peer certificate. This is for
+reading the OID strings from the certificate, not the extension values associated with OIDs.
+Returns an empty table if there is no peer certificate or no OIDs.
 
 oidsLocalCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -1117,8 +1118,9 @@ oidsLocalCertificate()
 
   downstreamSslConnection:oidsLocalCertificate()
 
-Returns the OIDs (ASN.1 Object Identifiers) of the peer certificate. Returns an empty table if
-there is no peer certificate or no OIDs.
+Returns the string representation of OIDs (as a table) from the local certificate. This is for
+reading the OID strings from the certificate, not the extension values associated with OIDs.
+Returns an empty table if there is no local certificate or no OIDs.
 
 validFromPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -17,6 +17,10 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+// OpenSSL caps OBJ_obj2txt for Object Identifier at 586 bytes per
+// https://github.com/openssl/openssl/blob/master/CHANGES.md#changes-between-310-and-311-30-may-2023
+static constexpr int MAX_OID_SIZE = 256;
+
 static constexpr absl::string_view SSL_ERROR_UNKNOWN_ERROR_MESSAGE = "UNKNOWN_ERROR";
 
 Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const std::string& path,
@@ -253,9 +257,9 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       break;
     }
     case V_ASN1_OBJECT: {
-      char tmp_obj[256]; // OID Max length
-      int obj_len = OBJ_obj2txt(tmp_obj, 256, value->value.object, 1);
-      if (obj_len > 256 || obj_len < 0) {
+      char tmp_obj[MAX_OID_SIZE];
+      int obj_len = OBJ_obj2txt(tmp_obj, MAX_OID_SIZE, value->value.object, 1);
+      if (obj_len > MAX_OID_SIZE || obj_len < 0) {
         break;
       }
       san.assign(tmp_obj);
@@ -392,10 +396,10 @@ std::vector<std::string> Utility::getCertificateExtensionOids(X509& cert) {
     X509_EXTENSION* extension = X509_get_ext(&cert, pos);
     RELEASE_ASSERT(extension != nullptr, "");
 
-    char oid[256];
-    int len = OBJ_obj2txt(oid, sizeof(oid), X509_EXTENSION_get_object(extension),
-                          1 /* always_return_oid */);
-    if (len > 0) {
+    char oid[MAX_OID_SIZE];
+    int obj_len = OBJ_obj2txt(oid, MAX_OID_SIZE, X509_EXTENSION_get_object(extension),
+                              1 /* always_return_oid */);
+    if (obj_len > 0 && obj_len < MAX_OID_SIZE) {
       extension_oids.push_back(oid);
     }
   }
