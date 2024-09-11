@@ -174,9 +174,10 @@ public:
   }
 
   void processRequestHeadersMessage(
-      FakeUpstream* side_stream, bool send_bad_resp,
-      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
-    getAndCheckHttpRequest(side_stream, true);
+      FakeUpstream* side_stream, bool first_message,
+      absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb,
+      bool send_bad_resp = false) {
+    getAndCheckHttpRequest(side_stream, first_message);
 
     if (send_bad_resp) {
       processor_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "400"}}, true);
@@ -200,9 +201,9 @@ public:
   }
 
   void processResponseHeadersMessage(
-      FakeUpstream* side_stream, bool,
+      FakeUpstream* side_stream, bool first_message,
       absl::optional<std::function<bool(const HttpHeaders&, HeadersResponse&)>> cb) {
-    getAndCheckHttpRequest(side_stream, false);
+    getAndCheckHttpRequest(side_stream, first_message);
 
     std::string body = processor_stream_->body().toString();
     ProcessingRequest request;
@@ -363,8 +364,8 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(ExtProcHttpClientIntegrationTest::getValuesForExtProcHttpTest()),
     ExtProcHttpClientIntegrationTest::ExtProcHttpTestParamsToString);
 
-// Side stream server does not mutate the header request.
-TEST_P(ExtProcHttpClientIntegrationTest, ServerNoHeaderMutation) {
+// Side stream server does not mutate the request header.
+TEST_P(ExtProcHttpClientIntegrationTest, ServerNoRequestHeaderMutation) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   initializeConfig();
@@ -373,13 +374,30 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoHeaderMutation) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("foo"), "yes"); });
 
   // The side stream get the request and sends back the response.
-  processRequestHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
+  processRequestHeadersMessage(http_side_upstreams_[0], true, absl::nullopt);
 
   // The request is sent to the upstream.
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Side stream server does not mutate the response header.
+TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseHeaderMutation) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("foo"), "yes"); });
+
+  // The request is sent to the upstream.
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  processResponseHeadersMessage(http_side_upstreams_[0], true, absl::nullopt);
   verifyDownstreamResponse(*response, 200);
 }
 
@@ -392,8 +410,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   processRequestHeadersMessage(
-      http_side_upstreams_[0], false,
-      [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+      http_side_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
         Http::TestRequestHeaderMapImpl expected_request_headers{
             {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
             {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
@@ -423,7 +440,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  processRequestHeadersMessage(http_side_upstreams_[0], false,
+  processRequestHeadersMessage(http_side_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
                                  // Travel forward 400 ms exceeding 200ms filter timeout.
                                  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(400));
@@ -443,7 +460,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  processRequestHeadersMessage(http_side_upstreams_[0], false,
+  processRequestHeadersMessage(http_side_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
                                  // Travel forward 50 ms exceeding 10ms HTTP URI timeout setting.
                                  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(50));
@@ -461,8 +478,9 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerSendsBackBadRequestFailClose) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  processRequestHeadersMessage(http_side_upstreams_[0], true,
-                               [](const HttpHeaders&, HeadersResponse&) { return true; });
+  processRequestHeadersMessage(
+      http_side_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse&) { return true; },
+      true);
 
   verifyDownstreamResponse(*response, 500);
 }
@@ -476,8 +494,9 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerSendsBackBadRequestFailOpen) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest(absl::nullopt);
 
-  processRequestHeadersMessage(http_side_upstreams_[0], true,
-                               [](const HttpHeaders&, HeadersResponse&) { return true; });
+  processRequestHeadersMessage(
+      http_side_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse&) { return true; },
+      true);
 
   // The request is sent to the upstream.
   handleUpstreamRequest();
@@ -495,8 +514,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeadersInBothDirection) {
   auto response = sendDownstreamRequestWithBodyAndTrailer("foo");
 
   processRequestHeadersMessage(
-      http_side_upstreams_[0], false,
-      [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+      http_side_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
         Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
                                                                 {":method", "GET"},
                                                                 {"host", "host"},
@@ -537,7 +555,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyInBothDirection) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequestWithBodyAndTrailer("foo");
 
-  processRequestHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
+  processRequestHeadersMessage(http_side_upstreams_[0], true, absl::nullopt);
   processRequestBodyMessage(
       http_side_upstreams_[0], [](const HttpBody& body, BodyResponse& body_resp) {
         EXPECT_EQ(body.body(), "foo");
@@ -579,7 +597,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeaderBodyTrailerInBothDirection) {
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequestWithBodyAndTrailer("foo");
 
-  processRequestHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
+  processRequestHeadersMessage(http_side_upstreams_[0], true, absl::nullopt);
   processRequestBodyMessage(http_side_upstreams_[0], absl::nullopt);
   processRequestTrailersMessage(
       http_side_upstreams_[0], [](const HttpTrailers& trailers, TrailersResponse& trailer_resp) {
