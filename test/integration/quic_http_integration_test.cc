@@ -2381,23 +2381,20 @@ TEST_P(QuicHttpIntegrationTest, SendDisableActiveMigration) {
 }
 
 TEST_P(QuicHttpIntegrationTest, RejectTraffic) {
-  config_helper_.addConfigModifier(
-      [=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_static_resources()
-            ->mutable_listeners(0)
-            ->mutable_udp_listener_config()
-            ->mutable_quic_options()
-            ->mutable_reject_new_connections()
-            ->set_value(true);
-      });
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->mutable_reject_new_connections()
+        ->set_value(true);
+  });
 
   initialize();
-  codec_client_ = makeRawHttpConnection(
-      makeClientConnection(lookupPort("http")), absl::nullopt);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
   EXPECT_EQ(quic::QUIC_INVALID_VERSION,
-            static_cast<EnvoyQuicClientSession*>(codec_client_->connection())
-                ->error());
+            static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->error());
 }
 
 // Validate that the transport parameter is not sent when `send_disable_active_migration` is
