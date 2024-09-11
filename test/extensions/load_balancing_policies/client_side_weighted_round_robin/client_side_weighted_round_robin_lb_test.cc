@@ -143,6 +143,9 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
+//////////////////////////////////////////////////////
+// These tests are copied from ../round_robin/round_robin_lb_test.cc to test common functionality.
+//
 // For the tests which mutate primary and failover host sets explicitly, only
 // run once.
 using FailoverTest = ClientSideWeightedRoundRobinLoadBalancerTest;
@@ -1680,6 +1683,10 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLo
   EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
+
+//////////////////////////////////////////////////////
+// These tests verify ClientSideWeightedRoundRobinLoadBalancer specific functionality.
+//
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest,
        updateWeightsOnHostsAllHostsHaveClientSideWeights) {

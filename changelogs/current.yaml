@@ -309,7 +309,7 @@ new_features:
     original IP detection method now supports using a list of trusted CIDRs when parsing ``x-forwarded-for``.
 - area: load_balancing
   change: |
-    Added implementation of :ref:`client_side_weighted_round_robin
+    WIP: Added implementation of :ref:`client_side_weighted_round_robin
     <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
     load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
 
