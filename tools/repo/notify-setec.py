@@ -130,9 +130,9 @@ class RepoNotifier(runner.Runner):
                 issue["updated_at"].replace('Z', '+00:00'))
             message = self.pr_message(age, issue)
 
-            is_approved = (
-                "patch:approved"
-                in [label["name"] for label in issue["labels"]])
+            is_approved = any(label["name"] in (
+                "patch:approved", "patch/complete")
+                              for label in issue["labels"])
 
             is_cve = (
                 "cve/next"
