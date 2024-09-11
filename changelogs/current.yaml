@@ -312,5 +312,9 @@ new_features:
   change: |
     The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
     original IP detection method now supports using a list of trusted CIDRs when parsing ``x-forwarded-for``.
+- area: oauth2
+  change: |
+    :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
+    is now enabled by default.
 
 deprecated:
