@@ -4493,7 +4493,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
             "SomeCDN, custom_server_name; error=http_response_timeout; details=\"baz; UT\"");
 }
 
-TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
+TEST_F(HttpConnectionManagerImplTest, TestFilterLogBeforeAccessLog) {
   setup();
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -4529,7 +4529,8 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnNewRequest) {
       }))
       .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
                           const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(conn_manager_.config_->accessLogs().front().AccessLogType, log_context.accessLogType());
+        EXPECT_EQ(&conn_manager_->config_->accessLogs().front().AccessLogType,
+                  log_context.accessLogType());
         EXPECT_FALSE(stream_info.responseCode());
       }));
   Buffer::OwnedImpl fake_input("1234");
