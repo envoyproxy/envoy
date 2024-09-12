@@ -113,7 +113,7 @@ void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   // we keep the request in the queue and let it be processed when the
   // authentication response is received.
   if (external_auth_call_status_ == ExternalAuthCallStatus::Pending) {
-    request.pending_value_ = std::move(value);
+    request.pending_request_value_ = std::move(value);
     return;
   }
 
@@ -201,8 +201,8 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
   request.onResponse(std::move(redis_response));
 
   // Resume processing of pending requests.
-  while (!pending_requests_.empty() && pending_requests_.front().pending_value_) {
-    processRespValue(std::move(pending_requests_.front().pending_value_),
+  while (!pending_requests_.empty() && pending_requests_.front().pending_request_value_) {
+    processRespValue(std::move(pending_requests_.front().pending_request_value_),
                      pending_requests_.front());
   }
 }

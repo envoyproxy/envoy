@@ -140,7 +140,7 @@ private:
 
     ProxyFilter& parent_;
     // This value is set when the request is on hold, waiting for an external auth response.
-    Common::Redis::RespValuePtr pending_value_;
+    Common::Redis::RespValuePtr pending_request_value_;
     Common::Redis::RespValuePtr pending_response_;
     CommandSplitter::SplitRequestPtr request_handle_;
   };
