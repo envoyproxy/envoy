@@ -3,11 +3,16 @@
 #include "envoy/thread/thread.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
 
 #if defined(__linux__)
+#include <sys/resource.h>
 #include <sys/syscall.h>
+#elif defined(__APPLE__)
+#include <objc/message.h>
+#include <objc/runtime.h>
 #endif
 
 namespace Envoy {
@@ -34,6 +39,29 @@ int64_t getCurrentThreadId() {
   return tid;
 }
 
+void setThreadPriority(const int64_t tid, const int priority) {
+#if defined(__linux__)
+  const int rc = setpriority(PRIO_PROCESS, tid, priority);
+  if (rc != 0) {
+    ENVOY_LOG_MISC(warn, "failed to set thread priority: {}", Envoy::errorDetails(errno));
+  }
+#elif defined(__APPLE__)
+  UNREFERENCED_PARAMETER(tid);
+  // Use NSThread via the Objective-C runtime to set the thread priority; it's the best way to set
+  // the thread priority on Apple platforms, and directly invoking `setpriority()` on iOS fails with
+  // permissions issues, as discovered through manual testing.
+  Class nsthread = objc_getClass("NSThread");
+  id (*getCurrentNSThread)(Class, SEL) = reinterpret_cast<id (*)(Class, SEL)>(objc_msgSend);
+  id current_thread = getCurrentNSThread(nsthread, sel_registerName("currentThread"));
+  void (*setNSThreadPriority)(id, SEL, double) =
+      reinterpret_cast<void (*)(id, SEL, double)>(objc_msgSend);
+  double ns_priority = static_cast<double>(priority) / 100.0;
+  setNSThreadPriority(current_thread, sel_registerName("setThreadPriority:"), ns_priority);
+#else
+#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
+#endif
+}
+
 } // namespace
 
 // See https://www.man7.org/linux/man-pages/man3/pthread_setname_np.3.html.
@@ -41,11 +69,14 @@ int64_t getCurrentThreadId() {
 // so we need to truncate the string_view to 15 bytes.
 #define PTHREAD_MAX_THREADNAME_LEN_INCLUDING_NULL_BYTE 16
 
-ThreadHandle::ThreadHandle(std::function<void()> thread_routine)
-    : thread_routine_(thread_routine) {}
+ThreadHandle::ThreadHandle(std::function<void()> thread_routine,
+                           absl::optional<int> thread_priority)
+    : thread_routine_(thread_routine), thread_priority_(thread_priority) {}
 
 /** Returns the thread routine. */
-std::function<void()>& ThreadHandle::routine() { return thread_routine_; };
+std::function<void()>& ThreadHandle::routine() { return thread_routine_; }
+
+absl::optional<int> ThreadHandle::priority() const { return thread_priority_; }
 
 /** Returns the thread handle. */
 pthread_t& ThreadHandle::handle() { return thread_handle_; }
@@ -140,7 +171,11 @@ int PosixThreadFactory::createPthread(ThreadHandle* thread_handle) {
   return pthread_create(
       &thread_handle->handle(), nullptr,
       [](void* arg) -> void* {
-        static_cast<ThreadHandle*>(arg)->routine()();
+        ThreadHandle* handle = static_cast<ThreadHandle*>(arg);
+        if (handle->priority()) {
+          setThreadPriority(getCurrentThreadId(), *handle->priority());
+        }
+        handle->routine()();
         return nullptr;
       },
       reinterpret_cast<void*>(thread_handle));
@@ -148,7 +183,8 @@ int PosixThreadFactory::createPthread(ThreadHandle* thread_handle) {
 
 PosixThreadPtr PosixThreadFactory::createThread(std::function<void()> thread_routine,
                                                 OptionsOptConstRef options, bool crash_on_failure) {
-  auto thread_handle = new ThreadHandle(thread_routine);
+  auto thread_handle =
+      new ThreadHandle(thread_routine, options ? options->priority_ : absl::nullopt);
   const int rc = createPthread(thread_handle);
   if (rc != 0) {
     delete thread_handle;
@@ -163,6 +199,21 @@ PosixThreadPtr PosixThreadFactory::createThread(std::function<void()> thread_rou
 };
 
 ThreadId PosixThreadFactory::currentThreadId() { return ThreadId(getCurrentThreadId()); };
+
+int PosixThreadFactory::currentThreadPriority() {
+#if defined(__linux__)
+  return static_cast<double>(getpriority(PRIO_PROCESS, getCurrentThreadId()));
+#elif defined(__APPLE__)
+  Class nsthread = objc_getClass("NSThread");
+  SEL selector = sel_registerName("threadPriority");
+  double (*getNSThreadPriority)(Class, SEL) =
+      reinterpret_cast<double (*)(Class, SEL)>(objc_msgSend);
+  double thread_priority = getNSThreadPriority(nsthread, selector);
+  return static_cast<int>(std::round(thread_priority * 100.0));
+#else
+#error "Enable and test pthread id retrieval code for you arch in pthread/thread_impl.cc"
+#endif
+}
 
 ThreadId PosixThreadFactory::currentPthreadId() {
 #if defined(__linux__)
