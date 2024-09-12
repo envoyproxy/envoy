@@ -83,7 +83,7 @@ class EnvoyConfigurationTest {
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
     enableCares: Boolean = false,
-    caresFallbackResolvers: MutableList<Pair<String, Integer>> = mutableListOf(Pair("1.2.3.4", 88)),
+    caresFallbackResolvers: MutableList<Pair<String, Int>> = mutableListOf(Pair("1.2.3.4", 88)),
     forceV6: Boolean = true,
     enableGro: Boolean = false,
     http3ConnectionOptions: String = "5RTO",
