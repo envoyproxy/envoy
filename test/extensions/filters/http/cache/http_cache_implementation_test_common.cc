@@ -41,8 +41,14 @@ MATCHER(IsOk, "") { return arg.ok(); }
 } // namespace
 
 void HttpCacheTestDelegate::pumpDispatcher() {
-  beforePumpingDispatcher();
-  dispatcher().run(Event::Dispatcher::RunType::Block);
+  // There may be multiple steps in a cache operation going back and forth with work
+  // on a cache's thread and work on the filter's thread. So we drain both things up to
+  // 5 times each. This number is arbitrary and could be increased if necessary for
+  // a cache implementation.
+  for (int i = 0; i < 5; i++) {
+    beforePumpingDispatcher();
+    dispatcher().run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 HttpCacheImplementationTest::HttpCacheImplementationTest()

@@ -103,7 +103,6 @@ void FileLookupContext::closeFileAndGetHeadersAgainWithNewVaryKey() {
   });
   ASSERT(queued.ok(), queued.status().ToString());
   cancel_action_in_flight_ = std::move(queued.value());
-  return;
 }
 
 void FileLookupContext::invalidateCacheEntry() {
