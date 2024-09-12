@@ -1230,7 +1230,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jstring app_version, jstring app_id, jboolean trust_chain_verification,
                       jobjectArray filter_chain, jboolean enable_platform_certificates_validation,
                       jstring upstream_tls_sni, jobjectArray runtime_guards,
-                      Envoy::Platform::EngineBuilder& builder) {
+                      jObjectArray fallback_resolvers, Envoy::Platform::EngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
   builder.addDnsFailureRefreshSeconds((dns_failure_refresh_seconds_base),
@@ -1271,6 +1271,12 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   }
   builder.enablePortMigration(enable_port_migration);
   builder.setUseCares(use_cares == JNI_TRUE);
+  if (use_cares == JNI_TRUE) {
+    auto resolvers = javaObjectArrayToStringPairVector(jni_helper, fallback_resolvers);
+    for (const auto& entry : resolvers) {
+      builder.addFallbackResolver(entry.first, stoi(entry.second));
+    }
+  }
   builder.setUseGroIfAvailable(use_gro == JNI_TRUE);
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
@@ -1326,22 +1332,23 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
     jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
-    jobjectArray runtime_guards) {
+    jobjectArray runtime_guards, jObjectArray fallback_resolvers) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
-  configureBuilder(
-      jni_helper, connect_timeout_seconds, dns_refresh_seconds, dns_failure_refresh_seconds_base,
-      dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
-      dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
-      enable_drain_post_dns_refresh, enable_http3, use_cares, force_v6, use_gro,
-      http3_connection_options, http3_client_connection_options, quic_hints,
-      quic_canonical_suffixes, enable_gzip_decompression, enable_brotli_decompression,
-      enable_port_migration, enable_socket_tagging, enable_interface_binding,
-      h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
-      max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
-      app_version, app_id, trust_chain_verification, filter_chain,
-      enable_platform_certificates_validation, upstream_tls_sni, runtime_guards, builder);
+  configureBuilder(jni_helper, connect_timeout_seconds, dns_refresh_seconds,
+                   dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max,
+                   dns_query_timeout_seconds, dns_min_refresh_seconds, dns_preresolve_hostnames,
+                   enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
+                   enable_drain_post_dns_refresh, enable_http3, use_cares, force_v6, use_gro,
+                   http3_connection_options, http3_client_connection_options, quic_hints,
+                   quic_canonical_suffixes, enable_gzip_decompression, enable_brotli_decompression,
+                   enable_port_migration, enable_socket_tagging, enable_interface_binding,
+                   h2_connection_keepalive_idle_interval_milliseconds,
+                   h2_connection_keepalive_timeout_seconds, max_connections_per_host,
+                   stream_idle_timeout_seconds, per_try_idle_timeout_seconds, app_version, app_id,
+                   trust_chain_verification, filter_chain, enable_platform_certificates_validation,
+                   upstream_tls_sni, runtime_guards, fallback_resolvers, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }

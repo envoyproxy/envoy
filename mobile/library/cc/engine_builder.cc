@@ -56,6 +56,11 @@ EngineBuilder& EngineBuilder::setUseCares(bool use_cares) {
   use_cares_ = use_cares;
   return *this;
 }
+
+EngineBuilder& EngineBuilder::addFallbackResolver(std::string host, int port) {
+  fallback_resolvers_.emplace_back(std::move(host), port);
+  return *this;
+}
 #endif
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
@@ -491,13 +496,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #else
   if (use_cares_) {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
-    auto* address = resolver_config.add_resolvers();
-    address->mutable_socket_address()->set_address("2001:4860:4860::8888");
-    address->mutable_socket_address()->set_port_value(53);
-    address = resolver_config.add_resolvers();
-    address->mutable_socket_address()->set_address("8.8.8.8");
-    address->mutable_socket_address()->set_port_value(53);
-    resolver_config.set_use_resolvers_as_fallback(true);
+    if (!fallback_resolvers_.empty()) {
+      for (auto& host_port_pair : fallback_resolvers_) {
+        auto* address = resolver_config.add_resolvers();
+        address->mutable_socket_address()->set_address(host_port_pair.first);
+        address->mutable_socket_address()->set_port_value(host_port_pair.second);
+      }
+      resolver_config.set_use_resolvers_as_fallback(true);
+    }
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.cares");
     dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
