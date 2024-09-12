@@ -69,7 +69,7 @@ jobs:
     - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.2.30
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
-        ref: main
+        ref: release/v1.28
         token: ${{ steps.appauth.outputs.token }}
         workflow: envoy-sync-receive.yaml
         inputs: |
