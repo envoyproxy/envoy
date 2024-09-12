@@ -114,7 +114,7 @@ public:
 #else
   // Only android supports c_ares
   EngineBuilder& setUseCares(bool use_cares);
-  EngineBuilder& addFallbackResolver(std::string host, int port);
+  EngineBuilder& addCaresFallbackResolver(std::string host, int port);
 #endif
 
   // This is separated from build() for the sake of testability
@@ -170,7 +170,7 @@ private:
   bool enable_http3_ = true;
 #if !defined(__APPLE__)
   bool use_cares_ = false;
-  std::vector<std::pair<std::string, int>> fallback_resolvers_;
+  std::vector<std::pair<std::string, int>> cares_fallback_resolvers_;
 #endif
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";

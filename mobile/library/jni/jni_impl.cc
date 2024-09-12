@@ -1230,7 +1230,8 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jstring app_version, jstring app_id, jboolean trust_chain_verification,
                       jobjectArray filter_chain, jboolean enable_platform_certificates_validation,
                       jstring upstream_tls_sni, jobjectArray runtime_guards,
-                      jobjectArray fallback_resolvers, Envoy::Platform::EngineBuilder& builder) {
+                      jobjectArray cares_fallback_resolvers,
+                      Envoy::Platform::EngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
   builder.addDnsFailureRefreshSeconds((dns_failure_refresh_seconds_base),
@@ -1272,9 +1273,9 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   builder.enablePortMigration(enable_port_migration);
   builder.setUseCares(use_cares == JNI_TRUE);
   if (use_cares == JNI_TRUE) {
-    auto resolvers = javaObjectArrayToStringPairVector(jni_helper, fallback_resolvers);
-    for (const auto& entry : resolvers) {
-      builder.addFallbackResolver(entry.first, stoi(entry.second));
+    auto resolvers = javaObjectArrayToStringPairVector(jni_helper, cares_fallback_resolvers);
+    for (const auto& [host, port] : resolvers) {
+      builder.addFallbackResolver(host, stoi(port));
     }
   }
   builder.setUseGroIfAvailable(use_gro == JNI_TRUE);
@@ -1332,7 +1333,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
     jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
-    jobjectArray runtime_guards, jobjectArray fallback_resolvers) {
+    jobjectArray runtime_guards, jobjectArray cares_fallback_resolvers) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
@@ -1348,7 +1349,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
                    h2_connection_keepalive_timeout_seconds, max_connections_per_host,
                    stream_idle_timeout_seconds, per_try_idle_timeout_seconds, app_version, app_id,
                    trust_chain_verification, filter_chain, enable_platform_certificates_validation,
-                   upstream_tls_sni, runtime_guards, fallback_resolvers, builder);
+                   upstream_tls_sni, runtime_guards, cares_fallback_resolvers, builder);
 
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }

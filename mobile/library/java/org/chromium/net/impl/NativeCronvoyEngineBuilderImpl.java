@@ -51,7 +51,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mUseCares = false;
-  private final List<Pair<String, Integer>> mFallbackResolvers = new ArrayList<>();
+  private final List<Pair<String, Integer>> mCaresFallbackResolvers = new ArrayList<>();
   private boolean mForceV6 = true;
   private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
@@ -106,8 +106,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    * @param host ip address string
    * @param port port for the resolver
    */
-  public NativeCronvoyEngineBuilderImpl addFallbackResolver(String host, int port) {
-    mFallbackResolvers.add(new Pair<String, Integer>(host, port));
+  public NativeCronvoyEngineBuilderImpl addCaresFallbackResolver(String host, int port) {
+    mCaresFallbackResolvers.add(new Pair<String, Integer>(host, port));
     return this;
   }
 
@@ -296,6 +296,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
         mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
         platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation, mUpstreamTlsSni, mFallbackResolvers);
+        mEnablePlatformCertificatesValidation, mUpstreamTlsSni, mCaresFallbackResolvers);
   }
 }

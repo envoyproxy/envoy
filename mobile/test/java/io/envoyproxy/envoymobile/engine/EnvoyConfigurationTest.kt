@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile.engine
 
+import android.util.Pair
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
@@ -82,7 +83,7 @@ class EnvoyConfigurationTest {
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
     enableCares: Boolean = false,
-    fallbackResolvers: MutableList<Pair<String, Integer>> = mutableListOf(Pair("1.2.3.4", 88)),
+    caresFallbackResolvers: MutableList<Pair<String, Integer>> = mutableListOf(Pair("1.2.3.4", 88)),
     forceV6: Boolean = true,
     enableGro: Boolean = false,
     http3ConnectionOptions: String = "5RTO",
@@ -157,7 +158,7 @@ class EnvoyConfigurationTest {
       runtimeGuards,
       enablePlatformCertificatesValidation,
       upstreamTlsSni,
-      fallbackResolvers,
+      caresFallbackResolvers,
     )
   }
 
