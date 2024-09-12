@@ -1765,7 +1765,10 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsMedia
   EXPECT_EQ(hosts[4]->weight(), 42);
 }
 
-TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, DISABLED_chooseHostWithClientSideWeights) {
+TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, chooseHostWithClientSideWeights) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
   hostSet().healthy_hosts_ = {
       makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
       makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
@@ -1773,8 +1776,6 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, DISABLED_chooseHostWithClie
   };
   hostSet().hosts_ = hostSet().healthy_hosts_;
   init(false);
-  // DeterminePriorityLoad is called in chooseHost.
-  ON_CALL(lb_context_, determinePriorityLoad(_, _, _)).WillByDefault(testing::ReturnArg<1>());
 
   lb_->addClientSideLbPolicyDataToHosts(hostSet().hosts_);
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(5)));
@@ -1787,7 +1788,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, DISABLED_chooseHostWithClie
         }));
     HostConstSharedPtr host = lb_->chooseHost(&lb_context_);
     // Hosts have equal weights, so chooseHost returns the current host.
-    EXPECT_EQ(host, host_ptr);
+    ASSERT_EQ(host, host_ptr);
     // Invoke the callback with an Orca load report.
     xds::data::orca::v3::OrcaLoadReport orca_load_report;
     orca_load_report.set_rps_fractional(1000);
