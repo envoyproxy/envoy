@@ -31,6 +31,7 @@ FileInsertContext::FileInsertContext(std::shared_ptr<FileSystemHttpCache> cache,
 void FileInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                       const ResponseMetadata& metadata,
                                       InsertCallback insert_complete, bool end_stream) {
+  ASSERT(dispatcher()->isThreadSafe());
   callback_in_flight_ = insert_complete;
   const VaryAllowList& vary_allow_list = lookup_context_->lookup().varyAllowList();
   const Http::RequestHeaderMap& request_headers = lookup_context_->lookup().requestHeaders();
@@ -63,6 +64,7 @@ void FileInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_he
 }
 
 void FileInsertContext::createFile() {
+  ASSERT(dispatcher()->isThreadSafe());
   ASSERT(!cancel_action_in_flight_);
   ASSERT(callback_in_flight_ != nullptr);
   cancel_action_in_flight_ = cache_->asyncFileManager()->createAnonymousFile(
@@ -78,6 +80,7 @@ void FileInsertContext::createFile() {
 }
 
 void FileInsertContext::writeEmptyHeaderBlock() {
+  ASSERT(dispatcher()->isThreadSafe());
   ASSERT(!cancel_action_in_flight_);
   ASSERT(callback_in_flight_ != nullptr);
   Buffer::OwnedImpl unset_header;
@@ -106,6 +109,7 @@ void FileInsertContext::succeedCurrentAction() {
 }
 
 void FileInsertContext::writeHeaderProto() {
+  ASSERT(dispatcher()->isThreadSafe());
   ASSERT(!cancel_action_in_flight_);
   ASSERT(callback_in_flight_ != nullptr);
   auto buf = bufferFromProto(cache_file_header_proto_);
@@ -131,6 +135,7 @@ void FileInsertContext::writeHeaderProto() {
 
 void FileInsertContext::insertBody(const Buffer::Instance& fragment,
                                    InsertCallback ready_for_next_fragment, bool end_stream) {
+  ASSERT(dispatcher()->isThreadSafe());
   ASSERT(!cancel_action_in_flight_, "should be no actions in flight when receiving new data");
   ASSERT(!callback_in_flight_);
   if (!cleanup_) {
@@ -162,6 +167,7 @@ void FileInsertContext::insertBody(const Buffer::Instance& fragment,
 
 void FileInsertContext::insertTrailers(const Http::ResponseTrailerMap& trailers,
                                        InsertCallback insert_complete) {
+  ASSERT(dispatcher()->isThreadSafe());
   ASSERT(!cancel_action_in_flight_, "should be no actions in flight when receiving new data");
   ASSERT(!callback_in_flight_);
   if (!cleanup_) {
@@ -191,6 +197,7 @@ void FileInsertContext::insertTrailers(const Http::ResponseTrailerMap& trailers,
 void FileInsertContext::onDestroy() { cancelInsert("InsertContext destroyed prematurely"); }
 
 void FileInsertContext::commit() {
+  ASSERT(dispatcher()->isThreadSafe());
   ASSERT(!cancel_action_in_flight_);
   ASSERT(callback_in_flight_ != nullptr);
   // Write the file header block now that we know the sizes of the pieces.
