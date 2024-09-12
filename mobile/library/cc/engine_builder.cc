@@ -492,6 +492,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (use_cares_) {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
     auto* address = resolver_config.add_resolvers();
+    address->mutable_socket_address()->set_address("2001:4860:4860::8888");
+    address->mutable_socket_address()->set_port_value(53);
+    address = resolver_config.add_resolvers();
     address->mutable_socket_address()->set_address("8.8.8.8");
     address->mutable_socket_address()->set_port_value(53);
     resolver_config.set_use_resolvers_as_fallback(true);
