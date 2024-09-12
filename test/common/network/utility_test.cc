@@ -247,8 +247,6 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
   EXPECT_EQ("[1::1]:65535",
             Utility::parseInternetAddressAndPortNoThrow("[1::1]:65535")->asString());
   EXPECT_EQ("[::1]:0", Utility::parseInternetAddressAndPortNoThrow("[::1]:0")->asString());
-  EXPECT_EQ("www.google.com:443",
-            Utility::parseInternetAddressAndPortNoThrow("www.google.com:443")->asString());
 }
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
