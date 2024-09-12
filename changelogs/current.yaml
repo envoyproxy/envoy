@@ -317,5 +317,13 @@ new_features:
   change: |
     The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
     original IP detection method now supports using a list of trusted CIDRs when parsing ``x-forwarded-for``.
+- area: resource_monitors
+  change: |
+    Added possibility to monitor CPU utilization in Linux based systems via :ref:`cpu utilization monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>` in overload manager.
+- area: lua
+  change: |
+      Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
+      connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 
 deprecated:
