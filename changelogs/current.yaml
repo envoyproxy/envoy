@@ -193,6 +193,9 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.normalize_host_for_preresolve_dfp_dns`` runtime flag and legacy code paths.
 - area: http
   change: |
+    Removed the ``envoy.reloadable_features.http2_validate_authority_with_quiche`` runtime flag and its legacy code paths.
+- area: http
+  change: |
     Removed ``envoy.reloadable_features.use_http3_header_normalisation`` runtime flag and legacy code paths.
 
 new_features:
@@ -289,6 +292,10 @@ new_features:
   change: |
     Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
     the configured duration.
+- area: ext_authz
+  change: |
+    Added :ref:`emit_filter_state_stats <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_filter_state_stats>`
+    which when true enables filter state stats for access logging.
 - area: extension_discovery_service
   change: |
     added ECDS support for :ref:`UDP session filters
@@ -318,9 +325,21 @@ new_features:
   change: |
     Added :ref:`external_auth_provider <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>` to support
     external authentication for redis proxy.
+- area: udp_access_logs
+  change: |
+    Added support for %BYTES_RECEIVED%, %BYTES_SENT%, %UPSTREAM_HEADER_BYTES_SENT%, %UPSTREAM_HEADER_BYTES_RECEIVED%,
+    %UPSTREAM_WIRE_BYTES_SENT%, %UPSTREAM_WIRE_BYTES_RECEIVED% access log substitution strings for UDP tunneling flows.
 - area: original_ip_detection extension
   change: |
     The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
     original IP detection method now supports using a list of trusted CIDRs when parsing ``x-forwarded-for``.
+- area: resource_monitors
+  change: |
+    Added possibility to monitor CPU utilization in Linux based systems via :ref:`cpu utilization monitor
+    <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>` in overload manager.
+- area: lua
+  change: |
+      Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
+      connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 
 deprecated:

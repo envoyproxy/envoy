@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 29]
+// [#next-free-field: 30]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -296,6 +296,17 @@ message ExtAuthz {
   // added to StreamInfo's filter state under the namespace corresponding to the ext_authz filter
   // name.
   google.protobuf.Struct filter_metadata = 28;
+
+  // When set to true, the filter will emit per-stream stats for access logging. The filter state
+  // key will be the same as the filter name.
+  //
+  // If using Envoy GRPC, emits latency, bytes sent / received, upstream info, and upstream cluster
+  // info. If not using Envoy GRPC, emits only latency. Note that stats are ONLY added to filter
+  // state if a check request is actually made to an ext_authz service.
+  //
+  // If this is false the filter will not emit stats, but filter_metadata will still be respected if
+  // it has a value.
+  bool emit_filter_state_stats = 29;
 }
 
 // Configuration for buffering the request data.

@@ -317,6 +317,16 @@ int SslConnectionWrapper::luaDnsSansLocalCertificate(lua_State* state) {
   return 1;
 }
 
+int SslConnectionWrapper::luaOidsPeerCertificate(lua_State* state) {
+  createLuaTableFromStringList(state, connection_info_.oidsPeerCertificate());
+  return 1;
+}
+
+int SslConnectionWrapper::luaOidsLocalCertificate(lua_State* state) {
+  createLuaTableFromStringList(state, connection_info_.oidsLocalCertificate());
+  return 1;
+}
+
 int SslConnectionWrapper::luaValidFromPeerCertificate(lua_State* state) {
   lua_pushinteger(state, timestampInSeconds(connection_info_.validFromPeerCertificate()));
   return 1;

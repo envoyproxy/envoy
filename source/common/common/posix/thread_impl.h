@@ -12,16 +12,20 @@ namespace Thread {
 
 class ThreadHandle {
 public:
-  explicit ThreadHandle(std::function<void()> thread_routine);
+  ThreadHandle(std::function<void()> thread_routine, absl::optional<int> thread_priority);
 
   /** Returns the thread routine. */
   std::function<void()>& routine();
+
+  /** Returns the thread priority, if any. */
+  absl::optional<int> priority() const;
 
   /** Returns the thread handle. */
   pthread_t& handle();
 
 private:
   std::function<void()> thread_routine_;
+  const absl::optional<int> thread_priority_;
   pthread_t thread_handle_;
 };
 
@@ -94,6 +98,13 @@ public:
    * thread ID returned from `currentPThreadId()`.
    */
   ThreadId currentThreadId();
+
+  /**
+   * On Linux and Android, this will return an integer value between [-20, 19].
+   * On Apple platforms, thread priorities range from [0,1] but this API normalizes the values to
+   * [0, 100] for consistency with the Options.priority_ values.
+   */
+  int currentThreadPriority();
 
   /** Returns the current pthread ID. It uses `pthread_self()`. */
   virtual ThreadId currentPthreadId();

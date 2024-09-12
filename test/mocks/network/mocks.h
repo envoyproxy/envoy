@@ -446,7 +446,7 @@ public:
   MOCK_METHOD(bool, reusePort, (), (const));
   MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
   MOCK_METHOD(void, closeAllSockets, ());
-  MOCK_METHOD(void, doFinalPreWorkerInit, ());
+  MOCK_METHOD(absl::Status, doFinalPreWorkerInit, ());
 };
 
 class MockUdpPacketWriterFactory : public UdpPacketWriterFactory {
