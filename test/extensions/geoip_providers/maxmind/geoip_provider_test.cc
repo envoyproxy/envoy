@@ -94,6 +94,7 @@ public:
         Registry::FactoryRegistry<Geolocation::GeoipProviderFactory>::getFactory(
             "envoy.geoip_providers.maxmind"));
     ASSERT(provider_factory_);
+    on_changed_cbs_.reserve(1);
   }
 
   ~GeoipProviderTestBase() {

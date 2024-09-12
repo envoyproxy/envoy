@@ -35,7 +35,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
     const auto client_config =
         std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
             proto_config, timeout_ms, proto_config.http_service().path_prefix(), server_context);
-    callback = [filter_config, client_config,
+    callback = [filter_config = std::move(filter_config), client_config,
                 &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
           server_context.clusterManager(), client_config);
@@ -48,13 +48,13 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
     THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(proto_config));
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
         Envoy::Grpc::GrpcServiceConfigWithHashKey(proto_config.grpc_service());
-    callback = [&server_context, filter_config, timeout_ms,
+    callback = [&server_context, filter_config = std::move(filter_config), timeout_ms,
                 config_with_hash_key](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client_or_error = server_context.clusterManager()
                                  .grpcAsyncClientManager()
                                  .getOrCreateRawAsyncClientWithHashKey(
                                      config_with_hash_key, server_context.scope(), true);
-      THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+      THROW_IF_NOT_OK_REF(client_or_error.status());
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           client_or_error.value(), std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));

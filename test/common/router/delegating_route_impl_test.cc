@@ -34,8 +34,7 @@ TEST(DelegatingRoute, DelegatingRouteTest) {
   std::string name;
   TEST_METHOD(mostSpecificPerFilterConfig, name);
 
-  std::function<void(const Router::RouteSpecificFilterConfig&)> cb;
-  TEST_METHOD(traversePerFilterConfig, name, cb);
+  TEST_METHOD(perFilterConfigs, name);
 }
 
 // Verify that DelegatingRouteEntry class forwards all calls to internal base route.

@@ -37,6 +37,8 @@ public:
   absl::Span<const std::string> dnsSansLocalCertificate() const override;
   absl::Span<const std::string> ipSansPeerCertificate() const override;
   absl::Span<const std::string> ipSansLocalCertificate() const override;
+  absl::Span<const std::string> oidsPeerCertificate() const override;
+  absl::Span<const std::string> oidsLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
   const std::string& sessionId() const override;
@@ -66,6 +68,8 @@ protected:
   mutable std::vector<std::string> cached_dns_san_local_certificate_;
   mutable std::vector<std::string> cached_ip_san_peer_certificate_;
   mutable std::vector<std::string> cached_ip_san_local_certificate_;
+  mutable std::vector<std::string> cached_oid_peer_certificate_;
+  mutable std::vector<std::string> cached_oid_local_certificate_;
   mutable std::string cached_session_id_;
   mutable std::string cached_tls_version_;
   mutable std::string alpn_;

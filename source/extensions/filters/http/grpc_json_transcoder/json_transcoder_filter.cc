@@ -124,7 +124,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::kProtoDescriptor: {
     auto file_or_error = api.fileSystem().fileReadToEnd(proto_config.proto_descriptor());
-    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    THROW_IF_NOT_OK_REF(file_or_error.status());
     if (!descriptor_set.ParseFromString(file_or_error.value())) {
       throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
     }
