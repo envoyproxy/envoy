@@ -26,7 +26,7 @@ PlatformBridgeCertValidator::PlatformBridgeCertValidator(
   ENVOY_BUG(config != nullptr && config->caCert().empty() &&
                 config->certificateRevocationList().empty(),
             "Invalid certificate validation context config.");
-  if (config->customValidatorConfig().has_value()) {
+  if (config != nullptr && config->customValidatorConfig().has_value()) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator cfg;
     Envoy::Config::Utility::translateOpaqueConfig(
         config->customValidatorConfig().value().typed_config(),
