@@ -1377,6 +1377,7 @@ public:
   FileSystemHttpCacheTestDelegate() { initCache(); }
   std::shared_ptr<HttpCache> cache() override { return cache_; }
   bool validationEnabled() const override { return true; }
+  void beforePumpingDispatcher() override { cache_->drainAsyncFileActionsForTest(); }
 };
 
 // For the standard cache tests from http_cache_implementation_test_common.cc

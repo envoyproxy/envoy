@@ -187,6 +187,9 @@ public:
 
   using PostEvictionCallback = std::function<void(uint64_t size_bytes, uint64_t count)>;
 
+  // Waits for all queued actions to be completed.
+  void drainAsyncFileActionsForTest() { async_file_manager_->waitForIdle(); };
+
 private:
   /**
    * Writes a vary node to disk for the given key. A vary node in the cache consists of
