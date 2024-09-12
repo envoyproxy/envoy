@@ -1275,7 +1275,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   if (use_cares == JNI_TRUE) {
     auto resolvers = javaObjectArrayToStringPairVector(jni_helper, cares_fallback_resolvers);
     for (const auto& [host, port] : resolvers) {
-      builder.addFallbackResolver(host, stoi(port));
+      builder.addCaresFallbackResolver(host, stoi(port));
     }
   }
   builder.setUseGroIfAvailable(use_gro == JNI_TRUE);
