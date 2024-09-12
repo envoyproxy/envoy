@@ -180,6 +180,7 @@ TEST_P(PlatformBridgeCertValidatorTest, NonEmptyCaCert) {
   EXPECT_CALL(config_, caCert()).WillRepeatedly(ReturnRef(ca_cert));
   EXPECT_CALL(config_, certificateRevocationList()).WillRepeatedly(ReturnRef(empty_string_));
   EXPECT_CALL(config_, trustChainVerification()).WillRepeatedly(Return(GetParam()));
+  EXPECT_CALL(config_, customValidatorConfig()).WillRepeatedly(ReturnRef(platform_bridge_config_));
 
   EXPECT_ENVOY_BUG({ PlatformBridgeCertValidator validator(&config_, stats_); },
                    "Invalid certificate validation context config.");
@@ -190,6 +191,7 @@ TEST_P(PlatformBridgeCertValidatorTest, NonEmptyRevocationList) {
   EXPECT_CALL(config_, caCert()).WillRepeatedly(ReturnRef(empty_string_));
   EXPECT_CALL(config_, certificateRevocationList()).WillRepeatedly(ReturnRef(revocation_list));
   EXPECT_CALL(config_, trustChainVerification()).WillRepeatedly(Return(GetParam()));
+  EXPECT_CALL(config_, customValidatorConfig()).WillRepeatedly(ReturnRef(platform_bridge_config_));
 
   EXPECT_ENVOY_BUG({ PlatformBridgeCertValidator validator(&config_, stats_); },
                    "Invalid certificate validation context config.");
