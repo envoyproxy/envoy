@@ -614,7 +614,7 @@ private:
       UnitFloat dropOverload() const override { return drop_overload_; }
       const std::string& dropCategory() const override { return drop_category_; }
       void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
-      void setDropCategory(const std::string& drop_category) override {
+      void setDropCategory(absl::string_view drop_category) override {
         drop_category_ = drop_category;
       }
 

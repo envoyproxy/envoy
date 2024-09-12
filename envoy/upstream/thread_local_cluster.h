@@ -170,7 +170,7 @@ public:
   /**
    * Set up the drop_category value for the thread local cluster.
    */
-  virtual void setDropCategory(const std::string& drop_category) PURE;
+  virtual void setDropCategory(absl::string_view drop_category) PURE;
 };
 
 using ThreadLocalClusterOptRef = absl::optional<std::reference_wrapper<ThreadLocalCluster>>;

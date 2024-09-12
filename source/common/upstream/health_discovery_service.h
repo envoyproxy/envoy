@@ -75,7 +75,7 @@ public:
   UnitFloat dropOverload() const override { return drop_overload_; }
   const std::string& dropCategory() const override { return drop_category_; }
   void setDropOverload(UnitFloat) override {}
-  void setDropCategory(const std::string&) override {}
+  void setDropCategory(absl::string_view) override {}
 
 protected:
   PrioritySetImpl priority_set_;
