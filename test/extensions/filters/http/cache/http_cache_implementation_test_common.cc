@@ -139,9 +139,9 @@ absl::Status HttpCacheImplementationTest::insert(
     if (!inserted_body) {
       return absl::InternalError("body was not inserted");
     }
-    if (!trailers.has_value()) {
-      return absl::OkStatus();
-    }
+  }
+  if (!trailers.has_value()) {
+    return absl::OkStatus();
   }
   inserter->insertTrailers(trailers.value(),
                            [&inserted_trailers](bool result) { inserted_trailers = result; });
