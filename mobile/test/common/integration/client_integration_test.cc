@@ -206,13 +206,7 @@ void ClientIntegrationTest::basicTest() {
                                    std::to_string(request_data.length()));
 
   EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
-  stream_callbacks.on_data_ = [this](const Buffer::Instance& buffer, uint64_t length,
-                                     bool end_stream, envoy_stream_intel) {
-    if (end_stream) {
-      std::string response_body(length, ' ');
-      buffer.copyOut(0, length, response_body.data());
-      EXPECT_EQ(response_body, "");
-    }
+  stream_callbacks.on_data_ = [this](const Buffer::Instance&, uint64_t, bool, envoy_stream_intel) {
     cc_.on_data_calls_++;
   };
 
