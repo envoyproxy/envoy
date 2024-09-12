@@ -2293,6 +2293,9 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
         request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():dnsSansPeerCertificate(), ","))
         request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():dnsSansLocalCertificate(), ","))
 
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():oidsPeerCertificate(), ","))
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():oidsLocalCertificate(), ","))
+
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():ciphersuiteId())
 
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():validFromPeerCertificate())
@@ -2344,6 +2347,14 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   EXPECT_CALL(*connection_info, dnsSansLocalCertificate()).WillOnce(Return(local_dns_sans));
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::trace, StrEq("local-dns-sans-1,local-dns-sans-2")));
+
+  const std::vector<std::string> peer_oids{"2.5.29.14", "1.2.840.113635.100"};
+  EXPECT_CALL(*connection_info, oidsPeerCertificate()).WillOnce(Return(peer_oids));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("2.5.29.14,1.2.840.113635.100")));
+
+  const std::vector<std::string> local_oids{"2.5.29.14", "2.5.29.15", "2.5.29.19"};
+  EXPECT_CALL(*connection_info, oidsLocalCertificate()).WillOnce(Return(local_oids));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("2.5.29.14,2.5.29.15,2.5.29.19")));
 
   const std::string subject_local = "subject-local";
   EXPECT_CALL(*connection_info, subjectLocalCertificate()).WillOnce(ReturnRef(subject_local));

@@ -828,7 +828,7 @@ void InstanceBase::onRuntimeReady() {
       // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
           *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
-      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+      THROW_IF_NOT_OK_REF(factory_or_error.status());
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           serverFactoryContext(), *stats_store_.rootScope(),
           factory_or_error.value()->createUncachedRawAsyncClient(), stats_store_,
@@ -853,21 +853,22 @@ void InstanceBase::onRuntimeReady() {
 
 void InstanceBase::startWorkers() {
   // The callback will be called after workers are started.
-  listener_manager_->startWorkers(makeOptRefFromPtr(worker_guard_dog_.get()), [this]() {
-    if (isShutdown()) {
-      return;
-    }
+  THROW_IF_NOT_OK(
+      listener_manager_->startWorkers(makeOptRefFromPtr(worker_guard_dog_.get()), [this]() {
+        if (isShutdown()) {
+          return;
+        }
 
-    initialization_timer_->complete();
-    // Update server stats as soon as initialization is done.
-    updateServerStats();
-    workers_started_ = true;
-    hooks_.onWorkersStarted();
-    // At this point we are ready to take traffic and all listening ports are up. Notify our
-    // parent if applicable that they can stop listening and drain.
-    restarter_.drainParentListeners();
-    drain_manager_->startParentShutdownSequence();
-  });
+        initialization_timer_->complete();
+        // Update server stats as soon as initialization is done.
+        updateServerStats();
+        workers_started_ = true;
+        hooks_.onWorkersStarted();
+        // At this point we are ready to take traffic and all listening ports are up. Notify our
+        // parent if applicable that they can stop listening and drain.
+        restarter_.drainParentListeners();
+        drain_manager_->startParentShutdownSequence();
+      }));
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,

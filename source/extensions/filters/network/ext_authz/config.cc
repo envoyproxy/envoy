@@ -34,7 +34,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
                                 .clusterManager()
                                 .grpcAsyncClientManager()
                                 .factoryForGrpcService(grpc_service, context.scope(), true);
-    THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+    THROW_IF_NOT_OK_REF(factory_or_error.status());
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
         factory_or_error.value()->createUncachedRawAsyncClient(),
         std::chrono::milliseconds(timeout_ms));

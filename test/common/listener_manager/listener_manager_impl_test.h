@@ -384,7 +384,7 @@ protected:
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _));
-    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 
@@ -433,7 +433,7 @@ protected:
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _));
-    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 
