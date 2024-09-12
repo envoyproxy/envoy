@@ -177,13 +177,12 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   absl::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
-  for (const auto* cfg :
+  for (const FilterConfigPerRoute& cfg :
        Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
-    ASSERT(cfg != nullptr);
     if (maybe_merged_per_route_config.has_value()) {
-      maybe_merged_per_route_config.value().merge(*cfg);
+      maybe_merged_per_route_config.value().merge(cfg);
     } else {
-      maybe_merged_per_route_config = *cfg;
+      maybe_merged_per_route_config = cfg;
     }
   }
 
