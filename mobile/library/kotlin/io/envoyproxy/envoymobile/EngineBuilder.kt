@@ -228,7 +228,7 @@ open class EngineBuilder() {
    * @return This builder.
    */
   fun addFallbackResolver(host: String, port: Int): EngineBuilder {
-    this.fallbackResolver.add(Pair(host, port))
+    this.fallbackResolvers.add(Pair(host, port))
     return this
   }
 
