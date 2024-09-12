@@ -287,6 +287,10 @@ new_features:
   change: |
     Added :ref:`delay_deny <envoy_v3_api_msg_extensions.filters.network.rbac.v3.RBAC>` to support deny connection after
     the configured duration.
+- area: ext_authz
+  change: |
+    Added :ref:`emit_filter_state_stats <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_filter_state_stats>`
+    which when true enables filter state stats for access logging.
 - area: extension_discovery_service
   change: |
     added ECDS support for :ref:`UDP session filters
