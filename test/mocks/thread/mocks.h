@@ -24,7 +24,7 @@ public:
   MOCK_METHOD(PosixThreadPtr, createThread,
               (std::function<void()>, OptionsOptConstRef, bool crash_on_failure));
   MOCK_METHOD(ThreadId, currentThreadId, ());
-  MOCK_METHOD(ThreadId, currentPthreadId, ());
+  MOCK_METHOD(ThreadId, currentPthreadId, (), (const));
 };
 #endif
 
