@@ -98,5 +98,5 @@ message QuicProtocolOptions {
   // If true, the listener will reject connection-establishing packets at the
   // QUIC layer by replying with an empty version negotiation packet to the
   // client.
-  google.protobuf.BoolValue reject_new_connections = 13;
+  bool reject_new_connections = 13;
 }

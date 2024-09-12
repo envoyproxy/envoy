@@ -2386,8 +2386,7 @@ TEST_P(QuicHttpIntegrationTest, RejectTraffic) {
         ->mutable_listeners(0)
         ->mutable_udp_listener_config()
         ->mutable_quic_options()
-        ->mutable_reject_new_connections()
-        ->set_value(true);
+        ->set_reject_new_connections(true);
   });
 
   initialize();

@@ -267,8 +267,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
       receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")),
-      context_(context), reject_new_connections_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                             config, reject_new_connections, false)) {
+      context_(context), reject_new_connections_(config.reject_new_connections()) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
