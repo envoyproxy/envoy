@@ -130,10 +130,27 @@ message ExternalProcessor {
   // Only one of ``http_service`` or
   // :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`.
   // can be set. It is required that one of them must be set.
+  //
   // If ``http_service`` is set, the
   // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
-  // can not be configured to send any body or trailers to the side stream server. i.e, http_service only supports
+  // can not be configured to send any body or trailers. i.e, http_service only supports
   // sending request or response headers to the side stream server.
+  //
+  // With this configuration, Envoy behavior:
+  // 1. The headers are first put in a proto message
+  // :ref:`ProcessingRequest <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest>`.
+  // 2. This proto message is then transcoded into a JSON text.
+  // 3. Envoy then sends a HTTP POST message with content-type as "application/json",
+  // and this JSON text as body to the side stream server.
+  //
+  // After receives this HTTP request message, the side stream server behavior:
+  // 1. It converts the body, which is a JSON string, into a ``ProcessingRequest`` proto message.
+  // 2. It performs whatever header mutation on the headers in the ``ProcessingRequest``.
+  // 2. It then put the mutated headers into a new proto message
+  // :ref:`ProcessingResponse <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse>`.
+  // 3. It converts this proto message ``ProcessingResponse`` into a JSON text.
+  // 4. It then sends a HTTP response back to Envoy with status code as "200",
+  // content-type as "application/json" and body as this JSON text.
   ExtProcHttpService http_service = 20
       [(udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"];
 

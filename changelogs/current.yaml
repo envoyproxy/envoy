@@ -325,5 +325,9 @@ new_features:
   change: |
       Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
       connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
+- area: ext_proc
+  change: |
+    Added :ref:`http_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.http_service>` support
+    for the ext_proc filter to support sending HTTP messages to the side stream server.
 
 deprecated:
