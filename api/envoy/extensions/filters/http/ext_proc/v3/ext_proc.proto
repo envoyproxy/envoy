@@ -126,11 +126,14 @@ message ExternalProcessor {
   config.core.v3.GrpcService grpc_service = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"];
 
-  // [#not-implemented-hide:]
   // Configuration for the HTTP service that the filter will communicate with.
   // Only one of ``http_service`` or
   // :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`.
   // can be set. It is required that one of them must be set.
+  // If ``http_service`` is set, the
+  // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+  // can not be configured to send any body or trailers to the side stream server. i.e, http_service only supports
+  // sending request or response headers to the side stream server.
   ExtProcHttpService http_service = 20
       [(udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"];
 

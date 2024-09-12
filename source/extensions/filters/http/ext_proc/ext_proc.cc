@@ -226,6 +226,16 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
+  if (!grpc_service_.has_value()) {
+    // In case http_service configured, the processing mode can only support sending headers.
+    if (processing_mode_.request_body_mode() != ProcessingMode::NONE ||
+        processing_mode_.response_body_mode() != ProcessingMode::NONE ||
+        processing_mode_.request_trailer_mode() == ProcessingMode::SEND ||
+        processing_mode_.response_trailer_mode() == ProcessingMode::SEND) {
+      throw EnvoyException(
+          "If http_service is configured, processing modes can not send any body or trailer.");
+    }
+  }
   if (config.disable_clear_route_cache() && (route_cache_action_ != ExternalProcessor::DEFAULT)) {
     throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
                          "be set to none-default at the same time.");
