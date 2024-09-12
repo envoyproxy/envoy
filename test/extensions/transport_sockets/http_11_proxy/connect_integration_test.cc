@@ -124,7 +124,7 @@ typed_config:
     // Strip the CONNECT upgrade.
     std::string prefix_data;
     const std::string hostname(default_request_headers_.getHostValue());
-    const std::string port = hostname.rfind(':') == std::string::npos ? ":443" : "";
+    const std::string port = Http::HeaderUtility::hostHasPort(hostname) ? "" : ":443";
     ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", &prefix_data));
     EXPECT_EQ(absl::StrCat("CONNECT ", hostname, port, " HTTP/1.1\r\n\r\n"), prefix_data);
 

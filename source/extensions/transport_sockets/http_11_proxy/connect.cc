@@ -8,6 +8,7 @@
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -40,7 +41,7 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
       if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_ssl_port")) {
         header_buffer_.add(absl::StrCat(
             "CONNECT ", options_->http11ProxyInfo()->hostname,
-            options_->http11ProxyInfo()->hostname.rfind(':') == std::string::npos ? ":443" : "",
+            Http::HeaderUtility::hostHasPort(options_->http11ProxyInfo()->hostname) ? "" : ":443",
             " HTTP/1.1\r\n\r\n"));
       } else {
         header_buffer_.add(absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname,
