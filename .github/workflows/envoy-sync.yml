@@ -8,6 +8,7 @@ on:
     branches:
     - main
     - release/v1.28
+    - release/v1.31
   workflow_dispatch:
 
 concurrency:
