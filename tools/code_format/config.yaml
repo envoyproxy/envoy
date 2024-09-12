@@ -38,7 +38,7 @@ paths:
   excluded:
   - .
   - bazel/external/http_parser/
-  - bazel/toolchains/configs/
+  - bazel/rbe/toolchains/configs/
   - bazel-
   - build
   - contrib/contrib_build_config.bzl
