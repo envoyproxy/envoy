@@ -321,5 +321,9 @@ new_features:
   change: |
     Added possibility to monitor CPU utilization in Linux based systems via :ref:`cpu utilization monitor
     <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>` in overload manager.
+- area: lua
+  change: |
+      Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
+      connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 
 deprecated:

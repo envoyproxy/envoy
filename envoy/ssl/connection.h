@@ -139,6 +139,18 @@ public:
   virtual absl::Span<const std::string> ipSansLocalCertificate() const PURE;
 
   /**
+   * @return absl::Span<const std::string> the OID entries of the peer certificate extensions.
+   *         Returns {} if there is no peer certificate, or no extensions.
+   **/
+  virtual absl::Span<const std::string> oidsPeerCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the OID entries of the local certificate extensions.
+   *         Returns {} if there is no local certificate, or no extensions.
+   **/
+  virtual absl::Span<const std::string> oidsLocalCertificate() const PURE;
+
+  /**
    * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be
    *         considered valid from. Returns empty absl::optional if there is no peer certificate.
    **/
