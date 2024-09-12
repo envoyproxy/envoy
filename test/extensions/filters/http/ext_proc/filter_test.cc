@@ -2705,6 +2705,93 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+TEST_F(HttpFilterTest, GrpcServiceHttpServiceBothSet) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          seconds: 500
+  processing_mode:
+    response_body_mode: "BUFFERED"
+  )EOF";
+
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto config = std::make_shared<FilterConfig>(
+            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
+            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+            factory_context_);
+      },
+      EnvoyException, "One and only one of grpc_service or http_service must be configured");
+}
+
+TEST_F(HttpFilterTest, HttpServiceBodyProcessingModeNotNone) {
+  std::string yaml = R"EOF(
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          seconds: 500
+  processing_mode:
+    response_header_mode: "SEND"
+    request_body_mode: "BUFFERED"
+  )EOF";
+
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto config = std::make_shared<FilterConfig>(
+            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
+            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+            factory_context_);
+      },
+      EnvoyException,
+      "If http_service is configured, processing modes can not send any body or trailer.");
+}
+
+TEST_F(HttpFilterTest, HttpServiceTrailerProcessingModeNotSKIP) {
+  std::string yaml = R"EOF(
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          seconds: 500
+  processing_mode:
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SEND"
+  )EOF";
+
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        auto config = std::make_shared<FilterConfig>(
+            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
+            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
+            factory_context_);
+      },
+      EnvoyException,
+      "If http_service is configured, processing modes can not send any body or trailer.");
+}
+
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate
 // callback on the filter for inbound traffic when header modifications are also present.
 // Also verify it does not make the callback for outbound traffic.
