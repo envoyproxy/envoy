@@ -157,6 +157,53 @@ TEST_F(AsyncFileManagerWithMockFilesTest,
   EXPECT_TRUE(did_second_action);
 }
 
+TEST_F(AsyncFileManagerWithMockFilesTest, CloseActionExecutesEvenIfCancelled) {
+  int fd = 1;
+  // First do a successful open so we have a file handle.
+  EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
+      .WillOnce(Return(Api::SysCallIntResult{fd, 0}));
+  AsyncFileHandle handle;
+  manager_->createAnonymousFile(
+      dispatcher_.get(), tmpdir_,
+      [&](absl::StatusOr<AsyncFileHandle> result) { handle = std::move(result.value()); });
+  resolveFileActions();
+  ASSERT_THAT(handle, testing::NotNull());
+  EXPECT_CALL(mock_posix_file_operations_, close(fd));
+  CancelFunction cancel = handle->close(nullptr, [](absl::Status) {}).value();
+  cancel();
+  resolveFileActions();
+}
+
+TEST_F(AsyncFileManagerWithMockFilesTest, CancellingBeforeCallbackUndoesActionsWithSideEffects) {
+  int fd = 1;
+  // First do a successful open so we have a file handle.
+  EXPECT_CALL(mock_posix_file_operations_, open(Eq(tmpdir_), O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR))
+      .WillOnce(Return(Api::SysCallIntResult{fd, 0}));
+  AsyncFileHandle handle;
+  manager_->createAnonymousFile(
+      dispatcher_.get(), tmpdir_,
+      [&](absl::StatusOr<AsyncFileHandle> result) { handle = std::move(result.value()); });
+  resolveFileActions();
+  ASSERT_THAT(handle, testing::NotNull());
+  EXPECT_CALL(mock_posix_file_operations_, linkat(fd, _, _, Eq(tmpdir_), _));
+  CancelFunction cancel_hard_link =
+      handle
+          ->createHardLink(
+              dispatcher_.get(), tmpdir_,
+              [&](absl::Status) { FAIL() << "callback should not be called in this test"; })
+          .value();
+  // wait for the manager to post to the dispatcher, but don't consume it yet.
+  manager_->waitForIdle();
+  // cancel while it's in the dispatcher queue.
+  cancel_hard_link();
+  // Cancellation should remove the link because the callback was not executed.
+  EXPECT_CALL(mock_posix_file_operations_, unlink(Eq(tmpdir_)));
+  resolveFileActions();
+  EXPECT_CALL(mock_posix_file_operations_, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  ASSERT_OK(handle->close(nullptr, [](absl::Status) {}));
+  resolveFileActions();
+}
+
 TEST_F(AsyncFileManagerWithMockFilesTest, OpenFailureInCreateAnonymousReturnsAnError) {
   int fd = 1;
   // First do a successful open and close, to establish that we can use the O_TMPFILE path
