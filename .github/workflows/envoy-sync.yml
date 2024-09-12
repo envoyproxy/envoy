@@ -51,7 +51,7 @@ jobs:
     if: >-
       ${{
           github.repository == 'envoyproxy/envoy'
-          && contains(['main', 'release/v1.28', 'release/v1.31'], github.ref_name)
+          && contains(fromJSON('["main", "release/v1.28", "release/v1.31"]'), github.ref_name)
           && (github.event.push
               || !contains(github.actor, '[bot]'))
       }}
