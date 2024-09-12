@@ -39,7 +39,7 @@ open class EngineBuilder() {
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
   internal var useCares = false
-  internal var fallbackResolvers = listOf<Pair<String, String>>()
+  internal var fallbackResolvers = listOf<Pair<String, Int>>()
   internal var forceV6 = true
   private var useGro = false
   private var http3ConnectionOptions = ""
