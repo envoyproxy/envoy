@@ -1342,7 +1342,7 @@ ClusterManagerImpl::ClusterInitializationObjectConstSharedPtr
 ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
     LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-    UnitFloat drop_overload, const std::string& drop_category) {
+    UnitFloat drop_overload, absl::string_view drop_category) {
   if (!deferralIsSupportedForCluster(cluster_info)) {
     return nullptr;
   }
@@ -1424,7 +1424,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
     LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-    UnitFloat drop_overload, const std::string& drop_category)
+    UnitFloat drop_overload, absl::string_view drop_category)
     : cluster_info_(std::move(cluster_info)), load_balancer_factory_(load_balancer_factory),
       cross_priority_host_map_(map), drop_overload_(drop_overload), drop_category_(drop_category) {
   // Copy the update since the map is empty.
@@ -1437,7 +1437,7 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>& per_priority_state,
     const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
     LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-    UnitFloat drop_overload, const std::string& drop_category)
+    UnitFloat drop_overload, absl::string_view drop_category)
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
       load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map),
       drop_overload_(drop_overload), drop_category_(drop_category) {
