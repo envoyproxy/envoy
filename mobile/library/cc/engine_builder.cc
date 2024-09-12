@@ -554,6 +554,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (platform_certificates_validation_on_) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator
         validator;
+    if (network_thread_priority_.has_value()) {
+      validator.mutable_thread_priority()->set_value(*network_thread_priority_);
+    }
     validation->mutable_custom_validator_config()->set_name(
         "envoy_mobile.cert_validator.platform_bridge_cert_validator");
     validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
