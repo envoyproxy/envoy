@@ -2147,7 +2147,8 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   if (orca_load_report_callbacks_.has_value()) {
     const absl::Status status = orca_load_report_callbacks_->onOrcaLoadReport(*orca_load_report);
     if (!status.ok()) {
-      ENVOY_LOG_MISC(error, "Failed to invoke OrcaLoadReportCallbacks: {}", status.message());
+      ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
+                       status.message());
     }
   }
 }
