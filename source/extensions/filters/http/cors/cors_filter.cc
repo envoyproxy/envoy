@@ -70,12 +70,12 @@ void CorsFilter::initializeCorsPolicies() {
     ASSERT(route != nullptr);
     ASSERT(route->routeEntry() != nullptr);
 
-    if (route->routeEntry()->corsPolicy() != nullptr) {
-      policies_.push_back(*route->routeEntry()->corsPolicy());
+    if (auto* typed_cfg = route->routeEntry()->corsPolicy(); typed_cfg != nullptr) {
+      policies_.push_back(*typed_cfg);
     }
 
-    if (route->virtualHost().corsPolicy() != nullptr) {
-      policies_.push_back(*route->virtualHost().corsPolicy());
+    if (auto* typed_cfg = route->virtualHost().corsPolicy(); typed_cfg != nullptr) {
+      policies_.push_back(*typed_cfg);
     }
   }
 }
