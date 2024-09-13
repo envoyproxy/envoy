@@ -80,6 +80,8 @@ cleanup_cache () {
     if [[ -n "$DOCKER_REMOVE_EXISTING" ]]; then
         rm -rf /var/lib/docker.old
     fi
+    mkdir -p "$DOCKER_CACHE_PATH"
+    mkdir -p "$BAZEL_CACHE_PATH"
 }
 
 restart_docker () {
