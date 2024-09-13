@@ -48,9 +48,11 @@ void FileLookupContext::doCacheEntryInvalid() {
 }
 
 void FileLookupContext::getHeaderBlockFromFile() {
+  ASSERT(dispatcher()->isThreadSafe());
   auto queued = file_handle_->read(
       dispatcher(), 0, CacheFileFixedBlock::size(),
       [this](absl::StatusOr<Buffer::InstancePtr> read_result) {
+        ASSERT(dispatcher()->isThreadSafe());
         cancel_action_in_flight_ = nullptr;
         if (!read_result.ok() || read_result.value()->length() != CacheFileFixedBlock::size()) {
           return doCacheEntryInvalid();
@@ -66,9 +68,11 @@ void FileLookupContext::getHeaderBlockFromFile() {
 }
 
 void FileLookupContext::getHeadersFromFile() {
+  ASSERT(dispatcher()->isThreadSafe());
   auto queued = file_handle_->read(
       dispatcher(), header_block_.offsetToHeaders(), header_block_.headerSize(),
       [this](absl::StatusOr<Buffer::InstancePtr> read_result) {
+        ASSERT(dispatcher()->isThreadSafe());
         cancel_action_in_flight_ = nullptr;
         if (!read_result.ok() || read_result.value()->length() != header_block_.headerSize()) {
           return doCacheEntryInvalid();
@@ -96,7 +100,9 @@ void FileLookupContext::getHeadersFromFile() {
 }
 
 void FileLookupContext::closeFileAndGetHeadersAgainWithNewVaryKey() {
+  ASSERT(dispatcher()->isThreadSafe());
   auto queued = file_handle_->close(dispatcher(), [this](absl::Status) {
+    ASSERT(dispatcher()->isThreadSafe());
     file_handle_ = nullptr;
     // Restart with the new key.
     return tryOpenCacheFile();
@@ -106,12 +112,14 @@ void FileLookupContext::closeFileAndGetHeadersAgainWithNewVaryKey() {
 }
 
 void FileLookupContext::invalidateCacheEntry() {
+  ASSERT(dispatcher()->isThreadSafe());
   // We don't capture the cancel action here because we want these operations to continue even
   // if the filter was destroyed in the meantime. For the same reason, we must not capture 'this'.
   cache_.asyncFileManager()->stat(
       dispatcher(), filepath(),
       [file = filepath(), cache = cache_.shared_from_this(),
        dispatcher = dispatcher()](absl::StatusOr<struct stat> stat_result) {
+        ASSERT(dispatcher->isThreadSafe());
         size_t file_size = 0;
         if (stat_result.ok()) {
           file_size = stat_result.value().st_size;
@@ -126,12 +134,14 @@ void FileLookupContext::invalidateCacheEntry() {
 }
 
 void FileLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) {
+  ASSERT(dispatcher()->isThreadSafe());
   ASSERT(cb);
   ASSERT(!cancel_action_in_flight_);
   ASSERT(file_handle_);
   auto queued = file_handle_->read(
       dispatcher(), header_block_.offsetToBody() + range.begin(), range.length(),
       [this, cb = std::move(cb), range](absl::StatusOr<Buffer::InstancePtr> read_result) {
+        ASSERT(dispatcher()->isThreadSafe());
         cancel_action_in_flight_ = nullptr;
         if (!read_result.ok() || read_result.value()->length() != range.length()) {
           invalidateCacheEntry();
@@ -148,12 +158,14 @@ void FileLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallba
 }
 
 void FileLookupContext::getTrailers(LookupTrailersCallback&& cb) {
+  ASSERT(dispatcher()->isThreadSafe());
   ASSERT(cb);
   ASSERT(!cancel_action_in_flight_);
   ASSERT(file_handle_);
   auto queued = file_handle_->read(
       dispatcher(), header_block_.offsetToTrailers(), header_block_.trailerSize(),
       [this, cb = std::move(cb)](absl::StatusOr<Buffer::InstancePtr> read_result) {
+        ASSERT(dispatcher()->isThreadSafe());
         cancel_action_in_flight_ = nullptr;
         if (!read_result.ok() || read_result.value()->length() != header_block_.trailerSize()) {
           invalidateCacheEntry();
