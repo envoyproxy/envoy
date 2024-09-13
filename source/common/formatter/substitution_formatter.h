@@ -244,9 +244,11 @@ private:
   std::vector<FormatterProviderBasePtr<FormatterContext>> providers_;
 };
 
-using JsonSerializer = Envoy::Json::StreamerBase<Envoy::Json::StringOutput>;
+using JsonStringSerializer = Envoy::Json::StreamerBase<Envoy::Json::StringOutput>;
 
-// Helper class to parse the Json format configuration.
+// Helper class to parse the Json format configuration. The class will be used to parse
+// the JSON format configuration and convert it to a list of raw JSON pieces and
+// substitution format template strings. See comments below for more details.
 class JsonFormatBuilder {
 public:
   struct FormatElement {
@@ -318,9 +320,9 @@ private:
 
   const bool keep_value_type_;
 
-  std::string buffer_;                 // JSON writer buffer.
-  JsonSerializer serializer_{buffer_}; // JSON streamer.
-  FormatElements output_;              // Output configuration.
+  std::string buffer_;                       // JSON writer buffer.
+  JsonStringSerializer serializer_{buffer_}; // JSON streamer.
+  FormatElements output_;                    // Output configuration.
 };
 
 template <class FormatterContext>
@@ -353,7 +355,7 @@ public:
                                 const StreamInfo::StreamInfo& info) const override {
     std::string log_line;
     log_line.reserve(2048);
-    JsonSerializer streamer(log_line); // Helper to serialize the value to log line.
+    JsonStringSerializer streamer(log_line); // Helper to serialize the value to log line.
 
     for (const ParsedFormatElement& element : parsed_elements_) {
       // 1. Handle the raw string element.
@@ -387,7 +389,7 @@ public:
 private:
   void stringValueToLogLine(const Formatters& formatters, const FormatterContext& context,
                             const StreamInfo::StreamInfo& info, std::string& log_line,
-                            JsonSerializer& streamer) const {
+                            JsonStringSerializer& streamer) const {
 
     log_line.append(Json::Constants::DoubleQuote); // Start the JSON string.
     for (const Formatter& formatter : formatters) {
@@ -406,7 +408,7 @@ private:
 
   void typedValueToLogLine(const Formatters& formatters, const FormatterContext& context,
                            const StreamInfo::StreamInfo& info, std::string& log_line,
-                           JsonSerializer& streamer) const {
+                           JsonStringSerializer& streamer) const {
 
     const ProtobufWkt::Value value = formatters[0]->formatValueWithContext(context, info);
 

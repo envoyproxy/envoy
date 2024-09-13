@@ -58,9 +58,13 @@ JsonFormatBuilder::FormatElements
 JsonFormatBuilder::fromStruct(const ProtobufWkt::Struct& struct_format) {
   output_.clear();
 
+  // This call will iterate through the map tree and seiralize the key/values as JSON.
+  // If a string value that contains a substitution commands is found, the current
+  // JSON piece and the substitution command will be pushed into the output list.
+  // After that, the iteration will continue until the whole tree is traversed.
   formatValueToFormatElements(struct_format.fields());
   output_.push_back(FormatElement{std::move(buffer_), false});
-  ASSERT(buffer_.empty(), "buffer_ should be consumed");
+  buffer_.clear();
 
   return std::move(output_);
 };
@@ -89,10 +93,10 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& va
       break;
     }
 
-    // The string contains a formatter, we need to push the current raw string
+    // The string contains a formatter, we need to push the current exist JSON piece
     // into the output list first.
     output_.push_back(FormatElement{std::move(buffer_), false});
-    ASSERT(buffer_.empty(), "buffer_ should be consumed");
+    buffer_.clear();
 
     // Now a formatter is coming, we need to push the current raw string into
     // the output list.
