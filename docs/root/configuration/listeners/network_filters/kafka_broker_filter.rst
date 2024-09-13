@@ -6,7 +6,8 @@ Kafka Broker filter
 The Apache Kafka broker filter decodes the client protocol for
 `Apache Kafka <https://kafka.apache.org/>`_, both the requests and responses in the payload.
 The message versions in `Kafka 3.5.1 <http://kafka.apache.org/35/protocol.html#protocol_api_keys>`_
-are supported (apart from ConsumerGroupHeartbeat).
+are supported (apart from ConsumerGroupHeartbeat - what means consumers configured with
+``group.protocol=consumer``).
 
 By default the filter attempts not to influence the communication between client and brokers, so
 the messages that could not be decoded (due to Kafka client or broker running a newer version than

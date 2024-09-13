@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile.engine
 
+import android.util.Pair
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
@@ -82,6 +83,7 @@ class EnvoyConfigurationTest {
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
     enableCares: Boolean = false,
+    caresFallbackResolvers: MutableList<Pair<String, Int>> = mutableListOf(Pair("1.2.3.4", 88)),
     forceV6: Boolean = true,
     enableGro: Boolean = false,
     http3ConnectionOptions: String = "5RTO",
@@ -156,6 +158,7 @@ class EnvoyConfigurationTest {
       runtimeGuards,
       enablePlatformCertificatesValidation,
       upstreamTlsSni,
+      caresFallbackResolvers,
     )
   }
 
@@ -261,6 +264,8 @@ class EnvoyConfigurationTest {
 
     // enableCares = true
     assertThat(resolvedTemplate).contains("envoy.network.dns_resolver.cares")
+    assertThat(resolvedTemplate).contains("address: \"1.2.3.4\"");
+    assertThat(resolvedTemplate).contains("port_value: 88");
 
     // enableGro = true
     assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")

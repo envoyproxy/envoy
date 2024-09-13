@@ -2221,7 +2221,7 @@ public:
     auto policy_or_error =
         Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
                                         factory_context, client_.factory_context_);
-    THROW_IF_STATUS_NOT_OK(policy_or_error, throw);
+    THROW_IF_NOT_OK_REF(policy_or_error.status());
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
@@ -2259,7 +2259,7 @@ public:
     auto policy_or_error =
         Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
                                         factory_context, client_.factory_context_);
-    THROW_IF_STATUS_NOT_OK(policy_or_error, throw);
+    THROW_IF_NOT_OK_REF(policy_or_error.status());
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 

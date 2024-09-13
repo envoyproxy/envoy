@@ -2546,7 +2546,7 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
   const auto& port_value = health_check_config.port_value();
   if (health_check_config.has_address()) {
     auto address_or_error = Network::Address::resolveProtoAddress(health_check_config.address());
-    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    THROW_IF_NOT_OK_REF(address_or_error.status());
     auto address = address_or_error.value();
     health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);

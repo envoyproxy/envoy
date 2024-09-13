@@ -15,7 +15,7 @@ FileSinkDelegate::FileSinkDelegate(const std::string& log_path,
     : SinkDelegate(log_sink) {
   auto file_or_error = log_manager.createAccessLog(
       Filesystem::FilePathAndType{Filesystem::DestinationType::File, log_path});
-  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  THROW_IF_NOT_OK_REF(file_or_error.status());
   log_file_ = file_or_error.value();
   setDelegate();
 }

@@ -8,7 +8,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
 "source/common/config:96.1"
 "source/common/crypto:95.5"
-"source/common/event:95.1" # Emulated edge events guards don't report LCOV
+"source/common/event:95.2" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.3" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:96.0"
 "source/common/json:94.4"
@@ -29,7 +29,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.8"
-"source/extensions/filters/http/cache:95.1"
+"source/extensions/filters/http/cache:95.3"
 "source/extensions/filters/http/grpc_json_transcoder:94.2" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.2"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
@@ -52,8 +52,8 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
-"source/extensions/listener_managers:70.5"
-"source/extensions/listener_managers/validation_listener_manager:70.5"
+"source/extensions/listener_managers:77.3"
+"source/extensions/listener_managers/validation_listener_manager:77.3"
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:91.0" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/config_validation:91.8"

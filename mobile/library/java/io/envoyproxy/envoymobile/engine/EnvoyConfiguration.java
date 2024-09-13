@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
+import android.util.Pair;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ public class EnvoyConfiguration {
   public final boolean enableDrainPostDnsRefresh;
   public final boolean enableHttp3;
   public final boolean useCares;
+  public final List<Pair<String, String>> caresFallbackResolvers;
   public final boolean forceV6;
   public final boolean useGro;
   public final String http3ConnectionOptions;
@@ -126,6 +128,8 @@ public class EnvoyConfiguration {
    * @param keyValueStores                                platform key-value store implementations.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
    * @param upstreamTlsSni                                the upstream TLS socket SNI override.
+   * @param caresFallbackResolvers                        A list of host port pair that's used as
+   *     c-ares's fallback resolvers.
    */
   public EnvoyConfiguration(
       int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
@@ -144,7 +148,8 @@ public class EnvoyConfiguration {
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, Map<String, Boolean> runtimeGuards,
-      boolean enablePlatformCertificatesValidation, String upstreamTlsSni) {
+      boolean enablePlatformCertificatesValidation, String upstreamTlsSni,
+      List<Pair<String, Integer>> caresFallbackResolvers) {
     JniLibrary.load();
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
@@ -159,6 +164,11 @@ public class EnvoyConfiguration {
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
     this.useCares = useCares;
+    this.caresFallbackResolvers = new ArrayList<>();
+    for (Pair<String, Integer> hostAndPort : caresFallbackResolvers) {
+      this.caresFallbackResolvers.add(
+          new Pair<String, String>(hostAndPort.first, String.valueOf(hostAndPort.second)));
+    }
     this.forceV6 = forceV6;
     this.useGro = useGro;
     this.http3ConnectionOptions = http3ConnectionOptions;
@@ -215,6 +225,8 @@ public class EnvoyConfiguration {
     byte[][] runtimeGuards = JniBridgeUtility.mapToJniBytes(this.runtimeGuards);
     byte[][] quicHints = JniBridgeUtility.mapToJniBytes(this.quicHints);
     byte[][] quicSuffixes = JniBridgeUtility.stringsToJniBytes(quicCanonicalSuffixes);
+    byte[][] caresFallbackResolvers =
+        JniBridgeUtility.listOfStringPairsToJniBytes(this.caresFallbackResolvers);
 
     return JniLibrary.createBootstrap(
         connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
@@ -226,6 +238,6 @@ public class EnvoyConfiguration {
         h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
         maxConnectionsPerHost, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
         appId, enforceTrustChainVerification, filterChain, enablePlatformCertificatesValidation,
-        upstreamTlsSni, runtimeGuards);
+        upstreamTlsSni, runtimeGuards, caresFallbackResolvers);
   }
 }

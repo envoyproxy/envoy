@@ -735,7 +735,12 @@ ListenerManagerImpl::listeners(ListenerState state) {
 bool ListenerManagerImpl::doFinalPreWorkerListenerInit(ListenerImpl& listener) {
   TRY_ASSERT_MAIN_THREAD {
     for (auto& socket_factory : listener.listenSocketFactories()) {
-      socket_factory->doFinalPreWorkerInit();
+      absl::Status success = (socket_factory->doFinalPreWorkerInit());
+      if (!success.ok()) {
+        ENVOY_LOG(error, "final pre-worker listener init for listener '{}' failed: {}",
+                  listener.name(), success.message());
+        return false;
+      }
     }
     return true;
   }
@@ -930,7 +935,8 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
   return true;
 }
 
-void ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) {
+absl::Status ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog,
+                                               std::function<void()> callback) {
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
   ASSERT(!workers_started_);
   workers_started_ = true;
@@ -952,7 +958,10 @@ void ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog, std::function
     auto& listener = *listener_it;
     listener_it++;
 
-    if (!doFinalPreWorkerListenerInit(*listener)) {
+    absl::StatusOr<bool> init_status = doFinalPreWorkerListenerInit(*listener);
+    RETURN_IF_NOT_OK_REF(init_status.status());
+
+    if (!*init_status) {
       incListenerCreateFailureStat();
       removeListenerInternal(listener->name(), false);
       continue;
@@ -983,6 +992,7 @@ void ListenerManagerImpl::startWorkers(OptRef<GuardDog> guard_dog, std::function
     stats_.workers_started_.set(1);
     callback();
   }
+  return absl::OkStatus();
 }
 
 void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
