@@ -43,7 +43,7 @@ INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages,
 TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   std::string language = GetParam();
   if (language == "go") {
-    // Go does not support RTLD_NODELETE.
+    // Go does not support dlclose.
     return;
   }
   using GetSomeVariableFuncType = int (*)();
