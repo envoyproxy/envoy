@@ -58,7 +58,7 @@ JsonFormatBuilder::FormatElements
 JsonFormatBuilder::fromStruct(const ProtobufWkt::Struct& struct_format) {
   output_.clear();
 
-  // This call will iterate through the map tree and seiralize the key/values as JSON.
+  // This call will iterate through the map tree and serialize the key/values as JSON.
   // If a string value that contains a substitution commands is found, the current
   // JSON piece and the substitution command will be pushed into the output list.
   // After that, the iteration will continue until the whole tree is traversed.
