@@ -460,5 +460,8 @@ new_features:
     WIP: Added implementation of :ref:`client_side_weighted_round_robin
     <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
     load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
+- area: redis_proxy
+  change: |
+    Added support to ``eval_ro`` and ``evalsha_ro`` command.
 
 deprecated:

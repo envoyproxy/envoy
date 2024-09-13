@@ -491,6 +491,50 @@ TEST_F(RedisSingleServerRequestTest, EvalShaSuccess) {
             store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
 };
 
+TEST_F(RedisSingleServerRequestTest, EvalRoSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"eval_ro", "return {ARGV[1]}", "1", "key", "arg"});
+  makeRequest("key", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  std::string lower_command = absl::AsciiStrToLower("eval_ro");
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
+};
+
+TEST_F(RedisSingleServerRequestTest, EvalShaRoSuccess) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"EVALSHA_RO", "return {ARGV[1]}", "1", "keykey", "arg"});
+  makeRequest("keykey", std::move(request));
+  EXPECT_NE(nullptr, handle_);
+
+  std::string lower_command = absl::AsciiStrToLower("evalsha_ro");
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name,
+                                   fmt::format("redis.foo.command.{}.latency", lower_command)),
+                          10));
+  respond();
+
+  EXPECT_EQ(1UL, store_.counter(fmt::format("redis.foo.command.{}.total", lower_command)).value());
+  EXPECT_EQ(1UL,
+            store_.counter(fmt::format("redis.foo.command.{}.success", lower_command)).value());
+};
+
 TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
   InSequence s;
 
