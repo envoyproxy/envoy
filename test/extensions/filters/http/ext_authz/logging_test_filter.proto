@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+import "google/protobuf/struct.proto";
+
+message LoggingTestFilterConfig {
+  string logging_id = 1;
+  string upstream_cluster_name = 2;
+  bool expect_stats = 3;
+  bool expect_envoy_grpc_specific_stats = 4;
+  bool expect_response_bytes = 5;
+  google.protobuf.Struct filter_metadata = 6;
+}

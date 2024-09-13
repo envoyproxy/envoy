@@ -165,6 +165,11 @@ public:
   virtual void check(RequestCallbacks& callback,
                      const envoy::service::auth::v3::CheckRequest& request,
                      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
+
+  /**
+   * Returns streamInfo of the current request if possible. By default just return a nullptr.
+   */
+  virtual StreamInfo::StreamInfo const* streamInfo() const { return nullptr; }
 };
 
 using ClientPtr = std::unique_ptr<Client>;
