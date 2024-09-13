@@ -20,6 +20,8 @@ MockDispatcher::MockDispatcher() : MockDispatcher("test_thread") {}
 
 MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   time_system_ = std::make_unique<GlobalTimeSystem>();
+  auto thread_factory = &Api::createApiForTest()->threadFactory();
+  Envoy::Thread::ThreadId thread_id = thread_factory->currentThreadId();
   ON_CALL(*this, initializeStats(_, _)).WillByDefault(Return());
   ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
     to_delete_.clear();
@@ -28,14 +30,21 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   ON_CALL(*this, createScaledTimer_(_, _)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, createScaledTypedTimer_(_, _))
       .WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
-  ON_CALL(*this, post(_)).WillByDefault(Invoke([](PostCb cb) -> void { cb(); }));
+  ON_CALL(*this, post(_)).WillByDefault([this](PostCb cb) -> void {
+    ASSERT(isThreadSafe(),
+           "MockDispatcher tried to execute a callback on a different thread - a test with threads "
+           "should probably use a dispatcher from Api::createApiForTest() instead.");
+    cb();
+  });
 
   ON_CALL(buffer_factory_, createBuffer_(_, _, _))
       .WillByDefault(Invoke([](std::function<void()> below_low, std::function<void()> above_high,
                                std::function<void()> above_overflow) -> Buffer::Instance* {
         return new Buffer::WatermarkBuffer(below_low, above_high, above_overflow);
       }));
-  ON_CALL(*this, isThreadSafe()).WillByDefault(Return(true));
+  ON_CALL(*this, isThreadSafe()).WillByDefault([thread_factory, thread_id]() {
+    return thread_factory->currentThreadId() == thread_id;
+  });
 }
 
 MockDispatcher::~MockDispatcher() = default;
