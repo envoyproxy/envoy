@@ -66,12 +66,15 @@ public:
 
 /**
  * Default profiler which will be enabled when tcmalloc (not `gperftools`) is used.
+ * This class is not thread-safe.
  */
 class TcmallocProfiler {
 public:
   TcmallocProfiler() = default;
 
   static absl::StatusOr<std::string> tcmallocHeapProfile();
+  static bool startAllocationProfile();
+  static absl::StatusOr<std::string> stopAllocationProfile();
 };
 
 } // namespace Profiler
