@@ -128,6 +128,11 @@ bug_fixes:
     the number of requests per I/O cycle is configured and an HTTP decoder filter that pauses filter chain is present. This behavior
     can be reverted by setting the runtime guard ``envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream``
     to false.
+- area: proxy_filter
+  change: |
+    Fixed a bug in the ``CONNECT`` implementation that would cause the ``CONNECT`` request created to be invalid when the
+    hostname contains a port number. When the port number is not specified, the port 443 will be automatically added.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.proxy_ssl_port`` to ``false``.
 - area: runtime
   change: |
     Fixed an inconsistency in how boolean values are loaded in RTDS, where they were previously converted to "1"/"0"
