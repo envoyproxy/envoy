@@ -30,8 +30,8 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   ON_CALL(*this, createScaledTimer_(_, _)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, createScaledTypedTimer_(_, _))
       .WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
-  ON_CALL(*this, post(_)).WillByDefault([this](PostCb cb) -> void {
-    ASSERT(isThreadSafe(),
+  ON_CALL(*this, post(_)).WillByDefault([thread_factory, thread_id](PostCb cb) -> void {
+    ASSERT(thread_factory->currentThreadId() == thread_id,
            "MockDispatcher tried to execute a callback on a different thread - a test with threads "
            "should probably use a dispatcher from Api::createApiForTest() instead.");
     cb();
