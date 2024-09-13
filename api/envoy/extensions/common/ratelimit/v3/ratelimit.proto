@@ -2,13 +2,13 @@ syntax = "proto3";
 
 package envoy.extensions.common.ratelimit.v3;
 
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/v3/ratelimit_unit.proto";
 import "envoy/type/v3/token_bucket.proto";
-import "envoy/config/route/v3/route_components.proto";
+
 import "google/protobuf/wrappers.proto";
-import "envoy/config/core/v3/extension.proto";
-import "envoy/config/core/v3/base.proto";
-import "envoy/type/metadata/v3/metadata.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -277,7 +277,8 @@ message RateLimitConfig {
       // specified headers in the config. A match will happen if all the
       // headers in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).
-      repeated config.route.v3.HeaderMatcher headers = 3 [(validate.rules).repeated = {min_items: 1}];
+      repeated config.route.v3.HeaderMatcher headers = 3
+          [(validate.rules).repeated = {min_items: 1}];
     }
 
     // The following descriptor entry is appended when the metadata contains a key value:
