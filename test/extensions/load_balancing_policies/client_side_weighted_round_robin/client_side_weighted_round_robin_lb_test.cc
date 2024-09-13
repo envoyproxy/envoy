@@ -102,9 +102,9 @@ public:
     client_side_weighted_round_robin_config_.mutable_weight_expiration_period()->set_seconds(180);
     client_side_weighted_round_robin_config_.mutable_weight_update_period()->set_seconds(1);
     client_side_weighted_round_robin_config_.mutable_error_utilization_penalty()->set_value(0.1);
-    client_side_weighted_round_robin_config_.mutable_utilization_from_metric_names()->Add(
+    client_side_weighted_round_robin_config_.mutable_metric_names_for_computing_utilization()->Add(
         "metric1");
-    client_side_weighted_round_robin_config_.mutable_utilization_from_metric_names()->Add(
+    client_side_weighted_round_robin_config_.mutable_metric_names_for_computing_utilization()->Add(
         "metric2");
 
     lb_ = std::make_shared<ClientSideWeightedRoundRobinLoadBalancerFriend>(
@@ -1689,7 +1689,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLo
 //
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest,
-       updateWeightsOnHostsAllHostsHaveClientSideWeights) {
+       UpdateWeightsOnHostsAllHostsHaveClientSideWeights) {
   init(false);
   HostVector hosts = {
       makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
@@ -1765,7 +1765,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsMedia
   EXPECT_EQ(hosts[4]->weight(), 42);
 }
 
-TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, chooseHostWithClientSideWeights) {
+TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWeights) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
   }
@@ -1860,13 +1860,13 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew,
 // Unit tests for ClientSideWeightedRoundRobinLoadBalancer implementation.
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
-     getClientSideWeightIfValidFromHost_NoClientSideData) {
+     GetClientSideWeightIfValidFromHost_NoClientSideData) {
   NiceMock<Envoy::Upstream::MockHost> host;
   EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host, MonotonicTime::min(), MonotonicTime::max()));
 }
 
-TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getClientSideWeightIfValidFromHost_TooRecent) {
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooRecent) {
   NiceMock<Envoy::Upstream::MockHost> host;
   auto client_side_data =
       std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
@@ -1883,7 +1883,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getClientSideWeightIfValidFro
   EXPECT_EQ(client_side_data->non_empty_since_, MonotonicTime(std::chrono::seconds(5)));
 }
 
-TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getClientSideWeightIfValidFromHost_TooStale) {
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooStale) {
   NiceMock<Envoy::Upstream::MockHost> host;
   auto client_side_data =
       std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
@@ -1902,7 +1902,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getClientSideWeightIfValidFro
       ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData::kDefaultNonEmptySince);
 }
 
-TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getClientSideWeightIfValidFromHost_Valid) {
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_Valid) {
   NiceMock<Envoy::Upstream::MockHost> host;
   auto client_side_data =
       std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
@@ -1923,7 +1923,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getClientSideWeightIfValidFro
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
-     getUtilizationFromOrcaReport_applicationUtilization) {
+     GetUtilizationFromOrcaReport_ApplicationUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_application_utilization(0.5);
   orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
@@ -1933,7 +1933,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
             0.5);
 }
 
-TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getUtilizationFromOrcaReport_namedMetrics) {
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_NamedMetrics) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
@@ -1942,7 +1942,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getUtilizationFromOrcaReport_
             0.3);
 }
 
-TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getUtilizationFromOrcaReport_cpuUtilization) {
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_CpuUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.mutable_named_metrics()->insert({"bar", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
@@ -1951,14 +1951,14 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getUtilizationFromOrcaReport_
             0.6);
 }
 
-TEST(ClientSideWeightedRoundRobinLoadBalancerTest, getUtilizationFromOrcaReport_noUtilization) {
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_NoUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
                 orca_load_report, {"foo"}),
             0);
 }
 
-TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport_noQps) {
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, CalculateWeightFromOrcaReport_NoQps) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
                 orca_load_report, {"foo"}, 0.0)
@@ -1966,7 +1966,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport
             absl::InvalidArgumentError("QPS must be positive"));
 }
 
-TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport_noUtilization) {
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, CalculateWeightFromOrcaReport_NoUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_rps_fractional(1000);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
@@ -1976,7 +1976,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
-     calculateWeightFromOrcaReport_ValidQpsAndUtilization) {
+     CalculateWeightFromOrcaReport_ValidQpsAndUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.set_application_utilization(0.5);
@@ -1986,7 +1986,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
             2000);
 }
 
-TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport_MaxWeight) {
+TEST(ClientSideWeightedRoundRobinLoadBalancerTest, CalculateWeightFromOrcaReport_MaxWeight) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   // High QPS and low utilization.
   orca_load_report.set_rps_fractional(10000000000000L);
@@ -1998,7 +1998,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, calculateWeightFromOrcaReport
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
-     calculateWeightFromOrcaReport_ValidNoErrorPenalty) {
+     CalculateWeightFromOrcaReport_ValidNoErrorPenalty) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.set_eps(100);
@@ -2010,7 +2010,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
-     calculateWeightFromOrcaReport_ValidWithErrorPenalty) {
+     CalculateWeightFromOrcaReport_ValidWithErrorPenalty) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.set_eps(100);

@@ -139,9 +139,9 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::onOrcaLoadReport(
 void ClientSideWeightedRoundRobinLoadBalancer::initFromConfig(
     const envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
         ClientSideWeightedRoundRobin& client_side_weighted_round_robin_config) {
-  utilization_from_metric_names_ = std::vector<std::string>(
-      client_side_weighted_round_robin_config.utilization_from_metric_names().begin(),
-      client_side_weighted_round_robin_config.utilization_from_metric_names().end());
+  metric_names_for_computing_utilization_ = std::vector<std::string>(
+      client_side_weighted_round_robin_config.metric_names_for_computing_utilization().begin(),
+      client_side_weighted_round_robin_config.metric_names_for_computing_utilization().end());
   error_utilization_penalty_ =
       client_side_weighted_round_robin_config.error_utilization_penalty().value();
   blackout_period_ = std::chrono::milliseconds(
@@ -255,14 +255,14 @@ ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
 
 double ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(
     const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-    const std::vector<std::string>& utilization_from_metric_names) {
+    const std::vector<std::string>& metric_names_for_computing_utilization) {
   // If application_utilization is valid, use it as the utilization metric.
   double utilization = orca_load_report.application_utilization();
   if (utilization > 0) {
     return utilization;
   }
   // Otherwise, find the most constrained utilization metric.
-  for (const auto& metric_name : utilization_from_metric_names) {
+  for (const auto& metric_name : metric_names_for_computing_utilization) {
     auto metric_it = orca_load_report.named_metrics().find(metric_name);
     if (metric_it != orca_load_report.named_metrics().end()) {
       utilization = std::max(utilization, metric_it->second);
@@ -277,7 +277,7 @@ double ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(
 
 absl::StatusOr<uint32_t> ClientSideWeightedRoundRobinLoadBalancer::calculateWeightFromOrcaReport(
     const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-    const std::vector<std::string>& utilization_from_metric_names,
+    const std::vector<std::string>& metric_names_for_computing_utilization,
     double error_utilization_penalty) {
   double qps = orca_load_report.rps_fractional();
   if (qps <= 0) {
@@ -285,7 +285,7 @@ absl::StatusOr<uint32_t> ClientSideWeightedRoundRobinLoadBalancer::calculateWeig
   }
 
   double utilization =
-      getUtilizationFromOrcaReport(orca_load_report, utilization_from_metric_names);
+      getUtilizationFromOrcaReport(orca_load_report, metric_names_for_computing_utilization);
   utilization += error_utilization_penalty * orca_load_report.eps() / qps;
 
   if (utilization <= 0) {
@@ -306,7 +306,7 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::updateClientSideDataFromO
     const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
     ClientSideHostLbPolicyData& client_side_data) {
   const absl::StatusOr<uint32_t> weight = calculateWeightFromOrcaReport(
-      orca_load_report, utilization_from_metric_names_, error_utilization_penalty_);
+      orca_load_report, metric_names_for_computing_utilization_, error_utilization_penalty_);
   if (!weight.ok()) {
     return weight.status();
   }

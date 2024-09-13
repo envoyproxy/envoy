@@ -70,8 +70,9 @@ message ClientSideWeightedRoundRobin {
   // Default is 1.0.
   google.protobuf.FloatValue error_utilization_penalty = 6 [(validate.rules).float = {gte: 0.0}];
 
-  // By default, endpoint weight is computed based on the `application_utilization <https://github.com/cncf/xds/blob/88aa3b3c978aa0d37c1df3b075f791855df80203/xds/data/orca/v3/orca_load_report.proto#L57>`_ field reported by the endpoint.  If that field is not set, then utilization
-  // will instead be computed by taking the max of the values of the metric names (e.g. "foo", "bar") specified here.  If none of the specified metrics are present in the `named_metrics <https://github.com/cncf/xds/blob/88aa3b3c978aa0d37c1df3b075f791855df80203/xds/data/orca/v3/orca_load_report.proto#L49>`_ map, then
-  // `cpu_utilization <https://github.com/cncf/xds/blob/88aa3b3c978aa0d37c1df3b075f791855df80203/xds/data/orca/v3/orca_load_report.proto#L20>`_ is used instead.
-  repeated string utilization_from_metric_names = 7;
+  // By default, endpoint weight is computed based on the :ref:`named_metrics <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.application_utilization>` field reported by the endpoint.
+  // If that field is not set, then utilization will instead be computed by taking the max of the values of the metrics specified here.
+  // For map fields in the ORCA proto, the string will be of the form ``<map_field_name>.<map_key>``. For example, the string ``named_metrics.foo`` will mean to look for the key ``foo`` in the ORCA :ref:`named_metrics <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.named_metrics>` field.
+  // If none of the specified metrics are present in the load report, then :ref:`named_metrics <envoy_v3_api_field_.xds.data.orca.v3.OrcaLoadReport.cpu_utilization>` is used instead.
+  repeated string metric_names_for_computing_utilization = 7;
 }

@@ -111,7 +111,7 @@ private:
 
   uint64_t peekahead_index_{};
   absl::flat_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
-  std::vector<std::string> utilization_from_metric_names_;
+  std::vector<std::string> metric_names_for_computing_utilization_;
   double error_utilization_penalty_;
   // Timing parameters for the weight update.
   std::chrono::milliseconds blackout_period_;
