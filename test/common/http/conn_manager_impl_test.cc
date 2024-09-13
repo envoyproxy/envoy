@@ -4493,48 +4493,41 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
             "SomeCDN, custom_server_name; error=http_response_timeout; details=\"baz; UT\"");
 }
 
-TEST_F(HttpConnectionManagerImplTest, TestFilterLogBeforeAccessLog) {
+TEST_F(HttpConnectionManagerImplTest, TestFilterAccessLogBeforeConfigAccessLog) {
+  log_handler_ = std::make_shared<NiceMock<AccessLog::MockInstance>>(); // filter log handler
+  std::shared_ptr<AccessLog::MockInstance> handler(
+      new NiceMock<AccessLog::MockInstance>()); // config log handler
+  access_logs_ = {handler};
   setup();
+  setupFilterChain(1, 0);
 
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-  std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  startRequest();
 
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
-        FilterFactoryCb filter_factory = createDecoderFilterFactoryCb(filter);
-        FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
+  {
+    InSequence s; // Create an InSequence object to enforce order
 
-        manager.applyFilterFactoryCb({}, filter_factory);
-        manager.applyFilterFactoryCb({}, handler_factory);
-        return true;
-      }));
+    EXPECT_CALL(*log_handler_, log(_, _))
+        .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                            const StreamInfo::StreamInfo& stream_info) {
+          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
+          EXPECT_FALSE(stream_info.hasAnyResponseFlag());
+        }));
 
-  flush_access_log_on_new_request_ = true;
+    EXPECT_CALL(*handler, log(_, _))
+        .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
+                            const StreamInfo::StreamInfo& stream_info) {
+          // First call to log() is made when a new HTTP request has been received
+          // On the first call it is expected that there is no response code.
+          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
+          EXPECT_TRUE(stream_info.responseCode());
+        }));
+  }
 
-  EXPECT_CALL(*handler, log(_, _))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        // First call to log() is made when a new HTTP request has been received
-        // On the first call it is expected that there is no response code.
-        EXPECT_EQ(AccessLog::AccessLogType::DownstreamStart, log_context.accessLogType());
-        EXPECT_FALSE(stream_info.responseCode());
-      }))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        // Second call to log() is made when filter is destroyed, so it is expected
-        // that the response code is available and matches the response headers.
-        EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-        EXPECT_TRUE(stream_info.responseCode());
-        EXPECT_EQ(stream_info.responseCode().value(), uint32_t(200));
-      }))
-      .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                          const StreamInfo::StreamInfo& stream_info) {
-        EXPECT_EQ(&conn_manager_->config_->accessLogs().front().AccessLogType,
-                  log_context.accessLogType());
-        EXPECT_FALSE(stream_info.responseCode());
-      }));
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 }
 
 } // namespace Http
