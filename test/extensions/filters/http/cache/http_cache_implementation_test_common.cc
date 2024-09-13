@@ -58,7 +58,8 @@ HttpCacheImplementationTest::HttpCacheImplementationTest()
   request_headers_.setHost("example.com");
   request_headers_.setScheme("https");
   request_headers_.setCopy(Http::CustomHeaders::get().CacheControl, "max-age=3600");
-
+  ON_CALL(encoder_callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher()));
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(dispatcher()));
   delegate_->setUp();
 }
 
