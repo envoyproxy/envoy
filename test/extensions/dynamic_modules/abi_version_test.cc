@@ -27,6 +27,16 @@ TEST(DynamicModules, ABIVersionCheck) {
   EXPECT_EQ(sha256, kAbiVersion);
 }
 
+// This test ensures that the hard-copied header file in the SDK directory is identical to the
+// original header file.
+TEST(DynamicModules, IdenticalHeader) {
+  const std::string original = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/source/extensions/dynamic_modules/abi.h"));
+  const std::string go_sdk = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/source/extensions/dynamic_modules/sdk/go/abi.h"));
+  EXPECT_EQ(original, go_sdk);
+}
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

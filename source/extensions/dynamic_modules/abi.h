@@ -15,14 +15,16 @@
 
 #ifdef __cplusplus
 #include <cstddef>
+#include <cstdint>
 
 extern "C" {
 #else
 #include <stddef.h>
+#include <stdint.h>
 #endif
 
 #ifdef ENVOY_DYNAMIC_MODULE_GO_SDK
-// Use uintptr_t to represent a raw pointer in C for simplicity in Go bindings.
+// Use the pointer-sized integer to represent a raw pointer in C for simplicity in Go bindings.
 typedef uintptr_t envoy_dynamic_module_raw_pointer;
 #else
 typedef void* envoy_dynamic_module_raw_pointer; // NOLINT(modernize-use-using)

@@ -30,7 +30,7 @@ macro_rules! declare_program_init {
             if ($f()) {
                 // This magic number is sha256 of the ABI headers which must match the
                 // value in abi_version.h
-                b"7bf4504e9874e385f15c4a835da3c4dfe9480a3d7262d46b18740d7192866649\0".as_ptr()
+                b"4613e2f0b4da7a99a65f578137207449085f4017160ea5818bb54fd8c4f11187\0".as_ptr()
                     as *const ::std::os::raw::c_char
             } else {
                 ::std::ptr::null()
