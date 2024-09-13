@@ -1,24 +1,15 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: September 14, 2024
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: c-ares
   change: |
     Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: dependencies
+  change: |
+    Update curl to mitigate CVE-2024-7264.
 
 new_features:
 - area: access_log
   change: |
     added %UPSTREAM_CLUSTER_RAW% access log formatter to log the original upstream cluster name, regadless of whether
     ``alt_stat_name`` is set.
-
-deprecated:
