@@ -15,10 +15,12 @@
 
 #ifdef __cplusplus
 #include <cstddef>
+#include <cstdint>
 
 extern "C" {
 #else
 #include <stddef.h>
+#include <stdint.h>
 #endif
 
 #ifdef ENVOY_DYNAMIC_MODULE_GO_SDK

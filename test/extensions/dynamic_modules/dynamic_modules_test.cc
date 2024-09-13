@@ -37,11 +37,15 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages,
-                         testing::Values("c", "rust"), // TODO: add Go.
+                         testing::Values("c", "rust", "go"),
                          DynamicModuleTestLanguages::languageParamToTestName);
 
 TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   std::string language = GetParam();
+  if (language == "go") {
+    // Go does not support RTLD_NODELETE.
+    return;
+  }
   using GetSomeVariableFuncType = int (*)();
   absl::StatusOr<DynamicModuleSharedPtr> module =
       newDynamicModule(testSharedObjectPath("no_op", language), false);

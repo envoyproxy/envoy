@@ -42,7 +42,7 @@ absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view 
         absl::StrCat("Failed to resolve envoy_dynamic_module_on_program_init: ", dlerror()));
   }
 
-  const char* abi_version = (*init_function)();
+  const char* abi_version = static_cast<const char*>((*init_function)());
   if (abi_version == nullptr) {
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to initialize dynamic module: ", object_file_path));
