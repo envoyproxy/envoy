@@ -419,7 +419,7 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
           updateDnsStats(status, response.empty());
           // If DNS resolution fails here, we move on to resolve other replicas in the list.
           // We log a warn message.
-          if (status != Network::DnsResolver::ResolutionStatus::Success) {
+          if (status != Network::DnsResolver::ResolutionStatus::Completed) {
             ENVOY_LOG(warn, "Unable to resolve cluster replica address {}", replica.first);
           } else {
             // Replica resolved

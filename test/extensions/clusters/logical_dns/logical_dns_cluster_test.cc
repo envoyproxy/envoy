@@ -99,7 +99,7 @@ protected:
     EXPECT_CALL(membership_updated_, ready());
     EXPECT_CALL(initialized_, ready());
     EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -129,7 +129,7 @@ protected:
 
     // Should not cause any changes.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
@@ -167,7 +167,7 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
@@ -196,10 +196,10 @@ protected:
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
     logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
 
-    // Empty Success should not cause any change.
+    // Empty Completed should not cause any change.
     ON_CALL(random_, random()).WillByDefault(Return(6000));
     EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(6000), _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "", {});
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "", {});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(server_context_.dispatcher_,
@@ -301,7 +301,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-        cb(Network::DnsResolver::ResolutionStatus::Success, "",
+        cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
@@ -350,7 +350,7 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   // Successful call should reset the failure backoff strategy.
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());

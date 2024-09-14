@@ -173,7 +173,7 @@ protected:
                               const std::string& expected_address,
                               const std::list<std::string>& resolved_addresses,
                               Network::DnsResolver::ResolutionStatus status =
-                                  Network::DnsResolver::ResolutionStatus::Success) {
+                                  Network::DnsResolver::ResolutionStatus::Completed) {
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, dns_lookup_family, _))
         .WillOnce(Invoke([status, resolved_addresses](
                              const std::string&, Network::DnsLookupFamily,
@@ -775,7 +775,7 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         std::list<std::string> address_pair = std::get<2>(GetParam());
-        cb(Network::DnsResolver::ResolutionStatus::Success, "",
+        cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(address_pair));
         EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
         expectClusterSlotResponse(

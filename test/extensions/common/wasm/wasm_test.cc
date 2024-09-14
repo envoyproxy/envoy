@@ -301,7 +301,7 @@ TEST_P(WasmCommonTest, Segv) {
 
   // Subsequent calls should be NOOP(s).
 
-  root_context->onResolveDns(0, Envoy::Network::DnsResolver::ResolutionStatus::Success, {});
+  root_context->onResolveDns(0, Envoy::Network::DnsResolver::ResolutionStatus::Completed, {});
   Envoy::Stats::MockMetricSnapshot stats_snapshot;
   root_context->onStatsUpdate(stats_snapshot);
 }
@@ -1386,7 +1386,7 @@ TEST_P(WasmCommonContextTest, EmptyContext) {
   setup(code, "context", "empty");
   setupContext();
 
-  root_context_->onResolveDns(0, Envoy::Network::DnsResolver::ResolutionStatus::Success, {});
+  root_context_->onResolveDns(0, Envoy::Network::DnsResolver::ResolutionStatus::Completed, {});
   NiceMock<Envoy::Stats::MockMetricSnapshot> stats_snapshot;
   root_context_->onStatsUpdate(stats_snapshot);
   root_context_->validateConfiguration("", plugin_);

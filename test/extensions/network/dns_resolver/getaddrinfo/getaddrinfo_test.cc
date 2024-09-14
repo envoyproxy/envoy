@@ -93,7 +93,7 @@ public:
                              std::list<DnsResponse>&& response) {
     // Since we use AF_UNSPEC, depending on the CI environment we might get either 1 or 2
     // addresses.
-    EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+    EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
     EXPECT_TRUE(response.size() == 1 || response.size() == 2);
     EXPECT_TRUE("127.0.0.1:0" == response.front().addrInfo().address_->asString() ||
                 "[::1]:0" == response.front().addrInfo().address_->asString());
