@@ -8,7 +8,6 @@ package gosdk
 */
 import "C"
 import (
-	"fmt"
 	"unsafe"
 )
 
@@ -18,9 +17,7 @@ var abiVersion = []byte("4613e2f0b4da7a99a65f578137207449085f4017160ea5818bb54fd
 //export envoy_dynamic_module_on_program_init
 func envoy_dynamic_module_on_program_init() C.envoy_dynamic_module_type_abi_version {
 	if OnProgramInit() {
-		fmt.Println("OnProgramInit() returned true")
 		return C.envoy_dynamic_module_type_abi_version(uintptr(unsafe.Pointer(&abiVersion[0])))
 	}
-	fmt.Println("OnProgramInit() returned false")
 	return 0
 }
