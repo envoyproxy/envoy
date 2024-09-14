@@ -95,20 +95,10 @@ envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
 // copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
 // `std::function`.
 envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
-  main_thread_ = thread_factory_->createThread(
-      [this, options]() mutable -> void {
-        if (thread_priority_) {
-          // Set the thread priority before invoking the thread routine.
-          const int rc = setpriority(PRIO_PROCESS, thread_factory_->currentThreadId().getId(),
-                                     *thread_priority_);
-          if (rc != 0) {
-            ENVOY_LOG(debug, "failed to set thread priority: {}", Envoy::errorDetails(errno));
-          }
-        }
-
-        main(options);
-      },
-      /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+  Thread::Options thread_options;
+  thread_options.priority_ = thread_priority_;
+  main_thread_ = thread_factory_->createThread([this, options]() mutable -> void { main(options); },
+                                               thread_options, /* crash_on_failure= */ false);
   return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
@@ -330,7 +320,9 @@ envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envo
       });
 }
 
-Event::ProvisionalDispatcher& InternalEngine::dispatcher() { return *dispatcher_; }
+Event::ProvisionalDispatcher& InternalEngine::dispatcher() const { return *dispatcher_; }
+
+Thread::PosixThreadFactory& InternalEngine::threadFactory() const { return *thread_factory_; }
 
 void statsAsText(const std::map<std::string, uint64_t>& all_stats,
                  const std::vector<Stats::ParentHistogramSharedPtr>& histograms,

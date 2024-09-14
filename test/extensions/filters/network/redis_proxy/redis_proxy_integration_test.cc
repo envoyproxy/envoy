@@ -1597,5 +1597,27 @@ TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSent
   redis_client->close();
 }
 
+TEST_P(RedisProxyWithExternalAuthIntegrationTest, ExternalAuthRespectsPipelining) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeHttpConnectionPtr fake_upstream_external_auth;
+
+  // Send an AUTH command followed immediately by a PING command should return OK and PONG.
+  proxyRequestStep(makeBulkStringArray({"AUTH", "somepassword"}), redis_client);
+  FakeStreamPtr auth_request;
+  expectExternalAuthRequest(fake_upstream_external_auth, auth_request, "somepassword");
+  auto expiration_time = timeSystem().systemTime() + std::chrono::hours(1);
+  // PING is sent before the response to the AUTH command is received.
+  proxyRequestStep(makeBulkStringArray({"PING"}), redis_client);
+  sendExternalAuthResponse(
+      auth_request, true,
+      duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch()).count());
+  proxyResponseOnlyStep("+OK\r\n+PONG\r\n", redis_client);
+
+  EXPECT_TRUE(fake_upstream_external_auth->close());
+  redis_client->close();
+}
+
 } // namespace
 } // namespace Envoy

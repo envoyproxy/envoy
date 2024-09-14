@@ -67,6 +67,10 @@ void UdpProxyFilter::onClusterRemoval(const std::string& cluster) {
 }
 
 Network::FilterStatus UdpProxyFilter::onData(Network::UdpRecvData& data) {
+  if (udp_proxy_stats_) {
+    udp_proxy_stats_.value().addBytesReceived(data.buffer_->length());
+  }
+
   const std::string& route = config_->route(*data.addresses_.local_, *data.addresses_.peer_);
   if (!cluster_infos_.contains(route)) {
     config_->stats().downstream_sess_no_route_.inc();
@@ -451,12 +455,12 @@ bool UdpProxyFilter::ActiveSession::onNewSession() {
 }
 
 void UdpProxyFilter::ActiveSession::onData(Network::UdpRecvData& data) {
+  const uint64_t rx_buffer_length = data.buffer_->length();
   ENVOY_LOG(trace, "received {} byte datagram from downstream: downstream={} local={} upstream={}",
-            data.buffer_->length(), addresses_.peer_->asStringView(),
-            addresses_.local_->asStringView(),
+            rx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_ != nullptr ? host_->address()->asStringView() : "unknown");
 
-  const uint64_t rx_buffer_length = data.buffer_->length();
+  streamInfo().addBytesReceived(rx_buffer_length);
   cluster_.filter_.config_->stats().downstream_sess_rx_bytes_.add(rx_buffer_length);
   session_stats_.downstream_sess_rx_bytes_ += rx_buffer_length;
   cluster_.filter_.config_->stats().downstream_sess_rx_datagrams_.inc();
@@ -680,6 +684,12 @@ void UdpProxyFilter::ActiveSession::writeDownstream(Network::UdpRecvData& recv_d
             tx_buffer_length, addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_ != nullptr ? host_->address()->asStringView() : "unknown");
 
+  streamInfo().addBytesSent(tx_buffer_length);
+
+  if (cluster_.filter_.udp_proxy_stats_) {
+    cluster_.filter_.udp_proxy_stats_.value().addBytesSent(tx_buffer_length);
+  }
+
   Network::UdpSendData data{addresses_.local_->ip(), *addresses_.peer_, *recv_data.buffer_};
   const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener().send(data);
   if (!rc.ok()) {
@@ -869,6 +879,7 @@ void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_enco
   upstream_->setRequestEncoder(request_encoder, is_ssl);
   upstream_->setTunnelCreationCallbacks(*this);
   downstream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
+  downstream_info_.setUpstreamBytesMeter(request_encoder.getStream().bytesMeter());
   downstream_info_.upstreamInfo()->setUpstreamConnectionId(upstream_connection_id);
   callbacks_->resetIdleTimer();
 }

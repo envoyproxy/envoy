@@ -80,10 +80,8 @@ genrule(
         "external/vppcom.h",
     ],
     cmd = """
-        EXTERNAL_DIR=$$(dirname $(location external/libsvm.a)) \
-        && mkdir -p $$EXTERNAL_DIR \
-        && find . -name "*.a" | xargs -I{} cp -a {} $$EXTERNAL_DIR \
-        && find . -name "vppcom.h" | xargs -I{} cp -a {} $$EXTERNAL_DIR
+        find . -name "*.a" | grep -v copy_build | xargs -I{} cp -a {} $(RULEDIR)/external \
+        && find . -name "vppcom.h" | grep -v copy_build | xargs -I{} cp -a {} $(RULEDIR)/external
     """,
     tools = [":build"],
 )
