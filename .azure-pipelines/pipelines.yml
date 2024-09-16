@@ -3,9 +3,6 @@ trigger:
     include:
     - "main"
     - "release/v*"
-  tags:
-    include:
-    - "v*"
 
 
 # PR build config is manually overridden in Azure pipelines UI with different secrets
