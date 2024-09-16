@@ -13,7 +13,7 @@ Each action on an AsyncFileHandle is effectively an "enqueue" action, in that it
 
 ## cancellation
 
-Each action function returns a cancellation function which can be called to remove an action from the queue and prevent the callback from being called. If the execution is already in progress, it may be undone (e.g. a file open operation will close the file if it is opening when cancel is called). The cancel function should only be called from the same thread as the
+Each action function returns a cancellation function which can be called to remove an action from the queue and prevent the callback from being called. If the execution is already in progress, it may be undone (e.g. a file open operation will close the file if it is opening when cancel is called). The cancel function must only be called from the same thread as the
 dispatcher that was provided to the original request, to ensure that cancellation and callback
 cannot be happening concurrently.
 
