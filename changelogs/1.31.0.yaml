@@ -538,7 +538,7 @@ new_features:
 - area: basic_auth
   change: |
     Added support to provide an override
-    :ref:`authentication_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.authentication_header>`
+    :ref:`authentication_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.forward_username_header>`
     to load Basic Auth credential.
 
 deprecated:
