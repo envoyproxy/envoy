@@ -18,7 +18,7 @@ public:
 };
 
 TEST_F(RateLimitClientTest, OpenAndCloseStream) {
-  EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
+  EXPECT_OK(test_client.client_->startStream(&test_client.stream_info_));
   EXPECT_CALL(test_client.stream_, closeStream());
   EXPECT_CALL(test_client.stream_, resetStream());
   test_client.client_->closeStream();
@@ -27,7 +27,7 @@ TEST_F(RateLimitClientTest, OpenAndCloseStream) {
 TEST_F(RateLimitClientTest, SendUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
+  EXPECT_OK(test_client.client_->startStream(&test_client.stream_info_));
   bool end_stream = false;
   // Send quota usage report and ensure that we get it.
   EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, end_stream));
@@ -39,7 +39,7 @@ TEST_F(RateLimitClientTest, SendUsageReport) {
 }
 
 TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
-  EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
+  EXPECT_OK(test_client.client_->startStream(&test_client.stream_info_));
   ASSERT_NE(test_client.stream_callbacks_, nullptr);
 
   auto empty_request_headers = Http::RequestHeaderMapImpl::create();
