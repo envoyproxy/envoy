@@ -144,7 +144,7 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
                                                           Ssl::ContextManager& context_manager,
                                                           ThreadLocal::Instance& threadlocal,
                                                           const std::string& san_to_match,
-                                                          bool connect_to_fake_upstreams) {
+                                                          bool connect_to_upstreams) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(api));
   ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
@@ -156,11 +156,11 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
 #ifdef ENVOY_ENABLE_YAML
   initializeUpstreamTlsContextConfig(
       Ssl::ClientSslTransportOptions().setAlpn(true).setSan(san_to_match).setSni("lyft.com"),
-      *tls_context, connect_to_fake_upstreams);
+      *tls_context, connect_to_upstreams);
 #else
   UNREFERENCED_PARAMETER(tls_context);
   UNREFERENCED_PARAMETER(san_to_match);
-  UNREFERENCED_PARAMETER(connect_to_fake_upstreams);
+  UNREFERENCED_PARAMETER(connect_to_upstreams);
   RELEASE_ASSERT(0, "unsupported");
 #endif // ENVOY_ENABLE_YAML
 

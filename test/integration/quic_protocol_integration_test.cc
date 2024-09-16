@@ -33,7 +33,11 @@ TEST_P(DownstreamProtocolIntegrationTest, BatchedPackets) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(default_response_headers_, false);
-  // Send more than the 32 packets that will be handled in one read pass.
+  // Send more than the 32 packets. Generally all packets will be read in one pass.
+  // All packet are sent here where the client is not looping, so can not read. The upstream is
+  // then deadlocked, guaranteeing all packets are sent to the kernel before the client performs
+  // any reads. Manual testing confirms they're consistently read at once. There are no guarantees
+  // of this, but given the test uses loopback sockets it's likely to continue to be the case.
   upstream_request_->encodeData(1024 * 35, true);
 
   // Now deadlock the upstream so it can not do anything - no acks, no
