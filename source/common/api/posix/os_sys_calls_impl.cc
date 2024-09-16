@@ -348,9 +348,9 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
     tcp_info->tcpi_snd_cwnd = unix_tcp_info.tcpi_snd_cwnd * mss;
   }
   return {!SOCKET_FAILURE(result), !SOCKET_FAILURE(result) ? 0 : errno};
-#endif
-
+#else
   return {false, EOPNOTSUPP};
+#endif
 }
 
 bool OsSysCallsImpl::supportsGetifaddrs() const { return true; }
