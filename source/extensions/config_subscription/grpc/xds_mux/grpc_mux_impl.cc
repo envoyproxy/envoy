@@ -256,7 +256,7 @@ absl::Status GrpcMuxImpl<S, F, RQ, RS>::updateMuxSource(
     watch_map->setConfigValidators(config_validators_.get());
   }
 
-  // Start the susbcriptions over the grpc_stream.
+  // Start the subscriptions over the grpc_stream.
   grpc_stream_->establishNewStream();
 
   return absl::OkStatus();

@@ -281,7 +281,7 @@ NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr primary_async_client,
     subscription->watch_map_.setConfigValidators(config_validators_.get());
   }
 
-  // Start the susbcriptions over the grpc_stream.
+  // Start the subscriptions over the grpc_stream.
   grpc_stream_->establishNewStream();
 
   return absl::OkStatus();

@@ -327,7 +327,7 @@ GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr primary_async_client,
   // Update the config validators.
   config_validators_ = std::move(custom_config_validators);
 
-  // Start the susbcriptions over the grpc_stream.
+  // Start the subscriptions over the grpc_stream.
   grpc_stream_->establishNewStream();
 
   return absl::OkStatus();
