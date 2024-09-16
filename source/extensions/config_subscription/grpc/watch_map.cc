@@ -154,7 +154,7 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
   }
 
   // Execute external config validators.
-  config_validators_.executeValidators(type_url_, resources);
+  config_validators_->executeValidators(type_url_, resources);
 
   const bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
@@ -249,7 +249,7 @@ void WatchMap::onConfigUpdate(
   }
 
   // Execute external config validators.
-  config_validators_.executeValidators(type_url_, decoded_resources, removed_resources);
+  config_validators_->executeValidators(type_url_, decoded_resources, removed_resources);
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& [cur_watch, resource_to_add] : per_watch_added) {
