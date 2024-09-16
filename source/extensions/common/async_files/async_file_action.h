@@ -38,7 +38,7 @@ public:
   // a hard-link that was just created).
   // Not necessary for things that don't make persistent resources,
   // e.g. cancelling a write does not have to undo the write.
-  virtual void onCancelledBeforeCallback(){};
+  virtual void onCancelledBeforeCallback() {}
   virtual bool hasActionIfCancelledBeforeCallback() const { return false; }
   virtual bool executesEvenIfCancelled() const { return false; }
 };
