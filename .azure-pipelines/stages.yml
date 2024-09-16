@@ -64,6 +64,7 @@ stages:
       authGPGPath: $(MaintainerGPGKey.secureFilePath)
       bucketGCP: $(GcsArtifactBucket)
       publishGithubRelease: variables['PUBLISH_GITHUB_RELEASE']
+      runBuild: stageDependencies.env.repo.outputs['run.releaseTests']
       runPrechecks: stageDependencies.env.repo.outputs['run.releaseTests']
 
 - stage: check
