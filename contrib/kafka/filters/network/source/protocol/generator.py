@@ -223,7 +223,9 @@ class StatefulProcessor:
                 fields.append(child)
 
         # Some structures share the same name, use request/response as prefix.
-        if cpp_name in ['Cursor', 'DirectoryData', 'EntityData', 'EntryData', 'PartitionData', 'PartitionSnapshot', 'SnapshotId', 'TopicData', 'TopicPartitions', 'TopicSnapshot']:
+        if cpp_name in ['Cursor', 'DirectoryData', 'EntityData', 'EntryData', 'PartitionData',
+                        'PartitionSnapshot', 'SnapshotId', 'TopicData', 'TopicPartitions',
+                        'TopicSnapshot']:
             cpp_name = self.type.capitalize() + type_name
 
         # Some of the types repeat multiple times (e.g. AlterableConfig).
@@ -426,7 +428,7 @@ class FieldSpec:
 
     def deserializer_name_in_version(self, version, compact):
         if self.is_nullable_in_version(version):
-            underlying_deserializer = self.type.deserializer_name_in_version(version, compact);
+            underlying_deserializer = self.type.deserializer_name_in_version(version, compact)
             # Handles KAFKA-14425 - structs (complex types) can now be nullable.
             if isinstance(self.type, Complex):
                 return 'NullableStructDeserializer<%s>' % underlying_deserializer

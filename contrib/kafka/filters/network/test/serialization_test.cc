@@ -551,7 +551,7 @@ TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfDataForLargeI
 using ExampleNSD = NullableStructDeserializer<Int32Deserializer>;
 
 TEST(NullableStructDeserializer, ShouldConsumeCorrectAmountOfData) {
-  const ExampleNSD::ResponseType value = { 42 };
+  const ExampleNSD::ResponseType value = {42};
   serializeThenDeserializeAndCheckEquality<ExampleNSD>(value);
 }
 
