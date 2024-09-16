@@ -116,19 +116,18 @@ void AsyncFileManagerThreadPool::executeAction(QueuedAction&& queued_action) {
     if (state->compare_exchange_strong(expected, State::Done)) {
       // Action was not cancelled; run the captured callback on the caller's thread.
       action->onComplete();
-    } else {
-      ASSERT(expected == State::Cancelled);
-      if (manager == nullptr) {
-        // Action had a "do nothing" cancellation so we don't need to post a cleanup action.
-        return;
-      }
-      // If an action with side-effects was cancelled after being posted, its
-      // side-effects need to be undone as the caller can no longer receive the
-      // returned context. That undo action will need to be done on one of the
-      // file manager's threads, as it is file related, so post it to the thread pool.
-      manager->postCancelledActionForCleanup(std::move(action));
       return;
     }
+    ASSERT(expected == State::Cancelled);
+    if (manager == nullptr) {
+      // Action had a "do nothing" cancellation so we don't need to post a cleanup action.
+      return;
+    }
+    // If an action with side-effects was cancelled after being posted, its
+    // side-effects need to be undone as the caller can no longer receive the
+    // returned context. That undo action will need to be done on one of the
+    // file manager's threads, as it is file related, so post it to the thread pool.
+    manager->postCancelledActionForCleanup(std::move(action));
   });
 }
 
