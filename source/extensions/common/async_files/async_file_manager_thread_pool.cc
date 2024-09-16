@@ -61,7 +61,7 @@ void AsyncFileManagerThreadPool::waitForIdle() {
 absl::AnyInvocable<void()>
 AsyncFileManagerThreadPool::enqueue(Event::Dispatcher* dispatcher,
                                     std::unique_ptr<AsyncFileAction> action) {
-  auto entry = QueuedAction{std::move(action), dispatcher};
+  QueuedAction entry{std::move(action), dispatcher};
   auto cancel_func = [dispatcher, state = entry.state_]() {
     ASSERT(dispatcher->isThreadSafe());
     state->store(QueuedAction::State::Cancelled);
