@@ -452,6 +452,9 @@ message RemoteJwks {
   //
   //
   config.core.v3.RetryPolicy retry_policy = 4;
+
+  //
+  bool refetch_jwks_on_kid_mismatch = 5;
 }
 
 // Fetch Jwks asynchronously in the main thread when the filter config is parsed.

@@ -276,8 +276,20 @@ void AuthenticatorImpl::startVerify() {
     // JWTs without a kid header field in the JWS we might be best to get each
     // time? This all only matters for remote JWKS.
 
-    verifyKey();
-    return;
+    // If extracted JWT's kid does not match with the JWKS kid, refetch JWKS.
+    // If extracted JWT does not have a kid, always refetch JWKS.
+    if (jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch()) {
+      for (const auto& jwk : jwks_obj->keys()) {
+        if (!jwk->kid_.empty() && !jwt_->kid_.empty() && (jwk->kid_ == jwt_->kid_)) {
+          verifyKey();
+          return;
+        }
+      }
+    }
+    else {
+      verifyKey();
+      return;
+    }
   }
 
   // TODO(potatop): potential optimization.
@@ -299,6 +311,7 @@ void AuthenticatorImpl::startVerify() {
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   jwks_cache_.stats().jwks_fetch_success_.inc();
+  ENVOY_LOG(info, "NEW JWKS with KID {}", jwks->keys()[0]->kid_);
   const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
   if (status != Status::Ok) {
     doneWithStatus(status);
