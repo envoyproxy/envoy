@@ -41,6 +41,8 @@ TEST_EmptyDeserializerShouldNotBeReady(BytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(CompactBytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(NullableBytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(NullableCompactBytesDeserializer);
+using ExampleNullableStructDeserializer = NullableStructDeserializer<Int8Deserializer>;
+TEST_EmptyDeserializerShouldNotBeReady(ExampleNullableStructDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(UuidDeserializer);
 
 TEST(ArrayDeserializer, EmptyBufferShouldNotBeReady) {
@@ -542,6 +544,20 @@ TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfDataForLargeI
   const NullableArray<int32_t> value{raw};
   serializeCompactThenDeserializeAndCheckEquality<
       NullableCompactArrayDeserializer<Int32Deserializer>>(value);
+}
+
+// Nullable struct.
+
+using ExampleNSD = NullableStructDeserializer<Int32Deserializer>;
+
+TEST(NullableStructDeserializer, ShouldConsumeCorrectAmountOfData) {
+  const ExampleNSD::ResponseType value = { 42 };
+  serializeThenDeserializeAndCheckEquality<ExampleNSD>(value);
+}
+
+TEST(NullableStructDeserializer, ShouldConsumeNullStruct) {
+  const ExampleNSD::ResponseType value = absl::nullopt;
+  serializeThenDeserializeAndCheckEquality<ExampleNSD>(value);
 }
 
 // UUID.
