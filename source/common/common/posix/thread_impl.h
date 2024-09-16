@@ -82,7 +82,7 @@ public:
    * Creates a new generic thread from the specified `thread_routine`. When the
    * thread cannot be created, this function will crash.
    */
-  ThreadPtr createThread(std::function<void()> thread_routine, OptionsOptConstRef options);
+  ThreadPtr createThread(std::function<void()> thread_routine, OptionsOptConstRef options) override;
 
   /**
    * Creates a new POSIX thread from the specified `thread_routine`. When
@@ -97,17 +97,17 @@ public:
    * thread ID. The thread ID returned from this call is not the same as the
    * thread ID returned from `currentPThreadId()`.
    */
-  ThreadId currentThreadId();
+  ThreadId currentThreadId() const override;
 
   /**
    * On Linux and Android, this will return an integer value between [-20, 19].
    * On Apple platforms, thread priorities range from [0,1] but this API normalizes the values to
    * [0, 100] for consistency with the Options.priority_ values.
    */
-  int currentThreadPriority();
+  int currentThreadPriority() const;
 
   /** Returns the current pthread ID. It uses `pthread_self()`. */
-  virtual ThreadId currentPthreadId();
+  virtual ThreadId currentPthreadId() const;
 
 protected:
   virtual int createPthread(ThreadHandle* thread_handle);
