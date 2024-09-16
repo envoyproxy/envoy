@@ -39,7 +39,7 @@ AsyncFileManagerThreadPool::~AsyncFileManagerThreadPool() ABSL_LOCKS_EXCLUDED(qu
     absl::MutexLock lock(&queue_mutex_);
     terminate_ = true;
   }
-  // The destructor will be blocked until all queued file actions are complete.
+  // This destructor will be blocked by this loop until all queued file actions are complete.
   while (!thread_pool_.empty()) {
     thread_pool_.back().join();
     thread_pool_.pop_back();
