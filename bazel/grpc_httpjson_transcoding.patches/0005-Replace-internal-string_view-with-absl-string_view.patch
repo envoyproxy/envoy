@@ -1,0 +1,871 @@
+From 035e2d8fdcb39599d46ac2ec1b524be57f6b3aaf Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Alejandro=20R=20Sede=C3=B1o?= <asedeno@google.com>
+Date: Sat, 14 Sep 2024 17:29:22 -0400
+Subject: [PATCH 5/9] Replace internal::string_view with absl::string_view
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+It's already an alias, and the internal thing is just unnecessary
+cognative load.
+
+This was the only thing added to the ':protobuf' library in the BUILD
+file, so remove that too and push its dependencies down.
+
+Signed-off-by: Alejandro R Sedeño <asedeno@google.com>
+---
+ src/BUILD                                     | 28 ++++-------
+ .../internal/protobuf_types.h                 | 30 ------------
+ src/include/grpc_transcoding/prefix_writer.h  | 30 ++++++------
+ .../request_message_translator.h              |  2 +-
+ .../request_stream_translator.h               | 37 ++++++--------
+ src/include/grpc_transcoding/request_weaver.h | 32 ++++++------
+ .../grpc_transcoding/status_error_listener.h  |  8 +--
+ src/json_request_translator.cc                |  4 +-
+ src/prefix_writer.cc                          | 34 ++++++-------
+ src/request_stream_translator.cc              | 26 +++++-----
+ src/request_weaver.cc                         | 49 +++++++++----------
+ src/status_error_listener.cc                  |  6 +--
+ 12 files changed, 116 insertions(+), 170 deletions(-)
+ delete mode 100644 src/include/grpc_transcoding/internal/protobuf_types.h
+
+diff --git a/src/BUILD b/src/BUILD
+index 1367b3e..bbdd168 100644
+--- a/src/BUILD
++++ b/src/BUILD
+@@ -16,20 +16,6 @@
+ #
+ package(default_visibility = ["//visibility:public"])
+ 
+-cc_library(
+-    name = "protobuf",
+-    hdrs = [
+-        "include/grpc_transcoding/internal/protobuf_types.h",
+-    ],
+-    includes = [
+-        "include/",
+-    ],
+-    deps = [
+-        "@com_google_protobuf//:protobuf",
+-        "@com_google_protoconverter//:all",
+-    ],
+-)
+-
+ cc_library(
+     name = "prefix_writer",
+     srcs = [
+@@ -42,8 +28,9 @@ cc_library(
+         "include/",
+     ],
+     deps = [
+-        ":protobuf",
+         "@com_google_absl//absl/strings",
++        "@com_google_protobuf//:protobuf",
++        "@com_google_protoconverter//:all",
+     ],
+ )
+ 
+@@ -59,10 +46,11 @@ cc_library(
+         "include/",
+     ],
+     deps = [
+-        ":protobuf",
+         ":status_error_listener",
+         "@com_google_absl//absl/strings",
+         "@com_google_absl//absl/strings:str_format",
++        "@com_google_protobuf//:protobuf",
++        "@com_google_protoconverter//:all",
+     ],
+ )
+ 
+@@ -98,8 +86,10 @@ cc_library(
+     deps = [
+         ":message_stream",
+         ":prefix_writer",
+-        ":protobuf",
+         ":request_weaver",
++        "@com_google_absl//absl/strings",
++        "@com_google_protobuf//:protobuf",
++        "@com_google_protoconverter//:all",
+     ],
+ )
+ 
+@@ -192,6 +182,7 @@ cc_library(
+     deps = [
+         ":request_message_translator",
+         ":request_stream_translator",
++        "@com_google_absl//absl/strings",
+         "@com_google_protobuf//:protobuf",
+     ],
+ )
+@@ -294,9 +285,10 @@ cc_library(
+         "include/",
+     ],
+     deps = [
+-        ":protobuf",
+         "@com_google_absl//absl/status",
+         "@com_google_absl//absl/strings",
+         "@com_google_absl//absl/strings:str_format",
++        "@com_google_protobuf//:protobuf",
++        "@com_google_protoconverter//:all",
+     ],
+ )
+diff --git a/src/include/grpc_transcoding/internal/protobuf_types.h b/src/include/grpc_transcoding/internal/protobuf_types.h
+deleted file mode 100644
+index 34f3f67..0000000
+--- a/src/include/grpc_transcoding/internal/protobuf_types.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/* Copyright 2016 Google Inc. All Rights Reserved.
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *    http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-#ifndef GRPC_TRANSCODING_INTERNAL_PROTOBUF_TYPES_H_
+-#define GRPC_TRANSCODING_INTERNAL_PROTOBUF_TYPES_H_
+-
+-namespace google {
+-namespace grpc {
+-namespace transcoding {
+-namespace internal {
+-
+-typedef ::absl::string_view string_view;
+-
+-}  // namespace internal
+-}  // namespace transcoding
+-}  // namespace grpc
+-}  // namespace google
+-
+-#endif  // GRPC_TRANSCODING_INTERNAL_PROTOBUF_TYPES_H_
+diff --git a/src/include/grpc_transcoding/prefix_writer.h b/src/include/grpc_transcoding/prefix_writer.h
+index e562fb3..1b86ee3 100644
+--- a/src/include/grpc_transcoding/prefix_writer.h
++++ b/src/include/grpc_transcoding/prefix_writer.h
+@@ -19,8 +19,8 @@
+ #include <string>
+ #include <vector>
+ 
++#include "absl/strings/string_view.h"
+ #include "google/protobuf/util/converter/object_writer.h"
+-#include "grpc_transcoding/internal/protobuf_types.h"
+ 
+ namespace google {
+ namespace grpc {
+@@ -64,26 +64,24 @@ class PrefixWriter : public google::protobuf::util::converter::ObjectWriter {
+                google::protobuf::util::converter::ObjectWriter* ow);
+ 
+   // ObjectWriter methods.
+-  PrefixWriter* StartObject(internal::string_view name);
++  PrefixWriter* StartObject(absl::string_view name);
+   PrefixWriter* EndObject();
+-  PrefixWriter* StartList(internal::string_view name);
++  PrefixWriter* StartList(absl::string_view name);
+   PrefixWriter* EndList();
+-  PrefixWriter* RenderBool(internal::string_view name, bool value);
+-  PrefixWriter* RenderInt32(internal::string_view name, int32_t value);
+-  PrefixWriter* RenderUint32(internal::string_view name, uint32_t value);
+-  PrefixWriter* RenderInt64(internal::string_view name, int64_t value);
+-  PrefixWriter* RenderUint64(internal::string_view name, uint64_t value);
+-  PrefixWriter* RenderDouble(internal::string_view name, double value);
+-  PrefixWriter* RenderFloat(internal::string_view name, float value);
+-  PrefixWriter* RenderString(internal::string_view name,
+-                             internal::string_view value);
+-  PrefixWriter* RenderBytes(internal::string_view name,
+-                            internal::string_view value);
+-  PrefixWriter* RenderNull(internal::string_view name);
++  PrefixWriter* RenderBool(absl::string_view name, bool value);
++  PrefixWriter* RenderInt32(absl::string_view name, int32_t value);
++  PrefixWriter* RenderUint32(absl::string_view name, uint32_t value);
++  PrefixWriter* RenderInt64(absl::string_view name, int64_t value);
++  PrefixWriter* RenderUint64(absl::string_view name, uint64_t value);
++  PrefixWriter* RenderDouble(absl::string_view name, double value);
++  PrefixWriter* RenderFloat(absl::string_view name, float value);
++  PrefixWriter* RenderString(absl::string_view name, absl::string_view value);
++  PrefixWriter* RenderBytes(absl::string_view name, absl::string_view value);
++  PrefixWriter* RenderNull(absl::string_view name);
+ 
+  private:
+   // Helper method to start the prefix and return the name to use for the value.
+-  internal::string_view StartPrefix(internal::string_view name);
++  absl::string_view StartPrefix(absl::string_view name);
+ 
+   // Helper method to end the prefix.
+   void EndPrefix();
+diff --git a/src/include/grpc_transcoding/request_message_translator.h b/src/include/grpc_transcoding/request_message_translator.h
+index 0532f08..7b8fdc2 100644
+--- a/src/include/grpc_transcoding/request_message_translator.h
++++ b/src/include/grpc_transcoding/request_message_translator.h
+@@ -18,12 +18,12 @@
+ #include <memory>
+ #include <string>
+ 
++#include "absl/strings/string_view.h"
+ #include "google/protobuf/stubs/bytestream.h"
+ #include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/converter/error_listener.h"
+ #include "google/protobuf/util/converter/protostream_objectwriter.h"
+ #include "google/protobuf/util/type_resolver.h"
+-#include "grpc_transcoding/internal/protobuf_types.h"
+ #include "message_stream.h"
+ #include "prefix_writer.h"
+ #include "request_weaver.h"
+diff --git a/src/include/grpc_transcoding/request_stream_translator.h b/src/include/grpc_transcoding/request_stream_translator.h
+index 71b9a80..3dec442 100644
+--- a/src/include/grpc_transcoding/request_stream_translator.h
++++ b/src/include/grpc_transcoding/request_stream_translator.h
+@@ -20,9 +20,9 @@
+ #include <functional>
+ #include <memory>
+ 
++#include "absl/strings/string_view.h"
+ #include "google/protobuf/util/converter/object_writer.h"
+ #include "google/protobuf/util/type_resolver.h"
+-#include "grpc_transcoding/internal/protobuf_types.h"
+ #include "message_stream.h"
+ #include "request_message_translator.h"
+ 
+@@ -76,27 +76,22 @@ class RequestStreamTranslator
+ 
+  private:
+   // ObjectWriter methods.
+-  RequestStreamTranslator* StartObject(internal::string_view name);
++  RequestStreamTranslator* StartObject(absl::string_view name);
+   RequestStreamTranslator* EndObject();
+-  RequestStreamTranslator* StartList(internal::string_view name);
++  RequestStreamTranslator* StartList(absl::string_view name);
+   RequestStreamTranslator* EndList();
+-  RequestStreamTranslator* RenderBool(internal::string_view name, bool value);
+-  RequestStreamTranslator* RenderInt32(internal::string_view name,
+-                                       int32_t value);
+-  RequestStreamTranslator* RenderUint32(internal::string_view name,
+-                                        uint32_t value);
+-  RequestStreamTranslator* RenderInt64(internal::string_view name,
+-                                       int64_t value);
+-  RequestStreamTranslator* RenderUint64(internal::string_view name,
+-                                        uint64_t value);
+-  RequestStreamTranslator* RenderDouble(internal::string_view name,
+-                                        double value);
+-  RequestStreamTranslator* RenderFloat(internal::string_view name, float value);
+-  RequestStreamTranslator* RenderString(internal::string_view name,
+-                                        internal::string_view value);
+-  RequestStreamTranslator* RenderBytes(internal::string_view name,
+-                                       internal::string_view value);
+-  RequestStreamTranslator* RenderNull(internal::string_view name);
++  RequestStreamTranslator* RenderBool(absl::string_view name, bool value);
++  RequestStreamTranslator* RenderInt32(absl::string_view name, int32_t value);
++  RequestStreamTranslator* RenderUint32(absl::string_view name, uint32_t value);
++  RequestStreamTranslator* RenderInt64(absl::string_view name, int64_t value);
++  RequestStreamTranslator* RenderUint64(absl::string_view name, uint64_t value);
++  RequestStreamTranslator* RenderDouble(absl::string_view name, double value);
++  RequestStreamTranslator* RenderFloat(absl::string_view name, float value);
++  RequestStreamTranslator* RenderString(absl::string_view name,
++                                        absl::string_view value);
++  RequestStreamTranslator* RenderBytes(absl::string_view name,
++                                       absl::string_view value);
++  RequestStreamTranslator* RenderNull(absl::string_view name);
+ 
+   // Sets up the ProtoMessageHelper to handle writing data.
+   void StartMessageTranslator();
+@@ -105,7 +100,7 @@ class RequestStreamTranslator
+   void EndMessageTranslator();
+ 
+   // Helper method to render a single piece of data, to reuse code.
+-  void RenderData(internal::string_view name, std::function<void()> renderer);
++  void RenderData(absl::string_view name, std::function<void()> renderer);
+ 
+   // TypeResolver to be passed to the RequestMessageTranslator
+   google::protobuf::util::TypeResolver& type_resolver_;
+diff --git a/src/include/grpc_transcoding/request_weaver.h b/src/include/grpc_transcoding/request_weaver.h
+index cb63dcd..589351d 100644
+--- a/src/include/grpc_transcoding/request_weaver.h
++++ b/src/include/grpc_transcoding/request_weaver.h
+@@ -21,9 +21,9 @@
+ #include <string>
+ #include <vector>
+ 
++#include "absl/strings/string_view.h"
+ #include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/converter/object_writer.h"
+-#include "grpc_transcoding/internal/protobuf_types.h"
+ #include "grpc_transcoding/status_error_listener.h"
+ 
+ namespace google {
+@@ -82,22 +82,20 @@ class RequestWeaver : public google::protobuf::util::converter::ObjectWriter {
+   absl::Status Status() { return error_listener_->status(); }
+ 
+   // ObjectWriter methods
+-  RequestWeaver* StartObject(internal::string_view name);
++  RequestWeaver* StartObject(absl::string_view name);
+   RequestWeaver* EndObject();
+-  RequestWeaver* StartList(internal::string_view name);
++  RequestWeaver* StartList(absl::string_view name);
+   RequestWeaver* EndList();
+-  RequestWeaver* RenderBool(internal::string_view name, bool value);
+-  RequestWeaver* RenderInt32(internal::string_view name, int32_t value);
+-  RequestWeaver* RenderUint32(internal::string_view name, uint32_t value);
+-  RequestWeaver* RenderInt64(internal::string_view name, int64_t value);
+-  RequestWeaver* RenderUint64(internal::string_view name, uint64_t value);
+-  RequestWeaver* RenderDouble(internal::string_view name, double value);
+-  RequestWeaver* RenderFloat(internal::string_view name, float value);
+-  RequestWeaver* RenderString(internal::string_view name,
+-                              internal::string_view value);
+-  RequestWeaver* RenderNull(internal::string_view name);
+-  RequestWeaver* RenderBytes(internal::string_view name,
+-                             internal::string_view value);
++  RequestWeaver* RenderBool(absl::string_view name, bool value);
++  RequestWeaver* RenderInt32(absl::string_view name, int32_t value);
++  RequestWeaver* RenderUint32(absl::string_view name, uint32_t value);
++  RequestWeaver* RenderInt64(absl::string_view name, int64_t value);
++  RequestWeaver* RenderUint64(absl::string_view name, uint64_t value);
++  RequestWeaver* RenderDouble(absl::string_view name, double value);
++  RequestWeaver* RenderFloat(absl::string_view name, float value);
++  RequestWeaver* RenderString(absl::string_view name, absl::string_view value);
++  RequestWeaver* RenderNull(absl::string_view name);
++  RequestWeaver* RenderBytes(absl::string_view name, absl::string_view value);
+ 
+  private:
+   // Container for information to be weaved.
+@@ -111,7 +109,7 @@ class RequestWeaver : public google::protobuf::util::converter::ObjectWriter {
+     std::list<std::pair<const google::protobuf::Field*, std::string>> bindings;
+ 
+     // Find the entry for the speciied field in messages list .
+-    WeaveInfo* FindWeaveMsg(internal::string_view field_name);
++    WeaveInfo* FindWeaveMsg(absl::string_view field_name);
+ 
+     // Create an entry in messages for the given field. The caller must make
+     // sure that there is no existing entry for the same field before calling.
+@@ -131,7 +129,7 @@ class RequestWeaver : public google::protobuf::util::converter::ObjectWriter {
+   // Checks if any repeated fields with the same field name are in the current
+   // node of the weave tree. Output them if there are any.
+   void CollisionCheck(
+-      internal::string_view name,
++      absl::string_view name,
+       const ::google::protobuf::util::converter::DataPiece& value);
+ 
+   // All the headers, variable bindings and parameter bindings to be weaved in.
+diff --git a/src/include/grpc_transcoding/status_error_listener.h b/src/include/grpc_transcoding/status_error_listener.h
+index aef0d18..9a53675 100644
+--- a/src/include/grpc_transcoding/status_error_listener.h
++++ b/src/include/grpc_transcoding/status_error_listener.h
+@@ -2,8 +2,8 @@
+ #define GRPC_TRANSCODING_STATUS_ERROR_LISTENER_H_
+ 
+ #include "absl/status/status.h"
++#include "absl/strings/string_view.h"
+ #include "google/protobuf/util/converter/error_listener.h"
+-#include "grpc_transcoding/internal/protobuf_types.h"
+ 
+ namespace google {
+ namespace grpc {
+@@ -22,13 +22,13 @@ class StatusErrorListener
+   // ErrorListener implementation
+   void InvalidName(
+       const ::google::protobuf::util::converter::LocationTrackerInterface& loc,
+-      internal::string_view unknown_name, internal::string_view message);
++      absl::string_view unknown_name, absl::string_view message);
+   void InvalidValue(
+       const ::google::protobuf::util::converter::LocationTrackerInterface& loc,
+-      internal::string_view type_name, internal::string_view value);
++      absl::string_view type_name, absl::string_view value);
+   void MissingField(
+       const ::google::protobuf::util::converter::LocationTrackerInterface& loc,
+-      internal::string_view missing_name);
++      absl::string_view missing_name);
+ 
+   void set_status(absl::Status status) { status_ = status; }
+ 
+diff --git a/src/json_request_translator.cc b/src/json_request_translator.cc
+index a4086ad..0b3276e 100644
+--- a/src/json_request_translator.cc
++++ b/src/json_request_translator.cc
+@@ -18,10 +18,10 @@
+ 
+ #include <string>
+ 
++#include "absl/strings/string_view.h"
+ #include "google/protobuf/io/zero_copy_stream.h"
+ #include "google/protobuf/util/converter/json_stream_parser.h"
+ #include "google/protobuf/util/converter/object_writer.h"
+-#include "grpc_transcoding/internal/protobuf_types.h"
+ #include "grpc_transcoding/message_stream.h"
+ #include "grpc_transcoding/request_message_translator.h"
+ #include "grpc_transcoding/request_stream_translator.h"
+@@ -102,7 +102,7 @@ class LazyRequestTranslator : public MessageStream {
+ 
+     // Feed the chunk to the parser & check the status.
+     return CheckParsingStatus(json_parser_->Parse(
+-        internal::string_view(reinterpret_cast<const char*>(data), size)));
++        absl::string_view(reinterpret_cast<const char*>(data), size)));
+   }
+ 
+   // If parsing status fails, return false.
+diff --git a/src/prefix_writer.cc b/src/prefix_writer.cc
+index 0b1e7cb..c363705 100644
+--- a/src/prefix_writer.cc
++++ b/src/prefix_writer.cc
+@@ -33,7 +33,7 @@ PrefixWriter::PrefixWriter(const std::string& prefix,
+       non_actionable_depth_(0),
+       writer_(ow) {}
+ 
+-PrefixWriter* PrefixWriter::StartObject(internal::string_view name) {
++PrefixWriter* PrefixWriter::StartObject(absl::string_view name) {
+   if (++non_actionable_depth_ == 1) {
+     name = StartPrefix(name);
+   }
+@@ -49,7 +49,7 @@ PrefixWriter* PrefixWriter::EndObject() {
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::StartList(internal::string_view name) {
++PrefixWriter* PrefixWriter::StartList(absl::string_view name) {
+   if (++non_actionable_depth_ == 1) {
+     name = StartPrefix(name);
+   }
+@@ -65,7 +65,7 @@ PrefixWriter* PrefixWriter::EndList() {
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderBool(internal::string_view name, bool value) {
++PrefixWriter* PrefixWriter::RenderBool(absl::string_view name, bool value) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+     name = StartPrefix(name);
+@@ -77,8 +77,7 @@ PrefixWriter* PrefixWriter::RenderBool(internal::string_view name, bool value) {
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderInt32(internal::string_view name,
+-                                        int32_t value) {
++PrefixWriter* PrefixWriter::RenderInt32(absl::string_view name, int32_t value) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+     name = StartPrefix(name);
+@@ -90,7 +89,7 @@ PrefixWriter* PrefixWriter::RenderInt32(internal::string_view name,
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderUint32(internal::string_view name,
++PrefixWriter* PrefixWriter::RenderUint32(absl::string_view name,
+                                          uint32_t value) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+@@ -103,8 +102,7 @@ PrefixWriter* PrefixWriter::RenderUint32(internal::string_view name,
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderInt64(internal::string_view name,
+-                                        int64_t value) {
++PrefixWriter* PrefixWriter::RenderInt64(absl::string_view name, int64_t value) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+     name = StartPrefix(name);
+@@ -116,7 +114,7 @@ PrefixWriter* PrefixWriter::RenderInt64(internal::string_view name,
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderUint64(internal::string_view name,
++PrefixWriter* PrefixWriter::RenderUint64(absl::string_view name,
+                                          uint64_t value) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+@@ -129,8 +127,7 @@ PrefixWriter* PrefixWriter::RenderUint64(internal::string_view name,
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderDouble(internal::string_view name,
+-                                         double value) {
++PrefixWriter* PrefixWriter::RenderDouble(absl::string_view name, double value) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+     name = StartPrefix(name);
+@@ -142,8 +139,7 @@ PrefixWriter* PrefixWriter::RenderDouble(internal::string_view name,
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderFloat(internal::string_view name,
+-                                        float value) {
++PrefixWriter* PrefixWriter::RenderFloat(absl::string_view name, float value) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+     name = StartPrefix(name);
+@@ -155,8 +151,8 @@ PrefixWriter* PrefixWriter::RenderFloat(internal::string_view name,
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderString(internal::string_view name,
+-                                         internal::string_view value) {
++PrefixWriter* PrefixWriter::RenderString(absl::string_view name,
++                                         absl::string_view value) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+     name = StartPrefix(name);
+@@ -168,8 +164,8 @@ PrefixWriter* PrefixWriter::RenderString(internal::string_view name,
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderBytes(internal::string_view name,
+-                                        internal::string_view value) {
++PrefixWriter* PrefixWriter::RenderBytes(absl::string_view name,
++                                        absl::string_view value) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+     name = StartPrefix(name);
+@@ -181,7 +177,7 @@ PrefixWriter* PrefixWriter::RenderBytes(internal::string_view name,
+   return this;
+ }
+ 
+-PrefixWriter* PrefixWriter::RenderNull(internal::string_view name) {
++PrefixWriter* PrefixWriter::RenderNull(absl::string_view name) {
+   bool root = non_actionable_depth_ == 0;
+   if (root) {
+     name = StartPrefix(name);
+@@ -194,7 +190,7 @@ PrefixWriter* PrefixWriter::RenderNull(internal::string_view name) {
+   return this;
+ }
+ 
+-internal::string_view PrefixWriter::StartPrefix(internal::string_view name) {
++absl::string_view PrefixWriter::StartPrefix(absl::string_view name) {
+   for (const auto& prefix : prefix_) {
+     writer_->StartObject(name);
+     name = prefix;
+diff --git a/src/request_stream_translator.cc b/src/request_stream_translator.cc
+index f11b2de..ab679cc 100644
+--- a/src/request_stream_translator.cc
++++ b/src/request_stream_translator.cc
+@@ -59,7 +59,7 @@ bool RequestStreamTranslator::Finished() const {
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::StartObject(
+-    internal::string_view name) {
++    absl::string_view name) {
+   if (!status_.ok()) {
+     // In error state - return right away
+     return this;
+@@ -101,7 +101,7 @@ RequestStreamTranslator* RequestStreamTranslator::EndObject() {
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::StartList(
+-    internal::string_view name) {
++    absl::string_view name) {
+   if (!status_.ok()) {
+     // In error state - return right away
+     return this;
+@@ -148,7 +148,7 @@ RequestStreamTranslator* RequestStreamTranslator::EndList() {
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderBool(
+-    internal::string_view name, bool value) {
++    absl::string_view name, bool value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderBool(name, value);
+   });
+@@ -156,7 +156,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderBool(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderInt32(
+-    internal::string_view name, pb::int32 value) {
++    absl::string_view name, pb::int32 value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderInt32(name, value);
+   });
+@@ -164,7 +164,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderInt32(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderUint32(
+-    internal::string_view name, pb::uint32 value) {
++    absl::string_view name, pb::uint32 value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderUint32(name, value);
+   });
+@@ -172,7 +172,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderUint32(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderInt64(
+-    internal::string_view name, pb::int64 value) {
++    absl::string_view name, pb::int64 value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderInt64(name, value);
+   });
+@@ -180,7 +180,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderInt64(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderUint64(
+-    internal::string_view name, pb::uint64 value) {
++    absl::string_view name, pb::uint64 value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderUint64(name, value);
+   });
+@@ -188,7 +188,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderUint64(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderDouble(
+-    internal::string_view name, double value) {
++    absl::string_view name, double value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderDouble(name, value);
+   });
+@@ -196,7 +196,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderDouble(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderFloat(
+-    internal::string_view name, float value) {
++    absl::string_view name, float value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderFloat(name, value);
+   });
+@@ -204,7 +204,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderFloat(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderString(
+-    internal::string_view name, internal::string_view value) {
++    absl::string_view name, absl::string_view value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderString(name, value);
+   });
+@@ -212,7 +212,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderString(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderBytes(
+-    internal::string_view name, internal::string_view value) {
++    absl::string_view name, absl::string_view value) {
+   RenderData(name, [this, name, value]() {
+     translator_->Input().RenderBytes(name, value);
+   });
+@@ -220,7 +220,7 @@ RequestStreamTranslator* RequestStreamTranslator::RenderBytes(
+ }
+ 
+ RequestStreamTranslator* RequestStreamTranslator::RenderNull(
+-    internal::string_view name) {
++    absl::string_view name) {
+   RenderData(name, [this, name]() { translator_->Input().RenderNull(name); });
+   return this;
+ }
+@@ -257,7 +257,7 @@ void RequestStreamTranslator::EndMessageTranslator() {
+   translator_.reset();
+ }
+ 
+-void RequestStreamTranslator::RenderData(internal::string_view name,
++void RequestStreamTranslator::RenderData(absl::string_view name,
+                                          std::function<void()> renderer) {
+   if (!status_.ok()) {
+     // In error state - ignore
+diff --git a/src/request_weaver.cc b/src/request_weaver.cc
+index 2c4411e..cea498a 100644
+--- a/src/request_weaver.cc
++++ b/src/request_weaver.cc
+@@ -44,8 +44,8 @@ namespace {
+ 
+ bool AlmostEquals(float a, float b) { return fabs(a - b) < 32 * FLT_EPSILON; }
+ 
+-absl::Status bindingFailureStatus(internal::string_view field_name,
+-                                  internal::string_view type,
++absl::Status bindingFailureStatus(absl::string_view field_name,
++                                  absl::string_view type,
+                                   const pbconv::DataPiece& value) {
+   return absl::Status(
+       absl::StatusCode::kInvalidArgument,
+@@ -53,7 +53,7 @@ absl::Status bindingFailureStatus(internal::string_view field_name,
+                    value.ValueAsStringOrDefault(""), " to ", type));
+ }
+ 
+-absl::Status isEqual(internal::string_view field_name,
++absl::Status isEqual(absl::string_view field_name,
+                      const pbconv::DataPiece& value_in_body,
+                      const pbconv::DataPiece& value_in_binding) {
+   bool value_is_same = true;
+@@ -179,7 +179,7 @@ RequestWeaver::RequestWeaver(std::vector<BindingInfo> bindings,
+   }
+ }
+ 
+-RequestWeaver* RequestWeaver::StartObject(internal::string_view name) {
++RequestWeaver* RequestWeaver::StartObject(absl::string_view name) {
+   ow_->StartObject(name);
+   if (current_.empty()) {
+     // The outermost StartObject("");
+@@ -210,7 +210,7 @@ RequestWeaver* RequestWeaver::EndObject() {
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::StartList(internal::string_view name) {
++RequestWeaver* RequestWeaver::StartList(absl::string_view name) {
+   ow_->StartList(name);
+   // We don't support weaving inside lists, so we won't need to do any matching
+   // until we leave this list.
+@@ -224,8 +224,7 @@ RequestWeaver* RequestWeaver::EndList() {
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderBool(internal::string_view name,
+-                                         bool value) {
++RequestWeaver* RequestWeaver::RenderBool(absl::string_view name, bool value) {
+   if (non_actionable_depth_ == 0) {
+     pbconv::DataPiece value_in_body = pbconv::DataPiece(value);
+     CollisionCheck(name, value_in_body);
+@@ -234,7 +233,7 @@ RequestWeaver* RequestWeaver::RenderBool(internal::string_view name,
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderInt32(internal::string_view name,
++RequestWeaver* RequestWeaver::RenderInt32(absl::string_view name,
+                                           int32_t value) {
+   if (non_actionable_depth_ == 0) {
+     pbconv::DataPiece value_in_body = pbconv::DataPiece(value);
+@@ -244,7 +243,7 @@ RequestWeaver* RequestWeaver::RenderInt32(internal::string_view name,
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderUint32(internal::string_view name,
++RequestWeaver* RequestWeaver::RenderUint32(absl::string_view name,
+                                            uint32_t value) {
+   if (non_actionable_depth_ == 0) {
+     pbconv::DataPiece value_in_body = pbconv::DataPiece(value);
+@@ -254,7 +253,7 @@ RequestWeaver* RequestWeaver::RenderUint32(internal::string_view name,
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderInt64(internal::string_view name,
++RequestWeaver* RequestWeaver::RenderInt64(absl::string_view name,
+                                           int64_t value) {
+   if (non_actionable_depth_ == 0) {
+     pbconv::DataPiece value_in_body = pbconv::DataPiece(value);
+@@ -264,7 +263,7 @@ RequestWeaver* RequestWeaver::RenderInt64(internal::string_view name,
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderUint64(internal::string_view name,
++RequestWeaver* RequestWeaver::RenderUint64(absl::string_view name,
+                                            uint64_t value) {
+   if (non_actionable_depth_ == 0) {
+     pbconv::DataPiece value_in_body = pbconv::DataPiece(value);
+@@ -274,7 +273,7 @@ RequestWeaver* RequestWeaver::RenderUint64(internal::string_view name,
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderDouble(internal::string_view name,
++RequestWeaver* RequestWeaver::RenderDouble(absl::string_view name,
+                                            double value) {
+   if (non_actionable_depth_ == 0) {
+     pbconv::DataPiece value_in_body = pbconv::DataPiece(value);
+@@ -284,8 +283,7 @@ RequestWeaver* RequestWeaver::RenderDouble(internal::string_view name,
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderFloat(internal::string_view name,
+-                                          float value) {
++RequestWeaver* RequestWeaver::RenderFloat(absl::string_view name, float value) {
+   if (non_actionable_depth_ == 0) {
+     pbconv::DataPiece value_in_body = pbconv::DataPiece(value);
+     CollisionCheck(name, value_in_body);
+@@ -294,8 +292,8 @@ RequestWeaver* RequestWeaver::RenderFloat(internal::string_view name,
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderString(internal::string_view name,
+-                                           internal::string_view value) {
++RequestWeaver* RequestWeaver::RenderString(absl::string_view name,
++                                           absl::string_view value) {
+   if (non_actionable_depth_ == 0) {
+     pbconv::DataPiece value_in_body = pbconv::DataPiece(value, true);
+     CollisionCheck(name, value_in_body);
+@@ -304,13 +302,13 @@ RequestWeaver* RequestWeaver::RenderString(internal::string_view name,
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderNull(internal::string_view name) {
++RequestWeaver* RequestWeaver::RenderNull(absl::string_view name) {
+   ow_->RenderNull(name);
+   return this;
+ }
+ 
+-RequestWeaver* RequestWeaver::RenderBytes(internal::string_view name,
+-                                          internal::string_view value) {
++RequestWeaver* RequestWeaver::RenderBytes(absl::string_view name,
++                                          absl::string_view value) {
+   if (non_actionable_depth_ == 0) {
+     pbconv::DataPiece value_in_body = pbconv::DataPiece(value, true);
+     CollisionCheck(name, value_in_body);
+@@ -337,8 +335,8 @@ void RequestWeaver::Bind(std::vector<const pb::Field*> field_path,
+ void RequestWeaver::WeaveTree(RequestWeaver::WeaveInfo* info) {
+   for (const auto& data : info->bindings) {
+     pbconv::ObjectWriter::RenderDataPieceTo(
+-        pbconv::DataPiece(internal::string_view(data.second), true),
+-        internal::string_view(data.first->name()), ow_);
++        pbconv::DataPiece(absl::string_view(data.second), true),
++        absl::string_view(data.first->name()), ow_);
+   }
+   info->bindings.clear();
+   for (auto& msg : info->messages) {
+@@ -352,7 +350,7 @@ void RequestWeaver::WeaveTree(RequestWeaver::WeaveInfo* info) {
+   info->messages.clear();
+ }
+ 
+-void RequestWeaver::CollisionCheck(internal::string_view name,
++void RequestWeaver::CollisionCheck(absl::string_view name,
+                                    const pbconv::DataPiece& value_in_body) {
+   if (current_.empty()) return;
+ 
+@@ -361,11 +359,10 @@ void RequestWeaver::CollisionCheck(internal::string_view name,
+     if (name == it->first->name()) {
+       if (it->first->cardinality() == pb::Field::CARDINALITY_REPEATED) {
+         pbconv::ObjectWriter::RenderDataPieceTo(
+-            pbconv::DataPiece(internal::string_view(it->second), true), name,
+-            ow_);
++            pbconv::DataPiece(absl::string_view(it->second), true), name, ow_);
+       } else if (report_collisions_) {
+         pbconv::DataPiece value_in_binding =
+-            pbconv::DataPiece(internal::string_view(it->second), true);
++            pbconv::DataPiece(absl::string_view(it->second), true);
+         absl::Status compare_status =
+             isEqual(name, value_in_body, value_in_binding);
+         if (!compare_status.ok()) {
+@@ -380,7 +377,7 @@ void RequestWeaver::CollisionCheck(internal::string_view name,
+ }
+ 
+ RequestWeaver::WeaveInfo* RequestWeaver::WeaveInfo::FindWeaveMsg(
+-    const internal::string_view field_name) {
++    const absl::string_view field_name) {
+   for (auto& msg : messages) {
+     if (field_name == msg.first->name()) {
+       return &msg.second;
+diff --git a/src/status_error_listener.cc b/src/status_error_listener.cc
+index 1b79fe4..0ee6f4e 100644
+--- a/src/status_error_listener.cc
++++ b/src/status_error_listener.cc
+@@ -9,14 +9,14 @@ namespace transcoding {
+ 
+ void StatusErrorListener::InvalidName(
+     const ::google::protobuf::util::converter::LocationTrackerInterface& loc,
+-    internal::string_view unknown_name, internal::string_view message) {
++    absl::string_view unknown_name, absl::string_view message) {
+   status_ = absl::Status(absl::StatusCode::kInvalidArgument,
+                          loc.ToString() + ": " + std::string(message));
+ }
+ 
+ void StatusErrorListener::InvalidValue(
+     const ::google::protobuf::util::converter::LocationTrackerInterface& loc,
+-    internal::string_view type_name, internal::string_view value) {
++    absl::string_view type_name, absl::string_view value) {
+   status_ =
+       absl::Status(absl::StatusCode::kInvalidArgument,
+                    loc.ToString() + ": invalid value " + std::string(value) +
+@@ -25,7 +25,7 @@ void StatusErrorListener::InvalidValue(
+ 
+ void StatusErrorListener::MissingField(
+     const ::google::protobuf::util::converter::LocationTrackerInterface& loc,
+-    internal::string_view missing_name) {
++    absl::string_view missing_name) {
+   status_ = absl::Status(
+       absl::StatusCode::kInvalidArgument,
+       loc.ToString() + ": missing field " + std::string(missing_name));
+-- 
+2.46.0.662.g92d0881bb0-goog
+

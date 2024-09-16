@@ -1,0 +1,36 @@
+From 98bc9cdd77c0d344ca5cc4fceca1b2f3ea43a749 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Alejandro=20R=20Sede=C3=B1o?= <asedeno@google.com>
+Date: Sun, 15 Sep 2024 10:26:54 -0400
+Subject: [PATCH 8/9] Update readme to reflect clang change in 8b7e71c
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Signed-off-by: Alejandro R Sedeño <asedeno@google.com>
+---
+ README.md | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/README.md b/README.md
+index 6bc2f1f..d3f7799 100644
+--- a/README.md
++++ b/README.md
+@@ -31,13 +31,13 @@ $ script/check-style
+ 
+ ## Toolchain
+ 
+-The Bazel build system defaults to using clang 10 to enable reproducible builds.
++The Bazel build system defaults to using clang 14 to enable reproducible builds.
+ 
+ ## Continuous Integration
+ 
+ This repository is integrated with [OSS Prow](https://github.com/kubernetes/test-infra/tree/master/prow). Prow will run the [presubmit script](https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/master/script/ci.sh) on each Pull Request to verify tests pass. Note:
+ 
+-- PR submission is only allowed if the job passes. 
++- PR submission is only allowed if the job passes.
+ - If you are an outside contributor, Prow may not run until a Googler LGTMs.
+ 
+ # Contribution
+-- 
+2.46.0.662.g92d0881bb0-goog
+
