@@ -21,53 +21,74 @@ static constexpr absl::string_view kRpsFractionalField = "rps_fractional";
 static constexpr absl::string_view kNamedMetricsFieldPrefix = "named_metrics.";
 static constexpr absl::string_view kRequestCostFieldPrefix = "request_cost.";
 static constexpr absl::string_view kUtilizationFieldPrefix = "utilization.";
-} // namespace
 
-void addOrcaNamedMetricToLoadMetricStats(const Protobuf::Map<std::string, double>& metrics_map,
-                                         const absl::string_view metric_name,
-                                         const absl::string_view metric_name_prefix,
-                                         Upstream::LoadMetricStats& stats) {
+typedef std::function<void(absl::string_view metric_name, double metric_value)>
+    OnLoadReportMetricFn;
+
+void scanOrcaLoadReportMetricsMap(const Protobuf::Map<std::string, double>& metrics_map,
+                                  const absl::string_view metric_name,
+                                  const absl::string_view metric_name_prefix,
+                                  OnLoadReportMetricFn on_load_report_metric) {
   absl::string_view metric_name_without_prefix = absl::StripPrefix(metric_name, metric_name_prefix);
-  // If the metric name is "*", add all metrics from the map.
+  // If the metric name is "*", report all metrics from the map.
   if (metric_name_without_prefix == "*") {
     for (const auto& [key, value] : metrics_map) {
-      stats.add(absl::StrCat(metric_name_prefix, key), value);
+      on_load_report_metric(absl::StrCat(metric_name_prefix, key), value);
     }
   } else {
-    // Add the metric if it exists in the map.
+    // Report the metric if it exists in the map.
     const auto metric_it = metrics_map.find(metric_name_without_prefix);
     if (metric_it != metrics_map.end()) {
-      stats.add(metric_name, metric_it->second);
+      on_load_report_metric(metric_name, metric_it->second);
     }
   }
 }
 
-void addOrcaLoadReportToLoadMetricStats(const LrsReportMetricNames& metric_names,
-                                        const xds::data::orca::v3::OrcaLoadReport& report,
-                                        Upstream::LoadMetricStats& stats) {
+void scanOrcaLoadReport(const LrsReportMetricNames& metric_names,
+                        const xds::data::orca::v3::OrcaLoadReport& report,
+                        OnLoadReportMetricFn on_load_report_metric) {
   // TODO(efimki): Use InlineMap to speed up this loop.
   for (const std::string& metric_name : metric_names) {
     if (metric_name == kCpuUtilizationField) {
-      stats.add(metric_name, report.cpu_utilization());
+      on_load_report_metric(metric_name, report.cpu_utilization());
     } else if (metric_name == kMemUtilizationField) {
-      stats.add(metric_name, report.mem_utilization());
+      on_load_report_metric(metric_name, report.mem_utilization());
     } else if (metric_name == kApplicationUtilizationField) {
-      stats.add(metric_name, report.application_utilization());
+      on_load_report_metric(metric_name, report.application_utilization());
     } else if (metric_name == kEpsField) {
-      stats.add(metric_name, report.eps());
+      on_load_report_metric(metric_name, report.eps());
     } else if (metric_name == kRpsFractionalField) {
-      stats.add(metric_name, report.rps_fractional());
+      on_load_report_metric(metric_name, report.rps_fractional());
     } else if (absl::StartsWith(metric_name, kNamedMetricsFieldPrefix)) {
-      addOrcaNamedMetricToLoadMetricStats(report.named_metrics(), metric_name,
-                                          kNamedMetricsFieldPrefix, stats);
+      scanOrcaLoadReportMetricsMap(report.named_metrics(), metric_name, kNamedMetricsFieldPrefix,
+                                   on_load_report_metric);
     } else if (absl::StartsWith(metric_name, kUtilizationFieldPrefix)) {
-      addOrcaNamedMetricToLoadMetricStats(report.utilization(), metric_name,
-                                          kUtilizationFieldPrefix, stats);
+      scanOrcaLoadReportMetricsMap(report.utilization(), metric_name, kUtilizationFieldPrefix,
+                                   on_load_report_metric);
     } else if (absl::StartsWith(metric_name, kRequestCostFieldPrefix)) {
-      addOrcaNamedMetricToLoadMetricStats(report.request_cost(), metric_name,
-                                          kRequestCostFieldPrefix, stats);
+      scanOrcaLoadReportMetricsMap(report.request_cost(), metric_name, kRequestCostFieldPrefix,
+                                   on_load_report_metric);
     }
   }
+}
+
+} // namespace
+
+void addOrcaLoadReportToLoadMetricStats(const LrsReportMetricNames& metric_names,
+                                        const xds::data::orca::v3::OrcaLoadReport& report,
+                                        Upstream::LoadMetricStats& stats) {
+  scanOrcaLoadReport(metric_names, report, [&](absl::string_view metric_name, double metric_value) {
+    stats.add(metric_name, metric_value);
+  });
+}
+
+double getMaxUtilization(const LrsReportMetricNames& metric_names,
+                         const xds::data::orca::v3::OrcaLoadReport& report) {
+  double max_utilization = 0;
+  scanOrcaLoadReport(metric_names, report, [&](absl::string_view, double metric_value) {
+    max_utilization = std::max<double>(max_utilization, metric_value);
+  });
+  return max_utilization;
 }
 
 } // namespace Orca

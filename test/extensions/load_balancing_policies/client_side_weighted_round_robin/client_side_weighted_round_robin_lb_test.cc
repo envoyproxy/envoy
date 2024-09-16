@@ -1929,7 +1929,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
   orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
-                orca_load_report, {"foo"}),
+                orca_load_report, {"named_metrics.foo"}),
             0.5);
 }
 
@@ -1938,7 +1938,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_
   orca_load_report.mutable_named_metrics()->insert({"foo", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
-                orca_load_report, {"foo"}),
+                orca_load_report, {"named_metrics.foo"}),
             0.3);
 }
 
@@ -1947,21 +1947,21 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_
   orca_load_report.mutable_named_metrics()->insert({"bar", 0.3});
   orca_load_report.set_cpu_utilization(0.6);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
-                orca_load_report, {"foo"}),
+                orca_load_report, {"named_metrics.foo"}),
             0.6);
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetUtilizationFromOrcaReport_NoUtilization) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getUtilizationFromOrcaReport(
-                orca_load_report, {"foo"}),
+                orca_load_report, {"named_metrics.foo"}),
             0);
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, CalculateWeightFromOrcaReport_NoQps) {
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
-                orca_load_report, {"foo"}, 0.0)
+                orca_load_report, {"named_metrics.foo"}, 0.0)
                 .status(),
             absl::InvalidArgumentError("QPS must be positive"));
 }
@@ -1970,7 +1970,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, CalculateWeightFromOrcaReport
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
   orca_load_report.set_rps_fractional(1000);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
-                orca_load_report, {"foo"}, 0.0)
+                orca_load_report, {"named_metrics.foo"}, 0.0)
                 .status(),
             absl::InvalidArgumentError("Utilization must be positive"));
 }
@@ -1981,7 +1981,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.set_application_utilization(0.5);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
-                orca_load_report, {"foo"}, 0.0)
+                orca_load_report, {"named_metrics.foo"}, 0.0)
                 .value(),
             2000);
 }
@@ -1992,7 +1992,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, CalculateWeightFromOrcaReport
   orca_load_report.set_rps_fractional(10000000000000L);
   orca_load_report.set_application_utilization(0.0000001);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
-                orca_load_report, {"foo"}, 0.0)
+                orca_load_report, {"named_metrics.foo"}, 0.0)
                 .value(),
             /*std::numeric_limits<uint32_t>::max() = */ 4294967295);
 }
@@ -2004,7 +2004,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
   orca_load_report.set_eps(100);
   orca_load_report.set_application_utilization(0.5);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
-                orca_load_report, {"foo"}, 0.0)
+                orca_load_report, {"named_metrics.foo"}, 0.0)
                 .value(),
             2000);
 }
@@ -2016,7 +2016,7 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
   orca_load_report.set_eps(100);
   orca_load_report.set_application_utilization(0.5);
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::calculateWeightFromOrcaReport(
-                orca_load_report, {"foo"}, 2.0)
+                orca_load_report, {"named_metrics.foo"}, 2.0)
                 .value(),
             1428);
 }

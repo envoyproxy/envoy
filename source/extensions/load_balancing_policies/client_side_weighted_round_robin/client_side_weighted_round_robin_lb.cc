@@ -9,6 +9,7 @@
 #include "envoy/common/time.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/orca/orca_load_metrics.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
@@ -262,12 +263,8 @@ double ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(
     return utilization;
   }
   // Otherwise, find the most constrained utilization metric.
-  for (const auto& metric_name : metric_names_for_computing_utilization) {
-    auto metric_it = orca_load_report.named_metrics().find(metric_name);
-    if (metric_it != orca_load_report.named_metrics().end()) {
-      utilization = std::max(utilization, metric_it->second);
-    }
-  }
+  utilization =
+      Envoy::Orca::getMaxUtilization(metric_names_for_computing_utilization, orca_load_report);
   if (utilization > 0) {
     return utilization;
   }
