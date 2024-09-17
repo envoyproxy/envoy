@@ -469,11 +469,6 @@ def _com_github_facebook_zstd():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-    native.bind(
-        name = "zstd",
-        actual = "@envoy//bazel/foreign_cc:zstd",
-    )
-
 def _com_google_cel_cpp():
     external_http_archive(
         "com_google_cel_cpp",
