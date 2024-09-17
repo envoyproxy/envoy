@@ -22,7 +22,7 @@ namespace Quic {
 // down casting can be avoided while passing around this object.
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit,
-                         quic::QuicByteCount max_packet_length);
+                         quic::QuicByteCount max_packet_length = 0);
 
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
