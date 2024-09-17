@@ -854,6 +854,10 @@ def _com_github_wamr():
         name = "com_github_wamr",
         build_file_content = BUILD_ALL_CONTENT,
     )
+    native.bind(
+        name = "wamr",
+        actual = "@envoy//bazel/foreign_cc:wamr",
+    )
 
 def _com_github_wasmtime():
     external_http_archive(
