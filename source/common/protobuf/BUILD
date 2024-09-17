@@ -74,7 +74,6 @@ envoy_cc_library(
     srcs = envoy_select_enable_yaml(["yaml_utility.cc"]),
     external_deps = [
         "protobuf",
-        "yaml_cpp",
     ],
     deps = [
         ":message_validator_lib",
@@ -88,6 +87,7 @@ envoy_cc_library(
         "//source/common/protobuf:visitor_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_github_cncf_xds//udpa/annotations:pkg_cc_proto",
+        "@com_github_jbeder_yaml_cpp//:yaml-cpp",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
         "@utf8_range//:utf8_validity",

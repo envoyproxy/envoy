@@ -396,10 +396,6 @@ def _com_github_jbeder_yaml_cpp():
     external_http_archive(
         name = "com_github_jbeder_yaml_cpp",
     )
-    native.bind(
-        name = "yaml_cpp",
-        actual = "@com_github_jbeder_yaml_cpp//:yaml-cpp",
-    )
 
 def _com_github_libevent_libevent():
     external_http_archive(
