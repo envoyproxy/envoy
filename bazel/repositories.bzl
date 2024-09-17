@@ -835,11 +835,6 @@ def _com_github_luajit_luajit():
         patch_cmds = ["chmod u+x build.py"],
     )
 
-    native.bind(
-        name = "luajit",
-        actual = "@envoy//bazel/foreign_cc:luajit",
-    )
-
 def _com_github_google_tcmalloc():
     external_http_archive(
         name = "com_github_google_tcmalloc",
