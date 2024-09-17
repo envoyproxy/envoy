@@ -122,8 +122,41 @@ void Span::setAttribute(absl::string_view name, const OTelAttribute& attribute_v
   *span_.add_attributes() = key_value;
 }
 
+::opentelemetry::proto::trace::v1::Status_StatusCode
+convertGrpcStatusToTraceStatusCode(::opentelemetry::proto::trace::v1::Span_SpanKind kind,
+                                   absl::string_view value) {
+  uint64_t grpc_status_code;
+  if (!absl::SimpleAtoi(value, &grpc_status_code)) {
+    return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_UNSET;
+  }
+
+  Grpc::Status::GrpcStatus grpc_status = static_cast<Grpc::Status::GrpcStatus>(grpc_status_code);
+  // Check mapping https://opentelemetry.io/docs/specs/semconv/rpc/grpc/#grpc-status
+  if (kind == ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER) {
+    if (grpc_status == Grpc::Status::WellKnownGrpcStatus::Ok) {
+      return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_UNSET;
+    }
+    return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_ERROR;
+  }
+
+  // SPAN_KIND_CLIENT
+  switch (grpc_status) {
+  case Grpc::Status::WellKnownGrpcStatus::Unknown:
+  case Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded:
+  case Grpc::Status::WellKnownGrpcStatus::Unimplemented:
+  case Grpc::Status::WellKnownGrpcStatus::Internal:
+  case Grpc::Status::WellKnownGrpcStatus::Unavailable:
+  case Grpc::Status::WellKnownGrpcStatus::DataLoss:
+    return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_ERROR;
+  default:
+    return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_UNSET;
+  }
+}
+
 void Span::setTag(absl::string_view name, absl::string_view value) {
-  if (name == Tracing::Tags::get().HttpStatusCode) {
+  if (name == Tracing::Tags::get().GrpcStatusCode) {
+    span_.mutable_status()->set_code(convertGrpcStatusToTraceStatusCode(span_.kind(), value));
+  } else if (name == Tracing::Tags::get().HttpStatusCode) {
     uint64_t status_code;
     // For HTTP status codes in the 5xx range, as well as any other code the client failed to
     // interpret, span status MUST be set to Error.
