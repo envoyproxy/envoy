@@ -80,6 +80,16 @@ generate_x509_cert() {
 }
 
 # $1=<certificate name> $2=<CA name> $3=[days]
+generate_x509_cert_no_extension() {
+    local days
+    days="${3:-${DEFAULT_VALIDITY_DAYS}}"
+    openssl req -new -key "${1}_key.pem" -out "${1}_cert.csr" -config "${1}_cert.cfg" -batch -sha256
+    openssl x509 -req -days "$days" -in "${1}_cert.csr" -sha256 -CA "${2}_cert.pem" -CAkey \
+            "${2}_key.pem" -out "${1}_cert.pem" -extensions v3_req -extfile "${1}_cert.cfg"
+    generate_info_header "$1"
+}
+
+# $1=<certificate name> $2=<CA name> $3=[days]
 #
 # Generate a certificate without a subject CN. For this to work, the config
 # must have an empty [req_distinguished_name] section.
@@ -355,6 +365,10 @@ openssl rand 79 > ticket_key_wrong_len
 # Generate a certificate with no subject CN and no altnames.
 generate_rsa_key no_subject
 generate_x509_cert_nosubject no_subject ca
+
+# Generate a certificate with no extensions
+generate_rsa_key no_extension
+generate_x509_cert_no_extension no_extension ca
 
 # Generate unit test certificate
 generate_rsa_key unittest

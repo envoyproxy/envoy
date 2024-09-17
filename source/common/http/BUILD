@@ -166,11 +166,9 @@ envoy_cc_library(
     name = "dependency_manager",
     srcs = ["dependency_manager.cc"],
     hdrs = ["dependency_manager.h"],
-    external_deps = [
-        "abseil_flat_hash_set",
-        "abseil_status",
-    ],
     deps = [
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/status",
         "@envoy_api//envoy/extensions/filters/common/dependency/v3:pkg_cc_proto",
     ],
 )
@@ -522,8 +520,6 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     external_deps = [
-        "abseil_node_hash_set",
-        "abseil_optional",
         "http_parser",
         "quiche_http2_protocol",
     ],
@@ -549,6 +545,8 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@com_google_absl//absl/container:node_hash_set",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
@@ -588,13 +586,11 @@ envoy_cc_library(
     name = "path_utility_lib",
     srcs = ["path_utility.cc"],
     hdrs = ["path_utility.h"],
-    external_deps = [
-        "abseil_optional",
-    ],
     deps = [
         "//envoy/http:header_map_interface",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@com_google_absl//absl/types:optional",
         "@com_googlesource_googleurl//url",
     ],
 )
@@ -619,12 +615,10 @@ envoy_cc_library(
     name = "status_lib",
     srcs = ["status.cc"],
     hdrs = ["status.h"],
-    external_deps = [
-        "abseil_status",
-    ],
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/common:assert_lib",
+        "@com_google_absl//absl/status",
     ],
 )
 

@@ -358,7 +358,7 @@ private:
     }
     Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
     void closeAllSockets() override {}
-    void doFinalPreWorkerInit() override {}
+    absl::Status doFinalPreWorkerInit() override { return absl::OkStatus(); }
 
   private:
     Network::SocketSharedPtr socket_;

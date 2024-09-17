@@ -14,7 +14,6 @@ envoy_cc_test(
         "//bazel:apple": ["apple_dns_impl_test.cc"],
         "//conditions:default": [],
     }),
-    external_deps = ["abseil_synchronization"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
@@ -30,6 +29,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ] + select({
         "//bazel:apple": [

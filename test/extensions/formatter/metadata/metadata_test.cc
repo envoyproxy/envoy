@@ -37,7 +37,9 @@ public:
 )EOF",
                                          tag, type);
     TestUtility::loadFromYaml(yaml, config_);
-    return Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+    return THROW_OR_RETURN_VALUE(
+        Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+        Envoy::Formatter::FormatterBasePtr<Envoy::Formatter::HttpFormatterContext>);
   }
 
   Http::TestRequestHeaderMapImpl request_headers_;

@@ -115,6 +115,7 @@ public:
                                                           Filesystem::Watcher::OnChangedCb cb) {
                 {
                   absl::WriterMutexLock lock(&mutex_);
+                  on_changed_cbs_.reserve(1);
                   on_changed_cbs_.emplace_back(std::move(cb));
                 }
                 if (conditional.has_value()) {

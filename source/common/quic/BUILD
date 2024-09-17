@@ -116,7 +116,9 @@ envoy_cc_library(
     name = "envoy_quic_proof_source_lib",
     srcs = ["envoy_quic_proof_source.cc"],
     hdrs = ["envoy_quic_proof_source.h"],
-    external_deps = ["ssl"],
+    external_deps = [
+        "ssl",
+    ],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_source_base_lib",
@@ -124,6 +126,7 @@ envoy_cc_library(
         ":quic_io_handle_wrapper_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/ssl:tls_certificate_config_interface",
+        "//source/common/quic:cert_compression_lib",
         "//source/common/quic:quic_server_transport_socket_factory_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/server:listener_stats",
@@ -284,9 +287,6 @@ envoy_cc_library(
         "envoy_quic_server_session.h",
         "envoy_quic_server_stream.h",
     ],
-    external_deps = [
-        "abseil_optional",
-    ],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_connection_debug_visitor_factory_interface",
@@ -302,6 +302,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_server_http_spdy_session_lib",
+        "@com_google_absl//absl/types:optional",
     ] + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
     ]),
@@ -500,6 +501,7 @@ envoy_cc_library(
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:transport_socket_options_lib",
+        "//source/common/quic:cert_compression_lib",
         "//source/common/tls:client_ssl_socket_lib",
         "//source/common/tls:context_config_lib",
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
@@ -712,5 +714,20 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_core_http_spdy_session_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "cert_compression_lib",
+    srcs = ["cert_compression.cc"],
+    hdrs = ["cert_compression.h"],
+    external_deps = [
+        "ssl",
+        "zlib",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/runtime:runtime_lib",
     ],
 )

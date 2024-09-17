@@ -38,7 +38,7 @@ paths:
   excluded:
   - .
   - bazel/external/http_parser/
-  - bazel/toolchains/configs/
+  - bazel/rbe/toolchains/configs/
   - bazel-
   - build
   - contrib/contrib_build_config.bzl
@@ -110,7 +110,6 @@ paths:
     - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
-    - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc

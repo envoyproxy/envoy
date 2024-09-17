@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile
 
+import android.util.Pair
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
@@ -39,6 +40,7 @@ open class EngineBuilder() {
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
   internal var useCares = false
+  internal var caresFallbackResolvers = mutableListOf<Pair<String, Int>>()
   internal var forceV6 = true
   private var useGro = false
   private var http3ConnectionOptions = ""
@@ -216,6 +218,18 @@ open class EngineBuilder() {
    */
   fun useCares(useCares: Boolean): EngineBuilder {
     this.useCares = useCares
+    return this
+  }
+
+  /**
+   * Add fallback resolver to c_ares.
+   *
+   * @param host ip address string
+   * @param port port for the resolver
+   * @return This builder.
+   */
+  fun addCaresFallbackResolver(host: String, port: Int): EngineBuilder {
+    this.caresFallbackResolvers.add(Pair(host, port))
     return this
   }
 
@@ -582,6 +596,7 @@ open class EngineBuilder() {
         runtimeGuards,
         enablePlatformCertificatesValidation,
         upstreamTlsSni,
+        caresFallbackResolvers,
       )
 
     return EngineImpl(engineType(), engineConfiguration, logLevel)

@@ -16,9 +16,6 @@ envoy_cc_library(
     name = "cors_filter_lib",
     srcs = ["cors_filter.cc"],
     hdrs = ["cors_filter.h"],
-    external_deps = [
-        "abseil_inlined_vector",
-    ],
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
@@ -28,6 +25,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 

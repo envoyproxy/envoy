@@ -346,8 +346,12 @@ public:
 
   // Grpc::AsyncRequest
   void cancel() override;
+  const StreamInfo::StreamInfo& streamInfo() const override {
+    return GoogleAsyncStreamImpl::streamInfo();
+  }
 
 private:
+  using GoogleAsyncStreamImpl::streamInfo;
   // Grpc::RawAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;

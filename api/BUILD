@@ -311,6 +311,7 @@ proto_library(
         "//envoy/extensions/rbac/matchers/upstream_ip_port/v3:pkg",
         "//envoy/extensions/regex_engines/v3:pkg",
         "//envoy/extensions/request_id/uuid/v3:pkg",
+        "//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg",
         "//envoy/extensions/resource_monitors/downstream_connections/v3:pkg",
         "//envoy/extensions/resource_monitors/fixed_heap/v3:pkg",
         "//envoy/extensions/resource_monitors/injected_resource/v3:pkg",
@@ -381,6 +382,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_cncf_xds//xds/core/v3:pkg",
+        "@com_github_cncf_xds//xds/data/orca/v3:pkg",
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg",
         "@com_github_cncf_xds//xds/type/v3:pkg",
     ],
