@@ -312,10 +312,6 @@ def _com_github_gabime_spdlog():
         name = "com_github_gabime_spdlog",
         build_file = "@envoy//bazel/external:spdlog.BUILD",
     )
-    native.bind(
-        name = "spdlog",
-        actual = "@com_github_gabime_spdlog//:spdlog",
-    )
 
 def _com_github_google_benchmark():
     external_http_archive(

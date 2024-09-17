@@ -227,10 +227,8 @@ envoy_cc_library(
     name = "base_logger_lib",
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
-    external_deps = [
-        "spdlog",
-    ],
     deps = [
+        "@com_github_gabime_spdlog//:spdlog",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -583,9 +581,6 @@ envoy_cc_library(
 
 envoy_pch_library(
     name = "common_pch",
-    external_deps = [
-        "spdlog",
-    ],
     includes = [
         "envoy/config/bootstrap/v3/bootstrap.pb.h",
         "envoy/config/cluster/v3/cluster.pb.h",
@@ -596,6 +591,7 @@ envoy_pch_library(
         "envoy/service/discovery/v3/discovery.pb.h",
         "spdlog/sinks/android_sink.h",
         "spdlog/spdlog.h",
+        "@com_github_gabime_spdlog//:spdlog",
     ],
     visibility = ["//visibility:public"],
     deps = [
