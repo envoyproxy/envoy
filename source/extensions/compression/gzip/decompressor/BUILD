@@ -13,8 +13,8 @@ envoy_cc_library(
     name = "zlib_decompressor_impl_lib",
     srcs = ["zlib_decompressor_impl.cc"],
     hdrs = ["zlib_decompressor_impl.h"],
-    external_deps = ["zlib"],
     deps = [
+        "//bazel/foreign_cc:zlib",
         "//envoy/compression/decompressor:decompressor_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",

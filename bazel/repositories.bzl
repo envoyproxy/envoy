@@ -423,11 +423,6 @@ def _net_zlib():
         patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
     )
 
-    native.bind(
-        name = "zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
-    )
-
     # Bind for grpc.
     native.bind(
         name = "madler_zlib",

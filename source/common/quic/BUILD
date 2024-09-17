@@ -723,9 +723,9 @@ envoy_cc_library(
     hdrs = ["cert_compression.h"],
     external_deps = [
         "ssl",
-        "zlib",
     ],
     deps = [
+        "//bazel/foreign_cc:zlib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/runtime:runtime_lib",
