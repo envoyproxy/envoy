@@ -34,6 +34,7 @@ public:
   std::function<void()> initialize_callback_;
   Network::Address::InstanceConstSharedPtr source_address_;
   UnitFloat drop_overload_{0};
+  std::string drop_category_{"drop_overload"};
 };
 } // namespace Upstream
 } // namespace Envoy
