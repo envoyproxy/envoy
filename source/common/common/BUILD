@@ -141,11 +141,11 @@ envoy_cc_library(
     name = "hash_lib",
     srcs = ["hash.cc"],
     hdrs = ["hash.h"],
-    external_deps = ["xxhash"],
     deps = [
         ":macros",
         ":safe_memcpy_lib",
         "//envoy/common:base_includes",
+        "@com_github_cyan4973_xxhash//:xxhash",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
     ],

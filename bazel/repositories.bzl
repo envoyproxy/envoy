@@ -288,10 +288,6 @@ def _com_github_cyan4973_xxhash():
         name = "com_github_cyan4973_xxhash",
         build_file = "@envoy//bazel/external:xxhash.BUILD",
     )
-    native.bind(
-        name = "xxhash",
-        actual = "@com_github_cyan4973_xxhash//:xxhash",
-    )
 
 def _com_github_envoyproxy_sqlparser():
     external_http_archive(
