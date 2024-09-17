@@ -840,27 +840,10 @@ def _com_github_google_tcmalloc():
         name = "com_github_google_tcmalloc",
     )
 
-    native.bind(
-        name = "tcmalloc",
-        actual = "@com_github_google_tcmalloc//tcmalloc",
-    )
-    native.bind(
-        name = "tcmalloc_profile_marshaler",
-        actual = "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
-    )
-    native.bind(
-        name = "tcmalloc_malloc_extension",
-        actual = "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
-    )
-
 def _com_github_gperftools_gperftools():
     external_http_archive(
         name = "com_github_gperftools_gperftools",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-    native.bind(
-        name = "gperftools",
-        actual = "@envoy//bazel/foreign_cc:gperftools",
     )
 
 def _com_github_wamr():
