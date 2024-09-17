@@ -269,10 +269,6 @@ def _com_github_axboe_liburing():
         name = "com_github_axboe_liburing",
         build_file_content = BUILD_ALL_CONTENT,
     )
-    native.bind(
-        name = "uring",
-        actual = "@envoy//bazel/foreign_cc:liburing_linux",
-    )
 
 def _com_github_bazel_buildtools():
     # TODO(phlax): Add binary download
