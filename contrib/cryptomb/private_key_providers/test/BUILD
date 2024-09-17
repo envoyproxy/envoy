@@ -88,12 +88,12 @@ envoy_cc_benchmark_binary(
     name = "speed_test",
     srcs = ["speed_test.cc"],
     external_deps = [
-        "benchmark",
         "ssl",
     ],
     deps = [
         "//contrib/cryptomb/private_key_providers/source:ipp_crypto_wrapper_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )

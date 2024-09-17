@@ -13,7 +13,6 @@ envoy_cc_test_library(
     srcs = ["main.cc"],
     hdrs = ["main.h"],
     external_deps = [
-        "benchmark",
         "tclap",
     ],
     deps = [
@@ -22,5 +21,6 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:test_runtime_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )

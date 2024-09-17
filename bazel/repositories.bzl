@@ -358,10 +358,6 @@ def _com_github_google_benchmark():
         name = "libpfm",
         build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
     )
-    native.bind(
-        name = "benchmark",
-        actual = "@com_github_google_benchmark//:benchmark",
-    )
 
 def _com_github_google_libprotobuf_mutator():
     external_http_archive(

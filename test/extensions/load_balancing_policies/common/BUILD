@@ -14,9 +14,6 @@ envoy_cc_test_library(
     name = "benchmark_base_tester_lib",
     srcs = ["benchmark_base_tester.cc"],
     hdrs = ["benchmark_base_tester.h"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/memory:stats_lib",
@@ -25,6 +22,7 @@ envoy_cc_test_library(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )

@@ -185,7 +185,6 @@ envoy_cc_benchmark_binary(
     name = "filter_chain_benchmark_test",
     srcs = ["filter_chain_benchmark_test.cc"],
     external_deps = [
-        "benchmark",
         "googletest",
     ],
     deps = [
@@ -197,6 +196,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
