@@ -116,9 +116,7 @@ envoy_cc_library(
     name = "envoy_quic_proof_source_lib",
     srcs = ["envoy_quic_proof_source.cc"],
     hdrs = ["envoy_quic_proof_source.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_source_base_lib",
@@ -462,9 +460,7 @@ envoy_cc_library(
     name = "envoy_quic_utils_lib",
     srcs = ["envoy_quic_utils.cc"],
     hdrs = ["envoy_quic_utils.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     tags = ["nofips"],
     deps = [
         "//envoy/http:codec_interface",
@@ -721,9 +717,7 @@ envoy_cc_library(
     name = "cert_compression_lib",
     srcs = ["cert_compression.cc"],
     hdrs = ["cert_compression.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//bazel/foreign_cc:zlib",
         "//source/common/common:assert_lib",

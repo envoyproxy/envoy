@@ -282,9 +282,7 @@ envoy_cc_benchmark_binary(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     # Uses raw POSIX syscalls, does not build on Windows.
     tags = ["skip_on_windows"],
     deps = [

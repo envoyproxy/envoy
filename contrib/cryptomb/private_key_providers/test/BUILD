@@ -87,9 +87,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "speed_test",
     srcs = ["speed_test.cc"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//contrib/cryptomb/private_key_providers/source:ipp_crypto_wrapper_lib",
         "//source/common/common:assert_lib",

@@ -2460,9 +2460,7 @@ envoy_quic_cc_library(
         "quiche/quic/core/crypto/quic_compressed_certs_cache.h",
         "quiche/quic/core/crypto/transport_parameters.h",
     ],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     tags = [
         "pg3",
     ],
@@ -2522,9 +2520,7 @@ envoy_quic_cc_library(
     hdrs = [
         "quiche/quic/core/crypto/quic_crypto_server_config.h",
     ],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     tags = [
         "pg3",
     ],
@@ -2656,9 +2652,7 @@ envoy_quic_cc_library(
     name = "quic_core_crypto_proof_source_x509_lib",
     srcs = ["quiche/quic/core/crypto/proof_source_x509.cc"],
     hdrs = ["quiche/quic/core/crypto/proof_source_x509.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         ":quic_core_crypto_certificate_view_lib",
         ":quic_core_crypto_crypto_handshake_lib",

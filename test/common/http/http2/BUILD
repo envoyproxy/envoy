@@ -199,9 +199,7 @@ envoy_cc_fuzz_test(
     name = "hpack_fuzz_test",
     srcs = ["hpack_fuzz_test.cc"],
     corpus = "hpack_corpus",
-    external_deps = [
-        "nghttp2",
-    ],
+    external_deps = ["nghttp2"],
     deps = [
         ":hpack_fuzz_proto_cc_proto",
         "//test/test_common:utility_lib",
@@ -218,9 +216,7 @@ envoy_cc_fuzz_test(
     name = "http2_connection_fuzz_test",
     srcs = ["http2_connection_fuzz_test.cc"],
     corpus = "http2_connection_corpus",
-    external_deps = [
-        "nghttp2",
-    ],
+    external_deps = ["nghttp2"],
     deps = [
         ":http2_connection_proto_cc_proto",
         "//source/common/http/http2:codec_lib",
