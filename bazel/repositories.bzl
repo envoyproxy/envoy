@@ -402,10 +402,6 @@ def _com_github_libevent_libevent():
         name = "com_github_libevent_libevent",
         build_file_content = BUILD_ALL_CONTENT,
     )
-    native.bind(
-        name = "event",
-        actual = "@envoy//bazel/foreign_cc:event",
-    )
 
 def _net_colm_open_source_colm():
     external_http_archive(
