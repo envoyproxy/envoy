@@ -301,10 +301,6 @@ def _com_github_mirror_tclap():
         build_file = "@envoy//bazel/external:tclap.BUILD",
         patch_args = ["-p1"],
     )
-    native.bind(
-        name = "tclap",
-        actual = "@com_github_mirror_tclap//:tclap",
-    )
 
 def _com_github_fmtlib_fmt():
     external_http_archive(
