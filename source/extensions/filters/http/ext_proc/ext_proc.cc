@@ -473,7 +473,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   return status;
 }
 
-ProcessorState::CallbackState Filter::getCallbackStateWhenStreamBody(ProcessorState& state) const {
+ProcessorState::CallbackState
+Filter::getCallbackStateWhenStreamBody(const ProcessorState& state) const {
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
     return ProcessorState::CallbackState::HeadersCallback;
   } else {
@@ -500,8 +501,11 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   }
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    if (state.bodyMode() != ProcessingMode::STREAMED ||
-        !config_->sendBodyWithoutWaitingForHeaderResponse()) {
+    if (state.bodyMode() == ProcessingMode::STREAMED &&
+        config_->sendBodyWithoutWaitingForHeaderResponse()) {
+      ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
+                       "is STREAMED and send_body_without_waiting_for_header_response is enabled");
+    } else {
       ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
       // We don't know what to do with the body until the response comes back.
       // We must buffer it in case we need it when that happens.
@@ -512,10 +516,6 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       state.setPaused(true);
       state.requestWatermark();
       return FilterDataStatus::StopIterationAndWatermark;
-    } else {
-      ENVOY_LOG(trace,
-                "Header processing still in progress. STREAMED body mode and "
-                "send_body_without_waiting_for_header_response is enabled ---- sending body data");
     }
   }
 
@@ -578,15 +578,13 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = setupBodyChunk(state, data, end_stream);
     state.enqueueStreamingChunk(data, end_stream);
-
+    sendBodyChunk(state, getCallbackStateWhenStreamBody(state), req);
     if (end_stream || state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
       result = FilterDataStatus::Continue;
     }
-    sendBodyChunk(state, getCallbackStateWhenStreamBody(state), req);
-
     break;
   }
   case ProcessingMode::BUFFERED_PARTIAL:
