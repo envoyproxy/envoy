@@ -414,10 +414,6 @@ def _net_colm_open_source_ragel():
         name = "net_colm_open_source_ragel",
         build_file_content = BUILD_ALL_CONTENT,
     )
-    native.bind(
-        name = "ragel",
-        actual = "@envoy//bazel/foreign_cc:ragel",
-    )
 
 def _net_zlib():
     external_http_archive(
