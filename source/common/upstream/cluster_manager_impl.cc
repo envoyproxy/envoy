@@ -2037,6 +2037,17 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImp
 
   ConnPoolsContainer& container = *parent_.getHttpConnPoolsContainer(host, true);
 
+#ifdef ENVOY_ENABLE_QUIC
+  // If upstream is HTTP/3 and the downstream request is CONNECT-UDP, the maximum packet length
+  // should be adjusted to ensure we can fit QUIC packets inside DATAGRAM frames.
+  if (!upstream_protocols.empty() && upstream_protocols[0] == Http::Protocol::Http3 && context &&
+      context->downstreamHeaders() &&
+      Http::HeaderUtility::isConnectUdpRequest(*context->downstreamHeaders())) {
+    quic_info_ = Quic::createPersistentQuicInfoForCluster(
+        parent_.thread_local_dispatcher_, host->cluster(), quic::kDefaultMaxPacketSizeForTunnels);
+  }
+#endif
+
   // Note: to simplify this, we assume that the factory is only called in the scope of this
   // function. Otherwise, we'd need to capture a few of these variables by value.
   ConnPoolsContainer::ConnPools::PoolOptRef pool =

@@ -21,7 +21,8 @@ namespace Quic {
 // TODO(danzh) considering exposing these QUICHE interfaces via base class virtual methods, so that
 // down casting can be avoided while passing around this object.
 struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
-  PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit);
+  PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit,
+                         quic::QuicByteCount max_packet_length);
 
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
@@ -30,11 +31,15 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   const uint32_t buffer_limit_;
   // Hard code with the default crypto stream as there's no pluggable crypto for upstream Envoy.
   EnvoyQuicCryptoClientStreamFactoryImpl crypto_stream_factory_;
+  // Override the maximum packet length of connections for tunneling. Use the default length in
+  // QUICHE if this is set to 0.
+  const quic::QuicByteCount max_packet_length_;
 };
 
 std::unique_ptr<PersistentQuicInfoImpl>
 createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
-                                   const Upstream::ClusterInfo& cluster);
+                                   const Upstream::ClusterInfo& cluster,
+                                   const quic::QuicByteCount max_packet_length = 0);
 
 std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
