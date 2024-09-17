@@ -63,7 +63,7 @@ AsyncFileManagerThreadPool::enqueue(Event::Dispatcher* dispatcher,
                                     std::unique_ptr<AsyncFileAction> action) {
   QueuedAction entry{std::move(action), dispatcher};
   auto cancel_func = [dispatcher, state = entry.state_]() {
-    ASSERT(dispatcher->isThreadSafe());
+    ASSERT(dispatcher == nullptr || dispatcher->isThreadSafe());
     state->store(QueuedAction::State::Cancelled);
   };
   absl::MutexLock lock(&queue_mutex_);
