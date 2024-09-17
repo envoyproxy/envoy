@@ -165,7 +165,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_nghttp2_nghttp2()
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
-    _com_github_nodejs_http_parser()
     _com_github_alibaba_hessian2_codec()
     _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
@@ -550,12 +549,6 @@ def _com_github_tencent_rapidjson():
 def _com_github_nlohmann_json():
     external_http_archive(
         name = "com_github_nlohmann_json",
-    )
-
-def _com_github_nodejs_http_parser():
-    native.bind(
-        name = "http_parser",
-        actual = "@envoy//bazel/external/http_parser",
     )
 
 def _com_github_alibaba_hessian2_codec():

@@ -520,7 +520,6 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     external_deps = [
-        "http_parser",
         "quiche_http2_protocol",
     ],
     deps = [
@@ -530,6 +529,7 @@ envoy_cc_library(
         ":headers_lib",
         ":http_option_limits_lib",
         ":message_lib",
+        "//bazel/external/http_parser",
         "//envoy/common:regex_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
