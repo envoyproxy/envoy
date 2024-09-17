@@ -787,42 +787,51 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowPeriodicalReportWithStreamClosed)
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ(response_->headers().getStatusValue(), "200");
 
+  // ValidMatcherConfig.
+  int report_interval_sec = 60;
   // Trigger the report periodically.
   for (int i = 0; i < 6; ++i) {
     if (i == 2) {
       // Close the stream.
-      rlqs_stream_->finishGrpcStream(Grpc::Status::Ok);
+      WAIT_FOR_LOG_CONTAINS("debug", "gRPC stream closed remotely with status",
+                            { rlqs_stream_->finishGrpcStream(Grpc::Status::Canceled); });
+      ASSERT_TRUE(rlqs_stream_->waitForReset());
     }
 
     // Advance the time by report_interval.
     simTime().advanceTimeWait(std::chrono::milliseconds(report_interval_sec * 1000));
 
-    // Only perform rlqs server check and response before stream is remotely closed.
-    if (i < 2) {
-      // Checks that the rate limit server has received the periodical reports.
-      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
-
-      // Verify the usage report content.
-      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
-      const auto& usage = reports.bucket_quota_usages(0);
-      // Report only represents the usage since last report.
-      // In the periodical report case here, the number of request allowed and denied is 0 since no
-      // new requests comes in.
-      EXPECT_EQ(usage.num_requests_allowed(), 0);
-      EXPECT_EQ(usage.num_requests_denied(), 0);
-      // time_elapsed equals to periodical reporting interval.
-      EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
-                report_interval_sec);
-
-      // Build the rlqs server response.
-      envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response2;
-      auto* bucket_action2 = rlqs_response2.add_bucket_action();
-
-      for (const auto& [key, value] : custom_headers_cpy) {
-        (*bucket_action2->mutable_bucket_id()->mutable_bucket()).insert({key, value});
-      }
-      rlqs_stream_->sendGrpcMessage(rlqs_response2);
+    if (i == 2) {
+      // Stream should be restarted when next required for usage reporting.
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+      rlqs_stream_->startGrpcStream();
     }
+
+    // Only perform rlqs server check and response before stream is remotely
+    // closed. Checks that the rate limit server has received the periodical
+    // reports.
+    ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+
+    // Verify the usage report content.
+    ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+    const auto& usage = reports.bucket_quota_usages(0);
+    // Report only represents the usage since last report.
+    // In the periodical report case here, the number of request allowed and
+    // denied is 0 since no new requests comes in.
+    EXPECT_EQ(usage.num_requests_allowed(), 0);
+    EXPECT_EQ(usage.num_requests_denied(), 0);
+    // time_elapsed equals to periodical reporting interval.
+    EXPECT_EQ(Protobuf::util::TimeUtil::DurationToSeconds(usage.time_elapsed()),
+              report_interval_sec);
+
+    // Build the rlqs server response.
+    envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse rlqs_response2;
+    auto* bucket_action2 = rlqs_response2.add_bucket_action();
+
+    for (const auto& [key, value] : custom_headers_cpy) {
+      (*bucket_action2->mutable_bucket_id()->mutable_bucket()).insert({key, value});
+    }
+    rlqs_stream_->sendGrpcMessage(rlqs_response2);
   }
 }
 
