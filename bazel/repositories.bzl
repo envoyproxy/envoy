@@ -664,42 +664,6 @@ def _io_opencensus_cpp():
     external_http_archive(
         name = "io_opencensus_cpp",
     )
-    native.bind(
-        name = "opencensus_trace",
-        actual = "@io_opencensus_cpp//opencensus/trace",
-    )
-    native.bind(
-        name = "opencensus_trace_b3",
-        actual = "@io_opencensus_cpp//opencensus/trace:b3",
-    )
-    native.bind(
-        name = "opencensus_trace_cloud_trace_context",
-        actual = "@io_opencensus_cpp//opencensus/trace:cloud_trace_context",
-    )
-    native.bind(
-        name = "opencensus_trace_grpc_trace_bin",
-        actual = "@io_opencensus_cpp//opencensus/trace:grpc_trace_bin",
-    )
-    native.bind(
-        name = "opencensus_trace_trace_context",
-        actual = "@io_opencensus_cpp//opencensus/trace:trace_context",
-    )
-    native.bind(
-        name = "opencensus_exporter_ocagent",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/ocagent:ocagent_exporter",
-    )
-    native.bind(
-        name = "opencensus_exporter_stdout",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stdout:stdout_exporter",
-    )
-    native.bind(
-        name = "opencensus_exporter_stackdriver",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stackdriver:stackdriver_exporter",
-    )
-    native.bind(
-        name = "opencensus_exporter_zipkin",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/zipkin:zipkin_exporter",
-    )
 
 def _com_github_curl():
     # The usage by AWS extensions common utilities is deprecated and will be removed by Q3 2024 after
