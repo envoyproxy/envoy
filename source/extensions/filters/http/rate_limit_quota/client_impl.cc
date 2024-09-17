@@ -72,13 +72,9 @@ void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
     }
   }
 
-  if (stream_ != nullptr) {
-    // Build the report and then send the report to RLQS server.
-    // `end_stream` should always be set to false as we don't want to close the stream locally.
-    stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
-  } else {
-    ENVOY_LOG(error, "gRPC stream is still unavailable so usage reports will be dropped.");
-  }
+  // Build the report and then send the report to RLQS server.
+  // `end_stream` should always be set to false as we don't want to close the stream locally.
+  stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
