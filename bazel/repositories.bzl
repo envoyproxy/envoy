@@ -613,6 +613,7 @@ def _com_google_protobuf():
         patch_args = ["-p1"],
     )
 
+    # Needed by grpc, jwt_verify_lib, maybe others.
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",
@@ -625,10 +626,6 @@ def _com_google_protobuf():
         name = "protocol_compiler",
         actual = "@com_google_protobuf//:protoc",
     )
-    native.bind(
-        name = "protoc",
-        actual = "@com_google_protobuf//:protoc",
-    )
 
     # Needed for `bazel fetch` to work with @com_google_protobuf
     # https://github.com/google/protobuf/blob/v3.6.1/util/python/BUILD#L6-L9
@@ -636,6 +633,8 @@ def _com_google_protobuf():
         name = "python_headers",
         actual = "//bazel:python_headers",
     )
+
+    # Needed by grpc until we update again.
     native.bind(
         name = "upb_base_lib",
         actual = "@com_google_protobuf//upb:base",
