@@ -9,7 +9,14 @@
 #include "gmock/gmock.h"
 
 namespace Envoy {
+
+namespace Network {
+std::ostream& operator<<(std::ostream& out, const Network::UdpListenerFilterFactoryCb&);
+
+} // namespace Network
+
 namespace Server {
+
 class MockListenerComponentFactory : public ListenerComponentFactory {
 public:
   MockListenerComponentFactory();

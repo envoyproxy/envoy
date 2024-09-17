@@ -6,6 +6,14 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
+namespace Network {
+std::ostream& operator<<(std::ostream& out, const Network::UdpListenerFilterFactoryCb&) {
+  return out;
+}
+
+} // namespace Network
+
 namespace Server {
 
 using ::testing::_;

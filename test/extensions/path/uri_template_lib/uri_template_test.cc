@@ -69,7 +69,7 @@ TEST_P(ParseRewriteHelperSuccess, ParseRewriteHelperSuccessTest) {
   SCOPED_TRACE(pattern);
 
   const auto result = parseRewritePattern(pattern);
-  EXPECT_OK(result);
+  EXPECT_OK(result.status());
 
   // The following is to exercise operator<< in ParseSegments.
   const auto& parsed_segments_vec = result.value();
@@ -100,7 +100,7 @@ protected:
 };
 
 TEST(ParseRewrite, InvalidRegex) {
-  EXPECT_THAT(parseRewritePattern("/{var1}", "+[abc"), StatusIs(absl::StatusCode::kInternal));
+  EXPECT_EQ(parseRewritePattern("/{var1}", "+[abc").status().code(), absl::StatusCode::kInternal);
 }
 
 INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
@@ -111,7 +111,7 @@ INSTANTIATE_TEST_SUITE_P(ParseRewriteSuccessTestSuite, ParseRewriteSuccess,
 
 TEST_P(ParseRewriteSuccess, ParseRewriteSuccessTest) {
   absl::StatusOr<RewriteSegments> rewrite = parseRewritePattern(rewritePattern(), kCaptureRegex);
-  ASSERT_OK(rewrite);
+  ASSERT_OK(rewrite.status());
 }
 
 class ParseRewriteFailure : public testing::TestWithParam<std::string> {};
@@ -124,8 +124,8 @@ TEST_P(ParseRewriteFailure, ParseRewriteFailureTest) {
   std::string pattern = GetParam();
   SCOPED_TRACE(pattern);
 
-  EXPECT_THAT(parseRewritePattern(pattern, kCaptureRegex),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(parseRewritePattern(pattern, kCaptureRegex).status().code(),
+            absl::StatusCode::kInvalidArgument);
 }
 
 class PathPatternMatchAndRewrite
@@ -157,7 +157,7 @@ TEST_P(PathPatternMatchAndRewrite, PathPatternMatchAndRewriteTest) {
 
   absl::StatusOr<RewriteSegments> rewrite_segment =
       parseRewritePattern(rewritePattern(), regex.value());
-  ASSERT_OK(rewrite_segment);
+  ASSERT_OK(rewrite_segment.status());
 }
 
 TEST_P(PathPatternMatchAndRewrite, IsValidMatchPattern) {
