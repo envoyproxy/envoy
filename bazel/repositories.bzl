@@ -462,14 +462,6 @@ def _org_brotli():
     external_http_archive(
         name = "org_brotli",
     )
-    native.bind(
-        name = "brotlienc",
-        actual = "@org_brotli//:brotlienc",
-    )
-    native.bind(
-        name = "brotlidec",
-        actual = "@org_brotli//:brotlidec",
-    )
 
 def _com_github_facebook_zstd():
     external_http_archive(
