@@ -532,10 +532,6 @@ def _io_opentelemetry_api_cpp():
 
 def _com_github_datadog_dd_trace_cpp():
     external_http_archive("com_github_datadog_dd_trace_cpp")
-    native.bind(
-        name = "dd_trace_cpp",
-        actual = "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
-    )
 
 def _com_github_skyapm_cpp2sky():
     external_http_archive(
