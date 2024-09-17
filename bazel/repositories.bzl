@@ -307,10 +307,6 @@ def _com_github_fmtlib_fmt():
         name = "com_github_fmtlib_fmt",
         build_file = "@envoy//bazel/external:fmtlib.BUILD",
     )
-    native.bind(
-        name = "fmtlib",
-        actual = "@com_github_fmtlib_fmt//:fmtlib",
-    )
 
 def _com_github_gabime_spdlog():
     external_http_archive(
