@@ -88,7 +88,7 @@ minor_behavior_changes:
     but may return StopIteration in onAccept to wait for asynchronous callback.
 - area: tracers
   change: |
-    Set status code base on GRPC status code for OpenTelemetry tracers (previously unset).
+    Set status code based on GRPC status code for OpenTelemetry tracers (previously unset).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

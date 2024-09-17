@@ -132,14 +132,14 @@ convertGrpcStatusToTraceStatusCode(::opentelemetry::proto::trace::v1::Span_SpanK
 
   Grpc::Status::GrpcStatus grpc_status = static_cast<Grpc::Status::GrpcStatus>(grpc_status_code);
   // Check mapping https://opentelemetry.io/docs/specs/semconv/rpc/grpc/#grpc-status
-  if (kind == ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER) {
+  if (kind == ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT) {
     if (grpc_status == Grpc::Status::WellKnownGrpcStatus::Ok) {
       return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_UNSET;
     }
     return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_ERROR;
   }
 
-  // SPAN_KIND_CLIENT
+  // SPAN_KIND_SERVER
   switch (grpc_status) {
   case Grpc::Status::WellKnownGrpcStatus::Unknown:
   case Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded:
