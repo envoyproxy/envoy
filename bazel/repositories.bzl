@@ -826,16 +826,6 @@ def _emsdk():
 def _com_github_google_jwt_verify():
     external_http_archive("com_github_google_jwt_verify")
 
-    native.bind(
-        name = "jwt_verify_lib",
-        actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
-    )
-
-    native.bind(
-        name = "simple_lru_cache_lib",
-        actual = "@com_github_google_jwt_verify//:simple_lru_cache_lib",
-    )
-
 def _com_github_luajit_luajit():
     external_http_archive(
         name = "com_github_luajit_luajit",
