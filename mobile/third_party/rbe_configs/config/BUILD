@@ -35,7 +35,6 @@ toolchain(
 
 platform(
     name = "platform",
-    parents = ["@local_config_platform//:host"],
     constraint_values = [
         "@platforms//os:linux",
         "@platforms//cpu:x86_64",
@@ -45,4 +44,22 @@ platform(
         "container-image": "docker://envoyproxy/envoy-build-ubuntu@sha256:2dd96b6f43c08ccabd5f4747fce5854f5f96af509b32e5cf6493f136e9833649",
         "OSFamily": "Linux",
     },
+    parents = ["@local_config_platform//:host"],
+)
+
+platform(
+    name = "platform-asan",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+        "@bazel_tools//tools/cpp:clang",
+    ],
+    exec_properties = {
+        "container-image": "docker://envoyproxy/envoy-build-ubuntu@sha256:2dd96b6f43c08ccabd5f4747fce5854f5f96af509b32e5cf6493f136e9833649",
+        "OSFamily": "Linux",
+        # Necessary to workaround https://github.com/google/sanitizers/issues/916, otherwise, dangling threads in the
+        # docker container fail tests on teardown.
+        "dockerAddCapabilities": "SYS_PTRACE",
+    },
+    parents = ["@local_config_platform//:host"],
 )
