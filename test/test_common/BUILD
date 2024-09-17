@@ -17,9 +17,6 @@ envoy_cc_test_library(
     name = "environment_lib",
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
-    external_deps = [
-        "bazel_runfiles",
-    ],
     deps = [
         ":network_utility_lib",
         "//envoy/server:options_interface",
@@ -31,6 +28,7 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_base",
+        "@bazel_tools//tools/cpp/runfiles",
         "@com_google_absl//absl/debugging:symbolize",
         "@com_google_absl//absl/types:optional",
     ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]) + envoy_select_enable_exceptions([
