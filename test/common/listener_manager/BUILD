@@ -184,11 +184,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "filter_chain_benchmark_test",
     srcs = ["filter_chain_benchmark_test.cc"],
-    external_deps = [
-        "googletest",
-    ],
     deps = [
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
@@ -197,6 +193,8 @@ envoy_cc_benchmark_binary(
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
         "@com_github_google_benchmark//:benchmark",
+        "@com_google_googletest//:gtest",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

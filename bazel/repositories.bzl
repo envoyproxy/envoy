@@ -566,10 +566,6 @@ def _com_google_googletest():
         patches = ["@envoy//bazel:googletest.patch"],
         patch_args = ["-p1"],
     )
-    native.bind(
-        name = "googletest",
-        actual = "@com_google_googletest//:gtest",
-    )
 
 # TODO(jmarantz): replace the use of bind and external_deps with just
 # the direct Bazel path at all sites.  This will make it easier to
