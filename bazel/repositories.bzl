@@ -553,14 +553,6 @@ def _com_github_nlohmann_json():
 
 def _com_github_alibaba_hessian2_codec():
     external_http_archive("com_github_alibaba_hessian2_codec")
-    native.bind(
-        name = "hessian2_codec_object_codec_lib",
-        actual = "@com_github_alibaba_hessian2_codec//hessian2/basic_codec:object_codec_lib",
-    )
-    native.bind(
-        name = "hessian2_codec_codec_impl",
-        actual = "@com_github_alibaba_hessian2_codec//hessian2:codec_impl_lib",
-    )
 
 def _com_github_ncopa_suexec():
     external_http_archive(
