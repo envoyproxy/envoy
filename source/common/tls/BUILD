@@ -64,10 +64,6 @@ envoy_cc_library(
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
     external_deps = [
-        "abseil_hash",
-        "abseil_node_hash_map",
-        "abseil_optional",
-        "abseil_synchronization",
         "ssl",
     ],
     # TLS is core functionality.
@@ -91,6 +87,10 @@ envoy_cc_library(
         "//source/common/common:thread_annotations",
         "//source/common/http:headers_lib",
         "//source/common/network:transport_socket_options_lib",
+        "@com_google_absl//absl/container:node_hash_set",
+        "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -99,14 +99,14 @@ envoy_cc_library(
     srcs = ["client_ssl_socket.cc"],
     hdrs = ["client_ssl_socket.h"],
     external_deps = [
-        "abseil_hash",
-        "abseil_node_hash_map",
-        "abseil_optional",
-        "abseil_synchronization",
         "ssl",
     ],
     deps = [
         ":ssl_socket_base",
+        "@com_google_absl//absl/container:node_hash_set",
+        "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -115,14 +115,14 @@ envoy_cc_library(
     srcs = ["server_ssl_socket.cc"],
     hdrs = ["server_ssl_socket.h"],
     external_deps = [
-        "abseil_hash",
-        "abseil_node_hash_map",
-        "abseil_optional",
-        "abseil_synchronization",
         "ssl",
     ],
     deps = [
         ":ssl_socket_base",
+        "@com_google_absl//absl/container:node_hash_set",
+        "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -186,8 +186,6 @@ envoy_cc_library(
         "context_manager_impl.h",
     ],
     external_deps = [
-        "abseil_node_hash_set",
-        "abseil_synchronization",
         "ssl",
     ],
     # TLS is core functionality.
@@ -215,6 +213,8 @@ envoy_cc_library(
         "//source/common/tls/cert_validator:cert_validator_lib",
         "//source/common/tls/private_key:private_key_manager_lib",
         "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
+        "@com_google_absl//absl/container:node_hash_set",
+        "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],

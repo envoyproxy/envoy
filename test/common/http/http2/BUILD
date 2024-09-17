@@ -53,13 +53,13 @@ envoy_cc_test_library(
     name = "codec_impl_test_util",
     hdrs = ["codec_impl_test_util.h"],
     external_deps = [
-        "abseil_optional",
         "quiche_http2_adapter",
     ],
     deps = [
         "//source/common/http/http2:codec_lib",
         "//test/mocks:common_lib",
         "//test/mocks/server:overload_manager_mocks",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
