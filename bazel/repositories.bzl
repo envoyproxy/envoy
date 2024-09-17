@@ -294,10 +294,6 @@ def _com_github_envoyproxy_sqlparser():
         name = "com_github_envoyproxy_sqlparser",
         build_file = "@envoy//bazel/external:sqlparser.BUILD",
     )
-    native.bind(
-        name = "sqlparser",
-        actual = "@com_github_envoyproxy_sqlparser//:sqlparser",
-    )
 
 def _com_github_mirror_tclap():
     external_http_archive(
