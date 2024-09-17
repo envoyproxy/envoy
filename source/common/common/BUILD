@@ -165,14 +165,12 @@ envoy_cc_library(
     name = "key_value_store_lib",
     srcs = ["key_value_store_base.cc"],
     hdrs = ["key_value_store_base.h"],
-    external_deps = [
-        "quiche_quic_platform",
-    ],
     deps = [
         "//envoy/common:key_value_store_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
         "//source/common/config:ttl_lib",
+        "@com_github_google_quiche//:quic_platform",
         "@com_github_google_quiche//:quiche_common_lib",
         "@com_google_absl//absl/cleanup",
     ],

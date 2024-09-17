@@ -720,38 +720,6 @@ def _com_github_google_quiche():
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
-    native.bind(
-        name = "quiche_common_platform",
-        actual = "@com_github_google_quiche//:quiche_common_platform",
-    )
-    native.bind(
-        name = "quiche_http2_adapter",
-        actual = "@com_github_google_quiche//:http2_adapter",
-    )
-    native.bind(
-        name = "quiche_http2_protocol",
-        actual = "@com_github_google_quiche//:http2_adapter_http2_protocol",
-    )
-    native.bind(
-        name = "quiche_http2_test_tools",
-        actual = "@com_github_google_quiche//:http2_adapter_mock_http2_visitor",
-    )
-    native.bind(
-        name = "quiche_quic_platform",
-        actual = "@com_github_google_quiche//:quic_platform",
-    )
-    native.bind(
-        name = "quiche_quic_platform_base",
-        actual = "@com_github_google_quiche//:quic_platform_base",
-    )
-    native.bind(
-        name = "quiche_http2_hpack",
-        actual = "@com_github_google_quiche//:http2_hpack_hpack_lib",
-    )
-    native.bind(
-        name = "quiche_http2_hpack_decoder",
-        actual = "@com_github_google_quiche//:http2_hpack_decoder_hpack_decoder_lib",
-    )
 
 def _com_googlesource_googleurl():
     external_http_archive(
