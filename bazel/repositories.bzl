@@ -241,6 +241,10 @@ def envoy_dependencies(skip_targets = []):
         python = True,
         grpc = True,
     )
+    native.bind(
+        name = "bazel_runfiles",
+        actual = "@bazel_tools//tools/cpp/runfiles",
+    )
 
 def _boringssl():
     external_http_archive(
