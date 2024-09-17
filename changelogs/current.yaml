@@ -248,6 +248,11 @@ new_features:
     QUIC server and client support certificate compression, which can in some cases reduce the number of round trips
     required to setup a connection. This change temporarily disabled by setting the runtime flag
     ``envoy.reloadable_features.quic_support_certificate_compression`` to ``false``.
+- area: quic
+  change: |
+    Added QUIC protocol option :ref:`reject_new_connections
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.reject_new_connections>` to reject connection-establishing
+    packets at the QUIC layer.
 - area: tls
   change: |
     Added an extension point :ref:`custom_tls_certificate_selector
