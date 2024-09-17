@@ -108,7 +108,7 @@ public:
     envoy::config::core::v3::SubstitutionFormatString sff_config;
     sff_config.mutable_text_format_source()->set_inline_string(format);
     auto formatter =
-        Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig<FormatterContext>(
+        *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig<FormatterContext>(
             sff_config, factory_context_);
 
     return std::make_shared<FileAccessLog>(
