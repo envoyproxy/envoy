@@ -529,10 +529,6 @@ def _io_vectorscan():
 
 def _io_opentelemetry_api_cpp():
     external_http_archive(name = "io_opentelemetry_cpp")
-    native.bind(
-        name = "opentelemetry_api",
-        actual = "@io_opentelemetry_cpp//api:api",
-    )
 
 def _com_github_datadog_dd_trace_cpp():
     external_http_archive("com_github_datadog_dd_trace_cpp")
