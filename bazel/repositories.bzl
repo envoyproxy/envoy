@@ -282,10 +282,6 @@ def _com_github_c_ares_c_ares():
         name = "com_github_c_ares_c_ares",
         build_file_content = BUILD_ALL_CONTENT,
     )
-    native.bind(
-        name = "ares",
-        actual = "@envoy//bazel/foreign_cc:ares",
-    )
 
 def _com_github_cyan4973_xxhash():
     external_http_archive(
@@ -933,7 +929,7 @@ def _com_github_grpc_grpc():
     )
     native.bind(
         name = "cares",
-        actual = "//external:ares",
+        actual = "@envoy//bazel/foreign_cc:ares",
     )
 
     native.bind(
