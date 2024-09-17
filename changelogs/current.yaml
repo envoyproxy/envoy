@@ -86,6 +86,9 @@ minor_behavior_changes:
   change: |
     Enhanced listener filter chain execution to include the case that listener filter has maxReadBytes() of 0,
     but may return StopIteration in onAccept to wait for asynchronous callback.
+- area: tracers
+  change: |
+    Set status code base on GRPC status code for OpenTelemetry tracers (previously unset).
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
