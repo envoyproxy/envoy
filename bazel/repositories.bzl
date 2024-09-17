@@ -709,6 +709,8 @@ def _com_googlesource_chromium_base_trace_event_common():
         name = "com_googlesource_chromium_base_trace_event_common",
         build_file = "@v8//:bazel/BUILD.trace_event_common",
     )
+
+    # Needed by v8.
     native.bind(
         name = "base_trace_event_common",
         actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
@@ -793,6 +795,7 @@ def _rules_proto_grpc():
 def _re2():
     external_http_archive("com_googlesource_code_re2")
 
+    # Needed by grpc.
     native.bind(
         name = "re2",
         actual = "@com_googlesource_code_re2//:re2",
