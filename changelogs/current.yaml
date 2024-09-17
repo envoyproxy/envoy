@@ -307,5 +307,10 @@ new_features:
   change: |
     The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
     original IP detection method now supports using a list of trusted CIDRs when parsing ``x-forwarded-for``.
+- area: basic_auth
+  change: |
+    Added support to provide an override
+    :ref:`authentication_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.authentication_header>`
+    to load Basic Auth credential.
 
 deprecated:
