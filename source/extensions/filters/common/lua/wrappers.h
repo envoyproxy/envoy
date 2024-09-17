@@ -122,12 +122,10 @@ private:
  */
 class ParsedX509NameWrapper : public BaseLuaObject<ParsedX509NameWrapper> {
 public:
-  ParsedX509NameWrapper(const Ssl::ParsedX509Name& parsed_name) :
-      parsed_name_{parsed_name} {}
+  ParsedX509NameWrapper(const Ssl::ParsedX509Name& parsed_name) : parsed_name_{parsed_name} {}
 
   static ExportedFunctions exportedFunctions() {
-    return {{"commonName", static_luaCommonName},
-            {"organizationName", static_luaOrganizationName}};
+    return {{"commonName", static_luaCommonName}, {"organizationName", static_luaOrganizationName}};
   }
 
 private:

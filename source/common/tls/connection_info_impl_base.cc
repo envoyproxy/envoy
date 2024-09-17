@@ -380,7 +380,8 @@ const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {
   });
 }
 
-const Ssl::ParsedX509NameConstSharedPtr& ConnectionInfoImplBase::parsedSubjectPeerCertificate() const {
+const Ssl::ParsedX509NameConstSharedPtr&
+ConnectionInfoImplBase::parsedSubjectPeerCertificate() const {
   if (cached_parsed_subject_peer_certificate_) {
     return cached_parsed_subject_peer_certificate_;
   }
