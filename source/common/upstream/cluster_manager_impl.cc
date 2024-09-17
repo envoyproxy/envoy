@@ -844,7 +844,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   // before destroy to avoid early initialization complete.
   auto status_or_cluster = loadCluster(cluster, new_hash, version_info, /*added_via_api=*/true,
                                        /*required_for_ads=*/false, warming_clusters_);
-  THROW_IF_STATUS_NOT_OK(status_or_cluster, throw);
+  THROW_IF_NOT_OK_REF(status_or_cluster.status());
   const ClusterDataPtr previous_cluster = std::move(status_or_cluster.value());
   auto& cluster_entry = warming_clusters_.at(cluster_name);
   cluster_entry->cluster_->info()->configUpdateStats().warming_state_.set(1);

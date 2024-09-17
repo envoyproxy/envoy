@@ -60,7 +60,7 @@ public:
     EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
         .WillRepeatedly(Return(resolver_));
     auto status_or_cache = DnsCacheImpl::createDnsCacheImpl(context_, config_);
-    THROW_IF_STATUS_NOT_OK(status_or_cache, throw);
+    THROW_IF_NOT_OK_REF(status_or_cache.status());
     dns_cache_ = status_or_cache.value();
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }

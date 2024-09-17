@@ -352,7 +352,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.socketFactory().clone();
   peer.socketFactory().closeAllSockets();
-  peer.socketFactory().doFinalPreWorkerInit();
+  ASSERT_TRUE(peer.socketFactory().doFinalPreWorkerInit().ok());
 
   peer.listener().name();
   peer.listener().udpListenerConfig();

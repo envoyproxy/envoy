@@ -1,6 +1,6 @@
 module example.com/basic
 
-go 1.20
+go 1.23
 
 require github.com/envoyproxy/envoy v1.24.0
 

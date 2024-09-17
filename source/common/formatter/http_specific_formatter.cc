@@ -300,7 +300,7 @@ BuiltInHttpCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_STATUS_NOT_OK(result, throw);
+           THROW_IF_NOT_OK_REF(result.status());
            return std::make_unique<RequestHeaderFormatter>(result.value().first,
                                                            result.value().second, max_length);
          }}},
@@ -308,7 +308,7 @@ BuiltInHttpCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_STATUS_NOT_OK(result, throw);
+           THROW_IF_NOT_OK_REF(result.status());
            return std::make_unique<ResponseHeaderFormatter>(result.value().first,
                                                             result.value().second, max_length);
          }}},
@@ -316,7 +316,7 @@ BuiltInHttpCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_STATUS_NOT_OK(result, throw);
+           THROW_IF_NOT_OK_REF(result.status());
            return std::make_unique<ResponseTrailerFormatter>(result.value().first,
                                                              result.value().second, max_length);
          }}},
@@ -364,7 +364,7 @@ BuiltInHttpCommandParser::getKnownFormatters() {
         {CommandSyntaxChecker::PARAMS_REQUIRED | CommandSyntaxChecker::LENGTH_ALLOWED,
          [](absl::string_view format, absl::optional<size_t> max_length) {
            auto result = SubstitutionFormatUtils::parseSubcommandHeaders(format);
-           THROW_IF_STATUS_NOT_OK(result, throw);
+           THROW_IF_NOT_OK_REF(result.status());
            return std::make_unique<RequestHeaderFormatter>(result.value().first,
                                                            result.value().second, max_length);
          }}},

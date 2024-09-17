@@ -81,6 +81,28 @@ TEST_F(JwksFetcherTest, TestGetSuccess) {
   fetcher_->fetch(parent_span_, receiver);
 }
 
+TEST_F(JwksFetcherTest, TestMessageHeader) {
+  // Setup
+  setupFetcher(config);
+  MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200",
+                           publicKey);
+  MockJwksReceiver receiver;
+
+  // Expectations for message
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                  .async_client_,
+              send_(_, _, _))
+      .WillOnce(Invoke([](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        EXPECT_EQ(message->headers().getUserAgentValue(),
+                  Http::Headers::get().UserAgentValues.GoBrowser);
+        return nullptr;
+      }));
+
+  // Act
+  fetcher_->fetch(parent_span_, receiver);
+}
+
 TEST_F(JwksFetcherTest, TestGet400) {
   // Setup
   setupFetcher(config);

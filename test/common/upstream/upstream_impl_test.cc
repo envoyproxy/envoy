@@ -75,7 +75,7 @@ protected:
                 ClusterFactoryContext& context) {
     StaticClusterFactory factory;
     auto status_or_cluster = factory.createClusterImpl(cluster, context);
-    THROW_IF_STATUS_NOT_OK(status_or_cluster, throw);
+    THROW_IF_NOT_OK_REF(status_or_cluster.status());
     return std::dynamic_pointer_cast<StaticClusterImpl>(status_or_cluster->first);
   }
 

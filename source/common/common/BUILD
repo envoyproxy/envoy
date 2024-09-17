@@ -433,6 +433,7 @@ envoy_cc_posix_library(
     strip_include_prefix = "posix",
     deps = [
         ":assert_lib",
+        ":utility_lib",
         "//envoy/thread:thread_interface",
     ],
 )
