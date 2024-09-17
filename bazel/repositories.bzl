@@ -697,6 +697,8 @@ def _v8():
         ],
         patch_args = ["-p1"],
     )
+
+    # Needed by proxy_wasm_cpp_host.
     native.bind(
         name = "wee8",
         actual = "@v8//:wee8",
