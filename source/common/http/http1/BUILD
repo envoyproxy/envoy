@@ -70,7 +70,6 @@ envoy_cc_library(
     name = "conn_pool_lib",
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
@@ -85,6 +84,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:upstream_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -92,12 +92,12 @@ envoy_cc_library(
     name = "settings_lib",
     srcs = ["settings.cc"],
     hdrs = ["settings.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:codec_interface",
         "//envoy/protobuf:message_validator_interface",
         "//source/common/config:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

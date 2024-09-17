@@ -282,9 +282,6 @@ envoy_cc_library(
         "envoy_quic_server_session.h",
         "envoy_quic_server_stream.h",
     ],
-    external_deps = [
-        "abseil_optional",
-    ],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_connection_debug_visitor_factory_interface",
@@ -300,6 +297,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "@com_github_google_quiche//:quic_server_http_spdy_session_lib",
+        "@com_google_absl//absl/types:optional",
     ] + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",
     ]),

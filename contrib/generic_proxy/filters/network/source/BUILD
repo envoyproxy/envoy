@@ -185,14 +185,13 @@ envoy_cc_library(
     hdrs = [
         "tracing.h",
     ],
-    external_deps = [
-        "abseil_strings",
-        "abseil_optional",
-        "abseil_status",
-    ],
     deps = [
         "//contrib/generic_proxy/filters/network/source/interface:stream_interface",
         "//envoy/common:pure_lib",
         "//envoy/tracing:trace_context_interface",
+        "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
     ],
 )

@@ -123,7 +123,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/config:utility_lib",
@@ -141,6 +140,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_cncf_xds//udpa/type/v1:pkg_cc_proto",
         "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

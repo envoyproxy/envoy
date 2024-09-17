@@ -343,9 +343,6 @@ exports_files(["test_utility.sh"])
 envoy_cc_test_binary(
     name = "hotrestart_main",
     srcs = ["hotrestart_main.cc"],
-    external_deps = [
-        "abseil_symbolize",
-    ],
     deps = [
         "//source/common/http:rds_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
@@ -358,15 +355,13 @@ envoy_cc_test_binary(
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/tls:config",
+        "@com_google_absl//absl/debugging:symbolize",
     ],
 )
 
 envoy_cc_test_binary(
     name = "hotrestart_small_main",
     srcs = ["hotrestart_main.cc"],
-    external_deps = [
-        "abseil_symbolize",
-    ],
     linkstatic = envoy_select_linkstatic(),
     deps = [
         "//source/exe:main_common_lib",
@@ -375,6 +370,7 @@ envoy_cc_test_binary(
         "//source/exe:stripped_main_base_lib",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/extensions/transport_sockets/tls:config",
+        "@com_google_absl//absl/debugging:symbolize",
     ],
 )
 
@@ -2608,7 +2604,6 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality([
         "xds_delegate_extension_integration_test.cc",
     ]),
-    external_deps = ["abseil_strings"],
     tags = [
         "cpu:3",
     ],
@@ -2619,6 +2614,7 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/test_common:registry_lib",
+        "@com_google_absl//absl/strings",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
     ],
@@ -2633,7 +2629,6 @@ envoy_cc_test(
     name = "xds_config_tracker_integration_test",
     size = "large",
     srcs = ["xds_config_tracker_integration_test.cc"],
-    external_deps = ["abseil_strings"],
     tags = [
         "cpu:3",
     ],
@@ -2646,6 +2641,7 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/test_common:registry_lib",
+        "@com_google_absl//absl/strings",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",

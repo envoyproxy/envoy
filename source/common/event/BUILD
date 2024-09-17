@@ -114,9 +114,6 @@ envoy_cc_library(
         "file_event_impl.h",
         "schedulable_cb_impl.h",
     ],
-    external_deps = [
-        "abseil_inlined_vector",
-    ],
     deps = [
         ":libevent_lib",
         ":libevent_scheduler_lib",
@@ -128,6 +125,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/signal:fatal_error_handler_lib",
+        "@com_google_absl//absl/container:inlined_vector",
     ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 

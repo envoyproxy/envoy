@@ -35,9 +35,6 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    external_deps = [
-        "abseil_node_hash_set",
-    ],
     deps = [
         ":alts_channel_pool",
         ":tsi_handshaker",
@@ -45,6 +42,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/grpc:google_grpc_context_lib",
+        "@com_google_absl//absl/container:node_hash_set",
         "@envoy_api//envoy/extensions/transport_sockets/alts/v3:pkg_cc_proto",
     ],
 )
@@ -135,13 +133,13 @@ envoy_cc_library(
     srcs = ["alts_proxy.cc"],
     hdrs = ["alts_proxy.h"],
     external_deps = [
-        "abseil_memory",
-        "abseil_status",
-        "abseil_statusor",
         "grpc",
     ],
     deps = [
         ":handshaker_cc_grpc",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -150,13 +148,13 @@ envoy_cc_library(
     srcs = ["alts_tsi_handshaker.cc"],
     hdrs = ["alts_tsi_handshaker.h"],
     external_deps = [
-        "abseil_memory",
-        "abseil_status",
         "grpc",
     ],
     deps = [
         ":alts_proxy",
         ":handshaker_cc_grpc",
         ":tsi_frame_protector",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
     ],
 )

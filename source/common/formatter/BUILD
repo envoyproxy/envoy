@@ -20,7 +20,6 @@ envoy_cc_library(
         "stream_info_formatter.h",
         "substitution_formatter.h",
     ],
-    external_deps = ["abseil_str_format"],
     deps = [
         ":substitution_format_utility_lib",
         "//envoy/api:api_interface",
@@ -39,6 +38,7 @@ envoy_cc_library(
         "//source/common/protobuf:message_validator_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:utility_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
