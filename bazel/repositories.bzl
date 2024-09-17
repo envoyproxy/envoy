@@ -550,11 +550,6 @@ def _com_github_tencent_rapidjson():
 def _com_github_nlohmann_json():
     external_http_archive(
         name = "com_github_nlohmann_json",
-        build_file = "@envoy//bazel/external:json.BUILD",
-    )
-    native.bind(
-        name = "json",
-        actual = "@com_github_nlohmann_json//:json",
     )
 
 def _com_github_nodejs_http_parser():
