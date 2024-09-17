@@ -263,10 +263,6 @@ def _com_github_openhistogram_libcircllhist():
         name = "com_github_openhistogram_libcircllhist",
         build_file = "@envoy//bazel/external:libcircllhist.BUILD",
     )
-    native.bind(
-        name = "libcircllhist",
-        actual = "@com_github_openhistogram_libcircllhist//:libcircllhist",
-    )
 
 def _com_github_axboe_liburing():
     external_http_archive(
