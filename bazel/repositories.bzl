@@ -559,10 +559,6 @@ def _com_github_ncopa_suexec():
         name = "com_github_ncopa_suexec",
         build_file = "@envoy//bazel/external:su-exec.BUILD",
     )
-    native.bind(
-        name = "su-exec",
-        actual = "@com_github_ncopa_suexec//:su-exec",
-    )
 
 def _com_google_googletest():
     external_http_archive(
