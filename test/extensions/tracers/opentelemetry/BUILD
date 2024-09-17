@@ -23,7 +23,6 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tracers.opentelemetry"],
     external_deps = [
-        "abseil_optional",
         "opentelemetry_api",
     ],
     deps = [
@@ -49,6 +48,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 

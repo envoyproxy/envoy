@@ -50,8 +50,10 @@ Config::parse(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_val
       break;
     }
     value.skip_if_empty_ = proto_value.skip_if_empty();
-    value.value_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-        proto_value.format_string(), context);
+    value.value_ =
+        THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+                                  proto_value.format_string(), context),
+                              Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
     values.push_back(std::move(value));
   }
   return values;

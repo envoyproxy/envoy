@@ -28,7 +28,7 @@ public:
   MockRateLimitClient() = default;
   ~MockRateLimitClient() override = default;
 
-  MOCK_METHOD(absl::Status, startStream, (const StreamInfo::StreamInfo&));
+  MOCK_METHOD(absl::Status, startStream, (const StreamInfo::StreamInfo*));
   MOCK_METHOD(void, closeStream, ());
   MOCK_METHOD(void, sendUsageReport, (absl::optional<size_t>));
 

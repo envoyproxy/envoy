@@ -78,11 +78,11 @@ envoy_cc_library(
     name = "substitution_formatter_lib",
     srcs = ["substitution_formatter.cc"],
     hdrs = ["substitution_formatter.h"],
-    external_deps = ["abseil_str_format"],
     deps = [
         "//envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
         "//source/common/formatter:substitution_formatter_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@opentelemetry_proto//:common_cc_proto",
     ],
 )

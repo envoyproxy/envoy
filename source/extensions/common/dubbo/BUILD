@@ -38,10 +38,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "metadata_lib",
     hdrs = ["metadata.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":message_lib",
         "//source/common/buffer:buffer_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
