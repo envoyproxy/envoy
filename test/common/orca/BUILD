@@ -12,8 +12,6 @@ envoy_cc_test(
     name = "orca_load_metrics_test",
     srcs = ["orca_load_metrics_test.cc"],
     external_deps = [
-        "abseil_status",
-        "abseil_strings",
         "fmtlib",
     ],
     deps = [
@@ -22,6 +20,8 @@ envoy_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -29,8 +29,6 @@ envoy_cc_test(
     name = "orca_parser_test",
     srcs = ["orca_parser_test.cc"],
     external_deps = [
-        "abseil_status",
-        "abseil_strings",
         "fmtlib",
     ],
     deps = [
@@ -39,5 +37,7 @@ envoy_cc_test(
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
