@@ -157,10 +157,10 @@ Envoy::Ssl::ParsedX509NameConstSharedPtr parseX509NameFromCertificate(X509& cert
   auto parsed = std::make_shared<Envoy::Ssl::ParsedX509Name>();
   int cnt = X509_NAME_entry_count(name);
   for (int i = 0; i < cnt; i++) {
-    const X509_NAME_ENTRY *ent;
+    const X509_NAME_ENTRY* ent;
     ent = X509_NAME_get_entry(name, i);
 
-    const ASN1_OBJECT *fn = X509_NAME_ENTRY_get_object(ent);
+    const ASN1_OBJECT* fn = X509_NAME_ENTRY_get_object(ent);
     int fn_nid = OBJ_obj2nid(fn);
     // ignore unknown attribute
     if (fn_nid != NID_commonName && fn_nid != NID_organizationName) {
@@ -168,8 +168,8 @@ Envoy::Ssl::ParsedX509NameConstSharedPtr parseX509NameFromCertificate(X509& cert
     }
 
     // put the value into utf8 string
-    const ASN1_STRING *val = X509_NAME_ENTRY_get_data(ent);
-    unsigned char *text = nullptr;
+    const ASN1_STRING* val = X509_NAME_ENTRY_get_data(ent);
+    unsigned char* text = nullptr;
     int len = ASN1_STRING_to_UTF8(&text, val);
     // Len < 0 means we could not encode as UTF-8, just ignore it
     // len = 0 is empty string already, also ignore it

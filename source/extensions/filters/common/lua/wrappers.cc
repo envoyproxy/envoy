@@ -313,8 +313,8 @@ int SslConnectionWrapper::luaParsedSubjectPeerCertificate(lua_State* state) {
     if (parsed_subject_peer_certificate_.get() != nullptr) {
       parsed_subject_peer_certificate_.pushStack();
     } else {
-      parsed_subject_peer_certificate_.reset(
-          ParsedX509NameWrapper::create(state, *parsed_name), true);
+      parsed_subject_peer_certificate_.reset(ParsedX509NameWrapper::create(state, *parsed_name),
+                                             true);
     }
   } else {
     lua_pushnil(state);
