@@ -291,6 +291,40 @@ TEST_F(CacheFilterTest, CacheMissWithTrailers) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+TEST_F(CacheFilterTest, CacheMissWithTrailersWhenCacheRespondsQuickerThanUpstream) {
+  request_headers_.setHost("CacheMissWithTrailers");
+  const std::string body = "abc";
+  Buffer::OwnedImpl body_buffer(body);
+  Http::TestResponseTrailerMapImpl trailers;
+
+  for (int request = 1; request <= 2; request++) {
+    // Each iteration a request is sent to a different host, therefore the second one is a miss
+    request_headers_.setHost("CacheMissWithTrailers" + std::to_string(request));
+
+    // Create filter for request 1
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+
+    testDecodeRequestMiss(filter);
+
+    // Encode response header
+    EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+    // Resolve cache response
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    EXPECT_EQ(filter->encodeData(body_buffer, false), Http::FilterDataStatus::Continue);
+    // Resolve cache response
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    EXPECT_EQ(filter->encodeTrailers(trailers), Http::FilterTrailersStatus::Continue);
+    // Resolve cache response
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    filter->onStreamComplete();
+    EXPECT_THAT(lookupStatus(), IsOkAndHolds(LookupStatus::CacheMiss));
+    EXPECT_THAT(insertStatus(), IsOkAndHolds(InsertStatus::InsertSucceeded));
+  }
+  // Clear events off the dispatcher.
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 TEST_F(CacheFilterTest, CacheHitNoBody) {
   request_headers_.setHost("CacheHitNoBody");
 
