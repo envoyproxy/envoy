@@ -923,10 +923,6 @@ filegroup(
         patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
         patch_args = ["-p1"],
     )
-    native.bind(
-        name = "librdkafka",
-        actual = "@envoy//bazel/foreign_cc:librdkafka",
-    )
 
     # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
     # tests.
