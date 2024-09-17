@@ -509,10 +509,6 @@ def _com_github_msgpack_cpp():
         name = "com_github_msgpack_cpp",
         build_file = "@envoy//bazel/external:msgpack.BUILD",
     )
-    native.bind(
-        name = "msgpack",
-        actual = "@com_github_msgpack_cpp//:msgpack",
-    )
 
 def _io_hyperscan():
     external_http_archive(
