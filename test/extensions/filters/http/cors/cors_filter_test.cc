@@ -87,8 +87,8 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
     EXPECT_EQ(false, isCorsRequest());
     EXPECT_EQ(2, filter_.policiesForTest().size());
-    EXPECT_EQ(cors_policy_.get(), filter_.policiesForTest().at(0));
-    EXPECT_EQ(cors_policy_.get(), filter_.policiesForTest().at(1));
+    EXPECT_EQ(cors_policy_.get(), &filter_.policiesForTest().at(0).get());
+    EXPECT_EQ(cors_policy_.get(), &filter_.policiesForTest().at(1).get());
   }
 
   // Only 'typed_per_filter_config' of virtual host has cors policy.
@@ -104,7 +104,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
     EXPECT_EQ(false, isCorsRequest());
     EXPECT_EQ(1, filter_.policiesForTest().size());
-    EXPECT_EQ(cors_policy_.get(), filter_.policiesForTest().at(0));
+    EXPECT_EQ(cors_policy_.get(), &filter_.policiesForTest().at(0).get());
   }
 
   // No cors policy in the 'typed_per_filter_config'.
@@ -121,9 +121,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
     EXPECT_EQ(false, isCorsRequest());
-    EXPECT_EQ(2, filter_.policiesForTest().size());
-    EXPECT_EQ(nullptr, filter_.policiesForTest().at(0));
-    EXPECT_EQ(nullptr, filter_.policiesForTest().at(1));
+    EXPECT_EQ(0, filter_.policiesForTest().size());
   }
   {
     filter_ = CorsFilter(config_);
@@ -139,9 +137,8 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, true));
     EXPECT_EQ(false, isCorsRequest());
-    EXPECT_EQ(2, filter_.policiesForTest().size());
-    EXPECT_EQ(cors_policy_.get(), filter_.policiesForTest().at(0));
-    EXPECT_EQ(nullptr, filter_.policiesForTest().at(1));
+    EXPECT_EQ(1, filter_.policiesForTest().size());
+    EXPECT_EQ(cors_policy_.get(), &filter_.policiesForTest().at(0).get());
   }
   {
     filter_ = CorsFilter(config_);
@@ -157,9 +154,8 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
     EXPECT_EQ(false, isCorsRequest());
-    EXPECT_EQ(2, filter_.policiesForTest().size());
-    EXPECT_EQ(nullptr, filter_.policiesForTest().at(0));
-    EXPECT_EQ(cors_policy_.get(), filter_.policiesForTest().at(1));
+    EXPECT_EQ(1, filter_.policiesForTest().size());
+    EXPECT_EQ(cors_policy_.get(), &filter_.policiesForTest().at(0).get());
   }
 }
 

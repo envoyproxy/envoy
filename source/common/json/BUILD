@@ -62,7 +62,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "constants_lib",
     hdrs = ["constants.h"],
-    external_deps = [
-        "abseil_strings",
+    deps = [
+        "@com_google_absl//absl/strings",
     ],
 )

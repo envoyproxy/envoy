@@ -48,13 +48,12 @@ Http::FilterHeadersStatus CustomResponseFilter::encodeHeaders(Http::ResponseHead
   // policy. Note that since the traversal is least to most specific, we can't
   // return early when a match is found.
   PolicySharedPtr policy;
-  for (const auto* typed_config :
+  for (const FilterConfig& typed_config :
        Http::Utility::getAllPerFilterConfig<FilterConfig>(encoder_callbacks_)) {
-    ASSERT(typed_config != nullptr);
 
     // Check if a match is found first to avoid overwriting policy with an
     // empty shared_ptr.
-    auto maybe_policy = typed_config->getPolicy(headers, encoder_callbacks_->streamInfo());
+    auto maybe_policy = typed_config.getPolicy(headers, encoder_callbacks_->streamInfo());
     if (maybe_policy) {
       policy = maybe_policy;
     }
