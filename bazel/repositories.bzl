@@ -870,6 +870,17 @@ def _com_github_wasm_c_api():
         name = "com_github_wasm_c_api",
         build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
     )
+    native.bind(
+        name = "wasmtime",
+        actual = "@com_github_wasm_c_api//:wasmtime_lib",
+    )
+
+    # This isn't needed in builds with a single Wasm engine, but "bazel query"
+    # complains about a missing dependency, so point it at the regular target.
+    native.bind(
+        name = "prefixed_wasmtime",
+        actual = "@com_github_wasm_c_api//:wasmtime_lib",
+    )
 
 def _intel_dlb():
     external_http_archive(
