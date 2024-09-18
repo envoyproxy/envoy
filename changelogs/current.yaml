@@ -116,6 +116,10 @@ bug_fixes:
   change: |
     RBAC will now allow stat prefixes configured in per-route config to override the base config's
     stat prefix.
+- area: http2
+  change: |
+    Fixed bug where an upstream that sent a GOAWAY and gracefully closed a connection would result in an increment of
+    the cluster stat ``upstream_cx_protocol_error`` and setting the ``UpstreamProtocolError`` response flag.
 - area: http3
   change: |
     Fixed a bug where an empty trailers block could be sent. This would occur if a filter removed
