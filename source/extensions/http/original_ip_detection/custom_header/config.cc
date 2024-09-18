@@ -13,7 +13,7 @@ namespace Http {
 namespace OriginalIPDetection {
 namespace CustomHeader {
 
-Envoy::Http::OriginalIPDetectionSharedPtr
+absl::StatusOr<Envoy::Http::OriginalIPDetectionSharedPtr>
 CustomHeaderIPDetectionFactory::createExtension(const Protobuf::Message& message,
                                                 Server::Configuration::FactoryContext& context) {
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
