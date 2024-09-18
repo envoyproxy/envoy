@@ -18,7 +18,7 @@ struct ParsedX509Name {
   // there should be only one commonName in the distinguished name
   std::string commonName_;
   // there could be multiple organizationNames
-  std::vector<const std::string> organizationName_;
+  std::vector<std::string> organizationName_;
   // TODO: add more well known fields such as L, OU, C, DC, UID etc.
 };
 
