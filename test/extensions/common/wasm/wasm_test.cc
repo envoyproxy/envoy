@@ -1353,7 +1353,7 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
   EXPECT_CALL(rootContext(), log_(spdlog::level::warn, Eq("TestRootContext::onDone 1")));
 
   dns_callback(
-      Network::DnsResolver::ResolutionStatus::Success, "",
+      Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"192.168.1.101", "192.168.1.102"}, std::chrono::seconds(1001)));
 
   rootContext().onResolveDns(1 /* token */, Envoy::Network::DnsResolver::ResolutionStatus::Failure,
@@ -1366,7 +1366,7 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
   }
   // Wait till the Wasm is destroyed and then the late callback should do nothing.
   deferred_runner_.setFunction([dns_callback] {
-    dns_callback(Network::DnsResolver::ResolutionStatus::Success, "",
+    dns_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
                  TestUtility::makeDnsResponse({"192.168.1.101", "192.168.1.102"},
                                               std::chrono::seconds(1001)));
   });

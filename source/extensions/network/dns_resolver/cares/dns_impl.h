@@ -110,10 +110,10 @@ private:
     };
 
     // Note: pending_response_ is constructed with ResolutionStatus::Failure by default and
-    // __only__ changed to ResolutionStatus::Success if there is an `ARES_SUCCESS` or `ARES_ENODATA`
+    // __only__ changed to ResolutionStatus::Completed if there is an `ARES_SUCCESS` or `ARES_ENODATA`
     // or `ARES_ENOTFOUND`reply.
     // In the dual_resolution case __any__ ARES_SUCCESS reply will result in a
-    // ResolutionStatus::Success callback.
+    // ResolutionStatus::Completed callback.
     PendingResponse pending_response_{ResolutionStatus::Failure, {}};
   };
 

@@ -390,12 +390,12 @@ TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(5000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(5)));
 
   // If the response is successful but empty, the cluster uses the cluster configured refresh rate.
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                 TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 
   // On failure, the cluster uses the cluster configured refresh rate.
@@ -603,7 +603,7 @@ TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 }
 
@@ -643,7 +643,7 @@ TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
   ON_CALL(random_, random()).WillByDefault(Return(random_return));
 
   dns_callback_(
-      Network::DnsResolver::ResolutionStatus::Success, "",
+      Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
 }
 

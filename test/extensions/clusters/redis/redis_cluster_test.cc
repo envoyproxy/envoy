@@ -856,9 +856,9 @@ TEST_F(RedisClusterTest, AddressAsHostnameParallelResolution) {
   EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
   cluster_->initialize([&]() -> void { initialized_.ready(); });
   expectClusterSlotResponse(twoSlotsPrimariesHostnames("primary1.com", "primary2.com", 22120));
-  primary1_resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  primary1_resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
                       TestUtility::makeDnsResponse(std::list<std::string>{"127.0.1.1"}));
-  primary2_resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  primary2_resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
                       TestUtility::makeDnsResponse(std::list<std::string>{"127.0.1.2"}));
   expectHealthyHosts(std::list<std::string>({
       "127.0.1.1:22120",
@@ -1241,7 +1241,7 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", _, _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(Network::DnsResolver::ResolutionStatus::Success, "",
+        cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})));
         return nullptr;
       }));
@@ -1249,7 +1249,7 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
   EXPECT_CALL(*dns_resolver_, resolve("foo1.bar.com", _, _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(Network::DnsResolver::ResolutionStatus::Success, "",
+        cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.3", "127.0.0.4"})));
         return nullptr;
       }));

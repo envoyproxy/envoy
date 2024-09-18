@@ -365,7 +365,7 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
             updateDnsStats(status, response.empty());
             // If DNS resolution for a primary fails, we stop resolution for remaining, and reset
             // the timer.
-            if (status != Network::DnsResolver::ResolutionStatus::Success) {
+            if (status != Network::DnsResolver::ResolutionStatus::Completed) {
               ENVOY_LOG(error, "Unable to resolve cluster slot primary hostname {}",
                         slot.primary_hostname_);
               resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);

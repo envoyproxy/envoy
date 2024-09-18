@@ -759,7 +759,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer()).Times(AnyNumber());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -812,7 +812,7 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -865,7 +865,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -917,7 +917,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "", TestUtility::makeDnsResponse({}));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "", TestUtility::makeDnsResponse({}));
 
   // parse the result
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
@@ -1003,7 +1003,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   // Execute resolve callback. This should harmlessly return and not alter
   // the response received by the client. Even though we are returning a successful
   // response, the client does not get an answer
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"130.207.244.251"}));
 
   // parse the result
