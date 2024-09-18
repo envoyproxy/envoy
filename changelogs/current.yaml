@@ -130,8 +130,9 @@ bug_fixes:
     to false.
 - area: upstream
   change: |
-    Fixed a bug using hard coded drop_category when reporting drop_overload stats to the load report service.
-    It is changed to use drop_category in the EDS config update message.
+    Fixed a bug using hard coded drop category when reporting drop_overload stats to the load report service.
+    It is changed to use drop category that is set in
+    :ref:`category <envoy_v3_api_field_config.endpoint.v3.clusterloadassignment.policy.DropOverload.category>`.
 - area: proxy_filter
   change: |
     Fixed a bug in the ``CONNECT`` implementation that would cause the ``CONNECT`` request created to be invalid when the
