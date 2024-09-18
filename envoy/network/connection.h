@@ -414,6 +414,19 @@ public:
 using ServerConnectionPtr = std::unique_ptr<ServerConnection>;
 
 /**
+ * Used by a client connection to report any changes to its underlying network.
+ */
+class NetworkChangeCallbacks {
+public:
+  virtual ~NetworkChangeCallbacks() = default;
+
+  /**
+   * Called by a connection if its underlying network has changed.
+   */
+  virtual void onConnectionNetworkChanged() PURE;
+};
+
+/**
  * Connections capable of outbound connects.
  */
 class ClientConnection : public virtual Connection {
@@ -423,6 +436,12 @@ public:
    * registered via addConnectionCallbacks().
    */
   virtual void connect() PURE;
+
+  /**
+   * Register network change callbacks to be called when the underlying network has changed.
+   * @param callback must outlive this connection.
+   */
+  virtual void setNetworkChangeCallbacks(NetworkChangeCallbacks& callback) PURE;
 };
 
 using ClientConnectionPtr = std::unique_ptr<ClientConnection>;

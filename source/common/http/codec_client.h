@@ -68,6 +68,13 @@ public:
   }
 
   /**
+   * Set network change callback for the underlying client connection.
+   */
+  void setNetworkChangeCallbacks(Network::NetworkChangeCallbacks& cb) {
+    connection_->setNetworkChangeCallbacks(cb);
+  }
+
+  /**
    * Return if half-close semantics are enabled on the underlying connection.
    */
   bool isHalfCloseEnabled() { return connection_->isHalfCloseEnabled(); }

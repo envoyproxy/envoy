@@ -167,6 +167,12 @@ void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
   }
 }
 
+void EnvoyQuicClientSession::notifyNetworkChange() {
+  if (network_change_callbacks_.has_value()) {
+    network_change_callbacks_->onConnectionNetworkChanged();
+  }
+}
+
 void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
   QuicSpdyClientSession::OnRstStream(frame);
   incrementSentQuicResetStreamErrorStats(frame.error(),

@@ -32,7 +32,7 @@ public:
   uint32_t numActiveStreams() const override { return active_streams_; }
   absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
   void onEvent(Network::ConnectionEvent event) override {
-    parent_.onConnectionEvent(*this, "", event);
+    parent_.onConnectionEvent(*this, "", event, true);
   }
 
   static void incrementActiveStreams(ActiveClient& client) {

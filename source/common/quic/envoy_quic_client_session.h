@@ -53,6 +53,9 @@ public:
   // Network::ClientConnection
   // Set up socket and start handshake.
   void connect() override;
+  void setNetworkChangeCallbacks(Network::NetworkChangeCallbacks& callback) override {
+    network_change_callbacks_ = makeOptRef(callback);
+  }
 
   // quic::QuicSession
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
@@ -88,6 +91,9 @@ public:
 
   void OnServerPreferredAddressAvailable(
       const quic::QuicSocketAddress& server_preferred_address) override;
+
+  // Called when the device switches to a different network.
+  void notifyNetworkChange();
 
   // Register this session to the given registry for receiving network change events.
   void registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry);
@@ -129,6 +135,7 @@ private:
   quic::HttpDatagramSupport http_datagram_support_ = quic::HttpDatagramSupport::kNone;
   QuicNetworkConnectivityObserverPtr network_connectivity_observer_;
   OptRef<EnvoyQuicNetworkObserverRegistry> registry_;
+  OptRef<Network::NetworkChangeCallbacks> network_change_callbacks_;
 };
 
 } // namespace Quic

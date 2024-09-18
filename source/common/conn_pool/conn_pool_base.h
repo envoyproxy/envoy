@@ -250,8 +250,11 @@ public:
   // Changes the state_ of an ActiveClient and moves to the appropriate list.
   void transitionActiveClientState(ActiveClient& client, ActiveClient::State new_state);
 
+  // Called when the client gets connected or disconnected.
+  // If the event is a connection close and purge_pending_streams is false, do not propagate this as
+  // a pool failure, but keep trying connecting new connections to handle these pending stream.
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
-                         Network::ConnectionEvent event);
+                         Network::ConnectionEvent event, bool purge_pending_streams);
 
   // Check if the pool has gone idle and invoke idle notification callbacks.
   void checkForIdleAndNotify();

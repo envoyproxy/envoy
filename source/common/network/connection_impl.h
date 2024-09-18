@@ -287,6 +287,7 @@ public:
 
   // Network::ClientConnection
   void connect() override;
+  void setNetworkChangeCallbacks(NetworkChangeCallbacks&) override{};
 
 private:
   void onConnected() override;
