@@ -153,6 +153,20 @@ absl::Status HttpCacheImplementationTest::insert(
   return absl::OkStatus();
 }
 
+LookupContextPtr HttpCacheImplementationTest::lookupContextWithAllParts() {
+  absl::string_view path = "/common";
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"cache-control", "public,max-age=3600"}};
+  Http::TestResponseTrailerMapImpl response_trailers{
+      {"common-trailer", "irrelevant value"},
+  };
+  EXPECT_THAT(insert(lookup(path), response_headers, "commonbody", response_trailers), IsOk());
+  LookupRequest request = makeLookupRequest(path);
+  return cache()->makeLookupContext(std::move(request), decoder_callbacks_);
+}
+
 absl::Status HttpCacheImplementationTest::insert(absl::string_view request_path,
                                                  const Http::TestResponseHeaderMapImpl& headers,
                                                  const absl::string_view body) {
@@ -775,6 +789,48 @@ TEST_P(HttpCacheImplementationTest, EmptyTrailers) {
   ASSERT_THAT(insert(std::move(name_lookup_context), response_headers, body1), IsOk());
   name_lookup_context = lookup(request_path1);
   EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(name_lookup_context.get(), body1));
+}
+
+TEST_P(HttpCacheImplementationTest, DoesNotRunHeadersCallbackWhenCancelledAfterPosted) {
+  bool was_called = false;
+  {
+    LookupContextPtr context = lookupContextWithAllParts();
+    context->getHeaders([&was_called](LookupResult&&, bool) { was_called = true; });
+    pumpIntoDispatcher();
+    context->onDestroy();
+  }
+  pumpDispatcher();
+  EXPECT_FALSE(was_called);
+}
+
+TEST_P(HttpCacheImplementationTest, DoesNotRunBodyCallbackWhenCancelledAfterPosted) {
+  bool was_called = false;
+  {
+    LookupContextPtr context = lookupContextWithAllParts();
+    context->getHeaders([](LookupResult&&, bool) {});
+    pumpDispatcher();
+    context->getBody({0, 10}, [&was_called](Buffer::InstancePtr&&, bool) { was_called = true; });
+    pumpIntoDispatcher();
+    context->onDestroy();
+  }
+  pumpDispatcher();
+  EXPECT_FALSE(was_called);
+}
+
+TEST_P(HttpCacheImplementationTest, DoesNotRunTrailersCallbackWhenCancelledAfterPosted) {
+  bool was_called = false;
+  {
+    LookupContextPtr context = lookupContextWithAllParts();
+    context->getHeaders([](LookupResult&&, bool) {});
+    pumpDispatcher();
+    context->getBody({0, 10}, [](Buffer::InstancePtr&&, bool) {});
+    pumpDispatcher();
+    context->getTrailers([&was_called](Http::ResponseTrailerMapPtr&&) { was_called = true; });
+    pumpIntoDispatcher();
+    context->onDestroy();
+  }
+  pumpDispatcher();
+  EXPECT_FALSE(was_called);
 }
 
 } // namespace Cache
