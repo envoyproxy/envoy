@@ -4734,6 +4734,75 @@ TEST_P(ExtProcIntegrationTest, SendBodyAndTrailerBeforeHeaderRespStreamedMoreDat
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespStreamedTest) {
+  config_helper_.setBufferLimits(1024, 1024);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_send_body_without_waiting_for_header_response(true);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  // Downstream client sending 16k data.
+  const std::string body_sent(16 * 1024, 's');
+  codec_client_->sendData(*request_encoder_, body_sent, true);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
+  ASSERT_TRUE(header_request.has_request_headers());
+
+  // The ext_proc server receives 16 chunks of body, each chunk size is 1k.
+  std::string body_received;
+  bool end_stream = false;
+  uint32_t total_body_msg_count = 0;
+  while (!end_stream) {
+    ProcessingRequest body_request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+    ASSERT_TRUE(body_request.has_request_body());
+    body_received = absl::StrCat(body_received, body_request.request_body().body());
+    end_stream = body_request.request_body().end_of_stream();
+    total_body_msg_count++;
+  }
+  EXPECT_TRUE(end_stream);
+  EXPECT_EQ(body_received, body_sent);
+
+  // The ext_proc server sends back the header response.
+  processor_stream_->startGrpcStream();
+  ProcessingResponse response_header;
+  auto* header_resp = response_header.mutable_request_headers();
+  auto header_mutation = header_resp->mutable_response()->mutable_header_mutation();
+  auto* mut = header_mutation->add_set_headers();
+  mut->mutable_header()->set_key("x-new-header");
+  mut->mutable_header()->set_raw_value("new");
+  processor_stream_->sendGrpcMessage(response_header);
+
+  // The ext_proc server sends back the body response.
+  const std::string body_upstream(total_body_msg_count, 'r');
+  while (total_body_msg_count) {
+    ProcessingResponse response_body;
+    auto* body_resp = response_body.mutable_request_body();
+    auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
+    body_mut->set_body("r");
+    processor_stream_->sendGrpcMessage(response_body);
+    total_body_msg_count--;
+  }
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedNotSendTrailerTest) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
