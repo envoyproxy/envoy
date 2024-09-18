@@ -44,26 +44,29 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 
 // Example trust_bundle_map json file:
-// {
-//         "spiffe_sequence": 2,
-//         "spiffe_refresh_hint": 2419200,
-//         "keys": [
-//                 {
-//                         "kty": “RSA”,
-//                         "use": "x509-svid",
-//                         "x5c": ["<base64 DER encoding of Certificate #1>"],
-//                         "n": "<base64urlUint-encoded value>",
-//                         "e": "AQAB"
-//                 },
-//                 {
-//                         "kty": “RSA”,
-//                         "use": "x509-svid",
-//                         "x5c": ["<base64 DER encoding of Certificate #2>"],
-//                         "n": "<base64urlUint-encoded value>",
-//                         "e": "AQAB"
-//                 }
-//         ]
-// }
+//{
+//  “trust_domains”: {
+//    "example.com": {
+//      “sequence_number”: 12035488,
+//      "keys": [
+//        {
+//          "kty": "RSA",
+//          "use": "x509-svid",
+//          "x5c": ["<base64 DER encoding of Certificate #1>"],
+//          "n": "<base64urlUint-encoded value>",
+//          "e": "AQAB"
+//        },
+//        {
+//          "kty": "RSA",
+//          “kid”: “<JWT key id>”,
+//          "use": "jwt-svid",
+//          "n": "<base64urlUint-encoded value>",
+//          "e": "AQAB"
+//        }
+//      ]
+//    }
+//  }
+//}
 // - :ref:`allow_expired_certificate <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.allow_expired_certificate>` to allow expired certificates.
 // - :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>` to match **URI** SAN of certificates. Unlike the default validator, SPIFFE validator only matches **URI** SAN (which equals to SVID in SPIFFE terminology) and ignore other SAN types.
 //

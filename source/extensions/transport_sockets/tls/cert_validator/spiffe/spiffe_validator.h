@@ -98,30 +98,46 @@ private:
                                             std::string& error_details);
 
   void initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
-  std::shared_ptr<SpiffeData> loadTrustBundle();
+  std::shared_ptr<SpiffeData> loadTrustBundleMap();
 
   class ThreadLocalSpiffeState : public Envoy::ThreadLocal::ThreadLocalObject {
   public:
       std::shared_ptr<SpiffeData> getSpiffeData() const { return spiffe_data_; }
-      void updateSpiffeData(std::shared_ptr<SpiffeData> new_data) { spiffe_data_ = new_data; }
+      void updateSpiffeData(std::shared_ptr<SpiffeData> new_data) {
+        ENVOY_LOG(debug, "updating spiffe data");
+        spiffe_data_ = new_data;
+      }
 
   private:
       std::shared_ptr<SpiffeData> spiffe_data_;
   };
 
-  void updateSpiffeData(std::shared_ptr<SpiffeData> new_spiffe_data) {
+  void updateSpiffeDataAsync(std::shared_ptr<SpiffeData> new_spiffe_data) {
+    ENVOY_LOG(debug, "Posting new SPIFFE data update to main thread dispatcher");
     main_thread_dispatcher_.post([this, new_spiffe_data]() {
+        ENVOY_LOG(debug, "Updating spiffe_data_ for all threads");
         tls_->runOnAllThreads([new_spiffe_data](OptRef<ThreadLocalSpiffeState> obj) {
+            ENVOY_LOG(debug, "loading new spiffe data");
             obj->updateSpiffeData(new_spiffe_data);
         });
     });
   };
 
+  void updateSpiffeData(std::shared_ptr<SpiffeData> new_spiffe_data) {
+    tls_->runOnAllThreads(
+        [new_spiffe_data](OptRef<ThreadLocalSpiffeState> obj) {
+            ENVOY_LOG(debug, "loading new spiffe data");
+            obj->updateSpiffeData(new_spiffe_data);
+        },
+        []() {
+            ENVOY_LOG(debug, "SPIFFE data update completed on all threads");
+        }
+    );
+  }
+
   bool allow_expired_certificate_{false};
 
   ThreadLocal::TypedSlotPtr<ThreadLocalSpiffeState> tls_;
-  //std::vector<bssl::UniquePtr<X509>> ca_certs_;
-  //absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;
   std::string ca_file_name_;
   std::string trust_bundle_file_name_;
   std::shared_ptr<SpiffeData> spiffe_data_;
