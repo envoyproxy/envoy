@@ -19,6 +19,7 @@
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
+#include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -72,9 +73,8 @@ private:
 class FilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-               Upstream::ClusterManager& cm, Singleton::Manager& singleton_manager,
-               Stats::Scope& scope, Runtime::Loader& runtime, bool per_route = false);
+               Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
+               const bool per_route = false);
   ~FilterConfig() override {
     // Ensure that the LocalRateLimiterImpl instance will be destroyed on the thread where its inner
     // timer is created and running.
@@ -111,6 +111,20 @@ public:
   bool consumeDefaultTokenBucket() const { return always_consume_default_token_bucket_; }
   const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
+  }
+
+  bool hasRateLimitPerConnection() const { return rate_limit_per_connection_; }
+
+  bool hasRateLimitConfigs() const {
+    ASSERT(rate_limit_config_ != nullptr);
+    return !rate_limit_config_->empty();
+  }
+
+  void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const StreamInfo::StreamInfo& info,
+                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors) const {
+    ASSERT(rate_limit_config_ != nullptr);
+    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors);
   }
 
 private:
@@ -150,6 +164,7 @@ private:
   const bool enable_x_rate_limit_headers_;
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
+  std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

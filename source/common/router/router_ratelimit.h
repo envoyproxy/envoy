@@ -16,6 +16,7 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_utility.h"
+#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 
 #include "absl/types/optional.h"
 
@@ -72,6 +73,12 @@ public:
       : header_name_(action.header_name()), descriptor_key_(action.descriptor_key()),
         skip_if_absent_(action.skip_if_absent()) {}
 
+  RequestHeadersAction(
+      const envoy::extensions::common::ratelimit::v3::RateLimitPolicy::Action::RequestHeaders&
+          action)
+      : header_name_(action.header_name()), descriptor_key_(action.descriptor_key()),
+        skip_if_absent_(action.skip_if_absent()) {}
+
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
@@ -106,6 +113,12 @@ public:
       : v4_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v4_prefix_mask_len, 32)),
         v6_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v6_prefix_mask_len, 128)) {}
 
+  MaskedRemoteAddressAction(
+      const envoy::extensions::common::ratelimit::v3::RateLimitPolicy::Action::MaskedRemoteAddress&
+          action)
+      : v4_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v4_prefix_mask_len, 32)),
+        v6_prefix_mask_len_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, v6_prefix_mask_len, 128)) {}
+
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
@@ -123,6 +136,12 @@ private:
 class GenericKeyAction : public RateLimit::DescriptorProducer {
 public:
   GenericKeyAction(const envoy::config::route::v3::RateLimit::Action::GenericKey& action)
+      : descriptor_value_(action.descriptor_value()),
+        descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key()
+                                                         : "generic_key") {}
+
+  GenericKeyAction(
+      const envoy::extensions::common::ratelimit::v3::RateLimitPolicy::Action::GenericKey& action)
       : descriptor_value_(action.descriptor_value()),
         descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key()
                                                          : "generic_key") {}
@@ -146,6 +165,10 @@ public:
   MetaDataAction(const envoy::config::route::v3::RateLimit::Action::MetaData& action);
   // for maintaining backward compatibility with the deprecated DynamicMetaData action
   MetaDataAction(const envoy::config::route::v3::RateLimit::Action::DynamicMetaData& action);
+
+  MetaDataAction(
+      const envoy::extensions::common::ratelimit::v3::RateLimitPolicy::Action::MetaData& action);
+
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
@@ -167,6 +190,11 @@ class HeaderValueMatchAction : public RateLimit::DescriptorProducer {
 public:
   HeaderValueMatchAction(
       const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
+
+  HeaderValueMatchAction(
+      const envoy::extensions::common::ratelimit::v3::RateLimitPolicy::Action::HeaderValueMatch&
+          action,
       Server::Configuration::CommonFactoryContext& context);
 
   // Ratelimit::DescriptorProducer
@@ -191,6 +219,10 @@ public:
       const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
       Server::Configuration::CommonFactoryContext& context);
 
+  QueryParameterValueMatchAction(const envoy::extensions::common::ratelimit::v3::RateLimitPolicy::
+                                     Action::QueryParameterValueMatch& action,
+                                 Server::Configuration::CommonFactoryContext& context);
+
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                           const std::string& local_service_cluster,
@@ -198,7 +230,8 @@ public:
                           const StreamInfo::StreamInfo& info) const override;
 
   std::vector<ConfigUtility::QueryParameterMatcherPtr> buildQueryParameterMatcherVector(
-      const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::QueryParameterMatcher>&
+          query_parameters,
       Server::Configuration::CommonFactoryContext& context);
 
 private:

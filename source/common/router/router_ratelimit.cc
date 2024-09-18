@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
+#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/config/metadata.h"
@@ -192,6 +193,16 @@ MetaDataAction::MetaDataAction(const envoy::config::route::v3::RateLimit::Action
       skip_if_absent_(action.skip_if_absent()) {}
 
 MetaDataAction::MetaDataAction(
+    const envoy::extensions::common::ratelimit::v3::RateLimitPolicy::Action::MetaData& action)
+    : metadata_key_(action.metadata_key()), descriptor_key_(action.descriptor_key()),
+      default_value_(action.default_value()),
+      source_(action.source() == envoy::extensions::common::ratelimit::v3::RateLimitPolicy::Action::
+                                     MetaData::ROUTE_ENTRY
+                  ? envoy::config::route::v3::RateLimit::Action::MetaData::ROUTE_ENTRY
+                  : envoy::config::route::v3::RateLimit::Action::MetaData::DYNAMIC),
+      skip_if_absent_(action.skip_if_absent()) {}
+
+MetaDataAction::MetaDataAction(
     const envoy::config::route::v3::RateLimit::Action::DynamicMetaData& action)
     : metadata_key_(action.metadata_key()), descriptor_key_(action.descriptor_key()),
       default_value_(action.default_value()),
@@ -238,6 +249,15 @@ HeaderValueMatchAction::HeaderValueMatchAction(
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
       action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers(), context)) {}
 
+HeaderValueMatchAction::HeaderValueMatchAction(
+    const envoy::extensions::common::ratelimit::v3::RateLimitPolicy::Action::HeaderValueMatch&
+        action,
+    Server::Configuration::CommonFactoryContext& context)
+    : descriptor_value_(action.descriptor_value()),
+      descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "header_match"),
+      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
+      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers(), context)) {}
+
 bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                                 const std::string&,
                                                 const Http::RequestHeaderMap& headers,
@@ -256,7 +276,18 @@ QueryParameterValueMatchAction::QueryParameterValueMatchAction(
     : descriptor_value_(action.descriptor_value()),
       descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
-      action_query_parameters_(buildQueryParameterMatcherVector(action, context)) {}
+      action_query_parameters_(
+          buildQueryParameterMatcherVector(action.query_parameters(), context)) {}
+
+QueryParameterValueMatchAction::QueryParameterValueMatchAction(
+    const envoy::extensions::common::ratelimit::v3::RateLimitPolicy::Action::
+        QueryParameterValueMatch& action,
+    Server::Configuration::CommonFactoryContext& context)
+    : descriptor_value_(action.descriptor_value()),
+      descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_match"),
+      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
+      action_query_parameters_(
+          buildQueryParameterMatcherVector(action.query_parameters(), context)) {}
 
 bool QueryParameterValueMatchAction::populateDescriptor(
     RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
@@ -274,10 +305,11 @@ bool QueryParameterValueMatchAction::populateDescriptor(
 
 std::vector<ConfigUtility::QueryParameterMatcherPtr>
 QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
-    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+    const Protobuf::RepeatedPtrField<envoy::config::route::v3::QueryParameterMatcher>&
+        query_parameters,
     Server::Configuration::CommonFactoryContext& context) {
   std::vector<ConfigUtility::QueryParameterMatcherPtr> ret;
-  for (const auto& query_parameter : action.query_parameters()) {
+  for (const auto& query_parameter : query_parameters) {
     ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, context));
   }
   return ret;

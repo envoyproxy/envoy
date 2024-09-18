@@ -156,5 +156,5 @@ message LocalRateLimit {
   // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
   // will be ignored.
   // [#not-implemented-hide:]
-  repeated common.ratelimit.v3.RateLimitConfig rate_limits = 17;
+  repeated common.ratelimit.v3.RateLimitPolicy rate_limits = 17;
 }

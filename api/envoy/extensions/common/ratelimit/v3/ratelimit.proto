@@ -155,7 +155,7 @@ message LocalClusterRateLimit {
 // ``LocalRateLimitDescriptor`` which contains a token bucket. And the token bucket will be used to
 // limit the request rate.
 // [#not-implemented-hide:]
-message RateLimitConfig {
+message RateLimitPolicy {
   // [#next-free-field: 11]
   message Action {
     // The following descriptor entry is appended to the descriptor:
