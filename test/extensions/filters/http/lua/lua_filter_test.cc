@@ -2396,7 +2396,7 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   parsed_subject->commonName_ = "Test CN";
   parsed_subject->organizationName_.push_back("Test O1");
   parsed_subject->organizationName_.push_back("Test O2");
-  // need this conversion to avoid complier error in ReturnRef
+  // need this conversion to avoid compiler error in ReturnRef
   Ssl::ParsedX509NameConstSharedPtr const_parsed_subject = parsed_subject;
   EXPECT_CALL(*connection_info, parsedSubjectPeerCertificate())
       .WillRepeatedly(ReturnRef(const_parsed_subject));
