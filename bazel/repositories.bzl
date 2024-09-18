@@ -696,24 +696,8 @@ def _com_google_absl():
         patches = ["@envoy//bazel:abseil.patch"],
         patch_args = ["-p1"],
     )
-    native.bind(
-        name = "abseil_any",
-        actual = "@com_google_absl//absl/types:any",
-    )
-    native.bind(
-        name = "abseil_base",
-        actual = "@com_google_absl//absl/base:base",
-    )
 
-    # Bind for grpc.
-    native.bind(
-        name = "absl-base",
-        actual = "@com_google_absl//absl/base",
-    )
-    native.bind(
-        name = "abseil_btree",
-        actual = "@com_google_absl//absl/container:btree",
-    )
+    # keep these until jwt_verify_lib is updated.
     native.bind(
         name = "abseil_flat_hash_map",
         actual = "@com_google_absl//absl/container:flat_hash_map",
@@ -723,90 +707,12 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/container:flat_hash_set",
     )
     native.bind(
-        name = "abseil_hash",
-        actual = "@com_google_absl//absl/hash:hash",
-    )
-    native.bind(
-        name = "abseil_hash_testing",
-        actual = "@com_google_absl//absl/hash:hash_testing",
-    )
-    native.bind(
-        name = "abseil_inlined_vector",
-        actual = "@com_google_absl//absl/container:inlined_vector",
-    )
-    native.bind(
-        name = "abseil_memory",
-        actual = "@com_google_absl//absl/memory:memory",
-    )
-    native.bind(
-        name = "abseil_node_hash_map",
-        actual = "@com_google_absl//absl/container:node_hash_map",
-    )
-    native.bind(
-        name = "abseil_node_hash_set",
-        actual = "@com_google_absl//absl/container:node_hash_set",
-    )
-    native.bind(
-        name = "abseil_str_format",
-        actual = "@com_google_absl//absl/strings:str_format",
-    )
-    native.bind(
         name = "abseil_strings",
         actual = "@com_google_absl//absl/strings:strings",
     )
     native.bind(
-        name = "abseil_int128",
-        actual = "@com_google_absl//absl/numeric:int128",
-    )
-    native.bind(
-        name = "abseil_optional",
-        actual = "@com_google_absl//absl/types:optional",
-    )
-    native.bind(
-        name = "abseil_synchronization",
-        actual = "@com_google_absl//absl/synchronization:synchronization",
-    )
-    native.bind(
-        name = "abseil_symbolize",
-        actual = "@com_google_absl//absl/debugging:symbolize",
-    )
-    native.bind(
-        name = "abseil_stacktrace",
-        actual = "@com_google_absl//absl/debugging:stacktrace",
-    )
-    native.bind(
-        name = "abseil_statusor",
-        actual = "@com_google_absl//absl/status:statusor",
-    )
-
-    # Require abseil_time as an indirect dependency as it is needed by the
-    # direct dependency jwt_verify_lib.
-    native.bind(
         name = "abseil_time",
         actual = "@com_google_absl//absl/time:time",
-    )
-
-    # Bind for grpc.
-    native.bind(
-        name = "absl-time",
-        actual = "@com_google_absl//absl/time:time",
-    )
-
-    native.bind(
-        name = "abseil_algorithm",
-        actual = "@com_google_absl//absl/algorithm:algorithm",
-    )
-    native.bind(
-        name = "abseil_variant",
-        actual = "@com_google_absl//absl/types:variant",
-    )
-    native.bind(
-        name = "abseil_status",
-        actual = "@com_google_absl//absl/status",
-    )
-    native.bind(
-        name = "abseil_cleanup",
-        actual = "@com_google_absl//absl/cleanup:cleanup",
     )
 
 def _com_google_protobuf():

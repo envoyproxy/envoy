@@ -26,9 +26,6 @@ exports_files(["headers.dict"])
 envoy_cc_test_library(
     name = "main",
     srcs = ["main.cc"],
-    external_deps = [
-        "abseil_symbolize",
-    ],
     deps = [
         ":fuzz_runner_lib",
         "//source/common/common:assert_lib",
@@ -37,6 +34,7 @@ envoy_cc_test_library(
         "//test:test_listener_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/synchronization",
     ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 

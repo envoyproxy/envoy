@@ -102,7 +102,6 @@ envoy_cc_library(
     name = "connection_impl",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
         ":connection_base_lib",
@@ -123,6 +122,7 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:stream_info_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -219,15 +219,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "lc_trie_lib",
     hdrs = ["lc_trie.h"],
-    external_deps = [
-        "abseil_node_hash_set",
-        "abseil_int128",
-    ],
     deps = [
         ":address_lib",
         ":cidr_range_lib",
         ":utility_lib",
         "//source/common/common:assert_lib",
+        "@com_google_absl//absl/container:node_hash_set",
+        "@com_google_absl//absl/numeric:int128",
     ],
 )
 
@@ -415,7 +413,6 @@ envoy_cc_library(
     name = "socket_option_lib",
     srcs = ["socket_option_impl.cc"],
     hdrs = ["socket_option_impl.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
         "//envoy/api:os_sys_calls_interface",
@@ -425,6 +422,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -433,7 +431,6 @@ envoy_cc_library(
     name = "addr_family_aware_socket_option_lib",
     srcs = ["addr_family_aware_socket_option_impl.cc"],
     hdrs = ["addr_family_aware_socket_option_impl.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
         ":socket_lib",
@@ -442,6 +439,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -467,7 +465,6 @@ envoy_cc_library(
     name = "socket_option_factory_lib",
     srcs = ["socket_option_factory.cc"],
     hdrs = ["socket_option_factory.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":addr_family_aware_socket_option_lib",
         ":address_lib",
@@ -475,6 +472,7 @@ envoy_cc_library(
         ":win32_redirect_records_option_lib",
         "//envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -574,12 +572,10 @@ envoy_cc_library(
         "filter_matcher.cc",
     ],
     hdrs = ["filter_matcher.h"],
-    external_deps = [
-        "abseil_str_format",
-    ],
     deps = [
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )

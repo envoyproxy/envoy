@@ -198,9 +198,9 @@ PosixThreadPtr PosixThreadFactory::createThread(std::function<void()> thread_rou
   return std::make_unique<PosixThread>(thread_handle, options);
 };
 
-ThreadId PosixThreadFactory::currentThreadId() { return ThreadId(getCurrentThreadId()); };
+ThreadId PosixThreadFactory::currentThreadId() const { return ThreadId(getCurrentThreadId()); };
 
-int PosixThreadFactory::currentThreadPriority() {
+int PosixThreadFactory::currentThreadPriority() const {
 #if defined(__linux__)
   return static_cast<double>(getpriority(PRIO_PROCESS, getCurrentThreadId()));
 #elif defined(__APPLE__)
@@ -215,7 +215,7 @@ int PosixThreadFactory::currentThreadPriority() {
 #endif
 }
 
-ThreadId PosixThreadFactory::currentPthreadId() {
+ThreadId PosixThreadFactory::currentPthreadId() const {
 #if defined(__linux__)
   return static_cast<ThreadId>(static_cast<int64_t>(pthread_self()));
 #elif defined(__APPLE__)
