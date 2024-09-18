@@ -4,8 +4,6 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.2"
-"source/common/api:84.5" # flaky due to posix: be careful adjusting
-"source/common/api/posix:83.8" # flaky (accept failover non-deterministic): be careful adjusting
 "source/common/common/posix:96.2" # flaky due to posix: be careful adjusting
 "source/common/config:96.1"
 "source/common/crypto:95.5"
