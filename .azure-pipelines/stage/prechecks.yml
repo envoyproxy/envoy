@@ -233,6 +233,7 @@ jobs:
   #  https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops#job-to-job-dependencies-within-one-stage
   condition: |
     and(
+      ne(variables.shouldTriggerGithub, false),
       in(dependencies.prechecks.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.precheck_release_x64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'),
       in(dependencies.precheck_release_arm64.result, 'Succeeded', 'SucceededWithIssues', 'Skipped'))

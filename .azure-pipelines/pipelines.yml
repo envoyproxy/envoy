@@ -62,6 +62,9 @@ variables:
     381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1v
     N1/wsjk="
 
+- name: shouldTriggerGithub
+  value: ${{ ne(variables.GitHubPublicRepoWorkflowInstallId, '') }}
+
 
 stages:
 
