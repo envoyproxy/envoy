@@ -13,12 +13,14 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
 #include "source/common/tls/stats.h"
+
 
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -30,12 +32,34 @@ namespace Tls {
 
 using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
-class SPIFFEValidator : public CertValidator {
+struct SpiffeData {
+  absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>> trust_bundle_stores;
+  std::vector<bssl::UniquePtr<X509>> ca_certs;
+
+  int64_t spiffe_refresh_hint;
+  int64_t spiffe_sequence;
+
+  SpiffeData() = default;
+  SpiffeData(const SpiffeData& other) = delete;
+  SpiffeData(SpiffeData&& other) = default;
+};
+
+class SPIFFEValidator : public CertValidator, Logger::Loggable<Logger::Id::secret> {
 public:
-  SPIFFEValidator(SslStats& stats, TimeSource& time_source)
-      : stats_(stats), time_source_(time_source){};
+  SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context)
+      : tls_(ThreadLocal::TypedSlot<ThreadLocalSpiffeState>::makeUnique(context.threadLocal())),
+        spiffe_data_(std::make_shared<SpiffeData>()),
+        main_thread_dispatcher_(context.mainThreadDispatcher()),
+        stats_(stats),
+        time_source_(context.timeSource()) {
+            tls_->set([](Event::Dispatcher&) {
+              return std::make_shared<ThreadLocalSpiffeState>();
+            });
+            updateSpiffeData(spiffe_data_);
+        };
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                   Server::Configuration::CommonFactoryContext& context);
+
   ~SPIFFEValidator() override = default;
 
   // Tls::CertValidator
@@ -62,22 +86,48 @@ public:
   X509_STORE* getTrustBundleStore(X509* leaf_cert);
   static std::string extractTrustDomain(const std::string& san);
   static bool certificatePrecheck(X509* leaf_cert);
-  absl::flat_hash_map<std::string, X509StorePtr>& trustBundleStores() {
-    return trust_bundle_stores_;
+  std::shared_ptr<SpiffeData> getSpiffeData() {
+    return spiffe_data_;
   };
-
   bool matchSubjectAltName(X509& leaf_cert);
+
 
 private:
   bool verifyCertChainUsingTrustBundleStore(X509& leaf_cert, STACK_OF(X509)* cert_chain,
                                             X509_VERIFY_PARAM* verify_param,
                                             std::string& error_details);
 
+  void initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
+  std::shared_ptr<SpiffeData> loadTrustBundle();
+
+  class ThreadLocalSpiffeState : public Envoy::ThreadLocal::ThreadLocalObject {
+  public:
+      std::shared_ptr<SpiffeData> getSpiffeData() const { return spiffe_data_; }
+      void updateSpiffeData(std::shared_ptr<SpiffeData> new_data) { spiffe_data_ = new_data; }
+
+  private:
+      std::shared_ptr<SpiffeData> spiffe_data_;
+  };
+
+  void updateSpiffeData(std::shared_ptr<SpiffeData> new_spiffe_data) {
+    main_thread_dispatcher_.post([this, new_spiffe_data]() {
+        tls_->runOnAllThreads([new_spiffe_data](OptRef<ThreadLocalSpiffeState> obj) {
+            obj->updateSpiffeData(new_spiffe_data);
+        });
+    });
+  };
+
   bool allow_expired_certificate_{false};
-  std::vector<bssl::UniquePtr<X509>> ca_certs_;
+
+  ThreadLocal::TypedSlotPtr<ThreadLocalSpiffeState> tls_;
+  //std::vector<bssl::UniquePtr<X509>> ca_certs_;
+  //absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;
   std::string ca_file_name_;
+  std::string trust_bundle_file_name_;
+  std::shared_ptr<SpiffeData> spiffe_data_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_{};
-  absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;
+  Event::Dispatcher& main_thread_dispatcher_;
+  std::unique_ptr<Filesystem::Watcher> file_watcher_;
 
   SslStats& stats_;
   TimeSource& time_source_;

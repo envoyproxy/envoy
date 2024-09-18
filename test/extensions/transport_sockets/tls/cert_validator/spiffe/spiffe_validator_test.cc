@@ -57,7 +57,7 @@ public:
     validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
   };
 
-  void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, time_system_); }
+  void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_); }
 
   // Getter.
   SPIFFEValidator& validator() { return *validator_; }
@@ -143,7 +143,7 @@ typed_config:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert_with_crl.pem"
   )EOF"));
 
-  EXPECT_EQ(1, validator().trustBundleStores().size());
+  EXPECT_EQ(1, validator().getSpiffeData()->trust_bundle_stores.size());
   EXPECT_NE(validator().getCaFileName().find("test_data/ca_cert_with_crl.pem"), std::string::npos);
   EXPECT_NE(validator().getCaFileName().find("hello.com"), std::string::npos);
 
@@ -161,7 +161,7 @@ typed_config:
         filename: "{{ test_rundir }}/test/common/tls/test_data/keyusage_crl_sign_cert.pem"
   )EOF"));
 
-  EXPECT_EQ(2, validator().trustBundleStores().size());
+  EXPECT_EQ(2, validator().getSpiffeData()->trust_bundle_stores.size());
 }
 
 TEST(SPIFFEValidator, TestExtractTrustDomain) {
@@ -229,7 +229,7 @@ TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
   // Trust bundle provided.
-  validator().trustBundleStores().emplace("example.com", X509StorePtr(X509_STORE_new()));
+  validator().getSpiffeData()->trust_bundle_stores.emplace("example.com", X509StorePtr(X509_STORE_new()));
   EXPECT_TRUE(validator().getTrustBundleStore(cert.get()));
 }
 

@@ -24,6 +24,7 @@ envoy_cc_extension(
         "//source/common/common:base64_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/common/common:hex_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
