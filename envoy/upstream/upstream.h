@@ -931,13 +931,6 @@ public:
   ~ClusterInfo() override = default;
 
   /**
-   * @return bool if true the cluster is created by a custom implementation and doesn't want it to
-   * be removed during CDS events. The deletion of the cluster is controlled by the custom
-   * implementation.
-   */
-  virtual bool ignoreRemoval() const PURE;
-
-  /**
    * @return bool whether the cluster was added via API (if false the cluster was present in the
    *         initial configuration and cannot be removed or updated).
    */

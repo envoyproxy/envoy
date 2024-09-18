@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 60]
+// [#next-free-field: 59]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -1222,12 +1222,6 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
-
-  // [#not-implemented-hide:]
-  // If ``ignore_removal`` is true, the cluster manager will ignore the cluster while removing during CDS event.
-  // This is useful when cluster is created and managed by custom implementation. For example, Dynamic Forward Proxy.
-  // NOTE: This is only for internal usage, not for users.
-  bool ignore_removal = 59;
 }
 
 // Extensible load balancing policy configuration.

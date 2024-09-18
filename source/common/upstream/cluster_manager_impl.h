@@ -251,7 +251,7 @@ public:
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                          const std::string& version_info) override;
+                          const std::string& version_info, const bool ignore_removal) override;
 
   void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
     init_helper_.setPrimaryClustersInitializedCb(callback);
@@ -285,8 +285,7 @@ public:
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
-  bool removeClusterAddedViaApi(const std::string& cluster) override;
-  bool removeCluster(const std::string& cluster) override;
+  bool removeCluster(const std::string& cluster, const bool remove_ignored) override;
   void shutdown() override {
     shutdown_ = true;
     if (resume_cds_ != nullptr) {
@@ -727,11 +726,11 @@ private:
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
                 const uint64_t cluster_config_hash, const std::string& version_info,
                 bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
-                TimeSource& time_source)
+                TimeSource& time_source, const bool ignore_removal = false)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
-          ignore_removal_(cluster_config.ignore_removal()), added_or_updated_{},
+          ignore_removal_(ignore_removal), added_or_updated_{},
           required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
@@ -843,7 +842,8 @@ private:
   absl::StatusOr<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                              const uint64_t cluster_hash,
                                              const std::string& version_info, bool added_via_api,
-                                             bool required_for_ads, ClusterMap& cluster_map);
+                                             bool required_for_ads, ClusterMap& cluster_map,
+                                             bool ignore_removal = false);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();

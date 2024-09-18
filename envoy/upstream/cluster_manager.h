@@ -237,10 +237,14 @@ public:
    *
    * @param cluster supplies the cluster configuration.
    * @param version_info supplies the xDS version of the cluster.
+   * @param ignore_removal If set to true, the cluster will be ignored from removal during CDS event.
+   *                       It can be removed by setting `remove_ignored` to true while calling removeCluster().
+   *                       This is useful for clusters whose lifecycle is managed with custom implementation.
    * @return true if the action results in an add/update of a cluster.
    */
   virtual bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                  const std::string& version_info) PURE;
+                                  const std::string& version_info,
+                                  const bool ignore_removal = false) PURE;
 
   /**
    * Set a callback that will be invoked when all primary clusters have been initialized.
@@ -322,21 +326,12 @@ public:
   /**
    * Remove a cluster via API. Only clusters added via addOrUpdateCluster() can
    * be removed in this manner. Statically defined clusters present when Envoy starts cannot be
-   * removed. This will remove cluster even if cluster's ignore_removal is set to true (useful for
-   * dynamic clusters created with custom implementation).
-   *
+   * removed.
+   * Cluster created using `addOrUpdateCluster()` with `ignore_removal` set to true. 
+   * can be removed by setting `remove_ignored` to true while removeCluster().
    * @return true if the action results in the removal of a cluster.
    */
-  virtual bool removeClusterAddedViaApi(const std::string& cluster) PURE;
-
-  /**
-   * Remove a cluster via API. Only clusters added via addOrUpdateCluster() can
-   * be removed in this manner. Statically defined clusters present when Envoy starts cannot be
-   * removed. Also, this will not remove the cluster if ignore_removal is set to true.
-   *
-   * @return true if the action results in the removal of a cluster.
-   */
-  virtual bool removeCluster(const std::string& cluster) PURE;
+  virtual bool removeCluster(const std::string& cluster, const bool remove_ignored = false) PURE;
 
   /**
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.

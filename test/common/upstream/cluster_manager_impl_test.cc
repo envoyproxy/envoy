@@ -6536,20 +6536,18 @@ TEST_F(ClusterManagerImplTest, ClusterIgnoreRemoval) {
                 port_value: 11001
   )EOF";
   auto cluster = parseClusterFromV3Yaml(added_via_api_yaml);
-  cluster.set_ignore_removal(true);
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(cluster, "v1"));
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(cluster, "v1", true));
 
   EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
   EXPECT_TRUE(cluster_manager_->checkActiveStaticCluster("good").ok());
 
-  // This should not remove the cluster as ignore_removal set to true
+  // This should not remove the cluster as remove_ignored is set to false
   EXPECT_FALSE(cluster_manager_->removeCluster("added_via_api"));
   EXPECT_EQ(2, cluster_manager_->clusters().active_clusters_.size());
 
-  // This should remove the cluster as removeClusterAddedViaApi will not consider ignore_removal
-  // attribute
-  EXPECT_TRUE(cluster_manager_->removeClusterAddedViaApi("added_via_api"));
+  // This should remove the cluster as remove_ignored is set to true
+  EXPECT_TRUE(cluster_manager_->removeCluster("added_via_api", true));
   EXPECT_EQ(1, cluster_manager_->clusters().active_clusters_.size());
 }
 
