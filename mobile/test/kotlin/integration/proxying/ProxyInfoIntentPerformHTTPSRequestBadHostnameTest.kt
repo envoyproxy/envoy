@@ -11,8 +11,10 @@ import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpProxyTestServerFactory
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -41,16 +43,19 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
   }
 
   private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
 
   @Before
   fun setUp() {
     httpProxyTestServer =
       HttpProxyTestServerFactory.start(HttpProxyTestServerFactory.Type.HTTPS_PROXY)
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP1_WITH_TLS)
   }
 
   @After
   fun tearDown() {
     httpProxyTestServer.shutdown()
+    httpTestServer.shutdown()
   }
 
   @Test
@@ -62,7 +67,7 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
     Shadows.shadowOf(connectivityManager)
       .setProxyForNetwork(
         connectivityManager.activeNetwork,
-        ProxyInfo.buildDirectProxy("loopback", httpProxyTestServer.port)
+        ProxyInfo.buildDirectProxy("bad.hostname", httpProxyTestServer.port)
       )
 
     val onEngineRunningLatch = CountDownLatch(1)
@@ -77,6 +82,7 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
         .setLogger { _, msg -> print(msg) }
         .enableProxying(true)
         .setOnEngineRunning { onEngineRunningLatch.countDown() }
+        .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .build()
 
     onEngineRunningLatch.await(10, TimeUnit.SECONDS)
@@ -86,8 +92,8 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "api.lyft.com",
-          path = "/ping"
+          authority = httpTestServer.address,
+          path = "/"
         )
         .build()
 

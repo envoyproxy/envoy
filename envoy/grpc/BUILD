@@ -11,7 +11,6 @@ envoy_package()
 envoy_cc_library(
     name = "async_client_interface",
     hdrs = ["async_client.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":status",
         "//envoy/buffer:buffer_interface",
@@ -21,6 +20,7 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
