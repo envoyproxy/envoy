@@ -2123,7 +2123,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   auto host = upstream_request.upstreamHost();
   const bool need_to_send_load_report =
       (host != nullptr) && cluster_->lrsReportMetricNames().has_value();
-  if (!need_to_send_load_report && !orca_load_report_callbacks_.has_value()) {
+  if (!need_to_send_load_report && orca_load_report_callbacks_.expired()) {
     return;
   }
 
@@ -2144,9 +2144,8 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
                                                     orca_load_report.value(),
                                                     host->loadMetricStats());
   }
-  if (orca_load_report_callbacks_.has_value()) {
-    const absl::Status status =
-        orca_load_report_callbacks_->onOrcaLoadReport(*orca_load_report, *host.get());
+  if (auto callbacks = orca_load_report_callbacks_.lock()) {
+    const absl::Status status = callbacks->onOrcaLoadReport(*orca_load_report, *host);
     if (!status.ok()) {
       ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
                        status.message());

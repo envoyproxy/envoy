@@ -15,9 +15,7 @@ namespace Upstream {
  * scheduling is used. When in not weighted mode, simple RR index selection is
  * used.
  */
-class ClientSideWeightedRoundRobinLoadBalancer
-    : public EdfLoadBalancerBase,
-      public LoadBalancerContext::OrcaLoadReportCallbacks {
+class ClientSideWeightedRoundRobinLoadBalancer : public EdfLoadBalancerBase {
 public:
   // This struct is used to store the client side data for the host. Hosts are
   // not shared between different clusters, but are shared between load
@@ -36,6 +34,49 @@ public:
 
     static constexpr MonotonicTime kDefaultNonEmptySince = MonotonicTime::max();
     static constexpr MonotonicTime kDefaultLastUpdateTime = MonotonicTime::min();
+  };
+
+  // This class is used to handle ORCA load reports.
+  // It stores the config necessary to calculate host weight based on the report.
+  // The load balancer context stores a weak pointer to this handler,
+  // so it is NOT invoked if the load balancer is deleted.
+  class OrcaLoadReportHandler : public LoadBalancerContext::OrcaLoadReportCallbacks {
+  public:
+    OrcaLoadReportHandler(
+        const envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
+            ClientSideWeightedRoundRobin& client_side_weighted_round_robin_config,
+        TimeSource& time_source);
+    ~OrcaLoadReportHandler() override = default;
+
+  private:
+    friend class ClientSideWeightedRoundRobinLoadBalancerFriend;
+
+    // {LoadBalancerContext::OrcaLoadReportCallbacks} implementation.
+    absl::Status onOrcaLoadReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                                  const HostDescription& host_description) override;
+
+    // Get utilization from `orca_load_report` using named metrics specified in
+    // `metric_names_for_computing_utilization`.
+    static double getUtilizationFromOrcaReport(
+        const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+        const std::vector<std::string>& metric_names_for_computing_utilization);
+
+    // Calculate client side weight from `orca_load_report` using `getUtilizationFromOrcaReport()`,
+    // QPS, EPS and `error_utilization_penalty`.
+    static absl::StatusOr<uint32_t> calculateWeightFromOrcaReport(
+        const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+        const std::vector<std::string>& metric_names_for_computing_utilization,
+        double error_utilization_penalty);
+
+    // Update client side data from `orca_load_report`. Invoked from `onOrcaLoadReport` callback on
+    // the worker thread.
+    absl::Status updateClientSideDataFromOrcaLoadReport(
+        const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+        ClientSideHostLbPolicyData& client_side_data);
+
+    std::vector<std::string> metric_names_for_computing_utilization_;
+    double error_utilization_penalty_;
+    TimeSource& time_source_;
   };
 
   ClientSideWeightedRoundRobinLoadBalancer(
@@ -60,10 +101,6 @@ private:
 
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
-
-  // {LoadBalancerContext::OrcaLoadReportCallbacks} implementation.
-  absl::Status onOrcaLoadReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                                const HostDescription& host_description) override;
 
   // Initialize LB policy based on the config.
   void initFromConfig(
@@ -90,29 +127,9 @@ private:
   getClientSideWeightIfValidFromHost(const Host& host, const MonotonicTime& min_non_empty_since,
                                      const MonotonicTime& max_last_update_time);
 
-  // Get utilization from `orca_load_report` using named metrics specified in
-  // `utilization_from_metric_names`.
-  static double
-  getUtilizationFromOrcaReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                               const std::vector<std::string>& utilization_from_metric_names);
-
-  // Calculate client side weight from `orca_load_report` using
-  // `getUtilizationFromOrcaReport()`, QPS, EPS and `error_utilization_penalty`.
-  static absl::StatusOr<uint32_t>
-  calculateWeightFromOrcaReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                                const std::vector<std::string>& utilization_from_metric_names,
-                                double error_utilization_penalty);
-
-  // Update client side data from `orca_load_report`. Invoked from
-  // `onOrcaLoadReport` callback on the worker thread.
-  absl::Status updateClientSideDataFromOrcaLoadReport(
-      const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-      ClientSideHostLbPolicyData& client_side_data);
-
   uint64_t peekahead_index_{};
   absl::flat_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
-  std::vector<std::string> metric_names_for_computing_utilization_;
-  double error_utilization_penalty_;
+  std::shared_ptr<OrcaLoadReportHandler> orca_load_report_handler_;
   // Timing parameters for the weight update.
   std::chrono::milliseconds blackout_period_;
   std::chrono::milliseconds weight_expiration_period_;

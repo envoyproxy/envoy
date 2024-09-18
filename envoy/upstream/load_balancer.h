@@ -124,8 +124,11 @@ public:
   /**
    * Install a callback to be invoked when ORCA Load report is received for this
    * LB context.
+   * Note: LB Context keeps a weak pointer to `callbacks` and doesn't invoke the callback
+   * if it is `expired()`.
    */
-  virtual void setOrcaLoadReportCallbacks(OrcaLoadReportCallbacks& callbacks) PURE;
+  virtual void
+  setOrcaLoadReportCallbacks(const std::weak_ptr<OrcaLoadReportCallbacks>& callbacks) PURE;
 };
 
 /**

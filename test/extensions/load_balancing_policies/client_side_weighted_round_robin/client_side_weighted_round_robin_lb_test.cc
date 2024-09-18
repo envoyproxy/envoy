@@ -46,22 +46,24 @@ public:
   static double
   getUtilizationFromOrcaReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
                                const std::vector<std::string>& utilization_from_metric_names) {
-    return ClientSideWeightedRoundRobinLoadBalancer::getUtilizationFromOrcaReport(
-        orca_load_report, utilization_from_metric_names);
+    return ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::
+        getUtilizationFromOrcaReport(orca_load_report, utilization_from_metric_names);
   }
 
   static absl::StatusOr<uint32_t>
   calculateWeightFromOrcaReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
                                 const std::vector<std::string>& utilization_from_metric_names,
                                 double error_utilization_penalty) {
-    return ClientSideWeightedRoundRobinLoadBalancer::calculateWeightFromOrcaReport(
-        orca_load_report, utilization_from_metric_names, error_utilization_penalty);
+    return ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::
+        calculateWeightFromOrcaReport(orca_load_report, utilization_from_metric_names,
+                                      error_utilization_penalty);
   }
 
   absl::Status updateClientSideDataFromOrcaLoadReport(
       const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
       ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData& client_side_data) {
-    return lb_->updateClientSideDataFromOrcaLoadReport(orca_load_report, client_side_data);
+    return lb_->orca_load_report_handler_->updateClientSideDataFromOrcaLoadReport(orca_load_report,
+                                                                                  client_side_data);
   }
 
 private:
@@ -1781,11 +1783,12 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(5)));
   for (const auto& host_ptr : hostSet().hosts_) {
     // chooseHost calls setOrcaLoadReportCallbacks.
-    LoadBalancerContext::OrcaLoadReportCallbacks* orca_load_report_callbacks;
+    std::shared_ptr<LoadBalancerContext::OrcaLoadReportCallbacks> orca_load_report_callbacks;
     EXPECT_CALL(lb_context_, setOrcaLoadReportCallbacks(_))
-        .WillOnce(Invoke([&](LoadBalancerContext::OrcaLoadReportCallbacks& callbacks) {
-          orca_load_report_callbacks = &callbacks;
-        }));
+        .WillOnce(Invoke(
+            [&](const std::shared_ptr<LoadBalancerContext::OrcaLoadReportCallbacks>& callbacks) {
+              orca_load_report_callbacks = callbacks;
+            }));
     HostConstSharedPtr host = lb_->chooseHost(&lb_context_);
     // Hosts have equal weights, so chooseHost returns the current host.
     ASSERT_EQ(host, host_ptr);

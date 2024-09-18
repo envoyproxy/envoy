@@ -6814,9 +6814,9 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   router_->decodeHeaders(headers, true);
 
   // Configure ORCA callbacks to receive the report.
-  TestOrcaLoadReportCallbacks callbacks;
+  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(callbacks, onOrcaLoadReport(_, _))
+  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _))
       .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
                            const Upstream::HostDescription&) {
         received_orca_load_report = orca_load_report;
@@ -6866,9 +6866,9 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   router_->decodeHeaders(headers, true);
 
   // Configure ORCA callbacks to receive the report.
-  TestOrcaLoadReportCallbacks callbacks;
+  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(callbacks, onOrcaLoadReport(_, _))
+  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _))
       .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
                            const Upstream::HostDescription&) {
         received_orca_load_report = orca_load_report;
@@ -6905,8 +6905,8 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
 
   // Configure ORCA callbacks to receive the report, but don't expect it to be
   // called for invalid orca header.
-  TestOrcaLoadReportCallbacks callbacks;
-  EXPECT_CALL(callbacks, onOrcaLoadReport(_, _)).Times(0);
+  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
+  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _)).Times(0);
   router_->setOrcaLoadReportCallbacks(callbacks);
 
   // Send report with invalid ORCA proto.
