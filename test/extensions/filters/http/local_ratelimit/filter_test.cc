@@ -3,9 +3,8 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -64,12 +63,12 @@ public:
   void setupPerRoute(const std::string& yaml, const bool enabled = true, const bool enforced = true,
                      const bool per_route = false) {
     EXPECT_CALL(
-        runtime_.snapshot_,
+        factory_context_.runtime_loader_.snapshot_,
         featureEnabled(absl::string_view("test_enabled"),
                        testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
         .WillRepeatedly(testing::Return(enabled));
     EXPECT_CALL(
-        runtime_.snapshot_,
+        factory_context_.runtime_loader_.snapshot_,
         featureEnabled(absl::string_view("test_enforced"),
                        testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
         .WillRepeatedly(testing::Return(enforced));
@@ -80,8 +79,7 @@ public:
     envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
     TestUtility::loadFromYaml(yaml, config);
     config_ =
-        std::make_shared<FilterConfig>(config, local_info_, dispatcher_, cm_, singleton_manager_,
-                                       *stats_.rootScope(), runtime_, per_route);
+        std::make_shared<FilterConfig>(config, factory_context_, *stats_.rootScope(), per_route);
     filter_ = std::make_shared<Filter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
 
@@ -103,10 +101,8 @@ public:
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_2_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  Singleton::ManagerImpl singleton_manager_;
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
 
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
@@ -115,7 +111,7 @@ public:
 
 TEST_F(FilterTest, Runtime) {
   setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\""), false, false);
-  EXPECT_EQ(&runtime_, &(config_->runtime()));
+  EXPECT_EQ(&factory_context_.runtime_loader_, &(config_->runtime()));
 }
 
 TEST_F(FilterTest, ToErrorCode) {
@@ -398,6 +394,56 @@ descriptors:
     tokens_per_fill: 1
     fill_interval: 60s
 stage: {}
+  )";
+
+static constexpr absl::string_view inlined_descriptor_config_yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: {}
+  tokens_per_fill: 1
+  fill_interval: 60s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+response_headers_to_add:
+  - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    header:
+      key: x-test-rate-limit
+      value: 'true'
+enable_x_ratelimit_headers: {}
+descriptors:
+- entries:
+   - key: hello
+     value: world
+   - key: foo
+     value: bar
+  token_bucket:
+    max_tokens: 10
+    tokens_per_fill: 10
+    fill_interval: 60s
+- entries:
+   - key: foo2
+     value: bar2
+  token_bucket:
+    max_tokens: {}
+    tokens_per_fill: 1
+    fill_interval: 60s
+rate_limits:
+- actions:
+  - header_value_match:
+      descriptor_key: foo2
+      descriptor_value: bar2
+      headers:
+      - name: x-header-name
+        string_match:
+          exact: test_value
   )";
 
 static constexpr absl::string_view consume_default_token_config_yaml = R"(
@@ -936,6 +982,24 @@ TEST_F(DescriptorFilterTest, IncludeVirtualHostRateLimitsSetTrue) {
       .WillOnce(testing::SetArgReferee<0>(descriptor_));
   auto headers = Http::TestRequestHeaderMapImpl();
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+}
+
+TEST_F(DescriptorFilterTest, UseInlinedRateLimitConfig) {
+  setUpTest(fmt::format(inlined_descriptor_config_yaml, "10", R"("OFF")", "1"));
+
+  auto headers = Http::TestRequestHeaderMapImpl();
+  // Requests will not be blocked because the requests don't match any descriptor and
+  // the global token bucket has enough tokens.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  headers.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
+
+  // Only one request is allowd in 60s for the matched request.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
 } // namespace LocalRateLimitFilter

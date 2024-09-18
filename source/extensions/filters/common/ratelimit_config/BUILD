@@ -12,12 +12,11 @@ envoy_cc_library(
     name = "ratelimit_config_lib",
     srcs = ["ratelimit_config.cc"],
     hdrs = ["ratelimit_config.h"],
-    external_deps = [
-        "abseil_strings",
-        "abseil_inlined_vector",
-    ],
     deps = [
         "//envoy/ratelimit:ratelimit_interface",
+        "//source/common/router:router_ratelimit_lib",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/strings",
         "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
     ],
 )
