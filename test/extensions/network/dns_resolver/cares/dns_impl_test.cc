@@ -1319,8 +1319,8 @@ TEST_P(DnsImplTest, AutoOnlyV6IfBothV6andV4) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}},
+                                             {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1330,8 +1330,8 @@ TEST_P(DnsImplTest, AutoV6IfOnlyV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}},
+                                             {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1363,8 +1363,8 @@ TEST_P(DnsImplTest, V4PreferredV6IfOnlyV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
-                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}},
+                                             {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1396,8 +1396,8 @@ TEST_P(DnsImplTest, AllV6IfOnlyV6) {
   server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
-                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}}, {},
-                                             absl::nullopt));
+                                             DnsResolver::ResolutionStatus::Completed, {{"1::2"}},
+                                             {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/);
@@ -1452,16 +1452,16 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 
   if (GetParam() == Address::IpVersion::v6) {
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::V6Only,
-                                               DnsResolver::ResolutionStatus::Completed, {"::1"}, {},
-                                               std::chrono::seconds(0)));
+                                               DnsResolver::ResolutionStatus::Completed, {"::1"},
+                                               {}, std::chrono::seconds(0)));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     checkStats(resolve_total + 1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
                0 /*get_addr_failure*/, 0 /*timeouts*/);
     resolve_total++;
 
     EXPECT_EQ(nullptr, resolveWithExpectations("localhost", DnsLookupFamily::Auto,
-                                               DnsResolver::ResolutionStatus::Completed, {"::1"}, {},
-                                               std::chrono::seconds(0)));
+                                               DnsResolver::ResolutionStatus::Completed, {"::1"},
+                                               {}, std::chrono::seconds(0)));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
     checkStats(resolve_total + 1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
                0 /*get_addr_failure*/, 0 /*timeouts*/);

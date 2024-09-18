@@ -882,7 +882,8 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithEmptyResult) {
               onDnsResolutionComplete("foo.com:80", DnsHostInfoAddressIsNull(),
                                       Network::DnsResolver::ResolutionStatus::Completed));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(configured_ttl_), _));
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "", TestUtility::makeDnsResponse({}));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({}));
   checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
@@ -1137,7 +1138,8 @@ TEST_F(DnsCacheImplTest, InvalidPort) {
   EXPECT_CALL(update_callbacks_,
               onDnsResolutionComplete("foo.com:abc:80", DnsHostInfoAddressIsNull(),
                                       Network::DnsResolver::ResolutionStatus::Completed));
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "", TestUtility::makeDnsResponse({}));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({}));
 }
 
 // Max host overflow.
