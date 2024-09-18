@@ -63,7 +63,7 @@ variables:
     N1/wsjk="
 
 - name: shouldTriggerGithub
-  value: ${{ ne(variables.GitHubPublicRepoWorkflowInstallId, '') }}
+  value: ${{ ne(variables['GitHubPublicRepoWorkflowInstallId'], '') }}
 
 
 stages:
