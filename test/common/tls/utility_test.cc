@@ -171,6 +171,33 @@ TEST(UtilityTest, GetLastCryptoError) {
   EXPECT_FALSE(Utility::getLastCryptoError().has_value());
 }
 
+TEST(UtilityTest, TestGetCertificateExtensionOids) {
+  const std::string test_data_path = "{{ test_rundir }}/test/common/tls/test_data/";
+  const std::vector<std::pair<std::string, int>> test_set = {
+      {"unittest_cert.pem", 1},
+      {"no_extension_cert.pem", 0},
+      {"extensions_cert.pem", 7},
+  };
+
+  for (const auto& test_case : test_set) {
+    bssl::UniquePtr<X509> cert =
+        readCertFromFile(TestEnvironment::substitute(test_data_path + test_case.first));
+    const auto& extension_oids = Utility::getCertificateExtensionOids(*cert);
+    EXPECT_EQ(test_case.second, extension_oids.size());
+  }
+
+  bssl::UniquePtr<X509> cert =
+      readCertFromFile(TestEnvironment::substitute(test_data_path + "extensions_cert.pem"));
+  // clang-format off
+  std::vector<std::string> expected_oids{
+      "2.5.29.14", "2.5.29.15", "2.5.29.19",
+      "2.5.29.35", "2.5.29.37",
+      "1.2.3.4.5.6.7.8", "1.2.3.4.5.6.7.9"};
+  // clang-format on
+  const auto& extension_oids = Utility::getCertificateExtensionOids(*cert);
+  EXPECT_THAT(extension_oids, testing::UnorderedElementsAreArray(expected_oids));
+}
+
 TEST(UtilityTest, TestGetCertificationExtensionValue) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/common/tls/test_data/extensions_cert.pem"));
@@ -223,11 +250,12 @@ TEST(UtilityTest, TestMapX509Stack) {
   auto func = [](X509& cert) -> std::string { return Utility::getSubjectFromCertificate(cert); };
   EXPECT_EQ(expected_subject, Utility::mapX509Stack(*cert_chain, func));
 
-  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*sk_X509_new_null(), func), "x509 stack is empty or NULL");
+  bssl::UniquePtr<STACK_OF(X509)> empty_chain(sk_X509_new_null());
+  EXPECT_ENVOY_BUG(Utility::mapX509Stack(*empty_chain, func), "x509 stack is empty or NULL");
   EXPECT_ENVOY_BUG(Utility::mapX509Stack(*cert_chain, nullptr), "field_extractor is nullptr");
-  bssl::UniquePtr<STACK_OF(X509)> fakeCertChain(sk_X509_new_null());
-  sk_X509_push(fakeCertChain.get(), nullptr);
-  EXPECT_EQ(std::vector<std::string>{""}, Utility::mapX509Stack(*fakeCertChain, func));
+  bssl::UniquePtr<STACK_OF(X509)> fake_cert_chain(sk_X509_new_null());
+  sk_X509_push(fake_cert_chain.get(), nullptr);
+  EXPECT_EQ(std::vector<std::string>{""}, Utility::mapX509Stack(*fake_cert_chain, func));
 }
 
 } // namespace

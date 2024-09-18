@@ -64,12 +64,12 @@ struct NullVirtualHost : public Router::VirtualHost {
   bool includeIsTimeoutRetryHeader() const override { return false; }
   uint32_t retryShadowBufferLimit() const override { return std::numeric_limits<uint32_t>::max(); }
   const Router::RouteSpecificFilterConfig*
-  mostSpecificPerFilterConfig(const std::string&) const override {
+  mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;
   }
-  void traversePerFilterConfig(
-      const std::string&,
-      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  Router::RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override {
+    return {};
+  }
   const envoy::config::core::v3::Metadata& metadata() const override {
     return Router::DefaultRouteMetadataPack::get().proto_metadata_;
   }
@@ -225,12 +225,12 @@ struct NullRouteImpl : public Router::Route {
   const Router::Decorator* decorator() const override { return nullptr; }
   const Router::RouteTracing* tracingConfig() const override { return nullptr; }
   const Router::RouteSpecificFilterConfig*
-  mostSpecificPerFilterConfig(const std::string&) const override {
+  mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;
   }
-  void traversePerFilterConfig(
-      const std::string&,
-      std::function<void(const Router::RouteSpecificFilterConfig&)>) const override {}
+  Router::RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override {
+    return {};
+  }
   const envoy::config::core::v3::Metadata& metadata() const override {
     return Router::DefaultRouteMetadataPack::get().proto_metadata_;
   }

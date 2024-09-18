@@ -153,13 +153,14 @@ void AsyncStreamImpl::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_str
   encoded_response_headers_ = true;
   stream_callbacks_.onHeaders(std::move(headers), end_stream);
   closeRemote(end_stream);
-  // At present, the router cleans up stream state as soon as the remote is closed, making a
-  // half-open local stream unsupported and dangerous. Ensure we close locally to trigger completion
-  // and keep things consistent. Another option would be to issue a stream reset here if local isn't
-  // yet closed, triggering cleanup along a more standardized path. However, this would require
-  // additional logic to handle the response completion and subsequent reset, and run the risk of
-  // being interpreted as a failure, when in fact no error has necessarily occurred. Gracefully
-  // closing seems most in-line with behavior elsewhere in Envoy for now.
+  // At present, the AsyncStream is always fully closed when the server half closes the stream.
+  //
+  // Always ensure we close locally to trigger completion. Another option would be to issue a stream
+  // reset here if local isn't yet closed, triggering cleanup along a more standardized path.
+  // However, this would require additional logic to handle the response completion and subsequent
+  // reset, and run the risk of being interpreted as a failure, when in fact no error has
+  // necessarily occurred. Gracefully closing seems most in-line with behavior elsewhere in Envoy
+  // for now.
   closeLocal(end_stream);
 }
 

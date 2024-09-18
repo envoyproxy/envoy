@@ -11,6 +11,13 @@ final class FilterResetIdleTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testFilterResetIdle() {
     let filterName = "reset_idle_test_filter"
 

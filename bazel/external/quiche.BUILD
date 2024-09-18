@@ -433,9 +433,6 @@ envoy_cc_library(
         "quiche/http2/adapter/oghttp2_session.h",
     ],
     copts = quiche_copts,
-    external_deps = [
-        "abseil_algorithm",
-    ],
     repository = "@envoy",
     deps = [
         ":http2_adapter_chunked_buffer",
@@ -457,6 +454,7 @@ envoy_cc_library(
         ":http2_no_op_headers_handler_lib",
         ":quiche_common_callbacks",
         ":spdy_core_http2_header_block_lib",
+        "@com_google_absl//absl/algorithm",
         "@com_google_absl//absl/cleanup",
     ],
 )
@@ -2296,13 +2294,11 @@ envoy_quic_cc_library(
     hdrs = [
         "quiche/quic/core/quic_connection_context.h",
     ],
-    external_deps = [
-        "abseil_str_format",
-    ],
     deps = [
         ":quic_platform_export",
         ":quiche_common_platform",
         ":quiche_common_text_utils_lib",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )
 
@@ -2664,7 +2660,6 @@ envoy_quic_cc_library(
     hdrs = ["quiche/quic/core/crypto/proof_source_x509.h"],
     external_deps = [
         "ssl",
-        "abseil_node_hash_map",
     ],
     deps = [
         ":quic_core_crypto_certificate_view_lib",
@@ -2675,6 +2670,7 @@ envoy_quic_cc_library(
         ":quic_platform_base",
         ":quiche_common_endian_lib",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:node_hash_map",
     ],
 )
 
@@ -3898,12 +3894,14 @@ envoy_quic_cc_library(
         "quiche/quic/core/chlo_extractor.cc",
         "quiche/quic/core/quic_buffered_packet_store.cc",
         "quiche/quic/core/quic_dispatcher.cc",
+        "quiche/quic/core/quic_dispatcher_stats.cc",
         "quiche/quic/core/tls_chlo_extractor.cc",
     ],
     hdrs = [
         "quiche/quic/core/chlo_extractor.h",
         "quiche/quic/core/quic_buffered_packet_store.h",
         "quiche/quic/core/quic_dispatcher.h",
+        "quiche/quic/core/quic_dispatcher_stats.h",
         "quiche/quic/core/tls_chlo_extractor.h",
     ],
     deps = [
@@ -5089,13 +5087,11 @@ envoy_cc_test(
 envoy_cc_library(
     name = "quiche_common_print_elements_lib",
     hdrs = ["quiche/common/print_elements.h"],
-    external_deps = [
-        "abseil_inlined_vector",
-    ],
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 
@@ -5121,14 +5117,12 @@ envoy_cc_library(
     name = "quiche_common_text_utils_lib",
     srcs = ["quiche/common/quiche_text_utils.cc"],
     hdrs = ["quiche/common/quiche_text_utils.h"],
-    external_deps = [
-        "abseil_str_format",
-    ],
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_export",
         "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )
 

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.oauth2.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
@@ -26,7 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 6]
 message OAuth2Credentials {
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message CookieNames {
     // Cookie name to hold OAuth bearer token value. When the authentication server validates the
     // client and returns an authorization token back to the OAuth filter, no matter what format
@@ -50,6 +51,10 @@ message OAuth2Credentials {
 
     // Cookie name to hold the refresh token. Defaults to ``RefreshToken``.
     string refresh_token = 5
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold the nonce value. Defaults to ``OauthNonce``.
+    string oauth_nonce = 6
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 
@@ -79,7 +84,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -92,6 +97,9 @@ message OAuth2Config {
 
   // Endpoint on the authorization server to retrieve the access token from.
   config.core.v3.HttpUri token_endpoint = 1;
+
+  // Specifies the retry policy for requests to the OAuth server. If not specified, then no retries will be performed.
+  config.core.v3.RetryPolicy retry_policy = 18;
 
   // The endpoint redirect to for authorization in response to unauthorized requests.
   string authorization_endpoint = 2 [(validate.rules).string = {min_len: 1}];
@@ -171,13 +179,13 @@ message OAuth2Config {
   // Enabling this option will only disable setting the cookie response header, the filter
   // will still process incoming Access Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
   // sessions would not set the Access Token cookie header.
-  bool disable_access_token_set_cookie = 18;
+  bool disable_access_token_set_cookie = 19;
 
   // If set to true, the client will not set a cookie for Refresh Token even if one is received from the Identity Provider.
   // Enabling this option will only disable setting the cookie response header, the filter
   // will still process incoming Refresh Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
   // sessions would not set the Refresh Token cookie header.
-  bool disable_refresh_token_set_cookie = 19;
+  bool disable_refresh_token_set_cookie = 20;
 }
 
 // Filter config.

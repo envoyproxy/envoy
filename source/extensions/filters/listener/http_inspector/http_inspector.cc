@@ -89,7 +89,7 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
       new_data = new_data.substr(0, pos + 1);
       ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
       ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
-                HTTP_PARSER_ERRNO(&parser_));
+                static_cast<int>(HTTP_PARSER_ERRNO(&parser_)));
 
       // Errors in parsing HTTP.
       if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
@@ -106,7 +106,7 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     } else {
       ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
       ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
-                HTTP_PARSER_ERRNO(&parser_));
+                static_cast<int>(HTTP_PARSER_ERRNO(&parser_)));
 
       // Errors in parsing HTTP.
       if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {

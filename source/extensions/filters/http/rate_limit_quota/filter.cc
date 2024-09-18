@@ -25,7 +25,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // allowed/denied, matching succeed/fail and so on.
     ENVOY_LOG(debug,
               "The request is not matched by any matchers: ", match_result.status().message());
-    return Envoy::Http::FilterHeadersStatus::Continue;
+    return sendAllowResponse();
   }
 
   // Second, generate the bucket id for this request based on match action when the request matching
@@ -38,7 +38,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
     // When it failed to generate the bucket id for this specific request, the request is ALLOWED by
     // default (i.e., fail-open).
     ENVOY_LOG(debug, "Unable to generate the bucket id: {}", ret.status().message());
-    return Envoy::Http::FilterHeadersStatus::Continue;
+    return sendAllowResponse();
   }
 
   const BucketId& bucket_id_proto = *ret;
@@ -163,6 +163,8 @@ void RateLimitQuotaFilter::createNewBucket(const BucketId& bucket_id,
   quota_buckets_[id] = std::move(new_bucket);
 }
 
+// This function should not update QuotaUsage as that will have been handled
+// when constructing the Report before this function is called.
 Http::FilterHeadersStatus
 RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
                                           const RateLimitOnMatchAction& match_action) {
@@ -187,10 +189,9 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
   if (!status.ok()) {
     ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
     // TODO(tyxia) Check `NoAssignmentBehavior` behavior instead of fail-open here.
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  } else {
-    ENVOY_LOG(debug, "The gRPC stream is established and active");
+    return sendAllowResponse();
   }
+  ENVOY_LOG(debug, "The gRPC stream is established and active");
 
   // Send the usage report to RLQS server immediately on the first time when the request is
   // matched.
@@ -219,7 +220,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
                      "request with hashed bucket_id {} is allowed through.");
     ENVOY_LOG(debug, "Default action for bucket_id {} does not contain a blanket action: {}",
               bucket_id, quota_buckets_[bucket_id]->default_action.DebugString());
-    return Http::FilterHeadersStatus::Continue;
+    return sendAllowResponse();
   }
   auto blanket_rule = quota_buckets_[bucket_id]
                           ->default_action.quota_assignment_action()
@@ -234,8 +235,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
               "throttled by DENY_ALL strategy.",
               bucket_id);
     ENVOY_LOG(debug, "Hit configured default DENY_ALL for bucket_id {}", bucket_id);
-    sendDenyResponse();
-    return Envoy::Http::FilterHeadersStatus::StopIteration;
+    return sendDenyResponse();
   }
 
   ENVOY_LOG(trace,
@@ -243,18 +243,19 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
             "allowed by the configured default ALLOW_ALL strategy.",
             bucket_id);
   ENVOY_LOG(debug, "Hit configured default ALLOW_ALL for bucket_id {}", bucket_id);
-  return Http::FilterHeadersStatus::Continue;
+  return sendAllowResponse();
 }
 
-Http::FilterHeadersStatus RateLimitQuotaFilter::getStatusFromAction(const BucketAction& action,
-                                                                    size_t bucket_id) {
+Http::FilterHeadersStatus
+RateLimitQuotaFilter::setUsageAndResponseFromAction(const BucketAction& action,
+                                                    const size_t bucket_id) {
   if (!action.has_quota_assignment_action() ||
       !action.quota_assignment_action().has_rate_limit_strategy()) {
     ENVOY_LOG(debug,
               "Selected bucket action defaulting to ALLOW_ALL as it does not "
               "have an assignment for bucket_id {}",
               bucket_id);
-    return Envoy::Http::FilterHeadersStatus::Continue;
+    return sendAllowResponse(&quota_buckets_[bucket_id]->quota_usage);
   }
 
   // TODO(tyxia) Currently, blanket rule and token bucket strategies are
@@ -265,8 +266,10 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::getStatusFromAction(const Bucket
     bool allow = (rate_limit_strategy.blanket_rule() != RateLimitStrategy::DENY_ALL);
     ENVOY_LOG(trace, "Request with hashed bucket_id {} is {} by the selected blanket rule.",
               bucket_id, allow ? "allowed" : "denied");
-    return allow ? Envoy::Http::FilterHeadersStatus::Continue
-                 : Envoy::Http::FilterHeadersStatus::StopIteration;
+    if (allow) {
+      return sendAllowResponse(&quota_buckets_[bucket_id]->quota_usage);
+    }
+    return sendDenyResponse(&quota_buckets_[bucket_id]->quota_usage);
   }
 
   if (rate_limit_strategy.has_token_bucket()) {
@@ -284,7 +287,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::getStatusFromAction(const Bucket
                 "Allowing request as token bucket is not empty for bucket_id "
                 "{}. Initial assignment: {}.",
                 bucket_id, rate_limit_strategy.token_bucket().ShortDebugString());
-      return Envoy::Http::FilterHeadersStatus::Continue;
+      return sendAllowResponse(&quota_buckets_[bucket_id]->quota_usage);
     }
     // Request is throttled.
     ENVOY_LOG(trace,
@@ -295,14 +298,14 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::getStatusFromAction(const Bucket
               "Denying request as token bucket is exhausted for bucket_id {}. "
               "Initial assignment: {}.",
               bucket_id, rate_limit_strategy.token_bucket().ShortDebugString());
-    return Envoy::Http::FilterHeadersStatus::StopIteration;
+    return sendDenyResponse(&quota_buckets_[bucket_id]->quota_usage);
   }
 
   ENVOY_LOG(error,
             "Failing open as selected bucket action for bucket_id {} contains "
             "an unsupported rate limit strategy: {}",
             bucket_id, rate_limit_strategy.DebugString());
-  return Envoy::Http::FilterHeadersStatus::Continue;
+  return sendAllowResponse(&quota_buckets_[bucket_id]->quota_usage);
 }
 
 bool isCachedActionExpired(TimeSource& time_source, const Bucket& bucket) {
@@ -322,28 +325,21 @@ Http::FilterHeadersStatus
 RateLimitQuotaFilter::processCachedBucket(size_t bucket_id,
                                           const RateLimitOnMatchAction& match_action) {
   auto* cached_bucket = quota_buckets_[bucket_id].get();
-  Http::FilterHeadersStatus ret_status;
 
+  // If no cached action, use the default action.
   if (!cached_bucket->cached_action.has_value()) {
-    // If no cached action, use the default action.
-    ret_status = getStatusFromAction(cached_bucket->default_action, bucket_id);
-  } else if (isCachedActionExpired(time_source_, *cached_bucket)) {
-    // If expired, remove the expired action & fallback.
-    ret_status = processExpiredBucket(bucket_id, match_action);
-    cached_bucket->cached_action = absl::nullopt;
-  } else {
-    // If not expired, use the cached action.
-    ret_status = getStatusFromAction(*cached_bucket->cached_action, bucket_id);
+    return setUsageAndResponseFromAction(cached_bucket->default_action, bucket_id);
   }
 
-  if (ret_status == Envoy::Http::FilterHeadersStatus::StopIteration) {
-    sendDenyResponse();
-    quota_buckets_[bucket_id]->quota_usage.num_requests_denied += 1;
-  } else {
-    quota_buckets_[bucket_id]->quota_usage.num_requests_allowed += 1;
+  // If expired, remove the expired action & fallback.
+  if (isCachedActionExpired(time_source_, *cached_bucket)) {
+    Http::FilterHeadersStatus ret_status = processExpiredBucket(bucket_id, match_action);
+    cached_bucket->cached_action = std::nullopt;
+    return ret_status;
   }
 
-  return ret_status;
+  // If not expired, use the cached action.
+  return setUsageAndResponseFromAction(*cached_bucket->cached_action, bucket_id);
 }
 
 // Note: does not remove the expired entity from the cache.
@@ -354,9 +350,11 @@ RateLimitQuotaFilter::processExpiredBucket(size_t bucket_id,
 
   if (!match_action.bucketSettings().has_expired_assignment_behavior() ||
       !match_action.bucketSettings().expired_assignment_behavior().has_fallback_rate_limit()) {
-    ENVOY_LOG(debug, "Selecting default action for bucket_id as expiration "
-                     "fallback assignment doesn't have a configured override {}");
-    return getStatusFromAction(cached_bucket->default_action, bucket_id);
+    ENVOY_LOG(debug,
+              "Selecting default action for bucket_id as expiration "
+              "fallback assignment doesn't have a configured override {}",
+              match_action.bucketSettings().expired_assignment_behavior().DebugString());
+    return setUsageAndResponseFromAction(cached_bucket->default_action, bucket_id);
   }
 
   const RateLimitStrategy& fallback_rate_limit =
@@ -367,14 +365,14 @@ RateLimitQuotaFilter::processExpiredBucket(size_t bucket_id,
               "Exipred action falling back to configured DENY_ALL for "
               "bucket_id {}",
               bucket_id);
-    return Envoy::Http::FilterHeadersStatus::StopIteration;
+    return sendDenyResponse(&cached_bucket->quota_usage);
   }
 
   ENVOY_LOG(debug,
-            "Exipred action falling back to configured ALLOW_ALL for "
-            "bucket_id {}",
-            bucket_id);
-  return Envoy::Http::FilterHeadersStatus::Continue;
+            "Exipred action falling back to ALLOW_ALL for bucket_id {} with "
+            "fallback action {}",
+            bucket_id, fallback_rate_limit.DebugString());
+  return sendAllowResponse(&cached_bucket->quota_usage);
 }
 
 } // namespace RateLimitQuota

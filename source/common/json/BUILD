@@ -43,17 +43,26 @@ envoy_cc_library(
         ":json_internal_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
+        "@utf8_range//:utf8_validity",
     ],
 )
 
 envoy_cc_library(
     name = "json_streamer_lib",
-    srcs = ["json_streamer.cc"],
     hdrs = ["json_streamer.h"],
     deps = [
+        ":constants_lib",
         ":json_sanitizer_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_util_lib",
         "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "constants_lib",
+    hdrs = ["constants.h"],
+    deps = [
+        "@com_google_absl//absl/strings",
     ],
 )

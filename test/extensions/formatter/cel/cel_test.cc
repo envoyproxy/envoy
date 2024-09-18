@@ -77,7 +77,7 @@ TEST_F(CELFormatterTest, TestRequestHeader) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("GET", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
@@ -93,7 +93,7 @@ TEST_F(CELFormatterTest, TestMissingRequestHeader) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("-", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
@@ -109,7 +109,7 @@ TEST_F(CELFormatterTest, TestWithoutMaxLength) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("/original/path?secret=parameter",
             formatter->formatWithContext(formatter_context_, stream_info_));
 }
@@ -126,7 +126,7 @@ TEST_F(CELFormatterTest, TestMaxLength) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("/original", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
@@ -142,7 +142,7 @@ TEST_F(CELFormatterTest, TestContains) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("true", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
@@ -158,7 +158,7 @@ TEST_F(CELFormatterTest, TestComplexCelExpression) {
   TestUtility::loadFromYaml(yaml, config_);
 
   auto formatter =
-      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("true /original false", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
@@ -174,7 +174,7 @@ TEST_F(CELFormatterTest, TestInvalidExpression) {
   TestUtility::loadFromYaml(yaml, config_);
 
   EXPECT_THROW_WITH_REGEX(
-      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
       EnvoyException, "Not able to parse filter expression: .*");
 }
 #endif

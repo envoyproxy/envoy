@@ -1121,7 +1121,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   default:
     // Any other message is considered spurious
     ENVOY_LOG(debug, "Received unknown stream message {} -- ignoring and marking spurious",
-              response->response_case());
+              static_cast<int>(response->response_case()));
     processing_status = absl::FailedPreconditionError("unhandled message");
     break;
   }
@@ -1136,7 +1136,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // ignore the stream for the rest of this filter instance's lifetime
     // to protect us from a malformed server.
     ENVOY_LOG(warn, "Spurious response message {} received on gRPC stream",
-              response->response_case());
+              static_cast<int>(response->response_case()));
     closeStream();
     clearAsyncState();
     processing_complete_ = true;
@@ -1279,20 +1279,14 @@ void Filter::mergePerRouteConfig() {
   route_config_merged_ = true;
 
   absl::optional<FilterConfigPerRoute> merged_config;
-
-  decoder_callbacks_->traversePerFilterConfig([&merged_config](
-                                                  const Router::RouteSpecificFilterConfig& cfg) {
-    const FilterConfigPerRoute* typed_cfg = dynamic_cast<const FilterConfigPerRoute*>(&cfg);
-    if (typed_cfg == nullptr) {
-      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
-      return;
-    }
+  for (const FilterConfigPerRoute& typed_cfg :
+       Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
     if (!merged_config.has_value()) {
-      merged_config.emplace(*typed_cfg);
+      merged_config.emplace(typed_cfg);
     } else {
-      merged_config.emplace(FilterConfigPerRoute(merged_config.value(), *typed_cfg));
+      merged_config.emplace(FilterConfigPerRoute(merged_config.value(), typed_cfg));
     }
-  });
+  }
 
   if (!merged_config.has_value()) {
     return;

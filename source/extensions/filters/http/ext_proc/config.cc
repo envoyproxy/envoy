@@ -23,8 +23,8 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
       dual_info.scope, stats_prefix, dual_info.is_upstream,
       Envoy::Extensions::Filters::Common::Expr::getBuilder(context), context);
 
-  return [filter_config, grpc_service = proto_config.grpc_service(), &context,
-          dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
+  return [filter_config = std::move(filter_config), grpc_service = proto_config.grpc_service(),
+          &context, dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
     auto client = std::make_unique<ExternalProcessorClientImpl>(
         context.clusterManager().grpcAsyncClientManager(), dual_info.scope);
 
@@ -54,7 +54,7 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyp
       server_context.scope(), stats_prefix, false,
       Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context), server_context);
 
-  return [filter_config, grpc_service = proto_config.grpc_service(),
+  return [filter_config = std::move(filter_config), grpc_service = proto_config.grpc_service(),
           &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
     auto client = std::make_unique<ExternalProcessorClientImpl>(
         server_context.clusterManager().grpcAsyncClientManager(), server_context.scope());

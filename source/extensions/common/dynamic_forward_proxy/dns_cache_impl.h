@@ -70,6 +70,7 @@ public:
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override;
   void forceRefreshHosts() override;
   void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) override;
+  void stop() override;
 
 private:
   DnsCacheImpl(Server::Configuration::GenericFactoryContext& context,

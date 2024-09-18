@@ -183,6 +183,12 @@ resources:
       result = fake_oauth2_connection_->waitForDisconnect();
       RELEASE_ASSERT(result, result.message());
     }
+    if (lds_connection_ != nullptr) {
+      AssertionResult result = lds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
     if (fake_upstream_connection_ != nullptr) {
       AssertionResult result = fake_upstream_connection_->close();
       RELEASE_ASSERT(result, result.message());
@@ -203,6 +209,11 @@ typed_config:
       cluster: oauth
       uri: oauth.com/token
       timeout: 3s
+    retry_policy:
+      retry_back_off:
+        base_interval: 1s
+        max_interval: 10s
+      num_retries: 5
     authorization_endpoint: https://oauth.com/oauth/authorize/
     redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
     redirect_path_matcher:
@@ -260,7 +271,7 @@ typed_config:
         Http::Headers::get().Cookie,
         absl::StrCat(default_cookie_names_.refresh_token_, "=", refreshToken));
 
-    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_};
+    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_, ""};
     validator.setParams(validate_headers, std::string(hmac_secret));
     return validator.isValid();
   }
@@ -306,11 +317,13 @@ typed_config:
 
     Http::TestRequestHeaderMapImpl headers{
         {":method", "GET"},
-        {":path", "/callback?code=foo&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
+        {":path", "/callback?code=foo&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%"
+                  "252F_oauth%26nonce%3D1234567890000000"},
         {":scheme", "http"},
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},
-        {"authority", "Bearer token"}};
+        {"authority", "Bearer token"},
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=1234567890000000")}};
 
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
@@ -341,13 +354,15 @@ typed_config:
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl headersWithCookie{
         {":method", "GET"},
-        {":path", "/callback?code=foo&state=http%3A%2F%2Ftraffic.example.com%2Fnot%2F_oauth"},
+        {":path", "/callback?code=foo&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%"
+                  "252F_oauth%26nonce%3D1234567890000000"},
         {":scheme", "http"},
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},
         {"authority", "Bearer token"},
         {"cookie", absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac)},
         {"cookie", absl::StrCat(default_cookie_names_.oauth_expires_, "=", oauth_expires)},
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=1234567890000000")},
         {"cookie", absl::StrCat(default_cookie_names_.bearer_token_, "=", bearer_token)},
         {"cookie", absl::StrCat(default_cookie_names_.refresh_token_, "=", refresh_token)},
     };
@@ -397,8 +412,8 @@ typed_config:
     cleanup();
   }
 
-  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires", "IdToken",
-                                          "RefreshToken"};
+  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC",    "OauthExpires",
+                                          "IdToken",     "RefreshToken", "OauthNonce"};
   envoy::config::listener::v3::Listener listener_config_;
   std::string listener_name_{"http"};
   FakeHttpConnectionPtr lds_connection_;

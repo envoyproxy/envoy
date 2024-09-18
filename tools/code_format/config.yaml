@@ -38,7 +38,7 @@ paths:
   excluded:
   - .
   - bazel/external/http_parser/
-  - bazel/toolchains/configs/
+  - bazel/rbe/toolchains/configs/
   - bazel-
   - build
   - contrib/contrib_build_config.bzl
@@ -110,7 +110,6 @@ paths:
     - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
-    - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
@@ -203,6 +202,7 @@ paths:
     - source/common/protobuf/utility.cc
     - source/common/protobuf/protobuf.h
     - source/common/protobuf/yaml_utility.cc
+    - source/extensions/filters/http/proto_message_extraction/extraction_util/extraction_util.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
 
   namespace_check:
@@ -224,6 +224,7 @@ paths:
     - ci/prebuilt
     - source/common/protobuf
     - source/extensions/filters/http/grpc_field_extraction
+    - source/extensions/filters/http/proto_message_extraction/extraction_util
     - test/extensions/bootstrap/wasm/test_data
 
   # Files that are allowed to use try without main thread assertion.

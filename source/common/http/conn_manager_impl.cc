@@ -126,8 +126,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfigSharedPtr co
                                      /*node_id=*/local_info_.node().id(),
                                      /*server_name=*/config_->serverName(),
                                      /*proxy_status_config=*/config_->proxyStatusConfig())),
-      max_requests_during_dispatch_(runtime_.snapshot().getInteger(
-          ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)) {
+      max_requests_during_dispatch_(
+          runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
+      allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -790,6 +792,10 @@ absl::optional<uint64_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::toInte
       *parent_.request_headers_);
 }
 
+namespace {
+constexpr absl::string_view kRouteFactoryName = "envoy.route_config_update_requester.default";
+} // namespace
+
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
                                                   uint32_t buffer_limit,
                                                   Buffer::BufferMemoryAccountSharedPtr account)
@@ -832,9 +838,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       connection_manager.config_->shouldSchemeMatchUpstream());
 
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
-  static const std::string route_factory = "envoy.route_config_update_requester.default";
-  auto factory =
-      Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(route_factory);
+  auto factory = Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(
+      kRouteFactoryName);
   if (connection_manager_.config_->isRoutable() &&
       connection_manager.config_->routeConfigProvider() != nullptr && factory) {
     route_config_update_requester_ = factory->createRouteConfigUpdateRequester(
