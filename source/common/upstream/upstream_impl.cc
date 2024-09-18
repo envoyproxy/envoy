@@ -1388,7 +1388,8 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
       codec_filter->set_name("envoy.filters.http.upstream_codec");
-      codec_filter->mutable_typed_config()->set_type_url(upstream_codec_type_url);
+      codec_filter->mutable_typed_config()->set_type_url(
+          absl::StrCat("type.googleapis.com/", upstream_codec_type_url));
     } else {
       const auto last_type_url =
           Config::Utility::getFactoryType(http_filters[http_filters.size() - 1].typed_config());
