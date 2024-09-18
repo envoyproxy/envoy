@@ -691,7 +691,10 @@ TEST_F(OAuth2Test, SetBearerToken) {
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=https://asdf&method=GET"},
+      {Http::Headers::get().Path.get(),
+       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf%26nonce%3D1234567890000000"},
+      {Http::Headers::get().Cookie.get(),
+       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1637,7 +1640,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
        "domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=;domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
-       {Http::Headers::get().Location.get(),
+      {Http::Headers::get().Location.get(),
        "https://traffic.example.com/test?name=admin&level=trace"},
   };
 

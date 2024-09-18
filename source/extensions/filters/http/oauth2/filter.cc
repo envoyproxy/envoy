@@ -619,8 +619,8 @@ std::string OAuth2Filter::getEncodedToken() const {
     domain = config_->cookieDomain();
   }
 
-
-  encoded_token = encodeHmac(token_secret_vec, domain, new_expires_, access_token_, id_token_, refresh_token_);
+  encoded_token =
+      encodeHmac(token_secret_vec, domain, new_expires_, access_token_, id_token_, refresh_token_);
 
   return encoded_token;
 }
