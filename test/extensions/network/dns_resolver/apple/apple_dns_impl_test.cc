@@ -342,8 +342,8 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionAllSupportsV6Only) {
                              EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
                              EXPECT_THAT(addrinfo.address_->ip()->ipv4(), IsNull());
                            }
-                         dispatcher_->exit();
-                       });
+                           dispatcher_->exit();
+                         });
   EXPECT_THAT(dns_query, NotNull());
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -460,7 +460,7 @@ TEST_F(AppleDnsImplTest, DoubleLookup) {
 TEST_F(AppleDnsImplTest, DoubleLookupInOneLoop) {
   EXPECT_NE(nullptr,
             resolveWithExpectations("google.com", DnsLookupFamily::V4Only,
-                                     DnsResolver::ResolutionStatus::Completed, true, false));
+                                    DnsResolver::ResolutionStatus::Completed, true, false));
 
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Only,
                                              DnsResolver::ResolutionStatus::Completed, true));
