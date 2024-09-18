@@ -86,7 +86,7 @@ public:
 
   /**
    * Final status for a DNS resolution.
-   * DNS resolution can return result statuses like NODATA and NONAME,
+   * DNS resolution can return result statuses like NODATA、SERVFAIL and NONAME,
    * which indicate successful completion of the query but
    * no results, and `Completed` is a more accurate way of reflecting that.
    */
