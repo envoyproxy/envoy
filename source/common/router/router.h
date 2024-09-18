@@ -425,7 +425,7 @@ public:
   }
 
   void
-  setOrcaLoadReportCallbacks(const std::shared_ptr<OrcaLoadReportCallbacks>& callbacks) override {
+  setOrcaLoadReportCallbacks(const std::weak_ptr<OrcaLoadReportCallbacks>& callbacks) override {
     orca_load_report_callbacks_ = callbacks;
   }
 

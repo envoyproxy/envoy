@@ -1783,11 +1783,11 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(5)));
   for (const auto& host_ptr : hostSet().hosts_) {
     // chooseHost calls setOrcaLoadReportCallbacks.
-    std::shared_ptr<LoadBalancerContext::OrcaLoadReportCallbacks> orca_load_report_callbacks;
+    std::weak_ptr<LoadBalancerContext::OrcaLoadReportCallbacks> weak_orca_load_report_callbacks;
     EXPECT_CALL(lb_context_, setOrcaLoadReportCallbacks(_))
         .WillOnce(Invoke(
-            [&](const std::shared_ptr<LoadBalancerContext::OrcaLoadReportCallbacks>& callbacks) {
-              orca_load_report_callbacks = callbacks;
+            [&](const std::weak_ptr<LoadBalancerContext::OrcaLoadReportCallbacks>& callbacks) {
+              weak_orca_load_report_callbacks = callbacks;
             }));
     HostConstSharedPtr host = lb_->chooseHost(&lb_context_);
     // Hosts have equal weights, so chooseHost returns the current host.
@@ -1797,6 +1797,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     orca_load_report.set_rps_fractional(1000);
     orca_load_report.set_application_utilization(0.5);
     // Orca load report callback does NOT change the host weight.
+    auto orca_load_report_callbacks = weak_orca_load_report_callbacks.lock();
     ASSERT_NE(orca_load_report_callbacks, nullptr);
     EXPECT_EQ(orca_load_report_callbacks->onOrcaLoadReport(orca_load_report, *host.get()),
               absl::OkStatus());
