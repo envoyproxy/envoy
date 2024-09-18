@@ -138,8 +138,10 @@ public:
 
   // Grpc::AsyncRequest
   void cancel() override;
+  const StreamInfo::StreamInfo& streamInfo() const override;
 
 private:
+  using AsyncStreamImpl::streamInfo;
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;

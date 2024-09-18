@@ -78,8 +78,9 @@ public:
    * workers. For example, the actual listen() call, post listen socket options, etc. This is done
    * so that all error handling can occur on the main thread and the gap between performing these
    * actions and using the socket is minimized.
+   * @return a status indicating if an error occurred.
    */
-  virtual void doFinalPreWorkerInit() PURE;
+  virtual absl::Status doFinalPreWorkerInit() PURE;
 };
 
 /**

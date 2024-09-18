@@ -55,7 +55,16 @@ using ThreadPtr = std::unique_ptr<Thread>;
 
 // Options specified during thread creation.
 struct Options {
-  std::string name_; // A name supplied for the thread. On Linux this is limited to 15 chars.
+  // A name supplied for the thread. On Linux this is limited to 15 chars.
+  std::string name_;
+  // An optional thread priority for the thread. The value will mean different things on different
+  // platforms. For example, on Linux or Android, the values can range from -20 to 19. On Apple
+  // platforms, the value can range from 1 to 100, which is used to divide by 100 to get a [0,1]
+  // value that can be used on Apple's NSThread.setThreadPriority method.
+  //
+  // If no value is set, the thread will be created with the default thread priority for the
+  // platform.
+  absl::optional<int> priority_{absl::nullopt};
 };
 
 using OptionsOptConstRef = const absl::optional<Options>&;
@@ -79,7 +88,7 @@ public:
   /**
    * Return the current system thread ID
    */
-  virtual ThreadId currentThreadId() PURE;
+  virtual ThreadId currentThreadId() const PURE;
 };
 
 using ThreadFactoryPtr = std::unique_ptr<ThreadFactory>;

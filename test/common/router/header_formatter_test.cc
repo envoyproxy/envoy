@@ -217,7 +217,7 @@ TEST(HeaderParserTest, TestParse) {
 
     if (test_case.expected_exception_) {
       EXPECT_FALSE(test_case.expected_output_);
-      EXPECT_THROW(THROW_IF_STATUS_NOT_OK(HeaderParser::configure(to_add), throw), EnvoyException);
+      EXPECT_THROW(THROW_IF_NOT_OK_REF(HeaderParser::configure(to_add).status()), EnvoyException);
       continue;
     }
 

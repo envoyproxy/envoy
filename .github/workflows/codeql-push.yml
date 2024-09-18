@@ -65,7 +65,7 @@ jobs:
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/init@4dd16135b69a43b6c8efb853346f8437d92d3c93  # codeql-bundle-v3.26.6
+      uses: github/codeql-action/init@8214744c546c1e5c8f03dde8fab3a7353211988d  # codeql-bundle-v3.26.7
       with:
         languages: cpp
 
@@ -85,7 +85,6 @@ jobs:
        cd bin/clang14
        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
        tar -xf clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
-       export PATH=bin/clang14/bin:$PATH
 
     - name: Build
       if: ${{ env.BUILD_TARGETS != '' }}
@@ -97,8 +96,8 @@ jobs:
            --spawn_strategy=local \
            --discard_analysis_cache \
            --nouse_action_cache \
-           --config clang \
-           --config libc++ \
+           --config=clang-libc++ \
+           --config=ci \
            $BUILD_TARGETS
        echo -e "Built targets...\n$BUILD_TARGETS"
 
@@ -109,4 +108,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/analyze@4dd16135b69a43b6c8efb853346f8437d92d3c93  # codeql-bundle-v3.26.6
+      uses: github/codeql-action/analyze@8214744c546c1e5c8f03dde8fab3a7353211988d  # codeql-bundle-v3.26.7

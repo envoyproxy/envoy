@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
-// This test ensure that abi_version.h contains the correct sha256 hash of ABI header files.
+// This test ensures that abi_version.h contains the correct sha256 hash of ABI header files.
 TEST(DynamicModules, ABIVersionCheck) {
   const auto abi_header_path =
       TestEnvironment::substitute("{{ test_rundir }}/source/extensions/dynamic_modules/abi.h");

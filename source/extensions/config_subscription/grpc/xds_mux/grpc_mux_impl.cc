@@ -167,7 +167,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::updateWatch(const std::string& type_url, Watch* 
   for (const auto& resource : resources) {
     if (XdsResourceIdentifier::hasXdsTpScheme(resource)) {
       auto xdstp_resource_or_error = XdsResourceIdentifier::decodeUrn(resource);
-      THROW_IF_STATUS_NOT_OK(xdstp_resource_or_error, throw);
+      THROW_IF_NOT_OK_REF(xdstp_resource_or_error.status());
       auto xdstp_resource = xdstp_resource_or_error.value();
       if (options.add_xdstp_node_context_params_) {
         const auto context = XdsContextParams::encodeResource(
@@ -456,7 +456,7 @@ public:
          XdsResourcesDelegateOptRef, bool use_eds_resources_cache) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
-    THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
+    THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
         /*failover_async_client=*/std::move(failover_async_client),
@@ -495,7 +495,7 @@ public:
          XdsResourcesDelegateOptRef, bool use_eds_resources_cache) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
-    THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
+    THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
         /*failover_async_client_=*/std::move(failover_async_client),

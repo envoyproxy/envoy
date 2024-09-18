@@ -16,9 +16,9 @@ envoy_extension_cc_test(
     name = "downstream_connections_monitor_test",
     srcs = ["downstream_connections_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//source/extensions/resource_monitors/downstream_connections:downstream_connections_monitor",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/extensions/resource_monitors/downstream_connections/v3:pkg_cc_proto",
     ],
 )
