@@ -1502,7 +1502,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
           reason = StreamResetReason::RemoteReset;
           stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
           break;
-         }
+        }
       }
 
       stream->runResetCallbacks(reason, absl::string_view());
