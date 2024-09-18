@@ -4910,6 +4910,38 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
   }
 }
 
+TEST_P(ProtocolIntegrationTest, PartialChunkedResponse) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  Envoy::FakeRawConnectionPtr upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
+
+  std::string upstream_request;
+  EXPECT_TRUE(upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("GET /"),
+                                               &upstream_request));
+
+  auto upstream_response_str = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhel";
+  ASSERT_TRUE(upstream_connection->write(upstream_response_str));
+  ASSERT_TRUE(upstream_connection->close());
+  response->waitForHeaders();
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("hel", response->body());
+  EXPECT_EQ(waitForAccessLog(access_log_name_),
+            "upstream_reset_after_response_started{protocol_error}");
+}
+
 TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
   // For H/1 this test is equivalent to InvalidResponseHeaderName
   if (upstreamProtocol() == Http::CodecType::HTTP1) {

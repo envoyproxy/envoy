@@ -74,6 +74,8 @@ public:
   const absl::string_view remote_refused = "http2.remote_refuse";
   // The peer reset the stream.
   const absl::string_view remote_reset = "http2.remote_reset";
+  // The peer violated the http2 protocol in an unspecified way.
+  const absl::string_view protocol_error = "http2.protocol_error";
 
 #ifdef ENVOY_NGHTTP2
   const absl::string_view errorDetails(int error_code) const {
@@ -100,8 +102,13 @@ int reasonToReset(StreamResetReason reason) {
     return OGHTTP2_REFUSED_STREAM;
   case StreamResetReason::ConnectError:
     return OGHTTP2_CONNECT_ERROR;
+  case StreamResetReason::ProtocolError:
+    return OGHTTP2_PROTOCOL_ERROR;
+  case StreamResetReason::Overflow:
+  case StreamResetReason::OverloadManager:
+    return OGHTTP2_ENHANCE_YOUR_CALM;
   default:
-    return OGHTTP2_NO_ERROR;
+    return OGHTTP2_INTERNAL_ERROR;
   }
 }
 
@@ -1470,17 +1477,32 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
         // depending whether the connection is upstream or downstream.
         reason = getMessagingErrorResetReason();
       } else {
-        if (error_code == OGHTTP2_REFUSED_STREAM) {
-          reason = StreamResetReason::RemoteRefusedStreamReset;
-          stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-        } else {
-          if (error_code == OGHTTP2_CONNECT_ERROR) {
+        switch (error_code) {
+          case NGHTTP2_PROTOCOL_ERROR:
+          case NGHTTP2_STREAM_CLOSED:
+          case NGHTTP2_FLOW_CONTROL_ERROR:
+          case NGHTTP2_SETTINGS_TIMEOUT:
+          case NGHTTP2_FRAME_SIZE_ERROR:
+          case NGHTTP2_COMPRESSION_ERROR:
+            reason = StreamResetReason::ProtocolError;
+            stream->setDetails(Http2ResponseCodeDetails::get().protocol_error);
+            break;
+          case NGHTTP2_CONNECT_ERROR:
             reason = StreamResetReason::ConnectError;
-          } else {
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+            break;
+          case NGHTTP2_REFUSED_STREAM:
+            reason = StreamResetReason::RemoteRefusedStreamReset;
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+          case NGHTTP2_ENHANCE_YOUR_CALM:
+            reason = StreamResetReason::Overflow;
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+            break;
+          default:
             reason = StreamResetReason::RemoteReset;
-          }
-          stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
-        }
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+            break;
+         }
       }
 
       stream->runResetCallbacks(reason, absl::string_view());

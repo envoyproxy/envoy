@@ -138,6 +138,9 @@ bug_fixes:
     Fixed an inconsistency in how boolean values are loaded in RTDS, where they were previously converted to "1"/"0"
     instead of "true"/"false". The correct string representation ("true"/"false") will now be used. This change can be
     reverted by setting the runtime guard ``envoy.reloadable_features.boolean_to_string_fix`` to false.
+- area: http
+  change: |
+    Fixed a bug where the HTTP/2 codec would not send the correct error code in RST_STREAM frames.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

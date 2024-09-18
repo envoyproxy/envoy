@@ -987,7 +987,7 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLengthAllowed) {
   }
 
   EXPECT_CALL(request_callbacks, onResetStream(StreamResetReason::ProtocolError, _));
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ProtocolError, _));
   response_encoder_->encodeHeaders(response_headers, false);
   driveToCompletion();
   EXPECT_TRUE(client_wrapper_->status_.ok());
