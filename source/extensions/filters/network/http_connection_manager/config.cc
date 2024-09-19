@@ -369,9 +369,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, max_request_headers_kb,
-          context.serverFactoryContext().runtime().snapshot().getInteger(
-              Http::MaxRequestHeadersSizeOverrideKey, Http::DEFAULT_MAX_REQUEST_HEADERS_KB))),
+          config.common_http_protocol_options(), max_headers_kb,
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+              config, max_request_headers_kb,
+              context.serverFactoryContext().runtime().snapshot().getInteger(
+                  Http::MaxRequestHeadersSizeOverrideKey, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)))),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
           context.serverFactoryContext().runtime().snapshot().getInteger(
@@ -430,6 +432,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
   if (!creation_status.ok()) {
     return;
+  }
+
+  if (config.has_max_request_headers_kb() &&
+      config.common_http_protocol_options().has_max_headers_kb() &&
+      config.max_request_headers_kb().value() !=
+          config.common_http_protocol_options().max_headers_kb().value()) {
+    ENVOY_LOG(warn, "Both `max_request_headers_kb` and `max_headers_kb` are configured. Ignoring "
+                    "`max_request_headers_kb`.");
   }
 
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(

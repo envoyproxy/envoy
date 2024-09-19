@@ -23,6 +23,12 @@
 #define PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, field_name, default_value)                        \
   ((message).has_##field_name() ? (message).field_name().value() : (default_value))
 
+// Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
+// absl::nullopt.
+#define PROTOBUF_GET_OPTIONAL_WRAPPED(message, field_name)                                         \
+  ((message).has_##field_name() ? absl::make_optional((message).field_name().value())              \
+                                : absl::nullopt)
+
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
 // a EnvoyException.
 

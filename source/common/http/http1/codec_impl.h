@@ -590,6 +590,7 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
+                       absl::optional<uint16_t> max_response_headers_kb,
                        const uint32_t max_response_headers_count,
                        bool passing_through_proxy = false);
   // Http::ClientConnection

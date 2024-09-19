@@ -573,6 +573,33 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersRejected) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
+// Tests configuration of max response headers size.
+TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersAccepted) {
+  constexpr uint32_t limit_kb = 150;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_headers_kb()->set_value(limit_kb);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  Http::TestResponseHeaderMapImpl large_headers(default_response_headers_);
+  large_headers.addCopy("large", std::string((limit_kb - 1) * 1024, 'a'));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+}
+
 TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
   // Set the fake upstream to start with 0 streams available.
   upstreamConfig().http2_options_.mutable_max_concurrent_streams()->set_value(0);

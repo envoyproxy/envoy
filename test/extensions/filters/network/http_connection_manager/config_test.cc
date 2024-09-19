@@ -826,6 +826,56 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbConfigured) {
   EXPECT_EQ(16, config.maxRequestHeadersKb());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, MaxHeadersKbConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_headers_kb: 16
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_EQ(16, config.maxRequestHeadersKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbAndMaxHeadersKbConfigured) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_headers_kb: 16
+  max_request_headers_kb: 32
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_LOG_CONTAINS("warn",
+                      "Both `max_request_headers_kb` and `max_headers_kb` are configured. Ignoring "
+                      "`max_request_headers_kb`.",
+                      {
+                        HttpConnectionManagerConfig config(
+                            parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                            date_provider_, route_config_provider_manager_,
+                            &scoped_routes_config_provider_manager_, tracer_manager_,
+                            filter_config_provider_manager_, creation_status_);
+
+                        ASSERT_TRUE(creation_status_.ok());
+                        EXPECT_EQ(16, config.maxRequestHeadersKb());
+                      });
+}
+
 TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfigurable) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
