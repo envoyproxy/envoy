@@ -48,6 +48,8 @@ public:
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
         const Http::AsyncClient::StreamOptions& options,
         Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) PURE;
+  virtual ExternalProcessorStream* stream() PURE;
+  virtual void setStream(ExternalProcessorStream* stream) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

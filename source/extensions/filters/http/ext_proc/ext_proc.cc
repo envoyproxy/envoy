@@ -336,7 +336,7 @@ Filter::StreamOpenState Filter::openStream() {
     ENVOY_LOG(debug, "External processing is completed when trying to open the gRPC stream");
     return StreamOpenState::IgnoreError;
   }
-  if (!stream_) {
+  if (!client_->stream()) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
 
     Http::AsyncClient::ParentContext grpc_context;
@@ -351,32 +351,33 @@ Filter::StreamOpenState Filter::openStream() {
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
-      // Asserts that `stream_` is nullptr since it is not valid to be used any further
+      // Asserts that `stream_object` is nullptr since it is not valid to be used any further
       // beyond this point.
       ASSERT(stream_object == nullptr);
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
     stats_.streams_started_.inc();
 
-    stream_ = config_->threadLocalStreamManager().store(std::move(stream_object), config_->stats(),
-                                                        config_->deferredCloseTimeout());
+    auto* stream = config_->threadLocalStreamManager().store(
+        std::move(stream_object), config_->stats(), config_->deferredCloseTimeout());
+    client_->setStream(stream);
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
-      logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
+      logging_info_->setClusterInfo(client_->stream()->streamInfo().upstreamClusterInfo());
     }
   }
   return StreamOpenState::Ok;
 }
 
 void Filter::closeStream() {
-  if (stream_) {
+  if (client_->stream()) {
     ENVOY_LOG(debug, "Calling close on stream");
-    if (stream_->close()) {
+    if (client_->stream()->close()) {
       stats_.streams_closed_.inc();
     }
-    config_->threadLocalStreamManager().erase(stream_);
-    stream_ = nullptr;
+    config_->threadLocalStreamManager().erase(client_->stream());
+    client_->setStream(nullptr);
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }
@@ -384,7 +385,8 @@ void Filter::closeStream() {
 
 void Filter::deferredCloseStream() {
   ENVOY_LOG(debug, "Calling deferred close on stream");
-  config_->threadLocalStreamManager().deferredErase(stream_, filter_callbacks_->dispatcher());
+  config_->threadLocalStreamManager().deferredErase(client_->stream(),
+                                                    filter_callbacks_->dispatcher());
 }
 
 void Filter::onDestroy() {
@@ -402,8 +404,8 @@ void Filter::onDestroy() {
     // closure is deferred upon filter destruction with a timer.
 
     // First, release the referenced filter resource.
-    if (stream_ != nullptr) {
-      stream_->notifyFilterDestroy();
+    if (client_->stream() != nullptr) {
+      client_->stream()->notifyFilterDestroy();
     }
 
     // Second, perform stream deferred closure.
@@ -433,7 +435,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
-  stream_->send(std::move(req), false);
+  client_->stream()->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
   state.setPaused(true);
   return FilterHeadersStatus::StopIteration;
@@ -658,7 +660,7 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
   ProcessingRequest req =
       buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/true);
   ENVOY_LOG(debug, "Sending headers message in observability mode");
-  stream_->send(std::move(req), false);
+  client_->stream()->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 
   return FilterHeadersStatus::Continue;
@@ -683,7 +685,7 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
     // Set up the the body chunk and send.
     auto req = setupBodyChunk(state, data, end_stream);
     req.set_observability_mode(true);
-    stream_->send(std::move(req), false);
+    client_->stream()->send(std::move(req), false);
     stats_.stream_msgs_sent_.inc();
     ENVOY_LOG(debug, "Sending body message in ObservabilityMode");
   } else if (state.bodyMode() != ProcessingMode::NONE) {
@@ -875,7 +877,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
-  stream_->send(std::move(req), false);
+  client_->stream()->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 
@@ -891,20 +893,21 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
-  stream_->send(std::move(req), false);
+  client_->stream()->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 
 void Filter::logGrpcStreamInfo() {
-  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
-    const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
+  if (client_->stream() != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
+    const auto& upstream_meter = client_->stream()->streamInfo().getUpstreamBytesMeter();
     if (upstream_meter != nullptr) {
       logging_info_->setBytesSent(upstream_meter->wireBytesSent());
       logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
     }
     // Only set upstream host in logging info once.
     if (logging_info_->upstreamHost() == nullptr) {
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+      logging_info_->setUpstreamHost(
+          client_->stream()->streamInfo().upstreamInfo()->upstreamHost());
     }
   }
 }
