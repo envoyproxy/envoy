@@ -1085,7 +1085,7 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   EXPECT_FALSE(codec_client_->connected());
   std::string failure_reason = "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
                                "(ENCRYPTION_HANDSHAKE) 46: "
-                               "certificate unknown";
+                               "certificate unknown. SSLErrorStack:";
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
