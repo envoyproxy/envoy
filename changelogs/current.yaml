@@ -41,11 +41,11 @@ behavior_changes:
     <envoy_v3_api_msg_config/route/v3/scoped_route>' and stat prefix extracted.
 - area: http
   change: |
-    Added ``loggersFromConfiguration`` to ``FilterManagerCallbacks``, which returns the loggers
-    from connection manager configuration. This is then used in the log() function to read filter
-    loggers before the config loggers to ensure dynamic metadata is written, such as with the wasm
-    filter. This change can be disabled by setting the runtime guard flag
-    ``envoy.reloadable_features.http_separate_config_and_filter_access_loggers`` to ``false``.
+    The access log handlers that added by the filters will be evaluated before the access
+    log handlers that configured in the :ref:`access_log configuration
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log>`.
+    This change can be disabled by setting the runtime guard flag
+    ``envoy.reloadable_features.filter_access_loggers_first`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

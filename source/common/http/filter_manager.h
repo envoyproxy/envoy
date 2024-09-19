@@ -669,7 +669,7 @@ public:
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
     access_log_handlers_.push_back(std::move(handler));
   }
-  void addConfigLogHandler(AccessLog::InstanceSharedPtr handler) {
+  void addConfigAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
     config_log_handlers_.push_back(std::move(handler));
   }
   void addStreamDecoderFilter(ActiveStreamDecoderFilterPtr filter) {
@@ -707,24 +707,40 @@ public:
         {},
         access_log_type,
         &filter_manager_callbacks_.activeSpan()};
-    absl::flat_hash_set<AccessLog::InstanceSharedPtr> config_log_handlers_set(
-        config_log_handlers_.begin(), config_log_handlers_.end());
-    for (const auto& log_handler : access_log_handlers_) {
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.http_separate_config_and_filter_access_loggers") ||
-          config_log_handlers_set.find(log_handler) == config_log_handlers_set.end()) {
+
+    const bool filter_access_loggers_first = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.filter_access_loggers_first");
+
+    if (!filter_access_loggers_first) {
+      for (const auto& log_handler : config_log_handlers_) {
         log_handler->log(log_context, streamInfo());
       }
     }
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.http_separate_config_and_filter_access_loggers")) {
+
+    for (const auto& log_handler : filter_log_handlers_) {
+      log_handler->log(log_context, streamInfo());
+    }
+
+    if (filter_access_loggers_first) {
       for (const auto& log_handler : config_log_handlers_) {
         log_handler->log(log_context, streamInfo());
       }
     }
   }
 
-  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() { return access_log_handlers_; }
+  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() {
+    std::list<AccessLog::InstanceSharedPtr> combined_log_handlers;
+    combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers_.begin(),
+                                 filter_log_handlers_.end());
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.filter_access_loggers_first")) {
+      combined_log_handlers.insert(combined_log_handlers.begin(), config_log_handlers_.begin(),
+                                   config_log_handlers_.end());
+    } else {
+      combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers_.begin(),
+                                   config_log_handlers_.end());
+    }
+    return combined_log_handlers;
+  }
 
   void onStreamComplete() {
     for (auto filter : filters_) {
