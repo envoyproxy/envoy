@@ -61,6 +61,9 @@ protected:
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _, _)).WillRepeatedly(Invoke(this, &OrderingTest::doStart));
+    EXPECT_CALL(*client_, stream()).WillRepeatedly(Invoke([this]() { return stream_; }));
+    EXPECT_CALL(*client_, setStream(_))
+        .WillRepeatedly(Invoke([this](ExternalProcessorStream* stream) { stream_ = stream; }));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
@@ -202,6 +205,7 @@ protected:
   }
 
   std::unique_ptr<MockClient> client_;
+  ExternalProcessorStream* stream_ = nullptr;
   MockStream stream_delegate_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;

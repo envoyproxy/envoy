@@ -94,7 +94,7 @@ protected:
     EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(*client_, stream()).WillRepeatedly(Invoke([this]() { return stream_; }));
     EXPECT_CALL(*client_, setStream(_))
-            .WillRepeatedly(Invoke([this](ExternalProcessorStream* stream) { stream_ = stream; }));
+        .WillRepeatedly(Invoke([this](ExternalProcessorStream* stream) { stream_ = stream; }));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
