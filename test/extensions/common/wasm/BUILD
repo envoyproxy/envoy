@@ -40,7 +40,6 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:test_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_restriction_cpp.wasm",
     ]),
-    external_deps = ["abseil_optional"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:hex_lib",
@@ -59,6 +58,7 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:wasm_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -75,10 +75,6 @@ envoy_cc_test(
 envoy_cc_test_binary(
     name = "wasm_speed_test",
     srcs = ["wasm_speed_test.cc"],
-    external_deps = [
-        "abseil_optional",
-        "benchmark",
-    ],
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -87,6 +83,8 @@ envoy_cc_test_binary(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "@com_github_google_benchmark//:benchmark",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 

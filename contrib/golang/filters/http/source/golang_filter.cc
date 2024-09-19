@@ -1377,16 +1377,13 @@ void Filter::deferredDeleteRequest(HttpRequestInternal* req) {
 uint64_t Filter::getMergedConfigId() {
   Http::StreamFilterCallbacks* callbacks = decoding_state_.getFilterCallbacks();
 
+  auto id = config_->getConfigId();
+
   // get all of the per route config
   auto route_config_list = Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(callbacks);
-
   ENVOY_LOG(debug, "golang filter route config list length: {}.", route_config_list.size());
-
-  auto id = config_->getConfigId();
-  for (auto it : route_config_list) {
-    ASSERT(it != nullptr, "route config should not be null");
-    auto route_config = *it;
-    id = route_config.getPluginConfigId(id, config_->pluginName());
+  for (const FilterConfigPerRoute& typed_config : route_config_list) {
+    id = typed_config.getPluginConfigId(id, config_->pluginName());
   }
 
   return id;

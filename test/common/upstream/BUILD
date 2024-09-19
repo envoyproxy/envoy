@@ -60,9 +60,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "deferred_cluster_initialization_test",
     srcs = ["deferred_cluster_initialization_test.cc"],
-    external_deps = [
-        "abseil_base",
-    ],
     deps = [
         ":test_cluster_manager",
         "//envoy/upstream:cluster_manager_interface",
@@ -73,6 +70,7 @@ envoy_cc_test(
         "//test/mocks/config:config_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/base",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -85,9 +83,6 @@ envoy_cc_test(
     name = "cluster_manager_impl_test",
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
-    external_deps = [
-        "abseil_optional",
-    ],
     deps = [
         ":test_cluster_manager",
         "//source/common/router:context_lib",
@@ -124,6 +119,7 @@ envoy_cc_test(
         "//test/mocks/upstream:od_cds_api_mocks",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
         "//test/test_common:test_runtime_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -353,7 +349,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "outlier_detection_impl_test",
     srcs = ["outlier_detection_impl_test.cc"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
         "//envoy/common:time_interface",
@@ -372,6 +367,7 @@ envoy_cc_test(
         "//test/mocks/upstream:host_set_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
@@ -608,12 +604,10 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "scheduler_benchmark",
     srcs = ["scheduler_benchmark.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/upstream:scheduler_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
@@ -654,8 +648,8 @@ envoy_cc_test_library(
     hdrs = [
         "test_local_address_selector.h",
     ],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/upstream:upstream_interface",
+        "@com_google_absl//absl/types:optional",
     ],
 )

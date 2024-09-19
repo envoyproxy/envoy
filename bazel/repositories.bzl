@@ -165,7 +165,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_nghttp2_nghttp2()
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
-    _com_github_nodejs_http_parser()
     _com_github_alibaba_hessian2_codec()
     _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
@@ -267,19 +266,11 @@ def _com_github_openhistogram_libcircllhist():
         name = "com_github_openhistogram_libcircllhist",
         build_file = "@envoy//bazel/external:libcircllhist.BUILD",
     )
-    native.bind(
-        name = "libcircllhist",
-        actual = "@com_github_openhistogram_libcircllhist//:libcircllhist",
-    )
 
 def _com_github_axboe_liburing():
     external_http_archive(
         name = "com_github_axboe_liburing",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-    native.bind(
-        name = "uring",
-        actual = "@envoy//bazel/foreign_cc:liburing_linux",
     )
 
 def _com_github_bazel_buildtools():
@@ -294,29 +285,17 @@ def _com_github_c_ares_c_ares():
         name = "com_github_c_ares_c_ares",
         build_file_content = BUILD_ALL_CONTENT,
     )
-    native.bind(
-        name = "ares",
-        actual = "@envoy//bazel/foreign_cc:ares",
-    )
 
 def _com_github_cyan4973_xxhash():
     external_http_archive(
         name = "com_github_cyan4973_xxhash",
         build_file = "@envoy//bazel/external:xxhash.BUILD",
     )
-    native.bind(
-        name = "xxhash",
-        actual = "@com_github_cyan4973_xxhash//:xxhash",
-    )
 
 def _com_github_envoyproxy_sqlparser():
     external_http_archive(
         name = "com_github_envoyproxy_sqlparser",
         build_file = "@envoy//bazel/external:sqlparser.BUILD",
-    )
-    native.bind(
-        name = "sqlparser",
-        actual = "@com_github_envoyproxy_sqlparser//:sqlparser",
     )
 
 def _com_github_mirror_tclap():
@@ -325,29 +304,17 @@ def _com_github_mirror_tclap():
         build_file = "@envoy//bazel/external:tclap.BUILD",
         patch_args = ["-p1"],
     )
-    native.bind(
-        name = "tclap",
-        actual = "@com_github_mirror_tclap//:tclap",
-    )
 
 def _com_github_fmtlib_fmt():
     external_http_archive(
         name = "com_github_fmtlib_fmt",
         build_file = "@envoy//bazel/external:fmtlib.BUILD",
     )
-    native.bind(
-        name = "fmtlib",
-        actual = "@com_github_fmtlib_fmt//:fmtlib",
-    )
 
 def _com_github_gabime_spdlog():
     external_http_archive(
         name = "com_github_gabime_spdlog",
         build_file = "@envoy//bazel/external:spdlog.BUILD",
-    )
-    native.bind(
-        name = "spdlog",
-        actual = "@com_github_gabime_spdlog//:spdlog",
     )
 
 def _com_github_google_benchmark():
@@ -357,10 +324,6 @@ def _com_github_google_benchmark():
     external_http_archive(
         name = "libpfm",
         build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
-    )
-    native.bind(
-        name = "benchmark",
-        actual = "@com_github_google_benchmark//:benchmark",
     )
 
 def _com_github_google_libprotobuf_mutator():
@@ -373,11 +336,6 @@ def _com_github_google_libsxg():
     external_http_archive(
         name = "com_github_google_libsxg",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-
-    native.bind(
-        name = "libsxg",
-        actual = "@envoy//bazel/foreign_cc:libsxg",
     )
 
 def _com_github_unicode_org_icu():
@@ -437,19 +395,11 @@ def _com_github_jbeder_yaml_cpp():
     external_http_archive(
         name = "com_github_jbeder_yaml_cpp",
     )
-    native.bind(
-        name = "yaml_cpp",
-        actual = "@com_github_jbeder_yaml_cpp//:yaml-cpp",
-    )
 
 def _com_github_libevent_libevent():
     external_http_archive(
         name = "com_github_libevent_libevent",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-    native.bind(
-        name = "event",
-        actual = "@envoy//bazel/foreign_cc:event",
     )
 
 def _net_colm_open_source_colm():
@@ -457,19 +407,11 @@ def _net_colm_open_source_colm():
         name = "net_colm_open_source_colm",
         build_file_content = BUILD_ALL_CONTENT,
     )
-    native.bind(
-        name = "colm",
-        actual = "@envoy//bazel/foreign_cc:colm",
-    )
 
 def _net_colm_open_source_ragel():
     external_http_archive(
         name = "net_colm_open_source_ragel",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-    native.bind(
-        name = "ragel",
-        actual = "@envoy//bazel/foreign_cc:ragel",
     )
 
 def _net_zlib():
@@ -478,11 +420,6 @@ def _net_zlib():
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
-    )
-
-    native.bind(
-        name = "zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
     # Bind for grpc.
@@ -524,24 +461,11 @@ def _org_brotli():
     external_http_archive(
         name = "org_brotli",
     )
-    native.bind(
-        name = "brotlienc",
-        actual = "@org_brotli//:brotlienc",
-    )
-    native.bind(
-        name = "brotlidec",
-        actual = "@org_brotli//:brotlidec",
-    )
 
 def _com_github_facebook_zstd():
     external_http_archive(
         name = "com_github_facebook_zstd",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-
-    native.bind(
-        name = "zstd",
-        actual = "@envoy//bazel/foreign_cc:zstd",
     )
 
 def _com_google_cel_cpp():
@@ -584,10 +508,6 @@ def _com_github_msgpack_cpp():
         name = "com_github_msgpack_cpp",
         build_file = "@envoy//bazel/external:msgpack.BUILD",
     )
-    native.bind(
-        name = "msgpack",
-        actual = "@com_github_msgpack_cpp//:msgpack",
-    )
 
 def _io_hyperscan():
     external_http_archive(
@@ -608,17 +528,9 @@ def _io_vectorscan():
 
 def _io_opentelemetry_api_cpp():
     external_http_archive(name = "io_opentelemetry_cpp")
-    native.bind(
-        name = "opentelemetry_api",
-        actual = "@io_opentelemetry_cpp//api:api",
-    )
 
 def _com_github_datadog_dd_trace_cpp():
     external_http_archive("com_github_datadog_dd_trace_cpp")
-    native.bind(
-        name = "dd_trace_cpp",
-        actual = "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
-    )
 
 def _com_github_skyapm_cpp2sky():
     external_http_archive(
@@ -626,10 +538,6 @@ def _com_github_skyapm_cpp2sky():
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
-    )
-    native.bind(
-        name = "cpp2sky",
-        actual = "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
     )
 
 def _com_github_tencent_rapidjson():
@@ -641,38 +549,15 @@ def _com_github_tencent_rapidjson():
 def _com_github_nlohmann_json():
     external_http_archive(
         name = "com_github_nlohmann_json",
-        build_file = "@envoy//bazel/external:json.BUILD",
-    )
-    native.bind(
-        name = "json",
-        actual = "@com_github_nlohmann_json//:json",
-    )
-
-def _com_github_nodejs_http_parser():
-    native.bind(
-        name = "http_parser",
-        actual = "@envoy//bazel/external/http_parser",
     )
 
 def _com_github_alibaba_hessian2_codec():
     external_http_archive("com_github_alibaba_hessian2_codec")
-    native.bind(
-        name = "hessian2_codec_object_codec_lib",
-        actual = "@com_github_alibaba_hessian2_codec//hessian2/basic_codec:object_codec_lib",
-    )
-    native.bind(
-        name = "hessian2_codec_codec_impl",
-        actual = "@com_github_alibaba_hessian2_codec//hessian2:codec_impl_lib",
-    )
 
 def _com_github_ncopa_suexec():
     external_http_archive(
         name = "com_github_ncopa_suexec",
         build_file = "@envoy//bazel/external:su-exec.BUILD",
-    )
-    native.bind(
-        name = "su-exec",
-        actual = "@com_github_ncopa_suexec//:su-exec",
     )
 
 def _com_google_googletest():
@@ -680,10 +565,6 @@ def _com_google_googletest():
         "com_google_googletest",
         patches = ["@envoy//bazel:googletest.patch"],
         patch_args = ["-p1"],
-    )
-    native.bind(
-        name = "googletest",
-        actual = "@com_google_googletest//:gtest",
     )
 
 # TODO(jmarantz): replace the use of bind and external_deps with just
@@ -696,24 +577,8 @@ def _com_google_absl():
         patches = ["@envoy//bazel:abseil.patch"],
         patch_args = ["-p1"],
     )
-    native.bind(
-        name = "abseil_any",
-        actual = "@com_google_absl//absl/types:any",
-    )
-    native.bind(
-        name = "abseil_base",
-        actual = "@com_google_absl//absl/base:base",
-    )
 
-    # Bind for grpc.
-    native.bind(
-        name = "absl-base",
-        actual = "@com_google_absl//absl/base",
-    )
-    native.bind(
-        name = "abseil_btree",
-        actual = "@com_google_absl//absl/container:btree",
-    )
+    # keep these until jwt_verify_lib is updated.
     native.bind(
         name = "abseil_flat_hash_map",
         actual = "@com_google_absl//absl/container:flat_hash_map",
@@ -723,90 +588,12 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/container:flat_hash_set",
     )
     native.bind(
-        name = "abseil_hash",
-        actual = "@com_google_absl//absl/hash:hash",
-    )
-    native.bind(
-        name = "abseil_hash_testing",
-        actual = "@com_google_absl//absl/hash:hash_testing",
-    )
-    native.bind(
-        name = "abseil_inlined_vector",
-        actual = "@com_google_absl//absl/container:inlined_vector",
-    )
-    native.bind(
-        name = "abseil_memory",
-        actual = "@com_google_absl//absl/memory:memory",
-    )
-    native.bind(
-        name = "abseil_node_hash_map",
-        actual = "@com_google_absl//absl/container:node_hash_map",
-    )
-    native.bind(
-        name = "abseil_node_hash_set",
-        actual = "@com_google_absl//absl/container:node_hash_set",
-    )
-    native.bind(
-        name = "abseil_str_format",
-        actual = "@com_google_absl//absl/strings:str_format",
-    )
-    native.bind(
         name = "abseil_strings",
         actual = "@com_google_absl//absl/strings:strings",
     )
     native.bind(
-        name = "abseil_int128",
-        actual = "@com_google_absl//absl/numeric:int128",
-    )
-    native.bind(
-        name = "abseil_optional",
-        actual = "@com_google_absl//absl/types:optional",
-    )
-    native.bind(
-        name = "abseil_synchronization",
-        actual = "@com_google_absl//absl/synchronization:synchronization",
-    )
-    native.bind(
-        name = "abseil_symbolize",
-        actual = "@com_google_absl//absl/debugging:symbolize",
-    )
-    native.bind(
-        name = "abseil_stacktrace",
-        actual = "@com_google_absl//absl/debugging:stacktrace",
-    )
-    native.bind(
-        name = "abseil_statusor",
-        actual = "@com_google_absl//absl/status:statusor",
-    )
-
-    # Require abseil_time as an indirect dependency as it is needed by the
-    # direct dependency jwt_verify_lib.
-    native.bind(
         name = "abseil_time",
         actual = "@com_google_absl//absl/time:time",
-    )
-
-    # Bind for grpc.
-    native.bind(
-        name = "absl-time",
-        actual = "@com_google_absl//absl/time:time",
-    )
-
-    native.bind(
-        name = "abseil_algorithm",
-        actual = "@com_google_absl//absl/algorithm:algorithm",
-    )
-    native.bind(
-        name = "abseil_variant",
-        actual = "@com_google_absl//absl/types:variant",
-    )
-    native.bind(
-        name = "abseil_status",
-        actual = "@com_google_absl//absl/status",
-    )
-    native.bind(
-        name = "abseil_cleanup",
-        actual = "@com_google_absl//absl/cleanup:cleanup",
     )
 
 def _com_google_protobuf():
@@ -830,6 +617,7 @@ def _com_google_protobuf():
         patch_args = ["-p1"],
     )
 
+    # Needed by grpc, jwt_verify_lib, maybe others.
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",
@@ -842,10 +630,6 @@ def _com_google_protobuf():
         name = "protocol_compiler",
         actual = "@com_google_protobuf//:protoc",
     )
-    native.bind(
-        name = "protoc",
-        actual = "@com_google_protobuf//:protoc",
-    )
 
     # Needed for `bazel fetch` to work with @com_google_protobuf
     # https://github.com/google/protobuf/blob/v3.6.1/util/python/BUILD#L6-L9
@@ -853,6 +637,8 @@ def _com_google_protobuf():
         name = "python_headers",
         actual = "//bazel:python_headers",
     )
+
+    # Needed by grpc until we update again.
     native.bind(
         name = "upb_base_lib",
         actual = "@com_google_protobuf//upb:base",
@@ -881,42 +667,6 @@ def _com_google_protobuf():
 def _io_opencensus_cpp():
     external_http_archive(
         name = "io_opencensus_cpp",
-    )
-    native.bind(
-        name = "opencensus_trace",
-        actual = "@io_opencensus_cpp//opencensus/trace",
-    )
-    native.bind(
-        name = "opencensus_trace_b3",
-        actual = "@io_opencensus_cpp//opencensus/trace:b3",
-    )
-    native.bind(
-        name = "opencensus_trace_cloud_trace_context",
-        actual = "@io_opencensus_cpp//opencensus/trace:cloud_trace_context",
-    )
-    native.bind(
-        name = "opencensus_trace_grpc_trace_bin",
-        actual = "@io_opencensus_cpp//opencensus/trace:grpc_trace_bin",
-    )
-    native.bind(
-        name = "opencensus_trace_trace_context",
-        actual = "@io_opencensus_cpp//opencensus/trace:trace_context",
-    )
-    native.bind(
-        name = "opencensus_exporter_ocagent",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/ocagent:ocagent_exporter",
-    )
-    native.bind(
-        name = "opencensus_exporter_stdout",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stdout:stdout_exporter",
-    )
-    native.bind(
-        name = "opencensus_exporter_stackdriver",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/stackdriver:stackdriver_exporter",
-    )
-    native.bind(
-        name = "opencensus_exporter_zipkin",
-        actual = "@io_opencensus_cpp//opencensus/exporters/trace/zipkin:zipkin_exporter",
     )
 
 def _com_github_curl():
@@ -951,6 +701,8 @@ def _v8():
         ],
         patch_args = ["-p1"],
     )
+
+    # Needed by proxy_wasm_cpp_host.
     native.bind(
         name = "wee8",
         actual = "@v8//:wee8",
@@ -961,6 +713,8 @@ def _com_googlesource_chromium_base_trace_event_common():
         name = "com_googlesource_chromium_base_trace_event_common",
         build_file = "@v8//:bazel/BUILD.trace_event_common",
     )
+
+    # Needed by v8.
     native.bind(
         name = "base_trace_event_common",
         actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
@@ -971,38 +725,6 @@ def _com_github_google_quiche():
         name = "com_github_google_quiche",
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
-    )
-    native.bind(
-        name = "quiche_common_platform",
-        actual = "@com_github_google_quiche//:quiche_common_platform",
-    )
-    native.bind(
-        name = "quiche_http2_adapter",
-        actual = "@com_github_google_quiche//:http2_adapter",
-    )
-    native.bind(
-        name = "quiche_http2_protocol",
-        actual = "@com_github_google_quiche//:http2_adapter_http2_protocol",
-    )
-    native.bind(
-        name = "quiche_http2_test_tools",
-        actual = "@com_github_google_quiche//:http2_adapter_mock_http2_visitor",
-    )
-    native.bind(
-        name = "quiche_quic_platform",
-        actual = "@com_github_google_quiche//:quic_platform",
-    )
-    native.bind(
-        name = "quiche_quic_platform_base",
-        actual = "@com_github_google_quiche//:quic_platform_base",
-    )
-    native.bind(
-        name = "quiche_http2_hpack",
-        actual = "@com_github_google_quiche//:http2_hpack_hpack_lib",
-    )
-    native.bind(
-        name = "quiche_http2_hpack_decoder",
-        actual = "@com_github_google_quiche//:http2_hpack_decoder_hpack_decoder_lib",
     )
 
 def _com_googlesource_googleurl():
@@ -1043,7 +765,7 @@ def _com_github_grpc_grpc():
     )
     native.bind(
         name = "cares",
-        actual = "//external:ares",
+        actual = "@envoy//bazel/foreign_cc:ares",
     )
 
     native.bind(
@@ -1077,6 +799,7 @@ def _rules_proto_grpc():
 def _re2():
     external_http_archive("com_googlesource_code_re2")
 
+    # Needed by grpc.
     native.bind(
         name = "re2",
         actual = "@com_googlesource_code_re2//:re2",
@@ -1110,16 +833,6 @@ def _emsdk():
 def _com_github_google_jwt_verify():
     external_http_archive("com_github_google_jwt_verify")
 
-    native.bind(
-        name = "jwt_verify_lib",
-        actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
-    )
-
-    native.bind(
-        name = "simple_lru_cache_lib",
-        actual = "@com_github_google_jwt_verify//:simple_lru_cache_lib",
-    )
-
 def _com_github_luajit_luajit():
     external_http_archive(
         name = "com_github_luajit_luajit",
@@ -1129,37 +842,15 @@ def _com_github_luajit_luajit():
         patch_cmds = ["chmod u+x build.py"],
     )
 
-    native.bind(
-        name = "luajit",
-        actual = "@envoy//bazel/foreign_cc:luajit",
-    )
-
 def _com_github_google_tcmalloc():
     external_http_archive(
         name = "com_github_google_tcmalloc",
-    )
-
-    native.bind(
-        name = "tcmalloc",
-        actual = "@com_github_google_tcmalloc//tcmalloc",
-    )
-    native.bind(
-        name = "tcmalloc_profile_marshaler",
-        actual = "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
-    )
-    native.bind(
-        name = "tcmalloc_malloc_extension",
-        actual = "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
     )
 
 def _com_github_gperftools_gperftools():
     external_http_archive(
         name = "com_github_gperftools_gperftools",
         build_file_content = BUILD_ALL_CONTENT,
-    )
-    native.bind(
-        name = "gperftools",
-        actual = "@envoy//bazel/foreign_cc:gperftools",
     )
 
 def _com_github_wamr():
@@ -1250,10 +941,6 @@ filegroup(
         # For now, let's just drop this dependency from Kafka, as it's used only for monitoring.
         patches = ["@envoy//bazel/foreign_cc:librdkafka.patch"],
         patch_args = ["-p1"],
-    )
-    native.bind(
-        name = "librdkafka",
-        actual = "@envoy//bazel/foreign_cc:librdkafka",
     )
 
     # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
