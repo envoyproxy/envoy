@@ -74,21 +74,7 @@ _default_envoy_build_config = repository_rule(
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
-    external_http_archive(
-        name = "grpc_httpjson_transcoding",
-        patch_args = ["-p1"],
-        patches = [
-            "@envoy//bazel/grpc_httpjson_transcoding.patches:0001-Update-googletest-to-v1.14.0.patch",
-            "@envoy//bazel/grpc_httpjson_transcoding.patches:0002-remove-custom-and-apparently-unused-zlib.patch",
-            "@envoy//bazel/grpc_httpjson_transcoding.patches:0003-Update-json-library-to-3.11.3.patch",
-            "@envoy//bazel/grpc_httpjson_transcoding.patches:0004-Use-int-types-from-cstdint-not-aliases-from-protocon.patch",
-            "@envoy//bazel/grpc_httpjson_transcoding.patches:0005-Replace-internal-string_view-with-absl-string_view.patch",
-            "@envoy//bazel/grpc_httpjson_transcoding.patches:0006-C-style-C-header-includes.patch",
-            "@envoy//bazel/grpc_httpjson_transcoding.patches:0007-Add-comments-for-namespace-closing-in-test-message_r.patch",
-            "@envoy//bazel/grpc_httpjson_transcoding.patches:0008-Update-readme-to-reflect-clang-change-in-8b7e71c.patch",
-            "@envoy//bazel/grpc_httpjson_transcoding.patches:0009-Drop-unused-include-of-cassert.patch",
-        ],
-    )
+    external_http_archive(name = "grpc_httpjson_transcoding")
     external_http_archive(
         name = "com_google_protoconverter",
         patch_args = ["-p1"],
