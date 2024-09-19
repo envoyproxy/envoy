@@ -19,7 +19,8 @@ Install Envoy on Debian-based Linux
 
    .. code-tab:: console Debian bookworm
 
-      $ curl -fsSL https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
+      $ wget -O /tmp/signing.key https://apt.envoyproxy.io/signing.key
+      $ sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg /tmp/signing.key
       $ echo "deb [signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bookworm main" | sudo tee /etc/apt/sources.list.d/envoy.list
       $ sudo apt-get update
       $ sudo apt-get install envoy
@@ -27,7 +28,8 @@ Install Envoy on Debian-based Linux
 
    .. code-tab:: console Debian bullseye
 
-      $ curl -fsSL https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
+      $ wget -O /tmp/signing.key https://apt.envoyproxy.io/signing.key
+      $ sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg /tmp/signing.key
       $ echo "deb [signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io bullseye main" | sudo tee /etc/apt/sources.list.d/envoy.list
       $ sudo apt-get update
       $ sudo apt-get install envoy
@@ -35,15 +37,17 @@ Install Envoy on Debian-based Linux
 
    .. code-tab:: console Ubuntu focal
 
-      $ wget https://apt.envoyproxy.io/signing.key  | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
-      $ echo "deb[signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io focal main" | sudo tee /etc/apt/sources.list.d/envoy.list
+      $ wget -O /tmp/signing.key https://apt.envoyproxy.io/signing.key
+      $ sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg /tmp/signing.key
+      $ echo "deb [signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io focal main" | sudo tee /etc/apt/sources.list.d/envoy.list
       $ sudo apt-get update
       $ sudo apt-get install envoy
       $ envoy --version
 
    .. code-tab:: console Ubuntu jammy
 
-      $ curl -fsSL https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg
+      $ wget -O /tmp/signing.key https://apt.envoyproxy.io/signing.key
+      $ sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg /tmp/signing.key
       $ echo "deb [signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io jammy main" | sudo tee /etc/apt/sources.list.d/envoy.list
       $ sudo apt-get update
       $ sudo apt-get install envoy
