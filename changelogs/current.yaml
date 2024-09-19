@@ -353,5 +353,10 @@ new_features:
   change: |
       Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
       connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
+- area: basic_auth
+  change: |
+    Added support to provide an override
+    :ref:`authentication_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.authentication_header>`
+    to load Basic Auth credential.
 
 deprecated:
