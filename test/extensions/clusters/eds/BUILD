@@ -45,9 +45,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "eds_speed_test",
     srcs = ["eds_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:protobuf_link_hacks",
@@ -69,6 +66,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",

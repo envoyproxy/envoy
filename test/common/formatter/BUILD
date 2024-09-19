@@ -89,9 +89,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "substitution_formatter_speed_test",
     srcs = ["substitution_formatter_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
@@ -100,6 +97,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 

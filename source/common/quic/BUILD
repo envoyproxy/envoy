@@ -20,13 +20,13 @@ envoy_cc_library(
     name = "envoy_quic_alarm_lib",
     srcs = ["envoy_quic_alarm.cc"],
     hdrs = ["envoy_quic_alarm.h"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "@com_github_google_quiche//:quic_core_alarm_lib",
         "@com_github_google_quiche//:quic_core_clock_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
@@ -34,13 +34,13 @@ envoy_cc_library(
     name = "envoy_quic_alarm_factory_lib",
     srcs = ["envoy_quic_alarm_factory.cc"],
     hdrs = ["envoy_quic_alarm_factory.h"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_alarm_lib",
         "@com_github_google_quiche//:quic_core_alarm_factory_lib",
         "@com_github_google_quiche//:quic_core_arena_scoped_ptr_lib",
         "@com_github_google_quiche//:quic_core_one_block_arena_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
@@ -99,7 +99,6 @@ envoy_cc_library(
     name = "envoy_quic_proof_source_base_lib",
     srcs = ["envoy_quic_proof_source_base.cc"],
     hdrs = ["envoy_quic_proof_source_base.h"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
@@ -108,6 +107,7 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_core_crypto_proof_source_lib",
         "@com_github_google_quiche//:quic_core_data_lib",
         "@com_github_google_quiche//:quic_core_versions_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
@@ -134,13 +134,13 @@ envoy_cc_library(
     name = "envoy_quic_proof_verifier_base_lib",
     srcs = ["envoy_quic_proof_verifier_base.cc"],
     hdrs = ["envoy_quic_proof_verifier_base.h"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_crypto_certificate_view_lib",
         "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
         "@com_github_google_quiche//:quic_core_versions_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
@@ -148,13 +148,13 @@ envoy_cc_library(
     name = "envoy_quic_proof_verifier_lib",
     srcs = ["envoy_quic_proof_verifier.cc"],
     hdrs = ["envoy_quic_proof_verifier.h"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_utils_lib",
         ":quic_ssl_connection_info_lib",
         "//source/common/tls:context_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
@@ -443,10 +443,7 @@ envoy_cc_library(
     name = "envoy_quic_utils_lib",
     srcs = ["envoy_quic_utils.cc"],
     hdrs = ["envoy_quic_utils.h"],
-    external_deps = [
-        "quiche_quic_platform",
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     tags = ["nofips"],
     deps = [
         "//envoy/http:codec_interface",
@@ -459,6 +456,7 @@ envoy_cc_library(
         "//source/common/quic:quic_io_handle_wrapper_lib",
         "@com_github_google_quiche//:quic_core_config_lib",
         "@com_github_google_quiche//:quic_core_http_header_list_lib",
+        "@com_github_google_quiche//:quic_platform",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
@@ -571,11 +569,11 @@ envoy_cc_library(
     name = "envoy_quic_packet_writer_lib",
     srcs = ["envoy_quic_packet_writer.cc"],
     hdrs = ["envoy_quic_packet_writer.h"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
         "@com_github_google_quiche//:quic_core_packet_writer_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
@@ -586,7 +584,6 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
     hdrs = ["udp_gso_batch_writer.h"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         ":envoy_quic_utils_lib",
@@ -594,6 +591,7 @@ envoy_cc_library(
         "//source/common/network:io_socket_error_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "@com_github_google_quiche//:quic_platform",
     ] + select({
         "//bazel:linux": ["@com_github_google_quiche//:quic_core_batch_writer_gso_batch_writer_lib"],
         "//conditions:default": [],

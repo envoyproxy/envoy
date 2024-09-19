@@ -306,8 +306,8 @@ envoy_cmake(
     deps = [
         ":ares",
         ":nghttp2",
+        ":zlib",
         "//external:ssl",
-        "//external:zlib",
     ],
 )
 

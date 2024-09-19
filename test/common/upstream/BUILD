@@ -603,12 +603,10 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "scheduler_benchmark",
     srcs = ["scheduler_benchmark.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/upstream:scheduler_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 

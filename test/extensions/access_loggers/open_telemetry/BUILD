@@ -126,15 +126,13 @@ envoy_extension_cc_test(
 envoy_cc_benchmark_binary(
     name = "substitution_formatter_speed_test",
     srcs = ["substitution_formatter_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
         "//source/extensions/access_loggers/open_telemetry:substitution_formatter_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/stream_info:stream_info_mocks",
+        "@com_github_google_benchmark//:benchmark",
         "@opentelemetry_proto//:common_cc_proto",
     ],
 )

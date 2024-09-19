@@ -221,14 +221,12 @@ envoy_cc_benchmark_binary(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    external_deps = [
-        "benchmark",
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     # Uses raw POSIX syscalls, does not build on Windows.
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/buffer:buffer_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
