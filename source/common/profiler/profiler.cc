@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "source/common/common/thread.h"
+
 #ifdef PROFILER_AVAILABLE
 
 #include "gperftools/heap-profiler.h"
@@ -76,6 +78,7 @@ absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
 }
 
 absl::Status TcmallocProfiler::startAllocationProfile() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (alloc_profiler != nullptr) {
     return absl::Status(absl::StatusCode::kFailedPrecondition,
                         "Allocation profiler has already started");
@@ -86,6 +89,7 @@ absl::Status TcmallocProfiler::startAllocationProfile() {
 }
 
 absl::StatusOr<std::string> TcmallocProfiler::stopAllocationProfile() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (!alloc_profiler) {
     return absl::Status(absl::StatusCode::kFailedPrecondition,
                         "Allocation profiler is not started");
