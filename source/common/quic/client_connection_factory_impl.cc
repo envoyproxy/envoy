@@ -5,19 +5,17 @@
 namespace Envoy {
 namespace Quic {
 
-PersistentQuicInfoImpl::PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit,
-                                               quic::QuicByteCount max_packet_length)
+PersistentQuicInfoImpl::PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, uint32_t buffer_limit)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
-      buffer_limit_(buffer_limit), max_packet_length_(max_packet_length) {
+      buffer_limit_(buffer_limit) {
   quiche::FlagRegistry::getInstance();
 }
 
 std::unique_ptr<PersistentQuicInfoImpl>
 createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
-                                   const Upstream::ClusterInfo& cluster,
-                                   const quic::QuicByteCount max_packet_length) {
+                                   const Upstream::ClusterInfo& cluster) {
   auto quic_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      dispatcher, cluster.perConnectionBufferLimitBytes(), max_packet_length);
+      dispatcher, cluster.perConnectionBufferLimitBytes());
   Quic::convertQuicConfig(cluster.http3Options().quic_protocol_options(), quic_info->quic_config_);
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
@@ -52,11 +50,6 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
       info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options, generator,
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_quic_client_udp_gro"));
-  // Override the max packet length of the QUIC connection if the option value is not 0.
-  if (info_impl->max_packet_length_ > 0) {
-    ENVOY_LOG_MISC(debug, "SetMaxPacketLength(info_impl->max_packet_length_)");
-    connection->SetMaxPacketLength(info_impl->max_packet_length_);
-  }
 
   // TODO (danzh) move this temporary config and initial RTT configuration to h3 pool.
   quic::QuicConfig config = info_impl->quic_config_;
