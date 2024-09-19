@@ -929,10 +929,10 @@ void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
 
   const bool filter_access_loggers_first =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.filter_access_loggers_first");
-  const bool defer_logging_to_ack_listener = Runtime::runtimeFeatureEnabled(
+  const bool quic_defer_logging_to_ack_listener = Runtime::runtimeFeatureEnabled(
       "envoy.reloadable_features.quic_defer_logging_to_ack_listener");
 
-  if (!filter_access_loggers_first && !defer_logging_to_ack_listener) {
+  if (!filter_access_loggers_first && !quic_defer_logging_to_ack_listener) {
     for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
       access_logger->log(log_context, filter_manager_.streamInfo());
     }
@@ -940,7 +940,7 @@ void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
 
   filter_manager_.log(log_context);
 
-  if (filter_access_loggers_first && !defer_logging_to_ack_listener) {
+  if (filter_access_loggers_first && !quic_defer_logging_to_ack_listener) {
     for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
       access_logger->log(log_context, filter_manager_.streamInfo());
     }
