@@ -35,6 +35,8 @@ public:
                const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                const Envoy::Http::AsyncClient::StreamOptions&,
                Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&));
+  MOCK_METHOD(ExternalProcessing::ExternalProcessorStream*, stream, ());
+  MOCK_METHOD(void, setStream, (ExternalProcessing::ExternalProcessorStream * stream));
 };
 
 } // namespace UnitTestFuzz

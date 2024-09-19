@@ -94,6 +94,12 @@ DEFINE_PROTO_FUZZER(
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
+  ExternalProcessing::ExternalProcessorStream* stream = nullptr;
+  EXPECT_CALL(*client, stream()).WillRepeatedly(Invoke([&stream]() { return stream; }));
+  EXPECT_CALL(*client, setStream(_))
+      .WillRepeatedly(Invoke([&stream](ExternalProcessing::ExternalProcessorStream* stream_ptr) {
+        stream = stream_ptr;
+      }));
   EXPECT_CALL(*client, start(_, _, _, _))
       .WillRepeatedly(Invoke([&](ExternalProcessing::ExternalProcessorCallbacks&,
                                  const Grpc::GrpcServiceConfigWithHashKey&,
