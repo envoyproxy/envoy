@@ -10,7 +10,7 @@ clang-format==14.0.6
 clang-tidy==14.0.6
 colorama
 coloredlogs
-cryptography>=42.0.0
+cryptography>=43.0.1
 dependatool>=0.2.2
 envoy.base.utils>=0.5.0
 envoy.code.check>=0.5.12
@@ -36,6 +36,7 @@ ply
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
 protobuf<5.29.0
 pygithub
+pyopenssl>=24.2.1
 pyreadline
 pyyaml
 setuptools
