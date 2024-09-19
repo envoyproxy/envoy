@@ -278,6 +278,13 @@ public:
    * addresses.
    */
   virtual void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) PURE;
+
+  /**
+   * Stops the DNS cache background tasks by canceling the pending queries and stopping the timeout
+   * and refresh timers. This function can be useful when the network is unavailable, such as when
+   * a device is in airplane mode, etc.
+   */
+  virtual void stop() PURE;
 };
 
 using DnsCacheSharedPtr = std::shared_ptr<DnsCache>;

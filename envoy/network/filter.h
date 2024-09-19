@@ -854,8 +854,9 @@ public:
    * Called when a new UDP session is created.
    * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
    *                  UdpSessionFilterChainFactoryCallbacks.
+   * @return true if filter chain was created successfully. Otherwise false.
    */
-  virtual void createFilterChain(UdpSessionFilterChainFactoryCallbacks& callbacks) const PURE;
+  virtual bool createFilterChain(UdpSessionFilterChainFactoryCallbacks& callbacks) const PURE;
 };
 
 /**

@@ -49,11 +49,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "route_config_update_info_interface",
     hdrs = ["route_config_update_receiver.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":rds_interface",
         "//envoy/common:time_interface",
         "//source/common/protobuf",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -62,7 +62,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "router_filter_interface",
     hdrs = ["router_filter_interface.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -70,13 +69,13 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:host_description_interface",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":internal_redirect_interface",
         ":path_matcher_interface",
@@ -98,6 +97,7 @@ envoy_cc_library(
         "//envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
@@ -136,9 +136,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "string_accessor_interface",
     hdrs = ["string_accessor.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 

@@ -982,10 +982,19 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFiltersPauseAndResume) {
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(default_response_headers_, false);
 
+  bool verify_no_remote_close = true;
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    // in HTTP1 case, the connection is closed on stream reset and therefore, it
+    // is possible to detect a remote close if remote FIN event gets processed before local close
+    // socket event. By sending verify_no_remote_close as false to the write function, we are
+    // allowing the test to pass even if remote close is detected.
+    verify_no_remote_close = false;
+  }
   // send some data to pause the filter
-  ASSERT_TRUE(tcp_client_->write("hello", false));
+  ASSERT_TRUE(tcp_client_->write("hello", false, verify_no_remote_close));
   // send end stream to resume the filter
-  ASSERT_TRUE(tcp_client_->write("hello", true));
+  ASSERT_TRUE(tcp_client_->write("hello", true, verify_no_remote_close));
+
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
 
   // Finally close and clean up.
@@ -1088,6 +1097,59 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
 
   sendBidiData(fake_upstream_connection_);
   closeConnection(fake_upstream_connection_);
+}
+
+TEST_P(TcpTunnelingIntegrationTest, TcpTunnelingAccessLog) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+        "%ACCESS_LOG_TYPE%-%UPSTREAM_CONNECTION_ID%\n");
+    access_log_config.set_path(access_log_filename);
+    proxy_config.add_access_log()->mutable_typed_config()->PackFrom(access_log_config);
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  sendBidiData(fake_upstream_connection_);
+  closeConnection(fake_upstream_connection_);
+
+  auto log_result = waitForAccessLog(access_log_filename);
+  std::vector<std::string> access_log_parts = absl::StrSplit(log_result, '-');
+  EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::TcpConnectionEnd), access_log_parts[0]);
+  uint32_t upstream_connection_id;
+  ASSERT_TRUE(absl::SimpleAtoi(access_log_parts[1], &upstream_connection_id));
+  EXPECT_GT(upstream_connection_id, 0);
 }
 
 TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {

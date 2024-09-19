@@ -6,10 +6,6 @@ load(
     "envoy_contrib_package",
 )
 load(
-    "//bazel:envoy_internal.bzl",
-    "envoy_external_dep_path",
-)
-load(
     "//contrib:all_contrib_extensions.bzl",
     "envoy_contrib_linux_aarch64_constraints",
     "envoy_contrib_linux_x86_64_constraints",
@@ -38,7 +34,7 @@ envoy_cmake(
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     deps = [
-        envoy_external_dep_path("ragel"),
+        "//bazel/foreign_cc:ragel",
     ],
 )
 
@@ -64,7 +60,7 @@ envoy_cmake(
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_aarch64_constraints(),
     deps = [
-        envoy_external_dep_path("ragel"),
+        "//bazel/foreign_cc:ragel",
     ],
 )
 

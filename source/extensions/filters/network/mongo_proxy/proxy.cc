@@ -39,7 +39,7 @@ AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogMa
     : time_source_(time_source) {
   auto file_or_error = log_manager.createAccessLog(
       Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
-  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  THROW_IF_NOT_OK_REF(file_or_error.status());
   file_ = file_or_error.value();
 }
 

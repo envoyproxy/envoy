@@ -101,12 +101,12 @@ index e7555ee10..a93beb1c5 100644
 diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.bazel
 --- a/src/google/protobuf/io/BUILD.bazel
 +++ b/src/google/protobuf/io/BUILD.bazel
-@@ -138,7 +138,7 @@ cc_library(
+@@ -138,6 +138,6 @@ cc_library(
          "@com_google_absl//absl/log:absl_log",
      ] + select({
          "//build_defs:config_msvc": [],
 -        "//conditions:default": ["@zlib"],
-+        "//conditions:default": ["//external:zlib"],
++        "//conditions:default": ["@envoy//bazel/foreign_cc:zlib"],
      }),
  )
 

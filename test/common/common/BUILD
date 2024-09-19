@@ -197,8 +197,10 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "logger_speed_test",
     srcs = ["logger_speed_test.cc"],
-    external_deps = ["benchmark"],
-    deps = ["//source/common/common:minimal_logger_lib"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
 )
 
 envoy_benchmark_test(
@@ -275,15 +277,13 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         "//source/common/common:utility_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -373,10 +373,10 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "re_speed_test",
     srcs = ["re_speed_test.cc"],
-    external_deps = ["benchmark"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@com_googlesource_code_re2//:re2",
     ],
 )
@@ -384,13 +384,11 @@ envoy_cc_benchmark_binary(
 envoy_cc_benchmark_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
-    external_deps = [
-        "abseil_strings",
-        "benchmark",
-    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -402,12 +400,10 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "trie_lookup_table_speed_test",
     srcs = ["trie_lookup_table_speed_test.cc"],
-    external_deps = [
-        "abseil_strings",
-        "benchmark",
-    ],
     deps = [
         "//source/common/common:trie_lookup_table_lib",
+        "@com_github_google_benchmark//:benchmark",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -428,10 +424,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "thread_id_test",
     srcs = ["thread_id_test.cc"],
-    external_deps = ["abseil_hash_testing"],
     deps = [
         "//source/common/common:thread_lib",
         "//test/test_common:thread_factory_for_test_lib",
+        "@com_google_absl//absl/hash:hash_testing",
     ],
 )
 
@@ -457,11 +453,9 @@ envoy_cc_test(
     name = "version_test",
     srcs = ["version_test.cc"],
     copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         "//source/common/version:version_lib",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -533,8 +527,10 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "inline_map_speed_test",
     srcs = ["inline_map_speed_test.cc"],
-    external_deps = ["benchmark"],
-    deps = ["//source/common/common:inline_map"],
+    deps = [
+        "//source/common/common:inline_map",
+        "@com_github_google_benchmark//:benchmark",
+    ],
 )
 
 envoy_benchmark_test(

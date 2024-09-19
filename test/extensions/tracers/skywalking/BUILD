@@ -50,14 +50,12 @@ envoy_cc_library(
 envoy_extension_cc_test(
     name = "skywalking_test_helper",
     extension_names = ["envoy.tracers.skywalking"],
-    external_deps = [
-        "cpp2sky",
-    ],
     deps = [
         ":skywalking_test_helper_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//test/test_common:utility_lib",
+        "@com_github_skyapm_cpp2sky//source:cpp2sky_data_lib",
     ],
 )
 

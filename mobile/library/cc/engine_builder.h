@@ -89,6 +89,11 @@ public:
   // For example if the runtime guard is `envoy.reloadable_features.use_foo`, the guard name is
   // `use_foo`.
   EngineBuilder& addRuntimeGuard(std::string guard, bool value);
+  // Adds a runtime guard for the `envoy.restart_features.<guard>`. Restart features cannot be
+  // changed after the Envoy applicable has started and initialized.
+  // For example if the runtime guard is `envoy.restart_features.use_foo`, the guard name is
+  // `use_foo`.
+  EngineBuilder& addRestartRuntimeGuard(std::string guard, bool value);
 
   // These functions don't affect the Bootstrap configuration but instead perform registrations.
   EngineBuilder& addKeyValueStore(std::string name, KeyValueStoreSharedPtr key_value_store);
@@ -109,6 +114,7 @@ public:
 #else
   // Only android supports c_ares
   EngineBuilder& setUseCares(bool use_cares);
+  EngineBuilder& addCaresFallbackResolver(std::string host, int port);
 #endif
 
   // This is separated from build() for the sake of testability
@@ -164,6 +170,7 @@ private:
   bool enable_http3_ = true;
 #if !defined(__APPLE__)
   bool use_cares_ = false;
+  std::vector<std::pair<std::string, int>> cares_fallback_resolvers_;
 #endif
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";
@@ -183,6 +190,7 @@ private:
   std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
+  std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
   bool use_gro_if_available_ = false;
 

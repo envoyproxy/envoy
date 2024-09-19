@@ -10644,11 +10644,11 @@ public:
     check(dynamic_cast<const DerivedFilterConfig*>(
               route->mostSpecificPerFilterConfig(route_config_name)),
           expected_most_specific_config, "most specific config");
-    route->traversePerFilterConfig(
-        route_config_name, [&](const Router::RouteSpecificFilterConfig& cfg) {
-          auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
-          traveled_cfg.push_back(typed_cfg->config_.seconds());
-        });
+    for (const auto* cfg : route->perFilterConfigs(route_config_name)) {
+      auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(cfg);
+      traveled_cfg.push_back(typed_cfg->config_.seconds());
+    }
+
     ASSERT_EQ(expected_traveled_config, traveled_cfg);
   }
 
@@ -10666,11 +10666,10 @@ public:
     absl::InlinedVector<uint32_t, 3> traveled_cfg;
 
     EXPECT_EQ(nullptr, route->mostSpecificPerFilterConfig(route_config_name));
-    route->traversePerFilterConfig(
-        route_config_name, [&](const Router::RouteSpecificFilterConfig& cfg) {
-          auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
-          traveled_cfg.push_back(typed_cfg->config_.seconds());
-        });
+    for (const auto* cfg : route->perFilterConfigs(route_config_name)) {
+      auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(cfg);
+      traveled_cfg.push_back(typed_cfg->config_.seconds());
+    }
     EXPECT_EQ(0, traveled_cfg.size());
   }
 

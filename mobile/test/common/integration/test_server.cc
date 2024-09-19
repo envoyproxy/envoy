@@ -169,11 +169,15 @@ void TestServer::start(TestServerType type, int port) {
     break;
   case TestServerType::HTTP2_WITH_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
-    factory = createUpstreamTlsContext(factory_context_);
+    factory = createUpstreamTlsContext(factory_context_, /* add_alpn= */ true);
     break;
   case TestServerType::HTTP1_WITHOUT_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
     factory = Network::Test::createRawBufferDownstreamSocketFactory();
+    break;
+  case TestServerType::HTTP1_WITH_TLS:
+    upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
+    factory = createUpstreamTlsContext(factory_context_, /* add_alpn= */ false);
     break;
   case TestServerType::HTTP_PROXY: {
     Server::forceRegisterDefaultListenerManagerFactoryImpl();
@@ -327,7 +331,8 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
+    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context,
+    bool add_alpn) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -338,7 +343,9 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
   auto* ctx = tls_context.mutable_common_tls_context()->mutable_validation_context();
   ctx->mutable_trusted_ca()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-  tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+  if (add_alpn) {
+    tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+  }
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
       tls_context, factory_context, false);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();

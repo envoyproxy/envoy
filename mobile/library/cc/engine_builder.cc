@@ -56,6 +56,11 @@ EngineBuilder& EngineBuilder::setUseCares(bool use_cares) {
   use_cares_ = use_cares;
   return *this;
 }
+
+EngineBuilder& EngineBuilder::addCaresFallbackResolver(std::string host, int port) {
+  cares_fallback_resolvers_.emplace_back(std::move(host), port);
+  return *this;
+}
 #endif
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
@@ -321,6 +326,11 @@ EngineBuilder& EngineBuilder::addRuntimeGuard(std::string guard, bool value) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool value) {
+  restart_runtime_guards_.emplace_back(std::move(guard), value);
+  return *this;
+}
+
 #if defined(__APPLE__)
 EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
   respect_system_proxy_settings_ = value;
@@ -486,6 +496,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #else
   if (use_cares_) {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
+    if (!cares_fallback_resolvers_.empty()) {
+      for (const auto& [host, port] : cares_fallback_resolvers_) {
+        auto* address = resolver_config.add_resolvers();
+        address->mutable_socket_address()->set_address(host);
+        address->mutable_socket_address()->set_port_value(port);
+      }
+      resolver_config.set_use_resolvers_as_fallback(true);
+    }
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.cares");
     dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
@@ -549,6 +567,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (platform_certificates_validation_on_) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator
         validator;
+    if (network_thread_priority_.has_value()) {
+      validator.mutable_thread_priority()->set_value(*network_thread_priority_);
+    }
     validation->mutable_custom_validator_config()->set_name(
         "envoy_mobile.cert_validator.platform_bridge_cert_validator");
     validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
@@ -818,6 +839,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   // needed to be merged with the default off due to unresolved test issues. Once those are fixed,
   // and the default for `allow_client_socket_creation_failure` is true, we can remove this.
   (*restart_features.mutable_fields())["allow_client_socket_creation_failure"].set_bool_value(true);
+  for (auto& guard_and_value : restart_runtime_guards_) {
+    (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
+        guard_and_value.second);
+  }
 
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
