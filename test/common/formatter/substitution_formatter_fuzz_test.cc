@@ -81,11 +81,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
                                 struct_for_json_formatter);
 
       // Create JSON formatter.
-      formatter =
-          std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, false, false);
-      typed_formatter =
-          std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, true, false);
-
+      formatter = std::make_unique<Formatter::JsonFormatterImpl>(struct_for_json_formatter, false);
     } catch (const EnvoyException& e) {
       ENVOY_LOG_MISC(debug, "JSON formatter failed, EnvoyException: {}", e.what());
       return;

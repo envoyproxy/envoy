@@ -244,7 +244,44 @@ private:
   std::vector<FormatterProviderBasePtr<FormatterContext>> providers_;
 };
 
-using JsonStringSerializer = Envoy::Json::StreamerBase<Envoy::Json::StringOutput>;
+// Helper class to write value to output buffer in JSON style.
+class JsonStringSerializer {
+public:
+  using OutputBufferType = Json::StringOutput;
+  explicit JsonStringSerializer(std::string& output_buffer) : output_buffer_(output_buffer) {}
+
+  // Methods that be used to add JSON delimiter to output buffer.
+  void addMapBeginDelimiter() { output_buffer_.add("{"); }
+  void addMapEndDelimiter() { output_buffer_.add("}"); }
+  void addArrayBeginDelimiter() { output_buffer_.add("["); }
+  void addArrayEndDelimiter() { output_buffer_.add("]"); }
+  void addElementDelimiter() { output_buffer_.add(","); }
+  void addKeyValueDelimiter() { output_buffer_.add(":"); }
+
+  // Methods that be used to add JSON key or value to output buffer.
+  void addString(absl::string_view value) { addSanitized(R"(")", value, R"(")"); }
+  void addNumber(double d) {
+    if (std::isnan(d)) {
+      output_buffer_.add(Json::Constants::Null);
+    } else {
+      Buffer::Util::serializeDouble(d, output_buffer_);
+    }
+  }
+  void addNumber(uint64_t i) { output_buffer_.add(absl::StrCat(i)); }
+  void addNumber(int64_t i) { output_buffer_.add(absl::StrCat(i)); }
+  void addBool(bool b) { output_buffer_.add(b ? Json::Constants::True : Json::Constants::False); }
+  void addNull() { output_buffer_.add(Json::Constants::Null); }
+
+  // Low-level methods that be used to provide a low-level control to buffer.
+  void addSanitized(absl::string_view prefix, absl::string_view value, absl::string_view suffix) {
+    output_buffer_.add(prefix, Json::sanitize(sanitize_buffer_, value), suffix);
+  }
+  void addRawString(absl::string_view value) { output_buffer_.add(value); }
+
+protected:
+  std::string sanitize_buffer_;
+  OutputBufferType output_buffer_;
+};
 
 // Helper class to parse the Json format configuration. The class will be used to parse
 // the JSON format configuration and convert it to a list of raw JSON pieces and
@@ -264,10 +301,8 @@ public:
 
   /**
    * Constructor of JsonFormatBuilder.
-   * @param keep_value_type whether to keep the value type in JSON. If false
-   * then all values will be converted to string.
    */
-  explicit JsonFormatBuilder(bool keep_value_type) : keep_value_type_(keep_value_type) {}
+  JsonFormatBuilder() = default;
 
   /**
    * Convert a proto struct format configuration to an array of raw JSON pieces and
@@ -318,11 +353,9 @@ private:
   void formatValueToFormatElements(const ProtobufWkt::Value& value);
   void formatValueToFormatElements(const ProtoList& list_value);
 
-  const bool keep_value_type_;
-
   std::string buffer_;                       // JSON writer buffer.
-  JsonStringSerializer serializer_{buffer_}; // JSON streamer.
-  FormatElements output_;                    // Output configuration.
+  JsonStringSerializer serializer_{buffer_}; // JSON serializer.
+  FormatElements elements_;                  // Parsed elements.
 };
 
 template <class FormatterContext>
@@ -332,16 +365,13 @@ public:
   using Formatter = FormatterProviderBasePtr<FormatterContext>;
   using Formatters = std::vector<Formatter>;
 
-  JsonFormatterImplBase(const ProtobufWkt::Struct& struct_format, bool keep_value_type,
-                        bool omit_empty_values, const CommandParsers& commands = {})
-      : keep_value_type_(keep_value_type),
-        empty_value_(omit_empty_values ? std::string()
+  JsonFormatterImplBase(const ProtobufWkt::Struct& struct_format, bool omit_empty_values,
+                        const CommandParsers& commands = {})
+      : empty_value_(omit_empty_values ? std::string()
                                        : std::string(DefaultUnspecifiedValueStringView)) {
 
-    JsonFormatBuilder::FormatElements elements =
-        JsonFormatBuilder(keep_value_type).fromStruct(struct_format);
-
-    for (JsonFormatBuilder::FormatElement& element : elements) {
+    for (JsonFormatBuilder::FormatElement& element :
+         JsonFormatBuilder().fromStruct(struct_format)) {
       if (element.is_template_) {
         parsed_elements_.emplace_back(
             SubstitutionFormatParser::parse<FormatterContext>(element.value_, commands));
@@ -355,14 +385,14 @@ public:
                                 const StreamInfo::StreamInfo& info) const override {
     std::string log_line;
     log_line.reserve(2048);
-    JsonStringSerializer streamer(log_line); // Helper to serialize the value to log line.
+    JsonStringSerializer serializer(log_line); // Helper to serialize the value to log line.
 
     for (const ParsedFormatElement& element : parsed_elements_) {
       // 1. Handle the raw string element.
       if (absl::holds_alternative<std::string>(element)) {
         // The raw string element will be added to the buffer directly.
         // It is sanitized when loading the configuration.
-        log_line.append(absl::get<std::string>(element));
+        serializer.addRawString(absl::get<std::string>(element));
         continue;
       }
 
@@ -370,16 +400,15 @@ public:
       const Formatters& formatters = absl::get<Formatters>(element);
       ASSERT(!formatters.empty());
 
-      // 2. Handle the formatter element with multiple providers or case
-      //    that value type needs not to be kept.
-      if (formatters.size() > 1 || !keep_value_type_) {
-        stringValueToLogLine(formatters, context, info, log_line, streamer);
-        continue;
+      if (formatters.size() > 1) {
+        // 2. Handle the formatter element with multiple providers or case
+        //    that value type needs not to be kept.
+        stringValueToLogLine(formatters, context, info, serializer);
+      } else {
+        // 3. Handle the formatter element with a single provider and value
+        //    type needs to be kept.
+        typedValueToLogLine(formatters, context, info, serializer);
       }
-
-      // 4. Handle the formatter element with a single provider and value
-      //    type needs to be kept.
-      typedValueToLogLine(formatters, context, info, log_line, streamer);
     }
 
     log_line.push_back('\n');
@@ -388,43 +417,43 @@ public:
 
 private:
   void stringValueToLogLine(const Formatters& formatters, const FormatterContext& context,
-                            const StreamInfo::StreamInfo& info, std::string& log_line,
-                            JsonStringSerializer& streamer) const {
+                            const StreamInfo::StreamInfo& info,
+                            JsonStringSerializer& serializer) const {
 
-    log_line.append(Json::Constants::DoubleQuote); // Start the JSON string.
+    serializer.addRawString(Json::Constants::DoubleQuote); // Start the JSON string.
     for (const Formatter& formatter : formatters) {
       const absl::optional<std::string> value = formatter->formatWithContext(context, info);
       if (!value.has_value()) {
         // Add the empty value. This needn't be sanitized.
-        log_line.append(empty_value_);
+        serializer.addRawString(empty_value_);
         continue;
       }
       // Sanitize the string value and add it to the buffer. The string value will not be quoted
       // since we handle the quoting by ourselves at the outer level.
-      streamer.addSanitized({}, value.value(), {});
+      serializer.addSanitized({}, value.value(), {});
     }
-    log_line.append(Json::Constants::DoubleQuote); // End the JSON string.
+    serializer.addRawString(Json::Constants::DoubleQuote); // End the JSON string.
   }
 
   void typedValueToLogLine(const Formatters& formatters, const FormatterContext& context,
-                           const StreamInfo::StreamInfo& info, std::string& log_line,
-                           JsonStringSerializer& streamer) const {
+                           const StreamInfo::StreamInfo& info,
+                           JsonStringSerializer& serializer) const {
 
     const ProtobufWkt::Value value = formatters[0]->formatValueWithContext(context, info);
 
     switch (value.kind_case()) {
     case ProtobufWkt::Value::KIND_NOT_SET:
     case ProtobufWkt::Value::kNullValue:
-      streamer.addNull();
+      serializer.addNull();
       break;
     case ProtobufWkt::Value::kNumberValue:
-      streamer.addNumber(value.number_value());
+      serializer.addNumber(value.number_value());
       break;
     case ProtobufWkt::Value::kStringValue:
-      streamer.addString(value.string_value());
+      serializer.addString(value.string_value());
       break;
     case ProtobufWkt::Value::kBoolValue:
-      streamer.addBool(value.bool_value());
+      serializer.addBool(value.bool_value());
       break;
     case ProtobufWkt::Value::kStructValue:
     case ProtobufWkt::Value::kListValue:
@@ -436,19 +465,18 @@ private:
           MessageUtil::getJsonStringFromMessage(value, false, true);
       if (json_or.ok()) {
         // We assume the output of getJsonStringFromMessage is a valid JSON string piece.
-        log_line.append(json_or.value());
+        serializer.addRawString(json_or.value());
       } else {
-        streamer.addString(json_or.status().ToString());
+        serializer.addString(json_or.status().ToString());
       }
 #else
       IS_ENVOY_BUG("Json support compiled out");
-      log_line.append(R"EOF("Json support compiled out")EOF");
+      serializer.addRawString(R"EOF("Json support compiled out")EOF");
 #endif
       break;
     }
   }
 
-  const bool keep_value_type_{};
   const std::string empty_value_;
 
   using ParsedFormatElement = absl::variant<std::string, Formatters>;

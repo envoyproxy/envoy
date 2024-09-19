@@ -336,7 +336,9 @@ new_features:
     implementation. The legacy implementation will be enabled by default for now but will be deprecated and removed
     in a future release.
     The :ref:`sort_properties <envoy_v3_api_field_config.core.v3.JsonFormatOptions.sort_properties>` field will
-    be ignored in the new implementation because the new implementation always sorts properties.
+    be ignored in the new implementation because the new implementation always sorts properties. And the new implementation
+    will always keep the value type in the JSON output. For example, the duration field will always be rendered as a number
+    instead of a string.
     The new JSON formatter could be enabled by setting the runtime guard
     ``envoy.reloadable_features.logging_with_fast_json_formatter`` to true.
 - area: access_logs

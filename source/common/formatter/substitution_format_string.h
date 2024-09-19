@@ -101,7 +101,7 @@ public:
           struct_format, preserve_types, omit_empty_values, sort_properties, commands);
     }
 
-    return std::make_unique<JsonFormatterImplBase<FormatterContext>>(struct_format, preserve_types,
+    return std::make_unique<JsonFormatterImplBase<FormatterContext>>(struct_format,
                                                                      omit_empty_values, commands);
   }
 };

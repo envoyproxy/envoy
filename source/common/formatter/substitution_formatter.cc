@@ -56,17 +56,17 @@ const re2::RE2& SubstitutionFormatParser::commandWithArgsRegex() {
 
 JsonFormatBuilder::FormatElements
 JsonFormatBuilder::fromStruct(const ProtobufWkt::Struct& struct_format) {
-  output_.clear();
+  elements_.clear();
 
   // This call will iterate through the map tree and serialize the key/values as JSON.
   // If a string value that contains a substitution commands is found, the current
   // JSON piece and the substitution command will be pushed into the output list.
   // After that, the iteration will continue until the whole tree is traversed.
   formatValueToFormatElements(struct_format.fields());
-  output_.push_back(FormatElement{std::move(buffer_), false});
+  elements_.push_back(FormatElement{std::move(buffer_), false});
   buffer_.clear();
 
-  return std::move(output_);
+  return std::move(elements_);
 };
 
 void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& value) {
@@ -76,15 +76,7 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& va
     serializer_.addNull();
     break;
   case ProtobufWkt::Value::kNumberValue:
-    if (keep_value_type_) {
-      serializer_.addNumber(value.number_value());
-    } else {
-      // TODO(wbpcode): may use Buffer::Util::serializeDouble for best performance.
-      // But this function only be executed when the configuration is loading. So,
-      // it's fine to use the fmt::to_string.
-      serializer_.addString(fmt::to_string(value.number_value()));
-    }
-
+    serializer_.addNumber(value.number_value());
     break;
   case ProtobufWkt::Value::kStringValue: {
     absl::string_view string_format = value.string_value();
@@ -95,21 +87,16 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& va
 
     // The string contains a formatter, we need to push the current exist JSON piece
     // into the output list first.
-    output_.push_back(FormatElement{std::move(buffer_), false});
+    elements_.push_back(FormatElement{std::move(buffer_), false});
     buffer_.clear();
 
     // Now a formatter is coming, we need to push the current raw string into
     // the output list.
-    output_.push_back(FormatElement{std::string(string_format), true});
+    elements_.push_back(FormatElement{std::string(string_format), true});
     break;
   }
   case ProtobufWkt::Value::kBoolValue:
-    if (keep_value_type_) {
-      serializer_.addBool(value.bool_value());
-    } else {
-      serializer_.addString(value.bool_value() ? Json::Constants::True : Json::Constants::False);
-    }
-
+    serializer_.addBool(value.bool_value());
     break;
   case ProtobufWkt::Value::kStructValue: {
     formatValueToFormatElements(value.struct_value().fields());
@@ -122,14 +109,14 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& va
 }
 
 void JsonFormatBuilder::formatValueToFormatElements(const ProtoList& list_value) {
-  buffer_.append(Json::Constants::ArrayBegin); // Delimiter to start list.
+  serializer_.addArrayBeginDelimiter(); // Delimiter to start list.
   for (int i = 0; i < list_value.size(); ++i) {
     if (i > 0) {
-      buffer_.append(Json::Constants::Comma); // Delimiter to separate list elements.
+      serializer_.addElementDelimiter(); // Delimiter to separate list elements.
     }
     formatValueToFormatElements(list_value[i]);
   }
-  buffer_.append(Json::Constants::ArrayEnd); // Delimiter to end list.
+  serializer_.addArrayEndDelimiter(); // Delimiter to end list.
 }
 
 void JsonFormatBuilder::formatValueToFormatElements(const ProtoDict& dict_value) {
@@ -144,17 +131,17 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtoDict& dict_value)
   std::sort(sorted_fields.begin(), sorted_fields.end(),
             [](const auto& a, const auto& b) { return a.first < b.first; });
 
-  buffer_.append(Json::Constants::MapBegin); // Delimiter to start map.
+  serializer_.addMapBeginDelimiter(); // Delimiter to start map.
   for (size_t i = 0; i < sorted_fields.size(); ++i) {
     if (i > 0) {
-      buffer_.append(Json::Constants::Comma); // Delimiter to separate map elements.
+      serializer_.addElementDelimiter(); // Delimiter to separate map elements.
     }
     // Add the key.
     serializer_.addString(sorted_fields[i].first);
-    buffer_.append(Json::Constants::Colon); // Delimiter to separate key and value.
+    serializer_.addKeyValueDelimiter(); // Delimiter to separate key and value.
     formatValueToFormatElements(sorted_fields[i].second->second);
   }
-  buffer_.append(Json::Constants::MapEnd); // Delimiter to end map.
+  serializer_.addMapEndDelimiter(); // Delimiter to end map.
 }
 
 } // namespace Formatter
