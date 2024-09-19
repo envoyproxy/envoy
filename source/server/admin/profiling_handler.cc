@@ -105,8 +105,9 @@ Http::Code TcmallocProfilingHandler::handlerAllocationProfiler(Http::ResponseHea
   }
   const bool enable = enableVal.value() == "y";
   if (enable) {
-    const bool started = Profiler::TcmallocProfiler::startAllocationProfile();
-    if (!started) {
+    const auto started = Profiler::TcmallocProfiler::startAllocationProfile();
+    if (!started.ok()) {
+      response.add(started.message());
       return Http::Code::BadRequest;
     }
     response.add("OK\n");

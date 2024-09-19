@@ -73,7 +73,7 @@ public:
   TcmallocProfiler() = default;
 
   static absl::StatusOr<std::string> tcmallocHeapProfile();
-  static bool startAllocationProfile();
+  static absl::Status startAllocationProfile();
   static absl::StatusOr<std::string> stopAllocationProfile();
 };
 

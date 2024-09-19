@@ -68,20 +68,21 @@ bool Heap::stopProfiler() { return false; }
 namespace Envoy {
 namespace Profiler {
 
-static absl::optional<tcmalloc::MallocExtension::AllocationProfilingToken> alloc_profiler =
-    absl::nullopt;
+static tcmalloc::MallocExtension::AllocationProfilingToken* alloc_profiler = nullptr;
 
 absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
   auto profile = tcmalloc::MallocExtension::SnapshotCurrent(tcmalloc::ProfileType::kHeap);
   return tcmalloc::Marshal(profile);
 }
 
-bool TcmallocProfiler::startAllocationProfile() {
-  if (alloc_profiler) {
-    return false;
+absl::Status TcmallocProfiler::startAllocationProfile() {
+  if (alloc_profiler != nullptr) {
+    return absl::Status(absl::StatusCode::kFailedPrecondition,
+                        "Allocation profiler has already started");
   }
-  alloc_profiler = tcmalloc::MallocExtension::StartAllocationProfiling();
-  return true;
+  alloc_profiler = new tcmalloc::MallocExtension::AllocationProfilingToken(
+      tcmalloc::MallocExtension::StartAllocationProfiling());
+  return absl::OkStatus();
 }
 
 absl::StatusOr<std::string> TcmallocProfiler::stopAllocationProfile() {
@@ -89,9 +90,10 @@ absl::StatusOr<std::string> TcmallocProfiler::stopAllocationProfile() {
     return absl::Status(absl::StatusCode::kFailedPrecondition,
                         "Allocation profiler is not started");
   }
-  const auto profile = std::move(alloc_profiler.value()).Stop();
+  const auto profile = std::move(*alloc_profiler).Stop();
   const auto result = tcmalloc::Marshal(profile);
-  alloc_profiler = absl::nullopt;
+  delete alloc_profiler;
+  alloc_profiler = nullptr;
   return result;
 }
 
@@ -108,12 +110,14 @@ absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
                       "Heap profile is not implemented in current build");
 }
 
-bool TcmallocProfiler::startAllocationProfile() { return false; }
-
-absl::StatusOr<std::string> TcmallocProfiler::stopAllocationProfile() {
+absl::Status TcmallocProfiler::startAllocationProfile() {
   return absl::Status(absl::StatusCode::kUnimplemented,
                       "Allocation profile is not implemented in current build");
-}
+
+  absl::StatusOr<std::string> TcmallocProfiler::stopAllocationProfile() {
+    return absl::Status(absl::StatusCode::kUnimplemented,
+                        "Allocation profile is not implemented in current build");
+  }
 
 } // namespace Profiler
 } // namespace Envoy
