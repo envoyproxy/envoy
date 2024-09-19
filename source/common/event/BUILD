@@ -88,8 +88,8 @@ envoy_cc_library(
     name = "event_impl_base_lib",
     srcs = ["event_impl_base.cc"],
     hdrs = ["event_impl_base.h"],
-    external_deps = [
-        "event",
+    deps = [
+        "//bazel/foreign_cc:event",
     ],
 )
 
@@ -133,10 +133,8 @@ envoy_cc_library(
     name = "libevent_lib",
     srcs = ["libevent.cc"],
     hdrs = ["libevent.h"],
-    external_deps = [
-        "event",
-    ],
     deps = [
+        "//bazel/foreign_cc:event",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
     ],
@@ -146,11 +144,11 @@ envoy_cc_library(
     name = "libevent_scheduler_lib",
     srcs = ["libevent_scheduler.cc"],
     hdrs = ["libevent_scheduler.h"],
-    external_deps = ["event"],
     deps = [
         ":libevent_lib",
         ":schedulable_cb_lib",
         ":timer_lib",
+        "//bazel/foreign_cc:event",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//source/common/common:assert_lib",
@@ -161,10 +159,10 @@ envoy_cc_library(
     name = "schedulable_cb_lib",
     srcs = ["schedulable_cb_impl.cc"],
     hdrs = ["schedulable_cb_impl.h"],
-    external_deps = ["event"],
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
+        "//bazel/foreign_cc:event",
         "//envoy/event:schedulable_cb_interface",
     ],
 )
@@ -173,10 +171,10 @@ envoy_cc_library(
     name = "timer_lib",
     srcs = ["timer_impl.cc"],
     hdrs = ["timer_impl.h"],
-    external_deps = ["event"],
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
+        "//bazel/foreign_cc:event",
         "//envoy/event:timer_interface",
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",

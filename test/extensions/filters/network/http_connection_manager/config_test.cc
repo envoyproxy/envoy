@@ -708,6 +708,47 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, FutureDefaultInternalAddress) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.explicit_internal_address_config", "true"}});
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  // Envoy no longer considers RFC1918 IP addresses to be internal if runtime guard is enabled.
+  Network::Address::Ipv4Instance default_ip_address{"10.48.179.130", 0, nullptr};
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(default_ip_address));
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DefaultInternalAddress) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  // Previously, Envoy considered RFC1918 IP addresses to be internal, by default.
+  Network::Address::Ipv4Instance default_ip_address{"10.48.179.130", 0, nullptr};
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(default_ip_address));
+}
+
 TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http

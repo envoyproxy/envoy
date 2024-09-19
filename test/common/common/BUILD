@@ -197,8 +197,10 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "logger_speed_test",
     srcs = ["logger_speed_test.cc"],
-    external_deps = ["benchmark"],
-    deps = ["//source/common/common:minimal_logger_lib"],
+    deps = [
+        "//source/common/common:minimal_logger_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
 )
 
 envoy_benchmark_test(
@@ -371,10 +373,10 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "re_speed_test",
     srcs = ["re_speed_test.cc"],
-    external_deps = ["benchmark"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@com_googlesource_code_re2//:re2",
     ],
 )
@@ -382,12 +384,10 @@ envoy_cc_benchmark_binary(
 envoy_cc_benchmark_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -400,11 +400,9 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "trie_lookup_table_speed_test",
     srcs = ["trie_lookup_table_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/common:trie_lookup_table_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -529,8 +527,10 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "inline_map_speed_test",
     srcs = ["inline_map_speed_test.cc"],
-    external_deps = ["benchmark"],
-    deps = ["//source/common/common:inline_map"],
+    deps = [
+        "//source/common/common:inline_map",
+        "@com_github_google_benchmark//:benchmark",
+    ],
 )
 
 envoy_benchmark_test(

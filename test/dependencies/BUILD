@@ -11,7 +11,5 @@ envoy_package()
 envoy_cc_test(
     name = "curl_test",
     srcs = ["curl_test.cc"],
-    external_deps = [
-        "curl",
-    ],
+    external_deps = ["curl"],
 )

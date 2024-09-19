@@ -75,9 +75,6 @@ envoy_cc_test(
 envoy_cc_test_binary(
     name = "wasm_speed_test",
     srcs = ["wasm_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -86,6 +83,7 @@ envoy_cc_test_binary(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@com_google_absl//absl/types:optional",
     ],
 )

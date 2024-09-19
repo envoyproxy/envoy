@@ -102,11 +102,11 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
-    external_deps = ["benchmark"],
     deps = [
         ":deterministic_hash_test_proto_cc_proto",
         "//source/common/protobuf:utility_lib",
         "//test/test_common:test_runtime_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 

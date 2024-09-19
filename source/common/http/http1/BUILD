@@ -115,9 +115,9 @@ envoy_cc_library(
     name = "legacy_parser_lib",
     srcs = ["legacy_parser_impl.cc"],
     hdrs = ["legacy_parser_impl.h"],
-    external_deps = ["http_parser"],
     deps = [
         ":parser_interface",
+        "//bazel/external/http_parser",
         "//source/common/common:assert_lib",
     ],
 )
