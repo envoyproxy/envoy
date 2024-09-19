@@ -136,9 +136,6 @@ envoy_extension_cc_benchmark_binary(
     name = "command_lookup_speed_test",
     srcs = ["command_lookup_speed_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
@@ -148,6 +145,7 @@ envoy_extension_cc_benchmark_binary(
         "//test/mocks/network:network_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
@@ -193,9 +191,6 @@ envoy_extension_cc_benchmark_binary(
     name = "command_split_speed_test",
     srcs = ["command_split_speed_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
@@ -204,6 +199,7 @@ envoy_extension_cc_benchmark_binary(
         "//source/extensions/filters/network/redis_proxy:router_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 

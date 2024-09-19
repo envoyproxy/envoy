@@ -18,8 +18,8 @@ envoy_extension_cc_test_library(
     srcs = ["dns_filter_test_utils.cc"],
     hdrs = ["dns_filter_test_utils.h"],
     extension_names = ["envoy.filters.udp.dns_filter"],
-    external_deps = ["ares"],
     deps = [
+        "//bazel/foreign_cc:ares",
         "//source/common/common:random_generator_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

@@ -17,9 +17,7 @@ envoy_cc_test_library(
     name = "environment_lib",
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
-    external_deps = [
-        "bazel_runfiles",
-    ],
+    external_deps = ["bazel_runfiles"],
     deps = [
         ":network_utility_lib",
         "//envoy/server:options_interface",
