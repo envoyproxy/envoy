@@ -122,7 +122,7 @@ private:
     // Small wrapping struct to accumulate addresses from firings of the
     // onDNSServiceGetAddrInfoReply callback.
     struct PendingResponse {
-      ResolutionStatus status_ = ResolutionStatus::Success;
+      ResolutionStatus status_ = ResolutionStatus::Completed;
       std::string details_ = "not_set";
       // `v4_response_received_` and `v6_response_received_` denote whether a callback from the
       // `DNSServiceGetAddrInfo` call has been received for the IPv4 address family and IPv6
