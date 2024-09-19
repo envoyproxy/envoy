@@ -496,7 +496,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
 // followup health check would happen. Using real time solves this because then
 // the ordering of advancing the time system and enabling the health check timer
 // is inconsequential.
-TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayErroSingleEndpointGoAwayError) {
+TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayError) {
   initialize();
 
   // GOAWAY doesn't exist in HTTP1.
