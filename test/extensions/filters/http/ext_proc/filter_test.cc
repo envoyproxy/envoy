@@ -92,7 +92,7 @@ protected:
     client_ = std::make_unique<MockClient>();
     route_ = std::make_shared<NiceMock<Router::MockRoute>>();
     EXPECT_CALL(*client_, start(_, _, _, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
-    EXPECT_CALL(filter_->client_, stream()).WillRepeatedly(Invoke([this]() { return stream_; }));
+    EXPECT_CALL(*client_, stream()).WillRepeatedly(Invoke([this]() { return stream_; }));
     EXPECT_CALL(*client_, setStream(_))
             .WillRepeatedly(Invoke([this](ExternalProcessorStream* stream) { stream_ = stream; }));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
