@@ -246,8 +246,8 @@ envoy_cc_library(
     hdrs = [
         "kafka_types.h",
     ],
-    external_deps = ["abseil_optional"],
     deps = [
         "//source/common/common:macros",
+        "@com_google_absl//absl/types:optional",
     ],
 )

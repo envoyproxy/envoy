@@ -8,6 +8,7 @@
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -37,11 +38,17 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
   // options, we want to maintain the original behavior of this transport socket.
   if (options_ && options_->http11ProxyInfo()) {
     if (transport_socket_->ssl()) {
-      header_buffer_.add(
-          absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname, ":443 HTTP/1.1\r\n\r\n"));
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_ssl_port")) {
+        header_buffer_.add(absl::StrCat(
+            "CONNECT ", options_->http11ProxyInfo()->hostname,
+            Http::HeaderUtility::hostHasPort(options_->http11ProxyInfo()->hostname) ? "" : ":443",
+            " HTTP/1.1\r\n\r\n"));
+      } else {
+        header_buffer_.add(absl::StrCat("CONNECT ", options_->http11ProxyInfo()->hostname,
+                                        ":443 HTTP/1.1\r\n\r\n"));
+      }
       need_to_strip_connect_response_ = true;
     }
-
     return;
   }
 

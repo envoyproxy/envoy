@@ -18,8 +18,6 @@ envoy_cc_test_library(
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
     external_deps = [
-        "abseil_optional",
-        "abseil_symbolize",
         "bazel_runfiles",
     ],
     deps = [
@@ -33,6 +31,8 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_base",
+        "@com_google_absl//absl/debugging:symbolize",
+        "@com_google_absl//absl/types:optional",
     ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]) + envoy_select_enable_exceptions([
         "//source/server:options_lib",
     ]),
@@ -126,9 +126,6 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = [
-        "abseil_strings",
-    ],
     deps = [
         ":file_system_for_test_lib",
         ":logging_lib",
@@ -158,6 +155,7 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
+        "@com_google_absl//absl/strings",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
