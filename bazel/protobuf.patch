@@ -90,7 +90,7 @@ index e7555ee10..a93beb1c5 100644
 @@ -8,3 +8,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
 
- __version__ = '5.28.1'
+ __version__ = '5.28.2'
 +
 +
 +if __name__ != '__main__':
