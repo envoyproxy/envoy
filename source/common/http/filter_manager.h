@@ -669,6 +669,9 @@ public:
   void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
     access_log_handlers_.push_back(std::move(handler));
   }
+  void addConfigAccessLogHandler(AccessLog::InstanceSharedPtr handler) {
+    config_log_handlers_.push_back(std::move(handler));
+  }
   void addStreamDecoderFilter(ActiveStreamDecoderFilterPtr filter) {
     // Note: configured decoder filters are appended to decoder_filters_.
     // This means that if filters are configured in the following order (assume all three filters
@@ -696,13 +699,45 @@ public:
   // FilterChainManager
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
-  void log(const Formatter::HttpFormatterContext log_context) {
+  void log(AccessLog::AccessLogType access_log_type) {
+    const Formatter::HttpFormatterContext log_context{
+        filter_manager_callbacks_.requestHeaders().ptr(),
+        filter_manager_callbacks_.responseHeaders().ptr(),
+        filter_manager_callbacks_.responseTrailers().ptr(),
+        {},
+        access_log_type,
+        &filter_manager_callbacks_.activeSpan()};
+    const bool filter_access_loggers_first =
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.filter_access_loggers_first");
+
+    if (!filter_access_loggers_first) {
+      for (const auto& log_handler : config_log_handlers_) {
+        log_handler->log(log_context, streamInfo());
+      }
+    }
+
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());
     }
+
+    if (filter_access_loggers_first) {
+      for (const auto& log_handler : config_log_handlers_) {
+        log_handler->log(log_context, streamInfo());
+      }
+    }
   }
 
-  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() { return access_log_handlers_; }
+  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() {
+    std::list<AccessLog::InstanceSharedPtr> combined_log_handlers(access_log_handlers_);
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.filter_access_loggers_first")) {
+      combined_log_handlers.insert(combined_log_handlers.begin(), config_log_handlers_.begin(),
+                                   config_log_handlers_.end());
+    } else {
+      combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers_.begin(),
+                                   config_log_handlers_.end());
+    }
+    return combined_log_handlers;
+  }
 
   void onStreamComplete() {
     for (auto filter : filters_) {
@@ -1036,6 +1071,7 @@ private:
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
   std::list<StreamFilterBase*> filters_;
   std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+  std::list<AccessLog::InstanceSharedPtr> config_log_handlers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata
