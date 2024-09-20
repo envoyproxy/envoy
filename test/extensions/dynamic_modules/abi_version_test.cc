@@ -27,6 +27,17 @@ TEST(DynamicModules, ABIVersionCheck) {
   EXPECT_EQ(sha256, kAbiVersion);
 }
 
+// This test ensures that the copied ABI header files in the SDK directory are identical to the
+// original ABI headers.
+TEST(DynamicModules, ABIHeaderIdentical) {
+  const std::string original_abi_header = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/source/extensions/dynamic_modules/abi.h"));
+  const std::string rust_abi_header =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir }}/source/extensions/dynamic_modules/sdk/rust/abi.h"));
+  EXPECT_EQ(original_abi_header, rust_abi_header);
+}
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy
