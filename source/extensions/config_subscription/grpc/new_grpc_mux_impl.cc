@@ -57,10 +57,10 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
 
 std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                     envoy::service::discovery::v3::DeltaDiscoveryResponse>>
-NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr async_client,
-                                       Grpc::RawAsyncClientPtr failover_async_client,
+NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
+                                       Grpc::RawAsyncClientPtr&& failover_async_client,
                                        const Protobuf::MethodDescriptor& service_method,
-                                       Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
+                                       Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
                                        const RateLimitSettings& rate_limit_settings) {
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
     return std::make_unique<GrpcMuxFailover<envoy::service::discovery::v3::DeltaDiscoveryRequest,
@@ -253,10 +253,10 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 }
 
 absl::Status
-NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr primary_async_client,
-                                Grpc::RawAsyncClientPtr failover_async_client,
-                                CustomConfigValidatorsPtr custom_config_validators,
-                                Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
+NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                                Grpc::RawAsyncClientPtr&& failover_async_client,
+                                CustomConfigValidatorsPtr&& custom_config_validators,
+                                Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
                                 const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =

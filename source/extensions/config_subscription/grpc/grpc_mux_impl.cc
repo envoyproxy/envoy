@@ -84,10 +84,10 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_
 
 std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
                                     envoy::service::discovery::v3::DiscoveryResponse>>
-GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr async_client,
-                                    Grpc::RawAsyncClientPtr failover_async_client,
+GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
+                                    Grpc::RawAsyncClientPtr&& failover_async_client,
                                     const Protobuf::MethodDescriptor& service_method,
-                                    Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
+                                    Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
                                     const RateLimitSettings& rate_limit_settings) {
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
     return std::make_unique<GrpcMuxFailover<envoy::service::discovery::v3::DiscoveryRequest,
@@ -303,10 +303,10 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
 // custom_config_validators, BackOffStrategyPtr backoff_strategy, const
 // envoy::config::core::v3::ApiConfigSource& ads_config_source) {
 absl::Status
-GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr primary_async_client,
-                             Grpc::RawAsyncClientPtr failover_async_client,
-                             CustomConfigValidatorsPtr custom_config_validators,
-                             Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
+GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                             Grpc::RawAsyncClientPtr&& failover_async_client,
+                             CustomConfigValidatorsPtr&& custom_config_validators,
+                             Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
                              const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =

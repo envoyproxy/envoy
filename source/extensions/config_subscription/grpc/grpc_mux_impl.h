@@ -74,10 +74,10 @@ public:
   }
 
   absl::Status
-  updateMuxSource(Grpc::RawAsyncClientPtr primary_async_client,
-                  Grpc::RawAsyncClientPtr failover_async_client,
-                  CustomConfigValidatorsPtr custom_config_validators, Stats::Scope& scope,
-                  BackOffStrategyPtr backoff_strategy,
+  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                  Grpc::RawAsyncClientPtr&& failover_async_client,
+                  CustomConfigValidatorsPtr&& custom_config_validators, Stats::Scope& scope,
+                  BackOffStrategyPtr&& backoff_strategy,
                   const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
 
   void handleDiscoveryResponse(
@@ -109,10 +109,10 @@ private:
   // Helper function to create the grpc_stream_ object.
   std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
                                       envoy::service::discovery::v3::DiscoveryResponse>>
-  createGrpcStreamObject(Grpc::RawAsyncClientPtr async_client,
-                         Grpc::RawAsyncClientPtr failover_async_client,
+  createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
+                         Grpc::RawAsyncClientPtr&& failover_async_client,
                          const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
-                         BackOffStrategyPtr backoff_strategy,
+                         BackOffStrategyPtr&& backoff_strategy,
                          const RateLimitSettings& rate_limit_settings);
 
   void drainRequests();

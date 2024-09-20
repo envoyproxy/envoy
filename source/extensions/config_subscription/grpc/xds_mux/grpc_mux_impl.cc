@@ -65,9 +65,9 @@ GrpcMuxImpl<S, F, RQ, RS>::GrpcMuxImpl(std::unique_ptr<F> subscription_state_fac
 
 template <class S, class F, class RQ, class RS>
 std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGrpcStreamObject(
-    Grpc::RawAsyncClientPtr async_client, Grpc::RawAsyncClientPtr failover_async_client,
+    Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
     const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
-    BackOffStrategyPtr backoff_strategy, const RateLimitSettings& rate_limit_settings) {
+    BackOffStrategyPtr&& backoff_strategy, const RateLimitSettings& rate_limit_settings) {
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
     return std::make_unique<GrpcMuxFailover<RQ, RS>>(
         /*primary_stream_creator=*/
@@ -230,9 +230,9 @@ ScopedResume GrpcMuxImpl<S, F, RQ, RS>::pause(const std::vector<std::string> typ
 
 template <class S, class F, class RQ, class RS>
 absl::Status GrpcMuxImpl<S, F, RQ, RS>::updateMuxSource(
-    Grpc::RawAsyncClientPtr primary_async_client, Grpc::RawAsyncClientPtr failover_async_client,
-    CustomConfigValidatorsPtr custom_config_validators, Stats::Scope& scope,
-    BackOffStrategyPtr backoff_strategy,
+    Grpc::RawAsyncClientPtr&& primary_async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
+    CustomConfigValidatorsPtr&& custom_config_validators, Stats::Scope& scope,
+    BackOffStrategyPtr&& backoff_strategy,
     const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =

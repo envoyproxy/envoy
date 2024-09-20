@@ -6,8 +6,6 @@
 namespace Envoy {
 namespace Config {
 
-class GrpcMuxFailoverTest;
-
 /**
  * This class arbitrates between two config providers of the same GrpcMux -
  * the primary and the failover. Envoy always prefers fetching config from the
