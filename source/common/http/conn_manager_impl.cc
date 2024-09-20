@@ -828,7 +828,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
          "set in "
          "ConnectionManagerImpl.");
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_->accessLogs()) {
-    filter_manager_.addAccessLogHandler(access_log);
+    filter_manager_.addConfigAccessLogHandler(access_log);
   }
 
   filter_manager_.streamInfo().setStreamIdProvider(
