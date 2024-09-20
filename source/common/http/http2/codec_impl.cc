@@ -1478,23 +1478,24 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
         reason = getMessagingErrorResetReason();
       } else {
         switch (error_code) {
-        case NGHTTP2_PROTOCOL_ERROR:
-        case NGHTTP2_STREAM_CLOSED:
-        case NGHTTP2_FLOW_CONTROL_ERROR:
-        case NGHTTP2_SETTINGS_TIMEOUT:
-        case NGHTTP2_FRAME_SIZE_ERROR:
-        case NGHTTP2_COMPRESSION_ERROR:
+        case OGHTTP2_PROTOCOL_ERROR:
+        case OGHTTP2_STREAM_CLOSED:
+        case OGHTTP2_FLOW_CONTROL_ERROR:
+        case OGHTTP2_SETTINGS_TIMEOUT:
+        case OGHTTP2_FRAME_SIZE_ERROR:
+        case OGHTTP2_COMPRESSION_ERROR:
           reason = StreamResetReason::ProtocolError;
           stream->setDetails(Http2ResponseCodeDetails::get().protocol_error);
           break;
-        case NGHTTP2_CONNECT_ERROR:
+        case OGHTTP2_CONNECT_ERROR:
           reason = StreamResetReason::ConnectError;
           stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
           break;
-        case NGHTTP2_REFUSED_STREAM:
+        case OGHTTP2_REFUSED_STREAM:
           reason = StreamResetReason::RemoteRefusedStreamReset;
           stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-        case NGHTTP2_ENHANCE_YOUR_CALM:
+          break;
+        case OGHTTP2_ENHANCE_YOUR_CALM:
           reason = StreamResetReason::Overflow;
           stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
           break;

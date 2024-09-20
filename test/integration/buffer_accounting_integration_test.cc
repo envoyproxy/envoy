@@ -586,7 +586,7 @@ TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
       ASSERT_TRUE(response1->waitForReset());
       EXPECT_EQ(response1->resetReason(),
                 (std::get<0>(GetParam()).downstream_protocol == Http::CodecType::HTTP2
-                     ? Http::StreamResetReason::RemoteReset
+                     ? Http::StreamResetReason::Overflow
                      : Http::StreamResetReason::OverloadManager));
     }
 
