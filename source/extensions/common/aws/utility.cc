@@ -31,7 +31,7 @@ constexpr absl::string_view RESERVED_CHARS = "-._~";
 constexpr absl::string_view S3_SERVICE_NAME = "s3";
 constexpr absl::string_view S3_OUTPOSTS_SERVICE_NAME = "s3-outposts";
 constexpr absl::string_view URI_ENCODE = "%{:02X}";
-constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
+// constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
 
 constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
 constexpr char AWS_PROFILE[] = "AWS_PROFILE";
@@ -205,24 +205,25 @@ std::string Utility::canonicalizeQueryString(absl::string_view query_string) {
   std::sort(query_list.begin(), query_list.end());
   // Encode query params name and value separately
   for (auto& query : query_list) {
-    query = std::make_pair(Utility::encodeQueryParam(query.first),
-                           Utility::encodeQueryParam(query.second));
+    query = std::make_pair(Utility::encodeQueryParam(Envoy::Http::Utility::PercentEncoding::decode(query.first)),
+                           Utility::encodeQueryParam(Envoy::Http::Utility::PercentEncoding::decode(query.second)));
   }
   return absl::StrJoin(query_list, QUERY_SEPERATOR, absl::PairFormatter(QUERY_PARAM_SEPERATOR));
 }
 
 std::string Utility::encodeQueryParam(absl::string_view decoded) {
+
   std::string encoded;
   for (char c : decoded) {
-    if (isReservedChar(c) || c == '%') {
+    if (isReservedChar(c)) {
       // Escape unreserved chars from RFC 3986
       encoded.push_back(c);
     } else if (c == '+') {
       // Encode '+' as space
       absl::StrAppend(&encoded, "%20");
-    } else if (c == QUERY_PARAM_SEPERATOR[0]) {
-      // Double encode '='
-      absl::StrAppend(&encoded, fmt::format(URI_DOUBLE_ENCODE, c));
+    // } else if (c == QUERY_PARAM_SEPERATOR[0]) {
+    //   // Double encode '='
+    //   absl::StrAppend(&encoded, fmt::format(URI_DOUBLE_ENCODE, c));
     } else {
       absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
     }

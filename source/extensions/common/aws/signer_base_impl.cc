@@ -57,9 +57,9 @@ std::string SignerBaseImpl::getRegion() const { return region_; }
 absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
                                   const absl::string_view override_region) {
 
-  if (!query_string_) {
-    headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
-  }
+  // if (!query_string_) {
+  //   headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
+  // }
 
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
