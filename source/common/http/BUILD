@@ -240,7 +240,6 @@ envoy_cc_library(
         "http_server_properties_cache_impl.h",
         "http_server_properties_cache_manager_impl.h",
     ],
-    external_deps = ["quiche_quic_platform"],
     deps = [
         ":http3_status_tracker_impl_lib",
         "//envoy/common:time_interface",
@@ -253,6 +252,7 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "@com_github_google_quiche//:http2_core_alt_svc_wire_format_lib",
+        "@com_github_google_quiche//:quic_platform",
         "@envoy_api//envoy/config/common/key_value/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -519,10 +519,6 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = [
-        "http_parser",
-        "quiche_http2_protocol",
-    ],
     deps = [
         ":character_set_validation_lib",
         ":exception_lib",
@@ -530,6 +526,7 @@ envoy_cc_library(
         ":headers_lib",
         ":http_option_limits_lib",
         ":message_lib",
+        "//bazel/external/http_parser",
         "//envoy/common:regex_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
@@ -545,6 +542,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@com_github_google_quiche//:http2_adapter_http2_protocol",
         "@com_google_absl//absl/container:node_hash_set",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -556,9 +554,6 @@ envoy_cc_library(
     name = "header_utility_lib",
     srcs = ["header_utility.cc"],
     hdrs = ["header_utility.h"],
-    external_deps = [
-        "quiche_http2_adapter",
-    ],
     deps = [
         ":character_set_validation_lib",
         ":header_map_lib",
@@ -574,6 +569,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@com_github_google_quiche//:http2_adapter",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

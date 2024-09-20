@@ -202,7 +202,7 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   if (wasm()->isFailed() || !wasm()->on_resolve_dns_) {
     return;
   }
-  if (status != Network::DnsResolver::ResolutionStatus::Success) {
+  if (status != Network::DnsResolver::ResolutionStatus::Completed) {
     buffer_.set("");
     wasm()->on_resolve_dns_(this, id_, token, 0);
     return;
