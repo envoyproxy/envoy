@@ -81,15 +81,15 @@ TEST_F(ConnectivityManagerTest, WhenDrainPostDnsRefreshEnabledDrainsPostDnsRefre
   connectivity_manager_->onDnsResolutionComplete(
       "cached.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
+      Network::DnsResolver::ResolutionStatus::Completed);
   connectivity_manager_->onDnsResolutionComplete(
       "not-cached.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
+      Network::DnsResolver::ResolutionStatus::Completed);
   connectivity_manager_->onDnsResolutionComplete(
       "not-cached2.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
+      Network::DnsResolver::ResolutionStatus::Completed);
 }
 
 TEST_F(ConnectivityManagerTest, WhenDrainPostDnsNotEnabledDoesntDrainPostDnsRefresh) {
@@ -102,7 +102,7 @@ TEST_F(ConnectivityManagerTest, WhenDrainPostDnsNotEnabledDoesntDrainPostDnsRefr
   EXPECT_CALL(cm_, drainConnections(_)).Times(0);
   connectivity_manager_->onDnsResolutionComplete(
       "example.com", std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
+      Network::DnsResolver::ResolutionStatus::Completed);
 }
 
 TEST_F(ConnectivityManagerTest,

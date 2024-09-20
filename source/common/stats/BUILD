@@ -54,15 +54,13 @@ envoy_cc_library(
     name = "histogram_lib",
     srcs = ["histogram_impl.cc"],
     hdrs = ["histogram_impl.h"],
-    external_deps = [
-        "libcircllhist",
-    ],
     deps = [
         ":metric_impl_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:matchers_lib",
         "//source/common/common:utility_lib",
+        "@com_github_openhistogram_libcircllhist//:libcircllhist",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )

@@ -164,13 +164,11 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "codes_speed_test",
     srcs = ["codes_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/http:codes_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
@@ -333,11 +331,9 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "header_map_impl_speed_test",
     srcs = ["header_map_impl_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/http:header_map_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 

@@ -2114,6 +2114,26 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_core_congestion_control_prague_sender_lib",
+    srcs = [
+        "quiche/quic/core/congestion_control/prague_sender.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/congestion_control/prague_sender.h",
+    ],
+    deps = [
+        ":quic_core_clock_lib",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
+        ":quic_core_congestion_control_rtt_stats_lib",
+        ":quic_core_congestion_control_tcp_cubic_bytes_lib",
+        ":quic_core_connection_stats_lib",
+        ":quic_core_time_lib",
+        ":quic_core_types_lib",
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_congestion_control_bbr2_lib",
     srcs = [
         "quiche/quic/core/congestion_control/bbr2_drain.cc",
@@ -2194,6 +2214,7 @@ envoy_quic_cc_library(
         ":quic_core_config_lib",
         ":quic_core_congestion_control_bbr2_lib",
         ":quic_core_congestion_control_bbr_lib",
+        ":quic_core_congestion_control_prague_sender_lib",
         ":quic_core_congestion_control_tcp_cubic_bytes_lib",
         ":quic_core_connection_stats_lib",
         ":quic_core_crypto_random_lib",
@@ -2460,10 +2481,7 @@ envoy_quic_cc_library(
         "quiche/quic/core/crypto/quic_compressed_certs_cache.h",
         "quiche/quic/core/crypto/transport_parameters.h",
     ],
-    external_deps = [
-        "ssl",
-        "zlib",
-    ],
+    external_deps = ["ssl"],
     tags = [
         "pg3",
     ],
@@ -2489,6 +2507,7 @@ envoy_quic_cc_library(
         ":quic_core_utils_lib",
         ":quic_core_versions_lib",
         ":quic_platform",
+        "@envoy//bazel/foreign_cc:zlib",
     ],
 )
 
@@ -2502,9 +2521,6 @@ envoy_quic_cc_library(
         "quiche/quic/core/crypto/quic_client_session_cache.h",
         "quiche/quic/core/crypto/quic_crypto_client_config.h",
     ],
-    external_deps = [
-        "zlib",
-    ],
     tags = [
         "pg3",
     ],
@@ -2513,6 +2529,7 @@ envoy_quic_cc_library(
         ":quic_core_crypto_client_proof_source_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quiche_common_platform_client_stats",
+        "@envoy//bazel/foreign_cc:zlib",
     ],
 )
 
@@ -2524,10 +2541,7 @@ envoy_quic_cc_library(
     hdrs = [
         "quiche/quic/core/crypto/quic_crypto_server_config.h",
     ],
-    external_deps = [
-        "ssl",
-        "zlib",
-    ],
+    external_deps = ["ssl"],
     tags = [
         "pg3",
     ],
@@ -2536,6 +2550,7 @@ envoy_quic_cc_library(
         ":quic_core_proto_crypto_server_config_proto_header",
         ":quic_core_server_id_lib",
         ":quic_server_crypto_tls_handshake_lib",
+        "@envoy//bazel/foreign_cc:zlib",
     ],
 )
 
@@ -2658,9 +2673,7 @@ envoy_quic_cc_library(
     name = "quic_core_crypto_proof_source_x509_lib",
     srcs = ["quiche/quic/core/crypto/proof_source_x509.cc"],
     hdrs = ["quiche/quic/core/crypto/proof_source_x509.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         ":quic_core_crypto_certificate_view_lib",
         ":quic_core_crypto_crypto_handshake_lib",

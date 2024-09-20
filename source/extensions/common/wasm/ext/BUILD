@@ -97,7 +97,7 @@ cc_proto_library(
     name = "node_subset_cc_proto",
     deps = [
         ":node_subset_proto",
-        # "//external:protobuf_clib",
+        # "@com_google_protobuf//:protoc_lib",
     ],
 )
 
