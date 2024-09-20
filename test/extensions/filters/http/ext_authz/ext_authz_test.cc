@@ -248,11 +248,13 @@ public:
       *(*filter_metadata->mutable_fields())["foo"].mutable_string_value() = "bar";
     }
 
-    expected_output_.setLatency(std::chrono::milliseconds(1));
-    expected_output_.setUpstreamHost(upstream_host);
-    expected_output_.setClusterInfo(upstream_cluster_info);
-    expected_output_.setBytesSent(123);
-    expected_output_.setBytesReceived(456);
+    if (std::get<1>(GetParam())) {
+      expected_output_.setLatency(std::chrono::milliseconds(1));
+      expected_output_.setUpstreamHost(upstream_host);
+      expected_output_.setClusterInfo(upstream_cluster_info);
+      expected_output_.setBytesSent(123);
+      expected_output_.setBytesReceived(456);
+    }
   }
 
   static std::string
@@ -283,29 +285,49 @@ public:
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter_->decodeHeaders(request_headers_, true));
 
-    request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-
     auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
 
-    // Will exist if either of stats or filter metadata is emitted or both.
+    // Check if there's already filter state present. If so, this was added by a test and it will
+    // affect the filter's behavior. Copy the object so we can later verify it wasn't overridden.
+    const auto preexisting_filter_state_ptr =
+        filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+    const absl::optional<ExtAuthzLoggingInfo> preexisting_filter_state_copy =
+        preexisting_filter_state_ptr
+            ? absl::make_optional<ExtAuthzLoggingInfo>(*preexisting_filter_state_ptr)
+            : absl::nullopt;
+
+    request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+    // Will exist if stats or filter metadata is emitted or if there was a preexisting logging info.
     ASSERT_EQ(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName),
-              std::get<1>(GetParam()) || std::get<2>(GetParam()));
+              std::get<1>(GetParam()) || std::get<2>(GetParam()) ||
+                  preexisting_filter_state_copy.has_value());
 
-    if (std::get<1>(GetParam())) {
-      auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-
-      EXPECT_EQ(actual->latency(), expected_output_.latency());
-      EXPECT_EQ(actual->upstreamHost(), expected_output_.upstreamHost());
-      EXPECT_EQ(actual->clusterInfo(), expected_output_.clusterInfo());
-      EXPECT_EQ(actual->bytesSent(), expected_output_.bytesSent());
-      EXPECT_EQ(actual->bytesReceived(), expected_output_.bytesReceived());
+    auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+    if (preexisting_filter_state_copy.has_value()) {
+      // Filter state should not have been changed at all.
+      expectEq(*actual, *preexisting_filter_state_copy);
+      if (std::get<1>(GetParam()) || std::get<2>(GetParam())) {
+        EXPECT_EQ(1U, config_->stats().filter_state_name_collision_.value());
+      } else {
+        EXPECT_EQ(0U, config_->stats().filter_state_name_collision_.value());
+      }
+      return;
     }
 
-    if (std::get<2>(GetParam())) {
-      auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-      ASSERT_TRUE(actual->filterMetadata().has_value());
-      EXPECT_EQ(actual->filterMetadata()->DebugString(),
-                expected_output_.filterMetadata()->DebugString());
+    expectEq(*actual, expected_output_);
+  }
+
+  static void expectEq(const ExtAuthzLoggingInfo& l, const ExtAuthzLoggingInfo& r) {
+    EXPECT_EQ(l.latency(), r.latency());
+    EXPECT_EQ(l.upstreamHost(), r.upstreamHost());
+    EXPECT_EQ(l.clusterInfo(), r.clusterInfo());
+    EXPECT_EQ(l.bytesSent(), r.bytesSent());
+    EXPECT_EQ(l.bytesReceived(), r.bytesReceived());
+
+    ASSERT_EQ(l.filterMetadata().has_value(), r.filterMetadata().has_value());
+    if (r.filterMetadata().has_value()) {
+      EXPECT_EQ(l.filterMetadata()->DebugString(), r.filterMetadata()->DebugString());
     }
   }
 
@@ -4009,6 +4031,23 @@ TEST_P(EmitFilterStateTest, NullUpstreamHost) {
   stream_info_->upstream_info_ = upstream_info;
 
   expected_output_.clearUpstreamHost();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  test(response);
+}
+
+TEST_P(EmitFilterStateTest, PreexistingFilterState) {
+  decoder_filter_callbacks_.stream_info_.filter_state_->setData(
+      FilterConfigName, std::make_shared<ExtAuthzLoggingInfo>(std::nullopt),
+      Envoy::StreamInfo::FilterState::StateType::ReadOnly,
+      Envoy::StreamInfo::FilterState::LifeSpan::Request);
+
+  expected_output_.clearUpstreamHost();
+  expected_output_.clearClusterInfo();
+  expected_output_.clearBytesSent();
+  expected_output_.clearBytesReceived();
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
