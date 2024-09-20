@@ -13,7 +13,10 @@ envoy_extension_package()
 cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
-    data = [],
+    data = [
+        "abi.h",
+        "abi_version.h",
+    ],
     edition = "2021",
     deps = all_crate_deps(
         build = True,
