@@ -69,7 +69,7 @@ def dockerhub_envoy_role(
         part = part[len("envoy"):]
 
     # envoy-build-ubuntu images
-    elif part.startswith("build"):
+    if part.startswith("build"):
         parts = part.split("-")
         if len(parts) > 2:
             title = f"envoyproxy/envoy-build-ubuntu:{''.join(parts[2:])}-<build_sha>"
