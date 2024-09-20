@@ -117,9 +117,7 @@ envoy_extension_cc_test(
     name = "tsi_socket_test",
     srcs = ["tsi_socket_test.cc"],
     extension_names = ["envoy.transport_sockets.alts"],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/network:address_interface",
@@ -149,9 +147,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = envoy_select_google_grpc(["alts_integration_test.cc"]),
     extension_names = ["envoy.transport_sockets.alts"],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/event:dispatcher_includes",
