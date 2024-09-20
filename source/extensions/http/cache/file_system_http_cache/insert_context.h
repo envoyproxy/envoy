@@ -88,7 +88,6 @@ private:
   void commitCreateHardLink();
   CacheFileHeader cache_file_header_proto_;
   bool end_stream_after_headers_ = false;
-  InsertCallback on_insert_complete_;
   std::unique_ptr<FileLookupContext> lookup_context_;
   Key key_;
   std::shared_ptr<FileSystemHttpCache> cache_;
