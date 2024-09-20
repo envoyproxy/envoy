@@ -138,6 +138,11 @@ bug_fixes:
     Fixed an inconsistency in how boolean values are loaded in RTDS, where they were previously converted to "1"/"0"
     instead of "true"/"false". The correct string representation ("true"/"false") will now be used. This change can be
     reverted by setting the runtime guard ``envoy.reloadable_features.boolean_to_string_fix`` to false.
+- area: http3
+  change: |
+    Fixed a bug in the CONNECT-UDP forwarding mode where Envoy reset the upstream stream when it
+    received HTTP/3 datagrams before receiving the SETTINGS frame from the upstream peer. Envoy now
+    drops the datagrams in this case instead of resetting the stream.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -343,5 +348,9 @@ new_features:
   change: |
       Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
       connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
+- area: quic
+  change: |
+    Added ``max_packet_length`` to the QUIC protocol options to allow users to change the largest
+    size of a QUIC packet that can be transmitted over the QUIC connection.
 
 deprecated:
