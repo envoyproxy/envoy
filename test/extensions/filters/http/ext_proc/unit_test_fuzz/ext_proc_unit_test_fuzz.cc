@@ -123,7 +123,6 @@ DEFINE_PROTO_FUZZER(
 
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
   fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()), input.request());
-  delete client;
 }
 
 } // namespace UnitTestFuzz
