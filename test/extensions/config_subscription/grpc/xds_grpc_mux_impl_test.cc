@@ -1406,6 +1406,46 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
                     &replaced_async_stream_);
 }
 
+// Updating the mux object with wrong rate limit settings is rejected.
+TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
+  replaced_async_client_ = new Grpc::MockAsyncClient();
+  setup();
+  InSequence s;
+
+  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = makeWatch(type_url, {"x", "y"});
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {"x", "y"}, "", true);
+  grpc_mux_->start();
+  EXPECT_EQ(1, control_plane_connected_state_.value());
+
+  // Switch the mux.
+  envoy::config::core::v3::ApiConfigSource ads_config_wrong_settings;
+  envoy::config::core::v3::RateLimitSettings* rate_limits =
+      ads_config_wrong_settings.mutable_rate_limit_settings();
+  rate_limits->mutable_max_tokens()->set_value(500);
+  rate_limits->mutable_fill_rate()->set_value(std::numeric_limits<double>::quiet_NaN());
+  // No disconnect and replacement of the original async_client.
+  EXPECT_CALL(async_stream_, resetStream()).Times(0);
+  EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _)).Times(0);
+  EXPECT_FALSE(grpc_mux_
+                   ->updateMuxSource(
+                       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(
+                           replaced_async_client_),
+                       /*failover_async_client=*/nullptr,
+                       /*custom_config_validators=*/nullptr,
+                       /*scope=*/*stats_.rootScope(),
+                       /*backoff_strategy=*/
+                       std::make_unique<JitteredExponentialBackOffStrategy>(
+                           SubscriptionFactory::RetryInitialDelayMs,
+                           SubscriptionFactory::RetryMaxDelayMs, random_),
+                       ads_config_wrong_settings)
+                   .ok());
+  // Ending test, removing subscriptions for type_url_foo.
+  expectSendMessage(type_url, {}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                    &async_stream_);
+}
+
 class NullGrpcMuxImplTest : public testing::Test {
 public:
   NullGrpcMuxImplTest() : null_mux_(std::make_unique<Config::XdsMux::NullGrpcMuxImpl>()) {}

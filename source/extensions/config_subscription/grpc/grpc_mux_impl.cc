@@ -298,10 +298,6 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
   return watch;
 }
 
-// void GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr primary_async_client,
-// Grpc::RawAsyncClientPtr failover_async_client, CustomConfigValidatorsPtr
-// custom_config_validators, BackOffStrategyPtr backoff_strategy, const
-// envoy::config::core::v3::ApiConfigSource& ads_config_source) {
 absl::Status
 GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
                              Grpc::RawAsyncClientPtr&& failover_async_client,
