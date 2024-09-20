@@ -7,7 +7,7 @@ aiohttp>=3.8.1
 aioquic>=0.9.21
 cffi>=1.15.0
 clang-format==14.0.6
-clang-tidy==14.0.6
+clang-tidy==19.1.0
 colorama
 coloredlogs
 cryptography>=43.0.1
