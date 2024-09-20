@@ -939,6 +939,7 @@ reexecute:
           goto error;
         }
 
+      #if HTTP_PARSER_STRICT
         parser->method = (enum http_method) 0;
         parser->index = 1;
         switch (ch) {
@@ -963,6 +964,9 @@ reexecute:
             SET_ERRNO(HPE_INVALID_METHOD);
             goto error;
         }
+      #else
+        parser->method = 0;
+      #endif
         UPDATE_STATE(s_req_method);
 
         CALLBACK_NOTIFY(message_begin);
@@ -978,6 +982,7 @@ reexecute:
           goto error;
         }
 
+      #if HTTP_PARSER_STRICT
         matcher = method_strings[parser->method];
         if (ch == ' ' && matcher[parser->index] == '\0') {
           UPDATE_STATE(s_req_spaces_before_url);
@@ -1020,6 +1025,16 @@ reexecute:
         }
 
         ++parser->index;
+      #else
+        if (ch == ' ') {
+          UPDATE_STATE(s_req_spaces_before_url);
+        } else if ((ch >= 'A' && ch <= 'Z') || ch == '-') {
+          /* nada */
+        } else {
+          SET_ERRNO(HPE_INVALID_METHOD);
+          goto error;
+        }
+      #endif
         break;
       }
 
