@@ -27,3 +27,21 @@ envoy_python_dependencies()
 load("//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
+
+# TODO: move them inside proper macros under bazel/**
+load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
+
+crate_universe_dependencies()
+
+load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+
+crates_repository(
+    name = "dynamic_modules_rust_sdk_crate_index",
+    cargo_lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
+    manifests = ["//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
+)
+
+load("@dynamic_modules_rust_sdk_crate_index//:defs.bzl", "crate_repositories")
+
+crate_repositories()
+#############
