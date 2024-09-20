@@ -117,11 +117,12 @@ absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
 absl::Status TcmallocProfiler::startAllocationProfile() {
   return absl::Status(absl::StatusCode::kUnimplemented,
                       "Allocation profile is not implemented in current build");
+}
 
-  absl::StatusOr<std::string> TcmallocProfiler::stopAllocationProfile() {
-    return absl::Status(absl::StatusCode::kUnimplemented,
-                        "Allocation profile is not implemented in current build");
-  }
+absl::StatusOr<std::string> TcmallocProfiler::stopAllocationProfile() {
+  return absl::Status(absl::StatusCode::kUnimplemented,
+                      "Allocation profile is not implemented in current build");
+}
 
 } // namespace Profiler
 } // namespace Envoy
