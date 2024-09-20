@@ -6,7 +6,7 @@
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
-pub mod abi {
+mod abi {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
@@ -33,7 +33,9 @@ macro_rules! declare_program_init {
         #[no_mangle]
         pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
             if ($f()) {
-                envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+                // This magic number is sha256 of the ABI headers which must match the
+                // value in abi_version.h
+                b"4293760426255b24c25b97a18d9fd31b4d1956f10ba0ff2f723580a46ee8fa21\0".as_ptr()
                     as *const ::std::os::raw::c_char
             } else {
                 ::std::ptr::null()
