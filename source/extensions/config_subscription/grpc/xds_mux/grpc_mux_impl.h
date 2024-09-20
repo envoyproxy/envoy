@@ -172,7 +172,7 @@ protected:
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
 
-  virtual std::string methodName() const PURE;
+  virtual absl::string_view methodName() const PURE;
 
 private:
   // Helper function to create the grpc_stream_ object.
@@ -262,7 +262,7 @@ public:
                              const absl::flat_hash_set<std::string>& for_update) override;
 
 private:
-  std::string methodName() const override {
+  absl::string_view methodName() const override {
     return "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources";
   }
 };
@@ -279,7 +279,7 @@ public:
   }
 
 private:
-  std::string methodName() const override {
+  absl::string_view methodName() const override {
     return "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources";
   }
 };
