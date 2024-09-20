@@ -227,9 +227,7 @@ envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
-    external_deps = [
-        "grpc_health_proto",
-    ],
+    external_deps = ["grpc_health_proto"],
     deps = [
         ":health_checker_event_logger_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
