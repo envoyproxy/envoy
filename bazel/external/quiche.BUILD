@@ -2114,6 +2114,26 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_core_congestion_control_prague_sender_lib",
+    srcs = [
+        "quiche/quic/core/congestion_control/prague_sender.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/congestion_control/prague_sender.h",
+    ],
+    deps = [
+        ":quic_core_clock_lib",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
+        ":quic_core_congestion_control_rtt_stats_lib",
+        ":quic_core_congestion_control_tcp_cubic_bytes_lib",
+        ":quic_core_connection_stats_lib",
+        ":quic_core_time_lib",
+        ":quic_core_types_lib",
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_congestion_control_bbr2_lib",
     srcs = [
         "quiche/quic/core/congestion_control/bbr2_drain.cc",
@@ -2194,6 +2214,7 @@ envoy_quic_cc_library(
         ":quic_core_config_lib",
         ":quic_core_congestion_control_bbr2_lib",
         ":quic_core_congestion_control_bbr_lib",
+        ":quic_core_congestion_control_prague_sender_lib",
         ":quic_core_congestion_control_tcp_cubic_bytes_lib",
         ":quic_core_connection_stats_lib",
         ":quic_core_crypto_random_lib",

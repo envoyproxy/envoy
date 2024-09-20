@@ -200,6 +200,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_client_session_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_client_stream_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",
