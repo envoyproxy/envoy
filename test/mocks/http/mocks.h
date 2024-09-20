@@ -695,8 +695,15 @@ public:
   MOCK_METHOD(bool, appendXForwardedPort, (), (const));
   MOCK_METHOD(bool, addProxyProtocolConnectionState, (), (const));
 
+  class AllowInternalAddressConfig : public Http::InternalAddressConfig {
+  public:
+    bool isInternalAddress(const Network::Address::Instance& address) const override {
+      return Network::Utility::isInternalAddress(address);
+    }
+  };
+
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
-      std::make_unique<DefaultInternalAddressConfig>();
+      std::make_unique<AllowInternalAddressConfig>();
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
   absl::optional<std::string> scheme_;
   bool scheme_match_upstream_;

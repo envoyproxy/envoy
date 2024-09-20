@@ -684,6 +684,34 @@ message HttpConnectionManager {
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
   // See the documentation for :ref:`config_http_conn_man_headers_x-envoy-internal` for more
   // information about internal/external addresses.
+  //
+  // .. warning::
+  //     In the next release, no IP addresses will be considered trusted. If you have tooling such as probes
+  //     on your private network which need to be treated as trusted (e.g. changing arbitrary x-envoy headers)
+  //     you will have to manually include those addresses or CIDR ranges like:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.extensions.filters.network.http_connection_manager.v3.InternalAddressConfig
+  //
+  //   cidr_ranges:
+  //       address_prefix: 10.0.0.0
+  //       prefix_len: 8
+  //   cidr_ranges:
+  //       address_prefix: 192.168.0.0
+  //       prefix_len: 16
+  //   cidr_ranges:
+  //       address_prefix: 172.16.0.0
+  //       prefix_len: 12
+  //   cidr_ranges:
+  //       address_prefix: 127.0.0.1
+  //       prefix_len: 32
+  //   cidr_ranges:
+  //       address_prefix: fd00::
+  //       prefix_len: 8
+  //   cidr_ranges:
+  //       address_prefix: ::1
+  //       prefix_len: 128
+  //
   InternalAddressConfig internal_address_config = 25;
 
   // If set, Envoy will not append the remote address to the

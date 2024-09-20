@@ -15,9 +15,6 @@ envoy_cc_test(
     name = "codec_impl_test",
     size = "large",
     srcs = ["codec_impl_test.cc"],
-    external_deps = [
-        "quiche_http2_adapter",
-    ],
     shard_count = 5,
     deps = [
         ":codec_impl_test_util",
@@ -46,19 +43,18 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:http2_adapter",
     ],
 )
 
 envoy_cc_test_library(
     name = "codec_impl_test_util",
     hdrs = ["codec_impl_test_util.h"],
-    external_deps = [
-        "quiche_http2_adapter",
-    ],
     deps = [
         "//source/common/http/http2:codec_lib",
         "//test/mocks:common_lib",
         "//test/mocks/server:overload_manager_mocks",
+        "@com_github_google_quiche//:http2_adapter",
         "@com_google_absl//absl/types:optional",
     ],
 )
@@ -89,15 +85,13 @@ envoy_cc_test_library(
     name = "http2_frame",
     srcs = ["http2_frame.cc"],
     hdrs = ["http2_frame.h"],
-    external_deps = [
-        "quiche_http2_hpack",
-    ],
     deps = [
         "//envoy/http:metadata_interface_with_external_headers",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
+        "@com_github_google_quiche//:http2_hpack_hpack_lib",
     ],
 )
 
@@ -137,10 +131,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "metadata_encoder_test",
     srcs = ["metadata_encoder_test.cc"],
-    external_deps = [
-        "quiche_http2_adapter",
-        "quiche_http2_test_tools",
-    ],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:random_generator_lib",
@@ -151,6 +141,8 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:http2_adapter",
+        "@com_github_google_quiche//:http2_adapter_mock_http2_visitor",
     ],
 )
 
@@ -207,9 +199,7 @@ envoy_cc_fuzz_test(
     name = "hpack_fuzz_test",
     srcs = ["hpack_fuzz_test.cc"],
     corpus = "hpack_corpus",
-    external_deps = [
-        "nghttp2",
-    ],
+    external_deps = ["nghttp2"],
     deps = [
         ":hpack_fuzz_proto_cc_proto",
         "//test/test_common:utility_lib",
@@ -226,9 +216,7 @@ envoy_cc_fuzz_test(
     name = "http2_connection_fuzz_test",
     srcs = ["http2_connection_fuzz_test.cc"],
     corpus = "http2_connection_corpus",
-    external_deps = [
-        "nghttp2",
-    ],
+    external_deps = ["nghttp2"],
     deps = [
         ":http2_connection_proto_cc_proto",
         "//source/common/http/http2:codec_lib",

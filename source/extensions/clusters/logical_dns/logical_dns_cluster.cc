@@ -107,7 +107,7 @@ void LogicalDnsCluster::startResolve() {
         // If the DNS resolver successfully resolved with an empty response list, the logical DNS
         // cluster does not update. This ensures that a potentially previously resolved address does
         // not stabilize back to 0 hosts.
-        if (status == Network::DnsResolver::ResolutionStatus::Success && !response.empty()) {
+        if (status == Network::DnsResolver::ResolutionStatus::Completed && !response.empty()) {
           info_->configUpdateStats().update_success_.inc();
           const auto addrinfo = response.front().addrInfo();
           // TODO(mattklein123): Move port handling into the DNS interface.
