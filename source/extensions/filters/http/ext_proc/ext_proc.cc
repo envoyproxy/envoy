@@ -1279,13 +1279,12 @@ void Filter::mergePerRouteConfig() {
   route_config_merged_ = true;
 
   absl::optional<FilterConfigPerRoute> merged_config;
-  for (const auto* typed_cfg :
+  for (const FilterConfigPerRoute& typed_cfg :
        Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
-    ASSERT(typed_cfg != nullptr);
     if (!merged_config.has_value()) {
-      merged_config.emplace(*typed_cfg);
+      merged_config.emplace(typed_cfg);
     } else {
-      merged_config.emplace(FilterConfigPerRoute(merged_config.value(), *typed_cfg));
+      merged_config.emplace(FilterConfigPerRoute(merged_config.value(), typed_cfg));
     }
   }
 

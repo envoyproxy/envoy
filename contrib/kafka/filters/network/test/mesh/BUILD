@@ -4,10 +4,6 @@ load(
     "envoy_cc_test_library",
     "envoy_contrib_package",
 )
-load(
-    "//bazel:envoy_internal.bzl",
-    "envoy_external_dep_path",
-)
 
 licenses(["notice"])  # Apache 2
 
@@ -104,7 +100,7 @@ envoy_cc_test_library(
     hdrs = ["kafka_mocks.h"],
     tags = ["skip_on_windows"],
     deps = [
-        envoy_external_dep_path("librdkafka"),
+        "//bazel/foreign_cc:librdkafka",
         "//contrib/kafka/filters/network/source/mesh:librdkafka_utils_lib",
     ],
 )

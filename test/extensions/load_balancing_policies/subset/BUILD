@@ -81,14 +81,12 @@ envoy_extension_cc_benchmark_binary(
     name = "subset_benchmark",
     srcs = ["subset_benchmark.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
         "//test/mocks/upstream:load_balancer_mocks",
+        "@com_github_google_benchmark//:benchmark",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/random/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/load_balancing_policies/subset/v3:pkg_cc_proto",

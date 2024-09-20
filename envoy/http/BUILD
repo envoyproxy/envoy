@@ -27,7 +27,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "async_client_interface",
     hdrs = ["async_client.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":filter_interface",
         ":message_interface",
@@ -36,6 +35,7 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -91,18 +91,17 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_factory_interface",
     hdrs = ["filter_factory.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":header_map_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/grpc:status",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
 envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":codec_interface",
         ":filter_factory_interface",
@@ -119,6 +118,7 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//envoy/upstream:load_balancer_interface",
         "//source/common/common:scope_tracked_object_stack",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -135,15 +135,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "header_map_interface",
     hdrs = ["header_map.h"],
-    external_deps = [
-        "abseil_inlined_vector",
-    ],
     deps = [
         ":header_formatter_interface",
         "//envoy/common:union_string",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 
@@ -164,13 +162,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "query_params_interface",
     hdrs = ["query_params.h"],
-    external_deps = ["abseil_btree"],
+    deps = ["@com_google_absl//absl/container:btree"],
 )
 
 envoy_cc_library(
     name = "metadata_interface",
     hdrs = ["metadata_interface.h"],
-    external_deps = ["abseil_node_hash_map"],
+    deps = ["@com_google_absl//absl/container:node_hash_map"],
 )
 
 envoy_cc_library(

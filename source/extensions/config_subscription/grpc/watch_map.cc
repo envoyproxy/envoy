@@ -206,6 +206,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   }
 
   std::vector<DecodedResourcePtr> decoded_resources;
+  decoded_resources.reserve(resources.size());
   for (const auto& r : resources) {
     decoded_resources.emplace_back(
         DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info));
@@ -227,6 +228,10 @@ void WatchMap::onConfigUpdate(
   // into the individual onConfigUpdate()s.
   std::vector<DecodedResourcePtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_added;
+  // If the server behaves according to the protocol, it will only send the
+  // resources the watch map is interested in. Reserve the correct amount of
+  // space for the vector for the good case.
+  decoded_resources.reserve(added_resources.size());
   for (const auto& r : added_resources) {
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
     // If there are no watches, then we don't need to decode. If there are watches, they should all

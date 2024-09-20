@@ -66,10 +66,17 @@ void CorsFilter::initializeCorsPolicies() {
   // If no cors policy is configured in the per filter config, then the cors policy fields in the
   // route configuration will be ignored.
   if (policies_.empty()) {
-    policies_ = {
-        decoder_callbacks_->route()->routeEntry()->corsPolicy(),
-        decoder_callbacks_->route()->virtualHost().corsPolicy(),
-    };
+    const auto route = decoder_callbacks_->route();
+    ASSERT(route != nullptr);
+    ASSERT(route->routeEntry() != nullptr);
+
+    if (auto* typed_cfg = route->routeEntry()->corsPolicy(); typed_cfg != nullptr) {
+      policies_.push_back(*typed_cfg);
+    }
+
+    if (auto* typed_cfg = route->virtualHost().corsPolicy(); typed_cfg != nullptr) {
+      policies_.push_back(*typed_cfg);
+    }
   }
 }
 
@@ -204,11 +211,7 @@ void CorsFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& c
 }
 
 bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
-  const auto allow_origins = allowOrigins();
-  if (allow_origins == nullptr) {
-    return false;
-  }
-  for (const auto& allow_origin : *allow_origins) {
+  for (const auto& allow_origin : allowOrigins()) {
     if (allow_origin->match("*") || allow_origin->match(origin.getStringView())) {
       return true;
     }
@@ -216,92 +219,88 @@ bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
   return false;
 }
 
-const std::vector<Matchers::StringMatcherPtr>* CorsFilter::allowOrigins() {
-  for (const auto policy : policies_) {
-    if (policy && !policy->allowOrigins().empty()) {
-      return &policy->allowOrigins();
+absl::Span<const Matchers::StringMatcherPtr> CorsFilter::allowOrigins() {
+  for (const Router::CorsPolicy& policy : policies_) {
+    if (!policy.allowOrigins().empty()) {
+      return policy.allowOrigins();
     }
   }
-  return nullptr;
+  return {};
 }
 
 bool CorsFilter::forwardNotMatchingPreflights() {
-  for (const auto policy : policies_) {
-    if (policy && policy->forwardNotMatchingPreflights()) {
-      return policy->forwardNotMatchingPreflights().value();
+  for (const Router::CorsPolicy& policy : policies_) {
+    if (policy.forwardNotMatchingPreflights()) {
+      return policy.forwardNotMatchingPreflights().value();
     }
   }
   return true;
 }
 
-const std::string& CorsFilter::allowMethods() {
-  for (const auto policy : policies_) {
-    if (policy && !policy->allowMethods().empty()) {
-      return policy->allowMethods();
+absl::string_view CorsFilter::allowMethods() {
+  for (const Router::CorsPolicy& policy : policies_) {
+    if (!policy.allowMethods().empty()) {
+      return policy.allowMethods();
     }
   }
   return EMPTY_STRING;
 }
 
-const std::string& CorsFilter::allowHeaders() {
-  for (const auto policy : policies_) {
-    if (policy && !policy->allowHeaders().empty()) {
-      return policy->allowHeaders();
+absl::string_view CorsFilter::allowHeaders() {
+  for (const Router::CorsPolicy& policy : policies_) {
+    if (!policy.allowHeaders().empty()) {
+      return policy.allowHeaders();
     }
   }
   return EMPTY_STRING;
 }
 
-const std::string& CorsFilter::exposeHeaders() {
-  for (const auto policy : policies_) {
-    if (policy && !policy->exposeHeaders().empty()) {
-      return policy->exposeHeaders();
+absl::string_view CorsFilter::exposeHeaders() {
+  for (const Router::CorsPolicy& policy : policies_) {
+    if (!policy.exposeHeaders().empty()) {
+      return policy.exposeHeaders();
     }
   }
   return EMPTY_STRING;
 }
 
-const std::string& CorsFilter::maxAge() {
-  for (const auto policy : policies_) {
-    if (policy && !policy->maxAge().empty()) {
-      return policy->maxAge();
+absl::string_view CorsFilter::maxAge() {
+  for (const Router::CorsPolicy& policy : policies_) {
+    if (!policy.maxAge().empty()) {
+      return policy.maxAge();
     }
   }
   return EMPTY_STRING;
 }
 
 bool CorsFilter::allowCredentials() {
-  for (const auto policy : policies_) {
-    if (policy && policy->allowCredentials()) {
-      return policy->allowCredentials().value();
+  for (const Router::CorsPolicy& policy : policies_) {
+    if (policy.allowCredentials()) {
+      return policy.allowCredentials().value();
     }
   }
   return false;
 }
 
 bool CorsFilter::allowPrivateNetworkAccess() {
-  for (const auto policy : policies_) {
-    if (policy && policy->allowPrivateNetworkAccess()) {
-      return policy->allowPrivateNetworkAccess().value();
+  for (const Router::CorsPolicy& policy : policies_) {
+    if (policy.allowPrivateNetworkAccess()) {
+      return policy.allowPrivateNetworkAccess().value();
     }
   }
   return false;
 }
 
 bool CorsFilter::shadowEnabled() {
-  for (const auto policy : policies_) {
-    if (policy) {
-      return policy->shadowEnabled();
-    }
+  for (const Router::CorsPolicy& policy : policies_) {
+    return policy.shadowEnabled();
   }
   return false;
 }
 
 bool CorsFilter::enabled() {
-  for (const auto policy : policies_) {
-    if (policy) {
-      return policy->enabled();
-    }
+  for (const Router::CorsPolicy& policy : policies_) {
+    return policy.enabled();
   }
   return false;
 }

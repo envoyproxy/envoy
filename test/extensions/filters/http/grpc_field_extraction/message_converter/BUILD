@@ -12,8 +12,6 @@ envoy_package()
 envoy_cc_test_library(
     name = "message_converter_test_lib",
     hdrs = ["message_converter_test_lib.h"],
-    external_deps = [
-    ],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",
