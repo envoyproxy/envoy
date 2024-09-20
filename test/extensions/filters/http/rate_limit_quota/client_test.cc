@@ -859,7 +859,7 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   *default_deny_action3.mutable_bucket_id() = sample_bucket_id3;
 
   // Test falling back to a different TokenBucket assignment and falling back to
-  // a blanket rule after cached action expirations.
+  // a blanket rule after assignment expiration.
   int fallback_max_tokens = 100;
   RateLimitStrategy fallback_tb_action =
       buildTokenBucketStrategy(fallback_max_tokens, 60, std::chrono::seconds(12));
