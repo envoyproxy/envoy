@@ -181,7 +181,7 @@ bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& d
     // For Ipv4, masked_address is returned in a format similar to '192.168.1.0/32', '.' It's a key
     // word in statsd, This makes it difficult to export measurements in Promethean format in the
     // RateLimit server.
-    absl::StrReplaceAll({}, &masked_address);
+    masked_address = absl::StrReplaceAll(masked_address, {{".", "_"}});
   }
   descriptor_entry = {"masked_remote_address", masked_address};
 
