@@ -32,7 +32,7 @@ void FileInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_he
                                       const ResponseMetadata& metadata,
                                       InsertCallback insert_complete, bool end_stream) {
   ASSERT(dispatcher()->isThreadSafe());
-  callback_in_flight_ = insert_complete;
+  callback_in_flight_ = std::move(insert_complete);
   const VaryAllowList& vary_allow_list = lookup_context_->lookup().varyAllowList();
   const Http::RequestHeaderMap& request_headers = lookup_context_->lookup().requestHeaders();
   if (VaryHeaderUtils::hasVary(response_headers)) {
@@ -59,7 +59,6 @@ void FileInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_he
   }
   cache_file_header_proto_ = makeCacheFileHeaderProto(key_, response_headers, metadata);
   end_stream_after_headers_ = end_stream;
-  on_insert_complete_ = std::move(insert_complete);
   createFile();
 }
 
@@ -140,10 +139,10 @@ void FileInsertContext::insertBody(const Buffer::Instance& fragment,
   ASSERT(!callback_in_flight_);
   if (!cleanup_) {
     // Already cancelled, do nothing, return failure.
-    ready_for_next_fragment(false);
+    std::move(ready_for_next_fragment)(false);
     return;
   }
-  callback_in_flight_ = ready_for_next_fragment;
+  callback_in_flight_ = std::move(ready_for_next_fragment);
   size_t sz = fragment.length();
   Buffer::OwnedImpl consumable_fragment(fragment);
   auto queued = file_handle_->write(
@@ -172,10 +171,10 @@ void FileInsertContext::insertTrailers(const Http::ResponseTrailerMap& trailers,
   ASSERT(!callback_in_flight_);
   if (!cleanup_) {
     // Already cancelled, do nothing, return failure.
-    insert_complete(false);
+    std::move(insert_complete)(false);
     return;
   }
-  callback_in_flight_ = insert_complete;
+  callback_in_flight_ = std::move(insert_complete);
   CacheFileTrailer file_trailer = makeCacheFileTrailerProto(trailers);
   Buffer::OwnedImpl consumable_buffer = bufferFromProto(file_trailer);
   size_t sz = consumable_buffer.length();

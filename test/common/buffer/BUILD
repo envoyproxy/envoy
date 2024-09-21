@@ -117,12 +117,10 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "buffer_speed_test",
     srcs = ["buffer_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )

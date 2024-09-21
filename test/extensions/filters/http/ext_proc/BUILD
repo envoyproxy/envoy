@@ -377,8 +377,6 @@ envoy_extension_cc_test_library(
     name = "tracer_test_filter_lib",
     srcs = ["tracer_test_filter.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    external_deps = [
-    ],
     deps = [
         ":tracer_test_filter_proto_cc_proto",
         "//source/common/config:utility_lib",

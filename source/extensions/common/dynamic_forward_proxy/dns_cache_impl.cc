@@ -216,7 +216,7 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
   // If the DNS request was simply to create a host endpoint in a Dynamic Forward Proxy cluster,
   // fast fail the look-up as the address is not needed.
   if (is_proxy_lookup) {
-    finishResolve(host, Network::DnsResolver::ResolutionStatus::Success, "proxy_resolve", {}, {},
+    finishResolve(host, Network::DnsResolver::ResolutionStatus::Completed, "proxy_resolve", {}, {},
                   true);
   } else {
     startResolve(host, *primary_host);
@@ -503,7 +503,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   runResolutionCompleteCallbacks(host, primary_host_info->host_info_, status);
 
   // Kick off the refresh timer.
-  if (status == Network::DnsResolver::ResolutionStatus::Success) {
+  if (status == Network::DnsResolver::ResolutionStatus::Completed) {
     primary_host_info->failure_backoff_strategy_->reset(
         std::chrono::duration_cast<std::chrono::milliseconds>(dns_ttl).count());
     primary_host_info->refresh_timer_->enableTimer(dns_ttl);
@@ -682,7 +682,7 @@ void DnsCacheImpl::loadCacheEntries(
         key, accumulateToString<Network::DnsResponse>(responses, [](const auto& dns_response) {
           return dns_response.addrInfo().address_->asString();
         }));
-    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, "from_cache",
+    finishResolve(key, Network::DnsResolver::ResolutionStatus::Completed, "from_cache",
                   std::move(responses), resolution_time);
     stats_.cache_load_.inc();
     return KeyValueStore::Iterate::Continue;

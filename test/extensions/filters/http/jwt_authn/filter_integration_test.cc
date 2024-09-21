@@ -20,7 +20,7 @@ namespace JwtAuthn {
 namespace {
 
 std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jwks,
-                                bool strip_failure_response) {
+                                bool strip_failure_response, bool clear_route_cache = false) {
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config_str, proto_config);
   proto_config.set_strip_failure_response(strip_failure_response);
@@ -30,6 +30,11 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
     provider0.clear_remote_jwks();
     auto local_jwks = provider0.mutable_local_jwks();
     local_jwks->set_inline_string(PublicKey);
+  }
+
+  if (clear_route_cache) {
+    auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
+    provider0.set_clear_route_cache(true);
   }
 
   HttpFilter filter;
@@ -57,8 +62,10 @@ std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_l
   return MessageUtil::getJsonStringFromMessageOrError(filter);
 }
 
-std::string getFilterConfig(bool use_local_jwks, bool strip_failure_response) {
-  return getAuthFilterConfig(ExampleConfig, use_local_jwks, strip_failure_response);
+std::string getFilterConfig(bool use_local_jwks, bool strip_failure_response,
+                            bool clear_route_cache = false) {
+  return getAuthFilterConfig(ExampleConfig, use_local_jwks, strip_failure_response,
+                             clear_route_cache);
 }
 
 class LocalJwksIntegrationTest : public HttpProtocolIntegrationTest {};
@@ -378,8 +385,8 @@ public:
     addFakeUpstream(GetParam().upstream_protocol);
   }
 
-  void initializeFilter(bool add_cluster) {
-    config_helper_.prependFilter(getFilterConfig(false, false));
+  void initializeFilter(bool add_cluster, bool clear_route_cache = false) {
+    config_helper_.prependFilter(getFilterConfig(false, false, clear_route_cache));
 
     if (add_cluster) {
       config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -389,6 +396,17 @@ public:
       });
     } else {
       config_helper_.skipPortUsageValidation();
+    }
+    if (clear_route_cache) {
+      config_helper_.addConfigModifier(
+          [](envoy::extensions::filters::network::http_connection_manager::v3::
+                 HttpConnectionManager& hcm) {
+            auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+            auto* route = virtual_host->mutable_routes(0);
+            auto* header = route->mutable_match()->add_headers();
+            header->set_name("x-jwt-claim-sub");
+            header->mutable_string_match()->set_exact("test");
+          });
     }
 
     initialize();
@@ -477,6 +495,29 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+TEST_P(RemoteJwksIntegrationTest, WithGoodTokenClearRouteCache) {
+  initializeFilter(/*add_cluster=*/true, true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"x-jwt-claim-sub", "test"},
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+  });
+
+  waitForJwksResponse("200", PublicKey);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
 
   cleanup();
 }
