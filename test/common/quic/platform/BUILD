@@ -23,7 +23,6 @@ envoy_cc_test(
         "//conditions:default": ["-Wno-unused-parameter"],
     }),
     data = ["//test/common/tls/test_data:certs"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         "//source/common/memory:stats_lib",
@@ -37,6 +36,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_core_error_codes_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
+        "@com_github_google_quiche//:quic_platform",
         "@com_github_google_quiche//:quic_platform_expect_bug",
         "@com_github_google_quiche//:quic_platform_test",
         "@com_github_google_quiche//:quic_platform_test_output",

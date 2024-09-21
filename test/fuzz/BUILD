@@ -59,9 +59,6 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = [
-        "quiche_http2_adapter",
-    ],
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
@@ -72,6 +69,7 @@ envoy_cc_test_library(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:http2_adapter",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

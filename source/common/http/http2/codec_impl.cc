@@ -1704,7 +1704,11 @@ int ConnectionImpl::setAndCheckCodecCallbackStatus(Status&& status) {
   // error statuses are silently discarded.
   codec_callback_status_.Update(std::move(status));
   if (codec_callback_status_.ok() && connection_.state() != Network::Connection::State::Open) {
-    codec_callback_status_ = codecProtocolError("Connection was closed while dispatching frames");
+    if (!active_streams_.empty() || !raised_goaway_) {
+      codec_callback_status_ = codecProtocolError("Connection was closed while dispatching frames");
+    } else {
+      codec_callback_status_ = goAwayGracefulCloseError();
+    }
   }
 
   return codec_callback_status_.ok() ? 0 : ERR_CALLBACK_FAILURE;

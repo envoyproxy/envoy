@@ -65,14 +65,12 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "config_impl_headermap_benchmark_test",
     srcs = ["config_impl_headermap_benchmark_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/router:config_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -519,15 +517,13 @@ envoy_proto_library(
 envoy_cc_benchmark_binary(
     name = "config_impl_speed_test",
     srcs = ["config_impl_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/router:config_lib",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -540,12 +536,10 @@ envoy_benchmark_test(
 envoy_cc_benchmark_binary(
     name = "header_formatter_speed_test",
     srcs = ["header_formatter_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/router:router_lib",
         "//test/common/stream_info:test_util",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 

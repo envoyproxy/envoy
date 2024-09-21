@@ -44,9 +44,6 @@ envoy_cc_library(
     name = "oauth_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    external_deps = [
-        "jwt_verify_lib",
-    ],
     deps = [
         ":oauth_client",
         "//envoy/server:filter_config_interface",
@@ -59,6 +56,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/secret:secret_provider_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@com_github_google_jwt_verify//:jwt_verify_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
