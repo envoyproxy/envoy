@@ -15,7 +15,6 @@ envoy_package()
 envoy_cc_test(
     name = "envoy_quic_alarm_test",
     srcs = ["envoy_quic_alarm_test.cc"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         "//source/common/quic:envoy_quic_alarm_factory_lib",
@@ -23,6 +22,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_clock_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
@@ -41,7 +41,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_writer_test",
     srcs = ["envoy_quic_writer_test.cc"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         "//source/common/network:io_socket_error_lib",
@@ -50,13 +49,13 @@ envoy_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@com_github_google_quiche//:quic_platform",
     ],
 )
 
 envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = ["envoy_quic_proof_source_test.cc"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
@@ -69,6 +68,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:test_runtime_lib",
         "@com_github_google_quiche//:quic_core_versions_lib",
+        "@com_github_google_quiche//:quic_platform",
         "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
     ],
 )
@@ -101,7 +101,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_verifier_test",
     srcs = ["envoy_quic_proof_verifier_test.cc"],
-    external_deps = ["quiche_quic_platform"],
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
@@ -112,6 +111,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "@com_github_google_quiche//:quic_platform",
         "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
     ],
 )
@@ -200,6 +200,7 @@ envoy_cc_test(
         "//source/common/quic:envoy_quic_client_session_lib",
         "//source/common/quic:envoy_quic_connection_helper_lib",
         "//source/extensions/quic/crypto_stream:envoy_quic_crypto_client_stream_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stream_decoder_mock",
         "//test/mocks/network:network_mocks",

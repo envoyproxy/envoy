@@ -109,7 +109,6 @@ envoy_cc_test(
         "mysql_command_test.cc",
     ],
     data = ["mysql_test_config.yaml"],
-    external_deps = ["sqlparser"],
     deps = [
         ":mysql_test_utils_lib",
         "//contrib/mysql_proxy/filters/network/source:codec_lib",
@@ -117,5 +116,6 @@ envoy_cc_test(
         "//source/common/tcp_proxy",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
+        "@com_github_envoyproxy_sqlparser//:sqlparser",
     ],
 )
