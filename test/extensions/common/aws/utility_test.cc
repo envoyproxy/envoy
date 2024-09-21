@@ -186,8 +186,9 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
 // Verify the format of a minimalist canonical request
 TEST(UtilityTest, MinimalCanonicalRequest) {
   std::map<std::string, std::string> headers;
-  const auto request =
-      Utility::createCanonicalRequest("appmesh", "GET", "", headers, "content-hash");
+  const auto request = Utility::createCanonicalRequest(
+      "GET", "", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
+      Utility::useDoubleUriEncode("vpc-lattice-svcs"));
   EXPECT_EQ(R"(GET
 /
 
@@ -199,8 +200,9 @@ content-hash)",
 
 TEST(UtilityTest, CanonicalRequestWithQueryString) {
   const std::map<std::string, std::string> headers;
-  const auto request =
-      Utility::createCanonicalRequest("appmesh", "GET", "?query", headers, "content-hash");
+  const auto request = Utility::createCanonicalRequest(
+      "GET", "?query", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
+      Utility::useDoubleUriEncode("vpc-lattice-svcs"));
   EXPECT_EQ(R"(GET
 /
 query=
@@ -216,8 +218,9 @@ TEST(UtilityTest, CanonicalRequestWithHeaders) {
       {"header2", "value2"},
       {"header3", "value3"},
   };
-  const auto request =
-      Utility::createCanonicalRequest("appmesh", "GET", "", headers, "content-hash");
+  const auto request = Utility::createCanonicalRequest(
+      "GET", "", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
+      Utility::useDoubleUriEncode("vpc-lattice-svcs"));
   EXPECT_EQ(R"(GET
 /
 
@@ -230,126 +233,73 @@ content-hash)",
             request);
 }
 
-TEST(UtilityTest, CanonicalizePathStringReturnSlash) {
+TEST(UtilityTest, normalizePathReturnSlash) {
   const absl::string_view path = "";
-  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  const auto canonical_path = Utility::normalizePath(path);
   EXPECT_EQ("/", canonical_path);
 }
 
-TEST(UtilityTest, CanonicalizePathStringSlash) {
+TEST(UtilityTest, normalizePathSlash) {
   const absl::string_view path = "/";
-  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  const auto canonical_path = Utility::normalizePath(path);
   EXPECT_EQ("/", canonical_path);
 }
 
-TEST(UtilityTest, CanonicalizePathStringSlashes) {
+TEST(UtilityTest, normalizePathDotDotMultiple) {
+  const absl::string_view path = "/../../";
+  const auto canonical_path = Utility::normalizePath(path);
+  EXPECT_EQ("/", canonical_path);
+}
+
+TEST(UtilityTest, normalizePathSlashes) {
   const absl::string_view path = "///";
-  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  const auto canonical_path = Utility::normalizePath(path);
   EXPECT_EQ("/", canonical_path);
 }
 
-TEST(UtilityTest, CanonicalizePathStringPrefixSlash) {
+TEST(UtilityTest, normalizePathPrefixSlash) {
   const absl::string_view path = "test";
-  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  const auto canonical_path = Utility::normalizePath(path);
   EXPECT_EQ("/test", canonical_path);
 }
 
-TEST(UtilityTest, CanonicalizePathStringSuffixSlash) {
+TEST(UtilityTest, normalizePathSuffixSlash) {
   const absl::string_view path = "test/";
-  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  const auto canonical_path = Utility::normalizePath(path);
   EXPECT_EQ("/test/", canonical_path);
 }
 
-TEST(UtilityTest, CanonicalizePathStringNormalizeSlash) {
+TEST(UtilityTest, normalizePathNormalizeSlash) {
   const absl::string_view path = "test////test///";
-  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  const auto canonical_path = Utility::normalizePath(path);
   EXPECT_EQ("/test/test/", canonical_path);
 }
 
-TEST(UtilityTest, CanonicalizePathStringWithEncoding) {
+TEST(UtilityTest, normalizePathWithEncoding) {
   const absl::string_view path = "test$file.txt";
-  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  auto canonical_path = Utility::normalizePath(path);
+  canonical_path = Utility::uriEncodePath(canonical_path);
   EXPECT_EQ("/test%24file.txt", canonical_path);
 }
 
-TEST(UtilityTest, CanonicalizePathStringWithEncodingSpaces) {
+TEST(UtilityTest, normalizePathWithEncodingSpaces) {
   const absl::string_view path = "/test and test/";
-  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  auto canonical_path = Utility::normalizePath(path);
+  canonical_path = Utility::uriEncodePath(canonical_path);
   EXPECT_EQ("/test%20and%20test/", canonical_path);
 }
 
-TEST(UtilityTest, CanonicalizePathStringWithAlreadyEncodedSpaces) {
+TEST(UtilityTest, normalizePathWithAlreadyEncodedSpaces) {
   const absl::string_view path = "/test%20and%20test/";
-  const auto canonical_path = Utility::canonicalizePathString(path, "appmesh");
+  auto canonical_path = Utility::normalizePath(path);
+  canonical_path = Utility::uriEncodePath(canonical_path);
   EXPECT_EQ("/test%2520and%2520test/", canonical_path);
 }
 
-TEST(UtilityTest, CanonicalizeS3PathStringDoNotNormalizeSlash) {
-  const absl::string_view path = "/test//test///";
-  const auto canonical_path = Utility::canonicalizePathString(path, "s3");
-  EXPECT_EQ("/test//test///", canonical_path);
-}
-
-TEST(UtilityTest, CanonicalizeS3PathStringSlashes) {
-  const absl::string_view path = "///";
-  const auto canonical_path = Utility::canonicalizePathString(path, "s3");
-  EXPECT_EQ("///", canonical_path);
-}
-
-TEST(UtilityTest, CanonicalizeS3PathStringWithEncoding) {
-  const absl::string_view path = "/test$file.txt";
-  const auto canonical_path = Utility::canonicalizePathString(path, "s3");
-  EXPECT_EQ("/test%24file.txt", canonical_path);
-}
-
-TEST(UtilityTest, CanonicalizeS3PathStringWithEncodingSpaces) {
-  const absl::string_view path = "/test and test/";
-  const auto canonical_path = Utility::canonicalizePathString(path, "s3");
-  EXPECT_EQ("/test%20and%20test/", canonical_path);
-}
-
-TEST(UtilityTest, EncodePathSegment) {
+TEST(UtilityTest, uriEncodePath) {
   const absl::string_view path = "test^!@=-_~.";
-  const auto encoded_path = Utility::encodePathSegment(path, "appmesh");
+  const auto encoded_path = Utility::uriEncodePath(path);
   EXPECT_EQ("test%5E%21%40%3D-_~.", encoded_path);
-}
-
-TEST(UtilityTest, EncodeS3PathSegment) {
-  const absl::string_view path = "/test/^!@=/-_~.";
-  const auto encoded_path = Utility::encodePathSegment(path, "s3");
-  EXPECT_EQ("/test/%5E%21%40%3D/-_~.", encoded_path);
-}
-
-// We assume that by the time our path has reached encodePathSegment, it has already been uriEncoded
-// These tests validate that we do not doubly encode these
-TEST(UtilityTest, CheckDoubleEncodingS3) {
-  const absl::string_view path = "/test%20file";
-  const auto encoded_path = Utility::encodePathSegment(path, "s3");
-  EXPECT_EQ("/test%20file", encoded_path);
-}
-
-TEST(UtilityTest, CheckDoubleEncodingS3withSpace) {
-  const absl::string_view path = "/test file";
-  const auto encoded_path = Utility::encodePathSegment(path, "s3");
-  EXPECT_EQ("/test%20file", encoded_path);
-}
-
-TEST(UtilityTest, CheckDoubleEncodingS3Outposts) {
-  const absl::string_view path = "/test%20file";
-  const auto encoded_path = Utility::encodePathSegment(path, "s3-outposts");
-  EXPECT_EQ("/test%20file", encoded_path);
-}
-
-TEST(UtilityTest, CheckDoubleEncodingS3Folder) {
-  const absl::string_view path = "/test%20folder/test%20file";
-  const auto encoded_path = Utility::encodePathSegment(path, "s3");
-  EXPECT_EQ("/test%20folder/test%20file", encoded_path);
-}
-
-TEST(UtilityTest, CheckDoubleEncodingS3FolderPercentFile) {
-  const absl::string_view path = "/test%20folder/%25";
-  const auto encoded_path = Utility::encodePathSegment(path, "s3");
-  EXPECT_EQ("/test%20folder/%25", encoded_path);
 }
 
 TEST(UtilityTest, CanonicalizeQueryString) {
@@ -410,8 +360,8 @@ TEST(UtilityTest, CanonicalizationFuzzTest) {
       fuzz.push_back(j);
       for (unsigned char k = 32; k <= 126; k++) {
         fuzz.push_back(k);
-        Utility::encodePathSegment(fuzz, "s3");
-        Utility::canonicalizePathString(fuzz, "appmesh");
+        Utility::uriEncodePath(fuzz);
+        Utility::normalizePath(fuzz);
         Utility::encodeQueryParam(fuzz);
         Utility::canonicalizeQueryString(fuzz);
         fuzz.pop_back();
@@ -594,6 +544,24 @@ TEST(UtilityTest, JsonIntegerExponentInvalid) {
       Utility::getIntegerFromJsonOrDefault(test_json.value(), "expiration", 9999);
   // Should return default value
   EXPECT_EQ(expiration, 9999);
+}
+
+TEST(UtilityTest, CheckNormalization) {
+  std::string service = "s3";
+  auto should_normalize = Utility::shouldNormalizeUriPath(service);
+  EXPECT_FALSE(should_normalize);
+  service = "s3-outposts";
+  should_normalize = Utility::shouldNormalizeUriPath(service);
+  EXPECT_FALSE(should_normalize);
+  service = "s3-express";
+  should_normalize = Utility::shouldNormalizeUriPath(service);
+  EXPECT_FALSE(should_normalize);
+  service = "vpc-lattice-svcs";
+  should_normalize = Utility::shouldNormalizeUriPath(service);
+  EXPECT_TRUE(should_normalize);
+  service = "lambda";
+  should_normalize = Utility::shouldNormalizeUriPath(service);
+  EXPECT_TRUE(should_normalize);
 }
 
 } // namespace
