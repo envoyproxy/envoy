@@ -88,6 +88,7 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
+  ENVOY_LOG_MISC(debug, "Envoy ext_proc start unit test fuzzer");
   MockClient* client = new MockClient();
   std::unique_ptr<ExternalProcessing::Filter> filter = std::make_unique<ExternalProcessing::Filter>(
       config, ExternalProcessing::ExternalProcessorClientPtr{client}, proto_config.grpc_service());
