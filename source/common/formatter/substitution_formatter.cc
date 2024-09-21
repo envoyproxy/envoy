@@ -112,7 +112,7 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtoList& list_value)
   serializer_.addArrayBeginDelimiter(); // Delimiter to start list.
   for (int i = 0; i < list_value.size(); ++i) {
     if (i > 0) {
-      serializer_.addElementDelimiter(); // Delimiter to separate list elements.
+      serializer_.addElementsDelimiter(); // Delimiter to separate list elements.
     }
     formatValueToFormatElements(list_value[i]);
   }
@@ -134,7 +134,7 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtoDict& dict_value)
   serializer_.addMapBeginDelimiter(); // Delimiter to start map.
   for (size_t i = 0; i < sorted_fields.size(); ++i) {
     if (i > 0) {
-      serializer_.addElementDelimiter(); // Delimiter to separate map elements.
+      serializer_.addElementsDelimiter(); // Delimiter to separate map elements.
     }
     // Add the key.
     serializer_.addString(sorted_fields[i].first);

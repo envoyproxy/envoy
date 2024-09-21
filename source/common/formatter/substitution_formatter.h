@@ -245,18 +245,22 @@ private:
 };
 
 // Helper class to write value to output buffer in JSON style.
+// NOTE: This helper class has duplicated logic with the Json::Streamer class but
+// provides lower level of APIs to operate on the output buffer (like control the
+// delimiters). This is designed for special scenario of substitution formatter and
+// is not intended to be used by other parts of the code.
 class JsonStringSerializer {
 public:
   using OutputBufferType = Json::StringOutput;
   explicit JsonStringSerializer(std::string& output_buffer) : output_buffer_(output_buffer) {}
 
   // Methods that be used to add JSON delimiter to output buffer.
-  void addMapBeginDelimiter() { output_buffer_.add("{"); }
-  void addMapEndDelimiter() { output_buffer_.add("}"); }
-  void addArrayBeginDelimiter() { output_buffer_.add("["); }
-  void addArrayEndDelimiter() { output_buffer_.add("]"); }
-  void addElementDelimiter() { output_buffer_.add(","); }
-  void addKeyValueDelimiter() { output_buffer_.add(":"); }
+  void addMapBeginDelimiter() { output_buffer_.add(Json::Constants::MapBegin); }
+  void addMapEndDelimiter() { output_buffer_.add(Json::Constants::MapEnd); }
+  void addArrayBeginDelimiter() { output_buffer_.add(Json::Constants::ArrayBegin); }
+  void addArrayEndDelimiter() { output_buffer_.add(Json::Constants::ArrayEnd); }
+  void addElementsDelimiter() { output_buffer_.add(Json::Constants::Comma); }
+  void addKeyValueDelimiter() { output_buffer_.add(Json::Constants::Colon); }
 
   // Methods that be used to add JSON key or value to output buffer.
   void addString(absl::string_view value) { addSanitized(R"(")", value, R"(")"); }
