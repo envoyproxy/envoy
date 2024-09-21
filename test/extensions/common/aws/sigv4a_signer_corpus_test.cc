@@ -4,9 +4,9 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
+#include "source/extensions/common/aws/sigv4a_key_derivation.h"
+#include "source/extensions/common/aws/sigv4a_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "test/extensions/common/aws/mocks.h"
@@ -26,15 +26,15 @@ std::vector<std::string> directoryListing() {
   std::vector<std::string> directories_;
   for (auto const& entry :
        std::filesystem::directory_iterator(TestEnvironment::runfilesDirectory() +
-                                           "/test/extensions/common/aws/signer_corpuses/v4")) {
+                                           "/test/extensions/common/aws/signer_corpuses/v4a")) {
     directories_.push_back(entry.path().string());
   }
   return directories_;
 }
 
-class SigV4SignerCorpusTest : public ::testing::TestWithParam<std::string> {
+class SigV4ASignerCorpusTest : public ::testing::TestWithParam<std::string> {
 public:
-  SigV4SignerCorpusTest()
+  SigV4ASignerCorpusTest()
       : credentials_provider_(new NiceMock<MockCredentialsProvider>()),
         message_(new Http::RequestMessageImpl()) {}
 
@@ -160,6 +160,22 @@ public:
     }
   }
 
+  void ecdsaVerifyAWSSignature(std::string akid, std::string skid, std::string string_to_sign,
+                               std::string calculated_signature) {
+    std::vector<uint8_t> signature;
+    auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+    auto hash = crypto_util.getSha256Digest(Buffer::OwnedImpl(string_to_sign));
+
+    EC_KEY* ec_key =
+        SigV4AKeyDerivation::derivePrivateKey(absl::string_view(akid), absl::string_view(skid));
+    SigV4AKeyDerivation::derivePublicKey(ec_key);
+    signature = Hex::decode(calculated_signature);
+
+    EXPECT_EQ(
+        1, ECDSA_verify(0, hash.data(), hash.size(), signature.data(), signature.size(), ec_key));
+    EC_KEY_free(ec_key);
+  }
+
   NiceMock<MockCredentialsProvider>* credentials_provider_;
   Http::RequestMessagePtr message_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -174,9 +190,9 @@ public:
   std::string content_hash_ = "";
 };
 
-class SigV4SignerImplFriend {
+class SigV4ASignerImplFriend {
 public:
-  SigV4SignerImplFriend(SigV4SignerImpl* signer) : signer_(signer) {}
+  SigV4ASignerImplFriend(SigV4ASignerImpl* signer) : signer_(signer) {}
 
   std::string createCredentialScope(const absl::string_view short_date,
                                     const absl::string_view override_region) {
@@ -227,13 +243,20 @@ public:
     signer_->addRequiredHeaders(headers, long_date, session_token, override_region);
   }
 
-  SigV4SignerImpl* signer_;
+  void addRegionQueryParam(Envoy::Http::Utility::QueryParamsMulti& query_params,
+                           const absl::string_view override_region) {
+    signer_->addRegionQueryParam(query_params, override_region);
+  }
+
+  SigV4ASignerImpl* signer_;
 };
 
 // Avoid multi line header test, as these should never reach the signer
-std::vector<std::string> denylist = {"get-header-value-multiline"};
+// Vanilla SigV4a query tests are missing in source repository
+std::vector<std::string> denylist = {"get-header-value-multiline", "get-vanilla-query-order-key",
+                                     "get-vanilla-query-order-value"};
 
-TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusHeaderSigning) {
+TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusHeaderSigning) {
 
   Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
@@ -254,11 +277,11 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusHeaderSigning) {
   setDate();
   addBodySigningIfRequired();
 
-  SigV4SignerImpl headersigner_(
+  SigV4ASignerImpl headersigner_(
       service_, region_, CredentialsProviderSharedPtr{credentials_provider_}, context_,
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false, expiration_);
 
-  auto signer_friend = SigV4SignerImplFriend(&headersigner_);
+  auto signer_friend = SigV4ASignerImplFriend(&headersigner_);
 
   signer_friend.addRequiredHeaders(message_->headers(), long_date_,
                                    absl::optional<std::string>(token_), region_);
@@ -287,10 +310,15 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusHeaderSigning) {
       signer_friend.createSignature(akid_, skid_, short_date_, calculated_string_to_sign, region_);
 
   auto source_header_signature_ = readStringFile("header-signature.txt");
-  EXPECT_EQ(source_header_signature_, calculated_signature);
+
+  // Check that the string to sign validates against the signature we calculated
+  ecdsaVerifyAWSSignature(akid_, skid_, calculated_string_to_sign, calculated_signature);
+
+  // Check that the string to sign also validates against the signature from the corpus
+  ecdsaVerifyAWSSignature(akid_, skid_, calculated_string_to_sign, source_header_signature_);
 }
 
-TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
+TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
 
   Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
@@ -313,16 +341,18 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
 
   const auto calculated_canonical_headers_ = Utility::canonicalizeHeaders(message_->headers(), {});
 
-  SigV4SignerImpl querysigner_(
+  SigV4ASignerImpl querysigner_(
       service_, region_, CredentialsProviderSharedPtr{credentials_provider_}, context_,
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_);
 
-  auto signer_friend = SigV4SignerImplFriend(&querysigner_);
+  auto signer_friend = SigV4ASignerImplFriend(&querysigner_);
 
   auto calculated_credential_scope = signer_friend.createCredentialScope(short_date_, region_);
 
   auto query_params =
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message_->headers().getPathValue());
+
+  signer_friend.addRegionQueryParam(query_params, region_);
 
   signer_friend.createQueryParams(
       query_params, signer_friend.createAuthorizationCredential(akid_, calculated_credential_scope),
@@ -352,12 +382,17 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
       signer_friend.createSignature(akid_, skid_, short_date_, calculated_string_to_sign, region_);
 
   auto source_query_signature_ = readStringFile("query-signature.txt");
-  EXPECT_EQ(source_query_signature_, calculated_signature);
+
+  // Check that the string to sign validates against the signature we calculated
+  ecdsaVerifyAWSSignature(akid_, skid_, calculated_string_to_sign, calculated_signature);
+
+  // Check that the string to sign also validates against the signature from the corpus
+  ecdsaVerifyAWSSignature(akid_, skid_, calculated_string_to_sign, source_query_signature_);
 }
 
-INSTANTIATE_TEST_SUITE_P(SigV4SignerCorpusTestSuite, SigV4SignerCorpusTest,
+INSTANTIATE_TEST_SUITE_P(SigV4ASignerCorpusTestSuite, SigV4ASignerCorpusTest,
                          ::testing::ValuesIn(directoryListing()),
-                         [](const testing::TestParamInfo<SigV4SignerCorpusTest::ParamType>& info) {
+                         [](const testing::TestParamInfo<SigV4ASignerCorpusTest::ParamType>& info) {
                            std::string a = std::filesystem::path(info.param).filename();
                            a.erase(std::remove(a.begin(), a.end(), '-'), a.end());
                            return a;
