@@ -3,23 +3,22 @@
 #include <vector>
 
 #include "envoy/config/route/v3/route.pb.h"
-
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.validate.h"
-#include "google/protobuf/struct.pb.h"
+
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 
+#include "test/extensions/filters/common/ratelimit_config/ratelimit_config_test.pb.h"
+#include "test/extensions/filters/common/ratelimit_config/ratelimit_config_test.pb.validate.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
-#include "test/extensions/filters/common/ratelimit_config/ratelimit_config_test.pb.h"
-#include "test/extensions/filters/common/ratelimit_config/ratelimit_config_test.pb.validate.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

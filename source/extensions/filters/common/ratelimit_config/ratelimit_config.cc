@@ -1,6 +1,5 @@
-#include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 #include "ratelimit_config.h"
-#include "source/common/config/utility.h"
+#include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/matching/data_impl.h"

@@ -113,8 +113,6 @@ public:
     return rate_limited_grpc_status_;
   }
 
-  bool hasRateLimitPerConnection() const { return rate_limit_per_connection_; }
-
   bool hasRateLimitConfigs() const {
     ASSERT(rate_limit_config_ != nullptr);
     return !rate_limit_config_->empty();

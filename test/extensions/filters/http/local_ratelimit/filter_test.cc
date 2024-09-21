@@ -3,8 +3,8 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/filters/http/local_ratelimit/local_ratelimit.h"
 
-#include "test/mocks/server/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -996,7 +996,7 @@ TEST_F(DescriptorFilterTest, UseInlinedRateLimitConfig) {
 
   headers.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  // Only one request is allowd in 60s for the matched request.
+  // Only one request is allowed in 60s for the matched request.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));

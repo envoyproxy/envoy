@@ -1,10 +1,11 @@
 #pragma once
 
-#include "envoy/ratelimit/ratelimit.h"
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
-#include "absl/container/inlined_vector.h"
-#include "google/protobuf/repeated_ptr_field.h"
+#include "envoy/ratelimit/ratelimit.h"
+
 #include "source/common/router/router_ratelimit.h"
+
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Extensions {

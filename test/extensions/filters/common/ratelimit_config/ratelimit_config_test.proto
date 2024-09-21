@@ -4,7 +4,6 @@ package test.extensions.filters.common.ratelimit_config;
 
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 
-
 message TestRateLimitConfig {
-    repeated envoy.extensions.common.ratelimit.v3.RateLimitPolicy rate_limits = 1;
+  repeated envoy.extensions.common.ratelimit.v3.RateLimitPolicy rate_limits = 1;
 }

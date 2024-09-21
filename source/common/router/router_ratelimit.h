@@ -7,6 +7,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
@@ -16,7 +17,6 @@
 #include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_utility.h"
-#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 
 #include "absl/types/optional.h"
 
