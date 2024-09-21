@@ -16,6 +16,8 @@
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -174,7 +176,14 @@ bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& d
   // from addressAsString this is a valid address.
   Network::Address::CidrRange cidr_entry =
       *Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), mask_len);
-  descriptor_entry = {"masked_remote_address", cidr_entry.asString()};
+  std::string masked_address = cidr_entry.asString();
+  if (remote_address->ip()->version() == Network::Address::IpVersion::v4) {
+    // For Ipv4, masked_address is returned in a format similar to '192.168.1.0/32', '.' It's a key
+    // word in statsd, This makes it difficult to export measurements in Promethean format in the
+    // RateLimit server.
+    absl::StrReplaceAll({}, &masked_address);
+  }
+  descriptor_entry = {"masked_remote_address", masked_address};
 
   return true;
 }
