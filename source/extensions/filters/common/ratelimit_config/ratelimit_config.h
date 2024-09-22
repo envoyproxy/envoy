@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 
 #include "source/common/router/router_ratelimit.h"
@@ -13,7 +13,7 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-using ProtoRateLimit = envoy::extensions::common::ratelimit::v3::RateLimitPolicy;
+using ProtoRateLimit = envoy::config::route::v3::RateLimit;
 using RateLimitDescriptors = std::vector<Envoy::RateLimit::LocalDescriptor>;
 
 class RateLimitPolicy {

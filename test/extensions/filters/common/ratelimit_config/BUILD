@@ -13,7 +13,7 @@ envoy_proto_library(
     name = "ratelimit_config_test_proto",
     srcs = ["ratelimit_config_test.proto"],
     deps = [
-        "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg",
+        "@envoy_api//envoy/config/route/v3:pkg",
     ],
 )
 
@@ -32,6 +32,5 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
     ],
 )

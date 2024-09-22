@@ -1,4 +1,3 @@
-#include "ratelimit_config.h"
 #include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 
 #include "source/common/config/utility.h"
@@ -10,48 +9,6 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace RateLimit {
-
-namespace {
-
-class MatchInputRateLimitDescriptor : public Envoy::RateLimit::DescriptorProducer {
-public:
-  MatchInputRateLimitDescriptor(const std::string& descriptor_key,
-                                Matcher::DataInputPtr<Http::HttpMatchingData>&& data_input)
-      : descriptor_key_(descriptor_key), data_input_(std::move(data_input)) {}
-
-  // Ratelimit::DescriptorProducer
-  bool populateDescriptor(Envoy::RateLimit::DescriptorEntry& entry, const std::string&,
-                          const Http::RequestHeaderMap& headers,
-                          const StreamInfo::StreamInfo& info) const override {
-    Http::Matching::HttpMatchingDataImpl data(info);
-    data.onRequestHeaders(headers);
-    const auto result = data_input_->get(data);
-    if (result.data_availability_ !=
-            Matcher::DataInputGetResult::DataAvailability::AllDataAvailable ||
-        !absl::holds_alternative<std::string>(result.data_)) {
-      return false;
-    }
-    if (absl::string_view value = absl::get<std::string>(result.data_); !value.empty()) {
-      std::cout << value << std::endl;
-      entry = {descriptor_key_, std::string(value)};
-    }
-    return true;
-  }
-
-private:
-  const std::string descriptor_key_;
-  Matcher::DataInputPtr<Http::HttpMatchingData> data_input_;
-};
-
-class DataInputValidator : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
-public:
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
-                                          absl::string_view) override {
-    return absl::OkStatus();
-  }
-};
-
-} // namespace
 
 RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
                                  Server::Configuration::CommonFactoryContext& context,
@@ -90,12 +47,12 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
         // input functions. Note that if the same extension name or type was
         // dual registered as an extension descriptor and an HTTP matcher input
         // function, the descriptor extension takes priority.
-        DataInputValidator validation_visitor;
+        Router::RateLimitDescriptorValidationVisitor validation_visitor;
         Matcher::MatchInputFactory<Http::HttpMatchingData> input_factory(validator,
                                                                          validation_visitor);
         Matcher::DataInputFactoryCb<Http::HttpMatchingData> data_input_cb =
             input_factory.createDataInput(action.extension());
-        actions_.emplace_back(std::make_unique<MatchInputRateLimitDescriptor>(
+        actions_.emplace_back(std::make_unique<Router::MatchInputRateLimitDescriptor>(
             action.extension().name(), data_input_cb()));
         break;
       }
@@ -119,8 +76,11 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
       actions_.emplace_back(new Router::QueryParameterValueMatchAction(
           action.query_parameter_value_match(), context));
       break;
+    case ProtoRateLimit::Action::ActionSpecifierCase::kDynamicMetadata:
     case ProtoRateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
-      PANIC_DUE_TO_CORRUPT_ENUM;
+      creation_status = absl::InvalidArgumentError(fmt::format(
+          "Unsupported rate limit action: {}", static_cast<int>(action.action_specifier_case())));
+      return;
     }
   }
 }

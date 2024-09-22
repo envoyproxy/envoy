@@ -17,6 +17,6 @@ envoy_cc_library(
         "//source/common/router:router_ratelimit_lib",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
-        "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

@@ -3,8 +3,8 @@
 #include <vector>
 
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
-#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.validate.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.validate.h"
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/address_impl.h"
@@ -32,9 +32,8 @@ namespace Common {
 namespace RateLimit {
 namespace {
 
-envoy::extensions::common::ratelimit::v3::RateLimitPolicy
-parseRateLimitFromV3Yaml(const std::string& yaml_string) {
-  envoy::extensions::common::ratelimit::v3::RateLimitPolicy rate_limit;
+ProtoRateLimit parseRateLimitFromV3Yaml(const std::string& yaml_string) {
+  ProtoRateLimit rate_limit;
   TestUtility::loadFromYaml(yaml_string, rate_limit);
   TestUtility::validate(rate_limit);
   return rate_limit;
