@@ -242,12 +242,6 @@ public:
     auto upstream_cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     stream_info_->upstream_cluster_info_ = upstream_cluster_info;
 
-    absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata = absl::nullopt;
-    if (std::get<2>(GetParam())) {
-      filter_metadata = Envoy::ProtobufWkt::Struct();
-      *(*filter_metadata->mutable_fields())["foo"].mutable_string_value() = "bar";
-    }
-
     if (std::get<1>(GetParam())) {
       expected_output_.setLatency(std::chrono::milliseconds(1));
       expected_output_.setUpstreamHost(upstream_host);
@@ -280,33 +274,38 @@ public:
           request_callbacks_ = &callbacks;
         }));
 
+    auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+
+    // Check if there's already filter state present. If so, this was added by a test and it will
+    // affect the filter's behavior. Copy the object so we can later verify it wasn't overridden.
+    absl::optional<ExtAuthzLoggingInfo> preexisting_data =
+        filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName)
+            ? absl::make_optional<ExtAuthzLoggingInfo>(
+                  *filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName))
+            : absl::nullopt;
+
     EXPECT_CALL(*client_, streamInfo()).WillRepeatedly(Return(stream_info_.get()));
 
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter_->decodeHeaders(request_headers_, true));
 
-    auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
-
-    // Check if there's already filter state present. If so, this was added by a test and it will
-    // affect the filter's behavior. Copy the object so we can later verify it wasn't overridden.
-    const auto preexisting_filter_state_ptr =
-        filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-    const absl::optional<ExtAuthzLoggingInfo> preexisting_filter_state_copy =
-        preexisting_filter_state_ptr
-            ? absl::make_optional<ExtAuthzLoggingInfo>(*preexisting_filter_state_ptr)
-            : absl::nullopt;
-
     request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-    // Will exist if stats or filter metadata is emitted or if there was a preexisting logging info.
-    ASSERT_EQ(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName),
-              std::get<1>(GetParam()) || std::get<2>(GetParam()) ||
-                  preexisting_filter_state_copy.has_value());
+    // Will exist if stats or filter metadata is emitted or if there was a preexisting logging
+    // info.
+    const bool expect_data =
+        std::get<1>(GetParam()) || std::get<2>(GetParam()) || preexisting_data.has_value();
+    ASSERT_EQ(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName), expect_data);
+
+    if (!expect_data) {
+      return;
+    }
 
     auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-    if (preexisting_filter_state_copy.has_value()) {
+    if (preexisting_data.has_value()) {
       // Filter state should not have been changed at all.
-      expectEq(*actual, *preexisting_filter_state_copy);
+      expectEq(*actual, *preexisting_data);
+
       if (std::get<1>(GetParam()) || std::get<2>(GetParam())) {
         EXPECT_EQ(1U, config_->stats().filter_state_name_collision_.value());
       } else {
@@ -318,16 +317,16 @@ public:
     expectEq(*actual, expected_output_);
   }
 
-  static void expectEq(const ExtAuthzLoggingInfo& l, const ExtAuthzLoggingInfo& r) {
-    EXPECT_EQ(l.latency(), r.latency());
-    EXPECT_EQ(l.upstreamHost(), r.upstreamHost());
-    EXPECT_EQ(l.clusterInfo(), r.clusterInfo());
-    EXPECT_EQ(l.bytesSent(), r.bytesSent());
-    EXPECT_EQ(l.bytesReceived(), r.bytesReceived());
+  static void expectEq(const ExtAuthzLoggingInfo& actual, const ExtAuthzLoggingInfo& expected) {
+    EXPECT_EQ(actual.latency(), expected.latency());
+    EXPECT_EQ(actual.upstreamHost(), expected.upstreamHost());
+    EXPECT_EQ(actual.clusterInfo(), expected.clusterInfo());
+    EXPECT_EQ(actual.bytesSent(), expected.bytesSent());
+    EXPECT_EQ(actual.bytesReceived(), expected.bytesReceived());
 
-    ASSERT_EQ(l.filterMetadata().has_value(), r.filterMetadata().has_value());
-    if (r.filterMetadata().has_value()) {
-      EXPECT_EQ(l.filterMetadata()->DebugString(), r.filterMetadata()->DebugString());
+    ASSERT_EQ(actual.filterMetadata().has_value(), expected.filterMetadata().has_value());
+    if (expected.filterMetadata().has_value()) {
+      EXPECT_EQ(actual.filterMetadata()->DebugString(), expected.filterMetadata()->DebugString());
     }
   }
 
@@ -3967,6 +3966,7 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
 }
 
 TEST_P(EmitFilterStateTest, OkResponse) {
+  ENVOY_LOG_MISC(debug, "START OF TEST");
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
 
