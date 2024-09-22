@@ -17,16 +17,21 @@ namespace Upstream {
 class ClientSideWeightedRoundRobinLoadBalancerFriend {
 public:
   explicit ClientSideWeightedRoundRobinLoadBalancerFriend(
-      std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb)
-      : lb_(std::move(lb)) {}
+      std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb,
+      std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb> worker_lb)
+      : lb_(std::move(lb)), worker_lb_(std::move(worker_lb)) {}
 
   ~ClientSideWeightedRoundRobinLoadBalancerFriend() = default;
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) { return lb_->chooseHost(context); }
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) {
+    return worker_lb_->chooseHost(context);
+  }
 
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) {
-    return lb_->peekAnotherHost(context);
+    return worker_lb_->peekAnotherHost(context);
   }
+
+  absl::Status initialize() { return lb_->initialize(); }
 
   void updateWeightsOnMainThread() { lb_->updateWeightsOnMainThread(); }
 
@@ -62,12 +67,13 @@ public:
   absl::Status updateClientSideDataFromOrcaLoadReport(
       const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
       ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData& client_side_data) {
-    return lb_->orca_load_report_handler_->updateClientSideDataFromOrcaLoadReport(orca_load_report,
-                                                                                  client_side_data);
+    return worker_lb_->orca_load_report_handler_->updateClientSideDataFromOrcaLoadReport(
+        orca_load_report, client_side_data);
   }
 
 private:
   std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer> lb_;
+  std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb> worker_lb_;
 };
 
 namespace {
@@ -111,8 +117,13 @@ public:
 
     lb_ = std::make_shared<ClientSideWeightedRoundRobinLoadBalancerFriend>(
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
+            lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
+        std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            client_side_weighted_round_robin_config_, simTime(), dispatcher_));
+            client_side_weighted_round_robin_config_, simTime()));
+
+    // Initialize the thread aware load balancer from config.
+    ASSERT_EQ(lb_->initialize(), absl::OkStatus());
   }
 
   // Updates priority 0 with the given hosts and hosts_per_locality.
@@ -136,6 +147,7 @@ public:
 
   envoy::extensions::load_balancing_policies::client_side_weighted_round_robin::v3::
       ClientSideWeightedRoundRobin client_side_weighted_round_robin_config_;
+
   std::shared_ptr<PrioritySetImpl> local_priority_set_;
   std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancerFriend> lb_;
   HostsPerLocalityConstSharedPtr empty_locality_;
@@ -143,6 +155,9 @@ public:
 
   NiceMock<MockLoadBalancerContext> lb_context_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<MockClusterInfo> cluster_info_;
+  ClientSideWeightedRoundRobinLbConfig lb_config_ =
+      ClientSideWeightedRoundRobinLbConfig(client_side_weighted_round_robin_config_, dispatcher_);
 };
 
 //////////////////////////////////////////////////////
@@ -618,8 +633,10 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, WeightedInitializationPicks
     EXPECT_CALL(random_, random()).Times(2).WillRepeatedly(Return(i));
     ClientSideWeightedRoundRobinLoadBalancerFriend lb(
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
+            lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
+        std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            client_side_weighted_round_robin_config_, simTime(), dispatcher_));
+            client_side_weighted_round_robin_config_, simTime()));
     const auto& host = lb.chooseHost(nullptr);
     host_picked_count_map[host]++;
   }
