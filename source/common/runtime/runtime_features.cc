@@ -116,9 +116,6 @@ RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
-// Execution context is optional and must be enabled explicitly.
-// See https://github.com/envoyproxy/envoy/issues/32012.
-FALSE_RUNTIME_GUARD(envoy_restart_features_enable_execution_context);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO(paul-r-gall) Make this enabled by default after additional soak time.

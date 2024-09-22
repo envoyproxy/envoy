@@ -78,7 +78,6 @@ envoy_cc_test(
         "//source/common/common:empty_string",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
-        "//source/common/network:common_connection_filter_states_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",

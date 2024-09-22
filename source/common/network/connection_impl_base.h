@@ -29,8 +29,6 @@ public:
   void setConnectionStats(const ConnectionStats& stats) override;
   void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
 
-  ExecutionContext* executionContext() const override;
-
 protected:
   void initializeDelayedCloseTimer();
 

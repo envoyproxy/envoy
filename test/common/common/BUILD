@@ -541,7 +541,13 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "execution_context_test",
     srcs = ["execution_context_test.cc"],
+    copts = [
+        "-DENVOY_ENABLE_EXECUTION_CONTEXT",
+    ],
     deps = [
         "//envoy/common:execution_context",
+        "//source/common/api:api_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )

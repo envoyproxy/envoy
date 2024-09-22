@@ -272,7 +272,7 @@ public:
   Envoy::Http::Status codec_status_;
 
   // ScopeTrackedObject
-  ExecutionContext* executionContext() const override;
+  OptRef<const StreamInfo::StreamInfo> trackedStream() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
 protected:
