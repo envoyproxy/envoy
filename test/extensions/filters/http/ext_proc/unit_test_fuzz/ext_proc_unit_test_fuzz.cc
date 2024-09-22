@@ -114,13 +114,6 @@ DEFINE_PROTO_FUZZER(
         return stream;
       }));
 
-  ExternalProcessing::ExternalProcessorStream* stream = nullptr;
-  EXPECT_CALL(*client, stream()).WillRepeatedly(Invoke([&stream]() { return stream; }));
-  EXPECT_CALL(*client, setStream(_))
-      .WillRepeatedly(Invoke([&stream](ExternalProcessing::ExternalProcessorStream* stream_ptr) {
-        stream = stream_ptr;
-      }));
-
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
   fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()), input.request());
 }

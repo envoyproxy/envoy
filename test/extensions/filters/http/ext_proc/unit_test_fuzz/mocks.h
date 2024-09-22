@@ -27,7 +27,14 @@ public:
 
 class MockClient : public ExternalProcessing::ExternalProcessorClient {
 public:
-  MockClient() = default;
+  MockClient() {
+    EXPECT_CALL(*this, stream()).WillRepeatedly(testing::Invoke([this]() { return stream_; }));
+    EXPECT_CALL(*this, setStream(testing::_))
+        .WillRepeatedly(
+            testing::Invoke([this](ExternalProcessing::ExternalProcessorStream* stream) -> void {
+              stream_ = stream;
+            }));
+  }
   ~MockClient() override = default;
 
   MOCK_METHOD(ExternalProcessing::ExternalProcessorStreamPtr, start,
@@ -37,6 +44,7 @@ public:
                Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&));
   MOCK_METHOD(ExternalProcessing::ExternalProcessorStream*, stream, ());
   MOCK_METHOD(void, setStream, (ExternalProcessing::ExternalProcessorStream * stream));
+  ExternalProcessing::ExternalProcessorStream* stream_ = nullptr;
 };
 
 } // namespace UnitTestFuzz
