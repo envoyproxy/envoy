@@ -159,7 +159,7 @@ message LocalRateLimit {
   //
   // .. note::
   //   Not all configuration fields of
-  //   :ref:`rate limit config <envoy_v3_api_field_config.route.v3.RateLimit>` is supported at here.
+  //   :ref:`rate limit config <envoy_v3_api_msg_config.route.v3.RateLimit>` is supported at here.
   //   Following fields are not supported:
   //
   //   1. :ref:`rate limit stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>`.
