@@ -50,11 +50,9 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "address_impl_speed_test",
     srcs = ["address_impl_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/network:address_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
@@ -408,12 +406,10 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "lc_trie_speed_test",
     srcs = ["lc_trie_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 

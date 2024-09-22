@@ -58,9 +58,6 @@ envoy_extension_cc_benchmark_binary(
     name = "tls_inspector_benchmark",
     srcs = ["tls_inspector_benchmark.cc"],
     extension_names = ["envoy.filters.listener.tls_inspector"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
@@ -71,6 +68,7 @@ envoy_extension_cc_benchmark_binary(
         "//test/mocks/network:network_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
