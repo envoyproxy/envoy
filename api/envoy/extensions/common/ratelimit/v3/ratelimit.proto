@@ -5,8 +5,6 @@ package envoy.extensions.common.ratelimit.v3;
 import "envoy/type/v3/ratelimit_unit.proto";
 import "envoy/type/v3/token_bucket.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
