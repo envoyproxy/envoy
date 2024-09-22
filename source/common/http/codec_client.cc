@@ -170,10 +170,15 @@ void CodecClient::onData(Buffer::Instance& data) {
   if (!status.ok()) {
     ENVOY_CONN_LOG(debug, "Error dispatching received data: {}", *connection_, status.message());
 
-    // Don't count 408 responses where we have no active requests as protocol errors
-    if (!isPrematureResponseError(status) ||
-        (!active_requests_.empty() ||
-         getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
+    // Don't count 408 responses where we have no active requests as protocol errors.
+    // Don't count graceful GOAWAY closes.
+    const bool not_408 =
+        !isPrematureResponseError(status) ||
+        (!active_requests_.empty() || getPrematureResponseHttpCode(status) != Code::RequestTimeout);
+    const bool is_goaway = isGoAwayGracefulCloseError(status);
+    if (not_408 &&
+        (!is_goaway || !Runtime::runtimeFeatureEnabled(
+                           "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close"))) {
       host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
       protocol_error_ = true;
     }

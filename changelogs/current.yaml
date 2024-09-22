@@ -47,6 +47,13 @@ behavior_changes:
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
     See the config examples from the above ``internal_address_config`` link. This default no trust internal address can be turned on by
     setting runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` to ``true``.
+- area: http
+  change: |
+    The access log handlers that added by the filters will be evaluated before the access
+    log handlers that configured in the :ref:`access_log configuration
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log>`.
+    This change can be disabled by setting the runtime guard flag
+    ``envoy.reloadable_features.filter_access_loggers_first`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -132,6 +139,12 @@ bug_fixes:
   change: |
     RBAC will now allow stat prefixes configured in per-route config to override the base config's
     stat prefix.
+- area: http2
+  change: |
+    Fixed bug where an upstream that sent a GOAWAY and gracefully closed a connection would result in an increment of
+    the cluster stat ``upstream_cx_protocol_error`` and setting the ``UpstreamProtocolError`` response flag. This behavior
+    can be reverted by setting the runtime guard ``envoy.reloadable_features.http2_no_protocol_error_upon_clean_close``
+    to false.
 - area: http3
   change: |
     Fixed a bug where an empty trailers block could be sent. This would occur if a filter removed
