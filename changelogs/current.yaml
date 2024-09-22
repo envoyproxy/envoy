@@ -395,5 +395,10 @@ new_features:
     Added support to provide an override
     :ref:`authentication_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.authentication_header>`
     to load Basic Auth credential.
+- area: ext_proc
+  change: |
+    Added allow list
+    :ref:`allowed_override_modes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allowed_override_modes>`
+    for :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
 
 deprecated:
