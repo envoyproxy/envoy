@@ -1073,7 +1073,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   if (config_->allowModeOverride() && inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
     const auto& mode_overide = response->mode_override();
+    // First, check if mode override allow-list is configured
     if (!config_->allowedOverrideModes().empty()) {
+      // Second, check if mode override from response is allowed.
       mode_override_allowed = absl::c_any_of(
           config_->allowedOverrideModes(),
           [&mode_overide](
@@ -1081,6 +1083,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
             return Protobuf::util::MessageDifferencer::Equals(mode_overide, other);
           });
     }
+
     if (mode_override_allowed) {
       ENVOY_LOG(debug, "Processing mode overridden by server for this request");
       decoding_state_.setProcessingMode(mode_overide);

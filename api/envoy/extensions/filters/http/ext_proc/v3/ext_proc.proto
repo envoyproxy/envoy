@@ -292,7 +292,7 @@ message ExternalProcessor {
   // can only be overridden by the response message from the external processing server iff the
   // :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>` is allowed by
   // the ``allowed_override_modes`` allow-list below.
-  repeated envoy.extensions.filters.http.ext_proc.v3.ProcessingMode allowed_override_modes = 22;
+  repeated ProcessingMode allowed_override_modes = 22;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
