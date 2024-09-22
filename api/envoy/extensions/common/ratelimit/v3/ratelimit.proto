@@ -154,7 +154,6 @@ message LocalClusterRateLimit {
 // Take the local rate limit extension as an example, the generated entries will be used to find a
 // ``LocalRateLimitDescriptor`` which contains a token bucket. And the token bucket will be used to
 // limit the request rate.
-// [#not-implemented-hide:]
 message RateLimitPolicy {
   // [#next-free-field: 11]
   message Action {
