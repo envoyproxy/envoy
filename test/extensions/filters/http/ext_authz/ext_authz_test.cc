@@ -3966,7 +3966,6 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
 }
 
 TEST_P(EmitFilterStateTest, OkResponse) {
-  ENVOY_LOG_MISC(debug, "START OF TEST");
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
 
