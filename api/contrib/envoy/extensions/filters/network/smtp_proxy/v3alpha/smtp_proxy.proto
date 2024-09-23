@@ -10,7 +10,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.smtp_proxy.v3alpha";
 option java_outer_classname = "SmtpProxyProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/smtp_proxy/v3alpha";
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/smtp_proxy/v3alpha";
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
@@ -19,6 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_network_filters_smtp_proxy>`.
 // [#extension: envoy.filters.network.smtp_proxy]
 
+// [#next-free-field: 7]
 message SmtpProxy {
   // TLS operational modes.
   enum SSLMode {
@@ -41,8 +42,10 @@ message SmtpProxy {
 
   // Controls whether to establish downstream TLS connection. Defaults to DISABLE.
   SSLMode downstream_tls = 3;
+
   // Controls whether to establish upstream TLS connection to the server. Defaults to DISABLE.
   SSLMode upstream_tls = 4;
+
   // Controls whether the smtp filter will operate in basic mode or it will perform protocol inspection for all commands.
   bool protocol_inspection = 5;
 
