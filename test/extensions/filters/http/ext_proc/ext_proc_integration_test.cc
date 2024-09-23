@@ -4668,6 +4668,7 @@ TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
 TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   proto_config_.set_allow_mode_override(true);
+  // Configure mode override allow list.
   auto* added_mode = proto_config_.add_allowed_override_modes();
   added_mode->set_request_body_mode(ProcessingMode::NONE);
   added_mode = proto_config_.add_allowed_override_modes();
@@ -4699,9 +4700,10 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {
 }
 
 TEST_P(ExtProcIntegrationTest, ModeOverrideDisallowed) {
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   proto_config_.set_allow_mode_override(true);
+  // Configure mode override allow list.
   auto* added_mode = proto_config_.add_allowed_override_modes();
   added_mode->set_request_body_mode(ProcessingMode::BUFFERED);
   added_mode->set_response_header_mode(ProcessingMode::SKIP);
