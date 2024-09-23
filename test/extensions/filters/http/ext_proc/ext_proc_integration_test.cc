@@ -4688,8 +4688,8 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {
         return true;
       });
 
-  // ext_proc server will receive the body message since the processing body mode has been overridden
-  // from `ProcessingMode::NONE` to `ProcessingMode::STREAMED`
+  // ext_proc server will receive the body message since the processing body mode has been
+  // overridden from `ProcessingMode::NONE` to `ProcessingMode::STREAMED`
   processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
     EXPECT_TRUE(body.end_of_stream());
     return true;
