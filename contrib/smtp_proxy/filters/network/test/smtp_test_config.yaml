@@ -46,13 +46,13 @@ static_resources:
           stat_prefix: tcp_stats
           cluster: cluster_0
       transport_socket:
-          name: envoy.transport_sockets.starttls
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
-            tls_socket_config:
-              common_tls_context:
-                tls_certificates:
-                - certificate_chain:
-                    filename: "server-cert.pem"
-                  private_key:
-                    filename: "key.pem"
+        name: envoy.transport_sockets.starttls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.starttls.v3.StartTlsConfig
+          tls_socket_config:
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain:
+                  filename: "server-cert.pem"
+                private_key:
+                  filename: "key.pem"
