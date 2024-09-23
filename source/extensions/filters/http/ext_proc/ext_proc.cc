@@ -358,7 +358,7 @@ Filter::StreamOpenState Filter::openStream() {
     }
     stats_.streams_started_.inc();
 
-    auto* stream = config_->threadLocalStreamManager().store(
+    ExternalProcessorStream* stream = config_->threadLocalStreamManager().store(
         std::move(stream_object), config_->stats(), config_->deferredCloseTimeout());
     client_->setStream(stream);
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not

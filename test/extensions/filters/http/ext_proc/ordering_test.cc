@@ -202,7 +202,6 @@ protected:
   }
 
   std::unique_ptr<MockClient> client_;
-  ExternalProcessorStream* stream_ = nullptr;
   MockStream stream_delegate_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
