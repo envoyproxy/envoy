@@ -120,7 +120,7 @@ public:
             lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            client_side_weighted_round_robin_config_, simTime()));
+            lb_config_, simTime()));
 
     // Initialize the thread aware load balancer from config.
     ASSERT_EQ(lb_->initialize(), absl::OkStatus());
@@ -636,7 +636,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, WeightedInitializationPicks
             lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            client_side_weighted_round_robin_config_, simTime()));
+            lb_config_, simTime()));
     const auto& host = lb.chooseHost(nullptr);
     host_picked_count_map[host]++;
   }

@@ -22,14 +22,14 @@ static constexpr absl::string_view kNamedMetricsFieldPrefix = "named_metrics.";
 static constexpr absl::string_view kRequestCostFieldPrefix = "request_cost.";
 static constexpr absl::string_view kUtilizationFieldPrefix = "utilization.";
 
-typedef std::function<void(absl::string_view metric_name, double metric_value)>
-    OnLoadReportMetricFn;
+using OnLoadReportMetricFn =
+    std::function<void(absl::string_view metric_name, double metric_value)>;
 
 void scanOrcaLoadReportMetricsMap(const Protobuf::Map<std::string, double>& metrics_map,
-                                  const absl::string_view metric_name,
-                                  const absl::string_view metric_name_prefix,
+                                  absl::string_view metric_name,
+                                  absl::string_view metric_name_prefix,
                                   OnLoadReportMetricFn on_load_report_metric) {
-  absl::string_view metric_name_without_prefix = absl::StripPrefix(metric_name, metric_name_prefix);
+  absl::string_view metric_name_without_prefix = metric_name.substr(metric_name_prefix.size());
   // If the metric name is "*", report all metrics from the map.
   if (metric_name_without_prefix == "*") {
     for (const auto& [key, value] : metrics_map) {
@@ -77,17 +77,19 @@ void scanOrcaLoadReport(const LrsReportMetricNames& metric_names,
 void addOrcaLoadReportToLoadMetricStats(const LrsReportMetricNames& metric_names,
                                         const xds::data::orca::v3::OrcaLoadReport& report,
                                         Upstream::LoadMetricStats& stats) {
-  scanOrcaLoadReport(metric_names, report, [&](absl::string_view metric_name, double metric_value) {
-    stats.add(metric_name, metric_value);
-  });
+  scanOrcaLoadReport(metric_names, report,
+                     [&stats](absl::string_view metric_name, double metric_value) {
+                       stats.add(metric_name, metric_value);
+                     });
 }
 
 double getMaxUtilization(const LrsReportMetricNames& metric_names,
                          const xds::data::orca::v3::OrcaLoadReport& report) {
   double max_utilization = 0;
-  scanOrcaLoadReport(metric_names, report, [&](absl::string_view, double metric_value) {
-    max_utilization = std::max<double>(max_utilization, metric_value);
-  });
+  scanOrcaLoadReport(metric_names, report,
+                     [&max_utilization](absl::string_view, double metric_value) {
+                       max_utilization = std::max<double>(max_utilization, metric_value);
+                     });
   return max_utilization;
 }
 

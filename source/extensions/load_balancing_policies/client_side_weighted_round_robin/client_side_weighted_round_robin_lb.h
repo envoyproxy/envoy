@@ -4,6 +4,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
+#include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 #include "absl/status/status.h"
 
@@ -19,11 +20,17 @@ using OrcaLoadReportProto = xds::data::orca::v3::OrcaLoadReport;
  */
 class ClientSideWeightedRoundRobinLbConfig : public Upstream::LoadBalancerConfig {
 public:
-  ClientSideWeightedRoundRobinLbConfig(const ClientSideWeightedRoundRobinLbProto& lb_config,
-                                       Event::Dispatcher& main_thread_dispatcher)
-      : lb_config_(lb_config), main_thread_dispatcher_(main_thread_dispatcher) {}
+  ClientSideWeightedRoundRobinLbConfig(const ClientSideWeightedRoundRobinLbProto& lb_proto,
+                                       Event::Dispatcher& main_thread_dispatcher);
 
-  const ClientSideWeightedRoundRobinLbProto lb_config_;
+  // Parameters for weight calculation from Orca Load report.
+  std::vector<std::string> metric_names_for_computing_utilization;
+  double error_utilization_penalty;
+  // Timing parameters for the weight update.
+  std::chrono::milliseconds blackout_period;
+  std::chrono::milliseconds weight_expiration_period;
+  std::chrono::milliseconds weight_update_period;
+
   Event::Dispatcher& main_thread_dispatcher_;
 };
 
@@ -44,10 +51,23 @@ public:
                                MonotonicTime last_update_time)
         : weight_(weight), non_empty_since_(non_empty_since), last_update_time_(last_update_time) {}
     virtual ~ClientSideHostLbPolicyData() = default;
-
+    // Update the weight and timestamps for first and last update time.
+    void updateWeightNow(uint32_t weight, const MonotonicTime& now) {
+      absl::MutexLock lock(&mu_);
+      weight_ = weight;
+      last_update_time_ = now;
+      if (non_empty_since_ == kDefaultNonEmptySince) {
+        non_empty_since_ = now;
+      }
+    }
     absl::Mutex mu_;
+    // Weight as calculated from the last load report.
     uint32_t weight_ ABSL_GUARDED_BY(mu_) = 1;
+    // Time when the weight is first updated. The weight is invalid if it is within of
+    // `blackout_period_`.
     MonotonicTime non_empty_since_ ABSL_GUARDED_BY(&mu_) = kDefaultNonEmptySince;
+    // Time when the weight is last updated. The weight is invalid if it is outside of
+    // `expiration_period_`.
     MonotonicTime last_update_time_ ABSL_GUARDED_BY(&mu_) = kDefaultLastUpdateTime;
 
     static constexpr MonotonicTime kDefaultNonEmptySince = MonotonicTime::max();
@@ -60,9 +80,8 @@ public:
   // so it is NOT invoked if the load balancer is deleted.
   class OrcaLoadReportHandler : public LoadBalancerContext::OrcaLoadReportCallbacks {
   public:
-    OrcaLoadReportHandler(
-        const ClientSideWeightedRoundRobinLbProto& client_side_weighted_round_robin_config,
-        TimeSource& time_source);
+    OrcaLoadReportHandler(const ClientSideWeightedRoundRobinLbConfig& lb_config,
+                          TimeSource& time_source);
     ~OrcaLoadReportHandler() override = default;
 
   private:
@@ -91,38 +110,26 @@ public:
     updateClientSideDataFromOrcaLoadReport(const OrcaLoadReportProto& orca_load_report,
                                            ClientSideHostLbPolicyData& client_side_data);
 
-    std::vector<std::string> metric_names_for_computing_utilization_;
-    double error_utilization_penalty_;
+    const std::vector<std::string> metric_names_for_computing_utilization_;
+    const double error_utilization_penalty_;
     TimeSource& time_source_;
   };
 
   // This class is used to handle the load balancing on the worker thread.
-  class WorkerLocalLb : public EdfLoadBalancerBase {
+  class WorkerLocalLb : public RoundRobinLoadBalancer {
   public:
     WorkerLocalLb(
         const PrioritySet& priority_set, const PrioritySet* local_priority_set,
         ClusterLbStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
         const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-        const ClientSideWeightedRoundRobinLbProto& client_side_weighted_round_robin_config,
+        const ClientSideWeightedRoundRobinLbConfig& client_side_weighted_round_robin_config,
         TimeSource& time_source);
 
   private:
-    friend class ClientSideWeightedRoundRobinLoadBalancerFriend;
-
-    // {LoadBalancer} Interface implementation.
-    void refreshHostSource(const HostsSource& source) override;
-
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
-    double hostWeight(const Host& host) const override;
-    HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,
-                                          const HostsSource& source) override;
+    friend class ClientSideWeightedRoundRobinLoadBalancerFriend;
 
-    HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
-                                          const HostsSource& source) override;
-
-    uint64_t peekahead_index_{};
-    absl::flat_hash_map<HostsSource, uint64_t, HostsSourceHash> rr_indexes_;
     std::shared_ptr<OrcaLoadReportHandler> orca_load_report_handler_;
   };
 
@@ -166,8 +173,7 @@ private:
   absl::Status initialize() override;
 
   // Initialize LB based on the config.
-  void initFromConfig(
-      const ClientSideWeightedRoundRobinLbProto& client_side_weighted_round_robin_config);
+  void initFromConfig(const ClientSideWeightedRoundRobinLbConfig& lb_config);
 
   // Start weight updates on the main thread.
   void startWeightUpdatesOnMainThread(Event::Dispatcher& main_thread_dispatcher);
@@ -205,6 +211,8 @@ private:
   std::chrono::milliseconds weight_update_period_;
 
   Event::TimerPtr weight_calculation_timer_;
+  // Callback for `priority_set_` updates.
+  Common::CallbackHandlePtr priority_update_cb_;
 };
 
 } // namespace Upstream

@@ -28,38 +28,38 @@ std::string getHostAddress(const Host* host) {
 }
 } // namespace
 
+ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
+    const ClientSideWeightedRoundRobinLbProto& lb_proto, Event::Dispatcher& main_thread_dispatcher)
+    : main_thread_dispatcher_(main_thread_dispatcher) {
+  ENVOY_LOG_MISC(trace, "ClientSideWeightedRoundRobinLbConfig config {}", lb_proto.DebugString());
+  metric_names_for_computing_utilization =
+      std::vector<std::string>(lb_proto.metric_names_for_computing_utilization().begin(),
+                               lb_proto.metric_names_for_computing_utilization().end());
+  error_utilization_penalty = lb_proto.error_utilization_penalty().value();
+  blackout_period =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, blackout_period, 10000));
+  weight_expiration_period = std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_expiration_period, 180000));
+  weight_update_period =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(lb_proto, weight_update_period, 1000));
+}
+
 ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-    const ClientSideWeightedRoundRobinLbProto& client_side_weighted_round_robin_config,
+    const ClientSideWeightedRoundRobinLbConfig& client_side_weighted_round_robin_config,
     TimeSource& time_source)
-    : EdfLoadBalancerBase(
-          priority_set, local_priority_set, stats, runtime, random,
-          PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config, healthy_panic_threshold,
-                                                         100, 50),
-          LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(common_config),
-          /*slow_start_config=*/std::nullopt, time_source) {
-  initialize();
-  orca_load_report_handler_ = std::make_shared<OrcaLoadReportHandler>(
-      client_side_weighted_round_robin_config, time_source_);
-}
-
-// {LoadBalancer} Interface implementation.
-void ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::refreshHostSource(
-    const HostsSource& source) {
-  // insert() is used here on purpose so that we don't overwrite the index if
-  // the host source already exists. Note that host sources will never be
-  // removed, but given how uncommon this is it probably doesn't matter.
-  rr_indexes_.insert({source, seed_});
-  // If the list of hosts changes, the order of picks change. Discard the
-  // index.
-  peekahead_index_ = 0;
+    : RoundRobinLoadBalancer(priority_set, local_priority_set, stats, runtime, random,
+                             common_config,
+                             /*round_robin_config=*/std::nullopt, time_source) {
+  orca_load_report_handler_ =
+      std::make_shared<OrcaLoadReportHandler>(client_side_weighted_round_robin_config, time_source);
 }
 
 HostConstSharedPtr
 ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr host = EdfLoadBalancerBase::chooseHost(context);
+  HostConstSharedPtr host = RoundRobinLoadBalancer::chooseHost(context);
   if (context != nullptr) {
     // Configure callbacks to receive ORCA load report.
     context->setOrcaLoadReportCallbacks(orca_load_report_handler_);
@@ -67,43 +67,10 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::chooseHost(LoadBalancer
   return host;
 }
 
-double ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::hostWeight(const Host& host) const {
-  ENVOY_LOG(trace, "hostWeight {} = {}", getHostAddress(&host), host.weight());
-  return host.weight();
-}
-
-HostConstSharedPtr ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::unweightedHostPeek(
-    const HostVector& hosts_to_use, const HostsSource& source) {
-  auto i = rr_indexes_.find(source);
-  if (i == rr_indexes_.end()) {
-    return nullptr;
-  }
-  return hosts_to_use[(i->second + (peekahead_index_)++) % hosts_to_use.size()];
-}
-
-HostConstSharedPtr ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::unweightedHostPick(
-    const HostVector& hosts_to_use, const HostsSource& source) {
-  if (peekahead_index_ > 0) {
-    --peekahead_index_;
-  }
-  // To avoid storing the RR index in the base class, we end up using a second
-  // map here with host source as the key. This means that each LB decision
-  // will require two map lookups in the unweighted case. We might consider
-  // trying to optimize this in the future.
-  ASSERT(rr_indexes_.find(source) != rr_indexes_.end());
-  return hosts_to_use[rr_indexes_[source]++ % hosts_to_use.size()];
-}
-
 ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::OrcaLoadReportHandler(
-    const ClientSideWeightedRoundRobinLbProto& client_side_weighted_round_robin_config,
-    TimeSource& time_source)
-    : time_source_(time_source) {
-  metric_names_for_computing_utilization_ = std::vector<std::string>(
-      client_side_weighted_round_robin_config.metric_names_for_computing_utilization().begin(),
-      client_side_weighted_round_robin_config.metric_names_for_computing_utilization().end());
-  error_utilization_penalty_ =
-      client_side_weighted_round_robin_config.error_utilization_penalty().value();
-}
+    const ClientSideWeightedRoundRobinLbConfig& lb_config, TimeSource& time_source)
+    : metric_names_for_computing_utilization_(lb_config.metric_names_for_computing_utilization),
+      error_utilization_penalty_(lb_config.error_utilization_penalty), time_source_(time_source) {}
 
 absl::Status ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::onOrcaLoadReport(
     const OrcaLoadReportProto& orca_load_report, const HostDescription& host_description) {
@@ -124,15 +91,10 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::on
 }
 
 void ClientSideWeightedRoundRobinLoadBalancer::initFromConfig(
-    const ClientSideWeightedRoundRobinLbProto& client_side_weighted_round_robin_config) {
-  ENVOY_LOG(trace, "ClientSideWeightedRoundRobinLbConfig config {}",
-            client_side_weighted_round_robin_config.DebugString());
-  blackout_period_ = std::chrono::milliseconds(
-      PROTOBUF_GET_MS_OR_DEFAULT(client_side_weighted_round_robin_config, blackout_period, 10000));
-  weight_expiration_period_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
-      client_side_weighted_round_robin_config, weight_expiration_period, 180000));
-  weight_update_period_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
-      client_side_weighted_round_robin_config, weight_update_period, 1000));
+    const ClientSideWeightedRoundRobinLbConfig& lb_config) {
+  blackout_period_ = lb_config.blackout_period;
+  weight_expiration_period_ = lb_config.weight_expiration_period;
+  weight_update_period_ = lb_config.weight_update_period;
 }
 
 void ClientSideWeightedRoundRobinLoadBalancer::startWeightUpdatesOnMainThread(
@@ -155,7 +117,10 @@ void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
   std::vector<uint32_t> weights;
   HostVector hosts_with_default_weight;
   const MonotonicTime now = time_source_.monotonicTime();
+  // Weight is considered invalid (too recent) if it was first updated within `blackout_period_`.
   const MonotonicTime min_non_empty_since = now - blackout_period_;
+  // Weight is considered invalid (too old) if it was last updated before
+  // `weight_expiration_period_`.
   const MonotonicTime max_last_update_time = now - weight_expiration_period_;
   weights.reserve(hosts.size());
   hosts_with_default_weight.reserve(hosts.size());
@@ -163,18 +128,22 @@ void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
             now.time_since_epoch().count());
   // Scan through all hosts and update their weights if they are valid.
   for (const auto& host_ptr : hosts) {
+    // Get client side weight or `nullopt` if it is invalid (see above).
     absl::optional<uint32_t> client_side_weight =
         getClientSideWeightIfValidFromHost(*host_ptr, min_non_empty_since, max_last_update_time);
+    // If `client_side_weight` is valid, then set it as the host weight and store it in
+    // `weights` to calculate median valid weight across all hosts.
     if (client_side_weight.has_value()) {
       weights.push_back(*client_side_weight);
       host_ptr->weight(*client_side_weight);
       ENVOY_LOG(trace, "updateWeights hostWeight {} = {}", getHostAddress(host_ptr.get()),
                 host_ptr->weight());
     } else {
+      // If `client_side_weight` is invalid, then set host to default (median) weight.
       hosts_with_default_weight.push_back(host_ptr);
     }
   }
-  // Calculate the default weight as median of all weights.
+  // Calculate the default weight as median of all valid weights.
   uint32_t default_weight = 1;
   if (!weights.empty()) {
     auto median_it = weights.begin() + weights.size() / 2;
@@ -262,6 +231,7 @@ ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::calculateWeight
 
   double utilization =
       getUtilizationFromOrcaReport(orca_load_report, metric_names_for_computing_utilization);
+  // If there are errors, then increase utilization to lower the weight.
   utilization += error_utilization_penalty * orca_load_report.eps() / qps;
 
   if (utilization <= 0) {
@@ -287,14 +257,8 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::
     return weight.status();
   }
 
-  const MonotonicTime now = time_source_.monotonicTime();
   // Update client side data attached to the host.
-  absl::MutexLock lock(&client_side_data.mu_);
-  client_side_data.weight_ = weight.value();
-  client_side_data.last_update_time_ = now;
-  if (client_side_data.non_empty_since_ == ClientSideHostLbPolicyData::kDefaultNonEmptySince) {
-    client_side_data.non_empty_since_ = now;
-  }
+  client_side_data.updateWeightNow(weight.value(), time_source_.monotonicTime());
   return absl::OkStatus();
 }
 
@@ -302,9 +266,10 @@ Upstream::LoadBalancerPtr ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalL
     Upstream::LoadBalancerParams params) {
   const auto* typed_lb_config =
       dynamic_cast<const ClientSideWeightedRoundRobinLbConfig*>(lb_config_.ptr());
+  ASSERT(typed_lb_config != nullptr);
   return std::make_unique<Upstream::ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
       params.priority_set, params.local_priority_set, cluster_info_.lbStats(), runtime_, random_,
-      cluster_info_.lbConfig(), typed_lb_config->lb_config_, time_source_);
+      cluster_info_.lbConfig(), *typed_lb_config, time_source_);
 }
 
 ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalancer(
@@ -321,10 +286,17 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::initialize() {
   for (const HostSetPtr& host_set : priority_set_.hostSetsPerPriority()) {
     addClientSideLbPolicyDataToHosts(host_set->hosts());
   }
+  // Setup a callback to receive priority set updates.
+  priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+      [](uint32_t, const HostVector& hosts_added, const HostVector&) -> absl::Status {
+        addClientSideLbPolicyDataToHosts(hosts_added);
+        return absl::OkStatus();
+      });
 
   const auto* typed_lb_config =
       dynamic_cast<const ClientSideWeightedRoundRobinLbConfig*>(lb_config_.ptr());
-  initFromConfig(typed_lb_config->lb_config_);
+  ASSERT(typed_lb_config != nullptr);
+  initFromConfig(*typed_lb_config);
   startWeightUpdatesOnMainThread(typed_lb_config->main_thread_dispatcher_);
   return absl::OkStatus();
 }
