@@ -613,6 +613,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersAccepted) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, NoInitialStreams) {
