@@ -116,7 +116,10 @@ def envoy_copts(repository, test = False):
                repository + "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
                "//conditions:default": [],
            }) + select({
-               repository + "//bazel:uhv_enabled": ["-DENVOY_ENABLE_UHV"],
+               repository + "//bazel:uhv_enabled": ["-DENVOY_ENABLE_UHV", "-DENVOY_HTTP_PARSER_STRICT_MODE_DISABLED"],
+               "//conditions:default": [],
+           }) + select({
+               repository + "//bazel:http_parser_strict_mode_disabled": ["-DENVOY_HTTP_PARSER_STRICT_MODE_DISABLED"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_nghttp2(["-DENVOY_NGHTTP2"], repository) + \

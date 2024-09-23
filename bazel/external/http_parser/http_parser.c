@@ -976,13 +976,13 @@ reexecute:
 
       case s_req_method:
       {
-        const char *matcher;
         if (UNLIKELY(ch == '\0')) {
           SET_ERRNO(HPE_INVALID_METHOD);
           goto error;
         }
 
       #if HTTP_PARSER_STRICT
+        const char *matcher;
         matcher = method_strings[parser->method];
         if (ch == ' ' && matcher[parser->index] == '\0') {
           UPDATE_STATE(s_req_spaces_before_url);

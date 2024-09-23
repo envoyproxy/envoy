@@ -397,13 +397,21 @@ TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
 }
 
 TEST_F(HttpInspectorTest, InvalidHttpMethod) {
+#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
+  return;
+#endif
+
   const absl::string_view header = "BAD /anything HTTP/1.1";
   testHttpInspectNotFound(header);
 }
 
 TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
   const absl::string_view header = "BAD /anything HTTP/1.1\r\n";
+#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
+  testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
+#else
   testHttpInspectNotFound(header);
+#endif
 }
 
 TEST_F(HttpInspectorTest, OldHttpProtocol) {
@@ -484,6 +492,10 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
+#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
+  return;
+#endif
+
   const std::string header = "505249202a20485454502f322e300d0a0d0c";
   testHttpInspectMultipleReadsNotFound(header, true);
 }
@@ -494,12 +506,16 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
+#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
+  return;
+#endif
+
   const absl::string_view data = "X";
   testHttpInspectMultipleReadsNotFound(data);
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
-#ifdef ENVOY_ENABLE_UHV
+#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
   // permissive parsing
   return;
 #endif
