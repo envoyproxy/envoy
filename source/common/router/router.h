@@ -424,8 +424,7 @@ public:
     return callbacks_->upstreamOverrideHost();
   }
 
-  void
-  setOrcaLoadReportCallbacks(const std::weak_ptr<OrcaLoadReportCallbacks>& callbacks) override {
+  void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) override {
     orca_load_report_callbacks_ = callbacks;
   }
 

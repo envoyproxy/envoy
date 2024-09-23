@@ -2144,7 +2144,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
                                                     orca_load_report.value(),
                                                     host->loadMetricStats());
   }
-  if (auto callbacks = orca_load_report_callbacks_.lock()) {
+  if (auto callbacks = orca_load_report_callbacks_.lock(); callbacks != nullptr) {
     const absl::Status status = callbacks->onOrcaLoadReport(*orca_load_report, *host);
     if (!status.ok()) {
       ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
