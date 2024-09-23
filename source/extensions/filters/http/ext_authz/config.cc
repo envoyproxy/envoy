@@ -54,7 +54,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
                                  .grpcAsyncClientManager()
                                  .getOrCreateRawAsyncClientWithHashKey(
                                      config_with_hash_key, server_context.scope(), true);
-      THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+      THROW_IF_NOT_OK_REF(client_or_error.status());
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           client_or_error.value(), std::chrono::milliseconds(timeout_ms));
       callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));

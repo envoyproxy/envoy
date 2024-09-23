@@ -394,21 +394,15 @@ void HttpConnectionManagerImplMixin::expectOnDestroy(bool deferred) {
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onStreamComplete());
   }
-  {
-    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
-      EXPECT_CALL(*filter, onStreamComplete());
-    };
-    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  for (auto filter : encoder_filters_) {
+    EXPECT_CALL(*filter, onStreamComplete());
   }
 
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onDestroy());
   }
-  {
-    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
-      EXPECT_CALL(*filter, onDestroy());
-    };
-    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  for (auto filter : encoder_filters_) {
+    EXPECT_CALL(*filter, onDestroy());
   }
 
   if (deferred) {

@@ -48,7 +48,7 @@ bool isXdsTpWildcard(const std::string& resource_name) {
 std::string convertToWildcard(const std::string& resource_name) {
   ASSERT(XdsResourceIdentifier::hasXdsTpScheme(resource_name));
   auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
-  THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+  THROW_IF_NOT_OK_REF(resource_or_error.status());
   xds::core::v3::ResourceName xdstp_resource = resource_or_error.value();
   const auto pos = xdstp_resource.id().find_last_of('/');
   xdstp_resource.set_id(
@@ -445,7 +445,7 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
       // Sort the context params of an xdstp resource, so we can compare them easily.
       auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource->name());
-      THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+      THROW_IF_NOT_OK_REF(resource_or_error.status());
       xds::core::v3::ResourceName xdstp_resource = resource_or_error.value();
       XdsResourceIdentifier::EncodeOptions options;
       options.sort_context_params_ = true;
@@ -631,7 +631,7 @@ public:
          XdsResourcesDelegateOptRef xds_resources_delegate, bool use_eds_resources_cache) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
-    THROW_IF_STATUS_NOT_OK(rate_limit_settings_or_error, throw);
+    THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
     GrpcMuxContext grpc_mux_context{
         /*async_client_=*/std::move(async_client),
         /*failover_async_client_=*/std::move(failover_async_client),

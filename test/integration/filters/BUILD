@@ -129,7 +129,6 @@ envoy_cc_test_library(
     hdrs = [
         "tee_filter.h",
     ],
-    external_deps = ["abseil_synchronization"],
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/registry",
@@ -139,6 +138,7 @@ envoy_cc_test_library(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 

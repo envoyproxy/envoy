@@ -111,7 +111,6 @@ envoy_cc_library(
     name = "range_utils_lib",
     srcs = ["range_utils.cc"],
     hdrs = ["range_utils.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":cache_headers_utils_lib",
         ":key_cc_proto",
@@ -120,6 +119,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
@@ -128,7 +128,6 @@ envoy_cc_library(
     name = "cache_headers_utils_lib",
     srcs = ["cache_headers_utils.cc"],
     hdrs = ["cache_headers_utils.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":cache_custom_headers",
         "//envoy/common:time_interface",
@@ -139,6 +138,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "@com_google_absl//absl/container:btree",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )

@@ -225,9 +225,6 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "async_client_manager_benchmark",
     srcs = ["async_client_manager_benchmark.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/api:api_lib",
         "//source/common/grpc:async_client_manager_lib",
@@ -238,6 +235,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

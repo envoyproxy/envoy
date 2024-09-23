@@ -50,11 +50,9 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "address_impl_speed_test",
     srcs = ["address_impl_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/network:address_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
@@ -332,7 +330,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "socket_option_factory_test",
     srcs = ["socket_option_factory_test.cc"],
-    external_deps = ["abseil_str_format"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -341,6 +338,7 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -408,12 +406,10 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "lc_trie_speed_test",
     srcs = ["lc_trie_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
     deps = [
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 

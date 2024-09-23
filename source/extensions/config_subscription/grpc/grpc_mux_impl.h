@@ -169,7 +169,7 @@ private:
           [this](const std::string& resource_name) -> std::string {
             if (XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
               auto xdstp_resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
-              THROW_IF_STATUS_NOT_OK(xdstp_resource_or_error, throw);
+              THROW_IF_NOT_OK_REF(xdstp_resource_or_error.status());
               auto xdstp_resource = xdstp_resource_or_error.value();
               if (subscription_options_.add_xdstp_node_context_params_) {
                 const auto context = XdsContextParams::encodeResource(

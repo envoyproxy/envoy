@@ -89,22 +89,47 @@ def generate_test_code(
         fd.write(contents)
 
 
+class MessageContext:
+    """
+    State kept during processing only one (request/response) message.
+    """
+
+    def __init__(self, message, versions, common_structs_el):
+        # Name of parent message type that's being processed right now.
+        self.message = message
+        # Versions supported by this message type.
+        self.top_level_versions = versions
+        # Common structs declared in this message type.
+        self.common_structs = {}
+        # The order of common structs and dependencies between them are unpredictable.
+        # So we keep a handle to the source if we encounter something not yet parsed.
+        self.common_structs_el = common_structs_el
+
+    def contains_common_struct(self, type_name):
+        return type_name in self.common_structs
+
+    def get_common_struct(self, type_name):
+        return self.common_structs[type_name]
+
+    def register_common_struct(self, common_struct):
+        self.common_structs[common_struct.original_name] = common_struct
+
+
 class StatefulProcessor:
     """
-  Helper entity that keeps state during the processing.
-  Some state needs to be shared across multiple message types, as we need to handle identical
-  sub-type names (e.g. both AlterConfigsRequest & IncrementalAlterConfigsRequest have child
-  AlterConfigsResource, what would cause a compile-time error if we were to handle it trivially).
-  """
+    Helper entity that keeps state during the processing.
+    Some state needs to be shared across multiple message types, as we need to handle identical
+    sub-type names (e.g. both AlterConfigsRequest & IncrementalAlterConfigsRequest have child
+    AlterConfigsResource, what would cause a compile-time error if we were to handle it trivially).
+    """
 
     def __init__(self, type):
+        # Whether we are processing request or response.
         self.type = type
         # Complex types that have been encountered during processing.
         self.known_types = set()
-        # Name of parent message type that's being processed right now.
-        self.currently_processed_message_type = None
-        # Common structs declared in this message type.
-        self.common_structs = {}
+        # Context for current message (set in 'parse_top_level_element').
+        self.context = None
 
     def parse_messages(self, input_files):
         """
@@ -128,8 +153,8 @@ class StatefulProcessor:
                     amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
                     message_spec = json.loads(amended)
                     api_key = message_spec['apiKey']
-                    # (adam.kotwasinski) ConsumerGroupHeartbeat needs some more changes to parse.
-                    if api_key not in [68]:
+                    # (adam.kotwasinski) Telemetry is not supported for now.
+                    if api_key not in [71, 72]:
                         message = self.parse_top_level_element(message_spec)
                         messages.append(message)
             except Exception as e:
@@ -142,11 +167,10 @@ class StatefulProcessor:
 
     def parse_top_level_element(self, spec):
         """
-    Parse a given structure into a request/response.
-    Request/response is just a complex type, that has name & version information kept in differently
-    named fields, compared to sub-structures in a message.
-    """
-        self.currently_processed_message_type = spec['name']
+        Parse a given structure into a request/response.
+        Request/response is just a complex type, that has name & version information kept
+        in differently named fields, compared to the sub-structures in a message.
+        """
 
         # Figure out all versions of this message type.
         versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
@@ -162,71 +186,67 @@ class StatefulProcessor:
         if [x for x in flexible_versions if x not in versions]:
             raise ValueError('invalid flexible versions')
 
-        try:
-            # In 2.4 some types are declared at top level, and only referenced inside.
-            # So let's parse them and store them in state.
-            common_structs = spec.get('commonStructs')
-            if common_structs is not None:
-                for common_struct in reversed(common_structs):
-                    common_struct_name = common_struct['name']
-                    common_struct_versions = Statics.parse_version_string(
-                        common_struct['versions'], versions[-1])
-                    parsed_complex = self.parse_complex_type(
-                        common_struct_name, common_struct, common_struct_versions)
-                    self.common_structs[parsed_complex.name] = parsed_complex
+        # Initialize the context that will be shared for this file's processing.
+        self.context = MessageContext(spec.get('name'), versions, spec.get('commonStructs'))
 
-            # Parse the type itself.
-            complex_type = self.parse_complex_type(
-                self.currently_processed_message_type, spec, versions)
-            complex_type.register_flexible_versions(flexible_versions)
+        # Parse the type itself.
+        complex_type = self.parse_complex_type(self.context.message, spec, versions)
+        complex_type.register_flexible_versions(flexible_versions)
 
-            # Request / response types need to carry api key version.
-            result = complex_type.with_extra('api_key', spec['apiKey'])
-            return result
-
-        finally:
-            self.common_structs = {}
-            self.currently_processed_message_type = None
+        # Request / response types need to carry api key version.
+        result = complex_type.with_extra('api_key', spec['apiKey'])
+        return result
 
     def parse_complex_type(self, type_name, field_spec, versions):
         """
-    Parse given complex type, returning a structure that holds its name, field specification and
-    allowed versions.
-    """
+        Parse given complex type, returning a structure that holds its name, field specification and
+        allowed versions.
+        """
+        cpp_name = type_name
+
         fields_el = field_spec.get('fields')
 
-        if fields_el is not None:
-            fields = []
-            for child_field in field_spec['fields']:
-                child = self.parse_field(child_field, versions[-1])
-                if child is not None:
-                    fields.append(child)
-            # Some structures share the same name, use request/response as prefix.
-            if type_name in ['EntityData', 'EntryData', 'PartitionData', 'PartitionSnapshot',
-                             'SnapshotId', 'TopicData', 'TopicSnapshot']:
-                type_name = self.type.capitalize() + type_name
-            # Some of the types repeat multiple times (e.g. AlterableConfig).
-            # In such a case, every second or later occurrence of the same name is going to be prefixed
-            # with parent type, e.g. we have AlterableConfig (for AlterConfigsRequest) and then
-            # IncrementalAlterConfigsRequestAlterableConfig (for IncrementalAlterConfigsRequest).
-            # This keeps names unique, while keeping non-duplicate ones short.
-            if type_name not in self.known_types:
-                self.known_types.add(type_name)
+        # There are no fields, so it's a reference to a common struct.
+        if fields_el is None:
+            if self.context.contains_common_struct(type_name):
+                return self.context.get_common_struct(type_name)
             else:
-                type_name = self.currently_processed_message_type + type_name
-                self.known_types.add(type_name)
+                for candidate in self.context.common_structs_el:
+                    if candidate['name'] == type_name:
+                        return self.parse_and_register_common_struct(candidate)
 
-            return Complex(type_name, fields, versions)
+        # We have fields, that's an ordinary type.
+        fields = []
+        for child_field in field_spec['fields']:
+            child = self.parse_field(child_field, versions[-1])
+            if child is not None:
+                fields.append(child)
 
+        # Some structures share the same name, use request/response as prefix.
+        if cpp_name in ['Cursor', 'DirectoryData', 'EntityData', 'EntryData', 'PartitionData',
+                        'PartitionSnapshot', 'SnapshotId', 'TopicData', 'TopicPartitions',
+                        'TopicSnapshot']:
+            cpp_name = self.type.capitalize() + type_name
+
+        # Some of the types repeat multiple times (e.g. AlterableConfig).
+        # In such a case, every second or later occurrence of the same name is going to be prefixed
+        # with parent type, e.g. we have AlterableConfig (for AlterConfigsRequest) and then
+        # IncrementalAlterConfigsRequestAlterableConfig (for IncrementalAlterConfigsRequest).
+        # This keeps names unique, while keeping non-duplicate ones short.
+        if cpp_name not in self.known_types:
+            self.known_types.add(cpp_name)
         else:
-            return self.common_structs[type_name]
+            cpp_name = self.context.message + cpp_name
+            self.known_types.add(cpp_name)
+
+        return Complex(type_name, cpp_name, fields, versions)
 
     def parse_field(self, field_spec, highest_possible_version):
         """
-    Parse given field, returning a structure holding the name, type, and versions when this field is
-    actually used (nullable or not). Obviously, field cannot be used in version higher than its
-    type's usage.
-    """
+        Parse given field, returning a structure holding the name, type, and versions when this
+        field is actually used (nullable or not). Obviously, field cannot be used in version higher
+        than its type's usage.
+        """
         if field_spec.get('tag') is not None:
             return None
 
@@ -254,6 +274,18 @@ class StatefulProcessor:
                 versions = Statics.parse_version_string(
                     field_spec['versions'], highest_possible_version)
                 return self.parse_complex_type(type_name, field_spec, versions)
+
+    def parse_and_register_common_struct(self, common_struct):
+        """
+        Parse a common struct (complex type) and store it.
+        """
+        common_struct_name = common_struct['name']
+        common_struct_versions = Statics.parse_version_string(
+            common_struct['versions'], self.context.top_level_versions[-1])
+        parsed_complex = self.parse_complex_type(
+            common_struct_name, common_struct, common_struct_versions)
+        self.context.register_common_struct(parsed_complex)
+        return parsed_complex
 
 
 class Statics:
@@ -338,9 +370,9 @@ class FieldList:
 
 class FieldSpec:
     """
-  Represents a field present in a structure (request, or child structure thereof).
-  Contains name, type, and versions when it is used (nullable or not).
-  """
+    Represents a field present in a structure (request, or child structure thereof).
+    Contains name, type, and versions when it is used (nullable or not).
+    """
 
     def __init__(self, name, type, version_usage, version_usage_as_nullable):
         import re
@@ -355,10 +387,10 @@ class FieldSpec:
 
     def is_nullable_in_version(self, version):
         """
-    Whether the field is nullable in given version.
-    Fields can be non-nullable in earlier versions.
-    See https://github.com/apache/kafka/tree/2.2.0-rc0/clients/src/main/resources/common/message#nullable-fields
-    """
+        Whether the field is nullable in given version.
+        Fields can be non-nullable in earlier versions.
+        See https://github.com/apache/kafka/tree/3.8.0/clients/src/main/resources/common/message#nullable-fields
+        """
         return version in self.version_usage_as_nullable
 
     def used_in_version(self, version):
@@ -396,12 +428,20 @@ class FieldSpec:
 
     def deserializer_name_in_version(self, version, compact):
         if self.is_nullable_in_version(version):
-            return 'Nullable%s' % self.type.deserializer_name_in_version(version, compact)
+            underlying_deserializer = self.type.deserializer_name_in_version(version, compact)
+            # Handles KAFKA-14425 - structs (complex types) can now be nullable.
+            if isinstance(self.type, Complex):
+                return 'NullableStructDeserializer<%s>' % underlying_deserializer
+            else:
+                return 'Nullable%s' % underlying_deserializer
         else:
             return self.type.deserializer_name_in_version(version, compact)
 
     def is_printable(self):
         return self.type.is_printable()
+
+    def __str__(self):
+        return '%s(%s)' % (self.name, self.type)
 
 
 class TypeSpecification:
@@ -439,10 +479,10 @@ class TypeSpecification:
 
 class Array(TypeSpecification):
     """
-  Represents array complex type.
-  To use instance of this type, it is necessary to declare structures required by self.underlying
-  (e.g. to use Array<Foo>, we need to have `struct Foo {...}`).
-  """
+    Represents array complex type.
+    To use instance of this type, it is necessary to declare structures required by self.underlying
+    (e.g. to use Array<Foo>, we need to have `struct Foo {...}`).
+    """
 
     def __init__(self, underlying):
         self.underlying = underlying
@@ -472,6 +512,9 @@ class Array(TypeSpecification):
 
     def is_printable(self):
         return self.underlying.is_printable()
+
+    def __str__(self):
+        return self.name
 
 
 class Primitive(TypeSpecification):
@@ -611,6 +654,9 @@ class Primitive(TypeSpecification):
     def is_printable(self):
         return self.name not in ['Bytes']
 
+    def __str__(self):
+        return self.name
+
 
 class FieldSerializationSpec():
 
@@ -623,12 +669,13 @@ class FieldSerializationSpec():
 
 class Complex(TypeSpecification):
     """
-  Represents a complex type (multiple types aggregated into one).
-  This type gets mapped to a C++ struct.
-  """
+    Represents a complex type (multiple types aggregated into one).
+    This type gets mapped to a C++ struct.
+    """
 
-    def __init__(self, name, fields, versions):
-        self.name = name
+    def __init__(self, original_name, type_name, fields, versions):
+        self.original_name = original_name
+        self.name = type_name
         self.fields = fields
         self.versions = versions
         self.flexible_versions = None  # Will be set in 'register_flexible_versions'.
@@ -646,9 +693,9 @@ class Complex(TypeSpecification):
 
     def compute_declaration_chain(self):
         """
-    Computes all dependencies, what means all non-primitive types used by this type.
-    They need to be declared before this struct is declared.
-    """
+        Computes all dependencies, what means all non-primitive types used by this type.
+        They need to be declared before this struct is declared.
+        """
         result = []
         for field in self.fields:
             field_dependencies = field.type.compute_declaration_chain()
@@ -667,10 +714,10 @@ class Complex(TypeSpecification):
 
     def compute_constructors(self):
         """
-    Field lists for different versions may not differ (as Kafka can bump version without any
-    changes). But constructors need to be unique, so we need to remove duplicates if the signatures
-    match.
-    """
+        Field lists for different versions may not differ (as Kafka can bump version without any
+        changes). But constructors need to be unique, so we need to remove duplicates
+        if the signatures match.
+        """
         signature_to_constructor = {}
         for field_list in self.compute_field_lists():
             signature = field_list.constructor_signature()
@@ -691,8 +738,8 @@ class Complex(TypeSpecification):
 
     def compute_field_lists(self):
         """
-    Return field lists representing each of structure versions.
-    """
+        Return field lists representing each of structure versions.
+        """
         field_lists = []
         for version in self.versions:
             field_list = FieldList(version, version in self.flexible_versions, self.fields)
@@ -738,6 +785,9 @@ class Complex(TypeSpecification):
 
     def is_printable(self):
         return True
+
+    def __str__(self):
+        return self.name
 
 
 class RenderingHelper:

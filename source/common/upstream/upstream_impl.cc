@@ -1388,7 +1388,8 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
       codec_filter->set_name("envoy.filters.http.upstream_codec");
-      codec_filter->mutable_typed_config()->set_type_url(upstream_codec_type_url);
+      codec_filter->mutable_typed_config()->set_type_url(
+          absl::StrCat("type.googleapis.com/", upstream_codec_type_url));
     } else {
       const auto last_type_url =
           Config::Utility::getFactoryType(http_filters[http_filters.size() - 1].typed_config());
@@ -1831,6 +1832,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
 
   drop_ratio = std::min(drop_ratio, float(drop_ratio_runtime) / float(MAX_DROP_OVERLOAD_RUNTIME));
   drop_overload_ = UnitFloat(drop_ratio);
+  drop_category_ = policy.drop_overloads(0).category();
   return absl::OkStatus();
 }
 
@@ -2546,7 +2548,7 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
   const auto& port_value = health_check_config.port_value();
   if (health_check_config.has_address()) {
     auto address_or_error = Network::Address::resolveProtoAddress(health_check_config.address());
-    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    THROW_IF_NOT_OK_REF(address_or_error.status());
     auto address = address_or_error.value();
     health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);

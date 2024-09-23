@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -564,43 +565,6 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const Http::StreamFilterCal
 }
 
 /**
- * Merge all the available per route filter configs into one. To perform the merge,
- * the reduce function will be called on each two configs until a single merged config is left.
- *
- * @param reduce The first argument for this function will be the config from the previous level
- * and the second argument is the config from the current level (the more specific one). The
- * function should merge the second argument into the first argument.
- *
- * @return The merged config.
- */
-template <class ConfigType>
-absl::optional<ConfigType>
-getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
-                         std::function<void(ConfigType&, const ConfigType&)> reduce) {
-  static_assert(std::is_copy_constructible<ConfigType>::value,
-                "ConfigType must be copy constructible");
-  ASSERT(callbacks != nullptr);
-
-  absl::optional<ConfigType> merged;
-
-  callbacks->traversePerFilterConfig([&reduce,
-                                      &merged](const Router::RouteSpecificFilterConfig& cfg) {
-    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-    if (typed_cfg == nullptr) {
-      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
-      return;
-    }
-    if (!merged) {
-      merged.emplace(*typed_cfg);
-    } else {
-      reduce(merged.value(), *typed_cfg);
-    }
-  });
-
-  return merged;
-}
-
-/**
  * Return all the available per route filter configs.
  *
  * @param callbacks The stream filter callbacks to check for route configs.
@@ -609,20 +573,20 @@ getMergedPerFilterConfig(const Http::StreamFilterCallbacks* callbacks,
  * and their lifetime is the same as the matched route.
  */
 template <class ConfigType>
-absl::InlinedVector<const ConfigType*, 3>
+absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4>
 getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
   ASSERT(callbacks != nullptr);
 
-  absl::InlinedVector<const ConfigType*, 3> all_configs;
-  callbacks->traversePerFilterConfig([&all_configs](const Router::RouteSpecificFilterConfig& cfg) {
-    const ConfigType* typed_cfg = dynamic_cast<const ConfigType*>(&cfg);
-    if (typed_cfg == nullptr) {
-      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
-      return;
-    }
+  absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4> all_configs;
 
-    all_configs.push_back(typed_cfg);
-  });
+  for (const auto* config : callbacks->perFilterConfigs()) {
+    const ConfigType* typed_config = dynamic_cast<const ConfigType*>(config);
+    if (typed_config == nullptr) {
+      ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
+      continue;
+    }
+    all_configs.push_back(*typed_config);
+  }
 
   return all_configs;
 }

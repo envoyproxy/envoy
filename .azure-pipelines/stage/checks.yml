@@ -47,12 +47,10 @@ jobs:
         CI_TARGET: "fuzz_coverage"
       compile_time_options:
         CI_TARGET: "compile_time_options"
-        ENVOY_FILTER_EXAMPLE: true
       tsan:
         CI_TARGET: "tsan"
       asan:
         CI_TARGET: "asan"
-        ENVOY_FILTER_EXAMPLE: true
       # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
       # api_compat:
       #  CI_TARGET: "api_compat"
@@ -60,7 +58,6 @@ jobs:
         CI_TARGET: "gcc"
       msan:
         CI_TARGET: "msan"
-        ENVOY_FILTER_EXAMPLE: true
       #
       # Temporarily disabled to facilitate release CI, should be resolved
       #    as part of https://github.com/envoyproxy/envoy/issues/28566
@@ -81,7 +78,6 @@ jobs:
     parameters:
       ciTarget: $(CI_TARGET)
       cacheName: $(CI_TARGET)
-      envoyBuildFilterExample: $(ENVOY_FILTER_EXAMPLE)
       cacheTestResults: ${{ parameters.cacheTestResults }}
       diskspaceHack: true
       managedAgent: false

@@ -33,8 +33,6 @@ fi
     export ENVOY_BUILD_ARCH
 }
 
-export ENVOY_BUILD_FILTER_EXAMPLE="${ENVOY_BUILD_FILTER_EXAMPLE:-0}"
-
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
 read -ra BAZEL_STARTUP_EXTRA_OPTIONS <<< "${BAZEL_STARTUP_EXTRA_OPTIONS:-}"
@@ -119,10 +117,12 @@ export BAZEL_STARTUP_OPTION_LIST
 export BAZEL_BUILD_OPTION_LIST
 export BAZEL_GLOBAL_OPTION_LIST
 
-if [[ -e "${LLVM_ROOT}" ]]; then
-    "${CURRENT_SCRIPT_DIR}/../bazel/setup_clang.sh" "${LLVM_ROOT}"
-else
-    echo "LLVM_ROOT not found, not setting up llvm."
+if [[ -z "${ENVOY_RBE}" ]]; then
+    if [[ -e "${LLVM_ROOT}" ]]; then
+        "${CURRENT_SCRIPT_DIR}/../bazel/setup_clang.sh" "${LLVM_ROOT}"
+    else
+        echo "LLVM_ROOT not found, not setting up llvm."
+    fi
 fi
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && bazel clean "${BAZEL_BUILD_OPTIONS[@]}" --expunge
@@ -154,12 +154,5 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 # This is where we copy the build profile to.
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
-
-if [[ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "true" ]]; then
-  # shellcheck source=ci/filter_example_setup.sh
-  . "${CURRENT_SCRIPT_DIR}"/filter_example_setup.sh
-else
-  echo "Skip setting up Envoy Filter Example."
-fi
 
 export NO_BUILD_SETUP=1
