@@ -8,6 +8,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
+#include "source/common/stream_info/utility.h"
 
 #include "eval/public/cel_value.h"
 #include "eval/public/containers/container_backed_list_impl.h"
@@ -94,6 +95,19 @@ constexpr absl::string_view FilterChainName = "filter_chain_name";
 constexpr absl::string_view ListenerMetadata = "listener_metadata";
 constexpr absl::string_view ListenerDirection = "listener_direction";
 constexpr absl::string_view Node = "node";
+
+// Stream duration properties
+constexpr absl::string_view StreamDuration = "stream_duration";
+constexpr absl::string_view FirstUpstreamTxByteSent = "first_upstream_tx_byte_sent";
+constexpr absl::string_view LastUpstreamTxByteSent = "last_upstream_tx_byte_sent";
+constexpr absl::string_view FirstUpstreamRxByteReceived = "first_upstream_rx_byte_received";
+constexpr absl::string_view LastUpstreamRxByteReceived = "last_upstream_rx_byte_received";
+constexpr absl::string_view UpstreamHandshakeComplete = "upstream_handshake_complete";
+constexpr absl::string_view FirstDownstreamTxByteSent = "first_downstream_tx_byte_sent";
+constexpr absl::string_view LastDownstreamTxByteSent = "last_downstream_tx_byte_sent";
+constexpr absl::string_view LastDownstreamRxByteReceived = "last_downstream_rx_byte_received";
+constexpr absl::string_view DownstreamHandshakeComplete = "downstream_handshake_complete";
+constexpr absl::string_view LastDownstreamAckReceived = "last_downstream_ack_received";
 
 class WrapperFieldValues {
 public:
@@ -201,6 +215,16 @@ private:
   const HeadersWrapper<::Envoy::Http::ResponseHeaderMap> headers_;
   const HeadersWrapper<::Envoy::Http::ResponseTrailerMap> trailers_;
   const StreamInfo::StreamInfo& info_;
+};
+
+class StreamDurationWrapper : public BaseWrapper {
+public:
+  StreamDurationWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
+      : BaseWrapper(arena), timing_(info) {}
+  absl::optional<CelValue> operator[](CelValue key) const override;
+
+private:
+  Envoy::StreamInfo::TimingUtility timing_;
 };
 
 class ConnectionWrapper : public BaseWrapper {

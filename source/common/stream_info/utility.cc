@@ -144,7 +144,7 @@ absl::optional<std::chrono::nanoseconds> duration(const absl::optional<Monotonic
                                                               stream_info.startTimeMonotonic());
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamTxByteSent() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamTxByteSent() const {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
     return absl::nullopt;
@@ -152,7 +152,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamTxByteSent(
   return duration(timing.value().get().first_upstream_tx_byte_sent_, stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamTxByteSent() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamTxByteSent() const {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
     return absl::nullopt;
@@ -160,7 +160,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamTxByteSent()
   return duration(timing.value().get().last_upstream_tx_byte_sent_, stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamRxByteReceived() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamRxByteReceived() const {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
     return absl::nullopt;
@@ -168,7 +168,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamRxByteRecei
   return duration(timing.value().get().first_upstream_rx_byte_received_, stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceived() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceived() const {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
     return absl::nullopt;
@@ -176,7 +176,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamRxByteReceiv
   return duration(timing.value().get().last_upstream_rx_byte_received_, stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplete() const {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
     return absl::nullopt;
@@ -184,7 +184,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::upstreamHandshakeComplet
   return duration(timing.value().get().upstreamHandshakeComplete(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::firstDownstreamTxByteSent() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::firstDownstreamTxByteSent() const {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
     return absl::nullopt;
@@ -192,7 +192,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::firstDownstreamTxByteSen
   return duration(timing.value().get().firstDownstreamTxByteSent(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamTxByteSent() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamTxByteSent() const {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
     return absl::nullopt;
@@ -200,7 +200,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamTxByteSent
   return duration(timing.value().get().lastDownstreamTxByteSent(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteReceived() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteReceived() const {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
     return absl::nullopt;
@@ -208,7 +208,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteRece
   return duration(timing.value().get().lastDownstreamRxByteReceived(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeComplete() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeComplete() const {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
     return absl::nullopt;
@@ -216,7 +216,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::downstreamHandshakeCompl
   return duration(timing.value().get().downstreamHandshakeComplete(), stream_info_);
 }
 
-absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamAckReceived() {
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamAckReceived() const {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
     return absl::nullopt;

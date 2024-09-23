@@ -146,6 +146,56 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
   return {};
 }
 
+absl::optional<CelValue> StreamDurationWrapper::operator[](CelValue key) const {
+  if (!key.IsString()) {
+    return {};
+  }
+  auto value = key.StringOrDie().value();
+  if (value == FirstUpstreamTxByteSent) {
+    if (auto duration = timing_.firstUpstreamTxByteSent(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  } else if (value == LastUpstreamTxByteSent) {
+    if (auto duration = timing_.lastUpstreamTxByteSent(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+
+  } else if (value == FirstUpstreamRxByteReceived) {
+    if (auto duration = timing_.firstUpstreamRxByteReceived(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  } else if (value == LastUpstreamRxByteReceived) {
+    if (auto duration = timing_.lastUpstreamRxByteReceived(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  } else if (value == UpstreamHandshakeComplete) {
+    if (auto duration = timing_.upstreamHandshakeComplete(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  } else if (value == FirstDownstreamTxByteSent) {
+    if (auto duration = timing_.firstDownstreamTxByteSent(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  } else if (value == LastDownstreamTxByteSent) {
+    if (auto duration = timing_.lastDownstreamTxByteSent(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  } else if (value == LastDownstreamRxByteReceived) {
+    if (auto duration = timing_.lastDownstreamRxByteReceived(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  } else if (value == DownstreamHandshakeComplete) {
+    if (auto duration = timing_.downstreamHandshakeComplete(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  } else if (value == LastDownstreamAckReceived) {
+    if (auto duration = timing_.lastDownstreamAckReceived(); duration.has_value()) {
+      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+    }
+  }
+  return {};
+}
+
 absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
