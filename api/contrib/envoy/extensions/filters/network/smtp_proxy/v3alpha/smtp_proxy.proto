@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.smtp_proxy.v3alpha;
+
+import "envoy/config/accesslog/v3/accesslog.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.smtp_proxy.v3alpha";
+option java_outer_classname = "SmtpProxyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/smtp_proxy/v3alpha";
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: SMTP Proxy]
+// SMTP Proxy :ref:`configuration overview
+// <config_network_filters_smtp_proxy>`.
+// [#extension: envoy.filters.network.smtp_proxy]
+
+message SmtpProxy {
+  // TLS operational modes.
+  enum SSLMode {
+    // Filter does not switch connection to TLS even when STARTTLS command is received.
+    DISABLE = 0;
+
+    // If the filter receives STARTTLS command, it will switch the connection to TLS.
+    ENABLE = 1;
+
+    // STARTTLS command ( and hence TLS connection) is required.
+    REQUIRE = 2;
+  }
+
+  // The human readable prefix to use when emitting :ref:`statistics
+  // <config_network_filters_smtp_proxy_stats>`.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // If enabled, filter will generate x-req-id to identify smtp session/transaction and send it to upstream.
+  bool tracing = 2;
+
+  // Controls whether to establish downstream TLS connection. Defaults to DISABLE.
+  SSLMode downstream_tls = 3;
+  // Controls whether to establish upstream TLS connection to the server. Defaults to DISABLE.
+  SSLMode upstream_tls = 4;
+  // Controls whether the smtp filter will operate in basic mode or it will perform protocol inspection for all commands.
+  bool protocol_inspection = 5;
+
+  // Configuration for :ref:`access logs <arch_overview_access_logs>`
+  // emitted by the SMTP Filter.
+  repeated config.accesslog.v3.AccessLog access_log = 6;
+}
