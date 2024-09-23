@@ -243,10 +243,15 @@ void LoadStatsReporter::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& 
 }
 
 void LoadStatsReporter::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
   response_timer_->disableTimer();
   stream_ = nullptr;
-  handleFailure();
+  if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
+    handleFailure();
+  } else {
+    ENVOY_LOG(debug, "{} gRPC config stream closed gracefully, {}", service_method_.name(), message);
+    setRetryTimer();
+  }
 }
 
 } // namespace Upstream
