@@ -18,6 +18,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -94,6 +95,37 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
+TEST_F(RateLimitConfigTest, NoAction) {
+  {
+    const std::string yaml = R"EOF(
+actions:
+- {}
+  )EOF";
+
+    ProtoRateLimit rate_limit;
+    TestUtility::loadFromYaml(yaml, rate_limit);
+
+    absl::Status creation_status;
+    RateLimitPolicy policy(rate_limit, factory_context_, creation_status);
+
+    EXPECT_TRUE(absl::StartsWith(creation_status.message(), "Unsupported rate limit action:"));
+  }
+
+  {
+    const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    - {}
+  )EOF";
+
+    factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+    setupTest(yaml);
+
+    EXPECT_TRUE(absl::StartsWith(creation_status_.message(), "Unsupported rate limit action:"));
+  }
+}
+
 TEST_F(RateLimitConfigTest, EmptyRateLimit) {
   const std::string yaml = R"EOF(
 rate_limits: []
@@ -149,10 +181,8 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActions) {
 class RateLimitPolicyTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    absl::Status creation_status;
     rate_limit_entry_ = std::make_unique<RateLimitPolicy>(parseRateLimitFromV3Yaml(yaml),
-                                                          factory_context_, creation_status);
-    THROW_IF_NOT_OK(creation_status); // NOLINT
+                                                          factory_context_, creation_status_);
     descriptors_.clear();
     stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
     ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
@@ -160,6 +190,7 @@ public:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<RateLimitPolicy> rate_limit_entry_;
+  absl::Status creation_status_{};
   Http::TestRequestHeaderMapImpl headers_;
   std::shared_ptr<Router::MockRoute> route_{new NiceMock<Router::MockRoute>()};
 
@@ -985,6 +1016,56 @@ TEST_F(RateLimitPolicyTest, RequestMatchInputSkip) {
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
+}
+
+class ExtensionDescriptorFactory : public Envoy::RateLimit::DescriptorProducerFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
+  std::string name() const override { return "test.descriptor_producer"; }
+
+  Envoy::RateLimit::DescriptorProducerPtr
+  createDescriptorProducerFromProto(const Protobuf::Message&,
+                                    Server::Configuration::CommonFactoryContext&) override {
+    return return_valid_producer_ ? std::make_unique<Router::SourceClusterAction>() : nullptr;
+  }
+  bool return_valid_producer_{true};
+};
+
+TEST_F(RateLimitPolicyTest, ExtensionDescriptorProducer) {
+  const std::string ExtensionDescriptor = R"EOF(
+actions:
+- extension:
+    name: test.descriptor_producer
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        key: value
+  )EOF";
+
+  {
+    ExtensionDescriptorFactory factory;
+    Registry::InjectFactory<Envoy::RateLimit::DescriptorProducerFactory> registration(factory);
+
+    setupTest(ExtensionDescriptor);
+
+    rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+    EXPECT_THAT(
+        std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"source_cluster", "service_cluster"}}}}),
+        testing::ContainerEq(descriptors_));
+  }
+
+  {
+    ExtensionDescriptorFactory factory;
+    factory.return_valid_producer_ = false;
+    Registry::InjectFactory<Envoy::RateLimit::DescriptorProducerFactory> registration(factory);
+
+    setupTest(ExtensionDescriptor);
+
+    EXPECT_TRUE(
+        absl::StartsWith(creation_status_.message(), "Rate limit descriptor extension failed:"));
+  }
 }
 
 } // namespace

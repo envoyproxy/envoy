@@ -76,8 +76,7 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
       actions_.emplace_back(new Router::QueryParameterValueMatchAction(
           action.query_parameter_value_match(), context));
       break;
-    case ProtoRateLimit::Action::ActionSpecifierCase::kDynamicMetadata:
-    case ProtoRateLimit::Action::ActionSpecifierCase::ACTION_SPECIFIER_NOT_SET:
+    default:
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Unsupported rate limit action: {}", static_cast<int>(action.action_specifier_case())));
       return;
