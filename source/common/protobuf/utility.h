@@ -772,10 +772,7 @@ public:
 
 } // namespace Envoy
 
-namespace std {
-// Inject an implementation of std::hash for Envoy::HashedValue into the std namespace.
-template <> struct hash<Envoy::HashedValue> {
+// Specialize std::hash on Envoy::HashedValue.
+template <> struct std::hash<Envoy::HashedValue> {
   std::size_t operator()(Envoy::HashedValue const& v) const { return v.hash(); }
 };
-
-} // namespace std

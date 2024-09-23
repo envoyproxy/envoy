@@ -8,6 +8,8 @@
 
 #include "test/test_common/utility.h"
 
+using ::testing::PrintToString;
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -26,14 +28,14 @@ void PrintTo(const ResponsePtr& ptr, std::ostream* os) {
 // NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const Response& response, std::ostream* os) {
   (*os) << "\n{\n  check_status: " << int(response.status)
-        << "\n  headers_to_append: " << response.headers_to_append
-        << "\n  headers_to_set: " << response.headers_to_set
-        << "\n  headers_to_add: " << response.headers_to_add
-        << "\n  response_headers_to_add: " << response.response_headers_to_add
-        << "\n  response_headers_to_set: " << response.response_headers_to_set
-        << "\n  headers_to_remove: " << response.headers_to_remove
-        << "\n  query_parameters_to_set: " << response.query_parameters_to_set
-        << "\n  query_parameters_to_remove: " << response.query_parameters_to_remove
+        << "\n  headers_to_append: " << PrintToString(response.headers_to_append)
+        << "\n  headers_to_set: " << PrintToString(response.headers_to_set)
+        << "\n  headers_to_add: " << PrintToString(response.headers_to_add)
+        << "\n  response_headers_to_add: " << PrintToString(response.response_headers_to_add)
+        << "\n  response_headers_to_set: " << PrintToString(response.response_headers_to_set)
+        << "\n  headers_to_remove: " << PrintToString(response.headers_to_remove)
+        << "\n  query_parameters_to_set: " << PrintToString(response.query_parameters_to_set)
+        << "\n  query_parameters_to_remove: " << PrintToString(response.query_parameters_to_remove)
         << "\n  body: " << response.body << "\n  status_code: " << int(response.status_code)
         << "\n  dynamic_metadata: " << response.dynamic_metadata.DebugString() << "\n}\n";
 }
