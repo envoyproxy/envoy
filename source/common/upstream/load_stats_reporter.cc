@@ -26,6 +26,8 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
 }
 
 void LoadStatsReporter::setRetryTimer() {
+  ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.",
+            RETRY_DELAY_MS);
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
 }
 
@@ -150,8 +152,6 @@ void LoadStatsReporter::sendLoadStatsRequest() {
 }
 
 void LoadStatsReporter::handleFailure() {
-  ENVOY_LOG(warn, "Load reporter stats stream/connection failure, will retry in {} ms.",
-            RETRY_DELAY_MS);
   stats_.errors_.inc();
   setRetryTimer();
 }

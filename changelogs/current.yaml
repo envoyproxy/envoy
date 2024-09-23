@@ -71,6 +71,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: lrs
+  change: |
+    Error stat counter is no longer incremented for graceful stream close.  Also decreased the log level for
+    this graceful close to debug from warn.
 - area: tls
   change: |
     Support operations on IP SANs when the IP version is not supported by the host operating system, for example
