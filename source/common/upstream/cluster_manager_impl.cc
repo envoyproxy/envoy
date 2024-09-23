@@ -884,7 +884,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name, const bo
   auto existing_active_cluster = active_clusters_.find(cluster_name);
   if (existing_active_cluster != active_clusters_.end() &&
       existing_active_cluster->second->added_via_api_ &&
-      existing_active_cluster->second->ignore_removal_ == remove_ignored) {
+      (!existing_active_cluster->second->ignore_removal_ || remove_ignored)) {
     removed = true;
     init_helper_.removeCluster(*existing_active_cluster->second);
     active_clusters_.erase(existing_active_cluster);
@@ -913,7 +913,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name, const bo
   auto existing_warming_cluster = warming_clusters_.find(cluster_name);
   if (existing_warming_cluster != warming_clusters_.end() &&
       existing_warming_cluster->second->added_via_api_ &&
-      existing_warming_cluster->second->ignore_removal_ == remove_ignored) {
+      (!existing_warming_cluster->second->ignore_removal_ || remove_ignored)) {
     removed = true;
     init_helper_.removeCluster(*existing_warming_cluster->second);
     warming_clusters_.erase(existing_warming_cluster);
