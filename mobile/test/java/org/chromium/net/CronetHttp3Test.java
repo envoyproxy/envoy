@@ -40,7 +40,7 @@ public class CronetHttp3Test {
 
   // If true, dump envoy logs on test completion.
   // Ideally we could override this from the command line but that's TBD.
-  private boolean printEnvoyLogs = true;
+  private boolean printEnvoyLogs = false;
   // The HTTP/2 server, set up to alt-svc to the HTTP/3 server
   private HttpTestServerFactory.HttpTestServer http2TestServer;
   // The HTTP/3 server
