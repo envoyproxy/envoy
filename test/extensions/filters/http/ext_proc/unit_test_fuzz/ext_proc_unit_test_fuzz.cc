@@ -1,8 +1,8 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
+#include "test/extensions/filters/http/ext_proc/mock_server.h"
 #include "test/extensions/filters/http/ext_proc/unit_test_fuzz/ext_proc_unit_test_fuzz.pb.validate.h"
-#include "test/extensions/filters/http/ext_proc/unit_test_fuzz/mocks.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -88,7 +88,7 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
-  MockClient* client = new MockClient();
+  ExternalProcessing::MockClient* client = new ExternalProcessing::MockClient();
   std::unique_ptr<ExternalProcessing::Filter> filter = std::make_unique<ExternalProcessing::Filter>(
       config, ExternalProcessing::ExternalProcessorClientPtr{client}, proto_config.grpc_service());
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
@@ -100,7 +100,7 @@ DEFINE_PROTO_FUZZER(
                                  const Envoy::Http::AsyncClient::StreamOptions&,
                                  Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&)
                                  -> ExternalProcessing::ExternalProcessorStreamPtr {
-        auto stream = std::make_unique<MockStream>();
+        auto stream = std::make_unique<ExternalProcessing::MockStream>();
         EXPECT_CALL(*stream, send(_, _))
             .WillRepeatedly(Invoke([&](envoy::service::ext_proc::v3::ProcessingRequest&&,
                                        bool) -> void {
