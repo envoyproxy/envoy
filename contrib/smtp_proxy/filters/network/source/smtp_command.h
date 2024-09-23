@@ -25,8 +25,10 @@ public:
       : name_(name), type_(type), time_source_(time_source),
         start_time_(time_source.monotonicTime()) {}
 
-  SmtpCommand(const std::string& name, int resp_code, const std::string msg, std::string details, TimeSource& time_source)
-      : name_(name), response_code_(resp_code), response_(msg), response_code_details_(details), time_source_(time_source) {}
+  SmtpCommand(const std::string& name, int resp_code, const std::string msg, std::string details,
+              TimeSource& time_source)
+      : name_(name), response_code_(resp_code), response_(msg), response_code_details_(details),
+        time_source_(time_source) {}
 
   SmtpCommand::Type getType() { return type_; }
   std::string& getName() { return name_; }

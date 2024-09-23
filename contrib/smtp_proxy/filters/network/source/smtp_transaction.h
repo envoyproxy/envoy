@@ -10,8 +10,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
-#include "contrib/smtp_proxy/filters/network/source/smtp_command.h"
 #include "contrib/smtp_proxy/filters/network/source/smtp_callbacks.h"
+#include "contrib/smtp_proxy/filters/network/source/smtp_command.h"
 #include "contrib/smtp_proxy/filters/network/source/smtp_utils.h"
 
 namespace Envoy {
@@ -48,10 +48,12 @@ public:
   void setErrResponse(const std::string err) { error_resp_ = err; }
   const std::string& getErrResponse() const { return error_resp_; }
 
-  void setErrRespCodeDetails(const std::string resp_code_details) { error_resp_code_details_ = resp_code_details; }
+  void setErrRespCodeDetails(const std::string resp_code_details) {
+    error_resp_code_details_ = resp_code_details;
+  }
 
   void setErrRespCode(int resp_code) { error_resp_code_ = resp_code; }
-  int getErrRespCode() { return error_resp_code_;}
+  int getErrRespCode() { return error_resp_code_; }
 
   void setSender(std::string& sender) { sender_ = sender; }
   std::string& getSender() { return sender_; }

@@ -77,7 +77,6 @@ public:
   static std::string extractAddress(std::string& arg);
 };
 
-
 } // namespace SmtpProxy
 } // namespace NetworkFilters
 } // namespace Extensions

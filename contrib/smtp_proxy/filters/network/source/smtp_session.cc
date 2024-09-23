@@ -187,7 +187,7 @@ SmtpUtils::Result SmtpSession::handleData(std::string& arg) {
 
   if (!transaction_in_progress_ || getTransaction()->getNoOfRecipients() == 0) {
     std::string resp_msg = SmtpUtils::generateResponse(502, {5, 5, 1}, "Missing RCPT TO command");
-    setSessionStatus( SmtpUtils::missing_rcpt_cmd, SmtpUtils::local_5xx_error);
+    setSessionStatus(SmtpUtils::missing_rcpt_cmd, SmtpUtils::local_5xx_error);
     recordLocalRespInSession(SmtpUtils::smtpRcptCommand, 502, resp_msg, SmtpUtils::local_5xx_error);
     callbacks_->sendReplyDownstream(resp_msg);
     callbacks_->getStats().local_5xx_errors_.inc();
@@ -536,7 +536,7 @@ SmtpUtils::Result SmtpSession::handleAuthResponse(int& response_code, std::strin
   } else if (response_code >= 400 && response_code <= 499) {
     callbacks_->getStats().upstream_4xx_auth_.inc();
     setSessionStatus("upstream_4xx_auth", response);
-  }  else if (response_code >= 500 && response_code <= 599) {
+  } else if (response_code >= 500 && response_code <= 599) {
     callbacks_->getStats().upstream_5xx_auth_.inc();
     setSessionStatus("upstream_5xx_auth", response);
   } else if (response_code >= 200 && response_code <= 299) {

@@ -34,7 +34,8 @@ namespace SmtpProxy {
 //   MOCK_METHOD(void, updateBytesMeterOnCommand, (Buffer::Instance & data), (override));
 //   MOCK_METHOD(SmtpUtils::Result, handleCommand, (std::string & command, std::string& args),
 //               (override));
-//   MOCK_METHOD(SmtpUtils::Result, handleResponse, (uint16_t & response_code, std::string& response),
+//   MOCK_METHOD(SmtpUtils::Result, handleResponse, (uint16_t & response_code, std::string&
+//   response),
 //               (override));
 // };
 
@@ -72,7 +73,6 @@ TEST_F(DecoderImplTest, TestParseCommand) {
   data_.add("\r\n");
   EXPECT_EQ(SmtpUtils::Result::ProtocolError, decoder_->parseCommand(data_, command));
   data_.drain(data_.length());
-
 }
 
 TEST_F(DecoderImplTest, TestParseResponse) {
@@ -95,7 +95,6 @@ TEST_F(DecoderImplTest, TestParseResponse) {
   EXPECT_EQ(250, response.resp_code);
   EXPECT_EQ("EHLO localhost\r\nAUTH PLAIN\r\nSTARTTLS", response.msg);
   data_.drain(data_.length());
-
 }
 
 // TEST_F(DecoderImplTest, TestParseCommand) {
@@ -104,7 +103,6 @@ TEST_F(DecoderImplTest, TestParseResponse) {
 //   EXPECT_EQ(SmtpUtils::Result::ReadyForNext, decoder_->parseCommand(*data_));
 //   EXPECT_EQ(data_->length(), 0);
 //   testing::Mock::VerifyAndClearExpectations(session_.get());
-
 
 //   data_->add("EHLO test.com\r\n");
 //   EXPECT_CALL(*session_, isTerminated()).WillOnce(Return(false));
@@ -115,7 +113,6 @@ TEST_F(DecoderImplTest, TestParseResponse) {
 //   EXPECT_EQ(data_->length(), 0);
 //   testing::Mock::VerifyAndClearExpectations(session_.get());
 
-
 //   // SMTP command without CRLF ending - only few bytes received by the filter
 //   data_->add("EHLO test.com");
 
@@ -125,7 +122,6 @@ TEST_F(DecoderImplTest, TestParseResponse) {
 //   EXPECT_EQ(SmtpUtils::Result::NeedMoreData, decoder_->parseCommand(*data_));
 //   EXPECT_EQ(data_->length(), 13);
 
-
 //   //Send remaining part of the command
 //   EXPECT_CALL(*session_, isTerminated()).WillOnce(Return(false));
 //   EXPECT_CALL(*session_, isDataTransferInProgress()).WillOnce(Return(false));
@@ -133,7 +129,6 @@ TEST_F(DecoderImplTest, TestParseResponse) {
 //   EXPECT_EQ(SmtpUtils::Result::ReadyForNext, decoder_->parseCommand(*data_));
 //   EXPECT_EQ(data_->length(), 0);
 //   testing::Mock::VerifyAndClearExpectations(session_.get());
-
 
 //   // Invalid command with mulitple CRLF characters
 //   data_->drain(data_->length());
@@ -168,7 +163,6 @@ TEST_F(DecoderImplTest, TestParseResponse) {
 //   EXPECT_EQ(data_->length(), 0);
 //   testing::Mock::VerifyAndClearExpectations(session_.get());
 
-
 //   // MAIl FROM command
 //   data_->drain(data_->length());
 //   data_->add("MAIL FROM:<abc@xyz.com>\r\n");
@@ -181,7 +175,6 @@ TEST_F(DecoderImplTest, TestParseResponse) {
 //   testing::Mock::VerifyAndClearExpectations(session_.get());
 
 // }
-
 
 /*
   // SMTP command with length < 4 (excluding CRLF)
@@ -327,7 +320,6 @@ TEST_F(DecoderImplTest, TestParseResponse) {
   EXPECT_EQ(SmtpUtils::Result::ReadyForNext, decoder_->parseCommand(*data_));
 */
 // }
-
 
 // TEST_F(DecoderImplTest, TestParseResponse) {
 

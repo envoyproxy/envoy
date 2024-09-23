@@ -36,8 +36,7 @@ public:
                     Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
                     Network::Test::getLoopbackAddressString(GetParam()),
                     std::get<1>(upstream_ssl_config), // upstream SSL transport socket
-                    Network::Test::getAnyAddressString(GetParam()),
-                    tracing_config_string,
+                    Network::Test::getAnyAddressString(GetParam()), tracing_config_string,
                     std::get<0>(downstream_ssl_config),  // downstream SSL termination
                     std::get<0>(upstream_ssl_config),    // upstream_SSL option
                     additional_filters,                  // additional filters to insert after smtp
@@ -47,7 +46,8 @@ public:
   }
 
   SmtpBaseIntegrationTest(SSLConfig downstream_ssl_config, SSLConfig upstream_ssl_config,
-                          std::string additional_filters = "", absl::string_view tracing_config_string = "")
+                          std::string additional_filters = "",
+                          absl::string_view tracing_config_string = "")
       : BaseIntegrationTest(GetParam(), smtpConfig(downstream_ssl_config, upstream_ssl_config,
                                                    additional_filters, tracing_config_string)) {
     skip_tag_extraction_rule_check_ = true;
@@ -149,7 +149,6 @@ TEST_P(BasicSmtpIntegrationTest, NoTls) {
   tcp_client->waitForData(mail_body_resp, true);
   tcp_client->clearData();
 
-
   std::string quit("QUIT\r\n");
   ASSERT_TRUE(tcp_client->write(quit));
   ASSERT_TRUE(fake_upstream_connection->waitForData(quit.size(), &rcvd));
@@ -235,7 +234,8 @@ TEST_P(DownstreamSSLRequiredSmtpIntegrationTest, StarttlsRequired) {
   // EXPECT_EQ(mail, rcvd);
   // rcvd.clear();
 
-  std::string mail_resp("530 5.7.10 plain-text connection is not allowed for this server. Please upgrade the connection to TLS\r\n");
+  std::string mail_resp("530 5.7.10 plain-text connection is not allowed for this server. Please "
+                        "upgrade the connection to TLS\r\n");
   // ASSERT_TRUE(fake_upstream_connection->write(mail_resp));
   tcp_client->waitForData(mail_resp, true);
   tcp_client->clearData();
@@ -245,14 +245,10 @@ TEST_P(DownstreamSSLRequiredSmtpIntegrationTest, StarttlsRequired) {
 
   test_server_->waitForCounterEq("smtp.smtp_stats.session_requests", 1);
   test_server_->waitForCounterEq("smtp.smtp_stats.mail_req_rejected_due_to_non_tls", 1);
-
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLRequiredSmtpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
-
-
-
 
 // Base class for tests with `downstream_ssl` enabled and `starttls` transport socket added.
 class DownstreamSSLSmtpIntegrationTest : public SmtpBaseIntegrationTest {
@@ -309,7 +305,6 @@ TEST_P(DownstreamSSLSmtpIntegrationTest, TerminateSSL) {
   ASSERT_TRUE(fake_upstream_connection->write(ehlo_resp));
   tcp_client->waitForData(ehlo_resp, true);
   tcp_client->clearData();
-
 
   std::string starttls("STARTTLS\r\n");
   ASSERT_TRUE(tcp_client->write(starttls));

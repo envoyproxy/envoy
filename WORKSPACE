@@ -14,7 +14,7 @@ envoy_dependencies()
 
 load("//bazel:repositories_extra.bzl", "envoy_dependencies_extra")
 
-envoy_dependencies_extra(ignore_root_user_error=True)
+envoy_dependencies_extra(ignore_root_user_error = True)
 
 load("//bazel:python_dependencies.bzl", "envoy_python_dependencies")
 

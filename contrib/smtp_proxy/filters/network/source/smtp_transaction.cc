@@ -76,7 +76,6 @@ void SmtpTransaction::emitLog() {
   err_resp_code.set_number_value(error_resp_code_);
   fields["error_resp_code"] = err_resp_code;
 
-
   ProtobufWkt::Value log_type;
   log_type.set_string_value("transaction");
   fields["type"] = log_type;

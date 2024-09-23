@@ -96,14 +96,16 @@ bool SmtpFilter::sendReplyDownstream(absl::string_view response) {
 
 bool SmtpFilter::upstreamTlsEnabled() const {
   return (config_->upstream_tls_ ==
-          envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::ENABLE || config_->upstream_tls_ ==
-          envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::REQUIRE);
+              envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::ENABLE ||
+          config_->upstream_tls_ ==
+              envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::REQUIRE);
 }
 
 bool SmtpFilter::downstreamTlsEnabled() const {
   return (config_->downstream_tls_ ==
-          envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::ENABLE || config_->downstream_tls_ ==
-          envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::REQUIRE);
+              envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::ENABLE ||
+          config_->downstream_tls_ ==
+              envoy::extensions::filters::network::smtp_proxy::v3alpha::SmtpProxy::REQUIRE);
 }
 
 bool SmtpFilter::downstreamTlsRequired() const {

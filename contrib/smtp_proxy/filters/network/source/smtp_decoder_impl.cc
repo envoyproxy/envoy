@@ -113,7 +113,6 @@ SmtpUtils::Result DecoderImpl::parseCommand(Buffer::Instance& data, Command& com
   ENVOY_LOG(debug, "command verb {}", command.verb);
   ENVOY_LOG(debug, "command args {}", command.args);
 
-
   data.drain(data.length());
   return result;
 }
@@ -184,19 +183,18 @@ SmtpUtils::Result DecoderImpl::parseResponse(Buffer::Instance& data, Response& r
     // Separator can be either ' ' or '-'
     char separator = ' ';
     if (!current_line.empty() && current_line != SmtpUtils::CRLF.data()) {
-        separator = current_line[0];
-        if (separator != ' ' && separator != '-') {
-            return SmtpUtils::Result::ProtocolError;
-        }
-        // Remove the first character from line
-        current_line = current_line.erase(0, 1);
-        response_msg += current_line;
+      separator = current_line[0];
+      if (separator != ' ' && separator != '-') {
+        return SmtpUtils::Result::ProtocolError;
+      }
+      // Remove the first character from line
+      current_line = current_line.erase(0, 1);
+      response_msg += current_line;
     }
 
-    if(separator == ' ') {
+    if (separator == ' ') {
       break; // We reached last line of reply.
     }
-
   }
 
   response.len = respose_len;

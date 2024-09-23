@@ -17,7 +17,7 @@ namespace SmtpProxy {
 // SMTP message decoder.
 class Decoder {
 public:
- struct Command {
+  struct Command {
     std::string verb;
     std::string args;
     size_t len;
@@ -43,8 +43,7 @@ class DecoderImpl : public Decoder, Logger::Loggable<Logger::Id::filter> {
 public:
   DecoderImpl() = default;
 
-  ~DecoderImpl() {
-  }
+  ~DecoderImpl() {}
   // void setSession(SmtpSession* session) { session_ = session; }
   // SmtpUtils::Result onData(Buffer::Instance& data, bool upstream) override;
   // SmtpSession* getSession() override { return session_; }
@@ -52,7 +51,7 @@ public:
   SmtpUtils::Result parseResponse(Buffer::Instance& data, Response& response) override;
   SmtpUtils::Result getLine(Buffer::Instance& data, size_t max_line, std::string& line_out);
   SmtpUtils::Result isValidSmtpLine(Buffer::Instance& data, size_t max_len, std::string& output);
-// protected:
+  // protected:
   // DecoderCallbacks* callbacks_{};
   // SmtpSession* session_;
   // Buffer::OwnedImpl response_;

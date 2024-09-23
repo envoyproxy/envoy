@@ -40,11 +40,11 @@ namespace SmtpProxy {
   COUNTER(upstream_5xx_data)                                                                       \
   COUNTER(upstream_5xx_auth)                                                                       \
   COUNTER(local_5xx_errors)                                                                        \
-  COUNTER(local_5xx_missing_ehlo)                                                                        \
-  COUNTER(local_5xx_missing_mail)                                                                        \
-  COUNTER(local_5xx_missing_rcpt)                                                                        \
-  COUNTER(local_5xx_duplilcate_auth)                                                                        \
-  COUNTER(local_5xx_duplilcate_starttls)                                                                        \
+  COUNTER(local_5xx_missing_ehlo)                                                                  \
+  COUNTER(local_5xx_missing_mail)                                                                  \
+  COUNTER(local_5xx_missing_rcpt)                                                                  \
+  COUNTER(local_5xx_duplilcate_auth)                                                               \
+  COUNTER(local_5xx_duplilcate_starttls)                                                           \
   COUNTER(passthrough_sessions)                                                                    \
   COUNTER(protocol_parse_error)                                                                    \
   COUNTER(bad_cmd_sequence)                                                                        \

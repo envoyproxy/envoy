@@ -5,8 +5,9 @@
 
 #include "source/common/common/logger.h"
 
-#include "contrib/smtp_proxy/filters/network/source/smtp_command.h"
 #include "contrib/smtp_proxy/filters/network/source/smtp_callbacks.h"
+#include "contrib/smtp_proxy/filters/network/source/smtp_command.h"
+
 // #include "contrib/smtp_proxy/filters/network/source/smtp_handler.h"
 #include "contrib/smtp_proxy/filters/network/source/smtp_transaction.h"
 
@@ -49,7 +50,7 @@ public:
   SmtpSession(DecoderCallbacks* callbacks, TimeSource& time_source,
               Random::RandomGenerator& random_generator);
 
- virtual ~SmtpSession() {
+  virtual ~SmtpSession() {
 
     if (state_ != SmtpSession::State::SessionTerminated) {
       terminateSession(SmtpUtils::connectionClose, SmtpUtils::terminatedByEnvoyMsg);
@@ -64,7 +65,6 @@ public:
 
   void setStatus(std::string status) { status_ = status; }
   std::string& getStatus() { return status_; }
-
 
   SmtpTransaction* getTransaction() { return smtp_transaction_; }
   void createNewTransaction();
@@ -110,8 +110,10 @@ public:
   void handleDownstreamTls();
 
   void newCommand(const std::string& name, SmtpCommand::Type type);
-  void recordLocalRespInSession(const std::string& command, int resp_code, std::string resp, std::string resp_code_details);
-  SmtpUtils::Result storeResponse(std::string response, std::string resp_code_details, int response_code, SmtpCommand::ResponseType resp_type);
+  void recordLocalRespInSession(const std::string& command, int resp_code, std::string resp,
+                                std::string resp_code_details);
+  SmtpUtils::Result storeResponse(std::string response, std::string resp_code_details,
+                                  int response_code, SmtpCommand::ResponseType resp_type);
   std::string& getResponseOnHold() { return response_on_hold_; }
   void setResponseOnHold(std::string& resp) { response_on_hold_ = resp; }
   bool isDataTransferInProgress() { return data_transfer_in_progress_; }
