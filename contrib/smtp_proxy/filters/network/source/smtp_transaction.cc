@@ -13,7 +13,8 @@ SmtpTransaction::SmtpTransaction(std::string& session_id, DecoderCallbacks* call
                                  TimeSource& time_source, Random::RandomGenerator& random_generator)
     : session_id_(session_id), callbacks_(callbacks), time_source_(time_source),
       random_generator_(random_generator),
-      stream_info_(time_source_, callbacks_->connection().connectionInfoProviderSharedPtr(), StreamInfo::FilterState::LifeSpan::FilterChain) {
+      stream_info_(time_source_, callbacks_->connection().connectionInfoProviderSharedPtr(),
+                   StreamInfo::FilterState::LifeSpan::FilterChain) {
 
   trxn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       callbacks_->getStats().transaction_length_, time_source_);
