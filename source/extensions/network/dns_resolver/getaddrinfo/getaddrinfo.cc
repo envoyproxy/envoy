@@ -172,20 +172,22 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
           (*num_retries)--;
         }
         if (!num_retries.has_value()) {
+          next_query->addDetail("retrying");
           ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
           pending_queries_.push_back({std::move(next_query), absl::nullopt});
           continue;
         }
         if (*num_retries > 0) {
+          next_query->addDetail("retrying");
           ENVOY_LOG(debug, "retrying query [{}], num_retries: {}", next_query->dns_name_,
                     *num_retries);
           pending_queries_.push_back({std::move(next_query), *num_retries});
           continue;
         }
+        next_query->addDetail("done_retrying");
         ENVOY_LOG(debug, "not retrying query [{}] because num_retries: {}", next_query->dns_name_,
                   *num_retries);
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
-        next_query->addDetail("retrying");
       } else if (treat_nodata_noname_as_success &&
                  (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA)) {
         // Treat NONAME and NODATA as DNS records with no results.
