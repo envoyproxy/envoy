@@ -14,7 +14,6 @@
 
 from datetime import datetime
 import os
-import sys
 from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 
