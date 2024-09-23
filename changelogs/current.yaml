@@ -47,6 +47,13 @@ behavior_changes:
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
     See the config examples from the above ``internal_address_config`` link. This default no trust internal address can be turned on by
     setting runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` to ``true``.
+- area: http
+  change: |
+    The access log handlers that added by the filters will be evaluated before the access
+    log handlers that configured in the :ref:`access_log configuration
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log>`.
+    This change can be disabled by setting the runtime guard flag
+    ``envoy.reloadable_features.filter_access_loggers_first`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -173,6 +180,11 @@ bug_fixes:
 - area: http_async_client
   change: |
     Fixed the local reply and destroy order crashes when using the http async client for websocket handshake.
+- area: http3
+  change: |
+    Fixed a bug in the CONNECT-UDP forwarding mode where Envoy reset the upstream stream when it
+    received HTTP/3 datagrams before receiving the SETTINGS frame from the upstream peer. Envoy now
+    drops the datagrams in this case instead of resetting the stream.
 - area: oauth
   change: |
     Set token cookies in response regardless of :ref:`forward_bearer_token
@@ -392,6 +404,10 @@ new_features:
     Added support to provide an override
     :ref:`authentication_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.authentication_header>`
     to load Basic Auth credential.
+- area: quic
+  change: |
+    Added ``max_packet_length`` to the QUIC protocol options to allow users to change the largest
+    size of a QUIC packet that can be transmitted over the QUIC connection.
 - area: oauth
   change: |
     Added :ref:`disable_access_token_set_cookie
