@@ -35,6 +35,13 @@ public:
    * @param reason supplies the cancel reason.
    */
   virtual void cancel(CancelReason reason) PURE;
+  /** Add the detail for the DNS query. */
+  void addDetail(absl::string_view detail) { details_.emplace_back(detail); }
+  /** Returns the details of the DNS query. */
+  const std::vector<std::string>& getDetails() const { return details_; }
+
+private:
+  std::vector<std::string> details_;
 };
 
 /**
