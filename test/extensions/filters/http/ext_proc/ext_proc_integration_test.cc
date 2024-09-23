@@ -4721,7 +4721,7 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideDisallowed) {
       });
 
   // ext_proc server still receive the body message even though body mode override was set to
-  // ProcessingMode::NONE. It is because that ProcessingMode::NONE was in allow list.
+  // ProcessingMode::NONE. It is because that ProcessingMode::NONE was not in allow list.
   processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
     EXPECT_TRUE(body.end_of_stream());
     return true;
