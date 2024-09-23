@@ -1,11 +1,4049 @@
---- a/src/google/protobuf/util/converter/port_def.inc	2024-01-04 20:39:52.910353189 +0000
-+++ b/src/google/protobuf/util/converter/port_def.inc	2024-01-04 20:39:02.134416756 +0000
-@@ -415,7 +415,7 @@
+diff --git a/src/google/protobuf/stubs/BUILD.bazel b/src/google/protobuf/stubs/BUILD.bazel
+index a7b8c82..4f66827 100644
+--- a/src/google/protobuf/stubs/BUILD.bazel
++++ b/src/google/protobuf/stubs/BUILD.bazel
+@@ -27,13 +27,11 @@ cc_library(
+     name = "lite",
+     srcs = [
+         "bytestream.cc",
+-        "common.cc",
+         "strutil.cc",
+     ],
+     hdrs = [
+         "bytestream.h",
+         "callback.h",
+-        "common.h",
+         "platform_macros.h",
+         "port.h",
+         "status_macros.h",
+@@ -43,7 +41,7 @@ cc_library(
+     include_prefix = "google/protobuf/stubs",
+     linkopts = LINK_OPTS,
+     deps = [
+-        "//src/google/protobuf/util/converter:port_def",
++        "@com_google_absl//absl/base:core_headers",
+         "@com_google_absl//absl/log:absl_check",
+         "@com_google_absl//absl/log:absl_log",
+         "@com_google_absl//absl/status",
+@@ -62,14 +60,12 @@ cc_library(
+     include_prefix = "google/protobuf/stubs",
+     textual_hdrs = [
+         "callback.h",
+-        "common.h",
+         "platform_macros.h",
+         "port.h",
+         "status_macros.h",
+     ],
+     deps = [
+         ":lite",
+-        "//src/google/protobuf/util/converter:port_def",
+         "@com_google_absl//absl/status",
+         "@com_google_absl//absl/status:statusor",
+         "@com_google_absl//absl/strings",
+@@ -80,7 +76,6 @@ cc_test(
+     name = "stubs_test",
+     srcs = [
+         "bytestream_unittest.cc",
+-        "common_unittest.cc",
+         "strutil_unittest.cc",
+     ],
+     copts = COPTS + select({
+diff --git a/src/google/protobuf/stubs/bytestream.h b/src/google/protobuf/stubs/bytestream.h
+index 9d08463..e3372cb 100644
+--- a/src/google/protobuf/stubs/bytestream.h
++++ b/src/google/protobuf/stubs/bytestream.h
+@@ -43,10 +43,6 @@
+ #include "absl/log/absl_check.h"
+ #include "absl/log/absl_log.h"
+ #include "absl/strings/string_view.h"
+-#include "google/protobuf/stubs/common.h"
+-
+-// Must be last.
+-#include "google/protobuf/util/converter/port_def.inc"  // NOLINT
  
- // The minimum library version which works with the current version of the
- // headers.
+ class CordByteSink;
+ 
+@@ -65,7 +61,7 @@ namespace strings {
+ //   sink->Append(my_data.data(), my_data.size());
+ //   sink->Flush();
+ //
+-class PROTOBUF_EXPORT ByteSink {
++class ByteSink {
+  public:
+   ByteSink() {}
+   ByteSink(const ByteSink&) = delete;
+@@ -93,7 +89,7 @@ class PROTOBUF_EXPORT ByteSink {
+ //     source->Skip(data.length());
+ //   }
+ //
+-class PROTOBUF_EXPORT ByteSource {
++class ByteSource {
+  public:
+   ByteSource() {}
+   ByteSource(const ByteSource&) = delete;
+@@ -149,7 +145,7 @@ class PROTOBUF_EXPORT ByteSource {
+ //   sink.Append("hi", 2);    // OK
+ //   sink.Append(data, 100);  // WOOPS! Overflows buf[10].
+ //
+-class PROTOBUF_EXPORT UncheckedArrayByteSink : public ByteSink {
++class UncheckedArrayByteSink : public ByteSink {
+  public:
+   UncheckedArrayByteSink(const UncheckedArrayByteSink&) = delete;
+   UncheckedArrayByteSink& operator=(const UncheckedArrayByteSink&) = delete;
+@@ -178,7 +174,7 @@ class PROTOBUF_EXPORT UncheckedArrayByteSink : public ByteSink {
+ //   sink.Append("hi", 2);    // OK
+ //   sink.Append(data, 100);  // Will only write 8 more bytes
+ //
+-class PROTOBUF_EXPORT CheckedArrayByteSink : public ByteSink {
++class CheckedArrayByteSink : public ByteSink {
+  public:
+   CheckedArrayByteSink(char* outbuf, size_t capacity);
+   CheckedArrayByteSink(const CheckedArrayByteSink&) = delete;
+@@ -215,7 +211,7 @@ class PROTOBUF_EXPORT CheckedArrayByteSink : public ByteSink {
+ //   const char* buf = sink.GetBuffer();  // Ownership transferred
+ //   delete[] buf;
+ //
+-class PROTOBUF_EXPORT GrowingArrayByteSink : public strings::ByteSink {
++class GrowingArrayByteSink : public strings::ByteSink {
+  public:
+   explicit GrowingArrayByteSink(size_t estimated_size);
+   GrowingArrayByteSink(const GrowingArrayByteSink&) = delete;
+@@ -246,7 +242,7 @@ class PROTOBUF_EXPORT GrowingArrayByteSink : public strings::ByteSink {
+ //   sink.Append("World", 5);
+ //   assert(dest == "Hello World");
+ //
+-class PROTOBUF_EXPORT StringByteSink : public ByteSink {
++class StringByteSink : public ByteSink {
+  public:
+   explicit StringByteSink(std::string* dest) : dest_(dest) {}
+   StringByteSink(const StringByteSink&) = delete;
+@@ -264,7 +260,7 @@ class PROTOBUF_EXPORT StringByteSink : public ByteSink {
+ //   NullByteSink sink;
+ //   sink.Append(data, data.size());  // All data ignored.
+ //
+-class PROTOBUF_EXPORT NullByteSink : public ByteSink {
++class NullByteSink : public ByteSink {
+  public:
+   NullByteSink() {}
+   NullByteSink(const NullByteSink&) = delete;
+@@ -285,7 +281,7 @@ class PROTOBUF_EXPORT NullByteSink : public ByteSink {
+ //   assert(source.Available() == 5);
+ //   assert(source.Peek() == "Hello");
+ //
+-class PROTOBUF_EXPORT ArrayByteSource : public ByteSource {
++class ArrayByteSource : public ByteSource {
+  public:
+   explicit ArrayByteSource(absl::string_view s) : input_(s) {}
+   ArrayByteSource(const ArrayByteSource&) = delete;
+@@ -317,7 +313,7 @@ class PROTOBUF_EXPORT ArrayByteSource : public ByteSource {
+ //   assert(limit.Available() == 5);
+ //   assert(limit.Peek() == "Hello");
+ //
+-class PROTOBUF_EXPORT LimitByteSource : public ByteSource {
++class LimitByteSource : public ByteSource {
+  public:
+   // Returns at most "limit" bytes from "source".
+   LimitByteSource(ByteSource* source, size_t limit);
+@@ -339,6 +335,4 @@ class PROTOBUF_EXPORT LimitByteSource : public ByteSource {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"  // NOLINT
+-
+ #endif  // GOOGLE_PROTOBUF_STUBS_BYTESTREAM_H_
+\ No newline at end of file
+diff --git a/src/google/protobuf/stubs/callback.h b/src/google/protobuf/stubs/callback.h
+index 112dfca..daa6901 100644
+--- a/src/google/protobuf/stubs/callback.h
++++ b/src/google/protobuf/stubs/callback.h
+@@ -19,8 +19,6 @@
+ 
+ #include <type_traits>
+ 
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ // ===================================================================
+ // emulates google3/base/callback.h
+ 
+@@ -84,7 +82,7 @@ namespace protobuf {
+ //   std::string my_str;
+ //   NewCallback(&Foo, my_str);  // WON'T WORK:  Can't use references.
+ // However, correctly-typed pointers will work just fine.
+-class PROTOBUF_EXPORT Closure {
++class Closure {
+  public:
+   Closure() {}
+   Closure(const Closure&) = delete;
+@@ -106,7 +104,7 @@ class ResultCallback {
+ };
+ 
+ template <typename R, typename A1>
+-class PROTOBUF_EXPORT ResultCallback1 {
++class ResultCallback1 {
+  public:
+   ResultCallback1() {}
+   ResultCallback1(const ResultCallback1&) = delete;
+@@ -117,7 +115,7 @@ class PROTOBUF_EXPORT ResultCallback1 {
+ };
+ 
+ template <typename R, typename A1, typename A2>
+-class PROTOBUF_EXPORT ResultCallback2 {
++class ResultCallback2 {
+  public:
+   ResultCallback2() {}
+   ResultCallback2(const ResultCallback2&) = delete;
+@@ -129,7 +127,7 @@ class PROTOBUF_EXPORT ResultCallback2 {
+ 
+ namespace internal {
+ 
+-class PROTOBUF_EXPORT FunctionClosure0 : public Closure {
++class FunctionClosure0 : public Closure {
+  public:
+   typedef void (*FunctionType)();
+ 
+@@ -583,11 +581,9 @@ inline ResultCallback2<R, A1, A2>* NewPermanentCallback(
+ 
+ // A function which does nothing.  Useful for creating no-op callbacks, e.g.:
+ //   Closure* nothing = NewCallback(&DoNothing);
+-void PROTOBUF_EXPORT DoNothing();
++void DoNothing();
+ 
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_STUBS_CALLBACK_H_
+diff --git a/src/google/protobuf/stubs/common.cc b/src/google/protobuf/stubs/common.cc
+deleted file mode 100644
+index 2b3efb8..0000000
+--- a/src/google/protobuf/stubs/common.cc
++++ /dev/null
+@@ -1,147 +0,0 @@
+-// Copyright 2023 Google LLC
+-//
+-// Licensed under the Apache License, Version 2.0 (the "License");
+-// you may not use this file except in compliance with the License.
+-// You may obtain a copy of the License at
+-//
+-//     http://www.apache.org/licenses/LICENSE-2.0
+-//
+-// Unless required by applicable law or agreed to in writing, software
+-// distributed under the License is distributed on an "AS IS" BASIS,
+-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-// See the License for the specific language governing permissions and
+-// limitations under the License.
+-
+-#include "google/protobuf/stubs/common.h"
+-
+-#include <errno.h>
+-#include <stdio.h>
+-
+-#include <atomic>
+-#include <sstream>
+-#include <vector>
+-
+-#ifdef _WIN32
+-#ifndef WIN32_LEAN_AND_MEAN
+-#define WIN32_LEAN_AND_MEAN  // We only need minimal includes
+-#endif
+-#include <windows.h>
+-#define snprintf _snprintf    // see comment in strutil.cc
+-#endif
+-#if defined(__ANDROID__)
+-#include <android/log.h>
+-#endif
+-
+-#include "absl/log/absl_log.h"
+-#include "absl/status/status.h"
+-#include "absl/strings/str_cat.h"
+-#include "absl/strings/string_view.h"
+-#include "google/protobuf/stubs/callback.h"
+-
+-// Must be last.
+-#include "google/protobuf/util/converter/port_def.inc"  // NOLINT
+-
+-namespace google {
+-namespace protobuf {
+-
+-namespace internal {
+-
+-void VerifyVersion(int headerVersion,
+-                   int minLibraryVersion,
+-                   const char* filename) {
+-  if (GOOGLE_PROTOBUF_VERSION < minLibraryVersion) {
+-    // Library is too old for headers.
+-    ABSL_LOG(FATAL)
+-        << "This program requires version " << VersionString(minLibraryVersion)
+-        << " of the Protocol Buffer runtime library, but the installed version "
+-           "is "
+-        << VersionString(GOOGLE_PROTOBUF_VERSION)
+-        << ".  Please update "
+-           "your library.  If you compiled the program yourself, make sure "
+-           "that "
+-           "your headers are from the same version of Protocol Buffers as your "
+-           "link-time library.  (Version verification failed in \""
+-        << filename << "\".)";
+-  }
+-  if (headerVersion < kMinHeaderVersionForLibrary) {
+-    // Headers are too old for library.
+-    ABSL_LOG(FATAL)
+-        << "This program was compiled against version "
+-        << VersionString(headerVersion)
+-        << " of the Protocol Buffer runtime "
+-           "library, which is not compatible with the installed version ("
+-        << VersionString(GOOGLE_PROTOBUF_VERSION)
+-        << ").  Contact the program "
+-           "author for an update.  If you compiled the program yourself, make "
+-           "sure that your headers are from the same version of Protocol "
+-           "Buffers "
+-           "as your link-time library.  (Version verification failed in \""
+-        << filename << "\".)";
+-  }
+-}
+-
+-std::string VersionString(int version) {
+-  int major = version / 1000000;
+-  int minor = (version / 1000) % 1000;
+-  int micro = version % 1000;
+-
+-  // 128 bytes should always be enough, but we use snprintf() anyway to be
+-  // safe.
+-  char buffer[128];
+-  snprintf(buffer, sizeof(buffer), "%d.%d.%d", major, minor, micro);
+-
+-  // Guard against broken MSVC snprintf().
+-  buffer[sizeof(buffer)-1] = '\0';
+-
+-  return buffer;
+-}
+-
+-std::string ProtocVersionString(int version) {
+-  int minor = (version / 1000) % 1000;
+-  int micro = version % 1000;
+-
+-  // 128 bytes should always be enough, but we use snprintf() anyway to be
+-  // safe.
+-  char buffer[128];
+-  snprintf(buffer, sizeof(buffer), "%d.%d", minor, micro);
+-
+-  // Guard against broken MSVC snprintf().
+-  buffer[sizeof(buffer) - 1] = '\0';
+-
+-  return buffer;
+-}
+-
+-}  // namespace internal
+-
+-
+-// ===================================================================
+-// emulates google3/base/callback.cc
+-
+-Closure::~Closure() {}
+-
+-namespace internal { FunctionClosure0::~FunctionClosure0() {} }
+-
+-void DoNothing() {}
+-
+-// ===================================================================
+-// emulates google3/util/endian/endian.h
+-//
+-// TODO(xiaofeng): PROTOBUF_LITTLE_ENDIAN is unfortunately defined in
+-// google/protobuf/io/coded_stream.h and therefore can not be used here.
+-// Maybe move that macro definition here in the future.
+-uint32_t ghtonl(uint32_t x) {
+-  union {
+-    uint32_t result;
+-    uint8_t result_array[4];
+-  };
+-  result_array[0] = static_cast<uint8_t>(x >> 24);
+-  result_array[1] = static_cast<uint8_t>((x >> 16) & 0xFF);
+-  result_array[2] = static_cast<uint8_t>((x >> 8) & 0xFF);
+-  result_array[3] = static_cast<uint8_t>(x & 0xFF);
+-  return result;
+-}
+-
+-}  // namespace protobuf
+-}  // namespace google
+-
+-#include "google/protobuf/util/converter/port_undef.inc"  // NOLINT
+diff --git a/src/google/protobuf/stubs/common.h b/src/google/protobuf/stubs/common.h
+deleted file mode 100644
+index 94fe003..0000000
+--- a/src/google/protobuf/stubs/common.h
++++ /dev/null
+@@ -1,114 +0,0 @@
+-/*
+- * Copyright 2023 Google LLC
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *     http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#ifndef GOOGLE_PROTOBUF_COMMON_H__
+-#define GOOGLE_PROTOBUF_COMMON_H__
+-
+-#include <algorithm>
+-#include <iostream>
+-#include <memory>
+-#include <string>
+-#include <vector>
+-
+-#include "absl/strings/string_view.h"
+-#include "google/protobuf/stubs/platform_macros.h"
+-#include "google/protobuf/stubs/port.h"
+-
+-#if defined(__APPLE__)
+-#include <TargetConditionals.h>  // for TARGET_OS_IPHONE
+-#endif
+-
+-#if defined(__ANDROID__) || defined(GOOGLE_PROTOBUF_OS_ANDROID) || (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE) || defined(GOOGLE_PROTOBUF_OS_IPHONE)
+-#include <pthread.h>
+-#endif
+-
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+-namespace std {}
+-
+-namespace google {
+-namespace protobuf {
+-namespace internal {
+-
+-// Some of these constants are macros rather than const ints so that they can
+-// be used in #if directives.
+-
+-// The current version, represented as a single integer to make comparison
+-// easier:  major * 10^6 + minor * 10^3 + micro
+-#define GOOGLE_PROTOBUF_VERSION 4022003
+-
+-// A suffix string for alpha, beta or rc releases. Empty for stable releases.
+-#define GOOGLE_PROTOBUF_VERSION_SUFFIX ""
+-
+-// The minimum header version which works with the current version of
+-// the library.  This constant should only be used by protoc's C++ code
+-// generator.
+-static const int kMinHeaderVersionForLibrary = 3021000;
+-
+-// The minimum protoc version which works with the current version of the
+-// headers.
+-#define GOOGLE_PROTOBUF_MIN_PROTOC_VERSION 3021000
+-
+-// The minimum header version which works with the current version of
+-// protoc.  This constant should only be used in VerifyVersion().
+-static const int kMinHeaderVersionForProtoc = 3021000;
+-
+-// Verifies that the headers and libraries are compatible.  Use the macro
+-// below to call this.
+-void PROTOBUF_EXPORT VerifyVersion(int headerVersion, int minLibraryVersion,
+-                                   const char* filename);
+-
+-// Converts a numeric version number to a string.
+-std::string PROTOBUF_EXPORT
+-VersionString(int version);  // NOLINT(runtime/string)
+-
+-// Prints the protoc compiler version (no major version)
+-std::string PROTOBUF_EXPORT
+-ProtocVersionString(int version);  // NOLINT(runtime/string)
+-
+-}  // namespace internal
+-
+-// Place this macro in your main() function (or somewhere before you attempt
+-// to use the protobuf library) to verify that the version you link against
+-// matches the headers you compiled against.  If a version mismatch is
+-// detected, the process will abort.
+-#define GOOGLE_PROTOBUF_VERIFY_VERSION                                    \
+-  ::google::protobuf::internal::VerifyVersion(                            \
+-    GOOGLE_PROTOBUF_VERSION, GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION,         \
+-    __FILE__)
+-
+-
+-// This lives in message_lite.h now, but we leave this here for any users that
+-// #include common.h and not message_lite.h.
+-PROTOBUF_EXPORT void ShutdownProtobufLibrary();
+-
+-namespace internal {
+-
+-// Strongly references the given variable such that the linker will be forced
+-// to pull in this variable's translation unit.
+-template <typename T>
+-void StrongReference(const T& var) {
+-  auto volatile unused = &var;
+-  (void)&unused;  // Use address to avoid an extra load of "unused".
+-}
+-
+-}  // namespace internal
+-}  // namespace protobuf
+-}  // namespace google
+-
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+-#endif  // GOOGLE_PROTOBUF_COMMON_H__
+diff --git a/src/google/protobuf/stubs/common_unittest.cc b/src/google/protobuf/stubs/common_unittest.cc
+deleted file mode 100644
+index 10d3c27..0000000
+--- a/src/google/protobuf/stubs/common_unittest.cc
++++ /dev/null
+@@ -1,257 +0,0 @@
+-// Copyright 2023 Google LLC
+-//
+-// Licensed under the Apache License, Version 2.0 (the "License");
+-// you may not use this file except in compliance with the License.
+-// You may obtain a copy of the License at
+-//
+-//     http://www.apache.org/licenses/LICENSE-2.0
+-//
+-// Unless required by applicable law or agreed to in writing, software
+-// distributed under the License is distributed on an "AS IS" BASIS,
+-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-// See the License for the specific language governing permissions and
+-// limitations under the License.
+-
+-#include "google/protobuf/stubs/common.h"
+-
+-#include <gtest/gtest.h>
+-
+-#include <vector>
+-
+-#include "absl/log/absl_log.h"
+-#include "absl/strings/ascii.h"
+-#include "absl/strings/substitute.h"
+-#include "google/protobuf/stubs/callback.h"
+-#include "google/protobuf/testing/googletest.h"
+-
+-namespace google {
+-namespace protobuf {
+-namespace {
+-
+-// TODO(kenton):  More tests.
+-
+-#ifdef PACKAGE_VERSION  // only defined when using automake, not MSVC
+-
+-TEST(VersionTest, VersionMatchesConfig) {
+-  // Verify that the version string specified in config.h matches the one
+-  // in common.h.  The config.h version is a string which may have a suffix
+-  // like "beta" or "rc1", so we remove that.
+-  std::string version = PACKAGE_VERSION;
+-  int pos = 0;
+-  while (pos < version.size() &&
+-         (absl::ascii_isdigit(version[pos]) || version[pos] == '.')) {
+-    ++pos;
+-  }
+-  version.erase(pos);
+-
+-  EXPECT_EQ(version, internal::VersionString(GOOGLE_PROTOBUF_VERSION));
+-}
+-
+-#endif  // PACKAGE_VERSION
+-
+-TEST(CommonTest, IntMinMaxConstants) {
+-  // kint32min was declared incorrectly in the first release of protobufs.
+-  // Ugh.
+-  EXPECT_LT(kint32min, kint32max);
+-  EXPECT_EQ(static_cast<uint32>(kint32min), static_cast<uint32>(kint32max) + 1);
+-  EXPECT_LT(kint64min, kint64max);
+-  EXPECT_EQ(static_cast<uint64>(kint64min), static_cast<uint64>(kint64max) + 1);
+-  EXPECT_EQ(0, kuint32max + 1);
+-  EXPECT_EQ(0, kuint64max + 1);
+-}
+-
+-class ClosureTest : public testing::Test {
+- public:
+-  void SetA123Method()   { a_ = 123; }
+-  static void SetA123Function() { current_instance_->a_ = 123; }
+-
+-  void SetAMethod(int a)         { a_ = a; }
+-  void SetCMethod(std::string c) { c_ = c; }
+-
+-  static void SetAFunction(int a)         { current_instance_->a_ = a; }
+-  static void SetCFunction(std::string c) { current_instance_->c_ = c; }
+-
+-  void SetABMethod(int a, const char* b)  { a_ = a; b_ = b; }
+-  static void SetABFunction(int a, const char* b) {
+-    current_instance_->a_ = a;
+-    current_instance_->b_ = b;
+-  }
+-
+-  virtual void SetUp() {
+-    current_instance_ = this;
+-    a_ = 0;
+-    b_ = nullptr;
+-    c_.clear();
+-    permanent_closure_ = nullptr;
+-  }
+-
+-  void DeleteClosureInCallback() {
+-    delete permanent_closure_;
+-  }
+-
+-  int a_;
+-  const char* b_;
+-  std::string c_;
+-  Closure* permanent_closure_;
+-
+-  static ClosureTest* current_instance_;
+-};
+-
+-ClosureTest* ClosureTest::current_instance_ = nullptr;
+-
+-TEST_F(ClosureTest, TestClosureFunction0) {
+-  Closure* closure = NewCallback(&SetA123Function);
+-  EXPECT_NE(123, a_);
+-  closure->Run();
+-  EXPECT_EQ(123, a_);
+-}
+-
+-TEST_F(ClosureTest, TestClosureMethod0) {
+-  Closure* closure = NewCallback(current_instance_,
+-                                 &ClosureTest::SetA123Method);
+-  EXPECT_NE(123, a_);
+-  closure->Run();
+-  EXPECT_EQ(123, a_);
+-}
+-
+-TEST_F(ClosureTest, TestClosureFunction1) {
+-  Closure* closure = NewCallback(&SetAFunction, 456);
+-  EXPECT_NE(456, a_);
+-  closure->Run();
+-  EXPECT_EQ(456, a_);
+-}
+-
+-TEST_F(ClosureTest, TestClosureMethod1) {
+-  Closure* closure = NewCallback(current_instance_,
+-                                 &ClosureTest::SetAMethod, 456);
+-  EXPECT_NE(456, a_);
+-  closure->Run();
+-  EXPECT_EQ(456, a_);
+-}
+-
+-TEST_F(ClosureTest, TestClosureFunction1String) {
+-  Closure* closure = NewCallback(&SetCFunction, std::string("test"));
+-  EXPECT_NE("test", c_);
+-  closure->Run();
+-  EXPECT_EQ("test", c_);
+-}
+-
+-TEST_F(ClosureTest, TestClosureMethod1String) {
+-  Closure* closure = NewCallback(current_instance_, &ClosureTest::SetCMethod,
+-                                 std::string("test"));
+-  EXPECT_NE("test", c_);
+-  closure->Run();
+-  EXPECT_EQ("test", c_);
+-}
+-
+-TEST_F(ClosureTest, TestClosureFunction2) {
+-  const char* cstr = "hello";
+-  Closure* closure = NewCallback(&SetABFunction, 789, cstr);
+-  EXPECT_NE(789, a_);
+-  EXPECT_NE(cstr, b_);
+-  closure->Run();
+-  EXPECT_EQ(789, a_);
+-  EXPECT_EQ(cstr, b_);
+-}
+-
+-TEST_F(ClosureTest, TestClosureMethod2) {
+-  const char* cstr = "hello";
+-  Closure* closure = NewCallback(current_instance_,
+-                                 &ClosureTest::SetABMethod, 789, cstr);
+-  EXPECT_NE(789, a_);
+-  EXPECT_NE(cstr, b_);
+-  closure->Run();
+-  EXPECT_EQ(789, a_);
+-  EXPECT_EQ(cstr, b_);
+-}
+-
+-// Repeat all of the above with NewPermanentCallback()
+-
+-TEST_F(ClosureTest, TestPermanentClosureFunction0) {
+-  Closure* closure = NewPermanentCallback(&SetA123Function);
+-  EXPECT_NE(123, a_);
+-  closure->Run();
+-  EXPECT_EQ(123, a_);
+-  a_ = 0;
+-  closure->Run();
+-  EXPECT_EQ(123, a_);
+-  delete closure;
+-}
+-
+-TEST_F(ClosureTest, TestPermanentClosureMethod0) {
+-  Closure* closure = NewPermanentCallback(current_instance_,
+-                                          &ClosureTest::SetA123Method);
+-  EXPECT_NE(123, a_);
+-  closure->Run();
+-  EXPECT_EQ(123, a_);
+-  a_ = 0;
+-  closure->Run();
+-  EXPECT_EQ(123, a_);
+-  delete closure;
+-}
+-
+-TEST_F(ClosureTest, TestPermanentClosureFunction1) {
+-  Closure* closure = NewPermanentCallback(&SetAFunction, 456);
+-  EXPECT_NE(456, a_);
+-  closure->Run();
+-  EXPECT_EQ(456, a_);
+-  a_ = 0;
+-  closure->Run();
+-  EXPECT_EQ(456, a_);
+-  delete closure;
+-}
+-
+-TEST_F(ClosureTest, TestPermanentClosureMethod1) {
+-  Closure* closure = NewPermanentCallback(current_instance_,
+-                                          &ClosureTest::SetAMethod, 456);
+-  EXPECT_NE(456, a_);
+-  closure->Run();
+-  EXPECT_EQ(456, a_);
+-  a_ = 0;
+-  closure->Run();
+-  EXPECT_EQ(456, a_);
+-  delete closure;
+-}
+-
+-TEST_F(ClosureTest, TestPermanentClosureFunction2) {
+-  const char* cstr = "hello";
+-  Closure* closure = NewPermanentCallback(&SetABFunction, 789, cstr);
+-  EXPECT_NE(789, a_);
+-  EXPECT_NE(cstr, b_);
+-  closure->Run();
+-  EXPECT_EQ(789, a_);
+-  EXPECT_EQ(cstr, b_);
+-  a_ = 0;
+-  b_ = nullptr;
+-  closure->Run();
+-  EXPECT_EQ(789, a_);
+-  EXPECT_EQ(cstr, b_);
+-  delete closure;
+-}
+-
+-TEST_F(ClosureTest, TestPermanentClosureMethod2) {
+-  const char* cstr = "hello";
+-  Closure* closure = NewPermanentCallback(current_instance_,
+-                                          &ClosureTest::SetABMethod, 789, cstr);
+-  EXPECT_NE(789, a_);
+-  EXPECT_NE(cstr, b_);
+-  closure->Run();
+-  EXPECT_EQ(789, a_);
+-  EXPECT_EQ(cstr, b_);
+-  a_ = 0;
+-  b_ = nullptr;
+-  closure->Run();
+-  EXPECT_EQ(789, a_);
+-  EXPECT_EQ(cstr, b_);
+-  delete closure;
+-}
+-
+-TEST_F(ClosureTest, TestPermanentClosureDeleteInCallback) {
+-  permanent_closure_ = NewPermanentCallback((ClosureTest*) this,
+-      &ClosureTest::DeleteClosureInCallback);
+-  permanent_closure_->Run();
+-}
+-
+-}  // anonymous namespace
+-}  // namespace protobuf
+-}  // namespace google
+diff --git a/src/google/protobuf/stubs/port.h b/src/google/protobuf/stubs/port.h
+index ad033a1..88690fa 100644
+--- a/src/google/protobuf/stubs/port.h
++++ b/src/google/protobuf/stubs/port.h
+@@ -27,9 +27,6 @@
+ 
+ #include "google/protobuf/stubs/platform_macros.h"
+ 
+-// Must be last.
+-#include "google/protobuf/util/converter/port_def.inc"  // NOLINT
+-
+ #undef PROTOBUF_LITTLE_ENDIAN
+ #ifdef _WIN32
+   // Assuming windows is always little-endian.
+@@ -217,7 +214,7 @@ static inline uint64_t bswap_64(uint64_t x) {
+ 
+ // ===================================================================
+ // from google3/util/endian/endian.h
+-PROTOBUF_EXPORT uint32_t ghtonl(uint32_t x);
++uint32_t ghtonl(uint32_t x);
+ 
+ class BigEndian {
+  public:
+@@ -278,6 +275,4 @@ class BigEndian {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_STUBS_PORT_H_
+diff --git a/src/google/protobuf/stubs/status_macros.h b/src/google/protobuf/stubs/status_macros.h
+index 46e65eb..5faaf5c 100644
+--- a/src/google/protobuf/stubs/status_macros.h
++++ b/src/google/protobuf/stubs/status_macros.h
+@@ -19,12 +19,9 @@
+ #ifndef GOOGLE_PROTOBUF_STUBS_STATUS_MACROS_H_
+ #define GOOGLE_PROTOBUF_STUBS_STATUS_MACROS_H_
+ 
++#include "absl/base/optimization.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+-#include "google/protobuf/stubs/common.h"
+-
+-// Needs to be last.
+-#include "google/protobuf/util/converter/port_def.inc"  // NOLINT
+ 
+ namespace google {
+ namespace protobuf {
+@@ -39,7 +36,7 @@ namespace util {
+   do {                                                                       \
+     /* Using _status below to avoid capture problems if expr is "status". */ \
+     const absl::Status _status = (expr);                                     \
+-    if (PROTOBUF_PREDICT_FALSE(!_status.ok())) return _status;               \
++    if (ABSL_PREDICT_FALSE(!_status.ok())) return _status;                   \
+   } while (0)
+ 
+ // Internal helper for concatenating macro values.
+@@ -56,7 +53,7 @@ absl::Status DoAssignOrReturn(T& lhs, absl::StatusOr<T> result) {
+ 
+ #define ASSIGN_OR_RETURN_IMPL(status, lhs, rexpr)       \
+   absl::Status status = DoAssignOrReturn(lhs, (rexpr)); \
+-  if (PROTOBUF_PREDICT_FALSE(!status.ok())) return status;
++  if (ABSL_PREDICT_FALSE(!status.ok())) return status;
+ 
+ // Executes an expression that returns a util::StatusOr, extracting its value
+ // into the variable defined by lhs (or returning on error).
+@@ -75,6 +72,4 @@ absl::Status DoAssignOrReturn(T& lhs, absl::StatusOr<T> result) {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"  // NOLINT
+-
+ #endif  // GOOGLE_PROTOBUF_STUBS_STATUS_H_
+diff --git a/src/google/protobuf/stubs/strutil.h b/src/google/protobuf/stubs/strutil.h
+index 82882f4..4d09bad 100644
+--- a/src/google/protobuf/stubs/strutil.h
++++ b/src/google/protobuf/stubs/strutil.h
+@@ -17,15 +17,13 @@
+ #ifndef GOOGLE_PROTOBUF_STUBS_STRUTIL_H__
+ #define GOOGLE_PROTOBUF_STUBS_STRUTIL_H__
+ 
+-#include <google/protobuf/stubs/common.h>
+-#include <stdlib.h>
+-
++#include <cstdlib>
+ #include <cstring>
+-#include <google/protobuf/util/converter/port_def.inc>
+ #include <vector>
+ 
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/str_join.h"
++#include "google/protobuf/stubs/port.h"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -138,10 +136,9 @@ inline std::string StripSuffixString(const std::string& str,
+ // StripWhitespace
+ //    Removes whitespaces from both ends of the given string.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void ReplaceCharacters(std::string* s, const char* remove,
+-                                       char replacewith);
++void ReplaceCharacters(std::string* s, const char* remove, char replacewith);
+ 
+-PROTOBUF_EXPORT void StripWhitespace(std::string* s);
++void StripWhitespace(std::string* s);
+ 
+ // ----------------------------------------------------------------------
+ // LowerString()
+@@ -185,10 +182,8 @@ inline std::string ToUpper(const std::string& s) {
+ //    happened or not.
+ // ----------------------------------------------------------------------
+ 
+-PROTOBUF_EXPORT std::string StringReplace(const std::string& s,
+-                                          const std::string& oldsub,
+-                                          const std::string& newsub,
+-                                          bool replace_all);
++std::string StringReplace(const std::string& s, const std::string& oldsub,
++                          const std::string& newsub, bool replace_all);
+ 
+ // ----------------------------------------------------------------------
+ // SplitStringUsing()
+@@ -196,8 +191,8 @@ PROTOBUF_EXPORT std::string StringReplace(const std::string& s,
+ //    to 'result'.  If there are consecutive delimiters, this function skips
+ //    over all of them.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void SplitStringUsing(absl::string_view full, const char* delim,
+-                                      std::vector<std::string>* res);
++void SplitStringUsing(absl::string_view full, const char* delim,
++                      std::vector<std::string>* res);
+ 
+ // Split a string using one or more byte delimiters, presented
+ // as a nul-terminated c string. Append the components to 'result'.
+@@ -207,9 +202,8 @@ PROTOBUF_EXPORT void SplitStringUsing(absl::string_view full, const char* delim,
+ //
+ // If "full" is the empty string, yields an empty string as the only value.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void SplitStringAllowEmpty(absl::string_view full,
+-                                           const char* delim,
+-                                           std::vector<std::string>* result);
++void SplitStringAllowEmpty(absl::string_view full, const char* delim,
++                           std::vector<std::string>* result);
+ 
+ // ----------------------------------------------------------------------
+ // Split()
+@@ -234,8 +228,8 @@ inline std::vector<std::string> Split(absl::string_view full, const char* delim,
+ //    another takes a pointer to the target string. In the latter case the
+ //    target string is cleared and overwritten.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void JoinStrings(const std::vector<std::string>& components,
+-                                 const char* delim, std::string* result);
++void JoinStrings(const std::vector<std::string>& components, const char* delim,
++                 std::string* result);
+ 
+ inline std::string JoinStrings(const std::vector<std::string>& components,
+                                const char* delim) {
+@@ -275,9 +269,9 @@ inline std::string JoinStrings(const std::vector<std::string>& components,
+ //    processed.
+ //    ----------------------------------------------------------------------
+ 
+-PROTOBUF_EXPORT int UnescapeCEscapeSequences(const char* source, char* dest);
+-PROTOBUF_EXPORT int UnescapeCEscapeSequences(const char* source, char* dest,
+-                                             std::vector<std::string>* errors);
++int UnescapeCEscapeSequences(const char* source, char* dest);
++int UnescapeCEscapeSequences(const char* source, char* dest,
++                             std::vector<std::string>* errors);
+ 
+ // ----------------------------------------------------------------------
+ // UnescapeCEscapeString()
+@@ -294,12 +288,10 @@ PROTOBUF_EXPORT int UnescapeCEscapeSequences(const char* source, char* dest,
+ //    the third call, the new string is returned.
+ // ----------------------------------------------------------------------
+ 
+-PROTOBUF_EXPORT int UnescapeCEscapeString(const std::string& src,
+-                                          std::string* dest);
+-PROTOBUF_EXPORT int UnescapeCEscapeString(const std::string& src,
+-                                          std::string* dest,
+-                                          std::vector<std::string>* errors);
+-PROTOBUF_EXPORT std::string UnescapeCEscapeString(const std::string& src);
++int UnescapeCEscapeString(const std::string& src, std::string* dest);
++int UnescapeCEscapeString(const std::string& src, std::string* dest,
++                          std::vector<std::string>* errors);
++std::string UnescapeCEscapeString(const std::string& src);
+ 
+ // ----------------------------------------------------------------------
+ // CEscape()
+@@ -308,21 +300,21 @@ PROTOBUF_EXPORT std::string UnescapeCEscapeString(const std::string& src);
+ //
+ //    Escaped chars: \n, \r, \t, ", ', \, and !isprint().
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT std::string CEscape(const std::string& src);
++std::string CEscape(const std::string& src);
+ 
+ // ----------------------------------------------------------------------
+ // CEscapeAndAppend()
+ //    Escapes 'src' using C-style escape sequences, and appends the escaped
+ //    string to 'dest'.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT void CEscapeAndAppend(absl::string_view src, std::string* dest);
++void CEscapeAndAppend(absl::string_view src, std::string* dest);
+ 
+ namespace strings {
+ // Like CEscape() but does not escape bytes with the upper bit set.
+-PROTOBUF_EXPORT std::string Utf8SafeCEscape(const std::string& src);
++std::string Utf8SafeCEscape(const std::string& src);
+ 
+ // Like CEscape() but uses hex (\x) escapes instead of octals.
+-PROTOBUF_EXPORT std::string CHexEscape(const std::string& src);
++std::string CHexEscape(const std::string& src);
+ }  // namespace strings
+ 
+ // ----------------------------------------------------------------------
+@@ -335,10 +327,8 @@ PROTOBUF_EXPORT std::string CHexEscape(const std::string& src);
+ //    platforms, so using these is safer, from the point of view of
+ //    overflow behavior, than using the standard libc functions.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int32_t strto32_adaptor(const char* nptr, char** endptr,
+-                                        int base);
+-PROTOBUF_EXPORT uint32_t strtou32_adaptor(const char* nptr, char** endptr,
+-                                          int base);
++int32_t strto32_adaptor(const char* nptr, char** endptr, int base);
++uint32_t strtou32_adaptor(const char* nptr, char** endptr, int base);
+ 
+ inline int32_t strto32(const char* nptr, char** endptr, int base) {
+   if (sizeof(int32_t) == sizeof(long))
+@@ -377,10 +367,10 @@ inline uint64_t strtou64(const char* nptr, char** endptr, int base) {
+ // safe_strtof()
+ // safe_strtod()
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT bool safe_strtob(absl::string_view str, bool* value);
++bool safe_strtob(absl::string_view str, bool* value);
+ 
+-PROTOBUF_EXPORT bool safe_strto32(const std::string& str, int32_t* value);
+-PROTOBUF_EXPORT bool safe_strtou32(const std::string& str, uint32_t* value);
++bool safe_strto32(const std::string& str, int32_t* value);
++bool safe_strtou32(const std::string& str, uint32_t* value);
+ inline bool safe_strto32(const char* str, int32_t* value) {
+   return safe_strto32(std::string(str), value);
+ }
+@@ -394,8 +384,8 @@ inline bool safe_strtou32(absl::string_view str, uint32_t* value) {
+   return safe_strtou32(std::string(str), value);
+ }
+ 
+-PROTOBUF_EXPORT bool safe_strto64(const std::string& str, int64_t* value);
+-PROTOBUF_EXPORT bool safe_strtou64(const std::string& str, uint64_t* value);
++bool safe_strto64(const std::string& str, int64_t* value);
++bool safe_strtou64(const std::string& str, uint64_t* value);
+ inline bool safe_strto64(const char* str, int64_t* value) {
+   return safe_strto64(std::string(str), value);
+ }
+@@ -409,8 +399,8 @@ inline bool safe_strtou64(absl::string_view str, uint64_t* value) {
+   return safe_strtou64(std::string(str), value);
+ }
+ 
+-PROTOBUF_EXPORT bool safe_strtof(const char* str, float* value);
+-PROTOBUF_EXPORT bool safe_strtod(const char* str, double* value);
++bool safe_strtof(const char* str, float* value);
++bool safe_strtod(const char* str, double* value);
+ inline bool safe_strtof(const std::string& str, float* value) {
+   return safe_strtof(str.c_str(), value);
+ }
+@@ -450,13 +440,13 @@ inline bool safe_strtod(absl::string_view str, double* value) {
+ // DoubleToBuffer() and FloatToBuffer().
+ static const int kFastToBufferSize = 32;
+ 
+-PROTOBUF_EXPORT char* FastInt32ToBuffer(int32_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastInt64ToBuffer(int64_t i, char* buffer);
++char* FastInt32ToBuffer(int32_t i, char* buffer);
++char* FastInt64ToBuffer(int64_t i, char* buffer);
+ char* FastUInt32ToBuffer(uint32_t i, char* buffer);  // inline below
+ char* FastUInt64ToBuffer(uint64_t i, char* buffer);  // inline below
+-PROTOBUF_EXPORT char* FastHexToBuffer(int i, char* buffer);
+-PROTOBUF_EXPORT char* FastHex64ToBuffer(uint64_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastHex32ToBuffer(uint32_t i, char* buffer);
++char* FastHexToBuffer(int i, char* buffer);
++char* FastHex64ToBuffer(uint64_t i, char* buffer);
++char* FastHex32ToBuffer(uint32_t i, char* buffer);
+ 
+ // at least 22 bytes long
+ inline char* FastIntToBuffer(int i, char* buffer) {
+@@ -492,10 +482,10 @@ inline char* FastULongToBuffer(unsigned long i, char* buffer) {
+ // terminating the string).
+ // ----------------------------------------------------------------------
+ 
+-PROTOBUF_EXPORT char* FastInt32ToBufferLeft(int32_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastUInt32ToBufferLeft(uint32_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastInt64ToBufferLeft(int64_t i, char* buffer);
+-PROTOBUF_EXPORT char* FastUInt64ToBufferLeft(uint64_t i, char* buffer);
++char* FastInt32ToBufferLeft(int32_t i, char* buffer);
++char* FastUInt32ToBufferLeft(uint32_t i, char* buffer);
++char* FastInt64ToBufferLeft(int64_t i, char* buffer);
++char* FastUInt64ToBufferLeft(uint64_t i, char* buffer);
+ 
+ // Just define these in terms of the above.
+ inline char* FastUInt32ToBuffer(uint32_t i, char* buffer) {
+@@ -515,12 +505,12 @@ inline std::string SimpleBtoa(bool value) { return value ? "true" : "false"; }
+ //
+ //    Return value: string
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT std::string SimpleItoa(int i);
+-PROTOBUF_EXPORT std::string SimpleItoa(unsigned int i);
+-PROTOBUF_EXPORT std::string SimpleItoa(long i);
+-PROTOBUF_EXPORT std::string SimpleItoa(unsigned long i);
+-PROTOBUF_EXPORT std::string SimpleItoa(long long i);
+-PROTOBUF_EXPORT std::string SimpleItoa(unsigned long long i);
++std::string SimpleItoa(int i);
++std::string SimpleItoa(unsigned int i);
++std::string SimpleItoa(long i);
++std::string SimpleItoa(unsigned long i);
++std::string SimpleItoa(long long i);
++std::string SimpleItoa(unsigned long long i);
+ 
+ // ----------------------------------------------------------------------
+ // SimpleDtoa()
+@@ -541,11 +531,11 @@ PROTOBUF_EXPORT std::string SimpleItoa(unsigned long long i);
+ //
+ //    Return value: string
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT std::string SimpleDtoa(double value);
+-PROTOBUF_EXPORT std::string SimpleFtoa(float value);
++std::string SimpleDtoa(double value);
++std::string SimpleFtoa(float value);
+ 
+-PROTOBUF_EXPORT char* DoubleToBuffer(double i, char* buffer);
+-PROTOBUF_EXPORT char* FloatToBuffer(float i, char* buffer);
++char* DoubleToBuffer(double i, char* buffer);
++char* FloatToBuffer(float i, char* buffer);
+ 
+ // In practice, doubles should never need more than 24 bytes and floats
+ // should never need more than 14 (including null terminators), but we
+@@ -563,7 +553,7 @@ using Hex = absl::Hex;
+ // ToHex()
+ //    Return a lower-case hex string representation of the given integer.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT std::string ToHex(uint64_t num);
++std::string ToHex(uint64_t num);
+ 
+ // ----------------------------------------------------------------------
+ // GlobalReplaceSubstring()
+@@ -572,9 +562,8 @@ PROTOBUF_EXPORT std::string ToHex(uint64_t num);
+ //
+ //    NOTE: The string pieces must not overlap s.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int GlobalReplaceSubstring(const std::string& substring,
+-                                           const std::string& replacement,
+-                                           std::string* s);
++int GlobalReplaceSubstring(const std::string& substring,
++                           const std::string& replacement, std::string* s);
+ 
+ // ----------------------------------------------------------------------
+ // Base64Unescape()
+@@ -582,7 +571,7 @@ PROTOBUF_EXPORT int GlobalReplaceSubstring(const std::string& substring,
+ //    writes it to "dest". If src contains invalid characters, dest is cleared
+ //    and the function returns false. Returns true on success.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT bool Base64Unescape(absl::string_view src, std::string* dest);
++bool Base64Unescape(absl::string_view src, std::string* dest);
+ 
+ // ----------------------------------------------------------------------
+ // WebSafeBase64Unescape()
+@@ -595,18 +584,16 @@ PROTOBUF_EXPORT bool Base64Unescape(absl::string_view src, std::string* dest);
+ //    returns false (with dest empty) if src contains invalid chars; for
+ //    this version src and dest must be different strings.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int WebSafeBase64Unescape(const char* src, int slen, char* dest,
+-                                          int szdest);
+-PROTOBUF_EXPORT bool WebSafeBase64Unescape(absl::string_view src,
+-                                           std::string* dest);
++int WebSafeBase64Unescape(const char* src, int slen, char* dest, int szdest);
++bool WebSafeBase64Unescape(absl::string_view src, std::string* dest);
+ 
+ // Return the length to use for the output buffer given to the base64 escape
+ // routines. Make sure to use the same value for do_padding in both.
+ // This function may return incorrect results if given input_len values that
+ // are extremely high, which should happen rarely.
+-PROTOBUF_EXPORT int CalculateBase64EscapedLen(int input_len, bool do_padding);
++int CalculateBase64EscapedLen(int input_len, bool do_padding);
+ // Use this version when calling Base64Escape without a do_padding arg.
+-PROTOBUF_EXPORT int CalculateBase64EscapedLen(int input_len);
++int CalculateBase64EscapedLen(int input_len);
+ 
+ // ----------------------------------------------------------------------
+ // Base64Escape()
+@@ -620,24 +607,20 @@ PROTOBUF_EXPORT int CalculateBase64EscapedLen(int input_len);
+ //    to escape them.  It also has an extra parameter "do_padding",
+ //    which when set to false will prevent padding with "=".
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int Base64Escape(const unsigned char* src, int slen, char* dest,
+-                                 int szdest);
+-PROTOBUF_EXPORT int WebSafeBase64Escape(const unsigned char* src, int slen,
+-                                        char* dest, int szdest,
+-                                        bool do_padding);
++int Base64Escape(const unsigned char* src, int slen, char* dest, int szdest);
++int WebSafeBase64Escape(const unsigned char* src, int slen, char* dest,
++                        int szdest, bool do_padding);
+ // Encode src into dest with padding.
+-PROTOBUF_EXPORT void Base64Escape(absl::string_view src, std::string* dest);
++void Base64Escape(absl::string_view src, std::string* dest);
+ // Encode src into dest web-safely without padding.
+-PROTOBUF_EXPORT void WebSafeBase64Escape(absl::string_view src,
+-                                         std::string* dest);
++void WebSafeBase64Escape(absl::string_view src, std::string* dest);
+ // Encode src into dest web-safely with padding.
+-PROTOBUF_EXPORT void WebSafeBase64EscapeWithPadding(absl::string_view src,
+-                                                    std::string* dest);
++void WebSafeBase64EscapeWithPadding(absl::string_view src, std::string* dest);
+ 
+-PROTOBUF_EXPORT void Base64Escape(const unsigned char* src, int szsrc,
+-                                  std::string* dest, bool do_padding);
+-PROTOBUF_EXPORT void WebSafeBase64Escape(const unsigned char* src, int szsrc,
+-                                         std::string* dest, bool do_padding);
++void Base64Escape(const unsigned char* src, int szsrc, std::string* dest,
++                  bool do_padding);
++void WebSafeBase64Escape(const unsigned char* src, int szsrc, std::string* dest,
++                         bool do_padding);
+ 
+ inline bool IsValidCodePoint(uint32_t code_point) {
+   return code_point < 0xD800 ||
+@@ -651,13 +634,13 @@ static const int UTFmax = 4;
+ //  in any external dependencies. The output buffer must be as least 4 bytes
+ //  large.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int EncodeAsUTF8Char(uint32_t code_point, char* output);
++int EncodeAsUTF8Char(uint32_t code_point, char* output);
+ 
+ // ----------------------------------------------------------------------
+ // UTF8FirstLetterNumBytes()
+ //   Length of the first UTF-8 character.
+ // ----------------------------------------------------------------------
+-PROTOBUF_EXPORT int UTF8FirstLetterNumBytes(const char* src, int len);
++int UTF8FirstLetterNumBytes(const char* src, int len);
+ 
+ // From google3/third_party/absl/strings/escaping.h
+ 
+@@ -693,13 +676,11 @@ PROTOBUF_EXPORT int UTF8FirstLetterNumBytes(const char* src, int len);
+ //
+ //       (1) determines the presence of LF (first one is ok)
+ //       (2) if yes, removes any CR, else convert every CR to LF
+-PROTOBUF_EXPORT void CleanStringLineEndings(const std::string& src,
+-                                            std::string* dst,
+-                                            bool auto_end_last_line);
++void CleanStringLineEndings(const std::string& src, std::string* dst,
++                            bool auto_end_last_line);
+ 
+ // Same as above, but transforms the argument in place.
+-PROTOBUF_EXPORT void CleanStringLineEndings(std::string* str,
+-                                            bool auto_end_last_line);
++void CleanStringLineEndings(std::string* str, bool auto_end_last_line);
+ 
+ namespace strings {
+ inline bool EndsWith(absl::string_view text, absl::string_view suffix) {
+@@ -720,6 +701,5 @@ double NoLocaleStrtod(const char* str, char** endptr);
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include <google/protobuf/util/converter/port_undef.inc>
+ 
+ #endif  // GOOGLE_PROTOBUF_STUBS_STRUTIL_H__
+\ No newline at end of file
+diff --git a/src/google/protobuf/util/converter/BUILD.bazel b/src/google/protobuf/util/converter/BUILD.bazel
+index bff9574..bcfa7ea 100644
+--- a/src/google/protobuf/util/converter/BUILD.bazel
++++ b/src/google/protobuf/util/converter/BUILD.bazel
+@@ -28,8 +28,7 @@ cc_library(
+     hdrs = ["constants.h"],
+     strip_include_prefix = "/src",
+     deps = [
+-        "//src/google/protobuf/stubs",
+-        "//src/google/protobuf/util/converter:port_def",
++        "//src/google/protobuf/util/converter:port",
+     ],
+ )
+ 
+@@ -42,19 +41,16 @@ cc_library(
+     deps = [
+         ":constants",
+         ":utility",
+-        "//src/google/protobuf/stubs",
+-        "//src/google/protobuf/util/converter:port_def",
++        "//src/google/protobuf/util/converter:port",
+         "@com_google_absl//absl/strings",
+         "@com_google_protobuf//:protobuf",
+     ],
+ )
+ 
+ cc_library(
+-    name = "port_def",
++    name = "port",
+     hdrs = [
+         "port.h",
+-        "port_def.inc",
+-        "port_undef.inc",
+     ],
+     strip_include_prefix = "/src",
+     visibility = [
+@@ -78,7 +74,7 @@ cc_library(
+         ":type_info",
+         ":utility",
+         "//src/google/protobuf/stubs",
+-        "//src/google/protobuf/util/converter:port_def",
++        "//src/google/protobuf/util/converter:port",
+     ],
+ )
+ 
+@@ -133,7 +129,7 @@ cc_library(
+         ":object_writer",
+         ":utility",
+         "//src/google/protobuf/stubs",
+-        "//src/google/protobuf/util/converter:port_def",
++        "//src/google/protobuf/util/converter:port",
+         "@com_google_absl//absl/status",
+         "@com_google_absl//absl/strings",
+         "@com_google_protobuf//:protobuf",
+diff --git a/src/google/protobuf/util/converter/constants.h b/src/google/protobuf/util/converter/constants.h
+index ff75f92..3843aa2 100644
+--- a/src/google/protobuf/util/converter/constants.h
++++ b/src/google/protobuf/util/converter/constants.h
+@@ -19,8 +19,6 @@
+ 
+ #include <cstdint>
+ 
+-#include "google/protobuf/stubs/common.h"
+-
+ // This file contains constants used by //net/proto2/util/converter.
+ 
+ namespace google {
+diff --git a/src/google/protobuf/util/converter/datapiece.cc b/src/google/protobuf/util/converter/datapiece.cc
+index 3acd35d..c7c12ef 100644
+--- a/src/google/protobuf/util/converter/datapiece.cc
++++ b/src/google/protobuf/util/converter/datapiece.cc
+@@ -18,18 +18,17 @@
+ #include <cstdint>
+ #include <limits>
+ 
+-#include "google/protobuf/struct.pb.h"
+-#include "google/protobuf/type.pb.h"
+-#include "google/protobuf/descriptor.h"
+ #include "absl/status/status.h"
+ #include "absl/strings/ascii.h"
+ #include "absl/strings/cord.h"
+ #include "absl/strings/escaping.h"
++#include "absl/strings/match.h"
+ #include "absl/strings/str_cat.h"
+-#include "google/protobuf/util/converter/utility.h"
+-#include "google/protobuf/stubs/strutil.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/struct.pb.h"
+ #include "google/protobuf/stubs/strutil.h"
+-#include "absl/strings/match.h"
++#include "google/protobuf/type.pb.h"
++#include "google/protobuf/util/converter/utility.h"
+ 
+ namespace google {
+ namespace protobuf {
+diff --git a/src/google/protobuf/util/converter/datapiece.h b/src/google/protobuf/util/converter/datapiece.h
+index 68b6b0e..fc25a7a 100644
+--- a/src/google/protobuf/util/converter/datapiece.h
++++ b/src/google/protobuf/util/converter/datapiece.h
+@@ -20,15 +20,10 @@
+ #include <cstdint>
+ #include <string>
+ 
+-#include "google/protobuf/stubs/common.h"
+-#include "google/protobuf/type.pb.h"
+ #include "absl/log/absl_log.h"
+-
+ #include "absl/status/statusor.h"
+ #include "absl/strings/string_view.h"
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/type.pb.h"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -46,7 +41,7 @@ class ProtoWriter;
+ // storage for the actual string or Cord, so it is the user's responsibility to
+ // guarantee that the underlying storage is still valid when the DataPiece is
+ // accessed.
+-class PROTOBUF_EXPORT DataPiece {
++class DataPiece {
+  public:
+   // Identifies data type of the value.
+   // These are the types supported by DataPiece.
+@@ -107,8 +102,7 @@ class PROTOBUF_EXPORT DataPiece {
+ 
+   static DataPiece NullData() { return DataPiece(TYPE_NULL, 0); }
+ 
+-  virtual ~DataPiece() {
+-  }
++  virtual ~DataPiece() {}
+ 
+   // Accessors
+   Type type() const { return type_; }
+@@ -120,7 +114,6 @@ class PROTOBUF_EXPORT DataPiece {
+     return str_;
+   }
+ 
+-
+   // Parses, casts or converts the value stored in the DataPiece into an int32.
+   absl::StatusOr<int32_t> ToInt32() const;
+ 
+@@ -206,6 +199,4 @@ class PROTOBUF_EXPORT DataPiece {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_DATAPIECE_H_
+diff --git a/src/google/protobuf/util/converter/default_value_objectwriter.h b/src/google/protobuf/util/converter/default_value_objectwriter.h
+index 0b253c8..4538fc7 100644
+--- a/src/google/protobuf/util/converter/default_value_objectwriter.h
++++ b/src/google/protobuf/util/converter/default_value_objectwriter.h
+@@ -31,9 +31,6 @@
+ #include "google/protobuf/util/converter/utility.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -45,7 +42,7 @@ namespace converter {
+ // ObjectWriter when EndObject() is called on the root object. It also writes
+ // out all non-repeated primitive fields that haven't been explicitly rendered
+ // with their default values (0 for numbers, "" for strings, etc).
+-class PROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
++class DefaultValueObjectWriter : public ObjectWriter {
+  public:
+   // A Callback function to check whether a field needs to be scrubbed.
+   //
+@@ -134,7 +131,7 @@ class PROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
+ 
+   // "Node" represents a node in the tree that holds the input of
+   // DefaultValueObjectWriter.
+-  class PROTOBUF_EXPORT Node {
++  class Node {
+    public:
+     Node(const std::string& name, const google::protobuf::Type* type,
+          NodeKind kind, const DataPiece& data, bool is_placeholder,
+@@ -312,6 +309,4 @@ class PROTOBUF_EXPORT DefaultValueObjectWriter : public ObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_DEFAULT_VALUE_OBJECTWRITER_H_
+diff --git a/src/google/protobuf/util/converter/error_listener.h b/src/google/protobuf/util/converter/error_listener.h
+index 2d671a5..04c4df6 100644
+--- a/src/google/protobuf/util/converter/error_listener.h
++++ b/src/google/protobuf/util/converter/error_listener.h
+@@ -22,21 +22,17 @@
+ #include <string>
+ #include <vector>
+ 
+-#include "google/protobuf/stubs/callback.h"
+-#include "google/protobuf/stubs/common.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/stubs/callback.h"
+ #include "google/protobuf/util/converter/location_tracker.h"
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+ // Interface for error listener.
+-class PROTOBUF_EXPORT ErrorListener {
++class ErrorListener {
+  public:
+   ErrorListener(const ErrorListener&) = delete;
+   ErrorListener& operator=(const ErrorListener&) = delete;
+@@ -61,7 +57,7 @@ class PROTOBUF_EXPORT ErrorListener {
+ };
+ 
+ // An error listener that ignores all errors.
+-class PROTOBUF_EXPORT NoopErrorListener : public ErrorListener {
++class NoopErrorListener : public ErrorListener {
+  public:
+   NoopErrorListener() {}
+   NoopErrorListener(const NoopErrorListener&) = delete;
+@@ -80,12 +76,9 @@ class PROTOBUF_EXPORT NoopErrorListener : public ErrorListener {
+                     absl::string_view /* missing_name */) override {}
+ };
+ 
+-
+ }  // namespace converter
+ }  // namespace util
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_ERROR_LISTENER_H_
+diff --git a/src/google/protobuf/util/converter/field_mask_utility.cc b/src/google/protobuf/util/converter/field_mask_utility.cc
+index 03736d7..c3a8ec2 100644
+--- a/src/google/protobuf/util/converter/field_mask_utility.cc
++++ b/src/google/protobuf/util/converter/field_mask_utility.cc
+@@ -17,11 +17,8 @@
+ #include "absl/status/status.h"
+ #include "absl/strings/match.h"
+ #include "absl/strings/str_cat.h"
+-#include "google/protobuf/util/converter/utility.h"
+ #include "google/protobuf/stubs/status_macros.h"
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/util/converter/utility.h"
+ 
+ namespace google {
+ namespace protobuf {
+diff --git a/src/google/protobuf/util/converter/json_objectwriter.h b/src/google/protobuf/util/converter/json_objectwriter.h
+index e3caf4d..4069682 100644
+--- a/src/google/protobuf/util/converter/json_objectwriter.h
++++ b/src/google/protobuf/util/converter/json_objectwriter.h
+@@ -21,20 +21,15 @@
+ #include <memory>
+ #include <string>
+ 
++#include "google/protobuf/io/coded_stream.h"
+ #include "google/protobuf/stubs/bytestream.h"
+ #include "google/protobuf/util/converter/structured_objectwriter.h"
+-#include "google/protobuf/io/coded_stream.h"
+-
+-// clang-format off
+-#include "google/protobuf/util/converter/port_def.inc"
+-// clang-format on
+ 
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+-
+ // An ObjectWriter implementation that outputs JSON. This ObjectWriter
+ // supports writing a compact form or a pretty printed form.
+ //
+@@ -74,7 +69,7 @@ namespace converter {
+ // uint64 would lose precision if rendered as numbers.
+ //
+ // JsonObjectWriter is thread-unsafe.
+-class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
++class JsonObjectWriter : public StructuredObjectWriter {
+  public:
+   JsonObjectWriter(absl::string_view indent_string, io::CodedOutputStream* out)
+       : element_(new Element(/*parent=*/nullptr, /*is_json_object=*/false)),
+@@ -127,7 +122,7 @@ class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
+   }
+ 
+  protected:
+-  class PROTOBUF_EXPORT Element : public BaseElement {
++  class Element : public BaseElement {
+    public:
+     Element(Element* parent, bool is_json_object)
+         : BaseElement(parent),
+@@ -158,7 +153,7 @@ class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
+   Element* element() override { return element_.get(); }
+ 
+  private:
+-  class PROTOBUF_EXPORT ByteSinkWrapper : public strings::ByteSink {
++  class ByteSinkWrapper : public strings::ByteSink {
+    public:
+     explicit ByteSinkWrapper(io::CodedOutputStream* stream) : stream_(stream) {}
+     ByteSinkWrapper(const ByteSinkWrapper&) = delete;
+@@ -260,6 +255,4 @@ class PROTOBUF_EXPORT JsonObjectWriter : public StructuredObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_JSON_OBJECTWRITER_H_
+diff --git a/src/google/protobuf/util/converter/json_stream_parser.h b/src/google/protobuf/util/converter/json_stream_parser.h
+index ed30e3a..3cc40a4 100644
+--- a/src/google/protobuf/util/converter/json_stream_parser.h
++++ b/src/google/protobuf/util/converter/json_stream_parser.h
+@@ -21,22 +21,15 @@
+ #include <stack>
+ #include <string>
+ 
+-#include "google/protobuf/stubs/common.h"
+ #include "absl/status/status.h"
+-#include "absl/types/optional.h"
+-
+ #include "absl/strings/string_view.h"
+-
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "absl/types/optional.h"
+ 
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+-
+ class ObjectWriter;
+ 
+ // A JSON parser that can parse a stream of JSON chunks rather than needing the
+@@ -59,7 +52,7 @@ class ObjectWriter;
+ //
+ // This parser is thread-compatible as long as only one thread is calling a
+ // Parse() method at a time.
+-class PROTOBUF_EXPORT JsonStreamParser {
++class JsonStreamParser {
+  public:
+   // Creates a JsonStreamParser that will write to the given ObjectWriter.
+   explicit JsonStreamParser(ObjectWriter* ow);
+@@ -74,14 +67,12 @@ class PROTOBUF_EXPORT JsonStreamParser {
+   // string snippet of the error with type_url kParseErrorSnippetUrl.
+   absl::Status Parse(absl::string_view json);
+ 
+-
+   // Finish parsing the JSON string. If the returned status is non-ok, the
+   // status might contain a payload ParseErrorType with type_url
+   // kParseErrorTypeUrl and a payload containing string snippet of the error
+   // with type_url kParseErrorSnippetUrl.
+   absl::Status FinishParse();
+ 
+-
+   // Sets the max recursion depth of JSON message to be deserialized. JSON
+   // messages over this depth will fail to be deserialized.
+   // Default value is 100.
+@@ -331,6 +322,4 @@ class PROTOBUF_EXPORT JsonStreamParser {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_JSON_STREAM_PARSER_H_
+diff --git a/src/google/protobuf/util/converter/legacy_json_util.cc b/src/google/protobuf/util/converter/legacy_json_util.cc
+index 6f37aa5..0ea7e3c 100644
+--- a/src/google/protobuf/util/converter/legacy_json_util.cc
++++ b/src/google/protobuf/util/converter/legacy_json_util.cc
+@@ -18,26 +18,22 @@
+ 
+ #include "absl/base/call_once.h"
+ #include "absl/status/status.h"
+-#include "google/protobuf/stubs/bytestream.h"
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/io/coded_stream.h"
++#include "google/protobuf/io/zero_copy_sink.h"
++#include "google/protobuf/io/zero_copy_stream.h"
++#include "google/protobuf/stubs/bytestream.h"
++#include "google/protobuf/stubs/status_macros.h"
+ #include "google/protobuf/util/converter/default_value_objectwriter.h"
+ #include "google/protobuf/util/converter/error_listener.h"
+ #include "google/protobuf/util/converter/json_objectwriter.h"
+ #include "google/protobuf/util/converter/json_stream_parser.h"
+ #include "google/protobuf/util/converter/protostream_objectsource.h"
+ #include "google/protobuf/util/converter/protostream_objectwriter.h"
+-#include "google/protobuf/io/coded_stream.h"
+-#include "google/protobuf/io/zero_copy_sink.h"
+-#include "google/protobuf/io/zero_copy_stream.h"
+ #include "google/protobuf/util/type_resolver.h"
+ #include "google/protobuf/util/type_resolver_util.h"
+-#include "google/protobuf/stubs/status_macros.h"
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+ 
+-namespace google {
+ namespace protobuf {
+ namespace util {
+ using ::google::protobuf::io::zc_sink_internal::ZeroCopyStreamByteSink;
+diff --git a/src/google/protobuf/util/converter/legacy_json_util.h b/src/google/protobuf/util/converter/legacy_json_util.h
+index 3399da0..44c0d07 100644
+--- a/src/google/protobuf/util/converter/legacy_json_util.h
++++ b/src/google/protobuf/util/converter/legacy_json_util.h
+@@ -24,9 +24,6 @@
+ #include "google/protobuf/message.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -57,27 +54,27 @@ struct JsonPrintOptions {
+ 
+ typedef JsonPrintOptions JsonOptions;
+ 
+-PROTOBUF_EXPORT absl::Status MessageToJsonString(const Message& message,
+-                                                 std::string* output,
+-                                                 const JsonOptions& options);
++absl::Status MessageToJsonString(const Message& message, std::string* output,
++                                 const JsonOptions& options);
+ 
+ inline absl::Status MessageToJsonString(const Message& message,
+                                         std::string* output) {
+   return MessageToJsonString(message, output, JsonOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status JsonStringToMessage(
+-    absl::string_view input, Message* message, const JsonParseOptions& options);
++absl::Status JsonStringToMessage(absl::string_view input, Message* message,
++                                 const JsonParseOptions& options);
+ 
+ inline absl::Status JsonStringToMessage(absl::string_view input,
+                                         Message* message) {
+   return JsonStringToMessage(input, message, JsonParseOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status BinaryToJsonStream(
+-    TypeResolver* resolver, const std::string& type_url,
+-    io::ZeroCopyInputStream* binary_input,
+-    io::ZeroCopyOutputStream* json_output, const JsonPrintOptions& options);
++absl::Status BinaryToJsonStream(TypeResolver* resolver,
++                                const std::string& type_url,
++                                io::ZeroCopyInputStream* binary_input,
++                                io::ZeroCopyOutputStream* json_output,
++                                const JsonPrintOptions& options);
+ 
+ inline absl::Status BinaryToJsonStream(TypeResolver* resolver,
+                                        const std::string& type_url,
+@@ -87,10 +84,11 @@ inline absl::Status BinaryToJsonStream(TypeResolver* resolver,
+                             JsonPrintOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status BinaryToJsonString(
+-    TypeResolver* resolver, const std::string& type_url,
+-    const std::string& binary_input, std::string* json_output,
+-    const JsonPrintOptions& options);
++absl::Status BinaryToJsonString(TypeResolver* resolver,
++                                const std::string& type_url,
++                                const std::string& binary_input,
++                                std::string* json_output,
++                                const JsonPrintOptions& options);
+ 
+ inline absl::Status BinaryToJsonString(TypeResolver* resolver,
+                                        const std::string& type_url,
+@@ -100,10 +98,11 @@ inline absl::Status BinaryToJsonString(TypeResolver* resolver,
+                             JsonPrintOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status JsonToBinaryStream(
+-    TypeResolver* resolver, const std::string& type_url,
+-    io::ZeroCopyInputStream* json_input,
+-    io::ZeroCopyOutputStream* binary_output, const JsonParseOptions& options);
++absl::Status JsonToBinaryStream(TypeResolver* resolver,
++                                const std::string& type_url,
++                                io::ZeroCopyInputStream* json_input,
++                                io::ZeroCopyOutputStream* binary_output,
++                                const JsonParseOptions& options);
+ 
+ inline absl::Status JsonToBinaryStream(
+     TypeResolver* resolver, const std::string& type_url,
+@@ -113,10 +112,11 @@ inline absl::Status JsonToBinaryStream(
+                             JsonParseOptions());
+ }
+ 
+-PROTOBUF_EXPORT absl::Status JsonToBinaryString(
+-    TypeResolver* resolver, const std::string& type_url,
+-    absl::string_view json_input, std::string* binary_output,
+-    const JsonParseOptions& options);
++absl::Status JsonToBinaryString(TypeResolver* resolver,
++                                const std::string& type_url,
++                                absl::string_view json_input,
++                                std::string* binary_output,
++                                const JsonParseOptions& options);
+ 
+ inline absl::Status JsonToBinaryString(TypeResolver* resolver,
+                                        const std::string& type_url,
+@@ -130,6 +130,4 @@ inline absl::Status JsonToBinaryString(TypeResolver* resolver,
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_JSON_LEGACY_UTIL_H_
+diff --git a/src/google/protobuf/util/converter/legacy_json_util_test.cc b/src/google/protobuf/util/converter/legacy_json_util_test.cc
+index eda760a..c95abe9 100644
+--- a/src/google/protobuf/util/converter/legacy_json_util_test.cc
++++ b/src/google/protobuf/util/converter/legacy_json_util_test.cc
+@@ -14,6 +14,9 @@
+ 
+ #include "google/protobuf/util/converter/legacy_json_util.h"
+ 
++#include <gmock/gmock.h>
++#include <gtest/gtest.h>
++
+ #include <algorithm>
+ #include <cstdint>
+ #include <list>
+@@ -21,29 +24,24 @@
+ #include <string>
+ #include <vector>
+ 
+-#include "google/protobuf/duration.pb.h"
+-#include "google/protobuf/field_mask.pb.h"
+-#include "google/protobuf/struct.pb.h"
+-#include "google/protobuf/timestamp.pb.h"
+-#include "google/protobuf/wrappers.pb.h"
+-#include <gmock/gmock.h>
+-#include <gtest/gtest.h>
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/string_view.h"
+-#include "google/protobuf/util/converter/testdata/maps.pb.h"
+ #include "google/protobuf/descriptor_database.h"
++#include "google/protobuf/duration.pb.h"
+ #include "google/protobuf/dynamic_message.h"
++#include "google/protobuf/field_mask.pb.h"
+ #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
++#include "google/protobuf/struct.pb.h"
++#include "google/protobuf/stubs/status_macros.h"
++#include "google/protobuf/timestamp.pb.h"
++#include "google/protobuf/unittest.pb.h"
++#include "google/protobuf/util/converter/testdata/maps.pb.h"
+ #include "google/protobuf/util/json_format.pb.h"
+ #include "google/protobuf/util/json_format_proto3.pb.h"
+-#include "google/protobuf/unittest.pb.h"
+ #include "google/protobuf/util/type_resolver.h"
+ #include "google/protobuf/util/type_resolver_util.h"
+-#include "google/protobuf/stubs/status_macros.h"
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/wrappers.pb.h"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -257,7 +255,6 @@ TEST_P(JsonTest, TestPreserveProtoFieldNames) {
+   JsonPrintOptions options;
+   options.preserve_proto_field_names = true;
+   EXPECT_THAT(ToJson(m, options), IsOkAndHolds("{\"message_value\":{}}"));
+-
+ }
+ 
+ TEST_P(JsonTest, Camels) {
+@@ -971,7 +968,6 @@ TEST_P(JsonTest, TestOverwriteRepeated) {
+   EXPECT_THAT(m.repeated_int32_value(), ElementsAre(1, 2, 3));
+ }
+ 
+-
+ TEST_P(JsonTest, TestDuration) {
+   auto m = ToProto<proto3::TestDuration>(R"json(
+     {
+diff --git a/src/google/protobuf/util/converter/location_tracker.h b/src/google/protobuf/util/converter/location_tracker.h
+index 1246114..5c896f2 100644
+--- a/src/google/protobuf/util/converter/location_tracker.h
++++ b/src/google/protobuf/util/converter/location_tracker.h
+@@ -19,9 +19,6 @@
+ 
+ #include <string>
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -29,7 +26,7 @@ namespace converter {
+ 
+ // LocationTrackerInterface is an interface for classes that track
+ // the location information for the purpose of error reporting.
+-class PROTOBUF_EXPORT LocationTrackerInterface {
++class LocationTrackerInterface {
+  public:
+   LocationTrackerInterface(const LocationTrackerInterface&) = delete;
+   LocationTrackerInterface& operator=(const LocationTrackerInterface&) = delete;
+@@ -50,6 +47,4 @@ class PROTOBUF_EXPORT LocationTrackerInterface {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_LOCATION_TRACKER_H_
+diff --git a/src/google/protobuf/util/converter/object_source.h b/src/google/protobuf/util/converter/object_source.h
+index 6a780d5..6d048aa 100644
+--- a/src/google/protobuf/util/converter/object_source.h
++++ b/src/google/protobuf/util/converter/object_source.h
+@@ -20,10 +20,6 @@
+ #include "absl/status/status.h"
+ #include "absl/strings/string_view.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -37,7 +33,7 @@ class ObjectWriter;
+ // example, a character stream, or protobuf.
+ //
+ // Derived classes could be thread-unsafe.
+-class PROTOBUF_EXPORT ObjectSource {
++class ObjectSource {
+  public:
+   ObjectSource(const ObjectSource&) = delete;
+   ObjectSource& operator=(const ObjectSource&) = delete;
+@@ -63,6 +59,4 @@ class PROTOBUF_EXPORT ObjectSource {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_OBJECT_SOURCE_H_
+diff --git a/src/google/protobuf/util/converter/object_writer.h b/src/google/protobuf/util/converter/object_writer.h
+index 499d9c0..5a7df8e 100644
+--- a/src/google/protobuf/util/converter/object_writer.h
++++ b/src/google/protobuf/util/converter/object_writer.h
+@@ -19,19 +19,13 @@
+ 
+ #include <cstdint>
+ 
+-#include "google/protobuf/stubs/common.h"
+-
+ #include "absl/strings/string_view.h"
+ 
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+-
+ class DataPiece;
+ 
+ // An ObjectWriter is an interface for writing a stream of events
+@@ -48,7 +42,7 @@ class DataPiece;
+ //
+ // TODO(xinb): seems like a prime candidate to apply the RAII paradigm
+ // and get rid the need to call EndXXX().
+-class PROTOBUF_EXPORT ObjectWriter {
++class ObjectWriter {
+  public:
+   ObjectWriter(const ObjectWriter&) = delete;
+   ObjectWriter& operator=(const ObjectWriter&) = delete;
+@@ -83,7 +77,6 @@ class PROTOBUF_EXPORT ObjectWriter {
+   virtual ObjectWriter* RenderUint64(absl::string_view name,
+                                      uint64_t value) = 0;
+ 
+-
+   // Renders a double value.
+   virtual ObjectWriter* RenderDouble(absl::string_view name, double value) = 0;
+   // Renders a float value.
+@@ -100,12 +93,10 @@ class PROTOBUF_EXPORT ObjectWriter {
+   // Renders a Null value.
+   virtual ObjectWriter* RenderNull(absl::string_view name) = 0;
+ 
+-
+   // Renders a DataPiece object to a ObjectWriter.
+   static void RenderDataPieceTo(const DataPiece& data, absl::string_view name,
+                                 ObjectWriter* ow);
+ 
+-
+   // Indicates whether this ObjectWriter has completed writing the root message,
+   // usually this means writing of one complete object. Subclasses must override
+   // this behavior appropriately.
+@@ -133,6 +124,4 @@ class PROTOBUF_EXPORT ObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_OBJECT_WRITER_H_
+diff --git a/src/google/protobuf/util/converter/port_def.inc b/src/google/protobuf/util/converter/port_def.inc
+deleted file mode 100644
+index 41af5b7..0000000
+--- a/src/google/protobuf/util/converter/port_def.inc
++++ /dev/null
+@@ -1,1116 +0,0 @@
+-// This file defines common macros that are used in protobuf.
+-//
+-// To hide these definitions from the outside world (and to prevent collisions
+-// if more than one version of protobuf is #included in the same project) you
+-// must follow this pattern when #including port_def.inc in a header file:
+-//
+-// #include "other_header.h"
+-// #include "message.h"
+-// // etc.
+-//
+-// #include "port_def.inc"  // MUST be last header included
+-//
+-// // Definitions for this header.
+-//
+-// #include "port_undef.inc"
+-//
+-// This is a textual header with no include guard, because we want to
+-// detect/prohibit anytime it is #included twice without a corresponding
+-// #undef.
+-
+-#ifdef PROTOBUF_PORT_
+-#error "port_def.inc included multiple times"
+-#endif
+-#define PROTOBUF_PORT_
+-
+-// The definitions in this file are intended to be portable across Clang,
+-// GCC, and MSVC. Function-like macros are usable without an #ifdef guard.
+-// Syntax macros (for example, attributes) are always defined, although
+-// they may be empty.
+-//
+-// Some definitions rely on the NDEBUG macro and/or (in MSVC) _DEBUG:
+-// - https://en.cppreference.com/w/c/error/assert
+-// - https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros#microsoft-specific-predefined-macros
+-//
+-// References for predefined macros:
+-// - Standard: https://en.cppreference.com/w/cpp/preprocessor/replace
+-// - Clang: https://clang.llvm.org/docs/LanguageExtensions.html
+-//          (see also GCC predefined macros)
+-// - GCC: https://gcc.gnu.org/onlinedocs/cpp/Predefined-Macros.html
+-// - MSVC: https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros
+-// - Interactive (Clang/GCC only): https://www.compiler-explorer.com/z/hc6jKd3sj
+-//
+-// References for attributes (and extension attributes):
+-// - Standard: https://en.cppreference.com/w/cpp/language/attributes
+-// - Clang: https://clang.llvm.org/docs/AttributeReference.html
+-// - GCC: https://gcc.gnu.org/onlinedocs/gcc/Attribute-Syntax.html
+-//        (see Clang attribute docs as well)
+-//
+-// References for standard C++ language conformance (and minimum versions):
+-// - Clang: https://clang.llvm.org/cxx_status.html
+-// - GCC: https://gcc.gnu.org/projects/cxx-status.html
+-// - MSVC: https://docs.microsoft.com/en-us/cpp/overview/visual-cpp-language-conformance
+-//
+-// Historical release notes (which can help to determine minimum versions):
+-// - Clang: https://releases.llvm.org/
+-// - GCC: https://gcc.gnu.org/releases.html
+-// - MSVC: https://docs.microsoft.com/en-us/visualstudio/releases/2019/release-notes-history
+-//         https://docs.microsoft.com/en-us/visualstudio/releasenotes/vs2017-relnotes-history
+-
+-// Portable fallbacks for C++20 feature test macros:
+-// https://en.cppreference.com/w/cpp/feature_test
+-#ifndef __has_cpp_attribute
+-#define __has_cpp_attribute(x) 0
+-#define PROTOBUF_has_cpp_attribute_DEFINED_
+-#endif
+-
+-// Portable fallback for Clang's __has_feature macro:
+-// https://clang.llvm.org/docs/LanguageExtensions.html#has-feature-and-has-extension
+-#ifndef __has_feature
+-#define __has_feature(x) 0
+-#define PROTOBUF_has_feature_DEFINED_
+-#endif
+-
+-// Portable fallback for Clang's __has_warning macro:
+-#ifndef __has_warning
+-#define __has_warning(x) 0
+-#define PROTOBUF_has_warning_DEFINED_
+-#endif
+-
+-// Portable fallbacks for the __has_attribute macro (GCC and Clang):
+-// https://clang.llvm.org/docs/LanguageExtensions.html#has-attribute
+-// https://gcc.gnu.org/onlinedocs/cpp/_005f_005fhas_005fattribute.html
+-#ifndef __has_attribute
+-#define __has_attribute(x) 0
+-#define PROTOBUF_has_attribute_DEFINED_
+-#endif
+-
+-// Portable fallback for __has_builtin (GCC and Clang):
+-// https://clang.llvm.org/docs/LanguageExtensions.html#has-builtin
+-// https://gcc.gnu.org/onlinedocs/cpp/_005f_005fhas_005fbuiltin.html
+-#ifndef __has_builtin
+-#define __has_builtin(x) 0
+-#define PROTOBUF_has_builtin_DEFINED_
+-#endif
+-
+-#ifdef ADDRESS_SANITIZER
+-#include <sanitizer/asan_interface.h>
+-#define PROTOBUF_POISON_MEMORY_REGION(p, n) ASAN_POISON_MEMORY_REGION(p, n)
+-#define PROTOBUF_UNPOISON_MEMORY_REGION(p, n) ASAN_UNPOISON_MEMORY_REGION(p, n)
+-#else  // ADDRESS_SANITIZER
+-#define PROTOBUF_POISON_MEMORY_REGION(p, n)
+-#define PROTOBUF_UNPOISON_MEMORY_REGION(p, n)
+-#endif  // ADDRESS_SANITIZER
+-
+-// Portable PROTOBUF_BUILTIN_BSWAPxx definitions
+-// Code must check for availability, e.g.: `defined(PROTOBUF_BUILTIN_BSWAP32)`
+-#ifdef PROTOBUF_BUILTIN_BSWAP16
+-#error PROTOBUF_BUILTIN_BSWAP16 was previously defined
+-#endif
+-#ifdef PROTOBUF_BUILTIN_BSWAP32
+-#error PROTOBUF_BUILTIN_BSWAP32 was previously defined
+-#endif
+-#ifdef PROTOBUF_BUILTIN_BSWAP64
+-#error PROTOBUF_BUILTIN_BSWAP64 was previously defined
+-#endif
+-#if defined(__GNUC__) || __has_builtin(__builtin_bswap16)
+-#define PROTOBUF_BUILTIN_BSWAP16(x) __builtin_bswap16(x)
+-#endif
+-#if defined(__GNUC__) || __has_builtin(__builtin_bswap32)
+-#define PROTOBUF_BUILTIN_BSWAP32(x) __builtin_bswap32(x)
+-#endif
+-#if defined(__GNUC__) || __has_builtin(__builtin_bswap64)
+-#define PROTOBUF_BUILTIN_BSWAP64(x) __builtin_bswap64(x)
+-#endif
+-
+-// Portable check for __builtin_mul_overflow.
+-#if __has_builtin(__builtin_mul_overflow)
+-#define PROTOBUF_HAS_BUILTIN_MUL_OVERFLOW 1
+-#endif
+-
+-// Portable check for gcc-style atomic built-ins
+-#if __has_builtin(__atomic_load_n)
+-#define PROTOBUF_BUILTIN_ATOMIC 1
+-#endif
+-
+-// Portable check for GCC minimum version:
+-// https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+-#if defined(__GNUC__) && defined(__GNUC_MINOR__) \
+-    && defined(__GNUC_PATCHLEVEL__)
+-#  define PROTOBUF_GNUC_MIN(x, y) \
+-  (__GNUC__ > (x) || (__GNUC__ == (x) && __GNUC_MINOR__ >= (y)))
+-#else
+-#  define PROTOBUF_GNUC_MIN(x, y) 0
+-#endif
+-
+-#if defined(__clang__) && defined(__clang_major__) && defined(__clang_minor__)
+-#define PROTOBUF_CLANG_MIN(x, y) \
+-  (__clang_major__ > (x) || (__clang_major__ == (x) && __clang_minor__ >= (y)))
+-#else
+-#define PROTOBUF_CLANG_MIN(x, y) 0
+-#endif
+-
+-// Portable check for MSVC minimum version:
+-// https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros
+-#if defined(_MSC_VER)
+-#define PROTOBUF_MSC_VER_MIN(x) (_MSC_VER >= x)
+-#else
+-#define PROTOBUF_MSC_VER_MIN(x) 0
+-#endif
+-
+-// Portable check for minimum C++ language version:
+-// https://en.cppreference.com/w/cpp/preprocessor/replace
+-// https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros
+-#if !defined(_MSVC_LANG)
+-#define PROTOBUF_CPLUSPLUS_MIN(x) (__cplusplus >= x)
+-#else
+-#define PROTOBUF_CPLUSPLUS_MIN(x) (_MSVC_LANG >= x)
+-#endif
+-
+-// Check minimum Protobuf support defined at:
+-// https://github.com/google/oss-policies-info/blob/main/foundational-cxx-support-matrix.md
+-#ifdef __clang__
+-static_assert(PROTOBUF_CLANG_MIN(6, 0), "Protobuf only supports Clang 6.0 and newer.");
+-#elif defined(__GNUC__)
+-static_assert(PROTOBUF_GNUC_MIN(7, 3), "Protobuf only supports GCC 7.3 and newer.");
+-#elif defined(_MSVC_LANG)
+-static_assert(PROTOBUF_MSC_VER_MIN(1910), "Protobuf only supports MSVC 2017 and newer.");
+-#endif
+-static_assert(PROTOBUF_CPLUSPLUS_MIN(201402L), "Protobuf only supports C++14 and newer.");
+-
+-// Check minimum Abseil version.
+-#if defined(ABSL_LTS_RELEASE_VERSION) && defined(ABSL_LTS_RELEASE_PATCH_LEVEL)
+-#define PROTOBUF_ABSL_MIN(x, y)      \
+-  (ABSL_LTS_RELEASE_VERSION > (x) || \
+-   (ABSL_LTS_RELEASE_VERSION == (x) && ABSL_LTS_RELEASE_PATCH_LEVEL >= (y)))
+-#else
+-// If we can't find an Abseil version, it's either not installed at all (which
+-// should trigger cmake errors), using a non-LTS release, or just isn't used in
+-// this file.
+-#define PROTOBUF_ABSL_MIN(x, y) 1
+-#endif
+-
+-static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
+-              "Protobuf only supports Abseil version 20230125.3 and newer.");
+-
+-// Future versions of protobuf will include breaking changes to some APIs.
+-// This macro can be set to enable these API changes ahead of time, so that
+-// user code can be updated before upgrading versions of protobuf.
+-
+-#ifdef PROTOBUF_FUTURE_BREAKING_CHANGES
+-
+-// Used to remove the manipulation of cleared elements in RepeatedPtrField.
+-// Owner: mkruskal@
+-#define PROTOBUF_FUTURE_REMOVE_CLEARED_API 1
+-
+-// Used for descriptor proto extension declarations.
+-// Owner: shaod@, gberg@
+-#define PROTOBUF_FUTURE_DESCRIPTOR_EXTENSION_DECL 1
+-
+-// Used to remove `RepeatedPtrField::GetArena() const`.
+-// Owner: ezb@
+-#define PROTOBUF_FUTURE_REMOVE_CONST_REPEATEDFIELD_GETARENA_API 1
+-
+-// Used to remove Protobuf editions feature.
+-// Owner: mkruskal@
+-#define PROTOBUF_FUTURE_EDITIONS 1
+-
+-// Used to make ExtensionRange into a fully-fledged descriptor class.
+-// Owner: mkruskal@
+-#define PROTOBUF_FUTURE_EXTENSION_RANGE_CLASS 1
+-
+-#endif
+-
+-#ifdef PROTOBUF_VERSION
+-#error PROTOBUF_VERSION was previously defined
+-#endif
+-#define PROTOBUF_VERSION 4023000
+-
+-#ifdef PROTOBUF_MIN_HEADER_VERSION_FOR_PROTOC
+-#error PROTOBUF_MIN_HEADER_VERSION_FOR_PROTOC was previously defined
+-#endif
+-#define PROTOBUF_MIN_HEADER_VERSION_FOR_PROTOC 4023000
+-
+-#ifdef PROTOBUF_MIN_PROTOC_VERSION
+-#error PROTOBUF_MIN_PROTOC_VERSION was previously defined
+-#endif
+-#define PROTOBUF_MIN_PROTOC_VERSION 4023000
+-
+-#ifdef PROTOBUF_VERSION_SUFFIX
+-#error PROTOBUF_VERSION_SUFFIX was previously defined
+-#endif
+-#define PROTOBUF_VERSION_SUFFIX ""
+-
+-#ifdef PROTOBUF_ALWAYS_INLINE
+-#error PROTOBUF_ALWAYS_INLINE was previously defined
+-#endif
+-// For functions we want to force inline.
+-#if defined(PROTOBUF_NO_INLINE)
+-# define PROTOBUF_ALWAYS_INLINE
+-#elif defined(__GNUC__)
+-# define PROTOBUF_ALWAYS_INLINE __attribute__((always_inline))
+-#elif defined(_MSC_VER)
+-# define PROTOBUF_ALWAYS_INLINE __forceinline
+-#else
+-# define PROTOBUF_ALWAYS_INLINE
+-#endif
+-
+-#ifdef PROTOBUF_ALWAYS_INLINE_CALL
+-#error PROTOBUF_ALWAYS_INLINE_CALL was previously defined
+-#endif
+-// For functions we want to force inline from the caller, instead of in the
+-// declaration of the callee.
+-// This is useful for lambdas where it is not easy to specify ALWAYS_INLINE.
+-// Use like:
+-//   PROTOBUF_ALWAYS_INLINE_CALL res = SomeFunc(args...);
+-#if defined(__clang__) && !defined(PROTOBUF_NO_INLINE_CALL) && \
+-    __has_cpp_attribute(clang::always_inline)
+-#define PROTOBUF_ALWAYS_INLINE_CALL [[clang::always_inline]]
+-#else
+-#define PROTOBUF_ALWAYS_INLINE_CALL
+-#endif
+-
+-#ifdef PROTOBUF_NDEBUG_INLINE
+-#error PROTOBUF_NDEBUG_INLINE was previously defined
+-#endif
+-// Avoid excessive inlining in non-optimized builds. Without other optimizations
+-// the inlining is not going to provide benefits anyway and the huge resulting
+-// functions, especially in the proto-generated serialization functions, produce
+-// stack frames so large that many tests run into stack overflows (b/32192897).
+-#if defined(NDEBUG) || (defined(_MSC_VER) && !defined(_DEBUG))
+-# define PROTOBUF_NDEBUG_INLINE PROTOBUF_ALWAYS_INLINE
+-#else
+-# define PROTOBUF_NDEBUG_INLINE
+-#endif
+-
+-// Note that PROTOBUF_NOINLINE is an attribute applied to functions, to prevent
+-// them from being inlined by the compiler. This is different from
+-// PROTOBUF_NO_INLINE, which is a user-supplied macro that disables forced
+-// inlining by PROTOBUF_(ALWAYS|NDEBUG)_INLINE.
+-#ifdef PROTOBUF_NOINLINE
+-#error PROTOBUF_NOINLINE was previously defined
+-#endif
+-#if defined(__GNUC__)
+-# define PROTOBUF_NOINLINE __attribute__((noinline))
+-#elif defined(_MSC_VER)
+-// Seems to have been around since at least Visual Studio 2005
+-# define PROTOBUF_NOINLINE __declspec(noinline)
+-#endif
+-
+-#ifdef PROTOBUF_MUSTTAIL
+-#error PROTOBUF_MUSTTAIL was previously defined
+-#endif
+-#ifdef PROTOBUF_TAILCALL
+-#error PROTOBUF_TAILCALL was previously defined
+-#endif
+-#if __has_cpp_attribute(clang::musttail) && !defined(__arm__) &&      \
+-    !defined(_ARCH_PPC) && !defined(__wasm__) &&                      \
+-    !(defined(_MSC_VER) && defined(_M_IX86)) && !defined(__i386__) && \
+-    !(defined(__NDK_MAJOR__) && __NDK_MAJOR <= 24)
+-#  ifndef PROTO2_OPENSOURCE
+-// Compilation fails on ARM32: b/195943306
+-// Compilation fails on powerpc64le: b/187985113
+-// Compilation fails on X86 Windows:
+-// https://github.com/llvm/llvm-project/issues/53271
+-#  endif
+-#define PROTOBUF_MUSTTAIL [[clang::musttail]]
+-#define PROTOBUF_TAILCALL true
+-#else
+-#define PROTOBUF_MUSTTAIL
+-#define PROTOBUF_TAILCALL false
+-#endif
+-
+-#ifdef PROTOBUF_EXCLUSIVE_LOCKS_REQUIRED
+-#error PROTOBUF_EXCLUSIVE_LOCKS_REQUIRED was previously defined
+-#endif
+-#if __has_attribute(exclusive_locks_required)
+-#define PROTOBUF_EXCLUSIVE_LOCKS_REQUIRED(...) \
+-  __attribute__((exclusive_locks_required(__VA_ARGS__)))
+-#else
+-#define PROTOBUF_EXCLUSIVE_LOCKS_REQUIRED(...)
+-#endif
+-
+-#ifdef PROTOBUF_NO_THREAD_SAFETY_ANALYSIS
+-#error PROTOBUF_NO_THREAD_SAFETY_ANALYSIS was previously defined
+-#endif
+-#if __has_attribute(no_thread_safety_analysis)
+-#define PROTOBUF_NO_THREAD_SAFETY_ANALYSIS \
+-  __attribute__((no_thread_safety_analysis))
+-#else
+-#define PROTOBUF_NO_THREAD_SAFETY_ANALYSIS
+-#endif
+-
+-#ifdef PROTOBUF_GUARDED_BY
+-#error PROTOBUF_GUARDED_BY was previously defined
+-#endif
+-#if __has_attribute(guarded_by)
+-#define PROTOBUF_GUARDED_BY(x) __attribute__((guarded_by(x)))
+-#else
+-#define PROTOBUF_GUARDED_BY(x)
+-#endif
+-
+-#ifdef PROTOBUF_LOCKS_EXCLUDED
+-#error PROTOBUF_LOCKS_EXCLUDED was previously defined
+-#endif
+-#if __has_attribute(locks_excluded)
+-#define PROTOBUF_LOCKS_EXCLUDED(...) \
+-  __attribute__((locks_excluded(__VA_ARGS__)))
+-#else
+-#define PROTOBUF_LOCKS_EXCLUDED(...)
+-#endif
+-
+-#ifdef PROTOBUF_COLD
+-#error PROTOBUF_COLD was previously defined
+-#endif
+-#if __has_attribute(cold) || defined(__GNUC__)
+-# define PROTOBUF_COLD __attribute__((cold))
+-#else
+-# define PROTOBUF_COLD
+-#endif
+-
+-#ifdef PROTOBUF_SECTION_VARIABLE
+-#error PROTOBUF_SECTION_VARIABLE was previously defined
+-#endif
+-#if (__has_attribute(section) || defined(__GNUC__)) && defined(__ELF__)
+-// Place a variable in the given ELF section.
+-# define PROTOBUF_SECTION_VARIABLE(x) __attribute__((section(#x)))
+-#else
+-# define PROTOBUF_SECTION_VARIABLE(x)
+-#endif
+-
+-#if defined(__clang__)
+-#define PROTOBUF_IGNORE_DEPRECATION_START                     \
+-  _Pragma("clang diagnostic push")                                  \
+-  _Pragma("clang diagnostic ignored \"-Wdeprecated-declarations\"")
+-#define PROTOBUF_IGNORE_DEPRECATION_STOP                     \
+-  _Pragma("clang diagnostic pop")
+-#elif defined(__GNUC__)
+-#define PROTOBUF_IGNORE_DEPRECATION_START                     \
+-  _Pragma("GCC diagnostic push")                                  \
+-  _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
+-#define PROTOBUF_IGNORE_DEPRECATION_STOP                     \
+-  _Pragma("GCC diagnostic pop")
+-#else
+-#define PROTOBUF_IGNORE_DEPRECATION_START
+-#define PROTOBUF_IGNORE_DEPRECATION_STOP
+-#endif
+-
+-#ifdef PROTOBUF_RETURNS_NONNULL
+-#error PROTOBUF_RETURNS_NONNULL was previously defined
+-#endif
+-#if __has_attribute(returns_nonnull) || defined(__GNUC__)
+-#define PROTOBUF_RETURNS_NONNULL __attribute__((returns_nonnull))
+-#else
+-#define PROTOBUF_RETURNS_NONNULL
+-#endif
+-
+-#ifdef PROTOBUF_ATTRIBUTE_REINITIALIZES
+-#error PROTOBUF_ATTRIBUTE_REINITIALIZES was previously defined
+-#endif
+-#if __has_cpp_attribute(clang::reinitializes)
+-#define PROTOBUF_ATTRIBUTE_REINITIALIZES [[clang::reinitializes]]
+-#else
+-#define PROTOBUF_ATTRIBUTE_REINITIALIZES
+-#endif
+-
+-// The minimum library version which works with the current version of the
+-// headers.
 -#define GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION 4023000
-+#define GOOGLE_PROTOBUF_MIN_LIBRARY_VERSION 4025000
+-
+-#ifdef PROTOBUF_RTTI
+-#error PROTOBUF_RTTI was previously defined
+-#endif
+-#if defined(GOOGLE_PROTOBUF_NO_RTTI) && GOOGLE_PROTOBUF_NO_RTTI
+-// A user-provided definition GOOGLE_PROTOBUF_NO_RTTI=1 disables RTTI.
+-#define PROTOBUF_RTTI 0
+-#elif defined(__cpp_rtti)
+-// https://en.cppreference.com/w/cpp/feature_test
+-#define PROTOBUF_RTTI 1
+-#elif __has_feature(cxx_rtti)
+-// https://clang.llvm.org/docs/LanguageExtensions.html#c-rtti
+-#define PROTOBUF_RTTI 1
+-#elif defined(__GXX_RTTI)
+-// https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+-#define PROTOBUF_RTTI 1
+-#elif defined(_CPPRTTI)
+-// https://docs.microsoft.com/en-us/cpp/build/reference/gr-enable-run-time-type-information
+-#define PROTOBUF_RTTI 1
+-#else
+-#define PROTOBUF_RTTI 0
+-#endif
+-
+-// Returns the offset of the given field within the given aggregate type.
+-// This is equivalent to the ANSI C offsetof() macro.  However, according
+-// to the C++ standard, offsetof() only works on POD types, and GCC
+-// enforces this requirement with a warning.  In practice, this rule is
+-// unnecessarily strict; there is probably no compiler or platform on
+-// which the offsets of the direct fields of a class are non-constant.
+-// Fields inherited from superclasses *can* have non-constant offsets,
+-// but that's not what this macro will be used for.
+-#ifdef PROTOBUF_FIELD_OFFSET
+-#error PROTOBUF_FIELD_OFFSET was previously defined
+-#endif
+-#if defined(__clang__)
+-// For Clang we use __builtin_offsetof() and suppress the warning,
+-// to avoid Control Flow Integrity and UBSan vptr sanitizers from
+-// crashing while trying to validate the invalid reinterpret_casts.
+-#define PROTOBUF_FIELD_OFFSET(TYPE, FIELD)                   \
+-  _Pragma("clang diagnostic push")                           \
+-  _Pragma("clang diagnostic ignored \"-Winvalid-offsetof\"") \
+-  __builtin_offsetof(TYPE, FIELD)                            \
+-  _Pragma("clang diagnostic pop")
+-#elif defined(__GNUC__)
+-#define PROTOBUF_FIELD_OFFSET(TYPE, FIELD) __builtin_offsetof(TYPE, FIELD)
+-#else  // defined(__clang__)
+-// Note that we calculate relative to the pointer value 16 here since if we
+-// just use zero, GCC complains about dereferencing a NULL pointer.  We
+-// choose 16 rather than some other number just in case the compiler would
+-// be confused by an unaligned pointer.
+-#define PROTOBUF_FIELD_OFFSET(TYPE, FIELD)                                \
+-  static_cast< ::uint32_t>(reinterpret_cast<const char*>(                   \
+-                             &reinterpret_cast<const TYPE*>(16)->FIELD) - \
+-                         reinterpret_cast<const char*>(16))
+-#endif
+-
+-#ifdef PROTOBUF_EXPORT
+-#error PROTOBUF_EXPORT was previously defined
+-#endif
+-
+-#if defined(PROTOBUF_USE_DLLS) && defined(_MSC_VER)
+-# if defined(LIBPROTOBUF_EXPORTS)
+-#  define PROTOBUF_EXPORT __declspec(dllexport)
+-#  define PROTOBUF_EXPORT_TEMPLATE_DECLARE
+-#  define PROTOBUF_EXPORT_TEMPLATE_DEFINE __declspec(dllexport)
+-# else
+-#  define PROTOBUF_EXPORT __declspec(dllimport)
+-#  define PROTOBUF_EXPORT_TEMPLATE_DECLARE
+-#  define PROTOBUF_EXPORT_TEMPLATE_DEFINE __declspec(dllimport)
+-# endif  // defined(LIBPROTOBUF_EXPORTS)
+-#elif defined(PROTOBUF_USE_DLLS) && defined(LIBPROTOBUF_EXPORTS)
+-# define PROTOBUF_EXPORT __attribute__((visibility("default")))
+-# define PROTOBUF_EXPORT_TEMPLATE_DECLARE __attribute__((visibility("default")))
+-# define PROTOBUF_EXPORT_TEMPLATE_DEFINE
+-#else
+-# define PROTOBUF_EXPORT
+-# define PROTOBUF_EXPORT_TEMPLATE_DECLARE
+-# define PROTOBUF_EXPORT_TEMPLATE_DEFINE
+-#endif
+-
+-#ifdef PROTOC_EXPORT
+-#error PROTOC_EXPORT was previously defined
+-#endif
+-
+-#if defined(PROTOBUF_USE_DLLS) && defined(_MSC_VER)
+-# if defined(LIBPROTOC_EXPORTS)
+-#  define PROTOC_EXPORT __declspec(dllexport)
+-# else
+-#  define PROTOC_EXPORT __declspec(dllimport)
+-# endif  // defined(LIBPROTOC_EXPORTS)
+-#elif defined(PROTOBUF_USE_DLLS) && defined(LIBPROTOC_EXPORTS)
+-# define PROTOC_EXPORT __attribute__((visibility("default")))
+-#else
+-# define PROTOC_EXPORT
+-#endif
+-
+-#if defined(PROTOBUF_PREDICT_TRUE) || defined(PROTOBUF_PREDICT_FALSE)
+-#error PROTOBUF_PREDICT_(TRUE|FALSE) was previously defined
+-#endif
+-#if defined(__GNUC__)
+-# define PROTOBUF_PREDICT_TRUE(x) (__builtin_expect(false || (x), true))
+-# define PROTOBUF_PREDICT_FALSE(x) (__builtin_expect(false || (x), false))
+-#else
+-# define PROTOBUF_PREDICT_TRUE(x) (x)
+-# define PROTOBUF_PREDICT_FALSE(x) (x)
+-#endif
+-
+-#ifdef PROTOBUF_NODISCARD
+-#error PROTOBUF_NODISCARD was previously defined
+-#endif
+-#if __has_cpp_attribute(nodiscard) && PROTOBUF_CPLUSPLUS_MIN(201703L)
+-#define PROTOBUF_NODISCARD [[nodiscard]]
+-#elif __has_attribute(warn_unused_result) || defined(__GNUC__)
+-#define PROTOBUF_NODISCARD __attribute__((warn_unused_result))
+-#else
+-#define PROTOBUF_NODISCARD
+-#endif
+-
+-#ifdef PROTOBUF_RESTRICT
+-#error PROTOBUF_RESTRICT was previously defined
+-#endif
+-#if defined( __clang__) || defined(__GNUC__)
+-#define PROTOBUF_RESTRICT __restrict
+-#else
+-#define PROTOBUF_RESTRICT
+-#endif
+-
+-#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+-#error PROTOBUF_FORCE_COPY_IN_RELEASE was previously defined
+-#endif
+-
+-#ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+-#error PROTOBUF_FORCE_COPY_IN_SWAP was previously defined
+-#endif
+-
+-#ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+-#error PROTOBUF_FORCE_COPY_IN_MOVE was previously defined
+-#endif
+-
+-#ifdef PROTOBUF_FORCE_RESET_IN_CLEAR
+-#error PROTOBUF_FORCE_RESET_IN_CLEAR was previously defined
+-#endif
+-
+-#ifdef PROTOBUF_FUZZ_MESSAGE_SPACE_USED_LONG
+-#error PROTOBUF_FUZZ_MESSAGE_SPACE_USED_LONG was previously defined
+-#endif
+-
+-// Force copy the default string to a string field so that non-optimized builds
+-// have harder-to-rely-on address stability.
+-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+-#error PROTOBUF_FORCE_COPY_DEFAULT_STRING was previously defined
+-#endif
+-
+-#ifdef PROTOBUF_FORCE_ALLOCATION_ON_CONSTRUCTION
+-#error PROTOBUF_FORCE_ALLOCATION_ON_CONSTRUCTION was previously defined
+-#endif
+-
+-#ifdef PROTOBUF_FALLTHROUGH_INTENDED
+-#error PROTOBUF_FALLTHROUGH_INTENDED was previously defined
+-#endif
+-#if __has_cpp_attribute(fallthrough)
+-#define PROTOBUF_FALLTHROUGH_INTENDED [[fallthrough]]
+-#elif __has_feature(cxx_attributes) && __has_warning("-Wimplicit-fallthrough")
+-#define PROTOBUF_FALLTHROUGH_INTENDED [[clang::fallthrough]]
+-#elif defined(__GNUC__)
+-#define PROTOBUF_FALLTHROUGH_INTENDED [[gnu::fallthrough]]
+-#else
+-#define PROTOBUF_FALLTHROUGH_INTENDED
+-#endif
+-
+-// Specify memory alignment for structs, classes, etc.
+-// Use like:
+-//   class PROTOBUF_ALIGNAS(16) MyClass { ... }
+-//   PROTOBUF_ALIGNAS(16) int array[4];
+-//
+-// In most places you can use the C++11 keyword "alignas", which is preferred.
+-//
+-// But compilers have trouble mixing __attribute__((...)) syntax with
+-// alignas(...) syntax.
+-//
+-// Doesn't work in clang or gcc:
+-//   struct alignas(16) __attribute__((packed)) S { char c; };
+-// Works in clang but not gcc:
+-//   struct __attribute__((packed)) alignas(16) S2 { char c; };
+-// Works in clang and gcc:
+-//   struct alignas(16) S3 { char c; } __attribute__((packed));
+-//
+-// There are also some attributes that must be specified *before* a class
+-// definition: visibility (used for exporting functions/classes) is one of
+-// these attributes. This means that it is not possible to use alignas() with a
+-// class that is marked as exported.
+-#ifdef PROTOBUF_ALIGNAS
+-#error PROTOBUF_ALIGNAS was previously defined
+-#endif
+-#if defined(_MSC_VER)
+-#define PROTOBUF_ALIGNAS(byte_alignment) __declspec(align(byte_alignment))
+-#elif defined(__GNUC__)
+-#define PROTOBUF_ALIGNAS(byte_alignment) \
+-  __attribute__((aligned(byte_alignment)))
+-#else
+-#define PROTOBUF_ALIGNAS(byte_alignment) alignas(byte_alignment)
+-#endif
+-
+-#ifdef PROTOBUF_FINAL
+-#error PROTOBUF_FINAL was previously defined
+-#endif
+-#define PROTOBUF_FINAL final
+-
+-#ifdef PROTOBUF_THREAD_LOCAL
+-#error PROTOBUF_THREAD_LOCAL was previously defined
+-#endif
+-#if defined(_MSC_VER)
+-#define PROTOBUF_THREAD_LOCAL __declspec(thread)
+-#else
+-#define PROTOBUF_THREAD_LOCAL __thread
+-#endif
+-
+-// TODO(b/228173843): cleanup PROTOBUF_LITTLE_ENDIAN in various 3p forks.
+-#if (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
+-     __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+-#define PROTOBUF_LITTLE_ENDIAN 1
+-#ifdef PROTOBUF_BIG_ENDIAN
+-#error Conflicting PROTOBUF_BIG_ENDIAN was previously defined
+-#endif
+-#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && \
+-    __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+-#define PROTOBUF_BIG_ENDIAN 1
+-#elif defined(_WIN32) || defined(__x86_64__) || defined(__aarch64__)
+-#define PROTOBUF_LITTLE_ENDIAN 1
+-#else
+-#error "endian detection failed for current compiler"
+-#endif
+-
+-#ifdef PROTOBUF_CONSTINIT
+-#error PROTOBUF_CONSTINIT was previously defined
+-#endif
+-
+-// Lexan sets both MSV_VER and clang, so handle it with the clang path.
+-#if defined(_MSC_VER) && !defined(__clang__)
+-// MSVC 17 currently seems to raise an error about constant-initialized pointers.
+-# if PROTOBUF_MSC_VER_MIN(1930)
+-#  define PROTOBUF_CONSTINIT
+-#  define PROTOBUF_CONSTEXPR constexpr
+-# endif
+-#elif defined(__GNUC__) && !defined(__clang__)
+-// GCC doesn't support constinit aggregate initialization of absl::Cord.
+-# if PROTOBUF_GNUC_MIN(12, 2)
+-#  define PROTOBUF_CONSTINIT
+-#  define PROTOBUF_CONSTEXPR constexpr
+-# endif
+-#else
+-# if defined(__cpp_constinit) && !defined(__CYGWIN__)
+-#  define PROTOBUF_CONSTINIT constinit
+-#  define PROTOBUF_CONSTEXPR constexpr
+-#  define PROTOBUF_CONSTINIT_DEFAULT_INSTANCES
+-// Some older Clang versions incorrectly raise an error about
+-// constant-initializing weak default instance pointers. Versions 12.0 and
+-// higher seem to work, except that XCode 12.5.1 shows the error even though it
+-// uses Clang 12.0.5.
+-# elif !defined(__CYGWIN__) && \
+-    __has_cpp_attribute(clang::require_constant_initialization) && \
+-        ((defined(__APPLE__) && PROTOBUF_CLANG_MIN(13, 0)) ||             \
+-     (!defined(__APPLE__) && PROTOBUF_CLANG_MIN(12, 0)))
+-#  define PROTOBUF_CONSTINIT [[clang::require_constant_initialization]]
+-#  define PROTOBUF_CONSTEXPR constexpr
+-#  define PROTOBUF_CONSTINIT_DEFAULT_INSTANCES
+-# endif
+-#endif
+-
+-#ifndef PROTOBUF_CONSTINIT
+-#define PROTOBUF_CONSTINIT
+-#define PROTOBUF_CONSTEXPR
+-#endif
+-
+-// Some globals with an empty non-trivial destructor are annotated with
+-// no_destroy for performance reasons. It reduces the cost of these globals in
+-// non-opt mode and under sanitizers.
+-#ifdef PROTOBUF_ATTRIBUTE_NO_DESTROY
+-#error PROTOBUF_ATTRIBUTE_NO_DESTROY was previously defined
+-#endif
+-#if __has_cpp_attribute(clang::no_destroy)
+-#define PROTOBUF_ATTRIBUTE_NO_DESTROY [[clang::no_destroy]]
+-#else
+-#define PROTOBUF_ATTRIBUTE_NO_DESTROY
+-#endif
+-
+-// Force clang to always emit complete debug info for a type.
+-// Clang uses constructor homing to determine when to emit debug info for a
+-// type. If the constructor of a type is never used, which can happen in some
+-// cases where member variables are constructed in place for optimization
+-// purposes (see b/208803175 for an example), the type will have incomplete
+-// debug info unless this attribute is used.
+-#ifdef PROTOBUF_ATTRIBUTE_STANDALONE_DEBUG
+-#error PROTOBUF_ATTRIBUTE_STANDALONE_DEBUG was previously defined
+-#endif
+-#if __has_cpp_attribute(clang::standalone_debug)
+-#define PROTOBUF_ATTRIBUTE_STANDALONE_DEBUG [[clang::standalone_debug]]
+-#else
+-#define PROTOBUF_ATTRIBUTE_STANDALONE_DEBUG
+-#endif
+-
+-// Protobuf extensions and reflection require registration of the protos linked
+-// in the binary. Not until everything is registered does the runtime have a
+-// complete view on all protos. When code is using reflection or extensions
+-// in between registration calls this can lead to surprising behavior. By
+-// having the registration run first we mitigate this scenario.
+-// Highest priority is 101. We use 102 for registration, to allow code that
+-// really wants to higher priority to still beat us. Some initialization happens
+-// at higher priority, though, since it is needed before registration.
+-#ifdef PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+-#error PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 was previously defined
+-#endif
+-#ifdef PROTOBUF_ATTRIBUTE_INIT_PRIORITY2
+-#error PROTOBUF_ATTRIBUTE_INIT_PRIORITY2 was previously defined
+-#endif
+-#if defined(__GNUC__) && (!defined(__APPLE__) || defined(__clang__)) && \
+-    !((defined(sun) || defined(__sun)) &&                                     \
+-      (defined(__SVR4) || defined(__svr4__)))
+-#define PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 __attribute__((init_priority((101))))
+-#define PROTOBUF_ATTRIBUTE_INIT_PRIORITY2 __attribute__((init_priority((102))))
+-#else
+-#define PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+-#define PROTOBUF_ATTRIBUTE_INIT_PRIORITY2
+-#endif
+-
+-#ifdef PROTOBUF_PRAGMA_INIT_SEG
+-#error PROTOBUF_PRAGMA_INIT_SEG was previously defined
+-#endif
+-#ifdef _MSC_VER
+-#define PROTOBUF_PRAGMA_INIT_SEG __pragma(init_seg(lib))
+-#else
+-#define PROTOBUF_PRAGMA_INIT_SEG
+-#endif
+-
+-#ifdef PROTOBUF_ATTRIBUTE_WEAK
+-#error PROTOBUF_ATTRIBUTE_WEAK was previously defined
+-#endif
+-#if __has_attribute(weak) && \
+-    !defined(__APPLE__) && \
+-    (!defined(_WIN32) || __clang_major__ < 9) && \
+-    !defined(__MINGW32__)
+-#define PROTOBUF_ATTRIBUTE_WEAK __attribute__((weak))
+-#define PROTOBUF_HAVE_ATTRIBUTE_WEAK 1
+-#else
+-#define PROTOBUF_ATTRIBUTE_WEAK
+-#define PROTOBUF_HAVE_ATTRIBUTE_WEAK 0
+-#endif
+-
+-// Macros to detect sanitizers.
+-#ifdef PROTOBUF_ASAN
+-#error PROTOBUF_ASAN was previously defined
+-#endif
+-#ifdef PROTOBUF_MSAN
+-#error PROTOBUF_MSAN was previously defined
+-#endif
+-#ifdef PROTOBUF_TSAN
+-#error PROTOBUF_TSAN was previously defined
+-#endif
+-#if defined(__clang__)
+-#  if __has_feature(address_sanitizer)
+-#    define PROTOBUF_ASAN 1
+-#  endif
+-#  if __has_feature(thread_sanitizer)
+-#    define PROTOBUF_TSAN 1
+-#  endif
+-#  if __has_feature(memory_sanitizer)
+-#    define PROTOBUF_MSAN 1
+-#  endif
+-#elif defined(__GNUC__)
+-// Double-guard is needed for -Wundef:
+-#  ifdef __SANITIZE_ADDRESS__
+-#  if    __SANITIZE_ADDRESS__
+-#    define PROTOBUF_ASAN 1
+-#  endif
+-#  endif
+-#  ifdef __SANITIZE_THREAD__
+-#  if    __SANITIZE_THREAD__
+-#    define PROTOBUF_TSAN 1
+-#  endif
+-#  endif
+-#endif
+-
+-#ifdef PROTOBUF_USE_TABLE_PARSER_ON_REFLECTION
+-#error PROTOBUF_USE_TABLE_PARSER_ON_REFLECTION was previously defined
+-#endif
+-#if !defined(PROTOBUF_TEMPORARY_DISABLE_TABLE_PARSER_ON_REFLECTION)
+-#define PROTOBUF_USE_TABLE_PARSER_ON_REFLECTION 1
+-#endif  // PROTOBUF_ENABLE_FORCE_ALLOCATION_ON_CONSTRUCTION
+-
+-// Note that this is performance sensitive: changing the parameters will change
+-// the registers used by the ABI calling convention, which subsequently affects
+-// register selection logic inside the function.
+-// Arguments `msg`, `ptr` and `ctx` are the 1st/2nd/3rd argument to match the
+-// signature of ParseLoop.
+-//
+-// Note for x86_64: `data` must be the third or fourth argument for performance
+-// reasons. In order to efficiently read the second byte of `data` we need it to
+-// be passed in RDX or RCX.
+-#define PROTOBUF_TC_PARAM_DECL                 \
+-  ::google::protobuf::MessageLite *msg, const char *ptr, \
+-      ::google::protobuf::internal::ParseContext *ctx,   \
+-      ::google::protobuf::internal::TcFieldData data,    \
+-      const ::google::protobuf::internal::TcParseTableBase *table, uint64_t hasbits
+-// PROTOBUF_TC_PARAM_PASS passes values to match PROTOBUF_TC_PARAM_DECL.
+-#define PROTOBUF_TC_PARAM_PASS msg, ptr, ctx, data, table, hasbits
+-
+-// PROTOBUF_TC_PARAM_NO_DATA_DECL and PROTOBUF_TC_PARAM_NO_DATA_PASS provide the
+-// exact same ABI as above, except that they don't name or pass the `data`
+-// argument. Specific functions such as `Error() and `ToTagDispatch()` don't
+-// use the `data` argument. By not passing `data` down the call stack, we free
+-// up the register holding that value, which may matter in highly optimized
+-// functions such as varint parsing.
+-#define PROTOBUF_TC_PARAM_NO_DATA_DECL                                        \
+-  ::google::protobuf::MessageLite *msg, const char *ptr,                                \
+-      ::google::protobuf::internal::ParseContext *ctx, ::google::protobuf::internal::TcFieldData, \
+-      const ::google::protobuf::internal::TcParseTableBase *table, uint64_t hasbits
+-#define PROTOBUF_TC_PARAM_NO_DATA_PASS \
+-  msg, ptr, ctx, ::google::protobuf::internal::TcFieldData::DefaultInit(), table, hasbits
+-
+-#ifdef PROTOBUF_UNUSED
+-#error PROTOBUF_UNUSED was previously defined
+-#endif
+-#if __has_cpp_attribute(maybe_unused) || \
+-    (PROTOBUF_MSC_VER_MIN(1911) && PROTOBUF_CPLUSPLUS_MIN(201703L))
+-#define PROTOBUF_UNUSED [[maybe_unused]]
+-#elif __has_attribute(unused) || defined(__GNUC__)
+-#define PROTOBUF_UNUSED __attribute__((__unused__))
+-#else
+-#define PROTOBUF_UNUSED
+-#endif
+-
+-// ThreadSafeArenaz is turned off completely in opensource builds.
+-
+-// autoheader defines this in some circumstances
+-#ifdef PACKAGE
+-#define PROTOBUF_DID_UNDEF_PACKAGE
+-#pragma push_macro("PACKAGE")
+-#undef PACKAGE
+-#endif
+-
+-// autoheader defines this in some circumstances
+-#ifdef PACKAGE
+-#define PROTOBUF_DID_UNDEF_PACKAGE
+-#pragma push_macro("PACKAGE")
+-#undef PACKAGE
+-#endif
+-
+-// a few common headers define this
+-#ifdef PACKED
+-#define PROTOBUF_DID_UNDEF_PACKED
+-#pragma push_macro("PACKED")
+-#undef PACKED
+-#endif
+-
+-// linux is a legacy MACRO defined in most popular C++ standards.
+-#ifdef linux
+-#pragma push_macro("linux")
+-#undef linux
+-#define PROTOBUF_DID_UNDEF_LINUX
+-#endif
+-
+-// Windows declares several inconvenient macro names.  We #undef them and then
+-// restore them in port_undef.inc.
+-#ifdef _WIN32
+-#pragma push_macro("CREATE_NEW")
+-#undef CREATE_NEW
+-#pragma push_macro("DELETE")
+-#undef DELETE
+-#pragma push_macro("DOMAIN")
+-#undef DOMAIN
+-#pragma push_macro("DOUBLE_CLICK")
+-#undef DOUBLE_CLICK
+-#pragma push_macro("ERROR")
+-#undef ERROR
+-#pragma push_macro("ERROR_BUSY")
+-#undef ERROR_BUSY
+-#pragma push_macro("ERROR_INSTALL_FAILED")
+-#undef ERROR_INSTALL_FAILED
+-#pragma push_macro("ERROR_NOT_FOUND")
+-#undef ERROR_NOT_FOUND
+-#pragma push_macro("GetClassName")
+-#undef GetClassName
+-#pragma push_macro("GetCurrentTime")
+-#undef GetCurrentTime
+-#pragma push_macro("GetMessage")
+-#undef GetMessage
+-#pragma push_macro("GetObject")
+-#undef GetObject
+-#pragma push_macro("IGNORE")
+-#undef IGNORE
+-#pragma push_macro("IN")
+-#undef IN
+-#pragma push_macro("INPUT_KEYBOARD")
+-#undef INPUT_KEYBOARD
+-#pragma push_macro("NO_ERROR")
+-#undef NO_ERROR
+-#pragma push_macro("OUT")
+-#undef OUT
+-#pragma push_macro("OPTIONAL")
+-#undef OPTIONAL
+-#pragma push_macro("min")
+-#undef min
+-#pragma push_macro("max")
+-#undef max
+-#pragma push_macro("NEAR")
+-#undef NEAR
+-#pragma push_macro("NO_DATA")
+-#undef NO_DATA
+-#pragma push_macro("REASON_UNKNOWN")
+-#undef REASON_UNKNOWN
+-#pragma push_macro("SERVICE_DISABLED")
+-#undef SERVICE_DISABLED
+-#pragma push_macro("SEVERITY_ERROR")
+-#undef SEVERITY_ERROR
+-#pragma push_macro("STATUS_PENDING")
+-#undef STATUS_PENDING
+-#pragma push_macro("STRICT")
+-#undef STRICT
+-#pragma push_macro("timezone")
+-#undef timezone
+-#pragma push_macro("TRUE")
+-#undef TRUE
+-#pragma push_macro("FALSE")
+-#undef FALSE
+-#endif  // _WIN32
+-
+-#ifdef __APPLE__
+-// Inconvenient macro names from usr/include/math.h in some macOS SDKs.
+-#pragma push_macro("DOMAIN")
+-#undef DOMAIN
+-// Inconvenient macro names from /usr/include/mach/boolean.h in some macOS SDKs.
+-#pragma push_macro("TRUE")
+-#undef TRUE
+-#pragma push_macro("FALSE")
+-#undef FALSE
+-// Inconvenient macro names from usr/include/sys/syslimits.h in some macOS SDKs.
+-#pragma push_macro("UID_MAX")
+-#undef UID_MAX
+-#pragma push_macro("GID_MAX")
+-#undef GID_MAX
+-// TYPE_BOOL is defined in the MacOS's ConditionalMacros.h.
+-#pragma push_macro("TYPE_BOOL")
+-#undef TYPE_BOOL
+-#endif  // __APPLE__
+-
+-#if defined(__clang__) || defined(__GNUC__) || defined(_MSC_VER)
+-// Don't let Objective-C Macros interfere with proto identifiers with the same
+-// name.
+-#pragma push_macro("DEBUG")
+-#undef DEBUG
+-#endif // defined(__clang__) || defined(__GNUC__) || defined(_MSC_VER)
+-
+-// Protobuf does not support building with a number of warnings that are noisy
+-// (and of variable quality across compiler versions) or impossible to implement
+-// effectively but which people turn on anyways.
+-#ifdef __clang__
+-#pragma clang diagnostic push
+-// -Wshorten-64-to-32 is a typical pain where we diff pointers.
+-//   char* p = strchr(s, '\n');
+-//   return p ? p - s : -1;
+-#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+-// Turn on -Wdeprecated-enum-enum-conversion. This deprecation comes in C++20
+-// via http://wg21.link/p1120r0.
+-#pragma clang diagnostic error "-Wdeprecated-enum-enum-conversion"
+-// This error has been generally flaky, but we need to disable it specifically
+-// to fix https://github.com/protocolbuffers/protobuf/issues/12313
+-#pragma clang diagnostic ignored "-Wunused-parameter"
+-#endif
+-#ifdef __GNUC__
+-#pragma GCC diagnostic push
+-// Some of the warnings below only exist in some GCC versions; those version
+-// ranges are poorly documented.
+-#pragma GCC diagnostic ignored "-Wpragmas"
+-// GCC does not allow disabling diagnostics within an expression:
+-// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60875, so we disable this one
+-// globally even though it's only used for PROTOBUF_FIELD_OFFSET.
+-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+-// Some versions of GCC seem to think that
+-//  [this] { Foo(); }
+-// leaves `this` unused, even though `Foo();` is a member function of the
+-// captured `this`.
+-// https://bugzilla.mozilla.org/show_bug.cgi?id=1373625
+-#pragma GCC diagnostic ignored "-Wunused-lambda-capture"
+-// -Wsign-conversion causes a lot of warnings on mostly code like:
+-//   int index = ...
+-//   int value = vec[index];
+-#pragma GCC diagnostic ignored "-Wsign-conversion"
+-// This error has been generally flaky, but we need to disable it specifically
+-// to fix https://github.com/protocolbuffers/protobuf/issues/12313
+-#pragma GCC diagnostic ignored "-Wunused-parameter"
+-#ifndef __clang__
+-// This causes spurious warnings in GCC 13.
+-#pragma GCC diagnostic ignored "-Wstringop-overflow"
+-// This causes spurious warnings in GCC 13.
+-#pragma GCC diagnostic ignored "-Wself-move"
+-#endif
+-#if __GNUC__ == 12 && __GNUC_MINOR__ < 4
+-// Wrong warning emitted when assigning a single char c-string to a std::string
+-// in c++20 mode and optimization on.
+-// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105329
+-// Planned to be fixed by 12.3 but widen window to 12.4.
+-#pragma GCC diagnostic ignored "-Wrestrict"
+-#endif
+-#endif  // __GNUC__
+-
+-// Silence some MSVC warnings in all our code.
+-#ifdef _MSC_VER
+-#pragma warning(push)
+-// For non-trivial unions
+-#pragma warning(disable : 4582)
+-#pragma warning(disable : 4583)
+-// For init_seg(lib)
+-#pragma warning(disable : 4073)
+-// To silence the fact that we will pop this push from another file
+-#pragma warning(disable : 5031)
+-// Conditional expression is constant
+-#pragma warning(disable: 4127)
+-// decimal digit terminates octal escape sequence
+-#pragma warning(disable: 4125)
+-#endif
+-
+-#if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
+-#define PROTOBUF_DEBUG true
+-#else
+-#define PROTOBUF_DEBUG false
+-#endif
+-
+-#define PROTO2_IS_OSS true
+-
+-#ifdef PROTOBUF_NO_THREADLOCAL
+-#error PROTOBUF_NO_THREADLOCAL was previously defined
+-#endif
+-
+-// port_def.inc may be included in very large compilation targets, so we need to
+-// minimize adding symbol and source file information here. For this reason we
+-// implement our own simple `protobuf_assumption_failed()` function for
+-// asserting PROTOBUF_ASSUME predicates in debug builds.
+-namespace proto_converter {
+-namespace internal {
+-PROTOBUF_EXPORT void protobuf_assumption_failed(const char *pred,
+-                                                const char *file, int line);
+-}  // namespace internal
+-}  // namespace proto_converter
+-
+-// PROTOBUF_ASSUME(pred) tells the compiler that it can assume pred is true.
+-// To be safe, we also validate the assumption in debug builds, printing an
+-// assert style "Assumption failed: ..." message and aborting the program if
+-// the predicate is false. The macro does not do anything useful if the
+-// compiler does not support __builtin_assume.
+-#ifdef PROTOBUF_ASSUME
+-#error PROTOBUF_ASSUME was previously defined
+-#endif
+-#if __has_builtin(__builtin_assume)
+-#ifdef NDEBUG
+-#define PROTOBUF_ASSUME(pred) __builtin_assume(pred)
+-#else  // NDEBUG
+-#define PROTOBUF_ASSUME(pred)                                                \
+-  if (!(pred)) {                                                             \
+-    ::proto_converter::internal::protobuf_assumption_failed(#pred, __FILE__, \
+-                                                            __LINE__);       \
+-  }                                                                          \
+-  __builtin_assume(pred)
+-#endif  // NDEBUG
+-#else   // has_builtin(__builtin_assume)
+-#ifndef NDEBUG
+-#define PROTOBUF_ASSUME(pred)                                                \
+-  if (!(pred)) {                                                             \
+-    ::proto_converter::internal::protobuf_assumption_failed(#pred, __FILE__, \
+-                                                            __LINE__);       \
+-  }
+-#else  // !NDEBUG
+-#define PROTOBUF_ASSUME(pred)
+-#endif  // !NDEBUG
+-#endif  // has_builtin(__builtin_assume)
+-
+-// We don't want code outside port_def doing complex testing, so
+-// remove our portable condition test macros to nudge folks away from
+-// using it themselves.
+-#ifdef PROTOBUF_has_cpp_attribute_DEFINED_
+-#  undef __has_cpp_attribute
+-#  undef PROTOBUF_has_cpp_attribute_DEFINED_
+-#endif
+-#ifdef PROTOBUF_has_feature_DEFINED_
+-#  undef __has_feature
+-#  undef PROTOBUF_has_feature_DEFINED_
+-#endif
+-#ifdef PROTOBUF_has_warning_DEFINED_
+-#  undef __has_warning
+-#  undef PROTOBUF_has_warning_DEFINED_
+-#endif
+-#ifdef PROTOBUF_has_attribute_DEFINED_
+-#  undef __has_attribute
+-#  undef PROTOBUF_has_attribute_DEFINED_
+-#endif
+-#ifdef PROTOBUF_has_builtin_DEFINED_
+-#  undef __has_builtin
+-#  undef PROTOBUF_has_builtin_DEFINED_
+-#endif
+diff --git a/src/google/protobuf/util/converter/port_undef.inc b/src/google/protobuf/util/converter/port_undef.inc
+deleted file mode 100644
+index 1756b1a..0000000
+--- a/src/google/protobuf/util/converter/port_undef.inc
++++ /dev/null
+@@ -1,165 +0,0 @@
+-
+-// #undefs all macros defined in port_def.inc.  See comments in port_def.inc
+-// for more info.
+-
+-#ifndef PROTOBUF_PORT_
+-#error "port_undef.inc must be included after port_def.inc"
+-#endif
+-#undef PROTOBUF_PORT_
+-
+-#undef PROTOBUF_POISON_MEMORY_REGION
+-#undef PROTOBUF_UNPOISON_MEMORY_REGION
+-#undef PROTOBUF_BUILTIN_BSWAP16
+-#undef PROTOBUF_BUILTIN_BSWAP32
+-#undef PROTOBUF_BUILTIN_BSWAP64
+-#undef PROTOBUF_HAS_BUILTIN_MUL_OVERFLOW
+-#undef PROTOBUF_BUILTIN_ATOMIC
+-#undef PROTOBUF_GNUC_MIN
+-#undef PROTOBUF_CLANG_MIN
+-#undef PROTOBUF_MSC_VER_MIN
+-#undef PROTOBUF_CPLUSPLUS_MIN
+-#undef PROTOBUF_ABSL_MIN
+-#undef PROTOBUF_ALWAYS_INLINE
+-#undef PROTOBUF_ALWAYS_INLINE_CALL
+-#undef PROTOBUF_NDEBUG_INLINE
+-#undef PROTOBUF_MUSTTAIL
+-#undef PROTOBUF_TAILCALL
+-#undef PROTOBUF_COLD
+-#undef PROTOBUF_NOINLINE
+-#undef PROTOBUF_SECTION_VARIABLE
+-#undef PROTOBUF_IGNORE_DEPRECATION_START
+-#undef PROTOBUF_IGNORE_DEPRECATION_STOP
+-#undef PROTOBUF_RETURNS_NONNULL
+-#undef PROTOBUF_ATTRIBUTE_REINITIALIZES
+-#undef PROTOBUF_RTTI
+-#undef PROTOBUF_VERSION
+-#undef PROTOBUF_VERSION_SUFFIX
+-#undef PROTOBUF_FIELD_OFFSET
+-#undef PROTOBUF_MIN_HEADER_VERSION_FOR_PROTOC
+-#undef PROTOBUF_MIN_PROTOC_VERSION
+-#undef PROTOBUF_PREDICT_TRUE
+-#undef PROTOBUF_PREDICT_FALSE
+-#undef PROTOBUF_FALLTHROUGH_INTENDED
+-#undef PROTOBUF_EXPORT
+-#undef PROTOC_EXPORT
+-#undef PROTOBUF_NODISCARD
+-#undef PROTOBUF_RESTRICT
+-#undef PROTOBUF_FORCE_COPY_IN_RELEASE
+-#undef PROTOBUF_FORCE_COPY_IN_SWAP
+-#undef PROTOBUF_FORCE_COPY_IN_MOVE
+-#undef PROTOBUF_FORCE_RESET_IN_CLEAR
+-#undef PROTOBUF_FUZZ_MESSAGE_SPACE_USED_LONG
+-#undef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+-#undef PROTOBUF_FORCE_ALLOCATION_ON_CONSTRUCTION
+-#undef PROTOBUF_UNUSED
+-#undef PROTOBUF_ASSUME
+-#undef PROTOBUF_EXPORT_TEMPLATE_DECLARE
+-#undef PROTOBUF_EXPORT_TEMPLATE_DEFINE
+-#undef PROTOBUF_ALIGNAS
+-#undef PROTOBUF_FINAL
+-#undef PROTOBUF_THREAD_LOCAL
+-#undef PROTOBUF_LITTLE_ENDIAN
+-#undef PROTOBUF_BIG_ENDIAN
+-#undef PROTOBUF_CONSTINIT
+-#undef PROTOBUF_CONSTEXPR
+-#undef PROTOBUF_CONSTINIT_DEFAULT_INSTANCES
+-#undef PROTOBUF_ATTRIBUTE_WEAK
+-#undef PROTOBUF_HAVE_ATTRIBUTE_WEAK
+-#undef PROTOBUF_ATTRIBUTE_NO_DESTROY
+-#undef PROTOBUF_ATTRIBUTE_STANDALONE_DEBUG
+-#undef PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+-#undef PROTOBUF_ATTRIBUTE_INIT_PRIORITY2
+-#undef PROTOBUF_PRAGMA_INIT_SEG
+-#undef PROTOBUF_ASAN
+-#undef PROTOBUF_MSAN
+-#undef PROTOBUF_TSAN
+-#undef PROTOBUF_USE_TABLE_PARSER_ON_REFLECTION
+-#undef PROTOBUF_TC_PARAM_DECL
+-#undef PROTOBUF_EXCLUSIVE_LOCKS_REQUIRED
+-#undef PROTOBUF_LOCKS_EXCLUDED
+-#undef PROTOBUF_NO_THREAD_SAFETY_ANALYSIS
+-#undef PROTOBUF_GUARDED_BY
+-#undef PROTOBUF_DEBUG
+-#undef PROTO2_IS_OSS
+-#undef PROTOBUF_NO_THREADLOCAL
+-
+-#ifdef PROTOBUF_FUTURE_BREAKING_CHANGES
+-#undef PROTOBUF_FUTURE_BREAKING_CHANGES
+-#undef PROTOBUF_FUTURE_REMOVE_CLEARED_API
+-#undef PROTOBUF_FUTURE_DESCRIPTOR_EXTENSION_DECL
+-#endif
+-
+-// Restore macros that may have been #undef'd in port_def.inc.
+-
+-#ifdef PROTOBUF_DID_UNDEF_PACKAGE
+-#pragma pop_macro("PACKAGE")
+-#undef PROTOBUF_DID_UNDEF_PACKAGE
+-#endif
+-
+-#ifdef PROTOBUF_DID_UNDEF_PACKED
+-#pragma pop_macro("PACKED")
+-#undef PROTOBUF_DID_UNDEF_PACKED
+-#endif
+-
+-#ifdef PROTOBUF_DID_UNDEF_LINUX
+-#pragma pop_macro("linux")
+-#endif
+-
+-#ifdef _WIN32
+-#pragma pop_macro("CREATE_NEW")
+-#pragma pop_macro("DELETE")
+-#pragma pop_macro("DOMAIN")
+-#pragma pop_macro("DOUBLE_CLICK")
+-#pragma pop_macro("ERROR")
+-#pragma pop_macro("ERROR_BUSY")
+-#pragma pop_macro("ERROR_INSTALL_FAILED")
+-#pragma pop_macro("ERROR_NOT_FOUND")
+-#pragma pop_macro("GetClassName")
+-#pragma pop_macro("GetCurrentTime")
+-#pragma pop_macro("GetMessage")
+-#pragma pop_macro("GetObject")
+-#pragma pop_macro("IGNORE")
+-#pragma pop_macro("IN")
+-#pragma pop_macro("INPUT_KEYBOARD")
+-#pragma pop_macro("OUT")
+-#pragma pop_macro("OPTIONAL")
+-#pragma pop_macro("min")
+-#pragma pop_macro("max")
+-#pragma pop_macro("NEAR")
+-#pragma pop_macro("NO_DATA")
+-#pragma pop_macro("NO_ERROR")
+-#pragma pop_macro("REASON_UNKNOWN")
+-#pragma pop_macro("SERVICE_DISABLED")
+-#pragma pop_macro("SEVERITY_ERROR")
+-#pragma pop_macro("STRICT")
+-#pragma pop_macro("STATUS_PENDING")
+-#pragma pop_macro("timezone")
+-#pragma pop_macro("TRUE")
+-#pragma pop_macro("FALSE")
+-#endif
+-
+-#ifdef __APPLE__
+-#pragma pop_macro("DOMAIN")
+-#pragma pop_macro("TRUE")
+-#pragma pop_macro("FALSE")
+-#pragma pop_macro("UID_MAX")
+-#pragma pop_macro("GID_MAX")
+-#pragma pop_macro("TYPE_BOOL")
+-#endif  // __APPLE__
+-
+-#if defined(__clang__) || defined(__GNUC__) || defined(_MSC_VER)
+-#pragma pop_macro("DEBUG")
+-#endif // defined(__clang__) || defined(__GNUC__) || defined(_MSC_VER)
+-
+-#if defined(__GNUC__)
+-#pragma GCC diagnostic pop
+-#endif
+-
+-#ifdef __clang__
+-#pragma clang diagnostic pop
+-#endif
+-
+-// Pop the warning(push) from port_def.inc
+-#ifdef _MSC_VER
+-#pragma warning(pop)
+-#endif
+diff --git a/src/google/protobuf/util/converter/proto_writer.cc b/src/google/protobuf/util/converter/proto_writer.cc
+index 2683c08..f1f718e 100644
+--- a/src/google/protobuf/util/converter/proto_writer.cc
++++ b/src/google/protobuf/util/converter/proto_writer.cc
+@@ -34,10 +34,6 @@
+ #include "google/protobuf/util/converter/utility.h"
+ #include "google/protobuf/wire_format_lite.h"
  
- #ifdef PROTOBUF_RTTI
- #error PROTOBUF_RTTI was previously defined
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -45,7 +41,6 @@ namespace converter {
+ using ::google::protobuf::internal::WireFormatLite;
+ using ::google::protobuf::io::CodedOutputStream;
+ 
+-
+ ProtoWriter::ProtoWriter(TypeResolver* type_resolver,
+                          const google::protobuf::Type& type,
+                          strings::ByteSink* output, ErrorListener* listener)
+@@ -437,8 +432,7 @@ void ProtoWriter::MissingField(absl::string_view missing_name) {
+   listener_->MissingField(location(), missing_name);
+ }
+ 
+-ProtoWriter* ProtoWriter::StartObject(
+-    absl::string_view name) {
++ProtoWriter* ProtoWriter::StartObject(absl::string_view name) {
+   // Starting the root message. Create the root ProtoElement and return.
+   if (element_ == nullptr) {
+     if (!name.empty()) {
+@@ -470,7 +464,6 @@ ProtoWriter* ProtoWriter::StartObject(
+   return StartObjectField(*field, *type);
+ }
+ 
+-
+ ProtoWriter* ProtoWriter::EndObject() {
+   if (invalid_depth_ > 0) {
+     --invalid_depth_;
+@@ -481,7 +474,6 @@ ProtoWriter* ProtoWriter::EndObject() {
+     element_.reset(element_->pop());
+   }
+ 
+-
+   // If ending the root element,
+   // then serialize the full message with calculated sizes.
+   if (element_ == nullptr) {
+@@ -490,9 +482,7 @@ ProtoWriter* ProtoWriter::EndObject() {
+   return this;
+ }
+ 
+-ProtoWriter* ProtoWriter::StartList(
+-    absl::string_view name) {
+-
++ProtoWriter* ProtoWriter::StartList(absl::string_view name) {
+   const google::protobuf::Field* field = BeginNamed(name, true);
+ 
+   if (field == nullptr) return this;
+@@ -513,7 +503,6 @@ ProtoWriter* ProtoWriter::StartList(
+   return StartListField(*field, *type);
+ }
+ 
+-
+ ProtoWriter* ProtoWriter::EndList() {
+   if (invalid_depth_ > 0) {
+     --invalid_depth_;
+@@ -523,8 +512,8 @@ ProtoWriter* ProtoWriter::EndList() {
+   return this;
+ }
+ 
+-ProtoWriter* ProtoWriter::RenderDataPiece(
+-    absl::string_view name, const DataPiece& data) {
++ProtoWriter* ProtoWriter::RenderDataPiece(absl::string_view name,
++                                          const DataPiece& data) {
+   absl::Status status;
+   if (invalid_depth_ > 0) return this;
+ 
+@@ -568,7 +557,7 @@ bool ProtoWriter::IsRepeated(const google::protobuf::Field& field) {
+ 
+ ProtoWriter* ProtoWriter::StartObjectField(const google::protobuf::Field& field,
+                                            const google::protobuf::Type& type) {
+-    WriteTag(field);
++  WriteTag(field);
+   element_.reset(new ProtoElement(element_.release(), &field, type, false));
+   return this;
+ }
+@@ -803,7 +792,6 @@ void ProtoWriter::WriteTag(const google::protobuf::Field& field) {
+   stream_->WriteTag(WireFormatLite::MakeTag(field.number(), wire_type));
+ }
+ 
+-
+ }  // namespace converter
+ }  // namespace util
+ }  // namespace protobuf
+diff --git a/src/google/protobuf/util/converter/proto_writer.h b/src/google/protobuf/util/converter/proto_writer.h
+index dd28102..bce0d4a 100644
+--- a/src/google/protobuf/util/converter/proto_writer.h
++++ b/src/google/protobuf/util/converter/proto_writer.h
+@@ -22,29 +22,24 @@
+ #include <string>
+ #include <vector>
+ 
+-#include "google/protobuf/type.pb.h"
+-#include "google/protobuf/descriptor.h"
+ #include "absl/container/flat_hash_set.h"
+ #include "absl/status/status.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/io/coded_stream.h"
++#include "google/protobuf/io/zero_copy_stream_impl.h"
+ #include "google/protobuf/stubs/bytestream.h"
++#include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/converter/datapiece.h"
+ #include "google/protobuf/util/converter/error_listener.h"
+ #include "google/protobuf/util/converter/structured_objectwriter.h"
+ #include "google/protobuf/util/converter/type_info.h"
+-#include "google/protobuf/io/coded_stream.h"
+-#include "google/protobuf/io/zero_copy_stream_impl.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ 
+-
+ class ObjectLocationTracker;
+ 
+ // An ObjectWriter that can write protobuf bytes directly from writer events.
+@@ -53,9 +48,9 @@ class ObjectLocationTracker;
+ // special types by inheriting from it or by wrapping it.
+ //
+ // It also supports streaming.
+-class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
++class ProtoWriter : public StructuredObjectWriter {
+  public:
+-// Constructor. Does not take ownership of any parameter passed in.
++  // Constructor. Does not take ownership of any parameter passed in.
+   ProtoWriter(TypeResolver* type_resolver, const google::protobuf::Type& type,
+               strings::ByteSink* output, ErrorListener* listener);
+   ProtoWriter() = delete;
+@@ -105,13 +100,11 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
+     return RenderDataPiece(name, DataPiece::NullData());
+   }
+ 
+-
+   // Renders a DataPiece 'value' into a field whose wire type is determined
+   // from the given field 'name'.
+   virtual ProtoWriter* RenderDataPiece(absl::string_view name,
+                                        const DataPiece& data);
+ 
+-
+   // Returns the location tracker to use for tracking locations for errors.
+   const LocationTrackerInterface& location() {
+     return element_ != nullptr ? *element_ : *tracker_;
+@@ -156,8 +149,7 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
+   }
+ 
+  protected:
+-  class PROTOBUF_EXPORT ProtoElement : public BaseElement,
+-                                       public LocationTrackerInterface {
++  class ProtoElement : public BaseElement, public LocationTrackerInterface {
+    public:
+     // Constructor for the root element. No parent nor field.
+     ProtoElement(const TypeInfo* typeinfo, const google::protobuf::Type& type,
+@@ -278,7 +270,6 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
+   // Helper method to write proto tags based on the given field.
+   void WriteTag(const google::protobuf::Field& field);
+ 
+-
+   // Returns true if the field for type_ can be set as a oneof. If field is not
+   // a oneof type, this function does nothing and returns true.
+   // If another field for this oneof is already set, this function returns
+@@ -371,6 +362,4 @@ class PROTOBUF_EXPORT ProtoWriter : public StructuredObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTO_WRITER_H_
+diff --git a/src/google/protobuf/util/converter/protostream_objectsource.cc b/src/google/protobuf/util/converter/protostream_objectsource.cc
+index fa4fe38..fa64ccd 100644
+--- a/src/google/protobuf/util/converter/protostream_objectsource.cc
++++ b/src/google/protobuf/util/converter/protostream_objectsource.cc
+@@ -18,10 +18,6 @@
+ #include <utility>
+ #include <vector>
+ 
+-#include "google/protobuf/descriptor.h"
+-#include "google/protobuf/unknown_field_set.h"
+-#include "google/protobuf/stubs/strutil.h"
+-#include "google/protobuf/stubs/strutil.h"
+ #include "absl/base/call_once.h"
+ #include "absl/base/casts.h"
+ #include "absl/container/btree_map.h"
+@@ -32,19 +28,17 @@
+ #include "absl/strings/str_format.h"
+ #include "absl/strings/string_view.h"
+ #include "absl/time/time.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/io/coded_stream.h"
++#include "google/protobuf/io/zero_copy_stream_impl.h"
++#include "google/protobuf/stubs/status_macros.h"
++#include "google/protobuf/stubs/strutil.h"
++#include "google/protobuf/unknown_field_set.h"
+ #include "google/protobuf/util/converter/constants.h"
+ #include "google/protobuf/util/converter/field_mask_utility.h"
+ #include "google/protobuf/util/converter/utility.h"
+-#include "google/protobuf/io/coded_stream.h"
+-#include "google/protobuf/io/zero_copy_stream_impl.h"
+ #include "google/protobuf/wire_format.h"
+ #include "google/protobuf/wire_format_lite.h"
+-#include "google/protobuf/stubs/status_macros.h"
+-
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ 
+ namespace google {
+ namespace protobuf {
+@@ -94,7 +88,6 @@ absl::StatusOr<std::string> MapKeyDefaultValueAsString(
+ }
+ }  // namespace
+ 
+-
+ ProtoStreamObjectSource::ProtoStreamObjectSource(
+     io::CodedInputStream* stream, TypeResolver* type_resolver,
+     const google::protobuf::Type& type, const RenderOptions& render_options)
+@@ -162,7 +155,6 @@ absl::Status ProtoStreamObjectSource::WriteMessage(
+     const google::protobuf::Type& type, absl::string_view name,
+     const uint32_t end_tag, bool include_start_and_end,
+     ObjectWriter* ow) const {
+-
+   const TypeRenderer* type_renderer = FindTypeRenderer(type.name());
+   if (type_renderer != nullptr) {
+     return (*type_renderer)(this, type, name, ow);
+@@ -174,7 +166,6 @@ absl::Status ProtoStreamObjectSource::WriteMessage(
+   uint32_t tag = stream_->ReadTag(), last_tag = tag + 1;
+   UnknownFieldSet unknown_fields;
+ 
+-
+   if (include_start_and_end) {
+     ow->StartObject(name);
+   }
+@@ -193,9 +184,7 @@ absl::Status ProtoStreamObjectSource::WriteMessage(
+     if (field == nullptr) {
+       // If we didn't find a field, skip this unknown tag.
+       // TODO(wpoon): Check return boolean value.
+-      WireFormat::SkipField(
+-          stream_, tag,
+-                                                nullptr);
++      WireFormat::SkipField(stream_, tag, nullptr);
+       tag = stream_->ReadTag();
+       continue;
+     }
+@@ -215,7 +204,6 @@ absl::Status ProtoStreamObjectSource::WriteMessage(
+     }
+   }
+ 
+-
+   if (include_start_and_end) {
+     ow->EndObject();
+   }
+@@ -323,12 +311,7 @@ absl::Status ProtoStreamObjectSource::RenderTimestamp(
+   std::string formatted_seconds =
+       absl::FormatTime(kRfc3339TimeFormat, tm, absl::UTCTimeZone());
+   std::string formatted_time = absl::StrFormat(
+-      "%s%sZ", formatted_seconds.c_str(),
+-      FormatNanos(
+-          nanos,
+-          false
+-          )
+-          .c_str());
++      "%s%sZ", formatted_seconds.c_str(), FormatNanos(nanos, false).c_str());
+   ow->RenderString(field_name, formatted_time);
+   return absl::Status();
+ }
+@@ -366,11 +349,7 @@ absl::Status ProtoStreamObjectSource::RenderDuration(
+   }
+   std::string formatted_duration = absl::StrFormat(
+       "%s%lld%ss", sign.c_str(), static_cast<long long>(seconds),  // NOLINT
+-      FormatNanos(
+-          nanos,
+-          false
+-          )
+-          .c_str());
++      FormatNanos(nanos, false).c_str());
+   ow->RenderString(field_name, formatted_duration);
+   return absl::Status();
+ }
+@@ -665,12 +644,10 @@ absl::Status ProtoStreamObjectSource::RenderFieldMask(
+   return absl::Status();
+ }
+ 
+-
+ absl::flat_hash_map<std::string, ProtoStreamObjectSource::TypeRenderer>*
+     ProtoStreamObjectSource::renderers_ = nullptr;
+ absl::once_flag source_renderers_init_;
+ 
+-
+ void ProtoStreamObjectSource::InitRendererMap() {
+   renderers_ = new absl::flat_hash_map<std::string,
+                                        ProtoStreamObjectSource::TypeRenderer>();
+@@ -866,10 +843,10 @@ absl::Status ProtoStreamObjectSource::RenderNonMessageField(
+             ow->RenderString(field_name, enum_value->name());
+           }
+         } else {
+-            ow->RenderInt32(field_name, buffer32);
++          ow->RenderInt32(field_name, buffer32);
+         }
+       } else {
+-          ow->RenderInt32(field_name, buffer32);
++        ow->RenderInt32(field_name, buffer32);
+       }
+       break;
+     }
+diff --git a/src/google/protobuf/util/converter/protostream_objectsource.h b/src/google/protobuf/util/converter/protostream_objectsource.h
+index b962707..fb10442 100644
+--- a/src/google/protobuf/util/converter/protostream_objectsource.h
++++ b/src/google/protobuf/util/converter/protostream_objectsource.h
+@@ -23,21 +23,16 @@
+ #include <stack>
+ #include <string>
+ 
+-#include "google/protobuf/stubs/common.h"
+-#include "google/protobuf/type.pb.h"
+ #include "absl/container/flat_hash_map.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/converter/object_source.h"
+ #include "google/protobuf/util/converter/object_writer.h"
+ #include "google/protobuf/util/converter/type_info.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -58,9 +53,8 @@ class TypeInfo;
+ //                              <your message google::protobuf::Type>);
+ //
+ //   Status status = os.WriteTo(<some ObjectWriter>);
+-class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
++class ProtoStreamObjectSource : public ObjectSource {
+  public:
+-
+   struct RenderOptions {
+     // Sets whether or not to use lowerCamelCase casing for enum values. If set
+     // to false, enum values are output without any case conversions.
+@@ -94,7 +88,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+ 
+     // Whether to preserve proto field names
+     bool preserve_proto_field_names = false;
+-
+   };
+ 
+   ProtoStreamObjectSource(io::CodedInputStream* stream,
+@@ -158,7 +151,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+   std::string ReadFieldValueAsString(
+       const google::protobuf::Field& field) const;
+ 
+-
+   // Returns the input stream.
+   io::CodedInputStream* stream() const { return stream_; }
+ 
+@@ -266,7 +258,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+                                      absl::string_view field_name,
+                                      ObjectWriter* ow) const;
+ 
+-
+   // Utility function to detect proto maps. The 'field' MUST be repeated.
+   bool IsMap(const google::protobuf::Field& field) const;
+ 
+@@ -295,7 +286,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+   // google::protobuf::Type of the message source.
+   const google::protobuf::Type& type_;
+ 
+-
+   const RenderOptions render_options_;
+ 
+   // Tracks current recursion depth.
+@@ -310,6 +300,4 @@ class PROTOBUF_EXPORT ProtoStreamObjectSource : public ObjectSource {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTOSTREAM_OBJECTSOURCE_H_
+diff --git a/src/google/protobuf/util/converter/protostream_objectwriter.cc b/src/google/protobuf/util/converter/protostream_objectwriter.cc
+index 5489063..cfe426b 100644
+--- a/src/google/protobuf/util/converter/protostream_objectwriter.cc
++++ b/src/google/protobuf/util/converter/protostream_objectwriter.cc
+@@ -18,7 +18,6 @@
+ #include <functional>
+ #include <stack>
+ 
+-#include "google/protobuf/stubs/strutil.h"
+ #include "absl/base/call_once.h"
+ #include "absl/log/absl_check.h"
+ #include "absl/log/absl_log.h"
+@@ -28,16 +27,13 @@
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/strip.h"
+ #include "absl/time/time.h"
++#include "google/protobuf/stubs/strutil.h"
+ #include "google/protobuf/util/converter/constants.h"
+ #include "google/protobuf/util/converter/field_mask_utility.h"
+ #include "google/protobuf/util/converter/object_location_tracker.h"
+ #include "google/protobuf/util/converter/utility.h"
+ #include "google/protobuf/wire_format_lite.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -47,7 +43,6 @@ using ::absl::Status;
+ using ::google::protobuf::internal::WireFormatLite;
+ using std::placeholders::_1;
+ 
+-
+ ProtoStreamObjectWriter::ProtoStreamObjectWriter(
+     TypeResolver* type_resolver, const google::protobuf::Type& type,
+     strings::ByteSink* output, ErrorListener* listener,
+@@ -482,7 +477,6 @@ bool ProtoStreamObjectWriter::Item::InsertMapKeyIfNotPresent(
+   return map_keys_.insert(std::string(map_key)).second;
+ }
+ 
+-
+ ProtoStreamObjectWriter* ProtoStreamObjectWriter::StartObject(
+     absl::string_view name) {
+   if (invalid_depth() > 0) {
+@@ -678,7 +672,6 @@ ProtoStreamObjectWriter* ProtoStreamObjectWriter::EndObject() {
+   return this;
+ }
+ 
+-
+ ProtoStreamObjectWriter* ProtoStreamObjectWriter::StartList(
+     absl::string_view name) {
+   if (invalid_depth() > 0) {
+@@ -924,8 +917,7 @@ Status ProtoStreamObjectWriter::RenderStructValue(ProtoStreamObjectWriter* ow,
+         absl::StatusOr<int32_t> int_value = data.ToInt32();
+         if (int_value.ok()) {
+           ow->ProtoWriter::RenderDataPiece(
+-              "string_value",
+-              DataPiece(SimpleDtoa(int_value.value()), true));
++              "string_value", DataPiece(SimpleDtoa(int_value.value()), true));
+           return Status();
+         }
+       }
+@@ -937,8 +929,7 @@ Status ProtoStreamObjectWriter::RenderStructValue(ProtoStreamObjectWriter* ow,
+         absl::StatusOr<uint32_t> int_value = data.ToUint32();
+         if (int_value.ok()) {
+           ow->ProtoWriter::RenderDataPiece(
+-              "string_value",
+-              DataPiece(SimpleDtoa(int_value.value()), true));
++              "string_value", DataPiece(SimpleDtoa(int_value.value()), true));
+           return Status();
+         }
+       }
+@@ -978,8 +969,7 @@ Status ProtoStreamObjectWriter::RenderStructValue(ProtoStreamObjectWriter* ow,
+         absl::StatusOr<float> float_value = data.ToFloat();
+         if (float_value.ok()) {
+           ow->ProtoWriter::RenderDataPiece(
+-              "string_value",
+-              DataPiece(SimpleDtoa(float_value.value()), true));
++              "string_value", DataPiece(SimpleDtoa(float_value.value()), true));
+           return Status();
+         }
+       }
+@@ -1368,9 +1358,9 @@ bool ProtoStreamObjectWriter::ValidMapKey(absl::string_view unnormalized_name) {
+   return true;
+ }
+ 
+-void ProtoStreamObjectWriter::Push(
+-    absl::string_view name, Item::ItemType item_type, bool is_placeholder,
+-    bool is_list) {
++void ProtoStreamObjectWriter::Push(absl::string_view name,
++                                   Item::ItemType item_type,
++                                   bool is_placeholder, bool is_list) {
+   is_list ? ProtoWriter::StartList(name) : ProtoWriter::StartObject(name);
+ 
+   // invalid_depth == 0 means it is a successful StartObject or StartList.
+diff --git a/src/google/protobuf/util/converter/protostream_objectwriter.h b/src/google/protobuf/util/converter/protostream_objectwriter.h
+index c9a93f7..92fcc0f 100644
+--- a/src/google/protobuf/util/converter/protostream_objectwriter.h
++++ b/src/google/protobuf/util/converter/protostream_objectwriter.h
+@@ -20,25 +20,21 @@
+ #include <deque>
+ #include <string>
+ 
+-#include "google/protobuf/type.pb.h"
+-#include "google/protobuf/descriptor.h"
+ #include "absl/container/flat_hash_set.h"
+ #include "absl/status/status.h"
+-#include "google/protobuf/stubs/bytestream.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/io/coded_stream.h"
++#include "google/protobuf/io/zero_copy_stream_impl.h"
++#include "google/protobuf/stubs/bytestream.h"
++#include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/converter/datapiece.h"
+ #include "google/protobuf/util/converter/error_listener.h"
+ #include "google/protobuf/util/converter/proto_writer.h"
+ #include "google/protobuf/util/converter/structured_objectwriter.h"
+ #include "google/protobuf/util/converter/type_info.h"
+-#include "google/protobuf/io/coded_stream.h"
+-#include "google/protobuf/io/zero_copy_stream_impl.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+@@ -51,7 +47,7 @@ class ObjectLocationTracker;
+ // the ProtoWriter class to write raw proto bytes.
+ //
+ // It also supports streaming.
+-class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
++class ProtoStreamObjectWriter : public ProtoWriter {
+  public:
+   // Options that control ProtoStreamObjectWriter class's behavior.
+   struct Options {
+@@ -158,7 +154,7 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+                                        const DataPiece&);
+ 
+   // Handles writing Anys out using nested object writers and the like.
+-  class PROTOBUF_EXPORT AnyWriter {
++  class AnyWriter {
+    public:
+     explicit AnyWriter(ProtoStreamObjectWriter* parent);
+     ~AnyWriter();
+@@ -183,7 +179,7 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+    private:
+     // Before the "@type" field is encountered, we store all incoming data
+     // into this Event struct and replay them after we get the "@type" field.
+-    class PROTOBUF_EXPORT Event {
++    class Event {
+      public:
+       enum Type {
+         START_OBJECT = 0,
+@@ -272,7 +268,7 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+ 
+   // Represents an item in a stack of items used to keep state between
+   // ObjectWrier events.
+-  class PROTOBUF_EXPORT Item : public BaseElement {
++  class Item : public BaseElement {
+    public:
+     // Indicates the type of item.
+     enum ItemType {
+@@ -405,7 +401,6 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+   void Push(absl::string_view name, Item::ItemType item_type,
+             bool is_placeholder, bool is_list);
+ 
+-
+   // Pops items from the stack. All placeholder items are popped until a
+   // non-placeholder item is found.
+   void Pop();
+@@ -435,6 +430,4 @@ class PROTOBUF_EXPORT ProtoStreamObjectWriter : public ProtoWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_PROTOSTREAM_OBJECTWRITER_H_
+diff --git a/src/google/protobuf/util/converter/structured_objectwriter.h b/src/google/protobuf/util/converter/structured_objectwriter.h
+index ada20d6..656ab13 100644
+--- a/src/google/protobuf/util/converter/structured_objectwriter.h
++++ b/src/google/protobuf/util/converter/structured_objectwriter.h
+@@ -21,10 +21,7 @@
+ 
+ #include "absl/base/casts.h"
+ #include "google/protobuf/util/converter/object_writer.h"
+-
+-// Must be included last.
+ #include "google/protobuf/util/converter/port.h"
+-#include "google/protobuf/util/converter/port_def.inc"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -42,7 +39,7 @@ namespace converter {
+ // StructuredObjectWriter and its use.
+ //
+ // Derived classes could be thread-unsafe.
+-class PROTOBUF_EXPORT StructuredObjectWriter : public ObjectWriter {
++class StructuredObjectWriter : public ObjectWriter {
+  public:
+   StructuredObjectWriter(const StructuredObjectWriter&) = delete;
+   StructuredObjectWriter& operator=(const StructuredObjectWriter&) = delete;
+@@ -54,7 +51,7 @@ class PROTOBUF_EXPORT StructuredObjectWriter : public ObjectWriter {
+   // StructuredObjectWriter behaves as a visitor. BaseElement represents a node
+   // in the input tree. Implementation of StructuredObjectWriter should also
+   // extend BaseElement to keep track of the location in the input tree.
+-  class PROTOBUF_EXPORT BaseElement {
++  class BaseElement {
+    public:
+     // Takes ownership of the parent Element.
+     explicit BaseElement(BaseElement* parent)
+@@ -105,6 +102,4 @@ class PROTOBUF_EXPORT StructuredObjectWriter : public ObjectWriter {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_STRUCTURED_OBJECTWRITER_H_
+diff --git a/src/google/protobuf/util/converter/type_info.h b/src/google/protobuf/util/converter/type_info.h
+index f1caf90..8884e5f 100644
+--- a/src/google/protobuf/util/converter/type_info.h
++++ b/src/google/protobuf/util/converter/type_info.h
+@@ -17,23 +17,19 @@
+ #ifndef GOOGLE_PROTOBUF_UTIL_CONVERTER_TYPE_INFO_H_
+ #define GOOGLE_PROTOBUF_UTIL_CONVERTER_TYPE_INFO_H_
+ 
+-#include "google/protobuf/type.pb.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/type.pb.h"
+ #include "google/protobuf/util/type_resolver.h"
+ 
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
+-
+ namespace google {
+ namespace protobuf {
+ namespace util {
+ namespace converter {
+ // Internal helper class for type resolving. Note that this class is not
+ // thread-safe and should only be accessed in one thread.
+-class PROTOBUF_EXPORT TypeInfo {
++class TypeInfo {
+  public:
+   TypeInfo() {}
+   TypeInfo(const TypeInfo&) = delete;
+@@ -77,6 +73,4 @@ class PROTOBUF_EXPORT TypeInfo {
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_TYPE_INFO_H_
+diff --git a/src/google/protobuf/util/converter/utility.cc b/src/google/protobuf/util/converter/utility.cc
+index 0770b0a..4007424 100644
+--- a/src/google/protobuf/util/converter/utility.cc
++++ b/src/google/protobuf/util/converter/utility.cc
+@@ -20,22 +20,17 @@
+ #include <iterator>
+ #include <limits>
+ 
+-#include "google/protobuf/stubs/callback.h"
+-#include "google/protobuf/stubs/common.h"
+-#include "google/protobuf/wrappers.pb.h"
+-#include "google/protobuf/descriptor.pb.h"
+-#include "google/protobuf/descriptor.h"
+-#include "google/protobuf/stubs/strutil.h"
+ #include "absl/container/flat_hash_set.h"
+ #include "absl/strings/ascii.h"
+ #include "absl/strings/cord.h"
+ #include "absl/strings/match.h"
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/string_view.h"
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/descriptor.pb.h"
++#include "google/protobuf/stubs/strutil.h"
+ #include "google/protobuf/util/converter/constants.h"
+-
+-// must be last
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/wrappers.pb.h"
+ 
+ namespace google {
+ namespace protobuf {
+diff --git a/src/google/protobuf/util/converter/utility.h b/src/google/protobuf/util/converter/utility.h
+index a98793b..f00ad3a 100644
+--- a/src/google/protobuf/util/converter/utility.h
++++ b/src/google/protobuf/util/converter/utility.h
+@@ -22,19 +22,13 @@
+ #include <string>
+ #include <utility>
+ 
+-#include "google/protobuf/stubs/common.h"
+-#include "google/protobuf/any.pb.h"
+-#include "google/protobuf/type.pb.h"
+-#include "google/protobuf/repeated_field.h"
+-#include "google/protobuf/stubs/strutil.h"
+ #include "absl/status/status.h"
+ #include "absl/status/statusor.h"
+ #include "absl/strings/str_cat.h"
+ #include "absl/strings/string_view.h"
+-
+-
+-// Must be included last.
+-#include "google/protobuf/util/converter/port_def.inc"
++#include "google/protobuf/any.pb.h"
++#include "google/protobuf/repeated_field.h"
++#include "google/protobuf/type.pb.h"
+ 
+ namespace google {
+ namespace protobuf {
+@@ -47,25 +41,25 @@ static const int64_t kTypeUrlSize = 19;
+ // Finds the tech option identified by option_name. Parses the boolean value and
+ // returns it.
+ // When the option with the given name is not found, default_value is returned.
+-PROTOBUF_EXPORT bool GetBoolOptionOrDefault(
++bool GetBoolOptionOrDefault(
+     const RepeatedPtrField<google::protobuf::Option>& options,
+     absl::string_view option_name, bool default_value);
+ 
+ // Returns int64 option value. If the option isn't found, returns the
+ // default_value.
+-PROTOBUF_EXPORT int64_t GetInt64OptionOrDefault(
++int64_t GetInt64OptionOrDefault(
+     const RepeatedPtrField<google::protobuf::Option>& options,
+     absl::string_view option_name, int64_t default_value);
+ 
+ // Returns double option value. If the option isn't found, returns the
+ // default_value.
+-PROTOBUF_EXPORT double GetDoubleOptionOrDefault(
++double GetDoubleOptionOrDefault(
+     const RepeatedPtrField<google::protobuf::Option>& options,
+     absl::string_view option_name, double default_value);
+ 
+ // Returns string option value. If the option isn't found, returns the
+ // default_value.
+-PROTOBUF_EXPORT std::string GetStringOptionOrDefault(
++std::string GetStringOptionOrDefault(
+     const RepeatedPtrField<google::protobuf::Option>& options,
+     absl::string_view option_name, absl::string_view default_value);
+ 
+@@ -73,21 +67,20 @@ PROTOBUF_EXPORT std::string GetStringOptionOrDefault(
+ // TODO(skarvaje): Make these utilities dealing with Any types more generic,
+ // add more error checking and move to a more public/shareable location so
+ // others can use.
+-PROTOBUF_EXPORT bool GetBoolFromAny(const google::protobuf::Any& any);
++bool GetBoolFromAny(const google::protobuf::Any& any);
+ 
+ // Returns int64 value contained in Any type.
+-PROTOBUF_EXPORT int64_t GetInt64FromAny(const google::protobuf::Any& any);
++int64_t GetInt64FromAny(const google::protobuf::Any& any);
+ 
+ // Returns double value contained in Any type.
+-PROTOBUF_EXPORT double GetDoubleFromAny(const google::protobuf::Any& any);
++double GetDoubleFromAny(const google::protobuf::Any& any);
+ 
+ // Returns string value contained in Any type.
+-PROTOBUF_EXPORT std::string GetStringFromAny(const google::protobuf::Any& any);
++std::string GetStringFromAny(const google::protobuf::Any& any);
+ 
+ // Returns the type string without the url prefix. e.g.: If the passed type is
+ // 'type.googleapis.com/tech.type.Bool', the returned value is 'tech.type.Bool'.
+-PROTOBUF_EXPORT absl::string_view GetTypeWithoutUrl(
+-    absl::string_view type_url);
++absl::string_view GetTypeWithoutUrl(absl::string_view type_url);
+ 
+ // Returns the simple_type with the base type url (kTypeServiceBaseUrl)
+ // prefixed.
+@@ -95,8 +88,7 @@ PROTOBUF_EXPORT absl::string_view GetTypeWithoutUrl(
+ // E.g:
+ // GetFullTypeWithUrl("google.protobuf.Timestamp") returns the string
+ // "type.googleapis.com/google.protobuf.Timestamp".
+-PROTOBUF_EXPORT std::string GetFullTypeWithUrl(
+-    absl::string_view simple_type);
++std::string GetFullTypeWithUrl(absl::string_view simple_type);
+ 
+ // Finds and returns option identified by name and option_name within the
+ // provided map. Returns nullptr if none found.
+@@ -136,31 +128,31 @@ const google::protobuf::EnumValue* FindEnumValueByNameWithoutUnderscoreOrNull(
+     const google::protobuf::Enum* enum_type, absl::string_view enum_name);
+ 
+ // Converts input to camel-case and returns it.
+-PROTOBUF_EXPORT std::string ToCamelCase(const absl::string_view input);
++std::string ToCamelCase(const absl::string_view input);
+ 
+ // Converts enum name string to camel-case and returns it.
+ std::string EnumValueNameToLowerCamelCase(const absl::string_view input);
+ 
+ // Converts input to snake_case and returns it.
+-PROTOBUF_EXPORT std::string ToSnakeCase(absl::string_view input);
++std::string ToSnakeCase(absl::string_view input);
+ 
+ // Returns true if type_name represents a well-known type.
+-PROTOBUF_EXPORT bool IsWellKnownType(const std::string& type_name);
++bool IsWellKnownType(const std::string& type_name);
+ 
+ // Returns true if 'bool_string' represents a valid boolean value. Only "true",
+ // "false", "0" and "1" are allowed.
+-PROTOBUF_EXPORT bool IsValidBoolString(absl::string_view bool_string);
++bool IsValidBoolString(absl::string_view bool_string);
+ 
+ // Returns true if "field" is a protobuf map field based on its type.
+-PROTOBUF_EXPORT bool IsMap(const google::protobuf::Field& field,
+-                           const google::protobuf::Type& type);
++bool IsMap(const google::protobuf::Field& field,
++           const google::protobuf::Type& type);
+ 
+ // Returns true if the given type has special MessageSet wire format.
+ bool IsMessageSetWireFormat(const google::protobuf::Type& type);
+ 
+ // Infinity/NaN-aware conversion to string.
+-PROTOBUF_EXPORT std::string DoubleAsString(double value);
+-PROTOBUF_EXPORT std::string FloatAsString(float value);
++std::string DoubleAsString(double value);
++std::string FloatAsString(float value);
+ 
+ // Convert from int32, int64, uint32, uint64, double or float to string.
+ template <typename T>
+@@ -180,13 +172,11 @@ inline std::string ValueAsString(double value) {
+ 
+ // Converts a string to float. Unlike safe_strtof, conversion will fail if the
+ // value fits into double but not float (e.g., DBL_MAX).
+-PROTOBUF_EXPORT bool SafeStrToFloat(absl::string_view str, float* value);
++bool SafeStrToFloat(absl::string_view str, float* value);
+ 
+ }  // namespace converter
+ }  // namespace util
+ }  // namespace protobuf
+ }  // namespace google
+ 
+-#include "google/protobuf/util/converter/port_undef.inc"
+-
+ #endif  // GOOGLE_PROTOBUF_UTIL_CONVERTER_UTILITY_H_
