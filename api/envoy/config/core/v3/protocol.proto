@@ -255,15 +255,21 @@ message HttpProtocolOptions {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
   google.protobuf.Duration max_connection_duration = 3;
 
-  // The maximum number of headers. If unconfigured, the default
-  // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
-  // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
+  // The maximum number of headers (request headers if configured on HttpConnectionManager,
+  // response headers when configured on a cluster).
+  // If unconfigured, the default maximum number of headers allowed is 100.
+  // Downstream requests that exceed this limit will receive a 431 response for HTTP/1.x and cause a stream
+  // reset for HTTP/2.
+  // Upstream responses that exceed this limit will result in a 503 response.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
 
-  // The maximum combined size of headers.
+  // The maximum size of headers (request headers if configured on HttpConnectionManager, response headers
+  // when configured on a cluster).
   // If unconfigured, the default is 60 KiB, except for HTTP/1 response headers which have a default
   // of 80KiB.
-  // Requests that exceed this limit will receive a 431 response.
+  // Downstream requests that exceed this limit will receive a 431 response for HTTP/1.x and cause a stream
+  // reset for HTTP/2.
+  // Upstream responses that exceed this limit will result in a 503 response.
   // If both this setting and :ref:`max_request_headers_kb
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`
   // are set, this setting is used.
