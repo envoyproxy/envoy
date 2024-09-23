@@ -551,9 +551,11 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketAllow) {
                                   ->mutable_rate_limit_strategy()
                                   ->mutable_token_bucket();
   token_bucket->set_max_tokens(100);
-  token_bucket->mutable_tokens_per_fill()->set_value(200);
+  token_bucket->mutable_tokens_per_fill()->set_value(100);
   token_bucket->mutable_fill_interval()->set_seconds(60);
-  std::shared_ptr<MockTokenBucket> mock_tb = std::make_shared<MockTokenBucket>();
+  // 100 available tokens so the test doesn't get throttled.
+  std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter =
+      std::make_shared<AtomicTokenBucketImpl>(100, dispatcher_.timeSource(), 100 / 60);
 
   RateLimitQuotaResponse::BucketAction no_assignment_action;
   no_assignment_action.mutable_quota_assignment_action()
@@ -563,10 +565,9 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketAllow) {
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
       std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      mock_tb);
+      token_bucket_limiter);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
-  EXPECT_CALL(*mock_tb, consume(1, _)).WillOnce(Return(1));
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
@@ -595,10 +596,13 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketDeny) {
   TokenBucket* token_bucket = cached_action->mutable_quota_assignment_action()
                                   ->mutable_rate_limit_strategy()
                                   ->mutable_token_bucket();
-  token_bucket->set_max_tokens(100);
-  token_bucket->mutable_tokens_per_fill()->set_value(200);
+  token_bucket->set_max_tokens(1);
+  token_bucket->mutable_tokens_per_fill()->set_value(1);
   token_bucket->mutable_fill_interval()->set_seconds(60);
-  std::shared_ptr<MockTokenBucket> mock_tb = std::make_shared<MockTokenBucket>();
+  std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter =
+      std::make_shared<AtomicTokenBucketImpl>(1, dispatcher_.timeSource(), 1 / 60);
+  // All subsequent requests should deny for 60 (mock) seconds.
+  EXPECT_TRUE(token_bucket_limiter->consume());
 
   RateLimitQuotaResponse::BucketAction no_assignment_action;
   no_assignment_action.mutable_quota_assignment_action()
@@ -608,10 +612,9 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketDeny) {
   std::shared_ptr<CachedBucket> bucket = std::make_shared<CachedBucket>(
       bucket_id, std::make_shared<QuotaUsage>(1, 0, std::chrono::nanoseconds(0)),
       std::move(cached_action), nullptr, std::chrono::milliseconds::zero(), no_assignment_action,
-      mock_tb);
+      token_bucket_limiter);
 
   EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(bucket));
-  EXPECT_CALL(*mock_tb, consume(1, _)).WillOnce(Return(0));
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);

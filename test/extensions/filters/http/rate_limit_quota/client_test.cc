@@ -592,18 +592,18 @@ TEST_F(GlobalClientTest, TestBasicResponseProcessing) {
 
   // Ensure that receiving a duplicate assignment doesn't reset the stateful
   // token bucket.
-  TimeSource* time_source = mock_stream_client->dispatcher_->time_system_.get();
-  std::shared_ptr<::Envoy::TokenBucket> cached_tb = token_bucket->token_bucket_limiter;
+  std::shared_ptr<AtomicTokenBucketImpl> cached_tb = token_bucket->token_bucket_limiter;
   EXPECT_EQ(cached_tb->consume(max_tokens, false), max_tokens);
-  std::chrono::milliseconds cached_next_token_available = cached_tb->nextTokenAvailable();
-  const MonotonicTime now = time_source->monotonicTime();
-  EXPECT_GT(cached_next_token_available, now.time_since_epoch());
+
   // Resend the same token bucket action.
   response = std::make_unique<RateLimitQuotaResponse>();
   response->add_bucket_action()->CopyFrom(token_bucket_action);
   // Send the response across the stream.
   global_client_->onReceiveMessage(std::move(response));
   waitForNotification(cb_ptr_->response_processed);
+
+  // Confirm no change to token bucket.
+  EXPECT_EQ(cached_tb.get(), token_bucket->token_bucket_limiter.get());
 
   // Clean up expiration timers for all three buckets.
   for (auto bucket : {token_bucket, deny_all_bucket, allow_all_bucket}) {
@@ -660,9 +660,8 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
       RateLimitTestClient::assertMockTimer(token_bucket->action_expiration_timer.get());
   ASSERT_TRUE(initial_tb_expiration_timer && initial_tb_expiration_timer->enabled_);
 
-  // Ensure that receiving a duplicate assignment doesn't reset the stateful
-  // token bucket.
-  std::shared_ptr<::Envoy::TokenBucket> cached_tb = token_bucket->token_bucket_limiter;
+  // Ensure that receiving a duplicate assignment doesn't reset the stateful token bucket.
+  std::shared_ptr<AtomicTokenBucketImpl> cached_tb = token_bucket->token_bucket_limiter;
   EXPECT_EQ(cached_tb->consume(max_tokens, false), max_tokens);
 
   // Resend the same token bucket action.
@@ -677,10 +676,10 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
   ASSERT_TRUE(token_bucket->cached_action);
   // Confirm that the action is still the same.
   EXPECT_TRUE(unordered_differencer_.Equals(*token_bucket->cached_action, token_bucket_action));
-  std::shared_ptr<::Envoy::TokenBucket> updated_tb = token_bucket->token_bucket_limiter;
+  std::shared_ptr<AtomicTokenBucketImpl> updated_tb = token_bucket->token_bucket_limiter;
   // These should match if the token bucket has been carried over, and hasn't
   // reset its state.
-  EXPECT_EQ(cached_tb, updated_tb);
+  EXPECT_EQ(cached_tb.get(), updated_tb.get());
 
   // Confirm that the expiration timer reset even when receiving a duplicate
   // assignment.

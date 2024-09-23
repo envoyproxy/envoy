@@ -207,8 +207,8 @@ bool protoTokenBucketsEq(const ::envoy::type::v3::TokenBucket& new_tb,
           new_tb.fill_interval().nanos() == old_tb.fill_interval().nanos());
 }
 
-std::shared_ptr<::Envoy::TokenBucket> createTokenBucketFromAction(const RateLimitStrategy& strategy,
-                                                                  TimeSource& time_source) {
+std::shared_ptr<AtomicTokenBucketImpl>
+createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_source) {
   const auto& token_bucket = strategy.token_bucket();
   const auto& interval_proto = token_bucket.fill_interval();
   // Convert absl::duration to int64_t seconds
@@ -217,9 +217,8 @@ std::shared_ptr<::Envoy::TokenBucket> createTokenBucketFromAction(const RateLimi
   double fill_rate_per_sec =
       static_cast<double>(token_bucket.tokens_per_fill().value()) / fill_interval_sec;
 
-  // NOTE: TokenBucketImpl is not thread-safe but is currently what's in use.
-  return std::make_shared<TokenBucketImpl>(token_bucket.max_tokens(), time_source,
-                                           fill_rate_per_sec);
+  return std::make_shared<AtomicTokenBucketImpl>(token_bucket.max_tokens(), time_source,
+                                                 fill_rate_per_sec);
 }
 
 void GlobalRateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
@@ -425,7 +424,7 @@ void GlobalRateLimitClientImpl::onActionExpirationTimer(CachedBucket* bucket, si
       fallback_action);
 
   // Handle fallback to a TokenBucket if given.
-  std::shared_ptr<::Envoy::TokenBucket> new_token_bucket = nullptr;
+  std::shared_ptr<AtomicTokenBucketImpl> new_token_bucket = nullptr;
   if (fallback_action.has_token_bucket() &&
       shouldReplaceTokenBucket(cached_bucket.get(), fallback_action)) {
     ENVOY_LOG(debug,

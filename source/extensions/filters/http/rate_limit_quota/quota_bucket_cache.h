@@ -51,7 +51,7 @@ struct CachedBucket {
                std::unique_ptr<BucketAction> cached_action,
                std::shared_ptr<envoy::type::v3::RateLimitStrategy> fallback_action,
                std::chrono::milliseconds fallback_ttl, const BucketAction& default_action,
-               std::shared_ptr<::Envoy::TokenBucket> token_bucket_limiter)
+               std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter)
       : bucket_id(bucket_id), quota_usage(quota_usage), cached_action(std::move(cached_action)),
         fallback_action(fallback_action), fallback_ttl(fallback_ttl),
         default_action(default_action), token_bucket_limiter(token_bucket_limiter) {}
@@ -90,7 +90,7 @@ struct CachedBucket {
 
   // Rate limiter based on token bucket algorithm. Shared to make a single
   // TokenBucket reusable when copying & pointer-swapping the overall cache.
-  std::shared_ptr<::Envoy::TokenBucket> token_bucket_limiter;
+  std::shared_ptr<AtomicTokenBucketImpl> token_bucket_limiter;
 };
 
 /**
