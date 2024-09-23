@@ -52,6 +52,14 @@ message CacheConfig {
 
   // Config specific to the cache storage implementation. Required unless ``disabled``
   // is true.
+  //
+  // Note that when the cache is enabled, cacheable requests are only sent through
+  // filters in the ``upstream_filters`` chain and *not* through any filters in the
+  // regular filter chain that are further upstream than the cache filter, while
+  // non-cacheable requests still go through the listener filter chain. It is
+  // recommended that only the router filter should be further upstream in the
+  // listener filter chain than the cache filter.
+  //
   // [#extension-category: envoy.http.cache]
   google.protobuf.Any typed_config = 1;
 
