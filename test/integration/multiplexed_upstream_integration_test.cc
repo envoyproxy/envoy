@@ -575,7 +575,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersRejected) {
 
 // Tests configuration of max response headers size.
 TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersAccepted) {
-  constexpr uint32_t limit_kb = 150;
+  constexpr uint32_t limit_kb = 8192;
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
@@ -584,7 +584,9 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersAccepted) {
                                      protocol_options);
   });
   Http::TestResponseHeaderMapImpl large_headers(default_response_headers_);
-  large_headers.addCopy("large", std::string((limit_kb - 1) * 1024, 'a'));
+  large_headers.addCopy(
+      "large",
+      std::string((limit_kb * 1024) - 512 /* allow 512 bytes for other response headers */, 'a'));
 
   // This test is validating upstream response headers, but the test client will fail to receive the
   // request from Envoy if its limits aren't increased.
