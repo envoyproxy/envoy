@@ -585,14 +585,27 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersAccepted) {
   });
   Http::TestResponseHeaderMapImpl large_headers(default_response_headers_);
   large_headers.addCopy("large", std::string((limit_kb - 1) * 1024, 'a'));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // This test is validating upstream response headers, but the test client will fail to receive the
+  // request from Envoy if its limits aren't increased.
+  envoy::config::core::v3::HttpProtocolOptions client_protocol_options;
+  client_protocol_options.mutable_max_headers_kb()->set_value(limit_kb * 2);
+
+  // nghttp2 test codec fails with a compression error in this test for unknown reasons, but oghttp2
+  // works fine, so force its use here, only for the test client. Use the test parameter specified
+  // http2 codec for the Envoy client and server codecs.
+  envoy::config::core::v3::Http2ProtocolOptions client_h2_options =
+      Http2::Utility::initializeAndValidateOptions(envoy::config::core::v3::Http2ProtocolOptions())
+          .value();
+  client_h2_options.mutable_use_oghttp2_codec()->set_value(true);
 
   initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), client_h2_options,
+                                        client_protocol_options);
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
   waitForNextUpstreamRequest();
 
-  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeHeaders(large_headers, false);
   upstream_request_->encodeData(512, true);
   ASSERT_TRUE(response->waitForEndStream());
 

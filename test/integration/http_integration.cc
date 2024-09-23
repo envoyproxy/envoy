@@ -266,6 +266,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
     Network::ClientConnectionPtr&& conn,
     absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+    absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options,
     bool wait_till_connected) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
@@ -285,6 +286,10 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
 
   cluster->http2_options_ = http2_options.value();
   cluster->http1_settings_.enable_trailers_ = true;
+
+  if (common_http_options.has_value()) {
+    cluster->common_http_protocol_options_ = common_http_options.value();
+  }
 
   if (!disable_client_header_validation_) {
     cluster->header_validator_factory_ = IntegrationUtil::makeHeaderValidationFactory(

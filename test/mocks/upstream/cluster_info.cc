@@ -96,6 +96,13 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
   ON_CALL(*this, maxResponseHeadersCount())
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
+  ON_CALL(*this, maxResponseHeadersKb()).WillByDefault(Invoke([this]() -> absl::optional<uint16_t> {
+    if (common_http_protocol_options_.has_max_headers_kb()) {
+      return common_http_protocol_options_.max_headers_kb().value();
+    } else {
+      return absl::nullopt;
+    }
+  }));
   ON_CALL(*this, maxRequestsPerConnection())
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
   ON_CALL(*this, trafficStats()).WillByDefault(ReturnRef(traffic_stats_));
