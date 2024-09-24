@@ -575,34 +575,73 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersRejected) {
 
 // Tests configuration of max response headers size.
 TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersAccepted) {
-  constexpr uint32_t limit_kb = 8192;
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  uint32_t limit_kb = 8192;
+  if (GetParam().http2_implementation == Http2Impl::Nghttp2) {
+    // nghttp2 has a hard-coded, unconfigurable limit of 64k for a header in it's header
+    // decompressor, so this test will always fail when using that codec.
+    // Reduce the size so that it can pass and receive some test coverage.
+    limit_kb = 100;
+  }
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
     http_protocol_options->mutable_max_headers_kb()->set_value(limit_kb);
+
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
   Http::TestResponseHeaderMapImpl large_headers(default_response_headers_);
-  large_headers.addCopy(
-      "large",
-      std::string((limit_kb * 1024) - 512 /* allow 512 bytes for other response headers */, 'a'));
+  large_headers.addCopy("large", std::string((limit_kb - 1) * 1024, 'a'));
 
   // This test is validating upstream response headers, but the test client will fail to receive the
   // request from Envoy if its limits aren't increased.
   envoy::config::core::v3::HttpProtocolOptions client_protocol_options;
   client_protocol_options.mutable_max_headers_kb()->set_value(limit_kb * 2);
 
-  // nghttp2 test codec fails with a compression error in this test for unknown reasons, but oghttp2
-  // works fine, so force its use here, only for the test client. Use the test parameter specified
-  // http2 codec for the Envoy client and server codecs.
-  envoy::config::core::v3::Http2ProtocolOptions client_h2_options =
-      Http2::Utility::initializeAndValidateOptions(envoy::config::core::v3::Http2ProtocolOptions())
-          .value();
-  client_h2_options.mutable_use_oghttp2_codec()->set_value(true);
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt,
+                                        client_protocol_options);
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(large_headers, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Tests configuration of max response headers size when that limit is consumed by many medium sized
+// headers.
+TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeResponseHeadersAccepted) {
+  constexpr uint32_t limit_kb = 8192;
+  constexpr uint32_t num_hdrs = 100;
+  constexpr uint32_t hdr_size_kb =
+      (limit_kb - 1) / num_hdrs; // Subtract 1 to leave some space for other response headers.
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_headers_kb()->set_value(limit_kb);
+    http_protocol_options->mutable_max_headers_count()->set_value(1000);
+
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  Http::TestResponseHeaderMapImpl large_headers(default_response_headers_);
+  for (uint32_t i = 0; i < num_hdrs; ++i) {
+    large_headers.addCopy(fmt::format("large{}", i), std::string(hdr_size_kb * 1024, 'a'));
+  }
+
+  // This test is validating upstream response headers, but the test client will fail to receive the
+  // request from Envoy if its limits aren't increased.
+  envoy::config::core::v3::HttpProtocolOptions client_protocol_options;
+  client_protocol_options.mutable_max_headers_kb()->set_value(limit_kb * 2);
 
   initialize();
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), client_h2_options,
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt,
                                         client_protocol_options);
   auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
   waitForNextUpstreamRequest();

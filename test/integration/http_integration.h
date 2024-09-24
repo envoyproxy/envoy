@@ -273,13 +273,13 @@ protected:
   void testRouterUpstreamResponseBeforeRequestComplete(uint32_t status_code = 0);
 
   void testTwoRequests(bool force_network_backup = false);
-  void testLargeHeaders(Http::TestRequestHeaderMapImpl request_headers,
-                        Http::TestRequestTrailerMapImpl request_trailers, uint32_t size,
-                        uint32_t max_size);
   void testLargeRequestUrl(uint32_t url_size, uint32_t max_headers_size);
   void testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
                                uint32_t max_count = 100,
                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  void testLargeResponseHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
+                                uint32_t max_count = 100,
+                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
   void testManyRequestHeaders(std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 
