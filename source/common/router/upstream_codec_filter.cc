@@ -69,9 +69,10 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
     // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
     // erroneously remove required headers.
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError);
-    const std::string details =
-        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders,
-                     "{", StringUtil::replaceAllEmptySpace(status.message()), "}");
+    const std::string details = absl::StrCat(
+        StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders, "{",
+        deferred_reset_ ? "deferred_reset" : StringUtil::replaceAllEmptySpace(status.message()),
+        "}");
     callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
                                absl::nullopt, details);
     return Http::FilterHeadersStatus::StopIteration;
