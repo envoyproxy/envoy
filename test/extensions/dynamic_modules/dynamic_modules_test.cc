@@ -36,8 +36,7 @@ public:
   };
 };
 
-INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages,
-                         testing::Values("c", "rust"), // TODO: add Go.
+INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),
                          DynamicModuleTestLanguages::languageParamToTestName);
 
 TEST_P(DynamicModuleTestLanguages, DoNotClose) {

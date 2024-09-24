@@ -261,6 +261,11 @@ public:
     return immediate_mutation_checker_;
   }
 
+  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
+  allowedOverrideModes() const {
+    return allowed_override_modes_;
+  }
+
   ThreadLocalStreamManager& threadLocalStreamManager() {
     return thread_local_stream_manager_slot_->getTyped<ThreadLocalStreamManager>();
   }
@@ -297,6 +302,8 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
+  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+      allowed_override_modes_;
   const ExpressionManager expression_manager_;
 
   const ImmediateMutationChecker immediate_mutation_checker_;

@@ -413,6 +413,7 @@ envoy_cc_library(
     srcs = ["thread.cc"],
     hdrs = ["thread.h"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [
+        ":assert_lib",
         ":macros",
         ":non_copyable",
         "@com_google_absl//absl/synchronization",
