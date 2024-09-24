@@ -21,6 +21,7 @@ envoy_proto_library(
 
 envoy_cc_fuzz_test(
     name = "ext_proc_unit_test_fuzz",
+    size = "large",
     srcs = ["ext_proc_unit_test_fuzz.cc"],
     corpus = "ext_proc_corpus",
     tags = ["skip_on_windows"],
