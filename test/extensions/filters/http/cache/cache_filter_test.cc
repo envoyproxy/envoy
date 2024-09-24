@@ -27,6 +27,7 @@ using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::Gt;
 using ::testing::IsNull;
 using ::testing::NotNull;
+using ::testing::Return;
 
 class CacheFilterTest : public ::testing::Test {
 protected:
@@ -1560,6 +1561,41 @@ TEST_F(ValidationHeadersTest, InvalidLastModified) {
         {"if-modified-since", formatter_.now(time_source_)}};
     EXPECT_THAT(mock_upstreams_headers_sent_[1],
                 testing::Optional(IsSupersetOfHeaders(injected_headers)));
+  }
+}
+
+TEST_F(CacheFilterTest, NoRouteShouldLocalReply) {
+  request_headers_.setHost("NoRoute");
+  EXPECT_CALL(decoder_callbacks_, route()).WillOnce(Return(nullptr));
+  {
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is
+    // in progress.
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Http::Code::NotFound, _, _, _, "cache_no_route"));
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    pumpDispatcher();
+  }
+}
+
+TEST_F(CacheFilterTest, NoClusterShouldLocalReply) {
+  request_headers_.setHost("NoCluster");
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillOnce(Return(nullptr));
+  {
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    // The filter should stop decoding iteration when decodeHeaders is called as a cache lookup is
+    // in progress.
+    EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+              Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, "cache_no_cluster"));
+    // The cache lookup callback should be posted to the dispatcher.
+    // Run events on the dispatcher so that the callback is invoked.
+    pumpDispatcher();
   }
 }
 
