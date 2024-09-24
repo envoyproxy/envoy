@@ -470,7 +470,7 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithDetails) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutDetails) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.dns_resolve_timeout_details",
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_resolve_timeout_details",
                                     "false");
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
