@@ -1038,7 +1038,9 @@ void UdpProxyFilter::TunnelingActiveSession::onAboveWriteBufferHighWatermark() {
 
 void UdpProxyFilter::TunnelingActiveSession::onBelowWriteBufferLowWatermark() {
   can_send_upstream_ = true;
-  flushBuffer();
+  cluster_.filter_.read_callbacks_->udpListener().dispatcher().post([this]() {
+    flushBuffer();
+  });
 }
 
 void UdpProxyFilter::TunnelingActiveSession::flushBuffer() {
