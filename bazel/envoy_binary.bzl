@@ -18,7 +18,7 @@ def envoy_cc_binary(
         data = [],
         testonly = 0,
         visibility = None,
-        engflow_pool = None,
+        rbe_pool = None,
         exec_properties = {},
         external_deps = [],
         repository = "",
@@ -29,7 +29,7 @@ def envoy_cc_binary(
         tags = [],
         features = []):
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": engflow_pool} if engflow_pool else {},
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     linker_inputs = envoy_exported_symbols_input()

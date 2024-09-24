@@ -79,7 +79,7 @@ def envoy_cc_fuzz_test(
         name,
         corpus,
         dictionaries = [],
-        engflow_pool = None,
+        rbe_pool = None,
         exec_properties = {},
         repository = "",
         size = "medium",
@@ -87,7 +87,7 @@ def envoy_cc_fuzz_test(
         tags = [],
         **kwargs):
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": engflow_pool} if engflow_pool else {},
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
@@ -169,11 +169,11 @@ def envoy_cc_test(
         size = "medium",
         flaky = False,
         env = {},
-        engflow_pool = None,
+        rbe_pool = None,
         exec_properties = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": engflow_pool} if engflow_pool else {},
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     native.cc_test(
@@ -208,7 +208,7 @@ def envoy_cc_test_library(
         srcs = [],
         hdrs = [],
         data = [],
-        engflow_pool = None,
+        rbe_pool = None,
         exec_properties = {},
         external_deps = [],
         deps = [],
@@ -219,7 +219,7 @@ def envoy_cc_test_library(
         alwayslink = 1,
         **kargs):
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": engflow_pool} if engflow_pool else {},
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     disable_pch = kargs.pop("disable_pch", True)
@@ -281,13 +281,13 @@ def envoy_benchmark_test(
         name,
         benchmark_binary,
         data = [],
-        engflow_pool = None,
+        rbe_pool = None,
         exec_properties = {},
         tags = [],
         repository = "",
         **kargs):
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": engflow_pool} if engflow_pool else {},
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
     native.sh_test(

@@ -97,7 +97,7 @@ def envoy_cc_library(
         hdrs = [],
         copts = [],
         visibility = None,
-        engflow_pool = None,
+        rbe_pool = None,
         exec_properties = {},
         external_deps = [],
         tcmalloc_dep = None,
@@ -114,7 +114,7 @@ def envoy_cc_library(
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": engflow_pool} if engflow_pool else {},
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
 
