@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/subset:config",
@@ -33,6 +34,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/http/header_to_metadata:config",
@@ -48,6 +50,7 @@ envoy_extension_cc_test(
     name = "subset_test",
     srcs = ["subset_test.cc"],
     extension_names = ["envoy.load_balancing_policies.subset"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/network:utility_lib",
@@ -79,6 +82,7 @@ envoy_extension_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",

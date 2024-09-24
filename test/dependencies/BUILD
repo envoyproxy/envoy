@@ -14,4 +14,5 @@ envoy_cc_test(
     external_deps = [
         "curl",
     ],
+    rbe_pool = "2core",
 )

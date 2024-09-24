@@ -27,6 +27,7 @@ envoy_cc_fuzz_test(
         "substitution_formatter_fuzz_test.dict",
         "//test/fuzz:headers.dict",
     ],
+    rbe_pool = "2core",
     deps = [
         ":substitution_formatter_fuzz_proto_cc_proto",
         "//source/common/formatter:substitution_formatter_lib",
@@ -47,6 +48,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":command_extension_lib",
         "//source/common/common:utility_lib",
@@ -74,6 +76,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "substitution_format_string_test",
     srcs = ["substitution_format_string_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":command_extension_lib",
         "//source/common/formatter:substitution_format_string_lib",
@@ -92,6 +95,7 @@ envoy_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
