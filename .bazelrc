@@ -42,9 +42,6 @@ build:windows --action_env=PATH --host_action_env=PATH
 # Requires setting `BAZEL_VOLATILE_DIRTY` in the env.
 build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
 
-# Prevent stamped caches from busting (eg in PRs)
-# Requires setting `BAZEL_FAKE_SCM_REVISION` in the env.
-build --action_env=BAZEL_FAKE_SCM_REVISION --host_action_env=BAZEL_FAKE_SCM_REVISION
 build --test_summary=terse
 
 build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
