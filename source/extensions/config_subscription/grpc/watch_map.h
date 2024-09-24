@@ -105,10 +105,10 @@ public:
   void onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
                       const std::string& version_info) override;
 
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) override;
+  void
+  onConfigUpdate(absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   WatchMap(const WatchMap&) = delete;

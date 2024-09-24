@@ -216,7 +216,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
 }
 
 void WatchMap::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+    absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   // Track any removals triggered by earlier watch updates.
@@ -232,15 +232,15 @@ void WatchMap::onConfigUpdate(
   // resources the watch map is interested in. Reserve the correct amount of
   // space for the vector for the good case.
   decoded_resources.reserve(added_resources.size());
-  for (const auto& r : added_resources) {
-    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
+  for (const auto* r : added_resources) {
+    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r->name());
     // If there are no watches, then we don't need to decode. If there are watches, they should all
     // be for the same resource type, so we can just use the callbacks of the first watch to decode.
     if (interested_in_r.empty()) {
       continue;
     }
     decoded_resources.emplace_back(
-        new DecodedResourceImpl((*interested_in_r.begin())->resource_decoder_, r));
+        new DecodedResourceImpl((*interested_in_r.begin())->resource_decoder_, *r));
     for (const auto& interested_watch : interested_in_r) {
       per_watch_added[interested_watch].emplace_back(*decoded_resources.back());
     }

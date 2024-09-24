@@ -56,11 +56,10 @@ public:
   MOCK_METHOD(void, onConfigUpdate,
               (const std::vector<DecodedResourcePtr>& resources, const std::string& version_info));
 
-  MOCK_METHOD(
-      void, onConfigUpdate,
-      (const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-       const std::string& system_version_info));
+  MOCK_METHOD(void, onConfigUpdate,
+              (absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+               const std::string& system_version_info));
   MOCK_METHOD(void, onConfigUpdateFailed,
               (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
 };
