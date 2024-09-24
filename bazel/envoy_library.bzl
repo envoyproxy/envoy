@@ -98,6 +98,8 @@ def envoy_cc_library(
         hdrs = [],
         copts = [],
         visibility = None,
+        rbe_pool = None,
+        exec_properties = {},
         external_deps = [],
         tcmalloc_dep = None,
         repository = "",
@@ -112,6 +114,10 @@ def envoy_cc_library(
         linkopts = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+    exec_properties = exec_properties | select({
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
 
     # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
