@@ -49,7 +49,7 @@ public:
                          Http::StreamFilterCallbacks&) -> std::unique_ptr<LookupContext> {
           auto ret = std::move(mock_lookup_context_);
           mock_lookup_context_ = nullptr;
-          return std::move(ret);
+          return ret;
         });
     return mock_lookup_context_.get();
   }
@@ -63,7 +63,7 @@ public:
           lookup_context->onDestroy();
           auto ret = std::move(mock_insert_context_);
           mock_insert_context_ = nullptr;
-          return std::move(ret);
+          return ret;
         });
     return mock_insert_context_.get();
   }
