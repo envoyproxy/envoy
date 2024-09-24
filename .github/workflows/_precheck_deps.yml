@@ -29,7 +29,7 @@ jobs:
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.target }}
     with:
-      bazel-extra: '--config=rbe-envoy-engflow'
+      bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       request: ${{ inputs.request }}
       error-match: |
