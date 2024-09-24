@@ -1230,7 +1230,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
       max_response_headers_kb_(PROTOBUF_GET_OPTIONAL_WRAPPED(
-          http_protocol_options_->common_http_protocol_options_, max_headers_kb)),
+          http_protocol_options_->common_http_protocol_options_, max_response_headers_kb)),
       type_(config.type()),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       connection_pool_per_downstream_connection_(

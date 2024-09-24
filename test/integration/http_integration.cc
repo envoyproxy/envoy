@@ -1475,7 +1475,7 @@ void HttpIntegrationTest::testLargeResponseHeaders(uint32_t size, uint32_t count
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
     auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
-    http_protocol_options->mutable_max_headers_kb()->set_value(max_size);
+    http_protocol_options->mutable_max_response_headers_kb()->set_value(max_size);
     http_protocol_options->mutable_max_headers_count()->set_value(max_count);
 
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
@@ -1485,7 +1485,7 @@ void HttpIntegrationTest::testLargeResponseHeaders(uint32_t size, uint32_t count
   // This test is validating upstream response headers, but the test client will fail to receive the
   // request from Envoy if its limits aren't increased.
   envoy::config::core::v3::HttpProtocolOptions client_protocol_options;
-  client_protocol_options.mutable_max_headers_kb()->set_value(max_size);
+  client_protocol_options.mutable_max_response_headers_kb()->set_value(max_size);
   client_protocol_options.mutable_max_headers_count()->set_value(max_count);
 
   Http::TestRequestHeaderMapImpl big_headers(default_response_headers_);

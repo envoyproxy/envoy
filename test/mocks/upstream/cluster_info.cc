@@ -97,8 +97,8 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, maxResponseHeadersCount())
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
   ON_CALL(*this, maxResponseHeadersKb()).WillByDefault(Invoke([this]() -> absl::optional<uint16_t> {
-    if (common_http_protocol_options_.has_max_headers_kb()) {
-      return common_http_protocol_options_.max_headers_kb().value();
+    if (common_http_protocol_options_.has_max_response_headers_kb()) {
+      return common_http_protocol_options_.max_response_headers_kb().value();
     } else {
       return absl::nullopt;
     }

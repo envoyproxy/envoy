@@ -369,11 +369,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config.common_http_protocol_options(), max_headers_kb,
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-              config, max_request_headers_kb,
-              context.serverFactoryContext().runtime().snapshot().getInteger(
-                  Http::MaxRequestHeadersSizeOverrideKey, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)))),
+          config, max_request_headers_kb,
+          context.serverFactoryContext().runtime().snapshot().getInteger(
+              Http::MaxRequestHeadersSizeOverrideKey, Http::DEFAULT_MAX_REQUEST_HEADERS_KB))),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
           context.serverFactoryContext().runtime().snapshot().getInteger(
@@ -434,14 +432,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     return;
   }
 
-  if (config.has_max_request_headers_kb() &&
-      config.common_http_protocol_options().has_max_headers_kb() &&
-      config.max_request_headers_kb().value() !=
-          config.common_http_protocol_options().max_headers_kb().value()) {
-    ENVOY_LOG(warn, "Both `max_request_headers_kb` and `max_headers_kb` are configured. Ignoring "
-                    "`max_request_headers_kb`.");
-  }
-
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(
       config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
       config.stream_error_on_invalid_http_message());
@@ -451,6 +441,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
     idle_timeout_ = absl::nullopt;
+  }
+
+  if (config.common_http_protocol_options().has_max_response_headers_kb()) {
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("Error: max_response_headers_kb cannot be set on http_connection_manager."));
+    return;
   }
 
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {
