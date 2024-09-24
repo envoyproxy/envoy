@@ -404,9 +404,8 @@ public:
       const Formatters& formatters = absl::get<Formatters>(element);
       ASSERT(!formatters.empty());
 
-      if (formatters.size() > 1) {
-        // 2. Handle the formatter element with multiple providers or case
-        //    that value type needs not to be kept.
+      if (formatters.size() != 1) {
+        // 2. Handle the formatter element with multiple or zero providers.
         stringValueToLogLine(formatters, context, info, serializer);
       } else {
         // 3. Handle the formatter element with a single provider and value
