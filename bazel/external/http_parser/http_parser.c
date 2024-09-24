@@ -161,6 +161,8 @@ do {                                                                 \
   }                                                                  \
 } while (0)
 
+#define IS_METHOD_END(matcher, index) \
+    (HTTP_PARSER_STRICT ? (matcher[index] == '\0') : true)
 
 #define PROXY_CONNECTION "proxy-connection"
 #define CONNECTION "connection"
@@ -939,7 +941,6 @@ reexecute:
           goto error;
         }
 
-      #if HTTP_PARSER_STRICT
         parser->method = (enum http_method) 0;
         parser->index = 1;
         switch (ch) {
@@ -961,12 +962,14 @@ reexecute:
           case 'T': parser->method = HTTP_TRACE; break;
           case 'U': parser->method = HTTP_UNLOCK; /* or UNSUBSCRIBE, UNBIND, UNLINK */ break;
           default:
+        #if HTTP_PARSER_STRICT
             SET_ERRNO(HPE_INVALID_METHOD);
             goto error;
+        #else
+            /*skip validations*/
+            break;
+        #endif
         }
-      #else
-        parser->method = 0;
-      #endif
         UPDATE_STATE(s_req_method);
 
         CALLBACK_NOTIFY(message_begin);
@@ -981,10 +984,9 @@ reexecute:
           goto error;
         }
 
-      #if HTTP_PARSER_STRICT
         const char *matcher;
         matcher = method_strings[parser->method];
-        if (ch == ' ' && matcher[parser->index] == '\0') {
+        if (ch == ' ' && IS_METHOD_END(matcher, parser->index)) {
           UPDATE_STATE(s_req_spaces_before_url);
         } else if (ch == matcher[parser->index]) {
           ; /* nada */
@@ -1016,8 +1018,13 @@ reexecute:
             XX(UNLOCK,    3, 'I', UNLINK)
 #undef XX
             default:
+          #if HTTP_PARSER_STRICT
               SET_ERRNO(HPE_INVALID_METHOD);
               goto error;
+          #else
+              /*skip validations*/
+              break;
+          #endif
           }
         } else {
           SET_ERRNO(HPE_INVALID_METHOD);
@@ -1025,16 +1032,6 @@ reexecute:
         }
 
         ++parser->index;
-      #else
-        if (ch == ' ') {
-          UPDATE_STATE(s_req_spaces_before_url);
-        } else if ((ch >= 'A' && ch <= 'Z') || ch == '-') {
-          /* nada */
-        } else {
-          SET_ERRNO(HPE_INVALID_METHOD);
-          goto error;
-        }
-      #endif
         break;
       }
 
