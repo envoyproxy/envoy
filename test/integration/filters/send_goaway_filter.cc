@@ -45,8 +45,5 @@ constexpr char GoAwayDuringDecoding::name[];
 static Registry::RegisterFactory<SimpleFilterConfig<GoAwayDuringDecoding>,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
-// static Registry::RegisterFactory<SimpleFilterConfig<GoAwayDuringDecoding>,
-//                                  Server::Configuration::UpstreamHttpFilterConfigFactory>
-//     register_upstream_;
 
 } // namespace Envoy
