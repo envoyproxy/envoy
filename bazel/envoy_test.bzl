@@ -80,11 +80,17 @@ def envoy_cc_fuzz_test(
         name,
         corpus,
         dictionaries = [],
+        rbe_pool = None,
+        exec_properties = {},
         repository = "",
         size = "medium",
         deps = [],
         tags = [],
         **kwargs):
+    exec_properties = exec_properties | select({
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
         corpus_name = name + "_corpus_files"
         native.filegroup(
@@ -165,9 +171,13 @@ def envoy_cc_test(
         size = "medium",
         flaky = False,
         env = {},
+        rbe_pool = None,
         exec_properties = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
-
+    exec_properties = exec_properties | select({
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
     native.cc_test(
         name = name,
         srcs = srcs,
@@ -200,6 +210,8 @@ def envoy_cc_test_library(
         srcs = [],
         hdrs = [],
         data = [],
+        rbe_pool = None,
+        exec_properties = {},
         external_deps = [],
         deps = [],
         repository = "",
@@ -208,6 +220,10 @@ def envoy_cc_test_library(
         copts = [],
         alwayslink = 1,
         **kargs):
+    exec_properties = exec_properties | select({
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
     disable_pch = kargs.pop("disable_pch", True)
     _envoy_cc_test_infrastructure_library(
         name,
@@ -269,9 +285,15 @@ def envoy_benchmark_test(
         name,
         benchmark_binary,
         data = [],
+        rbe_pool = None,
+        exec_properties = {},
         tags = [],
         repository = "",
         **kargs):
+    exec_properties = exec_properties | select({
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
     native.sh_test(
         name = name,
         srcs = [repository + "//bazel:test_for_benchmark_wrapper.sh"],
