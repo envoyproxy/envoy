@@ -146,7 +146,15 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
   if (!lb_endpoint.endpoint().additional_addresses().empty()) {
     address_list.push_back(address);
     for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
-      address_list.emplace_back(parent_.resolveProtoAddress(additional_address.address()));
+      Network::Address::InstanceConstSharedPtr address =
+          parent_.resolveProtoAddress(additional_address.address());
+      address_list.emplace_back(address);
+    }
+    for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+      // All addresses must by IP addresses.
+      if (!address->ip()) {
+        throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+      }
     }
   }
 
