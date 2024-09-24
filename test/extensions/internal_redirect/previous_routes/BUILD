@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.internal_redirect_predicates.previous_routes"],
     deps = [
         "//source/common/stream_info:filter_state_lib",

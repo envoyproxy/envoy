@@ -15,6 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "downstream_connections_monitor_test",
     srcs = ["downstream_connections_monitor_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
     deps = [
         "//source/extensions/resource_monitors/downstream_connections:downstream_connections_monitor",
@@ -26,6 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
     deps = [
         "//envoy/registry",
@@ -42,6 +44,7 @@ envoy_cc_test(
     name = "cx_limit_overload_integration_test",
     size = "large",
     srcs = ["cx_limit_overload_integration_test.cc"],
+    engflow_pool = "2core",
     tags = [
         "cpu:3",
     ],

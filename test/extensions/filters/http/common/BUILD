@@ -21,6 +21,7 @@ envoy_cc_test_library(
     hdrs = [
         "mock.h",
     ],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//test/mocks/upstream:upstream_mocks",
@@ -41,6 +42,7 @@ envoy_extension_cc_test(
     srcs = [
         "jwks_fetcher_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.jwt_authn"],
     deps = [
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
@@ -55,6 +57,7 @@ envoy_extension_cc_test(
 envoy_cc_test(
     name = "stream_rate_limiter_test",
     srcs = ["stream_rate_limiter_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",

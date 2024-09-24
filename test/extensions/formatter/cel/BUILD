@@ -20,6 +20,7 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
+    engflow_pool = "2core",
     extension_names = ["envoy.formatter.cel"],
     tags = ["skip_on_windows"],
     deps = [

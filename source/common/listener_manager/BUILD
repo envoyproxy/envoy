@@ -19,6 +19,7 @@ envoy_cc_library(
         "listener_impl.h",
         "listener_manager_impl.h",
     ],
+    engflow_pool = "2core",
     deps = [
         ":active_raw_udp_listener_config",
         ":connection_handler_lib",

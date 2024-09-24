@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = [
         "stateful_session_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.stateful_session"],
     deps = [
         "//source/extensions/filters/http/stateful_session:config",
@@ -35,6 +36,7 @@ envoy_extension_cc_test(
     srcs = [
         "stateful_session_integration_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.stateful_session"],
     deps = [
         "//source/common/protobuf",
@@ -50,6 +52,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.stateful_session"],
     deps = [
         "//source/extensions/filters/http/stateful_session:config",

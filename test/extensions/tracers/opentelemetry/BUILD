@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         # https://github.com/open-telemetry/opentelemetry-cpp/blob/v1.14.0/api/BUILD#L32
         "-DHAVE_ABSEIL",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
         "//envoy/common:time_interface",
@@ -53,6 +54,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
@@ -66,6 +68,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "span_context_extractor_test",
     srcs = ["span_context_extractor_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
@@ -77,6 +80,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "grpc_trace_exporter_test",
     srcs = ["grpc_trace_exporter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
         "//source/extensions/tracers/opentelemetry:trace_exporter",
@@ -89,6 +93,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "http_trace_exporter_test",
     srcs = ["http_trace_exporter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
         "//source/extensions/tracers/opentelemetry:trace_exporter",
@@ -103,6 +108,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "operation_name_test",
     srcs = ["operation_name_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry"],
     deps = [
         "//source/extensions/tracers/opentelemetry:config",

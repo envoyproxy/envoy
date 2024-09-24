@@ -69,6 +69,7 @@ envoy_cc_test(
         "postgres_test_config.yaml-template",
         "//test/config/integration/certs",
     ],
+    engflow_pool = "2core",
     deps = [
         ":postgres_integration_proto_cc_proto",
         ":postgres_test_utils_lib",

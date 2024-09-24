@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.oauth2"],
     deps = [
         "//source/extensions/filters/http/oauth2:config",
@@ -26,6 +27,7 @@ envoy_extension_cc_test(
     name = "oauth_integration_test",
     size = "large",
     srcs = ["oauth_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.oauth2"],
     deps = [
         "//source/common/common:base64_lib",
@@ -41,6 +43,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.oauth2"],
     deps = [
         "//source/common/secret:secret_manager_impl_lib",
@@ -59,6 +62,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "oauth_client_test",
     srcs = ["oauth_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.oauth2"],
     deps = [
         "//source/extensions/filters/http/oauth2:oauth_client",

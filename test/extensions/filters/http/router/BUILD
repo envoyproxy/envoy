@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.router"],
     deps = [
         "//source/extensions/filters/http/router:config",
@@ -30,6 +31,7 @@ envoy_extension_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.router"],
     deps = [
         "//source/extensions/filters/http/router:config",

@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "buffer_filter_test",
     srcs = ["buffer_filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.buffer"],
     deps = [
         "//envoy/event:dispatcher_interface",
@@ -36,6 +37,7 @@ envoy_extension_cc_test(
     name = "buffer_filter_integration_test",
     size = "large",
     srcs = ["buffer_filter_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.buffer"],
     shard_count = 4,
     deps = [
@@ -50,6 +52,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.buffer"],
     deps = [
         "//source/extensions/filters/http/buffer:config",

@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "datasource_server_preferred_address_test",
     srcs = ["datasource_server_preferred_address_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.quic.server_preferred_address.datasource"],
     tags = ["nofips"],
     deps = [
@@ -26,6 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "fixed_server_preferred_address_test",
     srcs = ["fixed_server_preferred_address_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.quic.server_preferred_address.fixed"],
     tags = ["nofips"],
     deps = [

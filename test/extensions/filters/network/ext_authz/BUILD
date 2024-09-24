@@ -16,6 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.ext_authz"],
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -38,6 +39,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.ext_authz"],
     deps = [
         "//source/extensions/filters/network/ext_authz:config",
@@ -59,6 +61,7 @@ envoy_cc_fuzz_test(
     name = "ext_authz_fuzz_test",
     srcs = ["ext_authz_fuzz_test.cc"],
     corpus = "ext_authz_corpus",
+    engflow_pool = "2core",
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",

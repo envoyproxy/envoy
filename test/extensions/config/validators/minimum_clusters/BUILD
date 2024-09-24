@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.config.validators.minimum_clusters_validator"],
     deps = [
         "//envoy/registry",
@@ -26,6 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "minimum_clusters_validator_test",
     srcs = ["minimum_clusters_validator_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.config.validators.minimum_clusters_validator"],
     deps = [
         "//source/common/config:decoded_resource_lib",
@@ -39,6 +41,7 @@ envoy_extension_cc_test(
     name = "minimum_clusters_validator_integration_test",
     size = "large",
     srcs = ["minimum_clusters_validator_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.config.validators.minimum_clusters_validator"],
     deps = [
         "//source/common/config:protobuf_link_hacks",

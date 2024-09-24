@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "fragment_test",
     srcs = ["fragment_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.file_system_buffer"],
     tags = ["skip_on_windows"],
     deps = [
@@ -30,6 +31,7 @@ envoy_extension_cc_test(
         "config_test.cc",
         "filter_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.file_system_buffer"],
     tags = ["skip_on_windows"],
     deps = [
@@ -46,6 +48,7 @@ envoy_extension_cc_test(
     srcs = [
         "filter_integration_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.file_system_buffer"],
     shard_count = 4,
     tags = [

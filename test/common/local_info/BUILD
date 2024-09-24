@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "local_info_impl_test",
     srcs = ["local_info_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/local_info:local_info_lib",
         "//test/common/stats:stat_test_utility_lib",

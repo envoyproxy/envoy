@@ -16,6 +16,7 @@ envoy_package()
 envoy_cc_test_binary(
     name = "router_check_tool",
     srcs = ["router_check.cc"],
+    engflow_pool = "2core",
     linkstatic = envoy_select_linkstatic(),
     deps = [":router_check_main_lib"] + select({
         "//bazel:coverage_build": [],
@@ -36,6 +37,7 @@ envoy_cc_test_library(
         "router.h",
     ],
     copts = ["-DHAVE_LONG_LONG"],
+    engflow_pool = "2core",
     deps = [
         ":validation_proto_cc_proto",
         "//source/common/common:random_generator_lib",

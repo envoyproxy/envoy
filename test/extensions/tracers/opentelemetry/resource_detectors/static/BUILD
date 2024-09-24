@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.static_config"],
     deps = [
         "//envoy/registry",
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "static_config_resource_detector_test",
     srcs = ["static_config_resource_detector_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.static_config"],
     deps = [
         "//source/extensions/tracers/opentelemetry/resource_detectors/static:static_config_resource_detector_lib",
@@ -42,6 +44,7 @@ envoy_extension_cc_test(
     srcs = [
         "static_config_resource_detector_integration_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.static_config"],
     deps = [
         "//source/extensions/tracers/opentelemetry:config",

@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "profile_action_test",
     srcs = ["profile_action_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.watchdog.profile_action"],
     deps = [
         "//envoy/common:time_interface",
@@ -37,6 +38,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.watchdog.profile_action"],
     deps = [
         "//envoy/registry",

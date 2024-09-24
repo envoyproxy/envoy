@@ -15,6 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "tap_config_impl_test",
     srcs = ["tap_config_impl_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.transport_sockets.tap"],
     deps = [
         "//source/extensions/transport_sockets/tap:tap_config_impl",
@@ -30,6 +31,7 @@ envoy_extension_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.transport_sockets.tap"],
     deps = [
         "//source/common/network:connection_lib",

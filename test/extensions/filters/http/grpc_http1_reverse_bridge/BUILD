@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "reverse_bridge_test",
     srcs = ["reverse_bridge_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_http1_reverse_bridge"],
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
     name = "reverse_bridge_integration_test",
     size = "large",
     srcs = ["reverse_bridge_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_http1_reverse_bridge"],
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -44,6 +46,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_http1_reverse_bridge"],
     deps = [
         "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",

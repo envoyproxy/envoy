@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.path.rewrite.uri_template.uri_template_rewriter"],
     deps = [
         "//source/extensions/path/rewrite/uri_template:config",
@@ -24,6 +25,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "library_test",
     srcs = ["library_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.path.rewrite.uri_template.uri_template_rewriter"],
     deps = [
         "//source/extensions/path/match/uri_template:config",

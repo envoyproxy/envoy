@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "connect_test",
     srcs = ["connect_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
     deps = [
         "//source/extensions/transport_sockets/http_11_proxy:connect",
@@ -30,6 +31,7 @@ envoy_extension_cc_test(
     name = "connect_integration_test",
     size = "large",
     srcs = ["connect_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",

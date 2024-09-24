@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "compressor_test",
     srcs = ["zlib_compressor_impl_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.compression.gzip.compressor"],
     deps = [
         "//source/common/common:assert_lib",

@@ -16,6 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "maglev_lb_test",
     srcs = ["maglev_lb_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.maglev"],
     deps = [
         "//source/extensions/load_balancing_policies/maglev:maglev_lb_lib",
@@ -37,6 +38,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "maglev_lb_force_original_impl_test",
     srcs = ["maglev_lb_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.maglev"],
     deps = [
         "//source/extensions/load_balancing_policies/maglev:maglev_lb_force_original_impl_lib",
@@ -56,6 +58,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.maglev"],
     deps = [
         "//source/extensions/load_balancing_policies/maglev:config",
@@ -71,6 +74,7 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.maglev"],
     deps = [
         "//source/common/protobuf",
@@ -84,6 +88,7 @@ envoy_extension_cc_test(
 envoy_cc_benchmark_binary(
     name = "maglev_lb_benchmark",
     srcs = ["maglev_lb_benchmark.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/load_balancing_policies/maglev:maglev_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",

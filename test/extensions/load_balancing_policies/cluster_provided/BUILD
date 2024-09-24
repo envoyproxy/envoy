@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.cluster_provided"],
     deps = [
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.cluster_provided"],
     deps = [
         "//source/common/protobuf",

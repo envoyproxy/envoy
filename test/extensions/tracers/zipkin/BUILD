@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "zipkin_core_types_test.cc",
         "zipkin_tracer_impl_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.zipkin"],
     deps = [
         "//envoy/common:time_interface",
@@ -51,6 +52,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.zipkin"],
     deps = [
         "//source/extensions/tracers/zipkin:config",

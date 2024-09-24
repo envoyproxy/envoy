@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ratelimit_test",
     srcs = ["ratelimit_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.ratelimit"],
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -37,6 +38,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.ratelimit"],
     deps = [
         "//source/extensions/filters/http/ratelimit:config",
@@ -51,6 +53,7 @@ envoy_extension_cc_test(
     name = "ratelimit_integration_test",
     size = "large",
     srcs = ["ratelimit_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.ratelimit"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -71,6 +74,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "ratelimit_headers_test",
     srcs = ["ratelimit_headers_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/ratelimit:ratelimit_headers_lib",

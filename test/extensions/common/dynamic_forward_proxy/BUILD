@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "dns_cache_impl_test",
     srcs = ["dns_cache_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         ":mocks",
         "//source/common/config:utility_lib",
@@ -35,6 +36,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dns_cache_resource_manager_test",
     srcs = ["dns_cache_resource_manager_test.cc"],
+    engflow_pool = "2core",
     deps = [
         ":mocks",
         "//source/common/config:utility_lib",

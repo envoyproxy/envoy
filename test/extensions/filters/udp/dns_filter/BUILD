@@ -31,6 +31,7 @@ envoy_extension_cc_test_library(
 envoy_extension_cc_test(
     name = "dns_filter_test",
     srcs = ["dns_filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.udp.dns_filter"],
     deps = [
         ":dns_filter_test_lib",
@@ -49,6 +50,7 @@ envoy_extension_cc_test(
     name = "dns_filter_integration_test",
     size = "large",
     srcs = ["dns_filter_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.udp.dns_filter"],
     deps = [
         ":dns_filter_test_lib",
@@ -62,6 +64,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "dns_filter_utils_test",
     srcs = ["dns_filter_utils_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.udp.dns_filter"],
     deps = [
         ":dns_filter_test_lib",
@@ -76,6 +79,7 @@ envoy_cc_fuzz_test(
     name = "dns_filter_fuzz_test",
     srcs = ["dns_filter_fuzz_test.cc"],
     corpus = "dns_filter_corpus",
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
         "//test/fuzz:utility_lib",

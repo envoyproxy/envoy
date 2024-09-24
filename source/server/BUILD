@@ -406,6 +406,7 @@ envoy_cc_library(
     name = "server_base_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
+    engflow_pool = "2core",
     deps = [
         ":api_listener_lib",
         ":configuration_lib",

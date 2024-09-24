@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "local_ratelimit_test",
     srcs = ["local_ratelimit_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.listener.local_ratelimit"],
     deps = [
         "//source/common/network:default_socket_interface_lib",
@@ -32,6 +33,7 @@ envoy_extension_cc_test(
     srcs = [
         "local_ratelimit_integration_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.listener.local_ratelimit"],
     deps = [
         "//source/extensions/access_loggers/file:config",

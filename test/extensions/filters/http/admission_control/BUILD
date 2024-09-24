@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "admission_control_filter_test",
     srcs = ["admission_control_filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.admission_control"],
     deps = [
         "//source/common/common:enum_to_int",
@@ -32,6 +33,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.admission_control"],
     deps = [
         "//source/common/http:header_map_lib",
@@ -50,6 +52,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "success_criteria_evaluator_test",
     srcs = ["success_criteria_evaluator_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.admission_control"],
     deps = [
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
@@ -61,6 +64,7 @@ envoy_extension_cc_test(
     name = "admission_control_integration_test",
     size = "large",
     srcs = ["admission_control_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.admission_control"],
     deps = [
         "//source/extensions/filters/http/admission_control:config",
@@ -72,6 +76,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "admission_controller_test",
     srcs = ["controller_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.admission_control"],
     deps = [
         "//source/common/http:headers_lib",

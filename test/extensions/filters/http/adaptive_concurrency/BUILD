@@ -15,6 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "adaptive_concurrency_filter_test",
     srcs = ["adaptive_concurrency_filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
     deps = [
         "//source/common/http:header_map_lib",
@@ -39,6 +40,7 @@ envoy_extension_cc_test(
     srcs = [
         "adaptive_concurrency_filter_integration_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
     deps = [
         ":adaptive_concurrency_filter_integration_test_lib",

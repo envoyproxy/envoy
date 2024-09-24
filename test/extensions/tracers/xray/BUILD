@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "util_test.cc",
         "xray_tracer_impl_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.xray"],
     deps = [
         "//source/extensions/tracers/xray:xray_lib",
@@ -42,6 +43,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.xray"],
     deps = [
         "//source/extensions/tracers/xray:config",
@@ -58,6 +60,7 @@ envoy_cc_fuzz_test(
     name = "xray_fuzz_test",
     srcs = ["fuzz_test.cc"],
     corpus = "wildcard_matcher_corpus",
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/tracers/xray:xray_lib",
     ],

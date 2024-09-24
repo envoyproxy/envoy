@@ -109,6 +109,7 @@ envoy_cc_library(
         "external/responses.h",
         "kafka_response_parser.h",
     ],
+    engflow_pool = "2core",
     deps = [
         ":kafka_response_lib",
         ":parser_lib",

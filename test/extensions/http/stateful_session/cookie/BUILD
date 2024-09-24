@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "cookie_test",
     srcs = ["cookie_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.stateful_session.cookie"],
     deps = [
         "//source/common/http:utility_lib",
@@ -27,6 +28,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.stateful_session.cookie"],
     deps = [
         "//envoy/registry",

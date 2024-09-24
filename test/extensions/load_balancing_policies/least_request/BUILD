@@ -18,6 +18,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.least_request"],
     deps = [
         "//source/extensions/load_balancing_policies/least_request:config",
@@ -32,6 +33,7 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.least_request"],
     deps = [
         "//source/common/protobuf",
@@ -55,6 +57,7 @@ envoy_cc_fuzz_test(
     name = "least_request_load_balancer_fuzz_test",
     srcs = ["least_request_load_balancer_fuzz_test.cc"],
     corpus = "least_request_load_balancer_corpus",
+    engflow_pool = "2core",
     deps = [
         ":least_request_load_balancer_fuzz_proto_cc_proto",
         "//source/extensions/load_balancing_policies/least_request:config",
@@ -66,6 +69,7 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "least_request_lb_benchmark",
     srcs = ["least_request_lb_benchmark.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/load_balancing_policies/least_request:least_request_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
@@ -81,6 +85,7 @@ envoy_benchmark_test(
 envoy_extension_cc_test(
     name = "least_request_lb_test",
     srcs = ["least_request_lb_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.least_request"],
     deps = [
         "//source/extensions/load_balancing_policies/least_request:least_request_lb_lib",
@@ -91,6 +96,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "least_request_lb_simulation_test",
     srcs = ["least_request_lb_simulation_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.least_request"],
     deps = [
         "//source/common/common:random_generator_lib",

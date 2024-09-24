@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     data = [
         "//test/extensions/compression/zstd/test_data:dictionary",
     ],
+    engflow_pool = "2core",
     extension_names = [
         "envoy.compression.zstd.compressor",
         "envoy.compression.zstd.decompressor",

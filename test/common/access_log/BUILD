@@ -17,6 +17,7 @@ envoy_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
+    engflow_pool = "2core",
     deps = [
         "//source/common/access_log:access_log_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -46,6 +47,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "access_log_manager_impl_test",
     srcs = ["access_log_manager_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/stats:stats_lib",

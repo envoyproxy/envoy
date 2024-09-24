@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "header_test",
     srcs = ["header_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.stateful_session.header"],
     deps = [
         "//source/common/http:utility_lib",
@@ -26,6 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.stateful_session.header"],
     deps = [
         "//envoy/registry",

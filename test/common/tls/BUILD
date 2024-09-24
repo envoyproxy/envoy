@@ -29,6 +29,7 @@ envoy_cc_test(
         "//test/common/tls/ocsp/test_data:certs",
         "//test/common/tls/test_data:certs",
     ],
+    engflow_pool = "2core",
     external_deps = ["ssl"],
     deps = [
         ":ssl_certs_test_lib",
@@ -88,6 +89,7 @@ envoy_cc_test(
         "//test/common/tls/ocsp/test_data:certs",
         "//test/common/tls/test_data:certs",
     ],
+    engflow_pool = "2core",
     external_deps = ["ssl"],
     deps = [
         ":ssl_certs_test_lib",
@@ -143,6 +145,7 @@ envoy_cc_test(
         "//test/common/tls/ocsp/test_data:certs",
         "//test/common/tls/test_data:certs",
     ],
+    engflow_pool = "2core",
     deps = [
         "ssl_certs_test_lib",
         ":ssl_test_utils",
@@ -172,6 +175,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "io_handle_bio_test",
     srcs = ["io_handle_bio_test.cc"],
+    engflow_pool = "2core",
     external_deps = ["ssl"],
     deps = [
         ":ssl_test_utils",
@@ -188,6 +192,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
+    engflow_pool = "2core",
     external_deps = ["ssl"],
     deps = [
         ":ssl_test_utils",
@@ -237,6 +242,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
+    engflow_pool = "2core",
     external_deps = ["ssl"],
     deps = [
         ":ssl_socket_test",
@@ -256,6 +262,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "handshaker_factory_test",
     srcs = ["handshaker_factory_test.cc"],
+    engflow_pool = "2core",
     deps = [
         ":ssl_test_utils",
         "//source/common/stream_info:stream_info_lib",
@@ -282,6 +289,7 @@ envoy_cc_benchmark_binary(
     data = [
         "//test/common/tls/test_data:certs",
     ],
+    engflow_pool = "2core",
     external_deps = ["ssl"],
     # Uses raw POSIX syscalls, does not build on Windows.
     tags = ["skip_on_windows"],

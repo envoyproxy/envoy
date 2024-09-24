@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.composite"],
     deps = [
         "//source/common/http:header_map_lib",
@@ -33,6 +34,7 @@ envoy_extension_cc_test(
     name = "composite_filter_integration_test",
     size = "large",
     srcs = ["composite_filter_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.composite"],
     deps = [
         "//source/common/http:header_map_lib",

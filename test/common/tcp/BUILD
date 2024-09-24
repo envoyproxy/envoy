@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -33,6 +34,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "async_tcp_client_impl_test",
     srcs = ["async_tcp_client_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/network:utility_lib",
         "//source/common/tcp:async_tcp_client_lib",

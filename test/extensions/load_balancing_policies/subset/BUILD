@@ -16,6 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.subset"],
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
@@ -32,6 +33,7 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.subset"],
     deps = [
         "//source/common/protobuf",
@@ -47,6 +49,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "subset_test",
     srcs = ["subset_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.subset"],
     deps = [
         "//source/common/common:minimal_logger_lib",
@@ -80,6 +83,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_benchmark_binary(
     name = "subset_benchmark",
     srcs = ["subset_benchmark.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.subset"],
     deps = [
         "//source/extensions/load_balancing_policies/random:config",

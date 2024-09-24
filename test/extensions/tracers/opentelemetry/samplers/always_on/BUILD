@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.samplers.always_on"],
     deps = [
         "//envoy/registry",
@@ -27,6 +28,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "always_on_sampler_test",
     srcs = ["always_on_sampler_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.samplers.always_on"],
     deps = [
         "//source/extensions/tracers/opentelemetry/samplers/always_on:always_on_sampler_lib",
@@ -42,6 +44,7 @@ envoy_extension_cc_test(
     srcs = [
         "always_on_sampler_integration_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.samplers.always_on"],
     deps = [
         "//source/exe:main_common_lib",

@@ -14,6 +14,7 @@ envoy_cc_test(
         "//bazel:apple": ["apple_dns_impl_test.cc"],
         "//conditions:default": [],
     }),
+    engflow_pool = "2core",
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",

@@ -21,6 +21,7 @@ envoy_extension_cc_test(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/access_loggers/wasm/test_data:test_cpp.wasm",
     ]),
+    engflow_pool = "2core",
     extension_names = ["envoy.access_loggers.wasm"],
     tags = ["skip_on_windows"],
     deps = [

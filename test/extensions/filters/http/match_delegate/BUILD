@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/filters/http/match_delegate:config",
         "//test/mocks/server:factory_context_mocks",
@@ -21,6 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "match_delegate_integration_test",
     srcs = ["match_delegate_integration_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/match_delegate:config",

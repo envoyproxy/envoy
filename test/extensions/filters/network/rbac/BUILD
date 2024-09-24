@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.rbac"],
     tags = ["skip_on_windows"],
     deps = [
@@ -27,6 +28,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.rbac"],
     tags = ["skip_on_windows"],
     deps = [
@@ -46,6 +48,7 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.rbac"],
     tags = ["skip_on_windows"],
     deps = [

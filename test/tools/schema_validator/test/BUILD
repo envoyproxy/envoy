@@ -14,6 +14,7 @@ envoy_cc_test(
     data = [
         ":configs",
     ],
+    engflow_pool = "2core",
     deps = [
         "//test/tools/schema_validator:schema_validator_lib",
     ],

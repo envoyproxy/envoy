@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.local_ratelimit"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -32,6 +33,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.local_ratelimit"],
     deps = [
         "//source/extensions/filters/http/local_ratelimit:config",
@@ -43,6 +45,7 @@ envoy_extension_cc_test(
     name = "local_ratelimit_integration_test",
     size = "large",
     srcs = ["local_ratelimit_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.local_ratelimit"],
     tags = [
         "cpu:3",

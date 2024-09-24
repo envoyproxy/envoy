@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "http_client_test",
     size = "small",
     srcs = ["http_client_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [

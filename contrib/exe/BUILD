@@ -30,6 +30,7 @@ SELECTED_CONTRIB_EXTENSIONS = select({
 
 envoy_cc_binary(
     name = "envoy-static",
+    engflow_pool = "2core",
     stamped = True,
     visibility = ["//visibility:public"],
     deps = ["//source/exe:envoy_main_entry_lib"] + SELECTED_CONTRIB_EXTENSIONS,
@@ -42,6 +43,7 @@ envoy_cc_test(
         "//configs:example_contrib_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
+    engflow_pool = "2core",
     env = {
         "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_contrib_configs.tar",
         "DISABLE_TEST_MERGE": "true",

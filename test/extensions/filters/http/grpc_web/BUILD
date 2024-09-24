@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "grpc_web_filter_test",
     srcs = ["grpc_web_filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_web"],
     deps = [
         "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",
@@ -26,6 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_web"],
     deps = [
         "//source/extensions/filters/http/grpc_web:config",
@@ -37,6 +39,7 @@ envoy_extension_cc_test(
     name = "grpc_web_integration_test",
     size = "large",
     srcs = ["grpc_web_filter_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_web"],
     deps = [
         "//source/common/buffer:buffer_lib",

@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "filter_state_impl_test",
     srcs = ["filter_state_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/stream_info:filter_state_lib",
         "//test/test_common:utility_lib",
@@ -21,6 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stream_info_impl_test",
     srcs = ["stream_info_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         ":test_int_accessor_lib",
         "//envoy/http:protocol_interface",
@@ -63,6 +65,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/stream_info:utility_lib",
         "//test/mocks/stream_info:stream_info_mocks",
@@ -74,6 +77,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "uint32_accessor_impl_test",
     srcs = ["uint32_accessor_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/stream_info:uint32_accessor_lib",
     ],
@@ -82,6 +86,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "uint64_accessor_impl_test",
     srcs = ["uint64_accessor_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/stream_info:uint64_accessor_lib",
     ],
@@ -90,6 +95,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "bool_accessor_impl_test",
     srcs = ["bool_accessor_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/stream_info:bool_accessor_lib",
     ],

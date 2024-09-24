@@ -17,6 +17,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
@@ -38,6 +39,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "conn_pool_impl_test",
     srcs = ["conn_pool_impl_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
@@ -72,6 +74,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
@@ -91,6 +94,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "external_auth_test",
     srcs = ["external_auth_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
@@ -123,6 +127,7 @@ envoy_cc_mock(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         "//source/common/protobuf:utility_lib",
@@ -135,6 +140,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_benchmark_binary(
     name = "command_lookup_speed_test",
     srcs = ["command_lookup_speed_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
@@ -158,6 +164,7 @@ envoy_extension_benchmark_test(
 envoy_extension_cc_test(
     name = "router_impl_test",
     srcs = ["router_impl_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",
@@ -178,6 +185,7 @@ envoy_extension_cc_test(
     name = "redis_proxy_integration_test",
     size = "large",
     srcs = ["redis_proxy_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         "//source/extensions/filters/network/common/redis:fault_lib",
@@ -190,6 +198,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_benchmark_binary(
     name = "command_split_speed_test",
     srcs = ["command_split_speed_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.redis_proxy"],
     deps = [
         ":redis_mocks",

@@ -18,6 +18,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore.proto",
         "//test/proto:bookstore_proto_descriptor",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
@@ -33,6 +34,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "http_body_utils_test",
     srcs = ["http_body_utils_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -46,6 +48,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "transcoder_input_stream_test",
     srcs = ["transcoder_input_stream_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -62,6 +65,7 @@ envoy_extension_cc_test(
     data = [
         "//test/proto:bookstore_proto_descriptor",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
     tags = [
         "cpu:3",
@@ -80,6 +84,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:config",
@@ -95,6 +100,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore.proto",
         "//test/proto:bookstore_proto_descriptor",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
     deps = [
         "//source/common/http:utility_lib",

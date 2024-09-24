@@ -16,6 +16,7 @@ envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = ["//test/proto:apikeys_proto_descriptor"],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/filters/http/proto_message_extraction:extractor",
         "//source/extensions/filters/http/proto_message_extraction:filter",
@@ -35,6 +36,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
         "//test/proto:apikeys_proto_descriptor",
     ],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/filters/http/proto_message_extraction:config",
         "//source/extensions/filters/http/proto_message_extraction:extractor",
@@ -55,6 +57,7 @@ envoy_extension_cc_test(
         "integration_test.cc",
     ],
     data = ["//test/proto:apikeys_proto_descriptor"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.proto_message_extraction"],
     deps = [
         "//source/extensions/filters/http/proto_message_extraction:config",

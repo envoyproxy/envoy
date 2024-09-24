@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "gradient_controller_test",
     srcs = ["gradient_controller_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
     deps = [
         "//source/common/stats:isolated_store_lib",

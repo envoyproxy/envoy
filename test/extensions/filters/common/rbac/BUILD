@@ -15,6 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
     tags = ["skip_on_windows"],
     deps = [
@@ -35,6 +36,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "engine_impl_test",
     srcs = ["engine_impl_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
     tags = ["skip_on_windows"],
     deps = [
@@ -55,6 +57,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
     tags = ["skip_on_windows"],
     deps = [

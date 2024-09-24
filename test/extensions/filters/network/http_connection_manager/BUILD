@@ -44,6 +44,7 @@ envoy_extension_cc_test_library(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.http_connection_manager"],
     deps = [
         ":config_cc_proto",
@@ -71,6 +72,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_filter_chain_test",
     srcs = ["config_filter_chain_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.http_connection_manager"],
     deps = [
         ":config_cc_proto",
@@ -83,6 +85,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_filter_dependencies_test",
     srcs = ["config_filter_dependencies_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.http_connection_manager"],
     deps = [
         ":config_cc_proto",

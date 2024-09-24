@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "subscription_factory_impl_test",
     srcs = ["subscription_factory_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
@@ -42,6 +43,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//test/common/config:grpc_subscription_test_harness",
         "//test/common/config:subscription_test_harness",

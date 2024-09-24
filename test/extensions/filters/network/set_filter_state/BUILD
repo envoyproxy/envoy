@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = [
         "integration_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.network.set_filter_state"],
     deps = [
         "//source/common/router:string_accessor_lib",

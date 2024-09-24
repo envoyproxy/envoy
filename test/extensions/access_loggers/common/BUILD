@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "access_log_base_test",
     srcs = ["access_log_base_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/access_loggers/common:access_log_base",
         "//test/mocks/access_log:access_log_mocks",
@@ -21,6 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "grpc_access_logger_test",
     srcs = ["grpc_access_logger_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/access_loggers/common:grpc_access_logger",

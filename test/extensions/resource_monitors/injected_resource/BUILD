@@ -16,6 +16,7 @@ envoy_cc_test(
     name = "injected_resource_monitor_integration_test",
     size = "large",
     srcs = ["injected_resource_monitor_integration_test.cc"],
+    engflow_pool = "2core",
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
@@ -31,6 +32,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "injected_resource_monitor_test",
     srcs = ["injected_resource_monitor_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",
@@ -46,6 +48,7 @@ envoy_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.resource_monitors.injected_resource"],
     deps = [
         "//envoy/registry",

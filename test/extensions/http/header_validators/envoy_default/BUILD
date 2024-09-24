@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     srcs = [
         "base_header_validator_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_utils_lib",
@@ -36,6 +37,7 @@ envoy_extension_cc_test(
     srcs = [
         "http_common_validation_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_utils_lib",
@@ -54,6 +56,7 @@ envoy_extension_cc_test(
     srcs = [
         "http1_header_validator_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_utils_lib",
@@ -70,6 +73,7 @@ envoy_extension_cc_test(
     srcs = [
         "http2_header_validator_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         ":header_validator_utils_lib",
@@ -103,6 +107,7 @@ envoy_extension_cc_test(
     srcs = [
         "header_validator_factory_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         "//source/common/network:utility_lib",
@@ -119,6 +124,7 @@ envoy_extension_cc_test(
     srcs = [
         "path_normalizer_test.cc",
     ],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         "//source/extensions/http/header_validators/envoy_default:path_normalizer",
@@ -130,6 +136,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
     deps = [
         "//envoy/registry",
@@ -152,6 +159,7 @@ envoy_cc_fuzz_test(
     name = "path_normalizer_fuzz_test",
     srcs = ["path_normalizer_fuzz_test.cc"],
     corpus = "path_normalizer_corpus",
+    engflow_pool = "2core",
     deps = [
         ":path_normalizer_fuzz_proto_cc_proto",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",

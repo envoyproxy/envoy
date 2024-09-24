@@ -16,6 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.cdn_loop"],
     deps = [
         "//source/extensions/filters/http/cdn_loop:config",
@@ -30,6 +31,7 @@ envoy_extension_cc_test(
     name = "filter_integration_test",
     size = "large",
     srcs = ["filter_integration_test.cc"],
+    engflow_pool = "2core",
     extension_names = ["envoy.filters.http.cdn_loop"],
     deps = [
         "//source/extensions/filters/http/cdn_loop:config",
@@ -42,6 +44,7 @@ envoy_extension_cc_test(
 envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
@@ -54,6 +57,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "parser_test",
     srcs = ["parser_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cdn_loop:parser_lib",
         "//test/test_common:status_utility_lib",
@@ -64,6 +68,7 @@ envoy_cc_fuzz_test(
     name = "parser_fuzz_test",
     srcs = ["parser_fuzz_test.cc"],
     corpus = "parser_corpus",
+    engflow_pool = "2core",
     deps = [
         "//source/common/common:statusor_lib",
         "//source/extensions/filters/http/cdn_loop:parser_lib",
@@ -74,6 +79,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "utils_test",
     srcs = ["utils_test.cc"],
+    engflow_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cdn_loop:utils_lib",
         "//test/test_common:status_utility_lib",
