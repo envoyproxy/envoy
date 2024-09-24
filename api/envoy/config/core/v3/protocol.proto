@@ -274,7 +274,8 @@ message HttpProtocolOptions {
   // Note: currently some protocol codecs impose limits on the maximum size of a single header:
   //   HTTP/2 (when using nghttp2) limits a single header to around 100kb.
   //   HTTP/3 limits a single header to around 1024kb.
-  google.protobuf.UInt32Value max_response_headers_kb = 7 [(validate.rules).uint32 = {lte: 8192 gt: 0}];
+  google.protobuf.UInt32Value max_response_headers_kb = 7
+      [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
   // Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
   // reset independent of any other timeouts. If not specified, this value is not set.
