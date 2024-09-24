@@ -94,7 +94,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -284,6 +284,15 @@ message ExternalProcessor {
   //       in a single body response message, followed by the remaining body responses.
   // In all scenarios, the header-body ordering must always be maintained.
   bool send_body_without_waiting_for_header_response = 21;
+
+  // When :ref:`allow_mode_override
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>` is enabled and
+  // ``allowed_override_modes`` is configured, the filter config :ref:`processing_mode
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+  // can only be overridden by the response message from the external processing server iff the
+  // :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>` is allowed by
+  // the ``allowed_override_modes`` allow-list below.
+  repeated ProcessingMode allowed_override_modes = 22;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.

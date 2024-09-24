@@ -404,5 +404,10 @@ new_features:
   change: |
     Added ``max_packet_length`` to the QUIC protocol options to allow users to change the largest
     size of a QUIC packet that can be transmitted over the QUIC connection.
+- area: ext_proc
+  change: |
+    Added allow list
+    :ref:`allowed_override_modes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allowed_override_modes>`
+    for :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
 
 deprecated:
