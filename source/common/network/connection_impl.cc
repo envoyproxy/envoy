@@ -872,8 +872,6 @@ void ConnectionImpl::flushWriteBuffer() {
   }
 }
 
-OptRef<const StreamInfo::StreamInfo> ConnectionImpl::trackedStream() const { return streamInfo(); }
-
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "ConnectionImpl " << this << DUMP_MEMBER(connecting_) << DUMP_MEMBER(bind_error_)
