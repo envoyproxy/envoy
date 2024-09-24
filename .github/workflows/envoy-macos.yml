@@ -68,6 +68,7 @@ jobs:
               --flaky_test_attempts=2
               --config=bes-envoy-engflow
               --config=cache-envoy-engflow
+              --config=common-envoy-engflow
               --config=ci)
             export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
 

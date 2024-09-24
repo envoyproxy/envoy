@@ -749,6 +749,11 @@ alias(
     }),
 )
 
+config_setting(
+    name = "engflow_rbe",
+    define_values = {"engflow_rbe": "true"},
+)
+
 selects.config_setting_group(
     name = "apple",
     match_any = [

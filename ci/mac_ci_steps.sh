@@ -17,6 +17,8 @@ BAZEL_BUILD_OPTIONS=(
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
     "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 
+echo "RUN MAC: ${BAZEL_BUILD_OPTIONS[*]}"
+
 NCPU=$(sysctl -n hw.ncpu)
 if [[ $NCPU -gt 0 ]]; then
     echo "limiting build to $NCPU jobs, based on CPU count"
