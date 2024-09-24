@@ -17,9 +17,7 @@ envoy_cc_test_library(
     name = "environment_lib",
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
-    external_deps = [
-        "bazel_runfiles",
-    ],
+    external_deps = ["bazel_runfiles"],
     deps = [
         ":network_utility_lib",
         "//envoy/server:options_interface",
@@ -70,6 +68,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "network_utility_test",
     srcs = ["network_utility_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":environment_lib",
         ":network_utility_lib",
@@ -207,6 +206,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":utility_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -244,6 +244,7 @@ envoy_cc_library(
 envoy_cc_test(
     name = "global_test",
     srcs = ["global_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":global_lib",
     ],
@@ -311,6 +312,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "status_utility_test",
     srcs = ["status_utility_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":status_utility_lib",
     ],
@@ -319,6 +321,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "simulated_time_system_test",
     srcs = ["simulated_time_system_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":simulated_time_system_lib",
         ":utility_lib",
@@ -331,6 +334,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "test_time_system_test",
     srcs = ["test_time_system_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":simulated_time_system_lib",
         ":test_time_lib",

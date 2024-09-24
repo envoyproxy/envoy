@@ -157,6 +157,7 @@ private:
       still_alive_.reset();
     }
 
+    void log(AccessLog::AccessLogType type);
     void completeRequest();
 
     const Network::Connection* connection();
@@ -190,7 +191,19 @@ private:
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-      return filter_manager_.accessLogHandlers();
+      std::list<AccessLog::InstanceSharedPtr> combined_log_handlers(
+          filter_manager_.accessLogHandlers());
+      std::list<AccessLog::InstanceSharedPtr> config_log_handlers_(
+          connection_manager_.config_->accessLogs());
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.filter_access_loggers_first")) {
+        combined_log_handlers.insert(combined_log_handlers.begin(), config_log_handlers_.begin(),
+                                     config_log_handlers_.end());
+      } else {
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers_.begin(),
+                                     config_log_handlers_.end());
+      }
+      return combined_log_handlers;
     }
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
     // (i.e. possibly after this stream has been destroyed).

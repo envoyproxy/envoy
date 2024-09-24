@@ -11,69 +11,88 @@ using ::testing::_;
 
 MockAsyncFileContext::MockAsyncFileContext(std::shared_ptr<MockAsyncFileManager> manager)
     : manager_(manager) {
-  ON_CALL(*this, stat(_))
-      .WillByDefault([this](std::function<void(absl::StatusOr<struct stat>)> on_complete) {
-        return manager_->enqueue(
-            std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
+  ON_CALL(*this, stat(_, _))
+      .WillByDefault([this](Event::Dispatcher* dispatcher,
+                            absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete) {
+        return manager_->enqueue(dispatcher,
+                                 std::unique_ptr<MockAsyncFileAction>(
+                                     new TypedMockAsyncFileAction(std::move(on_complete))));
       });
-  ON_CALL(*this, createHardLink(_, _))
-      .WillByDefault([this](absl::string_view, std::function<void(absl::Status)> on_complete) {
-        return manager_->enqueue(
-            std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
+  ON_CALL(*this, createHardLink(_, _, _))
+      .WillByDefault([this](Event::Dispatcher* dispatcher, absl::string_view,
+                            absl::AnyInvocable<void(absl::Status)> on_complete) {
+        return manager_->enqueue(dispatcher,
+                                 std::unique_ptr<MockAsyncFileAction>(
+                                     new TypedMockAsyncFileAction(std::move(on_complete))));
       });
-  EXPECT_CALL(*this, close(_)).WillOnce([this](std::function<void(absl::Status)> on_complete) {
-    manager_->enqueue(
-        std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
-    return absl::OkStatus();
-  });
-  ON_CALL(*this, read(_, _, _))
-      .WillByDefault([this](off_t, size_t,
-                            std::function<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete) {
-        return manager_->enqueue(
-            std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
+  EXPECT_CALL(*this, close(_, _))
+      .WillOnce([this](Event::Dispatcher* dispatcher,
+                       absl::AnyInvocable<void(absl::Status)> on_complete) mutable {
+        return manager_->enqueue(dispatcher,
+                                 std::unique_ptr<MockAsyncFileAction>(
+                                     new TypedMockAsyncFileAction(std::move(on_complete))));
       });
-  ON_CALL(*this, write(_, _, _))
-      .WillByDefault([this](Buffer::Instance&, off_t,
-                            std::function<void(absl::StatusOr<size_t>)> on_complete) {
-        return manager_->enqueue(
-            std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
-      });
-  ON_CALL(*this, duplicate(_))
+  ON_CALL(*this, read(_, _, _, _))
       .WillByDefault(
-          [this](
-              std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)> on_complete) {
-            return manager_->enqueue(
-                std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
+          [this](Event::Dispatcher* dispatcher, off_t, size_t,
+                 absl::AnyInvocable<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete) {
+            return manager_->enqueue(dispatcher,
+                                     std::unique_ptr<MockAsyncFileAction>(
+                                         new TypedMockAsyncFileAction(std::move(on_complete))));
+          });
+  ON_CALL(*this, write(_, _, _, _))
+      .WillByDefault([this](Event::Dispatcher* dispatcher, Buffer::Instance&, off_t,
+                            absl::AnyInvocable<void(absl::StatusOr<size_t>)> on_complete) {
+        return manager_->enqueue(dispatcher,
+                                 std::unique_ptr<MockAsyncFileAction>(
+                                     new TypedMockAsyncFileAction(std::move(on_complete))));
+      });
+  ON_CALL(*this, duplicate(_, _))
+      .WillByDefault(
+          [this](Event::Dispatcher* dispatcher,
+                 absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>
+                     on_complete) {
+            return manager_->enqueue(dispatcher,
+                                     std::unique_ptr<MockAsyncFileAction>(
+                                         new TypedMockAsyncFileAction(std::move(on_complete))));
           });
 };
 
 MockAsyncFileManager::MockAsyncFileManager() {
-  ON_CALL(*this, enqueue(_)).WillByDefault([this](const std::shared_ptr<AsyncFileAction> action) {
-    queue_.push_back(std::dynamic_pointer_cast<MockAsyncFileAction>(action));
-    return [this]() { mockCancel(); };
-  });
-  ON_CALL(*this, stat(_, _))
+  ON_CALL(*this, enqueue(_, _))
       .WillByDefault(
-          [this](absl::string_view, std::function<void(absl::StatusOr<struct stat>)> on_complete) {
-            return enqueue(
-                std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
+          [this](Event::Dispatcher* dispatcher, std::unique_ptr<AsyncFileAction> action) {
+            auto entry = QueuedAction{std::move(action), dispatcher};
+            auto cancel_func = [this, state = entry.state_]() {
+              state->store(QueuedAction::State::Cancelled);
+              mockCancel();
+            };
+            queue_.push(std::move(entry));
+            return cancel_func;
           });
-  ON_CALL(*this, createAnonymousFile(_, _))
-      .WillByDefault([this](absl::string_view,
-                            std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
-        return enqueue(
-            std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
+  ON_CALL(*this, stat(_, _, _))
+      .WillByDefault([this](Event::Dispatcher* dispatcher, absl::string_view,
+                            absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete) {
+        return enqueue(dispatcher, std::unique_ptr<MockAsyncFileAction>(
+                                       new TypedMockAsyncFileAction(std::move(on_complete))));
       });
-  ON_CALL(*this, openExistingFile(_, _, _))
-      .WillByDefault([this](absl::string_view, Mode,
-                            std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
-        return enqueue(
-            std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
+  ON_CALL(*this, createAnonymousFile(_, _, _))
+      .WillByDefault([this](Event::Dispatcher* dispatcher, absl::string_view,
+                            absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
+        return enqueue(dispatcher, std::unique_ptr<MockAsyncFileAction>(
+                                       new TypedMockAsyncFileAction(std::move(on_complete))));
       });
-  ON_CALL(*this, unlink(_, _))
-      .WillByDefault([this](absl::string_view, std::function<void(absl::Status)> on_complete) {
-        return enqueue(
-            std::shared_ptr<MockAsyncFileAction>(new TypedMockAsyncFileAction(on_complete)));
+  ON_CALL(*this, openExistingFile(_, _, _, _))
+      .WillByDefault([this](Event::Dispatcher* dispatcher, absl::string_view, Mode,
+                            absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
+        return enqueue(dispatcher, std::unique_ptr<MockAsyncFileAction>(
+                                       new TypedMockAsyncFileAction(std::move(on_complete))));
+      });
+  ON_CALL(*this, unlink(_, _, _))
+      .WillByDefault([this](Event::Dispatcher* dispatcher, absl::string_view,
+                            absl::AnyInvocable<void(absl::Status)> on_complete) {
+        return enqueue(dispatcher, std::unique_ptr<MockAsyncFileAction>(
+                                       new TypedMockAsyncFileAction(std::move(on_complete))));
       });
 }
 
