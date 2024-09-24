@@ -8,6 +8,8 @@ on:
     secrets:
       app-id:
       app-key:
+      dockerhub-username:
+      dockerhub-password:
       gpg-key:
       gpg-key-password:
       rbe-key:
@@ -248,6 +250,11 @@ jobs:
         passphrase-path: "${{ runner.temp }}/gpg-passphrase"
         configured-passphrase-path: /build/gpg-passphrase
 
+    - run: |
+        echo "e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9" > .BAZEL_FAKE_SCM_REVISION
+      if: >-
+        ${{ fromJSON(inputs.request).request.pr == '' }}
+
     - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.35
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
@@ -279,6 +286,8 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
       env:
         GITHUB_TOKEN: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
+        DOCKERHUB_USERNAME: ${{ secrets.dockerhub-username }}
+        DOCKERHUB_PASSWORD: ${{ secrets.dockerhub-password }}
         ENVOY_DOCKER_BUILD_DIR: ${{ runner.temp }}
         ENVOY_RBE: ${{ inputs.rbe == true && 1 || '' }}
         RBE_KEY: ${{ secrets.rbe-key }}
@@ -286,7 +295,10 @@ jobs:
           --config=remote-ci
           ${{ inputs.bazel-extra }}
           ${{ inputs.rbe == true && format('--jobs={0}', inputs.bazel-rbe-jobs) || '' }}
-        BAZEL_FAKE_SCM_REVISION: ${{ github.event_name == 'pull_request' && 'e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9' || '' }}
+        CI_BRANCH: >-
+          ${{ inputs.trusted
+              && format('refs/heads/{0}', fromJSON(inputs.request).request.target-branch)
+              || '' }}
         CI_SHA1: ${{ github.sha }}
         CI_TARGET_BRANCH: ${{ fromJSON(inputs.request).request.target-branch }}
         MOUNT_GPG_HOME: ${{ inputs.import-gpg && 1 || '' }}

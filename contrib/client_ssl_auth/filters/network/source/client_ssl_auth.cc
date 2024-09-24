@@ -35,7 +35,7 @@ ClientSslAuthConfig::ClientSslAuthConfig(
           std::chrono::milliseconds(1000)),
       tls_(tls.allocateSlot()), stats_(generateStats(scope, config.stat_prefix())) {
   auto list_or_error = Network::Address::IpList::create(config.ip_white_list());
-  THROW_IF_STATUS_NOT_OK(list_or_error, throw);
+  THROW_IF_NOT_OK_REF(list_or_error.status());
   ip_allowlist_ = std::move(list_or_error.value());
 
   if (!cm.clusters().hasCluster(remote_cluster_name_)) {

@@ -234,7 +234,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     // We cannot retry the resolution if ares returns without a response. The ares context
     // is still dirty and will result in a segfault when it is freed during a subsequent resolve
     // call from here. We will retry resolutions for pending lookups only
-    if (context->resolution_status_ != Network::DnsResolver::ResolutionStatus::Success &&
+    if (context->resolution_status_ != Network::DnsResolver::ResolutionStatus::Completed &&
         !context->in_callback_ && context->retry_ > 0) {
       --context->retry_;
       ENVOY_LOG(debug, "resolving name [{}] via external resolvers [retry {}]", query->name_,

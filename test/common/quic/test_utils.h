@@ -6,6 +6,7 @@
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -273,7 +274,7 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
-std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header) {
+std::string spdyHeaderToHttp3StreamPayload(const quiche::HttpHeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
@@ -366,6 +367,20 @@ DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory);
 
 REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory,
                  Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryInterface);
+
+class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
+public:
+  void onNetworkChanged() {
+    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
+      observer->onNetworkChanged();
+    }
+  }
+  using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
+};
 
 } // namespace Quic
 } // namespace Envoy

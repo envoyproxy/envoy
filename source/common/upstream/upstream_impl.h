@@ -794,7 +794,8 @@ public:
   HostMapConstSharedPtr crossPriorityHostMap() const override;
 
 protected:
-  void updateCrossPriorityHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
+  void updateCrossPriorityHostMap(uint32_t priority, const HostVector& hosts_added,
+                                  const HostVector& hosts_removed);
 
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
@@ -1199,7 +1200,9 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
   UnitFloat dropOverload() const override { return drop_overload_; }
+  const std::string& dropCategory() const override { return drop_category_; }
   void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
+  void setDropCategory(absl::string_view drop_category) override { drop_category_ = drop_category; }
 
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
@@ -1270,6 +1273,7 @@ private:
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
   UnitFloat drop_overload_{0};
+  std::string drop_category_;
   static constexpr int kDropOverloadSize = 1;
 };
 

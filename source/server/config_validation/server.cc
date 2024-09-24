@@ -102,7 +102,7 @@ void ValidationInstance::initialize(const Options& options,
 
   auto producer_or_error =
       Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
-  THROW_IF_STATUS_NOT_OK(producer_or_error, throw);
+  THROW_IF_NOT_OK_REF(producer_or_error.status());
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   }

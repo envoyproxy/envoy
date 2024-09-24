@@ -433,9 +433,6 @@ envoy_cc_library(
         "quiche/http2/adapter/oghttp2_session.h",
     ],
     copts = quiche_copts,
-    external_deps = [
-        "abseil_algorithm",
-    ],
     repository = "@envoy",
     deps = [
         ":http2_adapter_chunked_buffer",
@@ -457,6 +454,7 @@ envoy_cc_library(
         ":http2_no_op_headers_handler_lib",
         ":quiche_common_callbacks",
         ":spdy_core_http2_header_block_lib",
+        "@com_google_absl//absl/algorithm",
         "@com_google_absl//absl/cleanup",
     ],
 )
@@ -2116,6 +2114,26 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_core_congestion_control_prague_sender_lib",
+    srcs = [
+        "quiche/quic/core/congestion_control/prague_sender.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/congestion_control/prague_sender.h",
+    ],
+    deps = [
+        ":quic_core_clock_lib",
+        ":quic_core_congestion_control_congestion_control_interface_lib",
+        ":quic_core_congestion_control_rtt_stats_lib",
+        ":quic_core_congestion_control_tcp_cubic_bytes_lib",
+        ":quic_core_connection_stats_lib",
+        ":quic_core_time_lib",
+        ":quic_core_types_lib",
+        ":quiche_common_platform_export",
+    ],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_congestion_control_bbr2_lib",
     srcs = [
         "quiche/quic/core/congestion_control/bbr2_drain.cc",
@@ -2196,6 +2214,7 @@ envoy_quic_cc_library(
         ":quic_core_config_lib",
         ":quic_core_congestion_control_bbr2_lib",
         ":quic_core_congestion_control_bbr_lib",
+        ":quic_core_congestion_control_prague_sender_lib",
         ":quic_core_congestion_control_tcp_cubic_bytes_lib",
         ":quic_core_connection_stats_lib",
         ":quic_core_crypto_random_lib",
@@ -2296,13 +2315,11 @@ envoy_quic_cc_library(
     hdrs = [
         "quiche/quic/core/quic_connection_context.h",
     ],
-    external_deps = [
-        "abseil_str_format",
-    ],
     deps = [
         ":quic_platform_export",
         ":quiche_common_platform",
         ":quiche_common_text_utils_lib",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )
 
@@ -2464,10 +2481,7 @@ envoy_quic_cc_library(
         "quiche/quic/core/crypto/quic_compressed_certs_cache.h",
         "quiche/quic/core/crypto/transport_parameters.h",
     ],
-    external_deps = [
-        "ssl",
-        "zlib",
-    ],
+    external_deps = ["ssl"],
     tags = [
         "pg3",
     ],
@@ -2493,6 +2507,7 @@ envoy_quic_cc_library(
         ":quic_core_utils_lib",
         ":quic_core_versions_lib",
         ":quic_platform",
+        "@envoy//bazel/foreign_cc:zlib",
     ],
 )
 
@@ -2506,9 +2521,6 @@ envoy_quic_cc_library(
         "quiche/quic/core/crypto/quic_client_session_cache.h",
         "quiche/quic/core/crypto/quic_crypto_client_config.h",
     ],
-    external_deps = [
-        "zlib",
-    ],
     tags = [
         "pg3",
     ],
@@ -2517,6 +2529,7 @@ envoy_quic_cc_library(
         ":quic_core_crypto_client_proof_source_lib",
         ":quic_core_crypto_crypto_handshake_lib",
         ":quiche_common_platform_client_stats",
+        "@envoy//bazel/foreign_cc:zlib",
     ],
 )
 
@@ -2528,10 +2541,7 @@ envoy_quic_cc_library(
     hdrs = [
         "quiche/quic/core/crypto/quic_crypto_server_config.h",
     ],
-    external_deps = [
-        "ssl",
-        "zlib",
-    ],
+    external_deps = ["ssl"],
     tags = [
         "pg3",
     ],
@@ -2540,6 +2550,7 @@ envoy_quic_cc_library(
         ":quic_core_proto_crypto_server_config_proto_header",
         ":quic_core_server_id_lib",
         ":quic_server_crypto_tls_handshake_lib",
+        "@envoy//bazel/foreign_cc:zlib",
     ],
 )
 
@@ -2662,10 +2673,7 @@ envoy_quic_cc_library(
     name = "quic_core_crypto_proof_source_x509_lib",
     srcs = ["quiche/quic/core/crypto/proof_source_x509.cc"],
     hdrs = ["quiche/quic/core/crypto/proof_source_x509.h"],
-    external_deps = [
-        "ssl",
-        "abseil_node_hash_map",
-    ],
+    external_deps = ["ssl"],
     deps = [
         ":quic_core_crypto_certificate_view_lib",
         ":quic_core_crypto_crypto_handshake_lib",
@@ -2675,6 +2683,7 @@ envoy_quic_cc_library(
         ":quic_platform_base",
         ":quiche_common_endian_lib",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:node_hash_map",
     ],
 )
 
@@ -3898,12 +3907,14 @@ envoy_quic_cc_library(
         "quiche/quic/core/chlo_extractor.cc",
         "quiche/quic/core/quic_buffered_packet_store.cc",
         "quiche/quic/core/quic_dispatcher.cc",
+        "quiche/quic/core/quic_dispatcher_stats.cc",
         "quiche/quic/core/tls_chlo_extractor.cc",
     ],
     hdrs = [
         "quiche/quic/core/chlo_extractor.h",
         "quiche/quic/core/quic_buffered_packet_store.h",
         "quiche/quic/core/quic_dispatcher.h",
+        "quiche/quic/core/quic_dispatcher_stats.h",
         "quiche/quic/core/tls_chlo_extractor.h",
     ],
     deps = [
@@ -5089,13 +5100,11 @@ envoy_cc_test(
 envoy_cc_library(
     name = "quiche_common_print_elements_lib",
     hdrs = ["quiche/common/print_elements.h"],
-    external_deps = [
-        "abseil_inlined_vector",
-    ],
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_export",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 
@@ -5121,14 +5130,12 @@ envoy_cc_library(
     name = "quiche_common_text_utils_lib",
     srcs = ["quiche/common/quiche_text_utils.cc"],
     hdrs = ["quiche/common/quiche_text_utils.h"],
-    external_deps = [
-        "abseil_str_format",
-    ],
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
         ":quiche_common_platform_export",
         "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )
 

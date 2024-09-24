@@ -29,7 +29,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia @yanavlasov
@@ -142,6 +142,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/resource_monitors/common @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/fixed_heap @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
+/*/extensions/resource_monitors/cpu_utilization @cancecen @kbaichoo
 /*/extensions/retry/priority @alyssawilk @mattklein123
 /*/extensions/retry/priority/previous_priorities @alyssawilk @mattklein123
 /*/extensions/retry/host @alyssawilk @mattklein123

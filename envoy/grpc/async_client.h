@@ -29,6 +29,11 @@ public:
    * Signals that the request should be cancelled. No further callbacks will be invoked.
    */
   virtual void cancel() PURE;
+
+  /**
+   * Returns the underlying stream info.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 /**

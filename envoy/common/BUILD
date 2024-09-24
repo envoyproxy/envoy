@@ -14,7 +14,7 @@ envoy_basic_cc_library(
     hdrs = [
         "platform.h",
     ],
-    external_deps = ["abseil_strings"],
+    deps = ["@com_google_absl//absl/strings"],
 )
 
 envoy_basic_cc_library(
@@ -39,7 +39,7 @@ envoy_basic_cc_library(
     hdrs = [
         "optref.h",
     ],
-    external_deps = ["abseil_optional"],
+    deps = ["@com_google_absl//absl/types:optional"],
 )
 
 envoy_cc_library(
@@ -146,12 +146,10 @@ envoy_cc_library(
     hdrs = [
         "union_string.h",
     ],
-    external_deps = [
-        "abseil_inlined_vector",
-        "abseil_variant",
-    ],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:variant",
     ],
 )

@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "connect_test",
     srcs = ["connect_test.cc"],
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/transport_sockets/http_11_proxy:connect",
         "//test/mocks/buffer:buffer_mocks",
@@ -31,6 +32,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["connect_integration_test.cc"],
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
