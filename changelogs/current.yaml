@@ -208,6 +208,9 @@ removed_config_or_runtime:
 - area: tls
   change: |
     Removed runtime flag ``envoy.reloadable_features.ssl_transport_failure_reason_format``.
+- area: dynamic_foward_proxy
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.dfp_mixed_scheme`` and legacy code path.
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.abort_filter_chain_on_stream_reset`` and legacy
