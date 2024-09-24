@@ -645,7 +645,7 @@ public:
                               absl::string_view details) PURE;
 
   /**
-   * Attempt to send GOAWAY and close the connection.   
+   * Attempt to send GOAWAY and close the connection.
    */
   virtual void sendGoAwayandClose() PURE;
 

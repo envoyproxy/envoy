@@ -2691,7 +2691,7 @@ void Http2FrameIntegrationTest::sendRequestsAndResponses(uint32_t num_requests) 
   tcp_client_->close();
 }
 
-// Validate that GOAWAY is triggered by a L7 filter.  
+// Validate that GOAWAY is triggered by a L7 filter.
 TEST_P(Http2FrameIntegrationTest, SendGoAwayTriggerredByDecodingFilter) {
   config_helper_.addFilter("name: send-goaway-during-decode-filter");
   beginSession();
@@ -2718,7 +2718,7 @@ TEST_P(Http2FrameIntegrationTest, SendGoAwayNotTriggerredByDecodingFilter) {
   beginSession();
   std::string buffer;
   auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "a", "/",
-                                               {{"skip-goaway", "true"}});
+                                         {{"skip-goaway", "true"}});
   absl::StrAppend(&buffer, std::string(request));
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));

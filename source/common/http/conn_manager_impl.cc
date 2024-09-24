@@ -757,9 +757,11 @@ void ConnectionManagerImpl::onDrainTimeout() {
 }
 
 void ConnectionManagerImpl::sendGoAwayandClose() {
-  ENVOY_CONN_LOG(trace, "http connection manager sendGoAwayandClose", read_callbacks_->connection());
+  ENVOY_CONN_LOG(trace, "http connection manager sendGoAwayandClose",
+                 read_callbacks_->connection());
   codec_->goAway();
-  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt, "forced_goaway");
+  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+                    "forced_goaway");
 }
 
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,

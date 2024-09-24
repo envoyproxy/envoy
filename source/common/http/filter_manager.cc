@@ -453,9 +453,7 @@ void ActiveStreamDecoderFilter::sendLocalReply(
   ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
-void ActiveStreamDecoderFilter::sendGoAwayandClose() {
-  parent_.sendGoAwayandClose();
-}
+void ActiveStreamDecoderFilter::sendGoAwayandClose() { parent_.sendGoAwayandClose(); }
 
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
   // If Envoy is not configured to proxy 100-Continue responses, swallow the 100 Continue

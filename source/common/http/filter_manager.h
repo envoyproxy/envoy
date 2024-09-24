@@ -451,7 +451,7 @@ public:
   virtual void endStream() PURE;
 
   /**
-   * Attempt to send GOAWAY and close the connection.   
+   * Attempt to send GOAWAY and close the connection.
    */
   virtual void sendGoAwayandClose() PURE;
 
@@ -859,9 +859,7 @@ public:
 
   virtual bool shouldLoadShed() { return false; };
 
-  void sendGoAwayandClose() {
-    filter_manager_callbacks_.sendGoAwayandClose(); 
-  }
+  void sendGoAwayandClose() { filter_manager_callbacks_.sendGoAwayandClose(); }
 
 protected:
   struct State {
