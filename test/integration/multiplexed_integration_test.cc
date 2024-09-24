@@ -2691,6 +2691,44 @@ void Http2FrameIntegrationTest::sendRequestsAndResponses(uint32_t num_requests) 
   tcp_client_->close();
 }
 
+// Validate that GOAWAY is triggered by a L7 filter.  
+TEST_P(Http2FrameIntegrationTest, SendGoAwayTriggerredByDecodingFilter) {
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  beginSession();
+  uint32_t num_requests = 10;
+  std::string buffer;
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                               {{"request_no", absl::StrCat(i)}});
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a");
+    absl::StrAppend(&buffer, std::string(data));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+  tcp_client_->waitForDisconnect();
+}
+
+// GOAWAY is not triggered by a L7 filter.
+TEST_P(Http2FrameIntegrationTest, SendGoAwayNotTriggerredByDecodingFilter) {
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  beginSession();
+  std::string buffer;
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "a", "/",
+                                               {{"skip-goaway", "true"}});
+  absl::StrAppend(&buffer, std::string(request));
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+  tcp_client_->close();
+}
+
 // Validate that processing of deferred requests with body and trailers is handled correctly
 // when there is a filter that pauses and resumes iteration.
 TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersWithFilterChainPause) {

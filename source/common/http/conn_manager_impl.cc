@@ -756,6 +756,12 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose(false);
 }
 
+void ConnectionManagerImpl::sendGoAwayandClose() {
+  ENVOY_CONN_LOG(debug, "boteng sendGoAwayandClose", read_callbacks_->connection());
+  codec_->goAway();
+  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt, "forced_goaway");
+}
+
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
                                                ConnectionManagerTracingStats& tracing_stats) {
   switch (tracing_reason) {
