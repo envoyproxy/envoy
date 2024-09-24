@@ -241,7 +241,7 @@ public:
         quic::QuicServerId{
             (host.empty() ? transport_socket_factory_->clientContextConfig()->serverNameIndication()
                           : host),
-            static_cast<uint16_t>(port), false},
+            static_cast<uint16_t>(port)},
         transport_socket_factory_->getCryptoConfig(), *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.

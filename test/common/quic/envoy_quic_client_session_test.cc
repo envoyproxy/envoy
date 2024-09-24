@@ -137,7 +137,7 @@ public:
     envoy_quic_session_ = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, quic_version_,
         std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-        quic::QuicServerId("example.com", 443, false), crypto_config_, *dispatcher_,
+        quic::QuicServerId("example.com", 443), crypto_config_, *dispatcher_,
         /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, cache,
         *store_.rootScope(), transport_socket_options_, uts_factory);
 
