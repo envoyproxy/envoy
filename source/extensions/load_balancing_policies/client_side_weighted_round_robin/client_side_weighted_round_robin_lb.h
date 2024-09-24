@@ -53,22 +53,38 @@ public:
     virtual ~ClientSideHostLbPolicyData() = default;
     // Update the weight and timestamps for first and last update time.
     void updateWeightNow(uint32_t weight, const MonotonicTime& now) {
-      absl::MutexLock lock(&mu_);
-      weight_ = weight;
-      last_update_time_ = now;
-      if (non_empty_since_ == kDefaultNonEmptySince) {
-        non_empty_since_ = now;
+      weight_.store(weight);
+      last_update_time_.store(now);
+      if (non_empty_since_.load() == kDefaultNonEmptySince) {
+        non_empty_since_.store(now);
       }
     }
-    absl::Mutex mu_;
+
+    // Get the weight if it was updated between max_non_empty_since and min_last_update_time,
+    // otherwise return nullopt.
+    absl::optional<uint32_t> getWeightIfValid(MonotonicTime max_non_empty_since,
+                                              MonotonicTime min_last_update_time) {
+      // If non_empty_since_ is too recent, we should use the default weight.
+      if (max_non_empty_since < non_empty_since_.load()) {
+        return std::nullopt;
+      }
+      // If last update time is too old, we should use the default weight.
+      if (last_update_time_.load() < min_last_update_time) {
+        // Reset the non_empty_since_ time so the timer will start again.
+        non_empty_since_.store(ClientSideHostLbPolicyData::kDefaultNonEmptySince);
+        return std::nullopt;
+      }
+      return weight_;
+    }
+
     // Weight as calculated from the last load report.
-    uint32_t weight_ ABSL_GUARDED_BY(mu_) = 1;
+    std::atomic<uint32_t> weight_ = 1;
     // Time when the weight is first updated. The weight is invalid if it is within of
     // `blackout_period_`.
-    MonotonicTime non_empty_since_ ABSL_GUARDED_BY(&mu_) = kDefaultNonEmptySince;
+    std::atomic<MonotonicTime> non_empty_since_ = kDefaultNonEmptySince;
     // Time when the weight is last updated. The weight is invalid if it is outside of
     // `expiration_period_`.
-    MonotonicTime last_update_time_ ABSL_GUARDED_BY(&mu_) = kDefaultLastUpdateTime;
+    std::atomic<MonotonicTime> last_update_time_ = kDefaultLastUpdateTime;
 
     static constexpr MonotonicTime kDefaultNonEmptySince = MonotonicTime::max();
     static constexpr MonotonicTime kDefaultLastUpdateTime = MonotonicTime::min();
@@ -126,9 +142,10 @@ public:
         TimeSource& time_source);
 
   private:
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
-
     friend class ClientSideWeightedRoundRobinLoadBalancerFriend;
+
+    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+    bool alwaysUseEdfScheduler() const override { return true; };
 
     std::shared_ptr<OrcaLoadReportHandler> orca_load_report_handler_;
   };
@@ -189,11 +206,11 @@ private:
   static void addClientSideLbPolicyDataToHosts(const HostVector& hosts);
 
   // Get weight based on client side host LB policy data if it is valid (not
-  // empty at least since `min_non_empty_since` and updated no later than
-  // `max_last_update_time`), otherwise return std::nullopt.
+  // empty at least since `max_non_empty_since` and updated no later than
+  // `min_last_update_time`), otherwise return std::nullopt.
   static absl::optional<uint32_t>
-  getClientSideWeightIfValidFromHost(const Host& host, const MonotonicTime& min_non_empty_since,
-                                     const MonotonicTime& max_last_update_time);
+  getClientSideWeightIfValidFromHost(const Host& host, MonotonicTime max_non_empty_since,
+                                     MonotonicTime min_last_update_time);
 
   // Factory used to create worker-local load balancers on the worker thread.
   std::shared_ptr<WorkerLocalLbFactory> factory_;

@@ -82,8 +82,6 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::on
             getHostAddress(host), orca_load_report.DebugString());
   const auto& lb_policy_data_ptr = host->lbPolicyData();
   auto* client_side_data = dynamic_cast<ClientSideHostLbPolicyData*>(lb_policy_data_ptr.get());
-  ENVOY_BUG(client_side_data != nullptr,
-            "Unable to cast Host::lpPolicyData to ClientSideHostLbPolicyData.");
   if (client_side_data == nullptr) {
     return absl::NotFoundError("Host does not have ClientSideLbPolicyData");
   }
@@ -170,34 +168,14 @@ void ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(
 
 absl::optional<uint32_t>
 ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
-    const Host& host, const MonotonicTime& min_non_empty_since,
-    const MonotonicTime& max_last_update_time) {
+    const Host& host, MonotonicTime max_non_empty_since, MonotonicTime min_last_update_time) {
   const auto& lb_policy_data_ptr = host.lbPolicyData();
   auto* client_side_data = dynamic_cast<ClientSideHostLbPolicyData*>(lb_policy_data_ptr.get());
   if (client_side_data == nullptr) {
     ENVOY_LOG(trace, "Host does not have ClientSideHostLbPolicyData {}", getHostAddress(&host));
     return std::nullopt;
   }
-  // Get the weight based on the client side data if it is not expired.
-  absl::MutexLock lock(&client_side_data->mu_);
-  // If non_empty_since_ is too recent, we should use the default weight.
-  if (client_side_data->non_empty_since_ > min_non_empty_since) {
-    ENVOY_LOG(trace,
-              "Host {} ClientSideHostLbPolicyData non_empty_since_ is too "
-              "recent: {} > {}",
-              getHostAddress(&host), client_side_data->non_empty_since_.time_since_epoch().count(),
-              min_non_empty_since.time_since_epoch().count());
-    return std::nullopt;
-  }
-  // If last update time is too old, we should use the default weight.
-  if (client_side_data->last_update_time_ < max_last_update_time) {
-    ENVOY_LOG(trace, "Host {} ClientSideHostLbPolicyData last_update_time_ is too old",
-              getHostAddress(&host));
-    // Also reset the non_empty_since_ time so the timer will start again.
-    client_side_data->non_empty_since_ = ClientSideHostLbPolicyData::kDefaultNonEmptySince;
-    return std::nullopt;
-  }
-  return client_side_data->weight_;
+  return client_side_data->getWeightIfValid(max_non_empty_since, min_last_update_time);
 }
 
 double
