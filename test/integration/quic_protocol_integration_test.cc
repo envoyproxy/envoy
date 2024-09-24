@@ -6,7 +6,8 @@ namespace Envoy {
 
 // Test that the quiche code can handle packets getting batched together, i.e.
 // that it will re-register to read even without incoming packets.
-TEST_P(DownstreamProtocolIntegrationTest, BatchedPackets) {
+// TODO(alyssawilk) debug https://github.com/envoyproxy/envoy/issues/36265
+TEST_P(DownstreamProtocolIntegrationTest, DISABLED_BatchedPackets) {
   if (downstreamProtocol() != Http::CodecType::HTTP3) {
     return; // Testing H3 client talking to H3 upstream only.
   }

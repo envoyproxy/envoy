@@ -214,11 +214,10 @@ steps:
     # Any PR or CI run in envoy-presubmit uses the fake SCM hash
     if [[ "${{ variables['Build.Reason'] }}" == "PullRequest" || "${{ variables['Build.DefinitionName'] }}" == 'envoy-presubmit' ]]; then
         # sha1sum of `ENVOY_PULL_REQUEST`
-        BAZEL_FAKE_SCM_REVISION=e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9
+        echo "e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9" > .BAZEL_FAKE_SCM_REVISION
     fi
     echo "##vso[task.setvariable variable=BAZEL_BUILD_EXTRA_OPTIONS]${BAZEL_BUILD_EXTRA_OPTIONS}"
     echo "##vso[task.setvariable variable=BAZEL_EXTRA_TEST_OPTIONS]${BAZEL_EXTRA_TEST_OPTIONS}"
-    echo "##vso[task.setvariable variable=BAZEL_FAKE_SCM_REVISION]${BAZEL_FAKE_SCM_REVISION}"
     echo "##vso[task.setvariable variable=BAZEL_STARTUP_EXTRA_OPTIONS]${{ parameters.bazelStartupExtraOptions }}"
     echo "##vso[task.setvariable variable=CI_TARGET_BRANCH]${CI_TARGET_BRANCH}"
     echo "##vso[task.setvariable variable=ENVOY_DOCKER_BUILD_DIR]$(Build.StagingDirectory)"

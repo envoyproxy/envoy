@@ -31,6 +31,7 @@ envoy_extension_cc_test(
         "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     extension_names = ["envoy.tracers.datadog"],
+    rbe_pool = "2core",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
