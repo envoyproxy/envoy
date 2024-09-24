@@ -84,6 +84,7 @@ public:
   MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
   MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
   MOCK_METHOD(void, endStream, ());
+  MOCK_METHOD(void, sendGoAwayandClose, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, upgradeFilterChainCreated, ());
