@@ -553,7 +553,7 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileWatermarkedSendsLowWatermarkEvent) {
     pumpDispatcher();
 
     // TODO(ravenblack): enable watermark testing again once the cache filter's
-    // watermark behavior is useable. Currently this is blocked in two ways -
+    // watermark behavior is usable. Currently this is blocked in two ways -
     // async http streams don't support watermarking so we can't slow it down anyway,
     // and populating the cache and streaming to the individual client are still
     // linked, which means slowing it down for the client could also ruin the cache
