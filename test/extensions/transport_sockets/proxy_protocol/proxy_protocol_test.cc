@@ -6,6 +6,7 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
+#include "source/extensions/transport_sockets/starttls/starttls_socket.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/io_handle.h"
@@ -52,6 +53,52 @@ public:
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks_;
   Stats::TestUtil::TestStore stats_store_;
 };
+
+// Test startSecureTransport() api call on UpstreamProxyProtocolSocket
+TEST_F(ProxyProtocolTest, TestStartSecureTransportCall) {
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  initialize(config, nullptr);
+
+  EXPECT_CALL(*inner_socket_, startSecureTransport()).WillOnce(Return(false));
+  proxy_protocol_socket_->startSecureTransport();
+}
+
+// When Inner socket is of starttls type
+TEST_F(ProxyProtocolTest, TestInnerStarttlsSocket) {
+  // Initialize starttls socket
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>();
+  NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks;
+  Network::MockTransportSocket* raw_socket = new Network::MockTransportSocket;
+  Network::MockTransportSocket* ssl_socket = new Network::MockTransportSocket;
+
+  std::unique_ptr<StartTls::StartTlsSocket> inner_socket =
+      std::make_unique<StartTls::StartTlsSocket>(Network::TransportSocketPtr(raw_socket),
+                                                 Network::TransportSocketPtr(ssl_socket),
+                                                 socket_options);
+
+  // Initialize proxy protocol socket
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+
+  NiceMock<Network::MockTransportSocketCallbacks> proxyproto_transport_callbacks;
+  proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(
+      std::move(inner_socket), nullptr, config, *stats_store_.rootScope());
+
+  // Starttls socket is initial raw_socket.
+  EXPECT_CALL(*raw_socket, setTransportSocketCallbacks(_));
+  proxy_protocol_socket_->setTransportSocketCallbacks(proxyproto_transport_callbacks);
+
+  EXPECT_CALL(*raw_socket, onConnected());
+  proxy_protocol_socket_->onConnected();
+
+  // Now switch to secure transport i.e. TLS
+  EXPECT_CALL(*ssl_socket, ssl());
+  EXPECT_CALL(*ssl_socket, setTransportSocketCallbacks(_));
+  EXPECT_CALL(*ssl_socket, onConnected());
+  proxy_protocol_socket_->startSecureTransport();
+}
 
 // Test injects PROXY protocol header only once
 TEST_F(ProxyProtocolTest, InjectesHeaderOnlyOnce) {

@@ -167,6 +167,8 @@ public:
   const std::string PROXY_PROTOCOL_VERSION = "envoy.proxy_protocol_version";
   // Stats prefix for the proxy protocol listener filter.
   const std::string PROXY_PROTOCOL_PREFIX = "envoy.proxy_protocol_prefix";
+  // Stats prefix for the SMTP Proxy network filter
+  const std::string SMTP_PREFIX = "envoy.smtp_prefix";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;

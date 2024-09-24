@@ -502,6 +502,13 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          {proxy_protocol_version});
   regex_tester.testRegex("proxy_proto.test_stat_prefix.versions.v2.error", "proxy_proto.error",
                          {proxy_protocol_prefix, proxy_protocol_version});
+
+  // SMTP Proxy Prefix
+  Tag smtp_prefix;
+  smtp_prefix.name_ = tag_names.SMTP_PREFIX;
+  smtp_prefix.value_ = "my_smtp_prefix";
+  regex_tester.testRegex("smtp.my_smtp_prefix.smtp_transaction_completed",
+                         "smtp.smtp_transaction_completed", {smtp_prefix});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {
