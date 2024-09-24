@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     name = "pass_through_filter_test",
     srcs = ["pass_through_filter_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/udp/udp_proxy/session_filters:pass_through_filter_lib",
         "//test/extensions/filters/udp/udp_proxy:mocks",

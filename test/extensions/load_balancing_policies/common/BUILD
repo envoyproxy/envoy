@@ -32,6 +32,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/upstream:upstream_includes",
         "//source/extensions/load_balancing_policies/common:thread_aware_lb_lib",
@@ -45,6 +46,7 @@ envoy_cc_test_library(
     name = "load_balancer_fuzz_lib",
     srcs = ["load_balancer_fuzz_base.cc"],
     hdrs = ["load_balancer_fuzz_base.h"],
+    rbe_pool = "2core",
     deps = [
         ":load_balancer_fuzz_proto_cc_proto",
         "//source/common/upstream:load_balancer_context_base_lib",
@@ -120,6 +122,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "load_balancer_base_test",
     srcs = ["load_balancer_impl_base_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":load_balancer_base_test_lib",
     ],

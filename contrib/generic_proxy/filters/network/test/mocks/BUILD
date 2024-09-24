@@ -12,6 +12,7 @@ envoy_cc_mock(
     name = "filter_mocks",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
+    rbe_pool = "2core",
     deps = [
         "//contrib/generic_proxy/filters/network/source/interface:config_interface",
         "//contrib/generic_proxy/filters/network/source/interface:filter_interface",

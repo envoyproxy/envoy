@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "stdout_config_test",
     srcs = ["stdout_config_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":stream_test_base",
         "@envoy_api//envoy/extensions/access_loggers/stream/v3:pkg_cc_proto",
@@ -21,6 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stderr_config_test",
     srcs = ["stderr_config_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":stream_test_base",
         "@envoy_api//envoy/extensions/access_loggers/stream/v3:pkg_cc_proto",

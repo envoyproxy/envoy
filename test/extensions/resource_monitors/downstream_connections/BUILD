@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     srcs = ["downstream_connections_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.downstream_connections"],
     external_deps = ["abseil_optional"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/resource_monitors/downstream_connections:downstream_connections_monitor",
         "@envoy_api//envoy/extensions/resource_monitors/downstream_connections/v3:pkg_cc_proto",
@@ -27,6 +28,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.resource_monitors.downstream_connections"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//source/extensions/resource_monitors/downstream_connections:config",
@@ -42,6 +44,7 @@ envoy_cc_test(
     name = "cx_limit_overload_integration_test",
     size = "large",
     srcs = ["cx_limit_overload_integration_test.cc"],
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],

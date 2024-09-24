@@ -14,6 +14,7 @@ envoy_cc_test(
     external_deps = [
         "abseil_synchronization",
     ],
+    rbe_pool = "2core",
     deps = [
         "//envoy/common:time_interface",
         "//envoy/registry",
@@ -30,6 +31,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "abort_action_config_test",
     srcs = ["abort_action_config_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//envoy/server:guarddog_config_interface",
