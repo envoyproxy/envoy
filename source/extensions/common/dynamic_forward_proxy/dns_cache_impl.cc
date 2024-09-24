@@ -261,7 +261,6 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   stats_.dns_query_timeout_.inc();
   primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
   std::string details =
-
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_resolve_timeout_details")
           ? absl::StrCat("resolve_timeout:",
                          absl::StrJoin(primary_host.active_query_->getDetails(), ","))
