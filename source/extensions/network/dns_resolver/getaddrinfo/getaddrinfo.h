@@ -12,6 +12,19 @@ namespace Network {
 
 DECLARE_FACTORY(GetAddrInfoDnsResolverFactory);
 
+// Trace information for getaddrinfo.
+enum class GetAddrInfoTrace : uint8_t {
+  NotStarted = 0,
+  Starting = 1,
+  Success = 2,
+  Failed = 3,
+  NoData = 4,
+  Retrying = 5,
+  DoneRetrying = 6,
+  Cancelled = 7,
+  Callback = 8,
+};
+
 // This resolver uses getaddrinfo() on a dedicated resolution thread. Thus, it is only suitable
 // currently for relatively low rate resolutions. In the future a thread pool could be added if
 // desired.

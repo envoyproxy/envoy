@@ -466,11 +466,11 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithDetails) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_),
-              HasSubstr("dns_resolution_failure{resolve_timeout:not_started}"));
+              HasSubstr("dns_resolution_failure{resolve_timeout:0}"));
 }
 
 TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutDetails) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_resolve_timeout_details",
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_resolve_timeout_trace",
                                     "false");
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 

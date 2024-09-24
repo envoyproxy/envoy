@@ -36,12 +36,12 @@ public:
    */
   virtual void cancel(CancelReason reason) PURE;
   /** Add the detail for the DNS query. */
-  void addDetail(absl::string_view detail) { details_.emplace_back(detail); }
+  void addTrace(uint8_t trace) { traces_.emplace_back(trace); }
   /** Returns the details of the DNS query. */
-  const std::vector<std::string>& getDetails() const { return details_; }
+  const std::vector<uint8_t>& getTraces() const { return traces_; }
 
 private:
-  std::vector<std::string> details_;
+  std::vector<uint8_t> traces_;
 };
 
 /**
