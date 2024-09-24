@@ -91,7 +91,7 @@ bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: lrs
   change: |
-    Fixes log spamming for LoadStatsReporting graceful stream close when using default log level.
+    Fixes errors stats being incremented and warning log spamming for LoadStatsReporting graceful stream close.
 - area: dispatcher
   change: |
     Update approximate now after polling instead of before polling. This is only used by QUIC.
