@@ -71,11 +71,6 @@ public:
     return *data_ptr_;
   }
 
-  ~RateLimitQuotaFilter() override {
-    // A filter on a worker thread is not responsible for closing anything
-    // global.
-  }
-
 private:
   // Create the matcher factory and matcher.
   void createMatcher();

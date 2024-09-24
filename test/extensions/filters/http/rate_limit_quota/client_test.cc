@@ -1052,6 +1052,91 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   ASSERT_TRUE(allow_all_bucket->default_action.has_quota_assignment_action());
 }
 
+TEST_F(GlobalClientTest, TestFallbackToDuplicateTokenBucket) {
+  mock_stream_client->expectStreamCreation(1);
+  // Expect expiration timers to start for each of the response's assignments &
+  // a reset of the TokenBucket assignment's expiration timer (even when not
+  // resetting the TokenBucket itself).
+  mock_stream_client->expectTimerCreations(reporting_interval_, action_ttl, 1, fallback_ttl, 1);
+
+  // Test the bucket with a TokenBucket assignment pushed in a response, then
+  // falling back to a matching TokenBucket after that expires.
+  int max_tokens = 100;
+  RateLimitStrategy fallback_tb_action =
+      buildTokenBucketStrategy(max_tokens, 60, std::chrono::seconds(12));
+
+  // Create bucket with static default actions and fallback TokenBucket.
+  cb_ptr_->expectBuckets({sample_id_hash_});
+  global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action,
+                               std::make_unique<RateLimitStrategy>(fallback_tb_action),
+                               std::chrono::seconds(300), true);
+  cb_ptr_->waitForExpectedBuckets();
+
+  // Defaults from no_assignment_behavior.
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
+
+  mock_stream_client->timer_->invokeCallback();
+  waitForNotification(cb_ptr_->report_sent);
+
+  // Bucket1: TokenBucket assignment -> TokenBucket fallback -> default-allow.
+  BucketAction token_bucket_action =
+      buildTokenBucketAction(sample_bucket_id_, max_tokens, 60, std::chrono::seconds(12));
+
+  std::unique_ptr<RateLimitQuotaResponse> response = std::make_unique<RateLimitQuotaResponse>();
+  response->add_bucket_action()->CopyFrom(token_bucket_action);
+
+  // Mimic sending the response across the stream.
+  global_client_->onReceiveMessage(std::move(response));
+  waitForNotification(cb_ptr_->response_processed);
+
+  // Expect the bucket in TLS to have a matching assignment.
+  std::shared_ptr<CachedBucket> token_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+  ASSERT_TRUE(token_bucket && token_bucket->cached_action);
+  EXPECT_TRUE(unordered_differencer_.Equals(*token_bucket->cached_action, token_bucket_action));
+  ASSERT_TRUE(token_bucket->fallback_action);
+  EXPECT_TRUE(unordered_differencer_.Equals(*token_bucket->fallback_action, fallback_tb_action));
+
+  // Expect an active expiration timer per bucket.
+  ASSERT_EQ(mock_stream_client->expiration_timers_.size(), 1);
+
+  // Activate expiration of the bucket.
+  ASSERT_TRUE(token_bucket->action_expiration_timer);
+  Event::MockTimer* token_bucket_expiration_timer =
+      RateLimitTestClient::assertMockTimer(token_bucket->action_expiration_timer.get());
+  token_bucket_expiration_timer->invokeCallback();
+  waitForNotification(cb_ptr_->action_expired);
+
+  // Get the new CachedBucket, which should have carried over the existing token
+  // bucket.
+  std::shared_ptr<CachedBucket> new_token_bucket = getBucket(*buckets_tls_, sample_id_hash_);
+
+  EXPECT_NE(token_bucket.get(), new_token_bucket.get());
+  // Expect a fallback timer for the expired bucket.
+  ASSERT_EQ(mock_stream_client->fallback_timers_.size(), 1);
+
+  ASSERT_TRUE(new_token_bucket->cached_action);
+  EXPECT_TRUE(unordered_differencer_.Equals(
+      new_token_bucket->cached_action->quota_assignment_action().rate_limit_strategy(),
+      fallback_tb_action));
+  EXPECT_FALSE(new_token_bucket->action_expiration_timer);
+  ASSERT_TRUE(new_token_bucket->fallback_action);
+  ASSERT_TRUE(new_token_bucket->fallback_expiration_timer);
+  ASSERT_TRUE(new_token_bucket->default_action.has_quota_assignment_action());
+
+  // Expect the TokenBucket to have been carried over.
+  ASSERT_TRUE(new_token_bucket->token_bucket_limiter);
+  EXPECT_EQ(new_token_bucket->token_bucket_limiter.get(), token_bucket->token_bucket_limiter.get());
+
+  // Clean up the timer.
+  RateLimitTestClient::assertMockTimer(new_token_bucket->fallback_expiration_timer.get())
+      ->invokeCallback();
+  waitForNotification(cb_ptr_->fallback_expired);
+}
+
 TEST_F(GlobalClientTest, TestAbandonAction) {
   mock_stream_client->expectStreamCreation(1);
   mock_stream_client->expectTimerCreations(reporting_interval_);
