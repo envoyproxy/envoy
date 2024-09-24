@@ -17,8 +17,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/rbac:config",
@@ -32,8 +32,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "rbac_filter_test",
     srcs = ["rbac_filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/common/matcher:matcher_lib",
@@ -61,8 +61,8 @@ envoy_extension_cc_test(
     name = "rbac_filter_integration_test",
     size = "large",
     srcs = ["rbac_filter_integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "2core",
     shard_count = 3,
     tags = ["skip_on_windows"],
     deps = [

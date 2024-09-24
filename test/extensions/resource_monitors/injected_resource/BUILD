@@ -48,8 +48,8 @@ envoy_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.resource_monitors.injected_resource"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//source/common/event:dispatcher_lib",

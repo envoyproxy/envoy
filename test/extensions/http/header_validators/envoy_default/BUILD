@@ -19,8 +19,8 @@ envoy_extension_cc_test(
     srcs = [
         "base_header_validator_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
+    rbe_pool = "2core",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -37,8 +37,8 @@ envoy_extension_cc_test(
     srcs = [
         "http_common_validation_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
+    rbe_pool = "2core",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -56,8 +56,8 @@ envoy_extension_cc_test(
     srcs = [
         "http1_header_validator_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
+    rbe_pool = "2core",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -73,8 +73,8 @@ envoy_extension_cc_test(
     srcs = [
         "http2_header_validator_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
+    rbe_pool = "2core",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -107,8 +107,8 @@ envoy_extension_cc_test(
     srcs = [
         "header_validator_factory_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:config",
@@ -124,8 +124,8 @@ envoy_extension_cc_test(
     srcs = [
         "path_normalizer_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/http/header_validators/envoy_default:path_normalizer",
         "//test/test_common:test_runtime_lib",
@@ -136,8 +136,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.http.header_validators.envoy_default"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//source/extensions/http/header_validators/envoy_default:config",

@@ -15,8 +15,8 @@ envoy_extension_cc_test(
     name = "http_client_test",
     size = "small",
     srcs = ["http_client_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:message_lib",

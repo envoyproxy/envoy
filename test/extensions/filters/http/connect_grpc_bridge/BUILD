@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.connect_grpc_bridge"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/connect_grpc_bridge:config",
         "//test/mocks/server:factory_context_mocks",
@@ -26,8 +26,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "connect_grpc_bridge_filter_test",
     srcs = ["connect_grpc_bridge_filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.connect_grpc_bridge"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
@@ -44,8 +44,8 @@ envoy_extension_cc_test(
     srcs = [
         "connect_grpc_bridge_integration_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.connect_grpc_bridge"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -59,8 +59,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "end_stream_response_test",
     srcs = ["end_stream_response_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.connect_grpc_bridge"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/connect_grpc_bridge:end_stream_response_lib",
         "//test/test_common:global_lib",

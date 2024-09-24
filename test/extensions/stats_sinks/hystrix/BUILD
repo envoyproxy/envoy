@@ -15,8 +15,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.stat_sinks.hystrix"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
@@ -32,8 +32,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "hystrix_test",
     srcs = ["hystrix_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.stat_sinks.hystrix"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/common/stats:stats_lib",
@@ -52,8 +52,8 @@ envoy_extension_cc_test(
     name = "hystrix_integration_test",
     size = "large",
     srcs = envoy_select_admin_functionality(["hystrix_integration_test.cc"]),
-    rbe_pool = "2core",
     extension_names = ["envoy.stat_sinks.hystrix"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/stat_sinks/hystrix:config",
         "//test/integration:http_protocol_integration_lib",

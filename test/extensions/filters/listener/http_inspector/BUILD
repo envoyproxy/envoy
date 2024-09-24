@@ -15,8 +15,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "http_inspector_test",
     srcs = ["http_inspector_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.http_inspector"],
+    rbe_pool = "2core",
     #TODO(davinci26): The test passes on Windows *but* http inspector
     # *used* to rely on Event::FileTriggerType::Edge and we got away with it
     # because we mock the dispatcher. Need to verify that the scenario is
@@ -37,8 +37,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "http_inspector_config_test",
     srcs = ["http_inspector_config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.http_inspector"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/listener/http_inspector:config",
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
@@ -67,8 +67,8 @@ envoy_extension_cc_test(
     srcs = [
         "http_inspector_integration_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.http_inspector"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/listener/http_inspector:config",

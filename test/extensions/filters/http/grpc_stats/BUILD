@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_stats"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/grpc:common_lib",
         "//source/extensions/filters/http/grpc_stats:config",

@@ -22,8 +22,8 @@ envoy_extension_cc_test(
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.geoip_providers.maxmind"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/geoip_providers/maxmind:config",
@@ -44,8 +44,8 @@ envoy_extension_cc_test(
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.geoip_providers.maxmind"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",

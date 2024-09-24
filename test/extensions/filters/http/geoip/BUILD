@@ -22,8 +22,8 @@ envoy_extension_cc_test(
     name = "config_test",
     size = "small",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.geoip"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         ":geoip_mocks",
@@ -40,8 +40,8 @@ envoy_extension_cc_test(
     name = "geoip_filter_test",
     size = "small",
     srcs = ["geoip_filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.geoip"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         ":dummy_cc_proto",
@@ -66,10 +66,10 @@ envoy_extension_cc_test(
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
-    rbe_pool = "2core",
     extension_names = [
         "envoy.filters.http.geoip",
     ],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/geoip:config",

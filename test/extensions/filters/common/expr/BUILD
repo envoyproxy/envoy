@@ -16,8 +16,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "context_test",
     srcs = ["context_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
@@ -40,8 +40,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "evaluator_test",
     srcs = ["evaluator_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/expr:evaluator_lib",

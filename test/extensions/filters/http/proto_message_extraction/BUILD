@@ -57,8 +57,8 @@ envoy_extension_cc_test(
         "integration_test.cc",
     ],
     data = ["//test/proto:apikeys_proto_descriptor"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.proto_message_extraction"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/proto_message_extraction:config",
         "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",

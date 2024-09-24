@@ -16,8 +16,8 @@ envoy_package()
 envoy_cc_test_binary(
     name = "router_check_tool",
     srcs = ["router_check.cc"],
-    rbe_pool = "2core",
     linkstatic = envoy_select_linkstatic(),
+    rbe_pool = "2core",
     deps = [":router_check_main_lib"] + select({
         "//bazel:coverage_build": [],
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),

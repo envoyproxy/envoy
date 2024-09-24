@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.original_src"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/original_src:config_lib",
         "@envoy_api//envoy/extensions/filters/http/original_src/v3:pkg_cc_proto",
@@ -25,8 +25,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "original_src_config_factory_test",
     srcs = ["original_src_config_factory_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.original_src"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/original_src:config",
         "//source/extensions/filters/http/original_src:config_lib",
@@ -39,8 +39,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "original_src_test",
     srcs = ["original_src_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.original_src"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:socket_option_lib",
         "//source/extensions/filters/http/original_src:original_src_lib",

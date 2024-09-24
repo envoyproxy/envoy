@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.sni_dynamic_forward_proxy"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:uint32_accessor_lib",
@@ -36,8 +36,8 @@ envoy_extension_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.sni_dynamic_forward_proxy"],
+    rbe_pool = "2core",
     # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
     #   https://gist.github.com/wrowe/12b0b7579791c541c789c98563999a2e
     tags = ["fails_on_clang_cl"],

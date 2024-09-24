@@ -36,11 +36,11 @@ envoy_cc_test(
         "example_configs_test_setup.sh",
         "//configs:example_configs",
     ],
-    rbe_pool = "2core",
     env = {
         "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar",
         "GODEBUG": "cgocheck=0",
     },
+    rbe_pool = "2core",
     deps = [
         ":example_configs_test_lib",
     ],

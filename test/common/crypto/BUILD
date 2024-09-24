@@ -15,8 +15,8 @@ envoy_cc_test(
     srcs = [
         "utility_test.cc",
     ],
-    rbe_pool = "2core",
     external_deps = ["ssl"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:hex_lib",

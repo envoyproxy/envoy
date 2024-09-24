@@ -21,8 +21,8 @@ envoy_cc_test_library(
 envoy_extension_cc_test(
     name = "cel_matcher_test",
     srcs = ["cel_matcher_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.matching.matchers.cel_matcher"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         ":cel_matcher_test_lib",

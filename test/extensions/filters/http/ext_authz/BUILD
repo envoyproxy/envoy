@@ -18,8 +18,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/buffer:buffer_lib",
@@ -51,8 +51,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/network:address_lib",
@@ -74,8 +74,8 @@ envoy_extension_cc_test(
     data = [
         "ext_authz.yaml",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "2core",
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         ":logging_test_filter_lib",

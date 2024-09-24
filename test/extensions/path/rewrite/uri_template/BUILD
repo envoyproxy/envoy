@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.path.rewrite.uri_template.uri_template_rewriter"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/path/rewrite/uri_template:config",
         "//test/mocks/server:factory_context_mocks",
@@ -25,8 +25,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "library_test",
     srcs = ["library_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.path.rewrite.uri_template.uri_template_rewriter"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/match/uri_template:uri_template_match_lib",

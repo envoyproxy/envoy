@@ -377,8 +377,8 @@ envoy_cc_test_binary(
 envoy_cc_test_binary(
     name = "hotrestart_small_main",
     srcs = ["hotrestart_main.cc"],
-    rbe_pool = "2core",
     linkstatic = envoy_select_linkstatic(),
+    rbe_pool = "2core",
     deps = [
         ":common_extensions_lib",
         "//source/exe:main_common_lib",

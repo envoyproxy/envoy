@@ -31,8 +31,8 @@ envoy_extension_cc_test_library(
 envoy_extension_cc_test(
     name = "dns_filter_test",
     srcs = ["dns_filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.udp.dns_filter"],
+    rbe_pool = "2core",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:dns_filter_lib",
@@ -50,8 +50,8 @@ envoy_extension_cc_test(
     name = "dns_filter_integration_test",
     size = "large",
     srcs = ["dns_filter_integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.udp.dns_filter"],
+    rbe_pool = "2core",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:config",
@@ -64,8 +64,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "dns_filter_utils_test",
     srcs = ["dns_filter_utils_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.udp.dns_filter"],
+    rbe_pool = "2core",
     deps = [
         ":dns_filter_test_lib",
         "//source/extensions/filters/udp/dns_filter:config",

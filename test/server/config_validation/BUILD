@@ -49,8 +49,8 @@ envoy_cc_test(
         "//configs:example_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
-    rbe_pool = "2core",
     env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",

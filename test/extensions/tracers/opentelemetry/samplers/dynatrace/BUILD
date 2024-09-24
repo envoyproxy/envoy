@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:config",
@@ -35,8 +35,8 @@ envoy_extension_cc_test(
         "stream_summary_test.cc",
         "tenant_id_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:dynatrace_sampler_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
@@ -51,8 +51,8 @@ envoy_extension_cc_test(
     srcs = [
         "dynatrace_sampler_integration_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
+    rbe_pool = "2core",
     deps = [
         "//source/exe:main_common_lib",
         "//source/extensions/tracers/opentelemetry:config",

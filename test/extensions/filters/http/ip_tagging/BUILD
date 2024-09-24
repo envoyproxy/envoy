@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ip_tagging_filter_test",
     srcs = ["ip_tagging_filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ip_tagging"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
@@ -35,8 +35,8 @@ envoy_extension_cc_test(
     name = "ip_tagging_integration_test",
     size = "large",
     srcs = ["ip_tagging_integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ip_tagging"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/ip_tagging:config",
         "//test/integration:http_integration_lib",

@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.credential_injector"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/http/injected_credentials/oauth2:config",
         "//test/mocks/server:factory_context_mocks",
@@ -25,8 +25,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "token_provider_test",
     srcs = ["token_provider_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.credential_injector"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/http/injected_credentials/common:secret_reader_lib",
         "//source/extensions/http/injected_credentials/oauth2:token_provider_lib",
@@ -40,8 +40,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "credential_injector_oauth_integration_test",
     srcs = ["credential_injector_oauth_integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.credential_injector"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/credential_injector:config",
         "//source/extensions/http/injected_credentials/oauth2:config",

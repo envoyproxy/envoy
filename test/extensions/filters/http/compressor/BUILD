@@ -21,8 +21,8 @@ envoy_extension_cc_test(
     srcs = [
         "compressor_filter_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.compressor"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/filters/http/compressor:compressor_filter_lib",
@@ -39,8 +39,8 @@ envoy_extension_cc_test(
     srcs = [
         "compressor_filter_integration_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.compressor"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/compression/gzip/decompressor:config",
@@ -62,8 +62,8 @@ envoy_extension_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.compressor"],
+    rbe_pool = "2core",
     deps = [
         ":mock_config_cc_proto",
         "//source/extensions/filters/http/compressor:config",

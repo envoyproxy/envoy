@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "sni_cluster_test",
     srcs = ["sni_cluster_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.sni_cluster"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/network/sni_cluster",
         "//source/extensions/filters/network/sni_cluster:config",

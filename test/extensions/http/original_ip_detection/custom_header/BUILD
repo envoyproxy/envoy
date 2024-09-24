@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "custom_header_detection_test",
     srcs = ["custom_header_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.http.original_ip_detection.custom_header"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/http/original_ip_detection/custom_header:custom_header_lib",
@@ -27,8 +27,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.http.original_ip_detection.custom_header"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//source/extensions/http/original_ip_detection/custom_header:config",

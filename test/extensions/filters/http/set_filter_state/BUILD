@@ -16,8 +16,8 @@ envoy_extension_cc_test(
     srcs = [
         "integration_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.set_filter_state"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:string_accessor_lib",

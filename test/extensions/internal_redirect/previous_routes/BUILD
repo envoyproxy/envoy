@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.internal_redirect_predicates.previous_routes"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/internal_redirect/previous_routes:config",

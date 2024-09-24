@@ -16,8 +16,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.cdn_loop"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cdn_loop:config",
         "//test/mocks/http:http_mocks",
@@ -31,8 +31,8 @@ envoy_extension_cc_test(
     name = "filter_integration_test",
     size = "large",
     srcs = ["filter_integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.cdn_loop"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cdn_loop:config",
         "//test/integration:http_protocol_integration_lib",

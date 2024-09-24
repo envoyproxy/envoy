@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ratelimit_test",
     srcs = ["ratelimit_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.thrift.rate_limit"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
@@ -35,8 +35,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.thrift.rate_limit"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
         "//test/extensions/filters/network/thrift_proxy:mocks",

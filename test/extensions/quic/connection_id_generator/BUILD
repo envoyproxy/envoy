@@ -21,8 +21,8 @@ envoy_cc_test_library(
 envoy_extension_cc_test(
     name = "envoy_deterministic_connection_id_generator_test",
     srcs = ["envoy_deterministic_connection_id_generator_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.quic.deterministic_connection_id_generator"],
+    rbe_pool = "2core",
     tags = ["nofips"],
     deps = [
         ":matchers",

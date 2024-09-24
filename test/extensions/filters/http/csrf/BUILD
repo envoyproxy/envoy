@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "csrf_filter_test",
     srcs = ["csrf_filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.csrf"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/csrf:config",
@@ -33,8 +33,8 @@ envoy_extension_cc_test(
     name = "csrf_filter_integration_test",
     size = "large",
     srcs = ["csrf_filter_integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.csrf"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/csrf:config",
         "//test/config:utility_lib",

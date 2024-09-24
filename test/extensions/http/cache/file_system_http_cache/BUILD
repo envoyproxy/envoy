@@ -11,8 +11,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "file_system_http_cache_test",
     srcs = ["file_system_http_cache_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.extensions.http.cache.file_system_http_cache"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],  # async_files does not yet support Windows.
     deps = [
         "//source/common/filesystem:directory_lib",

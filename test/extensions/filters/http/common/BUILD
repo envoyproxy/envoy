@@ -42,8 +42,8 @@ envoy_extension_cc_test(
     srcs = [
         "jwks_fetcher_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.jwt_authn"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//test/extensions/filters/http/common:mock_lib",

@@ -16,8 +16,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "grpc_access_log_impl_test",
     srcs = ["grpc_access_log_impl_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.open_telemetry"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/protobuf",
@@ -35,8 +35,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "access_log_impl_test",
     srcs = ["access_log_impl_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.open_telemetry"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/common:time_interface",
         "//source/common/formatter:formatter_extension_lib",
@@ -60,8 +60,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.open_telemetry"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
@@ -76,8 +76,8 @@ envoy_extension_cc_test(
     name = "access_log_integration_test",
     size = "large",
     srcs = ["access_log_integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.open_telemetry"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -104,8 +104,8 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.open_telemetry"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",

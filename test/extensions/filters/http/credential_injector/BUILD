@@ -15,8 +15,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.credential_injector"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/credential_injector:credential_injector_lib",
         "//source/extensions/http/injected_credentials/generic:generic_lib",
@@ -33,8 +33,8 @@ envoy_proto_library(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.credential_injector"],
+    rbe_pool = "2core",
     deps = [
         ":mock_credentail_cc_proto",
         "//source/extensions/filters/http/credential_injector:config",

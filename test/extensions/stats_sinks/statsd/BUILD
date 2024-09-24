@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.stat_sinks.statsd"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",

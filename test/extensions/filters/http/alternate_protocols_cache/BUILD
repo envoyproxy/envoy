@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/alternate_protocols_cache:config",
         "//test/mocks/http:http_mocks",
@@ -33,8 +33,8 @@ envoy_extension_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
+    rbe_pool = "2core",
     shard_count = 2,
     tags = [
         "cpu:3",

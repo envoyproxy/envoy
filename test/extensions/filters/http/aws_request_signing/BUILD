@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "aws_request_signing_filter_test",
     srcs = ["aws_request_signing_filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.aws_request_signing"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/aws_request_signing:aws_request_signing_filter_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -26,8 +26,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.aws_request_signing"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/aws_request_signing:config",
         "//test/mocks/server:factory_context_mocks",
@@ -38,8 +38,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "aws_request_signing_integration_test",
     srcs = ["aws_request_signing_integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.aws_request_signing"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/filters/http/aws_request_signing:aws_request_signing_filter_lib",

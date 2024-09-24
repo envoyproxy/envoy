@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "proxy_protocol_test",
     srcs = ["proxy_protocol_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.upstream_proxy_protocol"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/network:proxy_protocol_options_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
@@ -32,8 +32,8 @@ envoy_extension_cc_test(
     name = "proxy_protocol_integration_test",
     size = "large",
     srcs = ["proxy_protocol_integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.upstream_proxy_protocol"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//source/extensions/filters/network/tcp_proxy:config",

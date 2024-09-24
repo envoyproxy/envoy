@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "req_without_query_test",
     srcs = ["req_without_query_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.formatter.req_without_query"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/json:json_loader_lib",

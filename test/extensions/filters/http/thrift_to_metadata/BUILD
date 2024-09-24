@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.thrift_to_metadata"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/thrift_to_metadata:thrift_to_metadata_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
@@ -29,8 +29,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.thrift_to_metadata"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/thrift_to_metadata:config",
         "//test/mocks/server:server_mocks",
@@ -41,8 +41,8 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.thrift_to_metadata"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/thrift_to_metadata:config",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",

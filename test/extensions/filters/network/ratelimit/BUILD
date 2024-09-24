@@ -14,11 +14,11 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ratelimit_test",
     srcs = ["ratelimit_test.cc"],
-    rbe_pool = "2core",
     extension_names = [
         "envoy.filters.network.ratelimit",
         "envoy.filters.network.tcp_proxy",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -42,8 +42,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.ratelimit"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/network/ratelimit:config",
         "//test/mocks/server:factory_context_mocks",

@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.router"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/router:config",
         "//test/mocks/server:factory_context_mocks",
@@ -31,8 +31,8 @@ envoy_extension_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.router"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/router:config",
         "//test/integration:http_integration_lib",

@@ -43,12 +43,12 @@ envoy_cc_test(
         "//configs:example_contrib_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
-    rbe_pool = "2core",
     env = {
         "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_contrib_configs.tar",
         "DISABLE_TEST_MERGE": "true",
         "GODEBUG": "cgocheck=0",
     },
+    rbe_pool = "2core",
     deps = [
         "//test/config_test:example_configs_test_lib",
     ] + SELECTED_CONTRIB_EXTENSIONS,

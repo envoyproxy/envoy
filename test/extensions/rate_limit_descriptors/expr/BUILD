@@ -20,8 +20,8 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    rbe_pool = "2core",
     extension_names = ["envoy.rate_limit_descriptors.expr"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/protobuf:utility_lib",

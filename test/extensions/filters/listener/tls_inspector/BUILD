@@ -59,8 +59,8 @@ envoy_cc_fuzz_test(
 envoy_extension_cc_benchmark_binary(
     name = "tls_inspector_benchmark",
     srcs = ["tls_inspector_benchmark.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.tls_inspector"],
+    rbe_pool = "2core",
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",

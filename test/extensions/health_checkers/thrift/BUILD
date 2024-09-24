@@ -30,8 +30,8 @@ envoy_cc_mock(
 envoy_extension_cc_test(
     name = "client_impl_test",
     srcs = ["client_impl_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.health_checkers.thrift"],
+    rbe_pool = "2core",
     deps = [
         ":thrift_mocks",
         "//source/common/network:utility_lib",
@@ -48,8 +48,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "thrift_test",
     srcs = ["thrift_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.health_checkers.thrift"],
+    rbe_pool = "2core",
     deps = [
         ":thrift_mocks",
         "//source/common/api:api_lib",
@@ -70,8 +70,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.health_checkers.thrift"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/upstream:health_checker_lib",
         "//source/extensions/health_checkers/thrift:config",

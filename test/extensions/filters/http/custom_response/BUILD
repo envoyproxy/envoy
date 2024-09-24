@@ -35,8 +35,8 @@ envoy_extension_cc_test(
     name = "config_test",
     size = "small",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.custom_response"],
+    rbe_pool = "2core",
     deps = [
         ":utility_lib",
         "//source/common/http:message_lib",
@@ -55,8 +55,8 @@ envoy_extension_cc_test(
     name = "custom_response_filter_test",
     size = "small",
     srcs = ["custom_response_filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.custom_response"],
+    rbe_pool = "2core",
     deps = [
         ":utility_lib",
         "//source/common/http:message_lib",
@@ -82,8 +82,8 @@ envoy_extension_cc_test(
     srcs = [
         "custom_response_integration_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.custom_response"],
+    rbe_pool = "2core",
     shard_count = 2,
     tags = [
         "cpu:3",

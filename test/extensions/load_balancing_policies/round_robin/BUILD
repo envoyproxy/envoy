@@ -18,8 +18,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.round_robin"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/server:factory_context_mocks",
@@ -33,8 +33,8 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.round_robin"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/round_robin:config",
@@ -86,8 +86,8 @@ envoy_benchmark_test(
 envoy_extension_cc_test(
     name = "round_robin_lb_test",
     srcs = ["round_robin_lb_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.round_robin"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/load_balancing_policies/round_robin:round_robin_lb_lib",
         "//test/extensions/load_balancing_policies/common:load_balancer_base_test_lib",

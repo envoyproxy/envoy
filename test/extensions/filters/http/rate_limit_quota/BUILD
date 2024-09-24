@@ -28,8 +28,8 @@ envoy_extension_cc_test(
     name = "config_test",
     size = "small",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rate_limit_quota"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:message_lib",
@@ -44,8 +44,8 @@ envoy_extension_cc_test(
     name = "filter_test",
     size = "small",
     srcs = ["filter_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rate_limit_quota"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
@@ -66,8 +66,8 @@ envoy_extension_cc_test(
     name = "client_test",
     size = "small",
     srcs = ["client_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rate_limit_quota"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         ":client_test_utils",
@@ -106,8 +106,8 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rate_limit_quota"],
+    rbe_pool = "2core",
     shard_count = 4,
     tags = [
         "cpu:3",

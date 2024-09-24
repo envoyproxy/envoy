@@ -20,8 +20,8 @@ envoy_extension_cc_test(
         "util_test.cc",
         "xray_tracer_impl_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.tracers.xray"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/tracers/xray:xray_lib",
         "//test/mocks:common_lib",
@@ -43,8 +43,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.tracers.xray"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/tracers/xray:config",
         "//test/mocks/server:instance_mocks",

@@ -30,8 +30,8 @@ envoy_extension_cc_test(
     ]) + envoy_select_wasm_rust_tests([
         "//test/extensions/bootstrap/wasm/test_data:logging_rust.wasm",
     ]),
-    rbe_pool = "2core",
     extension_names = ["envoy.bootstrap.wasm"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -56,8 +56,8 @@ envoy_extension_cc_test(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/bootstrap/wasm/test_data:http_cpp.wasm",
     ]),
-    rbe_pool = "2core",
     extension_names = ["envoy.bootstrap.wasm"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/bootstrap/wasm:config",
@@ -74,8 +74,8 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:missing_cpp.wasm",
         "//test/extensions/bootstrap/wasm/test_data:start_cpp.wasm",
     ]),
-    rbe_pool = "2core",
     extension_names = ["envoy.bootstrap.wasm"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -99,8 +99,8 @@ envoy_extension_cc_test_binary(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/bootstrap/wasm/test_data:speed_cpp.wasm",
     ]),
-    rbe_pool = "2core",
     extension_names = ["envoy.bootstrap.wasm"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",

@@ -14,8 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "file_sink_impl_test",
     srcs = ["file_sink_impl_test.cc"],
-    rbe_pool = "2core",
     extension_names = ["envoy.health_check.event_sinks.file"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/health_check/event_sinks/file:file_sink_lib",
         "//test/mocks/access_log:access_log_mocks",

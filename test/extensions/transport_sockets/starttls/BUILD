@@ -17,8 +17,8 @@ envoy_extension_cc_test(
     srcs = [
         "starttls_socket_test.cc",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.starttls"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:transport_socket_options_lib",
         "//source/extensions/transport_sockets/starttls:config",
@@ -41,8 +41,8 @@ envoy_extension_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.starttls"],
+    rbe_pool = "2core",
     deps = [
         ":starttls_integration_proto_cc_proto",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -63,8 +63,8 @@ envoy_extension_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.starttls"],
+    rbe_pool = "2core",
     deps = [
         ":starttls_integration_proto_cc_proto",
         "//source/extensions/transport_sockets/starttls:config",
