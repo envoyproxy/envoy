@@ -30,7 +30,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
@@ -85,7 +85,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ./ci/run_envoy_docker.sh

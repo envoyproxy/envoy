@@ -7,6 +7,7 @@
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 
@@ -206,6 +207,8 @@ FilterConfig::FilterConfig(
       untyped_receiving_namespaces_(
           config.metadata_options().receiving_namespaces().untyped().begin(),
           config.metadata_options().receiving_namespaces().untyped().end()),
+      allowed_override_modes_(config.allowed_override_modes().begin(),
+                              config.allowed_override_modes().end()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
@@ -1068,9 +1071,26 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // set to true and filter is waiting for header processing response.
   // Otherwise, the response mode_override proto field is ignored.
   if (config_->allowModeOverride() && inHeaderProcessState() && response->has_mode_override()) {
-    ENVOY_LOG(debug, "Processing mode overridden by server for this request");
-    decoding_state_.setProcessingMode(response->mode_override());
-    encoding_state_.setProcessingMode(response->mode_override());
+    bool mode_override_allowed = true;
+    const auto& mode_overide = response->mode_override();
+    // First, check if mode override allow-list is configured
+    if (!config_->allowedOverrideModes().empty()) {
+      // Second, check if mode override from response is allowed.
+      mode_override_allowed = absl::c_any_of(
+          config_->allowedOverrideModes(),
+          [&mode_overide](
+              const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& other) {
+            return Protobuf::util::MessageDifferencer::Equals(mode_overide, other);
+          });
+    }
+
+    if (mode_override_allowed) {
+      ENVOY_LOG(debug, "Processing mode overridden by server for this request");
+      decoding_state_.setProcessingMode(mode_overide);
+      encoding_state_.setProcessingMode(mode_overide);
+    } else {
+      ENVOY_LOG(debug, "Processing mode overridden by server is disallowed");
+    }
   }
 
   ENVOY_LOG(debug, "Received {} response", responseCaseToString(response->response_case()));

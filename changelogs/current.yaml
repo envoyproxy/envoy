@@ -185,6 +185,10 @@ bug_fixes:
     Fixed a bug in the CONNECT-UDP forwarding mode where Envoy reset the upstream stream when it
     received HTTP/3 datagrams before receiving the SETTINGS frame from the upstream peer. Envoy now
     drops the datagrams in this case instead of resetting the stream.
+- area: oauth
+  change: |
+    Set token cookies in response regardless of :ref:`forward_bearer_token
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>` config option.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -208,6 +212,9 @@ removed_config_or_runtime:
 - area: tls
   change: |
     Removed runtime flag ``envoy.reloadable_features.ssl_transport_failure_reason_format``.
+- area: dynamic_foward_proxy
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.dfp_mixed_scheme`` and legacy code path.
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.abort_filter_chain_on_stream_reset`` and legacy
@@ -404,6 +411,21 @@ new_features:
   change: |
     Added ``max_packet_length`` to the QUIC protocol options to allow users to change the largest
     size of a QUIC packet that can be transmitted over the QUIC connection.
+- area: oauth
+  change: |
+    Added :ref:`disable_access_token_set_cookie
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_access_token_set_cookie>`
+    to disable setting the Access Token cookie.
+- area: oauth
+  change: |
+    Added :ref:`disable_refresh_token_set_cookie
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_refresh_token_set_cookie>`
+    to disable setting the Refresh Token cookie.
+- area: ext_proc
+  change: |
+    Added allow list
+    :ref:`allowed_override_modes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allowed_override_modes>`
+    for :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
 - area: load_balancing
   change: |
     WIP: Added implementation of :ref:`client_side_weighted_round_robin
