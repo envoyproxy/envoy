@@ -116,10 +116,10 @@ void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
   HostVector hosts_with_default_weight;
   const MonotonicTime now = time_source_.monotonicTime();
   // Weight is considered invalid (too recent) if it was first updated within `blackout_period_`.
-  const MonotonicTime min_non_empty_since = now - blackout_period_;
+  const MonotonicTime max_non_empty_since = now - blackout_period_;
   // Weight is considered invalid (too old) if it was last updated before
   // `weight_expiration_period_`.
-  const MonotonicTime max_last_update_time = now - weight_expiration_period_;
+  const MonotonicTime min_last_update_time = now - weight_expiration_period_;
   weights.reserve(hosts.size());
   hosts_with_default_weight.reserve(hosts.size());
   ENVOY_LOG(trace, "updateWeights hosts.size() = {}, time since epoch = {}", hosts.size(),
@@ -128,7 +128,7 @@ void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
   for (const auto& host_ptr : hosts) {
     // Get client side weight or `nullopt` if it is invalid (see above).
     absl::optional<uint32_t> client_side_weight =
-        getClientSideWeightIfValidFromHost(*host_ptr, min_non_empty_since, max_last_update_time);
+        getClientSideWeightIfValidFromHost(*host_ptr, max_non_empty_since, min_last_update_time);
     // If `client_side_weight` is valid, then set it as the host weight and store it in
     // `weights` to calculate median valid weight across all hosts.
     if (client_side_weight.has_value()) {
