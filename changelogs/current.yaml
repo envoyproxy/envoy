@@ -185,6 +185,11 @@ bug_fixes:
     Fixed a bug in the CONNECT-UDP forwarding mode where Envoy reset the upstream stream when it
     received HTTP/3 datagrams before receiving the SETTINGS frame from the upstream peer. Envoy now
     drops the datagrams in this case instead of resetting the stream.
+- area: dns
+  change: |
+    Added details on the DNS resolve timeout. Currently only ``getaddrinfo`` DNS resolver has the details.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.dns_resolve_timeout_details``
+    to false.
 - area: oauth
   change: |
     Set token cookies in response regardless of :ref:`forward_bearer_token

@@ -260,9 +260,12 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
   primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
-  std::string details = absl::StrJoin(primary_host.active_query_->getDetails(), "_");
-  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure,
-                absl::StrCat("resolve_timeout:", details), {});
+  std::string details =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_resolve_timeout_details")
+          ? absl::StrCat("resolve_timeout:",
+                         absl::StrJoin(primary_host.active_query_->getDetails(), ","))
+          : "resolve_timeout";
+  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, std::move(details), {});
 }
 
 void DnsCacheImpl::onReResolveAlarm(const std::string& host) {

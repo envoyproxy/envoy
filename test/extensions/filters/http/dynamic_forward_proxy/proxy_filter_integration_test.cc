@@ -441,7 +441,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
 }
 
-TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeout) {
+TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithDetails) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -467,6 +467,36 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeout) {
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_),
               HasSubstr("dns_resolution_failure{resolve_timeout:not_started}"));
+}
+
+TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutDetails) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.dns_resolve_timeout_details",
+                                    "false");
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
+  autonomous_upstream_ = true;
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000001);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("dns_resolution_failure{resolve_timeout}"));
 }
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
