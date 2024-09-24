@@ -42,6 +42,7 @@ def envoy_cc_binary(
         data = data,
         additional_linker_inputs = linker_inputs,
         copts = envoy_copts(repository),
+        exec_properties = exec_properties,
         linkopts = linkopts,
         testonly = testonly,
         linkstatic = linkstatic,

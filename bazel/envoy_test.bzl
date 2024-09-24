@@ -97,6 +97,7 @@ def envoy_cc_fuzz_test(
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
+        exec_properties = exec_properties,
         deps = deps + envoy_stdlib_deps() + [
             repository + "//test/fuzz:fuzz_runner_lib",
             repository + "//test/test_common:test_version_linkstamp",
@@ -121,6 +122,7 @@ def envoy_cc_fuzz_test(
             "//conditions:default": ["$(locations %s)" % corpus_name],
         }),
         data = [corpus_name],
+        exec_properties = exec_properties,
         # No fuzzing on macOS or Windows
         deps = select({
             "@envoy//bazel:apple": [repository + "//test:dummy_main"],
@@ -273,6 +275,7 @@ def envoy_benchmark_test(
         name = name,
         srcs = [repository + "//bazel:test_for_benchmark_wrapper.sh"],
         data = [":" + benchmark_binary] + data,
+        exec_properties = exec_properties,
         args = ["%s/%s" % (native.package_name(), benchmark_binary)],
         tags = tags + ["nocoverage"],
         **kargs
