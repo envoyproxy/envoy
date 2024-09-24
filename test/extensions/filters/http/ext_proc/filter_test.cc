@@ -4143,42 +4143,29 @@ TEST_F(HttpFilterTest, HeaderRespWithStatusContinueAndReplace) {
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
-
-  bool encoding_watermarked = false;
-  setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-
-  Buffer::OwnedImpl want_response_body;
-  Buffer::OwnedImpl got_response_body;
-  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, _))
-      .WillRepeatedly(Invoke(
-          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
-
   for (int i = 0; i < 5; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, false));
   }
 
-  // Header response arrives after some amount of body data sent with status CONTINUE_AND_REPLACE.
+  Buffer::OwnedImpl resp_buffer;
+  setUpEncodingBuffering(resp_buffer, true);
+  // Header response arrives with status CONTINUE_AND_REPLACE after some amount of body data sent.
   auto response = std::make_unique<ProcessingResponse>();
   auto* hdrs_resp = response->mutable_response_headers();
   hdrs_resp->mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
-  auto* hdr = hdrs_resp->mutable_response()->mutable_header_mutation()->add_set_headers();
-  hdr->mutable_header()->set_key(":method");
-  hdr->mutable_header()->set_raw_value("POST");
   hdrs_resp->mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
   stream_callbacks_->onReceiveMessage(std::move(response));
 
-  // Now sends the rest of the body chunks to the server.
-  for (int i = 5; i < 10; i++) {
-    Buffer::OwnedImpl resp_chunk;
-    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
-  }
+  // Ensure buffered data was updated
+  EXPECT_EQ(resp_buffer.toString(), "Hello, World!");
 
-  Buffer::OwnedImpl last_resp_chunk;
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(last_resp_chunk, true));
+  // Since we did CONTINUE_AND_REPLACE, later data is cleared
+  Buffer::OwnedImpl resp_data_1("test");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_1, false));
+  EXPECT_EQ(resp_data_1.length(), 0);
 
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 0);
   filter_->onDestroy();

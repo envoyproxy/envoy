@@ -283,6 +283,11 @@ message ExternalProcessor {
   // 1. Instant Response: Send the header response as soon as the header request is received.
   // 2. Delayed Response: Wait for the body before sending any response.
   // In all scenarios, the header-body ordering must always be maintained.
+  //
+  // With this flag enabled, the server should not set
+  // :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+  // in the header response as the ``mode_override`` may be ignored by Envoy if it has already
+  // sent the body to the server.
   bool send_body_without_waiting_for_header_response = 21;
 }
 

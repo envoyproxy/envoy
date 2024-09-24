@@ -473,15 +473,6 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   return status;
 }
 
-ProcessorState::CallbackState
-Filter::getCallbackStateWhenStreamBody(const ProcessorState& state) const {
-  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    return ProcessorState::CallbackState::HeadersCallback;
-  } else {
-    return ProcessorState::CallbackState::StreamedBodyCallback;
-  }
-}
-
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
@@ -578,7 +569,12 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = setupBodyChunk(state, data, end_stream);
     state.enqueueStreamingChunk(data, end_stream);
-    sendBodyChunk(state, getCallbackStateWhenStreamBody(state), req);
+    // If the current state is HeadersCallback, stays in that state.
+    if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+      sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
+    } else {
+      sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
+    }
     if (end_stream || state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
