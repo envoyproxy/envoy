@@ -69,6 +69,14 @@ DEFINE_PROTO_FUZZER(
     return;
   }
 
+  // Limiting the max supported request body size to 128k.
+  if (input.request().has_proto_body()) {
+    const uint32_t max_body_size = 128 * 1024;
+    if (input.request().proto_body().message().value().size() > max_body_size) {
+      return;
+    }
+  }
+
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
 
