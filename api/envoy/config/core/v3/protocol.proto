@@ -273,6 +273,10 @@ message HttpProtocolOptions {
   // If both this setting and :ref:`max_request_headers_kb
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.max_request_headers_kb>`
   // are set, this setting is used.
+  //
+  // Note: currently some protocol codecs impose limits on the maximum size of a single header:
+  //   HTTP2 (when using nghttp2) limits a single header to around 100kb.
+  //   HTTP3 limits a single header to around 1024kb.
   google.protobuf.UInt32Value max_headers_kb = 7 [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
   // Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
