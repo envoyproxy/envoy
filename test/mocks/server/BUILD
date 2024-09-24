@@ -61,6 +61,7 @@ envoy_cc_mock(
     name = "admin_stream_mocks",
     srcs = ["admin_stream.cc"],
     hdrs = ["admin_stream.h"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/server:admin_interface",
         "//test/mocks/http:http_mocks",
@@ -119,6 +120,7 @@ envoy_cc_mock(
     name = "listener_component_factory_mocks",
     srcs = ["listener_component_factory.cc"],
     hdrs = ["listener_component_factory.h"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/server:drain_manager_interface",
         "//envoy/server:listener_manager_interface",
@@ -180,6 +182,7 @@ envoy_cc_mock(
     name = "instance_mocks",
     srcs = ["instance.cc"],
     hdrs = ["instance.h"],
+    rbe_pool = "2core",
     deps = [
         ":server_factory_context_mocks",
         ":transport_socket_factory_context_mocks",
@@ -200,6 +203,7 @@ envoy_cc_mock(
     name = "server_factory_context_mocks",
     srcs = ["server_factory_context.cc"],
     hdrs = ["server_factory_context.h"],
+    rbe_pool = "2core",
     deps = [
         ":admin_mocks",
         ":drain_manager_mocks",
@@ -237,6 +241,7 @@ envoy_cc_mock(
     name = "factory_context_mocks",
     srcs = ["factory_context.cc"],
     hdrs = ["factory_context.h"],
+    rbe_pool = "2core",
     deps = [
         ":drain_manager_mocks",
         ":instance_mocks",
@@ -250,6 +255,7 @@ envoy_cc_mock(
     name = "transport_socket_factory_context_mocks",
     srcs = ["transport_socket_factory_context.cc"],
     hdrs = ["transport_socket_factory_context.h"],
+    rbe_pool = "2core",
     deps = [
         ":server_factory_context_mocks",
         "//envoy/server:tracer_config_interface",
@@ -262,6 +268,7 @@ envoy_cc_mock(
     name = "listener_factory_context_mocks",
     srcs = ["listener_factory_context.cc"],
     hdrs = ["listener_factory_context.h"],
+    rbe_pool = "2core",
     deps = [
         ":factory_context_mocks",
         "//envoy/server:listener_manager_interface",
@@ -272,6 +279,7 @@ envoy_cc_mock(
     name = "health_checker_factory_context_mocks",
     srcs = ["health_checker_factory_context.cc"],
     hdrs = ["health_checker_factory_context.h"],
+    rbe_pool = "2core",
     deps = [
         ":factory_context_mocks",
         "//envoy/server:health_checker_config_interface",
@@ -292,6 +300,7 @@ envoy_cc_mock(
     name = "filter_chain_factory_context_mocks",
     srcs = ["filter_chain_factory_context.cc"],
     hdrs = ["filter_chain_factory_context.h"],
+    rbe_pool = "2core",
     deps = [
         ":factory_context_mocks",
         "//envoy/server:filter_config_interface",
@@ -313,6 +322,7 @@ envoy_cc_mock(
     name = "tracer_factory_context_mocks",
     srcs = ["tracer_factory_context.cc"],
     hdrs = ["tracer_factory_context.h"],
+    rbe_pool = "2core",
     deps = [
         ":instance_mocks",
         ":tracer_factory_mocks",

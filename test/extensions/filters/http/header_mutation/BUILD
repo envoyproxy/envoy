@@ -17,6 +17,7 @@ envoy_extension_cc_test(
         "header_mutation_test.cc",
     ],
     extension_names = ["envoy.filters.http.header_mutation"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/header_mutation:config",
         "//test/mocks/api:api_mocks",
@@ -31,6 +32,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.header_mutation"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/header_mutation:config",
         "//test/mocks/server:factory_context_mocks",
@@ -45,6 +47,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["header_mutation_integration_test.cc"],
     extension_names = ["envoy.filters.http.header_mutation"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/header_mutation:config",
         "//test/integration:http_integration_lib",

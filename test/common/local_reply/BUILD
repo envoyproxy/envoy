@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "local_reply_test",
     srcs = ["local_reply_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/local_reply:local_reply_lib",
         "//test/mocks/http:http_mocks",

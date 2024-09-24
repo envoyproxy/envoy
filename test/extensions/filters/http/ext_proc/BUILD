@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/ext_proc:config",
         "//test/mocks/server:factory_context_mocks",
@@ -31,6 +32,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     deps = [
         ":mock_server_lib",
         ":utils_lib",
@@ -61,6 +63,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["state_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/ext_proc",
     ],
@@ -71,6 +74,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["ordering_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     deps = [
         ":mock_server_lib",
         "//source/extensions/filters/http/ext_proc",
@@ -87,6 +91,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["client_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/ext_proc:client_lib",
@@ -102,6 +107,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["mutation_utils_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     deps = [
         ":utils_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
@@ -118,6 +124,7 @@ envoy_extension_cc_test(
     size = "large",  # This test can take a while under tsan.
     srcs = ["ext_proc_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -140,6 +147,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["streaming_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],
@@ -243,14 +251,16 @@ envoy_cc_fuzz_test(
     srcs = ["ext_proc_grpc_fuzz.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
+    rbe_pool = "2core",
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
 
 envoy_cc_fuzz_test(
-    name = "ext_proc_grpc_fuzz_test_persistent",
+    name = "ext_proc_grpc_persistent_fuzz_test",
     srcs = ["ext_proc_grpc_fuzz_persistent.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
+    rbe_pool = "2core",
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
 
@@ -258,6 +268,7 @@ envoy_extension_cc_test(
     name = "ext_proc_benchmark_test",
     srcs = ["ext_proc_benchmark_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     deps = [
         ":test_processor_lib",
         "//envoy/http:header_map_interface",

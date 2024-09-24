@@ -19,6 +19,7 @@ envoy_package()
 envoy_cc_test(
     name = "tls_inspector_test",
     srcs = ["tls_inspector_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
@@ -47,6 +48,7 @@ envoy_cc_fuzz_test(
     name = "tls_inspector_fuzz_test",
     srcs = ["tls_inspector_fuzz_test.cc"],
     corpus = "tls_inspector_corpus",
+    rbe_pool = "2core",
     deps = [
         ":tls_inspector_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
@@ -61,6 +63,7 @@ envoy_extension_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
+    rbe_pool = "2core",
     deps = [
         ":tls_utility_lib",
         "//source/common/http:utility_lib",
@@ -99,6 +102,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",

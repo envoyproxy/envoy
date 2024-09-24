@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tracers.opentelemetry"],
     external_deps = ["abseil_optional"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/common:time_interface",
         "//envoy/runtime:runtime_interface",
@@ -48,6 +49,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/tracers/opentelemetry:config",
         "//test/mocks/server:tracer_factory_context_mocks",
@@ -61,6 +63,7 @@ envoy_extension_cc_test(
     name = "span_context_extractor_test",
     srcs = ["span_context_extractor_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/test_common:status_utility_lib",
@@ -72,6 +75,7 @@ envoy_extension_cc_test(
     name = "grpc_trace_exporter_test",
     srcs = ["grpc_trace_exporter_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/grpc:grpc_mocks",
@@ -84,6 +88,7 @@ envoy_extension_cc_test(
     name = "http_trace_exporter_test",
     srcs = ["http_trace_exporter_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/tracers/opentelemetry:trace_exporter",
         "//test/mocks/http:http_mocks",

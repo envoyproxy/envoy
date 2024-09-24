@@ -21,6 +21,7 @@ envoy_extension_cc_test(
     name = "cache_headers_utils_test",
     srcs = ["cache_headers_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/http:header_map_interface",
         "//source/common/http:header_map_lib",
@@ -34,6 +35,7 @@ envoy_extension_cc_test(
     name = "cache_filter_logging_info_test",
     srcs = ["cache_filter_logging_info_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cache:cache_filter_logging_info_lib",
     ],
@@ -43,6 +45,7 @@ envoy_extension_cc_test(
     name = "cache_entry_utils_test",
     srcs = ["cache_entry_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cache:cache_entry_utils_lib",
     ],
@@ -52,6 +55,7 @@ envoy_extension_cc_test(
     name = "http_cache_test",
     srcs = ["http_cache_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cache:http_cache_lib",
         "//source/extensions/http/cache/simple_http_cache:config",
@@ -66,6 +70,7 @@ envoy_extension_cc_test(
     name = "range_utils_test",
     srcs = ["range_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cache:range_utils_lib",
         "//test/test_common:utility_lib",
@@ -76,6 +81,7 @@ envoy_extension_cc_test(
     name = "cache_filter_test",
     srcs = ["cache_filter_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         ":mocks",
         "//source/extensions/filters/http/cache:cache_filter_lib",
@@ -94,6 +100,7 @@ envoy_extension_cc_test(
     name = "cacheability_utils_test",
     srcs = ["cacheability_utils_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cache:cacheability_utils_lib",
         "//test/test_common:utility_lib",
@@ -104,6 +111,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/http/cache/simple_http_cache:config",
@@ -121,6 +129,7 @@ envoy_extension_cc_test(
         "cache_filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/filters/http/cache:http_cache_lib",
@@ -136,6 +145,7 @@ envoy_extension_cc_test(
         "cache_custom_headers_test.cc",
     ],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cache:cache_custom_headers",
     ],
@@ -146,6 +156,7 @@ envoy_extension_cc_test_library(
     srcs = ["http_cache_implementation_test_common.cc"],
     hdrs = ["http_cache_implementation_test_common.h"],
     extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",

@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/load_balancing_policies/random:config",
         "//test/mocks/server:factory_context_mocks",
@@ -29,6 +30,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.random"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/random:config",

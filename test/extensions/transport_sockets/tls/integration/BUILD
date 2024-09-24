@@ -13,6 +13,7 @@ envoy_package()
 envoy_cc_test_library(
     name = "ssl_integration_test_lib",
     hdrs = ["ssl_integration_test.h"],
+    rbe_pool = "2core",
 )
 
 envoy_cc_test(
@@ -24,6 +25,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    rbe_pool = "2core",
     deps = [
         ":sni_to_header_filter_lib",
         ":ssl_integration_test_lib",

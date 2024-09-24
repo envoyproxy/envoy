@@ -49,6 +49,7 @@ envoy_cc_test(
     data = [
         "//contrib/cryptomb/private_key_providers/test/test_data:certs",
     ],
+    rbe_pool = "2core",
     deps = [
         ":test_fake_factory",
         "//source/common/common:random_generator_lib",

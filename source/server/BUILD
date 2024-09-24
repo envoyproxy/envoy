@@ -409,6 +409,7 @@ envoy_cc_library(
         "abseil_node_hash_map",
         "abseil_optional",
     ],
+    rbe_pool = "2core",
     deps = [
         ":api_listener_lib",
         ":configuration_lib",

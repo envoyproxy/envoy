@@ -11,6 +11,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "checksum_filter_test",
     srcs = ["checksum_filter_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//contrib/checksum/filters/http/source:checksum_filter_lib",
         "//source/common/buffer:buffer_lib",
@@ -24,6 +25,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//contrib/checksum/filters/http/source:config",
         "//test/mocks/server:factory_context_mocks",

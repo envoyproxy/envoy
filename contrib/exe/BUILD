@@ -32,6 +32,7 @@ SELECTED_CONTRIB_EXTENSIONS = select({
 
 envoy_cc_binary(
     name = "envoy-static",
+    rbe_pool = "2core",
     stamped = True,
     visibility = ["//visibility:public"],
     deps = ["//source/exe:envoy_main_entry_lib"] + SELECTED_CONTRIB_EXTENSIONS,
@@ -49,6 +50,7 @@ envoy_cc_test(
         "DISABLE_TEST_MERGE": "true",
         "GODEBUG": "cgocheck=0",
     },
+    rbe_pool = "2core",
     deps = [
         "//test/config_test:example_configs_test_lib",
     ] + SELECTED_CONTRIB_EXTENSIONS,
