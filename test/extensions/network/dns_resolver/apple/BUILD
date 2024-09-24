@@ -15,6 +15,7 @@ envoy_cc_test(
         "//conditions:default": [],
     }),
     external_deps = ["abseil_synchronization"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",

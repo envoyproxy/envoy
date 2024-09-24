@@ -14,6 +14,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/network/test/test_data:filter.so",
     ],
+    rbe_pool = "2core",
     deps = [
         "//contrib/golang/filters/network/source:config",
         "//test/mocks/server:factory_context_mocks",
@@ -24,6 +25,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//contrib/golang/common/dso/test:dso_mocks",
         "//contrib/golang/filters/network/source:golang",
@@ -42,6 +44,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_test",
     srcs = ["upstream_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//contrib/golang/common/dso/test:dso_mocks",
         "//contrib/golang/filters/network/source:upstream",

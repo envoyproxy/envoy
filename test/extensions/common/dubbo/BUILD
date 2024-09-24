@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "message_test",
     srcs = ["message_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/common/dubbo:codec_lib",
         "//source/extensions/common/dubbo:message_lib",
@@ -23,6 +24,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/common/dubbo:metadata_lib",
         "//test/test_common:printers_lib",
@@ -33,6 +35,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hessian2_utils_test",
     srcs = ["hessian2_utils_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/common/dubbo:hessian2_utils_lib",
         "//test/test_common:printers_lib",
@@ -43,6 +46,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "hessian2_serializer_impl_test",
     srcs = ["hessian2_serializer_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/common/dubbo:hessian2_serializer_lib",
         "//test/test_common:printers_lib",
@@ -62,6 +66,7 @@ envoy_cc_mock(
 envoy_cc_test(
     name = "codec_test",
     srcs = ["codec_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":mocks_lib",
         "//source/extensions/common/dubbo:codec_lib",

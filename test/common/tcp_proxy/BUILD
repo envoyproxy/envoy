@@ -52,6 +52,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":tcp_proxy_test_base",
         "//envoy/common:hashable_interface",
@@ -63,6 +64,7 @@ envoy_cc_test(
     srcs = [
         "tcp_proxy_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":tcp_proxy_test_base",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
@@ -76,6 +78,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "upstream_test",
     srcs = ["upstream_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/tcp_proxy",
         "//test/mocks/http:http_mocks",
