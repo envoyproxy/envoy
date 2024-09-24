@@ -42,7 +42,6 @@ public:
   void initialize(
       std::vector<std::pair<std::string /*host*/, uint32_t /*port*/>> preresolve_hostnames = {},
       uint32_t max_hosts = 1024) {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.dfp_mixed_scheme", "true"}});
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
     config_.mutable_max_hosts()->set_value(max_hosts);
@@ -1915,7 +1914,6 @@ TEST(DnsCacheManagerImplTest, TestLifetime) {
 
 TEST(NoramlizeHost, NormalizeHost) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.dfp_mixed_scheme", "true"}});
   EXPECT_EQ("localhost:80", DnsHostInfo::normalizeHostForDfp("localhost:80", 80));
   EXPECT_EQ("localhost:80", DnsHostInfo::normalizeHostForDfp("localhost:80", 443));
   EXPECT_EQ("localhost:443", DnsHostInfo::normalizeHostForDfp("localhost:443", 80));

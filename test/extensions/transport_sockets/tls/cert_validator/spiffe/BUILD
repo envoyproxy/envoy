@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     extension_names = ["envoy.tls.cert_validator.spiffe"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/common/tls:ssl_test_utils",
@@ -47,6 +48,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.tls.cert_validator.spiffe"],
+    rbe_pool = "2core",
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
     deps = [
