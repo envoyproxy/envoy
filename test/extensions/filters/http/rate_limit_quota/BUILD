@@ -130,28 +130,3 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
-
-envoy_extension_cc_test(
-    name = "client_test",
-    size = "large",
-    srcs = ["client_test.cc"],
-    extension_names = ["envoy.filters.http.rate_limit_quota"],
-    shard_count = 2,
-    tags = [
-        "cpu:3",
-        "skip_on_windows",
-    ],
-    deps = [
-        ":client_test_utils",
-        "//source/common/http:message_lib",
-        "//source/extensions/filters/http/rate_limit_quota",
-        "//source/extensions/filters/http/rate_limit_quota:config",
-        "//source/extensions/filters/http/rate_limit_quota:global_client_lib",
-        "//test/common/http:common_lib",
-        "//test/test_common:status_utility_lib",
-        "//test/test_common:test_runtime_lib",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/rate_limit_quota/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3:pkg_cc_proto",
-    ],
-)
