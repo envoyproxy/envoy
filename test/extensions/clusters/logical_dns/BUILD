@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "logical_dns_cluster_test",
     srcs = ["logical_dns_cluster_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
