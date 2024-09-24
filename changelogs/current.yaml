@@ -11,6 +11,9 @@ bug_fixes:
 - area: http/1
   change: |
     Fixes sending overload crashes when HTTP/1 request is reset.
+- area: happy_eyeballs
+  change: |
+    Validate that ``additional_address`` are IP addresses instead of crashing when sorting.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
