@@ -580,13 +580,17 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
       (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_)) {
     ENVOY_LOG(debug, "use in place update filter chain update path for listener name={} hash={}",
               name, hash);
-    new_listener =
+    auto listener_or_error =
         (*existing_active_listener)->newListenerWithFilterChain(config, workers_started_, hash);
+    RETURN_IF_NOT_OK_REF(listener_or_error.status());
+    new_listener = std::move(*listener_or_error);
     stats_.listener_in_place_updated_.inc();
   } else {
     ENVOY_LOG(debug, "use full listener update path for listener name={} hash={}", name, hash);
-    new_listener = std::make_unique<ListenerImpl>(config, version_info, *this, name, added_via_api,
+    auto listener_or_error = ListenerImpl::create(config, version_info, *this, name, added_via_api,
                                                   workers_started_, hash);
+    RETURN_IF_NOT_OK_REF(listener_or_error.status());
+    new_listener = std::move(*listener_or_error);
   }
 
   ListenerImpl& new_listener_ref = *new_listener;
@@ -1197,10 +1201,15 @@ absl::Status ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listen
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
     for (std::vector<Network::Address::InstanceConstSharedPtr>::size_type i = 0;
          i < listener.addresses().size(); i++) {
-      socket_status = listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
+      auto factory_or_error = ListenSocketFactoryImpl::create(
           *factory_, listener.addresses()[i], socket_type, listener.listenSocketOptions(i),
           listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
-          server_.options().concurrency()));
+          server_.options().concurrency());
+      if (!factory_or_error.status().ok()) {
+        socket_status = factory_or_error.status();
+      } else {
+        socket_status = listener.addSocketFactory(std::move(*factory_or_error));
+      }
       if (!socket_status.ok()) {
         break;
       }
