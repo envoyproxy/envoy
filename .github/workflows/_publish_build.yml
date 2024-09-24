@@ -67,6 +67,7 @@ jobs:
           arch: arm64
           bazel-extra: >-
             --config=cache-envoy-engflow
+            --config=common-envoy-engflow
             --config=bes-envoy-engflow
           rbe: false
           runs-on: envoy-arm64-medium
