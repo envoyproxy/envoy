@@ -26,6 +26,7 @@ envoy_cc_test(
     srcs = [
         "route_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//contrib/generic_proxy/filters/network/source:route_lib",
@@ -44,6 +45,7 @@ envoy_cc_test(
     srcs = [
         "proxy_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//contrib/generic_proxy/filters/network/source:proxy_lib",
@@ -62,6 +64,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//contrib/generic_proxy/filters/network/source:config",
@@ -85,6 +88,7 @@ envoy_cc_test(
     srcs = [
         "integration_test.cc",
     ],
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],
@@ -116,6 +120,7 @@ envoy_cc_test(
     srcs = [
         "match_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//contrib/generic_proxy/filters/network/source:match_lib",
@@ -128,6 +133,7 @@ envoy_cc_test(
     srcs = [
         "access_log_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//contrib/generic_proxy/filters/network/source:access_log_lib",

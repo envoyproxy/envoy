@@ -15,6 +15,7 @@ envoy_package()
 envoy_cc_test(
     name = "allocator_impl_test",
     srcs = ["allocator_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/stats:allocator_lib",
         "//test/test_common:logging_lib",
@@ -25,6 +26,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "custom_stat_namespaces_impl_test",
     srcs = ["custom_stat_namespaces_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
     ],
@@ -33,6 +35,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/stats:isolated_store_lib",
     ],
@@ -41,6 +44,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "histogram_impl_test",
     srcs = ["histogram_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/stats:histogram_lib",
         "//test/mocks/server:server_factory_context_mocks",
@@ -51,6 +55,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "metric_impl_test",
     srcs = ["metric_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/stats:allocator_lib",
         "//source/common/stats:utility_lib",
@@ -61,6 +66,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "recent_lookups_test",
     srcs = ["recent_lookups_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/stats:recent_lookups_lib",
@@ -75,6 +81,7 @@ envoy_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/common:utility_lib",
@@ -91,6 +98,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "stat_merger_test",
     srcs = ["stat_merger_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":stat_test_utility_lib",
         "//source/common/stats:isolated_store_lib",
@@ -132,6 +140,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "stat_test_utility_test",
     srcs = ["stat_test_utility_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":stat_test_utility_lib",
         "//source/common/stats:isolated_store_lib",
@@ -141,6 +150,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stats_matcher_impl_test",
     srcs = ["stats_matcher_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -154,6 +164,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "refcount_ptr_test",
     srcs = ["refcount_ptr_test.cc"],
+    rbe_pool = "2core",
     deps = ["//envoy/stats:refcount_ptr_interface"],
 )
 
@@ -161,6 +172,7 @@ envoy_cc_test(
     name = "symbol_table_impl_test",
     srcs = ["symbol_table_impl_test.cc"],
     external_deps = ["abseil_hash_testing"],
+    rbe_pool = "2core",
     deps = [
         ":stat_test_utility_lib",
         "//source/common/common:mutex_tracer_lib",
@@ -177,6 +189,7 @@ envoy_cc_fuzz_test(
     name = "stat_merger_fuzz_test",
     srcs = ["stat_merger_fuzz_test.cc"],
     corpus = "stat_merger_corpus",
+    rbe_pool = "2core",
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/stats:symbol_table_lib",
@@ -188,6 +201,7 @@ envoy_cc_fuzz_test(
     name = "symbol_table_fuzz_test",
     srcs = ["symbol_table_fuzz_test.cc"],
     corpus = "symbol_table_corpus",
+    rbe_pool = "2core",
     deps = [
         ":stat_test_utility_lib",
         "//source/common/buffer:buffer_lib",
@@ -201,6 +215,7 @@ envoy_cc_fuzz_test(
     name = "utility_fuzz_test",
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
+    rbe_pool = "2core",
     deps = [
         "//source/common/stats:utility_lib",
     ],
@@ -221,6 +236,7 @@ envoy_cc_benchmark_binary(
         "abseil_strings",
         "benchmark",
     ],
+    rbe_pool = "2core",
     deps = [
         ":make_elements_helper_lib",
         ":stat_test_utility_lib",
@@ -238,6 +254,7 @@ envoy_cc_benchmark_binary(
 envoy_cc_test(
     name = "deferred_creation_stats_test",
     srcs = ["deferred_creation_stats_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/stats:stats_interface",
         "//source/common/memory:stats_lib",
@@ -253,6 +270,7 @@ envoy_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
+    rbe_pool = "2core",
     deps = [
         ":real_thread_test_base",
         "//source/common/common:random_generator_lib",
@@ -285,6 +303,7 @@ envoy_cc_benchmark_binary(
         "abseil_strings",
         "benchmark",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/stats:stats_matcher_lib",
@@ -304,6 +323,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "tag_extractor_impl_test",
     srcs = ["tag_extractor_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/stats:tag_extractor_lib",
         "//source/common/stats:tag_producer_lib",
@@ -315,6 +335,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "tag_producer_impl_test",
     srcs = ["tag_producer_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/stats:tag_producer_lib",
         "//test/test_common:utility_lib",
@@ -330,6 +351,7 @@ envoy_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/stats:tag_producer_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
@@ -344,6 +366,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":real_thread_test_base",
         ":stat_test_utility_lib",
@@ -372,6 +395,7 @@ envoy_cc_benchmark_binary(
         "abseil_strings",
         "benchmark",
     ],
+    rbe_pool = "2core",
     deps = [
         ":stat_test_utility_lib",
         "//source/common/common:thread_lib",
@@ -395,6 +419,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":stat_test_utility_lib",
         "//source/common/stats:isolated_store_lib",
