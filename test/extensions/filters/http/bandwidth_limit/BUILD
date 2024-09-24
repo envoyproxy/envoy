@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.bandwidth_limit"],
     deps = [
         "//source/common/common:utility_lib",
@@ -31,7 +31,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.bandwidth_limit"],
     deps = [
         "//source/extensions/filters/http/bandwidth_limit:config",

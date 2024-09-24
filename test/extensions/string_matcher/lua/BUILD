@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "lua_test",
     srcs = ["lua_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.string_matcher.lua"],
     deps = [
         "//source/extensions/string_matcher/lua:config",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "lua_integration_test",
     srcs = ["lua_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.string_matcher.lua"],
     deps = [
         "//source/extensions/string_matcher/lua:config",

@@ -13,7 +13,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",

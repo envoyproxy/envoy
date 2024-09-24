@@ -34,7 +34,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:shared_data_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
     ]),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.wasm"],
     shard_count = 50,
     tags = [
@@ -60,7 +60,7 @@ envoy_extension_cc_test(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.wasm"],
     shard_count = 16,
     tags = ["skip_on_windows"],
@@ -85,7 +85,7 @@ envoy_extension_cc_test(
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.wasm"],
     shard_count = 16,
     tags = ["skip_on_windows"],

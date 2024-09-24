@@ -16,7 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ring_hash_lb_test",
     srcs = ["ring_hash_lb_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.ring_hash"],
     deps = [
         "//envoy/router:router_interface",
@@ -40,7 +40,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.ring_hash"],
     deps = [
         "//source/extensions/load_balancing_policies/ring_hash:config",
@@ -56,7 +56,7 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.load_balancing_policies.ring_hash"],
     deps = [
         "//source/common/protobuf",
@@ -70,7 +70,7 @@ envoy_extension_cc_test(
 envoy_cc_benchmark_binary(
     name = "ring_hash_lb_benchmark",
     srcs = ["ring_hash_lb_benchmark.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/load_balancing_policies/ring_hash:ring_hash_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",

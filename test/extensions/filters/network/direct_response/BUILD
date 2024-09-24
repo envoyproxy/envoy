@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     srcs = [
         "direct_response_integration_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.direct_response"],
     deps = [
         "//source/extensions/filters/network/direct_response:config",
@@ -29,7 +29,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "direct_response_test",
     srcs = ["direct_response_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.direct_response"],
     deps = [
         "//source/extensions/filters/network/direct_response:filter",

@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "grpc_access_log_impl_test",
     srcs = ["grpc_access_log_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.http_grpc"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -39,7 +39,7 @@ envoy_extension_cc_test(
             "-DUSE_CEL",
         ],
     }),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.http_grpc"],
     deps = [
         "//source/extensions/access_loggers/grpc:grpc_access_log_utils",
@@ -58,7 +58,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "http_grpc_access_log_impl_test",
     srcs = ["http_grpc_access_log_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.http_grpc"],
     deps = [
         "//source/common/router:string_accessor_lib",
@@ -78,7 +78,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "http_config_test",
     srcs = ["http_config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.http_grpc"],
     deps = [
         "//source/extensions/access_loggers/grpc:http_config",
@@ -92,7 +92,7 @@ envoy_extension_cc_test(
     name = "http_grpc_access_log_integration_test",
     size = "large",
     srcs = ["http_grpc_access_log_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.http_grpc"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -112,7 +112,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "tcp_config_test",
     srcs = ["tcp_config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.tcp_grpc"],
     deps = [
         "//source/extensions/access_loggers/grpc:tcp_config",
@@ -132,7 +132,7 @@ envoy_extension_cc_test(
             "-DUSE_CEL",
         ],
     }),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.tcp_grpc"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",

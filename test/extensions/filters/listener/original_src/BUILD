@@ -16,7 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.original_src"],
     deps = [
         "//source/extensions/filters/listener/original_src:config_lib",
@@ -27,7 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "original_src_config_factory_test",
     srcs = ["original_src_config_factory_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.original_src"],
     deps = [
         "//source/extensions/filters/listener/original_src:config",
@@ -40,7 +40,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "original_src_test",
     srcs = ["original_src_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.original_src"],
     deps = [
         "//source/common/network:socket_option_lib",
@@ -67,7 +67,7 @@ envoy_cc_fuzz_test(
     name = "original_src_fuzz_test",
     srcs = ["original_src_fuzz_test.cc"],
     corpus = "original_src_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":original_src_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/original_src:original_src_lib",

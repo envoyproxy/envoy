@@ -16,7 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "redis_cluster_test",
     srcs = ["redis_cluster_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.clusters.redis"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -58,7 +58,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "redis_cluster_lb_test",
     srcs = ["redis_cluster_lb_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.clusters.redis"],
     deps = [
         "//envoy/upstream:cluster_manager_interface",
@@ -97,7 +97,7 @@ envoy_extension_cc_test(
     name = "redis_cluster_integration_test",
     size = "large",
     srcs = ["redis_cluster_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.clusters.redis"],
     deps = [
         "//source/extensions/clusters/redis:redis_cluster",
@@ -128,6 +128,6 @@ envoy_cc_mock(
 envoy_cc_test(
     name = "crc16_test",
     srcs = ["crc16_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = ["//source/extensions/clusters/redis:crc16_lib"],
 )

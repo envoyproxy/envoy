@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "aws_lambda_filter_test",
     srcs = ["aws_lambda_filter_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.aws_lambda"],
     deps = [
         "//source/extensions/filters/http/aws_lambda:aws_lambda_filter_lib",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
     name = "aws_lambda_filter_integration_test",
     size = "large",
     srcs = ["aws_lambda_filter_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.aws_lambda"],
     deps = [
         "//source/common/http:header_map_lib",
@@ -43,7 +43,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "arn_test",
     srcs = ["arn_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.aws_lambda"],
     deps = [
         "//source/extensions/filters/http/aws_lambda:aws_lambda_filter_lib",
@@ -54,7 +54,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.aws_lambda"],
     deps = [
         "//source/extensions/filters/http/aws_lambda:config",

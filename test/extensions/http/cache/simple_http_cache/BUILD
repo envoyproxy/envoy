@@ -11,7 +11,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "simple_http_cache_test",
     srcs = ["simple_http_cache_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.extensions.http.cache.simple"],
     deps = [
         "//source/extensions/filters/http/cache:cache_entry_utils_lib",

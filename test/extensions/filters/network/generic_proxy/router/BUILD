@@ -13,7 +13,7 @@ envoy_cc_test(
     srcs = [
         "router_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/generic_proxy/router:router_lib",
@@ -32,7 +32,7 @@ envoy_cc_test(
     srcs = [
         "upstream_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/generic_proxy/router:router_lib",
@@ -51,7 +51,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/network/generic_proxy/router:config",
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",

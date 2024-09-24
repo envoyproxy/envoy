@@ -36,7 +36,7 @@ envoy_cc_test(
         "example_configs_test_setup.sh",
         "//configs:example_configs",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     env = {
         "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar",
         "GODEBUG": "cgocheck=0",
@@ -50,7 +50,7 @@ envoy_cc_test_library(
     name = "config_test_lib",
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",

@@ -16,7 +16,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/ocsp/test_data:certs",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     external_deps = ["ssl"],
     deps = [
         "//source/common/filesystem:filesystem_lib",
@@ -35,7 +35,7 @@ envoy_cc_test(
     srcs = [
         "asn1_utility_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     external_deps = ["ssl"],
     deps = [
         "//source/common/tls/ocsp:asn1_utility_lib",

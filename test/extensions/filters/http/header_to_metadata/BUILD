@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "header_to_metadata_filter_test",
     srcs = ["header_to_metadata_filter_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.header_to_metadata"],
     deps = [
         "//source/common/common:base64_lib",
@@ -27,7 +27,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.header_to_metadata"],
     deps = [
         "//source/extensions/filters/http/header_to_metadata:config",

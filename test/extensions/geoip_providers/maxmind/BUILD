@@ -22,7 +22,7 @@ envoy_extension_cc_test(
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.geoip_providers.maxmind"],
     tags = ["skip_on_windows"],
     deps = [
@@ -44,7 +44,7 @@ envoy_extension_cc_test(
     data = [
         "//test/extensions/geoip_providers/maxmind/test_data:geolocation_databases",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.geoip_providers.maxmind"],
     tags = ["skip_on_windows"],
     deps = [

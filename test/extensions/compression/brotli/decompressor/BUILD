@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "brotli_decompressor_impl_test",
     srcs = ["brotli_decompressor_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.compression.brotli.decompressor"],
     deps = [
         "//source/common/stats:isolated_store_lib",

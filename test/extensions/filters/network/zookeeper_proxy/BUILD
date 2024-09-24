@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = [
         "filter_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.zookeeper_proxy"],
     deps = [
         "//source/extensions/filters/network/zookeeper_proxy:config",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.zookeeper_proxy"],
     deps = [
         "//source/extensions/filters/network/zookeeper_proxy:config",

@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "metrics_service_test",
     srcs = ["grpc_metrics_service_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.stat_sinks.metrics_service"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -35,7 +35,7 @@ envoy_extension_cc_test(
     name = "metrics_service_integration_test",
     size = "large",
     srcs = ["metrics_service_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.stat_sinks.metrics_service"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",

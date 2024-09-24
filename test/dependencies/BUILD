@@ -11,6 +11,6 @@ envoy_package()
 envoy_cc_test(
     name = "curl_test",
     srcs = ["curl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     external_deps = ["curl"],
 )

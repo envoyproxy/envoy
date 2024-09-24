@@ -17,7 +17,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":config_cc_proto",
         "//envoy/http:header_validator_factory_interface",

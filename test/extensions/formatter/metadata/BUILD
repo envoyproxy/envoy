@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.formatter.metadata"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",

@@ -16,7 +16,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "local_ratelimit_test",
     srcs = ["local_ratelimit_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.local_ratelimit"],
     deps = [
         "//source/common/singleton:manager_impl_lib",
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
     name = "local_ratelimit_integration_test",
     size = "large",
     srcs = ["local_ratelimit_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.local_ratelimit"],
     tags = [
         "cpu:3",
@@ -56,7 +56,7 @@ envoy_cc_fuzz_test(
     name = "local_ratelimit_fuzz_test",
     srcs = ["local_ratelimit_fuzz_test.cc"],
     corpus = "local_ratelimit_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":local_ratelimit_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",

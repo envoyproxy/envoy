@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "bson_impl_test",
     srcs = ["bson_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.mongo_proxy"],
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -25,7 +25,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.mongo_proxy"],
     deps = [
         "//source/common/buffer:buffer_lib",
@@ -38,7 +38,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "proxy_test",
     srcs = ["proxy_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.mongo_proxy"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -60,7 +60,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.mongo_proxy"],
     deps = [
         "//source/extensions/filters/network/mongo_proxy:bson_lib",
@@ -72,7 +72,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.mongo_proxy"],
     deps = [
         "//source/extensions/filters/network/mongo_proxy:config",

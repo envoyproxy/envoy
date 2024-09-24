@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "signals_test",
     srcs = ["signals_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     # Posix signal tests are irrelevant to Windows
     tags = [
         "backtrace",
@@ -28,7 +28,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "fatal_action_test",
     srcs = ["fatal_action_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/signal:fatal_error_handler_lib",
         "//test/mocks/server:instance_mocks",

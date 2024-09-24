@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
     deps = [
         "//envoy/registry",
@@ -35,7 +35,7 @@ envoy_extension_cc_test(
         "stream_summary_test.cc",
         "tenant_id_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
     deps = [
         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:dynatrace_sampler_lib",
@@ -51,7 +51,7 @@ envoy_extension_cc_test(
     srcs = [
         "dynatrace_sampler_integration_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.tracers.opentelemetry.samplers.dynatrace"],
     deps = [
         "//source/exe:main_common_lib",

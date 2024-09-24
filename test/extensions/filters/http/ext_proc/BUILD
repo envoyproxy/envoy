@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     name = "config_test",
     size = "small",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
@@ -69,7 +69,7 @@ envoy_extension_cc_test(
     name = "state_test",
     size = "small",
     srcs = ["state_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
@@ -81,7 +81,7 @@ envoy_extension_cc_test(
     name = "ordering_test",
     size = "small",
     srcs = ["ordering_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
@@ -100,7 +100,7 @@ envoy_extension_cc_test(
     name = "client_test",
     size = "small",
     srcs = ["client_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
@@ -124,7 +124,7 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
@@ -141,7 +141,7 @@ envoy_extension_cc_test(
     name = "mutation_utils_test",
     size = "small",
     srcs = ["mutation_utils_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [
@@ -165,7 +165,7 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = [
         "envoy.filters.http.ext_proc",
         # TODO(jbohanon) use a test filter here instead of production filter
@@ -209,7 +209,7 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = [
         "cpu:3",
@@ -318,7 +318,7 @@ envoy_cc_fuzz_test(
     srcs = ["ext_proc_grpc_fuzz.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
@@ -328,7 +328,7 @@ envoy_cc_fuzz_test(
     srcs = ["ext_proc_grpc_fuzz_persistent.cc"],
     hdrs = ["ext_proc_grpc_fuzz.h"],
     corpus = "ext_proc_grpc_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = EXT_PROC_GRPC_FUZZ_TEST_DEPS,
 )
@@ -336,7 +336,7 @@ envoy_cc_fuzz_test(
 envoy_extension_cc_test(
     name = "ext_proc_benchmark_test",
     srcs = ["ext_proc_benchmark_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_proc"],
     tags = ["skip_on_windows"],
     deps = [

@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "fault_filter_test",
     srcs = ["fault_filter_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.fault"],
     deps = [
         ":utility_lib",
@@ -42,7 +42,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.fault"],
     deps = [
         ":utility_lib",
@@ -57,7 +57,7 @@ envoy_extension_cc_test(
     name = "fault_filter_integration_test",
     size = "large",
     srcs = ["fault_filter_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.fault"],
     deps = [
         "//source/extensions/filters/http/fault:config",

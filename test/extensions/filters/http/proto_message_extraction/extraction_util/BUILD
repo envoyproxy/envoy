@@ -15,7 +15,7 @@ envoy_cc_test(
         "//test/proto:extraction.proto",
         "//test/proto:extraction_proto_descriptor",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/proto_message_extraction/extraction_util",
         "//test/proto:extraction_proto_cc_proto",

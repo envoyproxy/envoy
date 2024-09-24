@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/router:string_accessor_lib",

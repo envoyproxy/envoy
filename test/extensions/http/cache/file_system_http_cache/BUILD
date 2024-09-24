@@ -11,7 +11,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "file_system_http_cache_test",
     srcs = ["file_system_http_cache_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.extensions.http.cache.file_system_http_cache"],
     tags = ["skip_on_windows"],  # async_files does not yet support Windows.
     deps = [
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
 envoy_cc_test(
     name = "cache_file_header_proto_util_test",
     srcs = ["cache_file_header_proto_util_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/http/cache/file_system_http_cache:cache_file_header_proto_util",
     ],
@@ -39,7 +39,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cache_file_fixed_block_test",
     srcs = ["cache_file_fixed_block_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/http/cache/file_system_http_cache:cache_file_fixed_block",
     ],

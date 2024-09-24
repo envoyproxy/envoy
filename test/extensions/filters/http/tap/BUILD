@@ -24,7 +24,7 @@ envoy_cc_test_library(
 envoy_extension_cc_test(
     name = "tap_filter_test",
     srcs = envoy_select_admin_functionality(["tap_filter_test.cc"]),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.tap"],
     deps = [
         ":common",
@@ -40,7 +40,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "tap_config_impl_test",
     srcs = envoy_select_admin_functionality(["tap_config_impl_test.cc"]),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.tap"],
     deps = [
         ":common",
@@ -57,7 +57,7 @@ envoy_extension_cc_test(
     name = "tap_filter_integration_test",
     size = "large",
     srcs = envoy_select_admin_functionality(["tap_filter_integration_test.cc"]),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.tap"],
     deps = [
         "//source/extensions/filters/http/tap:config",

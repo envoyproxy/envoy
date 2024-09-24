@@ -14,7 +14,7 @@ envoy_cc_test(
         "//bazel:linux_x86_64": ["qatzip_compressor_impl_test.cc"],
         "//conditions:default": [],
     }),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//contrib/qat/compression/qatzip/compressor/source:config",
         "//source/extensions/compression/gzip/decompressor:zlib_decompressor_impl_lib",

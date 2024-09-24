@@ -17,7 +17,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
     tags = ["skip_on_windows"],
     deps = [
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "rbac_filter_test",
     srcs = ["rbac_filter_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
     tags = ["skip_on_windows"],
     deps = [
@@ -61,7 +61,7 @@ envoy_extension_cc_test(
     name = "rbac_filter_integration_test",
     size = "large",
     srcs = ["rbac_filter_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.rbac"],
     shard_count = 3,
     tags = ["skip_on_windows"],
@@ -108,7 +108,7 @@ envoy_cc_fuzz_test(
     name = "rbac_filter_fuzz_test",
     srcs = ["rbac_filter_fuzz_test.cc"],
     corpus = "rbac_filter_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":rbac_filter_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",

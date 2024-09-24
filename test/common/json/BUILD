@@ -16,7 +16,7 @@ envoy_cc_fuzz_test(
     name = "json_fuzz_test",
     srcs = ["json_fuzz_test.cc"],
     corpus = "json_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -34,7 +34,7 @@ JSON_TEST_DEPS = [
 envoy_cc_test(
     name = "json_loader_test",
     srcs = ["json_loader_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/json:json_loader_lib",
         "//source/common/stats:isolated_store_lib",
@@ -46,7 +46,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "json_sanitizer_test",
     srcs = ["json_sanitizer_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":json_sanitizer_test_util_lib",
         "//source/common/buffer:buffer_lib",
@@ -70,7 +70,7 @@ envoy_cc_fuzz_test(
     name = "json_sanitizer_fuzz_test",
     srcs = ["json_sanitizer_fuzz_test.cc"],
     corpus = "json_sanitizer_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":json_sanitizer_test_util_lib",
         "//source/common/json:json_sanitizer_lib",
@@ -82,7 +82,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "json_streamer_test",
     srcs = ["json_streamer_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/json:json_internal_lib",
@@ -121,6 +121,6 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "utf8_test",
     srcs = ["utf8_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [":utf8_lib"],
 )

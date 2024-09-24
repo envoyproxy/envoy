@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "req_without_query_test",
     srcs = ["req_without_query_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.formatter.req_without_query"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",

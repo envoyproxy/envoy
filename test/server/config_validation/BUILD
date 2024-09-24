@@ -9,7 +9,7 @@ envoy_package()
 envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -49,7 +49,7 @@ envoy_cc_test(
         "//configs:example_configs",
         "//test/config_test:example_configs_test_setup.sh",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
     deps = [
         "//source/extensions/access_loggers/stream:config",
@@ -76,7 +76,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dispatcher_test",
     srcs = ["dispatcher_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/event:libevent_lib",
         "//source/common/stats:isolated_store_lib",
@@ -93,7 +93,7 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["config_fuzz_test.cc"],
     corpus = "//test/server:server_fuzz_test_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/common:thread_lib",
         "//source/server/config_validation:server_lib",
@@ -135,7 +135,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "xds_verifier_test",
     srcs = ["xds_verifier_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":xds_verifier_lib",
         "//test/config:utility_lib",
@@ -146,7 +146,7 @@ envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
     hdrs = ["xds_fuzz.h"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
@@ -167,7 +167,7 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":xds_fuzz_lib",
         "//source/common/protobuf:utility_lib",

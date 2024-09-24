@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.matching.matchers.ip"],
     deps = [
         "//source/extensions/matching/input_matchers/ip:config",
@@ -25,7 +25,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.matching.matchers.ip"],
     deps = [
         "//source/extensions/matching/input_matchers/ip:ip_lib",

@@ -20,7 +20,7 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.rate_limit_descriptors.expr"],
     tags = ["skip_on_windows"],
     deps = [

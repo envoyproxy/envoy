@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     deps = [
         "//envoy/registry",
@@ -29,7 +29,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "open_telemetry_test",
     srcs = ["open_telemetry_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     deps = [
         "//source/extensions/stat_sinks/open_telemetry:open_telemetry_lib",
@@ -42,7 +42,7 @@ envoy_extension_cc_test(
     name = "open_telemetry_integration_test",
     size = "large",
     srcs = ["open_telemetry_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.stat_sinks.open_telemetry"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",

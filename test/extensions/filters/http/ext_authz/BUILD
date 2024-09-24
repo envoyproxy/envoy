@@ -18,7 +18,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_authz"],
     deps = [
         "//envoy/http:codes_interface",
@@ -51,7 +51,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_authz"],
     deps = [
         "//source/common/grpc:async_client_manager_lib",
@@ -74,7 +74,7 @@ envoy_extension_cc_test(
     data = [
         "ext_authz.yaml",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.ext_authz"],
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
@@ -109,7 +109,7 @@ envoy_cc_fuzz_test(
     name = "ext_authz_grpc_fuzz_test",
     srcs = ["ext_authz_grpc_fuzz_test.cc"],
     corpus = "ext_authz_grpc_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -127,7 +127,7 @@ envoy_cc_fuzz_test(
     name = "ext_authz_http_fuzz_test",
     srcs = ["ext_authz_http_fuzz_test.cc"],
     corpus = "ext_authz_http_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -147,7 +147,7 @@ envoy_cc_test_library(
     name = "ext_authz_fuzz_lib",
     srcs = ["ext_authz_fuzz_lib.cc"],
     hdrs = ["ext_authz_fuzz_lib.h"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         "//source/common/http:context_lib",

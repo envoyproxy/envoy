@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "client_connection_factory_test",
     srcs = ["client_connection_factory_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.bootstrap.internal_listener"],
     deps = [
         "//source/common/common:utility_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     name = "internal_listener_registry_test",
     size = "large",
     srcs = ["internal_listener_registry_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.bootstrap.internal_listener"],
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
@@ -44,7 +44,7 @@ envoy_extension_cc_test(
     srcs = [
         "internal_listener_integration_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.bootstrap.internal_listener"],
     deps = [
         "//source/common/config:api_version_lib",
@@ -73,7 +73,7 @@ envoy_extension_cc_test(
     name = "active_internal_listener_test",
     size = "large",
     srcs = ["active_internal_listener_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.bootstrap.internal_listener"],
     deps = [
         "//source/common/listener_manager:connection_handler_lib",

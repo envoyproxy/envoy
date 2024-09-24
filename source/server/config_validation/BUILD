@@ -63,7 +63,7 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":admin_lib",
         ":api_lib",

@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "inputs_test",
     srcs = ["inputs_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:inputs_lib",
@@ -26,7 +26,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "status_code_input_test",
     srcs = ["status_code_input_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/http/matching:status_code_input_lib",

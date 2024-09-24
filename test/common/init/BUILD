@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "watcher_impl_test",
     srcs = ["watcher_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//test/mocks/init:init_mocks",
     ],
@@ -20,7 +20,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "target_impl_test",
     srcs = ["target_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//test/mocks/init:init_mocks",
     ],
@@ -29,7 +29,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "manager_impl_test",
     srcs = ["manager_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/init:manager_lib",
         "//test/mocks/init:init_mocks",

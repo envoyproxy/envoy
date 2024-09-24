@@ -12,7 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "stdout_config_test",
     srcs = ["stdout_config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":stream_test_base",
         "//source/common/formatter:formatter_extension_lib",
@@ -23,7 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stderr_config_test",
     srcs = ["stderr_config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":stream_test_base",
         "//source/common/formatter:formatter_extension_lib",

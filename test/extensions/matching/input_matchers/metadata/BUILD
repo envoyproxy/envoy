@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "dyn_meta_matcher_test",
     srcs = ["dyn_meta_matcher_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.matching.matchers.metadata_matcher"],
     deps = [
         "//source/common/matcher:matcher_lib",

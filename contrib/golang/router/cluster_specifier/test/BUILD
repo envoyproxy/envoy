@@ -14,7 +14,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/router/cluster_specifier/test/test_data/simple:plugin.so",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     env = {"GODEBUG": "cgocheck=0"},
     deps = [
         "//contrib/golang/router/cluster_specifier/source:config",

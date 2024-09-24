@@ -12,7 +12,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//contrib/hyperscan/matching/input_matchers/source:config",
         "//test/mocks/server:factory_context_mocks",

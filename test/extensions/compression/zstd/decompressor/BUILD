@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "decompressor_test",
     srcs = ["zstd_decompressor_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.compression.zstd.decompressor"],
     deps = [
         "//source/common/stats:isolated_store_lib",

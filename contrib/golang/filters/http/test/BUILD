@@ -16,7 +16,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//test/mocks/server:factory_context_mocks",
@@ -31,7 +31,7 @@ envoy_cc_test(
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
         "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//contrib/golang/filters/http/source:golang_filter_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -62,7 +62,7 @@ envoy_cc_test(
         "//contrib/golang/filters/http/test/test_data/property:filter.so",
         "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//source/exe:main_common_lib",
@@ -88,7 +88,7 @@ envoy_cc_fuzz_test(
     name = "golang_filter_fuzz_test",
     srcs = ["golang_filter_fuzz_test.cc"],
     corpus = "golang_filter_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":golang_filter_fuzz_proto_cc_proto",
         "//contrib/golang/common/dso/test:dso_mocks",
@@ -110,7 +110,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data/websocket:filter.so",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],

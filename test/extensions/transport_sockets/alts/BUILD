@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.alts"],
     deps = [
         "//source/common/singleton:manager_impl_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "alts_channel_pool_test",
     srcs = ["alts_channel_pool_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.alts"],
     deps = [
         "//envoy/network:address_interface",
@@ -46,7 +46,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "alts_proxy_test",
     srcs = ["alts_proxy_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.alts"],
     deps = [
         "//envoy/network:address_interface",
@@ -66,7 +66,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "alts_tsi_handshaker_test",
     srcs = ["alts_tsi_handshaker_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.alts"],
     deps = [
         "//envoy/network:address_interface",
@@ -87,7 +87,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "tsi_frame_protector_test",
     srcs = ["tsi_frame_protector_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.alts"],
     deps = [
         "//source/extensions/transport_sockets/alts:tsi_frame_protector",
@@ -98,7 +98,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "tsi_handshaker_test",
     srcs = ["tsi_handshaker_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.alts"],
     deps = [
         "//envoy/event:dispatcher_interface",
@@ -122,7 +122,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "tsi_socket_test",
     srcs = ["tsi_socket_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.alts"],
     external_deps = ["grpc"],
     deps = [
@@ -142,7 +142,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "noop_transport_socket_callbacks_test",
     srcs = ["noop_transport_socket_callbacks_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.alts"],
     deps = [
         "//source/extensions/transport_sockets/alts:noop_transport_socket_callbacks_lib",
@@ -154,7 +154,7 @@ envoy_extension_cc_test(
     name = "alts_integration_test",
     size = "large",
     srcs = envoy_select_google_grpc(["alts_integration_test.cc"]),
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.transport_sockets.alts"],
     external_deps = ["grpc"],
     deps = [

@@ -11,7 +11,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "compressor_test",
     srcs = ["qatzstd_compressor_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//contrib/qat/compression/qatzstd/compressor/source:config",
         "//source/extensions/compression/zstd/decompressor:decompressor_lib",

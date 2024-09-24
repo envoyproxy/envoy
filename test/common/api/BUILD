@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "os_sys_calls_test",
     srcs = ["os_sys_calls_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/api:os_sys_calls_lib",
     ],

@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "lua_cluster_specifier_test",
     srcs = ["lua_cluster_specifier_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.router.cluster_specifier_plugin.lua"],
     deps = [
         "//source/extensions/router/cluster_specifiers/lua:lua_cluster_specifier_lib",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.router.cluster_specifier_plugin.lua"],
     deps = [
         "//source/extensions/router/cluster_specifiers/lua:config",

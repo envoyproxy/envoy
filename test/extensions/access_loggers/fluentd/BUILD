@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "fluentd_access_log_impl_test",
     srcs = ["fluentd_access_log_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.fluentd"],
     deps = [
         "//source/extensions/access_loggers/fluentd:config",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.fluentd"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -45,7 +45,7 @@ envoy_extension_cc_test(
     name = "fluentd_access_log_integration_test",
     size = "large",
     srcs = ["fluentd_access_log_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.access_loggers.fluentd"],
     deps = [
         "//source/extensions/access_loggers/fluentd:config",

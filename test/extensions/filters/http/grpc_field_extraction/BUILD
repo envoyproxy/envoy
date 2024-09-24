@@ -16,7 +16,7 @@ envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = ["//test/proto:apikeys_proto_descriptor"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:extractor",
         "//source/extensions/filters/http/grpc_field_extraction:filter",
@@ -36,7 +36,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
         "//test/proto:apikeys_proto_descriptor",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:extractor",
         "//source/extensions/filters/http/grpc_field_extraction:extractor_impl",
@@ -56,7 +56,7 @@ envoy_extension_cc_test(
         "integration_test.cc",
     ],
     data = ["//test/proto:apikeys_proto_descriptor"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.http.grpc_field_extraction"],
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:config",

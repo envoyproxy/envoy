@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "connection_limit_test",
     srcs = ["connection_limit_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.connection_limit"],
     deps = [
         "//source/extensions/filters/network/connection_limit:connection_limit_lib",
@@ -29,7 +29,7 @@ envoy_extension_cc_test(
     name = "connection_limit_integration_test",
     size = "large",
     srcs = ["connection_limit_integration_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.network.connection_limit"],
     deps = [
         "//source/extensions/filters/network/connection_limit:config",

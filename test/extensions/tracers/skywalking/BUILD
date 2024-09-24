@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.tracers.skywalking"],
     deps = [
         "//source/extensions/tracers/skywalking:config",
@@ -29,7 +29,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "trace_segment_reporter_test",
     srcs = ["trace_segment_reporter_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.tracers.skywalking"],
     deps = [
         ":skywalking_test_helper",
@@ -51,7 +51,7 @@ envoy_cc_library(
 
 envoy_extension_cc_test(
     name = "skywalking_test_helper",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.tracers.skywalking"],
     deps = [
         ":skywalking_test_helper_lib",
@@ -65,7 +65,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "tracer_test",
     srcs = ["tracer_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.tracers.skywalking"],
     deps = [
         ":skywalking_test_helper",
@@ -84,7 +84,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "skywalking_tracer_impl_test",
     srcs = ["skywalking_tracer_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.tracers.skywalking"],
     deps = [
         ":skywalking_test_helper",

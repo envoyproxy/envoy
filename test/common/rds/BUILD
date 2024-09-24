@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "rds_test",
     srcs = ["rds_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/rds:rds_lib",
         "//test/mocks/server:instance_mocks",

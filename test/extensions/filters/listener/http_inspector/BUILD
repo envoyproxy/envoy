@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "http_inspector_test",
     srcs = ["http_inspector_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.http_inspector"],
     #TODO(davinci26): The test passes on Windows *but* http inspector
     # *used* to rely on Event::FileTriggerType::Edge and we got away with it
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "http_inspector_config_test",
     srcs = ["http_inspector_config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.http_inspector"],
     deps = [
         "//source/extensions/filters/listener/http_inspector:config",
@@ -54,7 +54,7 @@ envoy_cc_fuzz_test(
     name = "http_inspector_fuzz_test",
     srcs = ["http_inspector_fuzz_test.cc"],
     corpus = "http_inspector_corpus",
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
         "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
@@ -67,7 +67,7 @@ envoy_extension_cc_test(
     srcs = [
         "http_inspector_integration_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.listener.http_inspector"],
     deps = [
         "//source/extensions/access_loggers/file:config",

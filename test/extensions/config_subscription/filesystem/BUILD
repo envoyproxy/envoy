@@ -12,7 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "filesystem_subscription_impl_test",
     srcs = ["filesystem_subscription_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         ":filesystem_subscription_test_harness",
         "//test/mocks/event:event_mocks",

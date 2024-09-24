@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.thrift.payload_to_metadata"],
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:config",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "payload_to_metadata_filter_test",
     srcs = ["payload_to_metadata_filter_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.filters.thrift.payload_to_metadata"],
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata:payload_to_metadata_filter_lib",

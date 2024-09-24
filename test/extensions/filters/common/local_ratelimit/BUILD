@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "local_ratelimit_test",
     srcs = ["local_ratelimit_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",

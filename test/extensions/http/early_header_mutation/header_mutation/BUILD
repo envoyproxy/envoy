@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = [
         "header_mutation_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.http.early_header_mutation.header_mutation"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",
@@ -31,7 +31,7 @@ envoy_extension_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.http.early_header_mutation.header_mutation"],
     deps = [
         "//envoy/registry",
@@ -49,7 +49,7 @@ envoy_extension_cc_test(
     srcs = [
         "header_mutation_integration_test.cc",
     ],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     extension_names = ["envoy.http.early_header_mutation.header_mutation"],
     deps = [
         "//source/common/formatter:formatter_extension_lib",

@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "local_reply_test",
     srcs = ["local_reply_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/local_reply:local_reply_lib",

@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "dispatcher_impl_test",
     srcs = ["dispatcher_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:deferred_task",
@@ -31,7 +31,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "file_event_impl_test",
     srcs = ["file_event_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//envoy/event:file_event_interface",
         "//source/common/event:dispatcher_includes",
@@ -47,7 +47,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "scaled_range_timer_manager_impl_test",
     srcs = ["scaled_range_timer_manager_impl_test.cc"],
-    engflow_pool = "2core",
+    rbe_pool = "2core",
     deps = [
         "//source/common/event:scaled_range_timer_manager_lib",
         "//test/mocks/event:wrapped_dispatcher",
