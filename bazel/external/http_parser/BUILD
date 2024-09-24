@@ -13,9 +13,6 @@ cc_library(
     copts = ["-DHTTP_MAX_HEADER_SIZE=0x2000000"] + select({
         "@envoy//bazel:uhv_enabled": ["-DHTTP_PARSER_STRICT=0"],
         "//conditions:default": [],
-    }) + select({
-        "@envoy//bazel:http_parser_strict_mode_disabled": ["-DHTTP_PARSER_STRICT=0"],
-        "//conditions:default": [],
     }),
     includes = ["."],
     visibility = ["//visibility:public"],

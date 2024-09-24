@@ -397,7 +397,8 @@ TEST_F(HttpInspectorTest, ExtraSpaceInRequestLine) {
 }
 
 TEST_F(HttpInspectorTest, InvalidHttpMethod) {
-#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
+#ifdef ENVOY_ENABLE_UHV
+  // enabling UHV skips method name checks
   return;
 #endif
 
@@ -407,7 +408,8 @@ TEST_F(HttpInspectorTest, InvalidHttpMethod) {
 
 TEST_F(HttpInspectorTest, InvalidHttpRequestLine) {
   const absl::string_view header = "BAD /anything HTTP/1.1\r\n";
-#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
+#ifdef ENVOY_ENABLE_UHV
+  // UHV allows custom methods
   testHttpInspectFound(header, Http::Utility::AlpnNames::get().Http11);
 #else
   testHttpInspectNotFound(header);
@@ -492,7 +494,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp2) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
-#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
+#ifdef ENVOY_ENABLE_UHV
   return;
 #endif
 
@@ -506,7 +508,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
-#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
+#ifdef ENVOY_ENABLE_UHV
   return;
 #endif
 
@@ -515,7 +517,7 @@ TEST_F(HttpInspectorTest, MultipleReadsHttp1IncompleteBadHeader) {
 }
 
 TEST_F(HttpInspectorTest, MultipleReadsHttp1BadProtocol) {
-#ifdef ENVOY_HTTP_PARSER_STRICT_MODE_DISABLED
+#ifdef ENVOY_ENABLE_UHV
   // permissive parsing
   return;
 #endif

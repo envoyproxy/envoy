@@ -161,8 +161,31 @@ do {                                                                 \
   }                                                                  \
 } while (0)
 
-#define IS_METHOD_END(matcher, index) \
+/* Macro to check if the method parsing has reached its end.
+* - In strict mode (`HTTP_PARSER_STRICT`), it checks if the character at
+*   the current `index` in the `matcher` string is the null terminator ('\0'),
+*   indicating the end of the method string.
+* - In non-strict mode, it always returns `true`, allowing custom methods to bypass
+*   strict validation and when UHV is enabled, HTTP_PARSER_STRICT is disabled.
+*/
+#define IS_METHOD_END(matcher, index)                                \
     (HTTP_PARSER_STRICT ? (matcher[index] == '\0') : true)
+
+/* Macro to handle invalid HTTP methods in the parser.
+* - In strict mode (`HTTP_PARSER_STRICT`), it sets the error to `HPE_INVALID_METHOD`
+*   and jumps to the error handling section.
+* - In non-strict mode, it assigns `HTTP_GET` as the default method (value 1).
+*   This bypasses method validation for custom or unknown HTTP methods.
+*/
+#define HANDLE_INVALID_METHOD(parser)                                \
+do {                                                                 \
+    if (HTTP_PARSER_STRICT) {                                        \
+      SET_ERRNO(HPE_INVALID_METHOD);                                 \
+      goto error;                                                    \
+    } else {                                                         \
+      (parser)->method = 1;                                          \
+    }                                                                \
+} while (0)
 
 #define PROXY_CONNECTION "proxy-connection"
 #define CONNECTION "connection"
@@ -962,13 +985,8 @@ reexecute:
           case 'T': parser->method = HTTP_TRACE; break;
           case 'U': parser->method = HTTP_UNLOCK; /* or UNSUBSCRIBE, UNBIND, UNLINK */ break;
           default:
-        #if HTTP_PARSER_STRICT
-            SET_ERRNO(HPE_INVALID_METHOD);
-            goto error;
-        #else
-            /*skip validations*/
+            HANDLE_INVALID_METHOD(parser);
             break;
-        #endif
         }
         UPDATE_STATE(s_req_method);
 
@@ -988,6 +1006,10 @@ reexecute:
         matcher = method_strings[parser->method];
         if (ch == ' ' && IS_METHOD_END(matcher, parser->index)) {
           UPDATE_STATE(s_req_spaces_before_url);
+          if (matcher[parser->index] != '\0') {
+            /*Default to GET if none of the existing HTTP methods match*/
+            parser->method = 1;
+          }
         } else if (ch == matcher[parser->index]) {
           ; /* nada */
         } else if ((ch >= 'A' && ch <= 'Z') || ch == '-') {
@@ -1018,13 +1040,8 @@ reexecute:
             XX(UNLOCK,    3, 'I', UNLINK)
 #undef XX
             default:
-          #if HTTP_PARSER_STRICT
-              SET_ERRNO(HPE_INVALID_METHOD);
-              goto error;
-          #else
-              /*skip validations*/
+              HANDLE_INVALID_METHOD(parser);
               break;
-          #endif
           }
         } else {
           SET_ERRNO(HPE_INVALID_METHOD);

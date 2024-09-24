@@ -1266,6 +1266,12 @@ TEST_P(Http1ServerConnectionImplTest, BadRequestNoStream) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, RejectCustomMethod) {
+#ifdef ENVOY_ENABLE_UHV
+  // When UHV flag is enabled, strict method matching are ignored
+  // and all the custom methods are allowed by default.
+  return;
+#endif
+
   initialize();
 
   MockRequestDecoder decoder;
@@ -1295,9 +1301,13 @@ TEST_P(Http1ServerConnectionImplTest, RejectInvalidCharacterInMethod) {
 }
 
 TEST_P(Http1ServerConnectionImplTest, AllowCustomMethod) {
+
+#ifndef ENVOY_ENABLE_UHV
+  // If UHV is enabled HttpParser allows custom methods
   if (parser_impl_ == Http1ParserImpl::HttpParser) {
     return;
   }
+#endif
 
   codec_settings_.allow_custom_methods_ = true;
   initialize();
@@ -1309,13 +1319,15 @@ TEST_P(Http1ServerConnectionImplTest, AllowCustomMethod) {
   auto status = codec_->dispatch(buffer);
   ASSERT_TRUE(status.ok());
 
-  TestRequestHeaderMapImpl expected_headers{
-      {":authority", "example.com"}, {":path", "/"}, {":method", "BAD"}, {"foo", "bar"}};
-  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+    TestRequestHeaderMapImpl expected_headers{
+        {":authority", "example.com"}, {":path", "/"}, {":method", "BAD"}, {"foo", "bar"}};
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
 
-  Buffer::OwnedImpl headers("host: example.com\r\nfoo: bar\r\n\r\n");
-  status = codec_->dispatch(headers);
-  EXPECT_TRUE(status.ok());
+    Buffer::OwnedImpl headers("host: example.com\r\nfoo: bar\r\n\r\n");
+    status = codec_->dispatch(headers);
+    EXPECT_TRUE(status.ok());
+  }
 }
 
 TEST_P(Http1ServerConnectionImplTest, BadRequestStartedStream) {
@@ -4197,10 +4209,8 @@ TEST_P(Http1ServerConnectionImplTest, ValidMethodFirstCharacter) {
 // Receiving a first byte that cannot start a valid method name is an error.
 TEST_P(Http1ServerConnectionImplTest, InvalidMethodFirstCharacter) {
 #ifdef ENVOY_ENABLE_UHV
-  if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-    // BalsaParser allows custom methods if UHV is enabled.
-    return;
-  }
+  // When UHV flag is enabled both BalsaParser and HttpParser allow custom methods
+  return;
 #endif
 
   initialize();

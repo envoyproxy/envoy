@@ -585,11 +585,6 @@ config_setting(
     values = {"define": "uhv=enabled"},
 )
 
-config_setting(
-    name = "http_parser_strict_mode_disabled",
-    values = {"define": "http_parser_strict_mode=disabled"},
-)
-
 # Alias pointing to the selected version of BoringSSL:
 # - BoringSSL FIPS from @boringssl_fips//:ssl,
 # - non-FIPS BoringSSL from @boringssl//:ssl.
