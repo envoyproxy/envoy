@@ -157,13 +157,13 @@ public:
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  DriverSharedPtr provider_;
   MaxmindProviderFactory* provider_factory_;
   Event::SimulatedTimeSystem time_system_;
   absl::flat_hash_map<std::string, std::string> captured_lookup_response_;
   absl::Mutex mutex_;
   std::vector<Filesystem::Watcher::OnChangedCb> on_changed_cbs_ ABSL_GUARDED_BY(mutex_);
   absl::optional<ConditionalInitializer> cb_added_nullopt = absl::nullopt;
+  DriverSharedPtr provider_;
 };
 
 class GeoipProviderTest : public testing::Test, public GeoipProviderTestBase {};
