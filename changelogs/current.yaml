@@ -382,7 +382,7 @@ new_features:
 - area: getaddrinfo
   change: |
     Added :ref:`num_retries<envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.enable_trace>`
-    to enable DNS query trace in the DNS details access log. This behavior can be reverted by setting the runtime guard
+    to enable DNS query trace in the DNS resolution details. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.dfp_trace`` to false.
 - area: geoip
   change: |
