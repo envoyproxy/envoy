@@ -38,6 +38,9 @@ public:
   static std::unique_ptr<Socket::Options> buildUdpGroOptions();
   static std::unique_ptr<Socket::Options> buildZeroSoLingerOptions();
   static std::unique_ptr<Socket::Options> buildIpRecvTosOptions();
+  /**
+   * @param mapped_v6 true if this option is to be applied to a dual socket.
+   */
   static std::unique_ptr<Socket::Options> buildDoNotFragmentOptions(bool mapped_v6);
 };
 } // namespace Network
