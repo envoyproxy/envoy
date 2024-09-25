@@ -265,8 +265,8 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     // chooseHost calls setOrcaLoadReportCallbacks.
     std::weak_ptr<LoadBalancerContext::OrcaLoadReportCallbacks> weak_orca_load_report_callbacks;
     EXPECT_CALL(lb_context_, setOrcaLoadReportCallbacks(_))
-        .WillOnce(Invoke(
-            [&](std::weak_ptr<LoadBalancerContext::OrcaLoadReportCallbacks> callbacks) {
+        .WillOnce(
+            Invoke([&](std::weak_ptr<LoadBalancerContext::OrcaLoadReportCallbacks> callbacks) {
               weak_orca_load_report_callbacks = callbacks;
             }));
     HostConstSharedPtr host = lb_->chooseHost(&lb_context_);
