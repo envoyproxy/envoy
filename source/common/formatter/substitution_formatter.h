@@ -264,6 +264,9 @@ public:
 
   // Methods that be used to add JSON key or value to output buffer.
   void addString(absl::string_view value) { addSanitized(R"(")", value, R"(")"); }
+  /**
+   * Serializes a number.
+   */
   void addNumber(double d) {
     if (std::isnan(d)) {
       output_buffer_.add(Json::Constants::Null);
@@ -271,6 +274,11 @@ public:
       Buffer::Util::serializeDouble(d, output_buffer_);
     }
   }
+  /**
+   * Serializes a integer number.
+   * NOTE: All numbers in JSON is float. When loading output of this serializer, the parser's
+   * implementation decides if the full precision of big integer could be preserved or not.
+   */
   void addNumber(uint64_t i) { output_buffer_.add(absl::StrCat(i)); }
   void addNumber(int64_t i) { output_buffer_.add(absl::StrCat(i)); }
   void addBool(bool b) { output_buffer_.add(b ? Json::Constants::True : Json::Constants::False); }
