@@ -1,14 +1,14 @@
-name: Precheck/deps
+name: Check/san
 
 permissions:
   contents: read
 
 on:
   workflow_call:
+    secrets:
+      gcp-key:
+        required: true
     inputs:
-      dependency-review:
-        type: boolean
-        default: false
       request:
         type: string
         required: true
@@ -17,19 +17,21 @@ on:
         required: true
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-deps
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-asan
   cancel-in-progress: true
 
 
 jobs:
-  deps:
+  san:
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
     permissions:
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.target }}
     with:
-      bazel-extra: '--config=remote-envoy-engflow'
+      # bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
       request: ${{ inputs.request }}
@@ -39,21 +41,15 @@ jobs:
         Error:
       rbe: ${{ matrix.rbe }}
       target: ${{ matrix.target }}
+      timeout-minutes: 180
       trusted: ${{ inputs.trusted }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-        - target: deps
-          rbe: false
-
-  dependency-review:
-    runs-on: ubuntu-22.04
-    if: ${{ inputs.dependency-review }}
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
-      with:
-        ref: ${{ fromJSON(inputs.request).request.sha }}
-        persist-credentials: false
-    - name: Dependency Review
-      uses: actions/dependency-review-action@5a2ce3f5b92ee19cbb1541a4984c76d921601d7c  # v4.3.4
+        - target: asan
+          rbe: true
+        - target: msan
+          rbe: true
+        - target: tsan
+          rbe: true

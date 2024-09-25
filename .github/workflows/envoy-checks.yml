@@ -1,4 +1,4 @@
-name: Envoy/Prechecks
+name: Envoy/Checks
 
 permissions:
   contents: read
@@ -6,7 +6,7 @@ permissions:
 on:
   workflow_run:
     workflows:
-    - Request
+    - Envoy/Prechecks
     types:
     - completed
 
@@ -33,48 +33,54 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_load.yml
     with:
-      check-name: prechecks
+      check-name: checks
+      head-sha: ${{ github.sha }}
 
-  format:
+  build:
+    secrets:
+      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read
       packages: read
       pull-requests: read
-    name: Precheck (${{ fromJSON(needs.load.outputs.request).summary.title }})
-    uses: ./.github/workflows/_precheck_format.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.precheck-format }}
+    name: Check (${{ fromJSON(needs.load.outputs.request).summary.title }})
+    uses: ./.github/workflows/_check_build.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.check-build }}
     needs:
     - load
     with:
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
 
-  deps:
+  coverage:
+    secrets:
+      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read
       packages: read
       pull-requests: read
-    name: Precheck (${{ fromJSON(needs.load.outputs.request).summary.title }})
-    uses: ./.github/workflows/_precheck_deps.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.precheck-deps }}
+    name: Check (${{ fromJSON(needs.load.outputs.request).summary.title }})
+    uses: ./.github/workflows/_check_coverage.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.check-coverage }}
     needs:
     - load
     with:
-      dependency-review: ${{ github.event_name == 'pull_request_target' && github.repository == 'envoyproxy/envoy' }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
 
-  publish:
+  san:
+    secrets:
+      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read
       packages: read
       pull-requests: read
-    name: Precheck (${{ fromJSON(needs.load.outputs.request).summary.title }})
-    uses: ./.github/workflows/_precheck_publish.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.precheck-publish }}
+    name: Check (${{ fromJSON(needs.load.outputs.request).summary.title }})
+    uses: ./.github/workflows/_check_san.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.check-san }}
     needs:
     - load
     with:
@@ -92,14 +98,14 @@ jobs:
     if: >-
       ${{ always()
           && github.event.workflow_run.conclusion == 'success'
-          && (fromJSON(needs.load.outputs.request).run.precheck-format
-              || fromJSON(needs.load.outputs.request).run.precheck-deps
-              || fromJSON(needs.load.outputs.request).run.precheck-publish) }}
+          && (fromJSON(needs.load.outputs.request).run.check-build
+              || fromJSON(needs.load.outputs.request).run.check-coverage
+              || fromJSON(needs.load.outputs.request).run.check-san) }}
     needs:
     - load
-    - format
-    - deps
-    - publish
+    - build
+    - coverage
+    - san
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}

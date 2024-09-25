@@ -7,15 +7,11 @@ permissions:
   contents: read
 
 on:
-  # This runs untrusted code, do not expose secrets in the verify job
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: "Git SHA ref to checkout"
-      sha:
-        description: "Git SHA of commit HEAD (ie last commit of PR)"
-      head_ref:
-        description: "Ref for grouping PRs"
+  workflow_run:
+    workflows:
+    - Envoy/Prechecks
+    types:
+    - completed
 
 concurrency:
   group: >-
@@ -24,6 +20,7 @@ concurrency:
         || github.run_id
     }}-${{ github.event.workflow.id }}
   cancel-in-progress: true
+
 
 jobs:
   load:
@@ -38,8 +35,7 @@ jobs:
       packages: read
       pull-requests: read
     if: >-
-      ${{
-          (github.repository == 'envoyproxy/envoy'
+      ${{ (github.repository == 'envoyproxy/envoy'
            || vars.ENVOY_CI)
           && (!contains(github.actor, '[bot]')
               || github.actor == 'trigger-workflow-envoy[bot]'
@@ -48,7 +44,7 @@ jobs:
     uses: ./.github/workflows/_load.yml
     with:
       check-name: publish
-      head-sha: ${{ inputs.sha }}
+      head-sha: ${{ github.sha }}
 
   build:
     permissions:
