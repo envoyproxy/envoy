@@ -185,8 +185,9 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     }
     return {};
   } else if (value == BackendLatency) {
-    auto last_upstream_rx_byte_received = timing_.lastUpstreamRxByteReceived();
-    auto first_upstream_tx_byte_sent = timing_.firstUpstreamTxByteSent();
+    Envoy::StreamInfo::TimingUtility timing(info_);
+    const auto last_upstream_rx_byte_received = timing.lastUpstreamRxByteReceived();
+    const auto first_upstream_tx_byte_sent = timing.firstUpstreamTxByteSent();
     if (last_upstream_rx_byte_received.has_value() && first_upstream_tx_byte_sent.has_value()) {
       return CelValue::CreateDuration(absl::FromChrono(last_upstream_rx_byte_received.value() -
                                                        first_upstream_tx_byte_sent.value()));

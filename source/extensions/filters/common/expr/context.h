@@ -204,7 +204,6 @@ private:
   const HeadersWrapper<::Envoy::Http::ResponseHeaderMap> headers_;
   const HeadersWrapper<::Envoy::Http::ResponseTrailerMap> trailers_;
   const StreamInfo::StreamInfo& info_;
-  Envoy::StreamInfo::TimingUtility timing_;
 };
 
 class ConnectionWrapper : public BaseWrapper {
