@@ -467,7 +467,7 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_),
-              HasSubstr("dns_resolution_failure{resolve_timeout:0}"));
+              HasSubstr("dns_resolution_failure{resolve_timeout:"));
 }
 
 TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {

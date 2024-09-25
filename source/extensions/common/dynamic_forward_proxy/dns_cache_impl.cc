@@ -421,13 +421,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   std::string details_with_maybe_trace = std::string(details);
   if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
     if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
-      absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
-      std::string trace = primary_host_info->active_query_->getTraces().empty()
-                              ? ""
-                              : absl::StrJoin(primary_host_info->active_query_->getTraces(), ",");
-      if (!trace.empty()) {
-        details_with_maybe_trace = absl::StrCat(details, ":", trace);
-      }
+      details_with_maybe_trace = absl::StrCat(
+          details, ":", absl::StrJoin(primary_host_info->active_query_->getTraces(), ","));
       primary_host_info->active_query_->removeTraces();
     }
   }

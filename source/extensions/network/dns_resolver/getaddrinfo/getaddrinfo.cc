@@ -35,16 +35,19 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
                                                 DnsLookupFamily dns_lookup_family,
                                                 ResolveCb callback) {
   ENVOY_LOG(debug, "adding new query [{}] to pending queries", dns_name);
-  absl::MutexLock guard(&mutex_);
   auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback, mutex_);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
-      config_.has_num_retries()) {
-    // + 1 to include the initial query.
-    pending_queries_.push_back({std::move(new_query), config_.num_retries().value() + 1});
-  } else {
-    pending_queries_.push_back({std::move(new_query), absl::nullopt});
+  ActiveDnsQuery* active_query;
+  {
+    absl::MutexLock guard(&mutex_);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
+        config_.has_num_retries()) {
+      // + 1 to include the initial query.
+      pending_queries_.push_back({std::move(new_query), config_.num_retries().value() + 1});
+    } else {
+      pending_queries_.push_back({std::move(new_query), absl::nullopt});
+    }
+    active_query = pending_queries_.back().pending_query_.get();
   }
-  ActiveDnsQuery* active_query = pending_queries_.back().pending_query_.get();
   active_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted));
   return active_query;
 }
@@ -150,10 +153,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
     std::pair<ResolutionStatus, std::list<DnsResponse>> response;
     std::string details;
     {
-      {
-        absl::MutexLock guard(&mutex_);
-        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
-      }
+      next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
       addrinfo hints;
       memset(&hints, 0, sizeof(hints));
       hints.ai_flags = AI_ADDRCONFIG;
@@ -167,32 +167,34 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
                                                             &hints, &addrinfo_result_do_not_use);
       auto addrinfo_wrapper = AddrInfoWrapper(addrinfo_result_do_not_use);
       if (rc.return_value_ == 0) {
+        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
         response = processResponse(*next_query, addrinfo_wrapper.get());
-        {
-          absl::MutexLock guard(&mutex_);
-          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
-        }
       } else if (reresolve && rc.return_value_ == EAI_AGAIN) {
-        absl::MutexLock guard(&mutex_);
         if (num_retries.has_value()) {
           (*num_retries)--;
         }
         if (!num_retries.has_value()) {
-          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
           ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
-          pending_queries_.push_back({std::move(next_query), absl::nullopt});
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
+          {
+            absl::MutexLock guard(&mutex_);
+            pending_queries_.push_back({std::move(next_query), absl::nullopt});
+          }
           continue;
         }
         if (*num_retries > 0) {
-          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
           ENVOY_LOG(debug, "retrying query [{}], num_retries: {}", next_query->dns_name_,
                     *num_retries);
-          pending_queries_.push_back({std::move(next_query), *num_retries});
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
+          {
+            absl::MutexLock guard(&mutex_);
+            pending_queries_.push_back({std::move(next_query), *num_retries});
+          }
           continue;
         }
-        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::DoneRetrying));
         ENVOY_LOG(debug, "not retrying query [{}] because num_retries: {}", next_query->dns_name_,
                   *num_retries);
+        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::DoneRetrying));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       } else if (treat_nodata_noname_as_success &&
                  (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA)) {
@@ -203,36 +205,24 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         // https://github.com/envoyproxy/envoy/blob/099d85925b32ce8bf06e241ee433375a0a3d751b/source/extensions/network/dns_resolver/cares/dns_impl.h#L109-L111.
         ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
                   gai_strerror(rc.return_value_));
+        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
         response = std::make_pair(ResolutionStatus::Completed, std::list<DnsResponse>());
-        {
-          absl::MutexLock guard(&mutex_);
-          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
-        }
       } else {
         ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
                   next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));
+        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
-        {
-          absl::MutexLock guard(&mutex_);
-          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
-        }
       }
       details = gai_strerror(rc.return_value_);
     }
 
-    dispatcher_.post([this, finished_query = std::move(next_query), response = std::move(response),
+    dispatcher_.post([finished_query = std::move(next_query), response = std::move(response),
                       details = std::string(details)]() mutable {
       if (finished_query->cancelled_) {
-        {
-          absl::MutexLock guard(&mutex_);
-          finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Cancelled));
-        }
+        finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Cancelled));
         ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
       } else {
-        {
-          absl::MutexLock guard(&mutex_);
-          finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Callback));
-        }
+        finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Callback));
         finished_query->callback_(response.first, std::move(details), std::move(response.second));
       }
     });
