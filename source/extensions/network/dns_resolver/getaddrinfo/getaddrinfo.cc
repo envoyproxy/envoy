@@ -150,7 +150,10 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
     std::pair<ResolutionStatus, std::list<DnsResponse>> response;
     std::string details;
     {
-      next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
+      {
+        absl::MutexLock guard(&mutex_);
+        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
+      }
       addrinfo hints;
       memset(&hints, 0, sizeof(hints));
       hints.ai_flags = AI_ADDRCONFIG;
@@ -165,7 +168,10 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       auto addrinfo_wrapper = AddrInfoWrapper(addrinfo_result_do_not_use);
       if (rc.return_value_ == 0) {
         response = processResponse(*next_query, addrinfo_wrapper.get());
-        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
+        {
+          absl::MutexLock guard(&mutex_);
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
+        }
       } else if (reresolve && rc.return_value_ == EAI_AGAIN) {
         absl::MutexLock guard(&mutex_);
         if (num_retries.has_value()) {
@@ -198,23 +204,35 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
                   gai_strerror(rc.return_value_));
         response = std::make_pair(ResolutionStatus::Completed, std::list<DnsResponse>());
-        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
+        {
+          absl::MutexLock guard(&mutex_);
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
+        }
       } else {
         ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
                   next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
-        next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
+        {
+          absl::MutexLock guard(&mutex_);
+          next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Failed));
+        }
       }
       details = gai_strerror(rc.return_value_);
     }
 
-    dispatcher_.post([finished_query = std::move(next_query), response = std::move(response),
+    dispatcher_.post([this, finished_query = std::move(next_query), response = std::move(response),
                       details = std::string(details)]() mutable {
       if (finished_query->cancelled_) {
-        finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Cancelled));
+        {
+          absl::MutexLock guard(&mutex_);
+          finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Cancelled));
+        }
         ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
       } else {
-        finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Callback));
+        {
+          absl::MutexLock guard(&mutex_);
+          finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Callback));
+        }
         finished_query->callback_(response.first, std::move(details), std::move(response.second));
       }
     });
