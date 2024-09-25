@@ -45,6 +45,7 @@ jobs:
     with:
       command:
       container-command:
+      docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       runs-on: macos-14-xlarge
       source: ${{ matrix.source }}

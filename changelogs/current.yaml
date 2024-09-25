@@ -193,6 +193,9 @@ bug_fixes:
   change: |
     Set token cookies in response regardless of :ref:`forward_bearer_token
     <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>` config option.
+- area: tracing
+  change: |
+    Fixed a bug where the OpenTelemetry tracer exports the OTLP request even when no spans are present.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -430,5 +433,10 @@ new_features:
     Added allow list
     :ref:`allowed_override_modes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allowed_override_modes>`
     for :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
+- area: load_balancing
+  change: |
+    WIP: Added implementation of :ref:`client_side_weighted_round_robin
+    <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
+    load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
 
 deprecated:
