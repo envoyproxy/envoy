@@ -32,4 +32,8 @@ message GetAddrInfoDnsResolverConfig {
   // Specifies the number of retries before the resolver gives up. If not specified, the resolver will
   // retry indefinitely until it succeeds or the DNS query times out.
   google.protobuf.UInt32Value num_retries = 1;
+
+  // Sets to true to enable DNS query trace. When enabled, the trace will be appended into the DNS
+  // details in the access log.
+  bool enable_trace = 2;
 }

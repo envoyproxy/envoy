@@ -260,12 +260,7 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
   primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
-  std::string details =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_resolve_timeout_trace")
-          ? absl::StrCat("resolve_timeout:",
-                         absl::StrJoin(primary_host.active_query_->getTraces(), ","))
-          : "resolve_timeout";
-  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, std::move(details), {});
+  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, "resolve_timeout", {});
 }
 
 void DnsCacheImpl::onReResolveAlarm(const std::string& host) {
@@ -422,6 +417,19 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     return primary_host_it->second.get();
   }();
 
+  std::string details_with_maybe_trace = std::string(details);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_trace")) {
+    if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
+      std::string trace = primary_host_info->active_query_->getTraces().empty()
+                              ? ""
+                              : absl::StrJoin(primary_host_info->active_query_->getTraces(), ",");
+      if (!trace.empty()) {
+        details_with_maybe_trace = absl::StrCat(details, ":", trace);
+      }
+      primary_host_info->active_query_->removeTraces();
+    }
+  }
+
   bool first_resolve = false;
 
   if (!from_cache) {
@@ -485,7 +493,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                     current_address ? current_address->asStringView() : "<empty>",
                     new_address ? new_address->asStringView() : "<empty>");
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
-    primary_host_info->host_info_->setDetails(std::string(details));
+    primary_host_info->host_info_->setDetails(details_with_maybe_trace);
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
     primary_host_info->host_info_->setFirstResolveComplete();
@@ -495,7 +503,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     // We only set details here if current address is null because but
     // non-null->null resolutions we don't update the address so will use a
     // previously resolved address + details.
-    primary_host_info->host_info_->setDetails(std::string(details));
+    primary_host_info->host_info_->setDetails(details_with_maybe_trace);
   }
 
   if (first_resolve) {

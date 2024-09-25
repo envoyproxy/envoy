@@ -18,7 +18,7 @@ enum class GetAddrInfoTrace : uint8_t {
   Starting = 1,
   Success = 2,
   Failed = 3,
-  NoData = 4,
+  NoResult = 4,
   Retrying = 5,
   DoneRetrying = 6,
   Cancelled = 7,

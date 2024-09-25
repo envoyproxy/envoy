@@ -35,10 +35,12 @@ public:
    * @param reason supplies the cancel reason.
    */
   virtual void cancel(CancelReason reason) PURE;
-  /** Add the detail for the DNS query. */
+  /** Add the trace for the DNS query. */
   void addTrace(uint8_t trace) { traces_.emplace_back(trace); }
-  /** Returns the details of the DNS query. */
+  /** Returns the DNS query traces. */
   const std::vector<uint8_t>& getTraces() const { return traces_; }
+  /** Remove the DNS query traces. */
+  void removeTraces() { traces_.clear(); }
 
 private:
   std::vector<uint8_t> traces_;

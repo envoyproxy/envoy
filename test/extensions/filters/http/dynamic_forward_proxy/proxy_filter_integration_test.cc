@@ -441,7 +441,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
 }
 
-TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithDetails) {
+TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -457,7 +457,8 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithDetails) {
     typed_dns_resolver_config:
       name: envoy.network.dns_resolver.getaddrinfo
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+        enable_trace: true)EOF";
   initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000001);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -469,9 +470,8 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithDetails) {
               HasSubstr("dns_resolution_failure{resolve_timeout:0}"));
 }
 
-TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutDetails) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_resolve_timeout_trace",
-                                    "false");
+TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_trace", "false");
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   setDownstreamProtocol(Http::CodecType::HTTP2);

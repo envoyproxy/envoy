@@ -185,10 +185,6 @@ bug_fixes:
     Fixed a bug in the CONNECT-UDP forwarding mode where Envoy reset the upstream stream when it
     received HTTP/3 datagrams before receiving the SETTINGS frame from the upstream peer. Envoy now
     drops the datagrams in this case instead of resetting the stream.
-- area: getaddrinfo
-  change: |
-    Added trace info in the ``getaddrinfo``. This behavior can be reverted by setting the runtime guard
-    ``envoy.reloadable_features.dfp_resolve_timeout_trace`` to false.
 - area: oauth
   change: |
     Set token cookies in response regardless of :ref:`forward_bearer_token
@@ -380,6 +376,11 @@ new_features:
     to configure the number of retries. If this field is not provided, the ``getaddrinfo`` resolver will retry indefinitely until it
     succeeds or the DNS query times out. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.getaddrinfo_num_retries`` to false.
+- area: getaddrinfo
+  change: |
+    Added :ref:`num_retries<envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.enable_trace>`
+    to enable DNS query trace in the DNS details access log. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.dfp_trace`` to false.
 - area: geoip
   change: |
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
