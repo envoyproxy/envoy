@@ -297,15 +297,53 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
   EXPECT_TRUE(connection_socket->isOpen());
   EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   EXPECT_EQ("127.0.0.1", no_local_addr->ip()->addressAsString());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int value = 0;
+    socklen_t val_length = sizeof(value);
+#ifdef ENVOY_IP_DONTFRAG
+    RELEASE_ASSERT(connection_socket->getSocketOption(IPPROTO_IP, IP_DONTFRAG, &value, &val_length)
+                       .return_value_ == 0);
+    EXPECT_EQ(value, 1);
+#else
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
+            .return_value_ == 0);
+    EXPECT_EQ(value, IP_PMTUDISC_DO);
+#endif
+  }
   connection_socket->close();
 
   Network::Address::InstanceConstSharedPtr local_addr_v6 =
-      std::make_shared<Network::Address::Ipv6Instance>("::1");
+      std::make_shared<Network::Address::Ipv6Instance>("::1", 0, nullptr, /*v6only*/ true);
   Network::Address::InstanceConstSharedPtr peer_addr_v6 =
-      std::make_shared<Network::Address::Ipv6Instance>("::1", 54321, nullptr);
+      std::make_shared<Network::Address::Ipv6Instance>("::1", 54321, nullptr, /*v6only*/ false);
   connection_socket = createConnectionSocket(peer_addr_v6, local_addr_v6, nullptr);
   EXPECT_TRUE(connection_socket->isOpen());
   EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_TRUE(local_addr_v6->ip()->ipv6()->v6only());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int value = 0;
+    socklen_t val_length = sizeof(value);
+#ifdef ENVOY_IP_DONTFRAG
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_DONTFRAG, &value, &val_length)
+            .return_value_ == 0);
+    ;
+    EXPECT_EQ(value, 1);
+#else
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
+            .return_value_ == 0);
+    EXPECT_EQ(value, IPV6_PMTUDISC_DO);
+    // v4 DF option is not applied.
+    value = 0;
+    val_length = sizeof(value);
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
+            .return_value_ == 0);
+    EXPECT_NE(value, IP_PMTUDISC_DO);
+#endif
+  }
   connection_socket->close();
 
   Network::Address::InstanceConstSharedPtr no_local_addr_v6 = nullptr;
@@ -313,6 +351,29 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
   EXPECT_TRUE(connection_socket->isOpen());
   EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
   EXPECT_EQ("::1", no_local_addr_v6->ip()->addressAsString());
+  EXPECT_FALSE(no_local_addr_v6->ip()->ipv6()->v6only());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int value = 0;
+    socklen_t val_length = sizeof(value);
+#ifdef ENVOY_IP_DONTFRAG
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_DONTFRAG, &value, &val_length)
+            .return_value_ == 0);
+    EXPECT_EQ(value, 1);
+#else
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
+            .return_value_ == 0);
+    EXPECT_EQ(value, IPV6_PMTUDISC_DO);
+    // v4 DF socket option is also applied to dual stack socket.
+    value = 0;
+    val_length = sizeof(value);
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
+            .return_value_ == 0);
+    EXPECT_EQ(value, IP_PMTUDISC_DO);
+#endif
+  }
   connection_socket->close();
 }
 

@@ -181,5 +181,31 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpRecvTosOptions() {
   return options;
 }
 
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildDoNotFragmentOptions(bool mapped_v6) {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+#ifdef ENVOY_IP_DONTFRAG
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_IP_DONTFRAG, ENVOY_IPV6_DONTFRAG,
+      1));
+  // v4 mapped v6 addresses don't support ENVOY_IP_DONTFRAG on MAC OS.
+  (void)mapped_v6;
+#elif defined(ENVOY_IP_MTU_DISCOVER)
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_IP_MTU_DISCOVER,
+      ENVOY_IP_MTU_DISCOVER_VALUE, ENVOY_IPV6_MTU_DISCOVER, ENVOY_IPV6_MTU_DISCOVER_VALUE));
+
+  if (mapped_v6) {
+    ENVOY_LOG_MISC(trace, "Also apply the V4 option to dual stack socket.");
+    options->push_back(
+        std::make_shared<SocketOptionImpl>(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                                           ENVOY_IP_MTU_DISCOVER, ENVOY_IP_MTU_DISCOVER_VALUE));
+  }
+#else
+  (void)mapped_v6;
+  static_assert(false, "Platform supports neither socket option IP_DONTFRAG nor IP_MTU_DISCOVER");
+#endif
+  return options;
+}
+
 } // namespace Network
 } // namespace Envoy

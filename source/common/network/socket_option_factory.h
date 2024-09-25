@@ -38,6 +38,7 @@ public:
   static std::unique_ptr<Socket::Options> buildUdpGroOptions();
   static std::unique_ptr<Socket::Options> buildZeroSoLingerOptions();
   static std::unique_ptr<Socket::Options> buildIpRecvTosOptions();
+  static std::unique_ptr<Socket::Options> buildDoNotFragmentOptions(bool mapped_v6);
 };
 } // namespace Network
 } // namespace Envoy
