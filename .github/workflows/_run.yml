@@ -1,4 +1,4 @@
-11;rgb:fdfd/f6f6/e3e3name: Envoy CI
+name: Envoy CI
 
 permissions:
   contents: read
