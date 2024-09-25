@@ -93,7 +93,7 @@ public:
                              std::list<DnsResponse>&& response) {
     // Since we use AF_UNSPEC, depending on the CI environment we might get either 1 or 2
     // addresses.
-    EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+    EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
     EXPECT_TRUE(response.size() == 1 || response.size() == 2);
     EXPECT_TRUE("127.0.0.1:0" == response.front().addrInfo().address_->asString() ||
                 "[::1]:0" == response.front().addrInfo().address_->asString());
@@ -166,7 +166,7 @@ TEST_F(GetAddrInfoDnsImplTest, NoData) {
   resolver_->resolve("localhost", DnsLookupFamily::All,
                      [this](DnsResolver::ResolutionStatus status, absl::string_view,
                             std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
                        EXPECT_TRUE(response.empty());
 
                        dispatcher_->exit();
@@ -183,7 +183,7 @@ TEST_F(GetAddrInfoDnsImplTest, NoName) {
   resolver_->resolve("localhost", DnsLookupFamily::All,
                      [this](DnsResolver::ResolutionStatus status, absl::string_view,
                             std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
                        EXPECT_TRUE(response.empty());
 
                        dispatcher_->exit();
@@ -203,7 +203,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccess) {
   resolver_->resolve("localhost", DnsLookupFamily::All,
                      [this](DnsResolver::ResolutionStatus status, absl::string_view,
                             std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
                        EXPECT_TRUE(response.empty());
 
                        dispatcher_->exit();
@@ -247,7 +247,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccess) {
   resolver_->resolve("localhost", DnsLookupFamily::All,
                      [this](DnsResolver::ResolutionStatus status, absl::string_view,
                             std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
                        EXPECT_TRUE(response.empty());
 
                        dispatcher_->exit();
@@ -293,7 +293,7 @@ TEST_F(GetAddrInfoDnsImplTest, All) {
       "localhost", DnsLookupFamily::All,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(2, response.size());
         EXPECT_EQ("[[::1]:0, 127.0.0.1:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -317,7 +317,7 @@ TEST_F(GetAddrInfoDnsImplTest, V4Only) {
       "localhost", DnsLookupFamily::V4Only,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[127.0.0.1:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -341,7 +341,7 @@ TEST_F(GetAddrInfoDnsImplTest, V6Only) {
       "localhost", DnsLookupFamily::V6Only,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -365,7 +365,7 @@ TEST_F(GetAddrInfoDnsImplTest, V4Preferred) {
       "localhost", DnsLookupFamily::V4Preferred,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[127.0.0.1:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -389,7 +389,7 @@ TEST_F(GetAddrInfoDnsImplTest, V4PreferredNoV4) {
       "localhost", DnsLookupFamily::V4Preferred,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -413,7 +413,7 @@ TEST_F(GetAddrInfoDnsImplTest, Auto) {
       "localhost", DnsLookupFamily::Auto,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -437,7 +437,7 @@ TEST_F(GetAddrInfoDnsImplTest, AutoNoV6) {
       "localhost", DnsLookupFamily::Auto,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[127.0.0.1:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {

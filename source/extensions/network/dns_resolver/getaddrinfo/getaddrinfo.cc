@@ -109,7 +109,7 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
               return dns_response.addrInfo().address_->asString();
             }));
 
-  return std::make_pair(ResolutionStatus::Success, final_results);
+  return std::make_pair(ResolutionStatus::Completed, final_results);
 }
 
 // Background thread which wakes up and does resolutions.
@@ -190,7 +190,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         // https://github.com/envoyproxy/envoy/blob/099d85925b32ce8bf06e241ee433375a0a3d751b/source/extensions/network/dns_resolver/cares/dns_impl.h#L109-L111.
         ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
                   gai_strerror(rc.return_value_));
-        response = std::make_pair(ResolutionStatus::Success, std::list<DnsResponse>());
+        response = std::make_pair(ResolutionStatus::Completed, std::list<DnsResponse>());
       } else {
         ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
                   next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));

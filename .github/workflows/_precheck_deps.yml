@@ -17,20 +17,21 @@ on:
         required: true
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-publish
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-deps
   cancel-in-progress: true
 
 
 jobs:
-  prechecks:
+  deps:
     permissions:
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.target }}
     with:
-      bazel-extra: '--config=rbe-envoy-engflow'
+      bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
       request: ${{ inputs.request }}
       error-match: |
         ERROR

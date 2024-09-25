@@ -140,7 +140,7 @@ void FileLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallba
   ASSERT(file_handle_);
   auto queued = file_handle_->read(
       dispatcher(), header_block_.offsetToBody() + range.begin(), range.length(),
-      [this, cb = std::move(cb), range](absl::StatusOr<Buffer::InstancePtr> read_result) {
+      [this, cb = std::move(cb), range](absl::StatusOr<Buffer::InstancePtr> read_result) mutable {
         ASSERT(dispatcher()->isThreadSafe());
         cancel_action_in_flight_ = nullptr;
         if (!read_result.ok() || read_result.value()->length() != range.length()) {
@@ -164,7 +164,7 @@ void FileLookupContext::getTrailers(LookupTrailersCallback&& cb) {
   ASSERT(file_handle_);
   auto queued = file_handle_->read(
       dispatcher(), header_block_.offsetToTrailers(), header_block_.trailerSize(),
-      [this, cb = std::move(cb)](absl::StatusOr<Buffer::InstancePtr> read_result) {
+      [this, cb = std::move(cb)](absl::StatusOr<Buffer::InstancePtr> read_result) mutable {
         ASSERT(dispatcher()->isThreadSafe());
         cancel_action_in_flight_ = nullptr;
         if (!read_result.ok() || read_result.value()->length() != header_block_.trailerSize()) {

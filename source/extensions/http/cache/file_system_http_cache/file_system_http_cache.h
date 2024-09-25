@@ -79,8 +79,7 @@ public:
    */
   void updateHeaders(const LookupContext& lookup_context,
                      const Http::ResponseHeaderMap& response_headers,
-                     const ResponseMetadata& metadata,
-                     std::function<void(bool)> on_complete) override;
+                     const ResponseMetadata& metadata, UpdateHeadersCallback on_complete) override;
 
   /**
    * The config of this cache. Used by the factory to ensure there aren't incompatible

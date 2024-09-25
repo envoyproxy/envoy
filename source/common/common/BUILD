@@ -127,11 +127,9 @@ envoy_cc_library(
 envoy_basic_cc_library(
     name = "fmt_lib",
     hdrs = ["fmt.h"],
-    external_deps = [
-        "fmtlib",
-    ],
     deps = [
         "//envoy/common:base_includes",
+        "@com_github_fmtlib_fmt//:fmtlib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],
@@ -141,11 +139,11 @@ envoy_cc_library(
     name = "hash_lib",
     srcs = ["hash.cc"],
     hdrs = ["hash.h"],
-    external_deps = ["xxhash"],
     deps = [
         ":macros",
         ":safe_memcpy_lib",
         "//envoy/common:base_includes",
+        "@com_github_cyan4973_xxhash//:xxhash",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
     ],
@@ -167,14 +165,12 @@ envoy_cc_library(
     name = "key_value_store_lib",
     srcs = ["key_value_store_base.cc"],
     hdrs = ["key_value_store_base.h"],
-    external_deps = [
-        "quiche_quic_platform",
-    ],
     deps = [
         "//envoy/common:key_value_store_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/filesystem:filesystem_interface",
         "//source/common/config:ttl_lib",
+        "@com_github_google_quiche//:quic_platform",
         "@com_github_google_quiche//:quiche_common_lib",
         "@com_google_absl//absl/cleanup",
     ],
@@ -229,10 +225,8 @@ envoy_cc_library(
     name = "base_logger_lib",
     srcs = ["base_logger.cc"],
     hdrs = ["base_logger.h"],
-    external_deps = [
-        "spdlog",
-    ],
     deps = [
+        "@com_github_gabime_spdlog//:spdlog",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -419,6 +413,7 @@ envoy_cc_library(
     srcs = ["thread.cc"],
     hdrs = ["thread.h"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [
+        ":assert_lib",
         ":macros",
         ":non_copyable",
         "@com_google_absl//absl/synchronization",
@@ -585,9 +580,6 @@ envoy_cc_library(
 
 envoy_pch_library(
     name = "common_pch",
-    external_deps = [
-        "spdlog",
-    ],
     includes = [
         "envoy/config/bootstrap/v3/bootstrap.pb.h",
         "envoy/config/cluster/v3/cluster.pb.h",
@@ -598,6 +590,7 @@ envoy_pch_library(
         "envoy/service/discovery/v3/discovery.pb.h",
         "spdlog/sinks/android_sink.h",
         "spdlog/spdlog.h",
+        "@com_github_gabime_spdlog//:spdlog",
     ],
     visibility = ["//visibility:public"],
     deps = [

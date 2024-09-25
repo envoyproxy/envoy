@@ -267,11 +267,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "options_lib",
-    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
     srcs = ["options_impl.cc"],
     hdrs = ["options_impl.h"],
+    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
     copts = ["-DHAVE_LONG_LONG"],
-    external_deps = ["tclap"],
     deps = [
         ":options_base",
         "//envoy/network:address_interface",
@@ -285,6 +284,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:tag_utility_lib",
         "//source/common/version:version_lib",
+        "@com_github_mirror_tclap//:tclap",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -406,6 +406,7 @@ envoy_cc_library(
     name = "server_base_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
+    rbe_pool = "2core",
     deps = [
         ":api_listener_lib",
         ":configuration_lib",

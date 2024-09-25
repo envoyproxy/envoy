@@ -87,6 +87,7 @@ envoy_cc_library(
     name = "stream_info_formatter_extension_lib",
     srcs = ["stream_info_formatter.cc"],
     hdrs = ["stream_info_formatter.h"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/api:api_interface",
         "//envoy/formatter:substitution_formatter_interface",
