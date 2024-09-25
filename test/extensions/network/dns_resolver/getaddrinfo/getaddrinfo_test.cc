@@ -109,27 +109,10 @@ public:
   ActiveDnsQuery* active_dns_query_;
 };
 
-TEST_F(GetAddrInfoDnsImplTest, LocalhostResolveWithoutTrace) {
+TEST_F(GetAddrInfoDnsImplTest, LocalhostResolve) {
   // See https://github.com/envoyproxy/envoy/issues/28504.
   DISABLE_UNDER_WINDOWS;
 
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                                std::list<DnsResponse>&& response) {
-                           verifyRealGaiResponse(status, std::move(response));
-                           EXPECT_TRUE(active_dns_query_->getTraces().empty());
-                           dispatcher_->exit();
-                         });
-
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-}
-
-TEST_F(GetAddrInfoDnsImplTest, LocalhostResolveWithTrace) {
-  // See https://github.com/envoyproxy/envoy/issues/28504.
-  DISABLE_UNDER_WINDOWS;
-
-  config_.set_enable_trace(true);
   initialize();
 
   active_dns_query_ = resolver_->resolve(
@@ -148,33 +131,10 @@ TEST_F(GetAddrInfoDnsImplTest, LocalhostResolveWithTrace) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
-TEST_F(GetAddrInfoDnsImplTest, CancelWithoutTrace) {
+TEST_F(GetAddrInfoDnsImplTest, Cancel) {
   // See https://github.com/envoyproxy/envoy/issues/28504.
   DISABLE_UNDER_WINDOWS;
 
-  auto query = resolver_->resolve(
-      "localhost", DnsLookupFamily::All,
-      [](DnsResolver::ResolutionStatus, absl::string_view, std::list<DnsResponse>&&) { FAIL(); });
-
-  query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
-
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                                std::list<DnsResponse>&& response) {
-                           verifyRealGaiResponse(status, std::move(response));
-                           EXPECT_TRUE(active_dns_query_->getTraces().empty());
-                           dispatcher_->exit();
-                         });
-
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-}
-
-TEST_F(GetAddrInfoDnsImplTest, CancelWithTrace) {
-  // See https://github.com/envoyproxy/envoy/issues/28504.
-  DISABLE_UNDER_WINDOWS;
-
-  config_.set_enable_trace(true);
   initialize();
 
   auto query = resolver_->resolve(
@@ -199,28 +159,7 @@ TEST_F(GetAddrInfoDnsImplTest, CancelWithTrace) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
-TEST_F(GetAddrInfoDnsImplTest, FailureWithoutTrace) {
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
-
-  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_FAIL, 0}));
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view details,
-                                std::list<DnsResponse>&& response) {
-                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
-                           EXPECT_EQ("Non-recoverable failure in name resolution", details);
-                           EXPECT_TRUE(response.empty());
-                           EXPECT_TRUE(active_dns_query_->getTraces().empty());
-
-                           dispatcher_->exit();
-                         });
-
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-}
-
-TEST_F(GetAddrInfoDnsImplTest, FailureWithTrace) {
-  config_.set_enable_trace(true);
+TEST_F(GetAddrInfoDnsImplTest, Failure) {
   initialize();
 
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
@@ -246,8 +185,7 @@ TEST_F(GetAddrInfoDnsImplTest, FailureWithTrace) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
-TEST_F(GetAddrInfoDnsImplTest, NoDataWithTrace) {
-  config_.set_enable_trace(true);
+TEST_F(GetAddrInfoDnsImplTest, NoData) {
   initialize();
 
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
@@ -272,27 +210,7 @@ TEST_F(GetAddrInfoDnsImplTest, NoDataWithTrace) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
-TEST_F(GetAddrInfoDnsImplTest, NoDataWithoutTrace) {
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
-
-  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_NODATA, 0}));
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                                std::list<DnsResponse>&& response) {
-                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
-                           EXPECT_TRUE(response.empty());
-                           EXPECT_TRUE(active_dns_query_->getTraces().empty());
-
-                           dispatcher_->exit();
-                         });
-
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-}
-
-TEST_F(GetAddrInfoDnsImplTest, NoNameWithTrace) {
-  config_.set_enable_trace(true);
+TEST_F(GetAddrInfoDnsImplTest, NoName) {
   initialize();
 
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
@@ -317,27 +235,7 @@ TEST_F(GetAddrInfoDnsImplTest, NoNameWithTrace) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
-TEST_F(GetAddrInfoDnsImplTest, NoNameWithoutTrace) {
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
-
-  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_NONAME, 0}));
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                                std::list<DnsResponse>&& response) {
-                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
-                           EXPECT_TRUE(response.empty());
-                           EXPECT_TRUE(active_dns_query_->getTraces().empty());
-
-                           dispatcher_->exit();
-                         });
-
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-}
-
-TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccessWithTrace) {
-  config_.set_enable_trace(true);
+TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccess) {
   initialize();
 
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
@@ -363,28 +261,6 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccessWithTrace) {
 
         dispatcher_->exit();
       });
-
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-}
-
-TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccessWithoutTrace) {
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
-
-  // 2 calls - one EAGAIN, one success.
-  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .Times(2)
-      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
-      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                                std::list<DnsResponse>&& response) {
-                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
-                           EXPECT_TRUE(response.empty());
-                           EXPECT_TRUE(active_dns_query_->getTraces().empty());
-
-                           dispatcher_->exit();
-                         });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
@@ -408,8 +284,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainThenCancel) {
   resolver_.reset();
 }
 
-TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccessWithTrace) {
-  config_.set_enable_trace(true);
+TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccess) {
   initialize();
 
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
@@ -448,35 +323,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccessWithTrace) {
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
-TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccessWithoutTrace) {
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
-
-  config_.mutable_num_retries()->set_value(3);
-  initialize();
-
-  // 4 calls - 3 EAGAIN, 1 success.
-  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .Times(4)
-      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
-      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                                std::list<DnsResponse>&& response) {
-                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
-                           EXPECT_TRUE(response.empty());
-                           EXPECT_TRUE(active_dns_query_->getTraces().empty());
-
-                           dispatcher_->exit();
-                         });
-
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-}
-
-TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailureWithTrace) {
-  config_.set_enable_trace(true);
+TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailure) {
   initialize();
 
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
@@ -512,34 +359,6 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailureWithTrace) {
 
         dispatcher_->exit();
       });
-
-  dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-}
-
-TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailureWithoutTrace) {
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
-
-  config_.mutable_num_retries()->set_value(3);
-  initialize();
-
-  // 4 calls - 4 EAGAIN.
-  EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-      .Times(4)
-      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
-      .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}));
-  active_dns_query_ =
-      resolver_->resolve("localhost", DnsLookupFamily::All,
-                         [this](DnsResolver::ResolutionStatus status, absl::string_view details,
-                                std::list<DnsResponse>&& response) {
-                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
-                           EXPECT_FALSE(details.empty());
-                           EXPECT_TRUE(response.empty());
-                           EXPECT_TRUE(active_dns_query_->getTraces().empty());
-
-                           dispatcher_->exit();
-                         });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }

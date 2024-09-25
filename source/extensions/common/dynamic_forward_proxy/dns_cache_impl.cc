@@ -49,7 +49,8 @@ DnsCacheImpl::DnsCacheImpl(
       file_system_(context.serverFactoryContext().api().fileSystem()),
       validation_visitor_(context.messageValidationVisitor()),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
-      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
+      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)),
+      runtime_(context.serverFactoryContext().runtime()) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
 
   loadCacheEntries(config);
@@ -418,7 +419,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   }();
 
   std::string details_with_maybe_trace = std::string(details);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_trace")) {
+  if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
     if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
       std::string trace = primary_host_info->active_query_->getTraces().empty()
                               ? ""
