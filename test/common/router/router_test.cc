@@ -6795,7 +6795,9 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
 class TestOrcaLoadReportCallbacks : public Filter::OrcaLoadReportCallbacks {
 public:
   MOCK_METHOD(absl::Status, onOrcaLoadReport,
-              (const xds::data::orca::v3::OrcaLoadReport& orca_load_report), (override));
+              (const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+               const Upstream::HostDescription&),
+              (override));
 };
 
 TEST_F(RouterTest, OrcaLoadReportCallbacks) {
@@ -6812,10 +6814,11 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   router_->decodeHeaders(headers, true);
 
   // Configure ORCA callbacks to receive the report.
-  TestOrcaLoadReportCallbacks callbacks;
+  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(callbacks, onOrcaLoadReport(_))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                           const Upstream::HostDescription&) {
         received_orca_load_report = orca_load_report;
         return absl::OkStatus();
       }));
@@ -6863,10 +6866,11 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   router_->decodeHeaders(headers, true);
 
   // Configure ORCA callbacks to receive the report.
-  TestOrcaLoadReportCallbacks callbacks;
+  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(callbacks, onOrcaLoadReport(_))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                           const Upstream::HostDescription&) {
         received_orca_load_report = orca_load_report;
         // Return an error that gets logged by router filter.
         return absl::InvalidArgumentError("Unexpected ORCA load Report");
@@ -6901,8 +6905,8 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
 
   // Configure ORCA callbacks to receive the report, but don't expect it to be
   // called for invalid orca header.
-  TestOrcaLoadReportCallbacks callbacks;
-  EXPECT_CALL(callbacks, onOrcaLoadReport(_)).Times(0);
+  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
+  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _)).Times(0);
   router_->setOrcaLoadReportCallbacks(callbacks);
 
   // Send report with invalid ORCA proto.
