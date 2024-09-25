@@ -486,10 +486,6 @@ private:
   DecodingProcessorState decoding_state_;
   EncodingProcessorState encoding_state_;
 
-  // The gRPC stream to the external processor, which will be opened
-  // when it's time to send the first message.
-  ExternalProcessorStream* stream_ = nullptr;
-
   // Set to true when no more messages need to be sent to the processor.
   // This happens when the processor has closed the stream, or when it has
   // failed.

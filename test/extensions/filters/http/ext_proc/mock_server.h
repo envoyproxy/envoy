@@ -17,6 +17,10 @@ public:
               (ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
                const Envoy::Http::AsyncClient::StreamOptions&,
                Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&));
+  MOCK_METHOD(ExternalProcessorStream*, stream, ());
+  MOCK_METHOD(void, setStream, (ExternalProcessorStream * stream));
+
+  ExternalProcessorStream* stream_ = nullptr;
 };
 
 class MockStream : public ExternalProcessorStream {
