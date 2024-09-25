@@ -237,6 +237,7 @@ def envoy_cc_test_library(
         visibility = ["//visibility:public"],
         alwayslink = alwayslink,
         disable_pch = disable_pch,
+        exec_properties = exec_properties,
         **kargs
     )
 

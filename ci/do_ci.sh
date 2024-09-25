@@ -344,7 +344,7 @@ case $CI_TARGET in
         # fi
         ;;
 
-    check_and_fix_proto_format)
+    format-api|check_and_fix_proto_format)
         setup_clang_toolchain
         echo "Check and fix proto format ..."
         "${ENVOY_SRCDIR}/ci/check_and_fix_format.sh"
