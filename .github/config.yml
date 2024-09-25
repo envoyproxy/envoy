@@ -23,6 +23,13 @@ checks:
   #
   # For example if macos is marked as `required: true` but then has a path
   # selection that means its doesnt run the check will be `skipped` and pass
+  checks:
+    name: Envoy/Checks
+    on-run:
+    - check-build
+    - check-coverage
+    - check-san
+    required: true
   macos:
     name: Envoy/macOS
     required: true
@@ -32,6 +39,8 @@ checks:
     name: Envoy/Prechecks
     on-run:
     - precheck-deps
+    - precheck-format
+    - precheck-publish
     required: true
     # yamllint disable rule:line-length
     advice:
@@ -95,6 +104,15 @@ run:
     - envoy/**/*
     - source/**/*
     - test/**/*
+  check-build:
+    paths:
+    - "**/*"
+  check-coverage:
+    paths:
+    - "**/*"
+  check-san:
+    paths:
+    - "**/*"
   precheck-deps:
     paths:
     - .bazelrc
@@ -107,6 +125,13 @@ run:
     - "**/requirements.txt"
     - "**/go.mod"
     - "**/Dockerfile*"
+    push: paths
+  precheck-format:
+    paths:
+    - "**/*"
+  precheck-publish:
+    paths:
+    - "**/*"
   publish:
     paths:
     - .bazelrc
