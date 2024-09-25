@@ -14,12 +14,11 @@ on:
     - completed
 
 concurrency:
-  group: >-
-    ${{ github.actor != 'trigger-release-envoy[bot]'
-        && github.event.inputs.head_ref
-        || github.run_id
-    }}-${{ github.event.workflow.id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG }}
 
 
 jobs:
@@ -35,12 +34,8 @@ jobs:
       packages: read
       pull-requests: read
     if: >-
-      ${{ (github.repository == 'envoyproxy/envoy'
-           || vars.ENVOY_CI)
-          && (!contains(github.actor, '[bot]')
-              || github.actor == 'trigger-workflow-envoy[bot]'
-              || github.actor == 'trigger-release-envoy[bot]')
-      }}
+      ${{ github.event.workflow_run.conclusion == 'success'
+       && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI) }}
     uses: ./.github/workflows/_load.yml
     with:
       check-name: publish
