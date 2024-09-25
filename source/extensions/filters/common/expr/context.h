@@ -196,8 +196,7 @@ public:
   ResponseWrapper(Protobuf::Arena& arena, const ::Envoy::Http::ResponseHeaderMap* headers,
                   const ::Envoy::Http::ResponseTrailerMap* trailers,
                   const StreamInfo::StreamInfo& info)
-      : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info),
-        timing_(info) {}
+      : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
