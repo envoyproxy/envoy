@@ -30,7 +30,9 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+       && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI) }}
     uses: ./.github/workflows/_load.yml
     with:
       check-name: checks
