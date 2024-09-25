@@ -1078,9 +1078,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
-  // set to true and filter is waiting for header processing response.
+  // set to true, send_body_without_waiting_for_header_response set to false,
+  // and filter is waiting for header processing response.
   // Otherwise, the response mode_override proto field is ignored.
-  if (config_->allowModeOverride() && inHeaderProcessState() && response->has_mode_override()) {
+  if (config_->allowModeOverride() && !config_->sendBodyWithoutWaitingForHeaderResponse() &&
+      inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
     const auto& mode_overide = response->mode_override();
     // First, check if mode override allow-list is configured
