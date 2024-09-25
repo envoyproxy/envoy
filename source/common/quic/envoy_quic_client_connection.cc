@@ -242,7 +242,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   ASSERT(events & (Event::FileReadyType::Read | Event::FileReadyType::Write));
 
   if (events & Event::FileReadyType::Write) {
-    OnCanWrite();
+    OnBlockedWriterCanWrite();
   }
 
   bool is_probing_socket =
@@ -261,14 +261,15 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
         *this, dispatcher_.timeSource(), prefer_gro_, !disallow_mmsg_, packets_dropped_);
     if (err == nullptr) {
-      // In the case where the path validation fails, the probing socket will be closed and its IO
-      // events are no longer interesting.
-      if (!is_probing_socket || HasPendingPathValidation() ||
-          connectionSocket().get() == &connection_socket) {
+      // If this READ event is on the probing socket and any packet read failed the path validation
+      // (i.e. via STATELESS_RESET), the probing socket should have been closed and the default
+      // socket remained unchanged. In this case any remaining unread packets are no longer
+      // interesting. Only re-register READ event to continue reading the remaining packets in the
+      // next loop if this is not the case.
+      if (!(is_probing_socket && !HasPendingPathValidation() &&
+            connectionSocket().get() != &connection_socket)) {
         connection_socket.ioHandle().activateFileEvents(Event::FileReadyType::Read);
-        return;
       }
-
     } else if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
                      err->getErrorDetails());

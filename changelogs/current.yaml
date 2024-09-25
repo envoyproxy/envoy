@@ -47,6 +47,13 @@ behavior_changes:
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
     See the config examples from the above ``internal_address_config`` link. This default no trust internal address can be turned on by
     setting runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` to ``true``.
+- area: http
+  change: |
+    The access log handlers that added by the filters will be evaluated before the access
+    log handlers that configured in the :ref:`access_log configuration
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log>`.
+    This change can be disabled by setting the runtime guard flag
+    ``envoy.reloadable_features.filter_access_loggers_first`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -132,6 +139,12 @@ bug_fixes:
   change: |
     RBAC will now allow stat prefixes configured in per-route config to override the base config's
     stat prefix.
+- area: http2
+  change: |
+    Fixed bug where an upstream that sent a GOAWAY and gracefully closed a connection would result in an increment of
+    the cluster stat ``upstream_cx_protocol_error`` and setting the ``UpstreamProtocolError`` response flag. This behavior
+    can be reverted by setting the runtime guard ``envoy.reloadable_features.http2_no_protocol_error_upon_clean_close``
+    to false.
 - area: http3
   change: |
     Fixed a bug where an empty trailers block could be sent. This would occur if a filter removed
@@ -167,6 +180,18 @@ bug_fixes:
 - area: http_async_client
   change: |
     Fixed the local reply and destroy order crashes when using the http async client for websocket handshake.
+- area: http3
+  change: |
+    Fixed a bug in the CONNECT-UDP forwarding mode where Envoy reset the upstream stream when it
+    received HTTP/3 datagrams before receiving the SETTINGS frame from the upstream peer. Envoy now
+    drops the datagrams in this case instead of resetting the stream.
+- area: oauth
+  change: |
+    Set token cookies in response regardless of :ref:`forward_bearer_token
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>` config option.
+- area: tracing
+  change: |
+    Fixed a bug where the OpenTelemetry tracer exports the OTLP request even when no spans are present.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -190,6 +215,9 @@ removed_config_or_runtime:
 - area: tls
   change: |
     Removed runtime flag ``envoy.reloadable_features.ssl_transport_failure_reason_format``.
+- area: dynamic_foward_proxy
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.dfp_mixed_scheme`` and legacy code path.
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.abort_filter_chain_on_stream_reset`` and legacy
@@ -386,5 +414,29 @@ new_features:
     Added support to provide an override
     :ref:`authentication_header <envoy_v3_api_field_extensions.filters.http.basic_auth.v3.BasicAuth.authentication_header>`
     to load Basic Auth credential.
+- area: quic
+  change: |
+    Added ``max_packet_length`` to the QUIC protocol options to allow users to change the largest
+    size of a QUIC packet that can be transmitted over the QUIC connection.
+- area: oauth
+  change: |
+    Added :ref:`disable_access_token_set_cookie
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_access_token_set_cookie>`
+    to disable setting the Access Token cookie.
+- area: oauth
+  change: |
+    Added :ref:`disable_refresh_token_set_cookie
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_refresh_token_set_cookie>`
+    to disable setting the Refresh Token cookie.
+- area: ext_proc
+  change: |
+    Added allow list
+    :ref:`allowed_override_modes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allowed_override_modes>`
+    for :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
+- area: load_balancing
+  change: |
+    WIP: Added implementation of :ref:`client_side_weighted_round_robin
+    <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
+    load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
 
 deprecated:

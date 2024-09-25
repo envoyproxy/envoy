@@ -35,7 +35,6 @@ RUNTIME_GUARD(envoy_reloadable_features_check_switch_protocol_websocket_handshak
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_consistent_header_validation);
 RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
-RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_dns_details);
 RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
@@ -47,6 +46,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 RUNTIME_GUARD(envoy_reloadable_features_exclude_host_in_eds_status_draining);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_timeout_error);
 RUNTIME_GUARD(envoy_reloadable_features_extend_h3_accept_untrusted);
+RUNTIME_GUARD(envoy_reloadable_features_filter_access_loggers_first);
 RUNTIME_GUARD(envoy_reloadable_features_gcp_authn_use_fixed_url);
 RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_num_retries);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
@@ -55,6 +55,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_ex
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year.
 RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
+RUNTIME_GUARD(envoy_reloadable_features_http2_no_protocol_error_upon_clean_close);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year.
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_visitor_for_data);
 RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);

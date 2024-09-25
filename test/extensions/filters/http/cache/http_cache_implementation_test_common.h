@@ -63,6 +63,7 @@ protected:
 
   std::shared_ptr<HttpCache> cache() const { return delegate_->cache(); }
   bool validationEnabled() const { return delegate_->validationEnabled(); }
+  void pumpIntoDispatcher() { delegate_->beforePumpingDispatcher(); }
   void pumpDispatcher() { delegate_->pumpDispatcher(); }
   LookupContextPtr lookup(absl::string_view request_path);
 
@@ -90,6 +91,8 @@ protected:
                      const ResponseMetadata& metadata);
 
   LookupRequest makeLookupRequest(absl::string_view request_path);
+
+  LookupContextPtr lookupContextWithAllParts();
 
   testing::AssertionResult
   expectLookupSuccessWithHeaders(LookupContext* lookup_context,
