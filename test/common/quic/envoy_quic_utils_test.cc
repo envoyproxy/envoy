@@ -335,7 +335,7 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
         connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
             .return_value_ == 0);
     EXPECT_EQ(value, IPV6_PMTUDISC_DO);
-    // v4 DF option is not applied.
+    // The v4 socket option is not applied to v6-only socket.
     value = 0;
     val_length = sizeof(value);
     RELEASE_ASSERT(
@@ -365,7 +365,7 @@ TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
         connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
             .return_value_ == 0);
     EXPECT_EQ(value, IPV6_PMTUDISC_DO);
-    // v4 DF socket option is also applied to dual stack socket.
+    // The v4 socket option is also applied to dual stack socket.
     value = 0;
     val_length = sizeof(value);
     RELEASE_ASSERT(
