@@ -38,7 +38,7 @@ jobs:
     uses: ./.github/workflows/_load.yml
     with:
       check-name: checks
-      head-sha: ${{ github.sha }}
+      # head-sha: ${{ github.sha }}
 
   build:
     secrets:
