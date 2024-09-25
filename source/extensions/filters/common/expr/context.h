@@ -48,6 +48,7 @@ constexpr absl::string_view CodeDetails = "code_details";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
 constexpr absl::string_view GrpcStatus = "grpc_status";
+constexpr absl::string_view BackendLatency = "backend_latency";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
@@ -95,19 +96,6 @@ constexpr absl::string_view FilterChainName = "filter_chain_name";
 constexpr absl::string_view ListenerMetadata = "listener_metadata";
 constexpr absl::string_view ListenerDirection = "listener_direction";
 constexpr absl::string_view Node = "node";
-
-// Stream duration properties
-constexpr absl::string_view StreamDuration = "stream_duration";
-constexpr absl::string_view FirstUpstreamTxByteSent = "first_upstream_tx_byte_sent";
-constexpr absl::string_view LastUpstreamTxByteSent = "last_upstream_tx_byte_sent";
-constexpr absl::string_view FirstUpstreamRxByteReceived = "first_upstream_rx_byte_received";
-constexpr absl::string_view LastUpstreamRxByteReceived = "last_upstream_rx_byte_received";
-constexpr absl::string_view UpstreamHandshakeComplete = "upstream_handshake_complete";
-constexpr absl::string_view FirstDownstreamTxByteSent = "first_downstream_tx_byte_sent";
-constexpr absl::string_view LastDownstreamTxByteSent = "last_downstream_tx_byte_sent";
-constexpr absl::string_view LastDownstreamRxByteReceived = "last_downstream_rx_byte_received";
-constexpr absl::string_view DownstreamHandshakeComplete = "downstream_handshake_complete";
-constexpr absl::string_view LastDownstreamAckReceived = "last_downstream_ack_received";
 
 class WrapperFieldValues {
 public:
@@ -208,22 +196,14 @@ public:
   ResponseWrapper(Protobuf::Arena& arena, const ::Envoy::Http::ResponseHeaderMap* headers,
                   const ::Envoy::Http::ResponseTrailerMap* trailers,
                   const StreamInfo::StreamInfo& info)
-      : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
+      : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info),
+        timing_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
 private:
   const HeadersWrapper<::Envoy::Http::ResponseHeaderMap> headers_;
   const HeadersWrapper<::Envoy::Http::ResponseTrailerMap> trailers_;
   const StreamInfo::StreamInfo& info_;
-};
-
-class StreamDurationWrapper : public BaseWrapper {
-public:
-  StreamDurationWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
-      : BaseWrapper(arena), timing_(info) {}
-  absl::optional<CelValue> operator[](CelValue key) const override;
-
-private:
   Envoy::StreamInfo::TimingUtility timing_;
 };
 

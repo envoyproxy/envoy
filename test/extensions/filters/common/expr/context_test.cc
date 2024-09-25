@@ -236,60 +236,6 @@ TEST(Context, RequestAttributes) {
   }
 }
 
-TEST(Context, StreamDuration) {
-  DangerousDeprecatedTestTime test_time;
-  MonotonicTime pre_start = test_time.timeSystem().monotonicTime();
-  StreamInfo::StreamInfoImpl info(Http::Protocol::Http2, test_time.timeSystem(), nullptr,
-                                  StreamInfo::FilterState::LifeSpan::FilterChain);
-  info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
-  StreamInfo::UpstreamTiming& upstream_timing = info.upstreamInfo()->upstreamTiming();
-  MonotonicTime post_start = test_time.timeSystem().monotonicTime();
-
-  const MonotonicTime& start = info.startTimeMonotonic();
-
-  EXPECT_LE(pre_start, start) << "Start time was lower than expected";
-  EXPECT_GE(post_start, start) << "Start time was higher than expected";
-
-  Protobuf::Arena arena;
-  StreamDurationWrapper wrapper(arena, info);
-
-  EXPECT_FALSE(wrapper[CelValue::CreateStringView(FirstUpstreamTxByteSent)]);
-  upstream_timing.onFirstUpstreamTxByteSent(test_time.timeSystem());
-  EXPECT_TRUE(wrapper[CelValue::CreateStringView(FirstUpstreamTxByteSent)]);
-
-  EXPECT_FALSE(wrapper[CelValue::CreateStringView(LastUpstreamTxByteSent)]);
-  upstream_timing.onLastUpstreamTxByteSent(test_time.timeSystem());
-  EXPECT_TRUE(wrapper[CelValue::CreateStringView(LastUpstreamTxByteSent)]);
-
-  EXPECT_FALSE(wrapper[CelValue::CreateStringView(FirstUpstreamRxByteReceived)]);
-  upstream_timing.onFirstUpstreamRxByteReceived(test_time.timeSystem());
-  EXPECT_TRUE(wrapper[CelValue::CreateStringView(FirstUpstreamRxByteReceived)]);
-
-  EXPECT_FALSE(wrapper[CelValue::CreateStringView(LastUpstreamRxByteReceived)]);
-  upstream_timing.onLastUpstreamRxByteReceived(test_time.timeSystem());
-  EXPECT_TRUE(wrapper[CelValue::CreateStringView(LastUpstreamRxByteReceived)]);
-
-  EXPECT_FALSE(wrapper[CelValue::CreateStringView(FirstDownstreamTxByteSent)]);
-  info.downstreamTiming().onFirstDownstreamTxByteSent(test_time.timeSystem());
-  EXPECT_TRUE(wrapper[CelValue::CreateStringView(FirstDownstreamTxByteSent)]);
-
-  EXPECT_FALSE(wrapper[CelValue::CreateStringView(LastDownstreamTxByteSent)]);
-  info.downstreamTiming().onLastDownstreamTxByteSent(test_time.timeSystem());
-  EXPECT_TRUE(wrapper[CelValue::CreateStringView(LastDownstreamTxByteSent)]);
-
-  EXPECT_FALSE(wrapper[CelValue::CreateStringView(DownstreamHandshakeComplete)]);
-  info.downstreamTiming().onDownstreamHandshakeComplete(test_time.timeSystem());
-  EXPECT_TRUE(wrapper[CelValue::CreateStringView(DownstreamHandshakeComplete)]);
-
-  EXPECT_FALSE(wrapper[CelValue::CreateStringView(UpstreamHandshakeComplete)]);
-  upstream_timing.onUpstreamHandshakeComplete(test_time.timeSystem());
-  EXPECT_TRUE(wrapper[CelValue::CreateStringView(UpstreamHandshakeComplete)]);
-
-  EXPECT_FALSE(wrapper[CelValue::CreateStringView(LastDownstreamAckReceived)]);
-  info.downstreamTiming().onLastDownstreamAckReceived(test_time.timeSystem());
-  EXPECT_TRUE(wrapper[CelValue::CreateStringView(LastDownstreamAckReceived)]);
-}
-
 TEST(Context, RequestFallbackAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Http::TestRequestHeaderMapImpl header_map{
@@ -463,6 +409,14 @@ TEST(Context, ResponseAttributes) {
   {
     auto value = empty_response[CelValue::CreateStringView(CodeDetails)];
     EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+    StreamInfo::UpstreamTiming& upstream_timing = info.upstreamInfo()->upstreamTiming();
+    upstream_timing.onFirstUpstreamTxByteSent(info.timeSource());
+    upstream_timing.onLastUpstreamRxByteReceived(info.timeSource());
+    EXPECT_TRUE(response[CelValue::CreateStringView(BackendLatency)].has_value());
   }
 
   {
