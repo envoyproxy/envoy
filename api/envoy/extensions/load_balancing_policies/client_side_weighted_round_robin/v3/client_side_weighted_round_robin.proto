@@ -15,7 +15,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/loa
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Client-Side Weighted Round Robin Load Balancing Policy]
-// [#not-implemented-hide:]
+// [#extension: envoy.load_balancing_policies.client_side_weighted_round_robin]
 
 // Configuration for the client_side_weighted_round_robin LB policy.
 //
