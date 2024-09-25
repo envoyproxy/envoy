@@ -152,6 +152,8 @@ public:
     return default_refresh_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
+  bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
+  bool disableRefreshTokenSetCookie() const { return disable_refresh_token_set_cookie_; }
   const OptRef<const RouteRetryPolicy> retryPolicy() const {
     if (!retry_policy_.has_value()) {
       return absl::nullopt;
@@ -186,6 +188,8 @@ private:
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
   const bool disable_id_token_set_cookie_ : 1;
+  const bool disable_access_token_set_cookie_ : 1;
+  const bool disable_refresh_token_set_cookie_ : 1;
   absl::optional<RouteRetryPolicy> retry_policy_;
 };
 

@@ -71,12 +71,9 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
     port = dynamic_port_filter_state->value();
   } else {
     port = config_->port();
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_mixed_scheme")) {
-      read_callbacks_->connection().streamInfo().filterState()->setData(
-          "envoy.upstream.dynamic_port", std::make_shared<StreamInfo::UInt32AccessorImpl>(port),
-          StreamInfo::FilterState::StateType::Mutable,
-          StreamInfo::FilterState::LifeSpan::Connection);
-    }
+    read_callbacks_->connection().streamInfo().filterState()->setData(
+        "envoy.upstream.dynamic_port", std::make_shared<StreamInfo::UInt32AccessorImpl>(port),
+        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   auto result = config_->cache().loadDnsCacheEntry(host, port, false, *this);

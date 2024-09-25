@@ -59,7 +59,7 @@ jobs:
           name: Release (x64)
           arch: x64
           bazel-extra: >-
-            --config=rbe-envoy-engflow
+            --config=remote-envoy-engflow
           rbe: true
           runs-on: ubuntu-24.04
         - target: release.server_only
@@ -67,6 +67,7 @@ jobs:
           arch: arm64
           bazel-extra: >-
             --config=cache-envoy-engflow
+            --config=common-envoy-engflow
             --config=bes-envoy-engflow
           rbe: false
           runs-on: envoy-arm64-medium
@@ -85,6 +86,7 @@ jobs:
     with:
       bazel-extra: >-
         --config=cache-envoy-engflow
+        --config=common-envoy-engflow
         --config=bes-envoy-engflow
       downloads: |
         release.${{ matrix.arch }}: release/${{ matrix.arch }}/bin/
