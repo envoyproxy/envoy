@@ -35,7 +35,7 @@ public:
 
   absl::optional<OverrideHost> overrideHostToSelect() const override { return {}; }
 
-  void setOrcaLoadReportCallbacks(OrcaLoadReportCallbacks&) override {}
+  void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks>) override {}
 };
 
 } // namespace Upstream
