@@ -141,6 +141,10 @@ void Tracer::enableTimer() {
 }
 
 void Tracer::flushSpans() {
+  if (span_buffer_.empty()) {
+    return;
+  }
+
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
