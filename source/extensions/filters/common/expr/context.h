@@ -8,6 +8,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
+#include "source/common/stream_info/utility.h"
 
 #include "eval/public/cel_value.h"
 #include "eval/public/containers/container_backed_list_impl.h"
@@ -47,6 +48,7 @@ constexpr absl::string_view CodeDetails = "code_details";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
 constexpr absl::string_view GrpcStatus = "grpc_status";
+constexpr absl::string_view BackendLatency = "backend_latency";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
