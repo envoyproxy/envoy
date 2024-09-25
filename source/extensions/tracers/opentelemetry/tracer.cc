@@ -127,6 +127,8 @@ convertGrpcStatusToTraceStatusCode(::opentelemetry::proto::trace::v1::Span_SpanK
                                    absl::string_view value) {
   uint64_t grpc_status_code;
   if (!absl::SimpleAtoi(value, &grpc_status_code)) {
+    // If the value is not a number, we can't map it to a status code.
+    // In this case, we should leave the status code unset.
     return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_UNSET;
   }
 
