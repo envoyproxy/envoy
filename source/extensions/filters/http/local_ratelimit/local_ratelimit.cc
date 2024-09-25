@@ -76,6 +76,16 @@ FilterConfig::FilterConfig(
       config.rate_limits(), context, creation_status);
   THROW_IF_NOT_OK_REF(creation_status);
 
+  if (rate_limit_config_->empty()) {
+    if (!config.descriptors().empty()) {
+      ENVOY_LOG_FIRST_N(
+          warn, 20,
+          "'descriptors' are set for local rate limit filter but no 'rate_limits' "
+          "are configured in the filter config. Please use the 'rate_limits' field "
+          "in filter config to instead of the 'rate_limits' field in the route config.");
+    }
+  }
+
   Filters::Common::LocalRateLimit::ShareProviderSharedPtr share_provider;
   if (config.has_local_cluster_rate_limit()) {
     if (rate_limit_per_connection_) {

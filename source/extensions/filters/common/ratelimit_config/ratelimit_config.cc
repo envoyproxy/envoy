@@ -12,7 +12,18 @@ namespace RateLimit {
 
 RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
                                  Server::Configuration::CommonFactoryContext& context,
-                                 absl::Status& creation_status) {
+                                 absl::Status& creation_status, bool no_limit) {
+  if (config.has_stage() || !config.disable_key().empty()) {
+    ENVOY_LOG(warn, "'stage' field and 'disable_key' field are not supported");
+  }
+
+  if (config.has_limit()) {
+    if (no_limit) {
+      ENVOY_LOG(warn, "'limit' field is only supported in filter that calls remote rate "
+                      "limit service.");
+    }
+  }
+
   for (const ProtoRateLimit::Action& action : config.actions()) {
     switch (action.action_specifier_case()) {
     case ProtoRateLimit::Action::ActionSpecifierCase::kSourceCluster:
@@ -103,9 +114,10 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
 
 RateLimitConfig::RateLimitConfig(const Protobuf::RepeatedPtrField<ProtoRateLimit>& configs,
                                  Server::Configuration::CommonFactoryContext& context,
-                                 absl::Status& creation_status) {
+                                 absl::Status& creation_status, bool no_limit) {
   for (const ProtoRateLimit& config : configs) {
-    auto descriptor_generator = std::make_unique<RateLimitPolicy>(config, context, creation_status);
+    auto descriptor_generator =
+        std::make_unique<RateLimitPolicy>(config, context, creation_status, no_limit);
     if (!creation_status.ok()) {
       return;
     }

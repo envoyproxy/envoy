@@ -16,11 +16,11 @@ namespace RateLimit {
 using ProtoRateLimit = envoy::config::route::v3::RateLimit;
 using RateLimitDescriptors = std::vector<Envoy::RateLimit::LocalDescriptor>;
 
-class RateLimitPolicy {
+class RateLimitPolicy : Logger::Loggable<Envoy::Logger::Id::config> {
 public:
   RateLimitPolicy(const ProtoRateLimit& config,
                   Server::Configuration::CommonFactoryContext& context,
-                  absl::Status& creation_status);
+                  absl::Status& creation_status, bool no_limit = true);
 
   void populateDescriptors(const Http::RequestHeaderMap& headers,
                            const StreamInfo::StreamInfo& info,
@@ -31,11 +31,11 @@ private:
   std::vector<Envoy::RateLimit::DescriptorProducerPtr> actions_;
 };
 
-class RateLimitConfig {
+class RateLimitConfig : Logger::Loggable<Envoy::Logger::Id::config> {
 public:
   RateLimitConfig(const Protobuf::RepeatedPtrField<ProtoRateLimit>& configs,
                   Server::Configuration::CommonFactoryContext& context,
-                  absl::Status& creation_status);
+                  absl::Status& creation_status, bool no_limit = true);
 
   bool empty() const { return rate_limit_policies_.empty(); }
 

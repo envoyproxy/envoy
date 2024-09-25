@@ -95,6 +95,27 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
+TEST_F(RateLimitConfigTest, MeaninglessAndForCoverage) {
+  {
+    const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    stage: 2
+    disable_key: anything
+    limit:
+      dynamic_metadata:
+        metadata_key:
+          key: key
+          path:
+          - key: key
+  )EOF";
+
+    factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+    setupTest(yaml);
+  }
+}
+
 TEST_F(RateLimitConfigTest, NoAction) {
   {
     const std::string yaml = R"EOF(

@@ -70,7 +70,8 @@ private:
 /**
  * Global configuration for the HTTP local rate limit filter.
  */
-class FilterConfig : public Router::RouteSpecificFilterConfig {
+class FilterConfig : public Router::RouteSpecificFilterConfig,
+                     Logger::Loggable<Logger::Id::config> {
 public:
   FilterConfig(const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
                Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
