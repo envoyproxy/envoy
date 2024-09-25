@@ -60,6 +60,7 @@ MockHost::MockHost() : socket_factory_(new testing::NiceMock<Network::MockTransp
   ON_CALL(*this, loadMetricStats()).WillByDefault(ReturnRef(load_metric_stats_));
   ON_CALL(*this, warmed()).WillByDefault(Return(true));
   ON_CALL(*this, transportSocketFactory()).WillByDefault(ReturnRef(*socket_factory_));
+  ON_CALL(*this, lbPolicyData()).WillByDefault(ReturnRef(lb_policy_data_));
 }
 
 MockHost::~MockHost() = default;

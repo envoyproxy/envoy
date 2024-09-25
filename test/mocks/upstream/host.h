@@ -236,6 +236,7 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
+  HostLbPolicyDataPtr lb_policy_data_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
