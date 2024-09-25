@@ -212,16 +212,16 @@ class TimingUtility {
 public:
   TimingUtility(const StreamInfo& info) : stream_info_(info) {}
 
-  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const;
-  absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const;
-  absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const;
-  absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const;
-  absl::optional<std::chrono::nanoseconds> upstreamHandshakeComplete() const;
-  absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const;
-  absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const;
-  absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const;
-  absl::optional<std::chrono::nanoseconds> downstreamHandshakeComplete() const;
-  absl::optional<std::chrono::nanoseconds> lastDownstreamAckReceived() const;
+  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent();
+  absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent();
+  absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> upstreamHandshakeComplete();
+  absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent();
+  absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
+  absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> downstreamHandshakeComplete();
+  absl::optional<std::chrono::nanoseconds> lastDownstreamAckReceived();
 
 private:
   const StreamInfo& stream_info_;
