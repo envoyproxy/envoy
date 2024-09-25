@@ -9,7 +9,9 @@ permissions:
 on:
   workflow_run:
     workflows:
-    - Envoy/Prechecks
+    # Workaround issue with PRs not triggering tertiary workflows
+    - Request
+    # - Envoy/Prechecks
     types:
     - completed
 
