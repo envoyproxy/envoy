@@ -94,9 +94,9 @@ jobs:
         gh api \
             -H "Accept: application/vnd.github+json" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
-            /repos/envoyproxy/envoy/actions/runs/${{ inputs.run-id }} \
+            /repos/${{ github.repository }}/actions/runs/${{ inputs.run-id }} \
           | jq '.'
-        RUNID=$(gh run view ${{ inputs.run-id }} --repo envoyproxy/envoy --json databaseId | jq -r '.databaseId')
+        RUNID=$(gh run view ${{ inputs.run-id }} --repo ${{ github.repository }} --json databaseId | jq -r '.databaseId')
         echo "value=${RUNID}" >> "$GITHUB_OUTPUT"
       id: run-id
       if: ${{ inputs.runs-after == true }}
