@@ -685,6 +685,13 @@ public:
    * @return wrapped list value.
    */
   static ProtobufWkt::Value listValue(const std::vector<ProtobufWkt::Value>& values);
+
+  /**
+   * Convert a ProtobufWkt::Value to a JSON string.
+   * @param value message of type type.googleapis.com/google.protobuf.Value
+   * @param dest JSON string.
+   */
+  static void toJsonString(const ProtobufWkt::Value& value, std::string& dest);
 };
 
 /**

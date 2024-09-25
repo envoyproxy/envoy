@@ -217,6 +217,7 @@ envoy_cc_library(
         "//source/common/common:documentation_url_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
+        "//source/common/json:json_streamer_lib",
         "//source/common/protobuf:visitor_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_github_cncf_xds//udpa/annotations:pkg_cc_proto",

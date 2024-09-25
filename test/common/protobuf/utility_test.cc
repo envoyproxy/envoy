@@ -216,11 +216,10 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
-  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
+  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated), testing::ContainsRegex("\\[value: 10\n\\]"));
   repeated.Add()->set_value(20);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
+              testing::ContainsRegex("\\[value: 10\n, value: 20\n\\]"));
 }
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
@@ -1356,6 +1355,125 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObjectWithIgnoredEntries) {
   EXPECT_TRUE(checkProtoEquality(
       ValueUtil::loadFromYaml("!ignore foo: bar\nbaz: qux"),
       "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }"));
+}
+
+TEST_F(ProtobufUtilityTest, ValueToJson) {
+  {
+    // null
+    ProtobufWkt::Value v;
+
+    std::string json_string;
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, "null");
+    json_string.clear();
+
+    v.set_null_value(ProtobufWkt::NULL_VALUE);
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, "null");
+  }
+
+  {
+    // bool
+    ProtobufWkt::Value v;
+    v.set_bool_value(true);
+
+    std::string json_string;
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, "true");
+    json_string.clear();
+
+    v.set_bool_value(false);
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, "false");
+  }
+
+  {
+    // number
+    ProtobufWkt::Value v;
+    v.set_number_value(1);
+
+    std::string json_string;
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, "1");
+    json_string.clear();
+
+    v.set_number_value(1.1);
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, "1.1");
+  }
+
+  {
+    // string
+    ProtobufWkt::Value v;
+    v.set_string_value("foo");
+
+    std::string json_string;
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, "\"foo\"");
+  }
+
+  {
+    // struct
+    ProtobufWkt::Value v;
+    auto* struct_value = v.mutable_struct_value();
+
+    std::string json_string;
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, R"EOF({})EOF");
+    json_string.clear();
+
+    struct_value->mutable_fields()->insert({"foo", ValueUtil::stringValue("bar")});
+
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, R"EOF({"foo":"bar"})EOF");
+  }
+
+  {
+    // list
+    ProtobufWkt::Value v;
+    auto* list_value = v.mutable_list_value();
+
+    std::string json_string;
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, R"EOF([])EOF");
+    json_string.clear();
+
+    list_value->add_values()->set_string_value("foo");
+    list_value->add_values()->set_string_value("bar");
+
+    ValueUtil::toJsonString(v, json_string);
+    EXPECT_EQ(json_string, R"EOF(["foo","bar"])EOF");
+  }
+
+  {
+    // Complex structure
+    const std::string yaml = R"EOF(
+    a:
+      a:
+        - a: 1
+          b: 2
+      b:
+        - a: 3
+          b: 4
+        - a: 5
+      c: true
+      d: [5, 3.14]
+      e: foo
+      f: 1.1
+    b: [1, 2, 3]
+    c: bar
+    )EOF";
+
+    ProtobufWkt::Value v;
+    MessageUtil::loadFromYaml(yaml, v, ProtobufMessage::getNullValidationVisitor());
+
+    std::string json_string;
+    ValueUtil::toJsonString(v, json_string);
+
+    EXPECT_EQ(
+        json_string,
+        R"EOF({"a":{"a":[{"a":1,"b":2}],"b":[{"a":3,"b":4},{"a":5}],"c":true,"d":[5,"3.14"],"e":"foo","f":"1.1"},"b":[1,2,3],"c":"bar"})EOF");
+  }
 }
 
 TEST(LoadFromYamlExceptionTest, BadConversion) {
