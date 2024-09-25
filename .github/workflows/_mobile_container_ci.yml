@@ -141,6 +141,7 @@ jobs:
       container-output: ${{ inputs.container-output }}
       command: ${{ inputs.command }}
       concurrency-suffix: ${{ inputs.concurrency-suffix }}
+      docker-ipv6: false
       entrypoint: ${{ inputs.entrypoint || inputs.entrypoint-DEFAULT }}
       downloads: ${{ inputs.downloads }}
       error-match: ${{ inputs.error-match }}
