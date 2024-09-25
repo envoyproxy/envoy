@@ -77,6 +77,10 @@ minor_behavior_changes:
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
+- area: ext_proc
+  change: |
+    Added support for :ref:`send_body_without_waiting_for_header_response
+    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`.
 - area: http
   change: |
     Modified the authority header value validator to allow the same characters as oghttp2

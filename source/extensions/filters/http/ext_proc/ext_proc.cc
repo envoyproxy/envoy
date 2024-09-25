@@ -189,6 +189,8 @@ FilterConfig::FilterConfig(
       deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
                                                          DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
       message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
+      send_body_without_waiting_for_header_response_(
+          config.send_body_without_waiting_for_header_response()),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       processing_mode_(config.processing_mode()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -495,16 +497,22 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   }
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
-    // We don't know what to do with the body until the response comes back.
-    // We must buffer it in case we need it when that happens.
-    // Raise a watermark to prevent a buffer overflow until the response comes back.
-    // When end_stream is true, we need to StopIterationAndWatermark as well to stop the
-    // ActiveStream from returning error when the last chunk added to stream buffer exceeds the
-    // buffer limit.
-    state.setPaused(true);
-    state.requestWatermark();
-    return FilterDataStatus::StopIterationAndWatermark;
+    if (state.bodyMode() == ProcessingMode::STREAMED &&
+        config_->sendBodyWithoutWaitingForHeaderResponse()) {
+      ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
+                       "is STREAMED and send_body_without_waiting_for_header_response is enabled");
+    } else {
+      ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
+      // We don't know what to do with the body until the response comes back.
+      // We must buffer it in case we need it when that happens.
+      // Raise a watermark to prevent a buffer overflow until the response comes back.
+      // When end_stream is true, we need to StopIterationAndWatermark as well to stop the
+      // ActiveStream from returning error when the last chunk added to stream buffer exceeds the
+      // buffer limit.
+      state.setPaused(true);
+      state.requestWatermark();
+      return FilterDataStatus::StopIterationAndWatermark;
+    }
   }
 
   FilterDataStatus result;
@@ -566,11 +574,13 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = setupBodyChunk(state, data, end_stream);
     state.enqueueStreamingChunk(data, end_stream);
-    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
-
-    // At this point we will continue, but with no data, because that will come later
-    if (end_stream) {
-      // But we need to stop iteration for the last chunk because it's our last chance to do stuff
+    // If the current state is HeadersCallback, stays in that state.
+    if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+      sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
+    } else {
+      sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
+    }
+    if (end_stream || state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
@@ -1071,9 +1081,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
-  // set to true and filter is waiting for header processing response.
+  // set to true, send_body_without_waiting_for_header_response set to false,
+  // and filter is waiting for header processing response.
   // Otherwise, the response mode_override proto field is ignored.
-  if (config_->allowModeOverride() && inHeaderProcessState() && response->has_mode_override()) {
+  if (config_->allowModeOverride() && !config_->sendBodyWithoutWaitingForHeaderResponse() &&
+      inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
     const auto& mode_overide = response->mode_override();
     // First, check if mode override allow-list is configured
