@@ -69,6 +69,9 @@ protected:
                 mock_upstreams_headers_sent_[i] = Http::TestRequestHeaderMapImpl();
                 mock_upstreams_headers_sent_[i]->copyFrom(headers);
               });
+          ON_CALL(*ret, reset).WillByDefault([this, i]() {
+            mock_upstreams_callbacks_[i].get().onReset();
+          });
           return ret;
         });
 
@@ -126,6 +129,21 @@ protected:
     if (end_stream) {
       receiveUpstreamComplete(upstream_index);
     }
+  }
+
+  // On successful verification, the upstream request gets reset rather than
+  // onComplete.
+  void receiveUpstreamHeadersWithReset(
+      size_t upstream_index, Http::ResponseHeaderMap& headers, bool end_stream,
+      testing::Matcher<Http::ResponseHeaderMap&> expected_response_headers = _) {
+    ASSERT(mock_upstreams_callbacks_.size() > upstream_index);
+    ASSERT(mock_upstreams_.size() > upstream_index);
+    EXPECT_CALL(*mock_upstreams_[upstream_index], reset());
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(expected_response_headers, _));
+    mock_upstreams_callbacks_[upstream_index].get().onHeaders(
+        std::make_unique<Http::TestResponseHeaderMapImpl>(headers), end_stream);
+    ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+    testing::Mock::VerifyAndClearExpectations(mock_upstreams_[1].get());
   }
 
   void receiveUpstreamBody(size_t upstream_index, absl::string_view body, bool end_stream) {
@@ -810,6 +828,7 @@ TEST_F(CacheFilterTest, CacheInsertAbortedByCache) {
     response_headers_.setContentLength(body.size());
     receiveUpstreamHeaders(0, response_headers_, false);
     receiveUpstreamBody(0, body, false);
+    EXPECT_CALL(*mock_upstreams_[0], reset());
     pumpDispatcher();
 
     filter->onStreamComplete();
@@ -936,16 +955,15 @@ TEST_F(CacheFilterTest, SuccessfulValidation) {
     const std::string not_modified_date = formatter_.now(time_source_);
     Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
                                                                      {"date", not_modified_date}};
-    EXPECT_CALL(*mock_upstreams_[1], reset());
 
     // Receiving the 304 response should result in sending the merged headers with
     // updated date.
     Http::TestResponseHeaderMapImpl expected_response_headers = response_headers_;
     expected_response_headers.setDate(not_modified_date);
 
-    receiveUpstreamHeaders(1, not_modified_response_headers, true,
-                           IsSupersetOfHeaders(expected_response_headers));
-    ::testing::Mock::VerifyAndClearExpectations(mock_upstreams_[1].get());
+    // The upstream should be reset on not_modified
+    receiveUpstreamHeadersWithReset(1, not_modified_response_headers, true,
+                                    IsSupersetOfHeaders(expected_response_headers));
 
     // It should be impossible for onData to be called on the upstream after reset
     // has been called on it.
@@ -1003,15 +1021,13 @@ TEST_F(CacheFilterTest, SuccessfulValidationWithFilterDestroyedDuringContinueEnc
     Http::TestResponseHeaderMapImpl not_modified_response_headers = {{":status", "304"},
                                                                      {"date", not_modified_date}};
 
-    // The upstream should be reset on not_modified
-    EXPECT_CALL(*mock_upstreams_[1], reset());
     // Check for the cached response headers with updated date
     Http::TestResponseHeaderMapImpl expected_response_headers = response_headers_;
     expected_response_headers.setDate(not_modified_date);
 
-    receiveUpstreamHeaders(1, not_modified_response_headers, true,
-                           IsSupersetOfHeaders(expected_response_headers));
-    testing::Mock::VerifyAndClearExpectations(mock_upstreams_[1].get());
+    // The upstream should be reset on not_modified
+    receiveUpstreamHeadersWithReset(1, not_modified_response_headers, true,
+                                    IsSupersetOfHeaders(expected_response_headers));
 
     // It should be impossible for onBody to be called after reset was called.
 

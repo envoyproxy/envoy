@@ -186,8 +186,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
 }
 
 void CacheFilter::UpstreamRequest::abort() {
-  stream_->reset();
-  self_ownership_ = nullptr;
+  stream_->reset(); // Calls onReset, resulting in deletion.
 }
 
 CacheFilter::UpstreamRequest::~UpstreamRequest() {
