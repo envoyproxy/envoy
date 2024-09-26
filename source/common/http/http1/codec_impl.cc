@@ -24,7 +24,6 @@
 #include "source/common/http/http1/header_formatter.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
@@ -976,8 +975,8 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
-ExecutionContext* ConnectionImpl::executionContext() const {
-  return getConnectionExecutionContext(connection_);
+OptRef<const StreamInfo::StreamInfo> ConnectionImpl::trackedStream() const {
+  return connection_.trackedStream();
 }
 
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {

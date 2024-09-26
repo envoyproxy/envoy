@@ -54,6 +54,10 @@ behavior_changes:
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log>`.
     This change can be disabled by setting the runtime guard flag
     ``envoy.reloadable_features.filter_access_loggers_first`` to ``false``.
+- area: monitoring
+  change: |
+    Removed runtime feature flag ``envoy.restart_features.enable_execution_context``. The execution context feature
+    now could be enabled only by setting compile option ``--define=execution_context=enabled``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
