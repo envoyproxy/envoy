@@ -129,9 +129,6 @@ private:
     // in turn provokes the rest of the destruction process.
     void abort();
 
-    // Returns true if filter_ is null or is in destroyed state.
-    bool filterDestroyed();
-
     // Precondition: lookup_result_ points to a cache lookup result that requires validation.
     //               filter_state_ is ValidatingCachedResponse.
     // Checks if a cached entry should be updated with a 304 response.

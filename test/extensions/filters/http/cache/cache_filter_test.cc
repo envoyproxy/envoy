@@ -177,6 +177,14 @@ protected:
     receiveUpstreamComplete(upstream_index);
   }
 
+  void receiveUpstreamTrailersAfterFilterDestroyed(size_t upstream_index,
+                                                   Http::ResponseTrailerMap& trailers) {
+    ASSERT(mock_upstreams_callbacks_.size() > upstream_index);
+    mock_upstreams_callbacks_[upstream_index].get().onTrailers(
+        std::make_unique<Http::TestResponseTrailerMapImpl>(trailers));
+    receiveUpstreamComplete(upstream_index);
+  }
+
   void populateCommonCacheEntry(size_t upstream_index, CacheFilterSharedPtr filter,
                                 absl::string_view body = "",
                                 OptRef<Http::ResponseTrailerMap> trailers = absl::nullopt) {
@@ -421,7 +429,9 @@ TEST_F(CacheFilterTest, CacheMissWithTrailersWhenCacheRespondsQuickerThanUpstrea
 
     testDecodeRequestMiss(request, filter);
     receiveUpstreamHeaders(request, response_headers_, false);
+    pumpDispatcher();
     receiveUpstreamBody(request, body, false);
+    pumpDispatcher();
     receiveUpstreamTrailers(request, trailers);
     pumpDispatcher();
 
@@ -852,8 +862,12 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileIncompleteCacheWriteInQueueShouldCom
       .WillOnce([&](const Http::ResponseHeaderMap&, const ResponseMetadata&,
                     InsertCallback insert_complete,
                     bool) { captured_insert_header_callback = std::move(insert_complete); });
-  EXPECT_CALL(*mock_insert_context, insertBody(_, _, true))
+  EXPECT_CALL(*mock_insert_context, insertBody(_, _, false))
       .WillOnce([this](const Buffer::Instance&, InsertCallback insert_complete, bool) {
+        dispatcher_->post([cb = std::move(insert_complete)]() mutable { cb(true); });
+      });
+  EXPECT_CALL(*mock_insert_context, insertTrailers(_, _))
+      .WillOnce([this](const Http::ResponseTrailerMap&, InsertCallback insert_complete) {
         dispatcher_->post([cb = std::move(insert_complete)]() mutable { cb(true); });
       });
 
@@ -876,7 +890,10 @@ TEST_F(CacheFilterTest, FilterDestroyedWhileIncompleteCacheWriteInQueueShouldCom
   // write allows the UpstreamRequest and CacheInsertQueue to complete and self-destruct.
   captured_insert_header_callback(true);
   pumpDispatcher();
-  receiveUpstreamBodyAfterFilterDestroyed(0, body, true);
+  receiveUpstreamBodyAfterFilterDestroyed(0, body, false);
+  pumpDispatcher();
+  Http::TestResponseTrailerMapImpl trailers{{"somekey", "somevalue"}};
+  receiveUpstreamTrailersAfterFilterDestroyed(0, trailers);
   pumpDispatcher();
 }
 
@@ -1611,6 +1628,20 @@ TEST_F(CacheFilterTest, NoClusterShouldLocalReply) {
                 sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, "cache_no_cluster"));
     // The cache lookup callback should be posted to the dispatcher.
     // Run events on the dispatcher so that the callback is invoked.
+    pumpDispatcher();
+  }
+}
+
+TEST_F(CacheFilterTest, UpstreamResetMidResponseShouldLocalReply) {
+  request_headers_.setHost("UpstreamResetMidResponse");
+  {
+    CacheFilterSharedPtr filter = makeFilter(simple_cache_);
+    testDecodeRequestMiss(0, filter);
+    receiveUpstreamHeaders(0, response_headers_, false);
+    pumpDispatcher();
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, "cache_upstream_reset"));
+    mock_upstreams_callbacks_[0].get().onReset();
     pumpDispatcher();
   }
 }

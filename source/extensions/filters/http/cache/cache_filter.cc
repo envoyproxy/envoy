@@ -190,7 +190,7 @@ void CacheFilter::UpstreamRequest::abort() {
 }
 
 CacheFilter::UpstreamRequest::~UpstreamRequest() {
-  if (filter_) {
+  if (filter_ != nullptr) {
     filter_->onUpstreamRequestReset();
   }
   if (lookup_) {
@@ -220,10 +220,6 @@ void CacheFilter::UpstreamRequest::disconnectFilter() {
   if (insert_queue_ == nullptr) {
     abort();
   }
-}
-
-bool CacheFilter::UpstreamRequest::filterDestroyed() {
-  return filter_ == nullptr || filter_->filter_state_ == FilterState::Destroyed;
 }
 
 void CacheFilter::UpstreamRequest::onHeaders(Http::ResponseHeaderMapPtr&& headers,
