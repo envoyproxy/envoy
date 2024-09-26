@@ -490,7 +490,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                     current_address ? current_address->asStringView() : "<empty>",
                     new_address ? new_address->asStringView() : "<empty>");
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
-    primary_host_info->host_info_->setDetails(details_with_maybe_trace);
+    primary_host_info->host_info_->setDetails(std::move(details_with_maybe_trace));
 
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
     primary_host_info->host_info_->setFirstResolveComplete();
@@ -500,7 +500,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     // We only set details here if current address is null because but
     // non-null->null resolutions we don't update the address so will use a
     // previously resolved address + details.
-    primary_host_info->host_info_->setDetails(details_with_maybe_trace);
+    primary_host_info->host_info_->setDetails(std::move(details_with_maybe_trace));
   }
 
   if (first_resolve) {
