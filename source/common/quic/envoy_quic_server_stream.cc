@@ -340,8 +340,7 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicResetStreamError error) {
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat("remote reset|",
-                           quic::QuicRstStreamErrorCodeToString(error.internal_code()))
+            ? absl::StrCat("rx|", quic::QuicRstStreamErrorCodeToString(error.internal_code()))
             : absl::string_view());
   }
   return true;
@@ -361,7 +360,7 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat("remote reset|", quic::QuicRstStreamErrorCodeToString(frame.error_code))
+            ? absl::StrCat("rx|", quic::QuicRstStreamErrorCodeToString(frame.error_code))
             : absl::string_view());
   }
 }
@@ -376,8 +375,7 @@ void EnvoyQuicServerStream::ResetWithError(quic::QuicResetStreamError error) {
     runResetCallbacks(
         quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat("local reset|",
-                           quic::QuicRstStreamErrorCodeToString(error.internal_code()))
+            ? absl::StrCat("tx|", quic::QuicRstStreamErrorCodeToString(error.internal_code()))
             : absl::string_view());
   }
   quic::QuicSpdyServerStreamBase::ResetWithError(error);
