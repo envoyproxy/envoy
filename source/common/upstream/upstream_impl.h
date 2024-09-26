@@ -419,7 +419,6 @@ public:
   }
 
   void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
-    ASSERT_IS_NOT_MAIN_OR_TEST_THREAD();
     lb_policy_data_ = std::move(lb_policy_data);
   }
   OptRef<HostLbPolicyData> lbPolicyData() const override {
