@@ -41,7 +41,7 @@ public:
     traces_.emplace_back(trace);
   }
   /** Return the DNS query traces. */
-  std::vector<uint8_t> getTraces() {
+  const std::vector<uint8_t>& getTraces() {
     absl::MutexLock lock(&lock_);
     return traces_;
   }
