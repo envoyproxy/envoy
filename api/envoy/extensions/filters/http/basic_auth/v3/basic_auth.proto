@@ -41,6 +41,12 @@ message BasicAuth {
   // If it is not specified, the username will not be forwarded.
   string forward_username_header = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // This field specifies the request header to load the basic credential from.
+  //
+  // If it is not specified, the filter loads the credential from  the "Authorization" header.
+  string authentication_header = 3
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 }
 
 // Extra settings that may be added to per-route configuration for

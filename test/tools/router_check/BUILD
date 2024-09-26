@@ -17,6 +17,7 @@ envoy_cc_test_binary(
     name = "router_check_tool",
     srcs = ["router_check.cc"],
     linkstatic = envoy_select_linkstatic(),
+    rbe_pool = "2core",
     deps = [":router_check_main_lib"] + select({
         "//bazel:coverage_build": [],
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
@@ -36,7 +37,7 @@ envoy_cc_test_library(
         "router.h",
     ],
     copts = ["-DHAVE_LONG_LONG"],
-    external_deps = ["tclap"],
+    rbe_pool = "2core",
     deps = [
         ":validation_proto_cc_proto",
         "//source/common/common:random_generator_lib",
@@ -54,6 +55,7 @@ envoy_cc_test_library(
         "//test/test_common:printers_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@com_github_mirror_tclap//:tclap",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

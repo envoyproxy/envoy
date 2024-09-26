@@ -408,7 +408,7 @@ envoy.filters.http.grpc_stats:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.grpc_stats.v3.FilterConfig
 envoy.filters.http.grpc_web:
@@ -1077,6 +1077,13 @@ envoy.request_id.uuid:
   status: stable
   type_urls:
   - envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
+envoy.resource_monitors.cpu_utilization:
+  categories:
+  - envoy.resource_monitors
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig
 envoy.resource_monitors.global_downstream_max_connections:
   categories:
   - envoy.resource_monitors
@@ -1302,7 +1309,7 @@ envoy.transport_sockets.tcp_stats:
   - envoy.transport_sockets.downstream
   - envoy.transport_sockets.upstream
   security_posture: robust_to_untrusted_downstream_and_upstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.transport_sockets.tcp_stats.v3.Config
 envoy.transport_sockets.tls:
@@ -1667,6 +1674,13 @@ envoy.load_balancing_policies.cluster_provided:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided
+envoy.load_balancing_policies.client_side_weighted_round_robin:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation

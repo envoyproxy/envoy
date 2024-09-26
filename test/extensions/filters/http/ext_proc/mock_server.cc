@@ -5,7 +5,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-MockClient::MockClient() = default;
+MockClient::MockClient() {
+  EXPECT_CALL(*this, stream()).WillRepeatedly(testing::Invoke([this]() { return stream_; }));
+
+  EXPECT_CALL(*this, setStream(testing::_))
+      .WillRepeatedly(
+          testing::Invoke([this](ExternalProcessorStream* stream) -> void { stream_ = stream; }));
+}
 MockClient::~MockClient() = default;
 
 MockStream::MockStream() = default;

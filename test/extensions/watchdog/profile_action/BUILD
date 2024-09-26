@@ -15,9 +15,7 @@ envoy_extension_cc_test(
     name = "profile_action_test",
     srcs = ["profile_action_test.cc"],
     extension_names = ["envoy.watchdog.profile_action"],
-    external_deps = [
-        "abseil_synchronization",
-    ],
+    rbe_pool = "2core",
     deps = [
         "//envoy/common:time_interface",
         "//envoy/registry",
@@ -31,6 +29,7 @@ envoy_extension_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/watchdog/profile_action/v3:pkg_cc_proto",
     ],
@@ -40,6 +39,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.watchdog.profile_action"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//envoy/server:guarddog_config_interface",

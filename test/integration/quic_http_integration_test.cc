@@ -251,12 +251,15 @@ public:
     return session;
   }
 
-  IntegrationCodecClientPtr
-  makeRawHttpConnection(Network::ClientConnectionPtr&& conn,
-                        absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-                        bool wait_till_connected = true) override {
+  IntegrationCodecClientPtr makeRawHttpConnection(
+      Network::ClientConnectionPtr&& conn,
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
+          absl::nullopt,
+      bool wait_till_connected = true) override {
     ENVOY_LOG(debug, "Creating a new client {}",
               conn->connectionInfoProvider().localAddress()->asStringView());
+    ASSERT(!common_http_options.has_value(), "Not implemented");
     return makeRawHttp3Connection(std::move(conn), http2_options, wait_till_connected);
   }
 
@@ -671,6 +674,26 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
   test_server_->waitForCounterEq("http3.quic_version_h3_29", 1u);
 }
 
+TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.quic_support_certificate_compression", "true");
+  initialize();
+
+  EXPECT_LOG_CONTAINS_ALL_OF(
+      Envoy::ExpectedLogMessages(
+          {{"trace", "Cert compression successful"}, {"trace", "Cert decompression successful"}}),
+      { testRouterHeaderOnlyRequestAndResponse(); });
+}
+
+TEST_P(QuicHttpIntegrationTest, CertCompressionDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.quic_support_certificate_compression", "false");
+  initialize();
+
+  EXPECT_LOG_NOT_CONTAINS("trace", "Cert compression successful",
+                          { testRouterHeaderOnlyRequestAndResponse(); });
+}
+
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
@@ -1065,7 +1088,7 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   EXPECT_FALSE(codec_client_->connected());
   std::string failure_reason = "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
                                "(ENCRYPTION_HANDSHAKE) 46: "
-                               "certificate unknown";
+                               "certificate unknown. SSLErrorStack:";
   EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
 }
 
@@ -2358,6 +2381,22 @@ TEST_P(QuicHttpIntegrationTest, SendDisableActiveMigration) {
       codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
+}
+
+TEST_P(QuicHttpIntegrationTest, RejectTraffic) {
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->set_reject_new_connections(true);
+  });
+
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_TRUE(codec_client_->disconnected());
+  EXPECT_EQ(quic::QUIC_INVALID_VERSION,
+            static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->error());
 }
 
 // Validate that the transport parameter is not sent when `send_disable_active_migration` is

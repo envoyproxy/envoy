@@ -25,7 +25,6 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
-#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/cleanup/cleanup.h"
@@ -1704,7 +1703,11 @@ int ConnectionImpl::setAndCheckCodecCallbackStatus(Status&& status) {
   // error statuses are silently discarded.
   codec_callback_status_.Update(std::move(status));
   if (codec_callback_status_.ok() && connection_.state() != Network::Connection::State::Open) {
-    codec_callback_status_ = codecProtocolError("Connection was closed while dispatching frames");
+    if (!active_streams_.empty() || !raised_goaway_) {
+      codec_callback_status_ = codecProtocolError("Connection was closed while dispatching frames");
+    } else {
+      codec_callback_status_ = goAwayGracefulCloseError();
+    }
   }
 
   return codec_callback_status_.ok() ? 0 : ERR_CALLBACK_FAILURE;
@@ -2062,8 +2065,8 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
 #endif
 }
 
-ExecutionContext* ConnectionImpl::executionContext() const {
-  return getConnectionExecutionContext(connection_);
+OptRef<const StreamInfo::StreamInfo> ConnectionImpl::trackedStream() const {
+  return connection_.trackedStream();
 }
 
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {

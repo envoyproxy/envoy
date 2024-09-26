@@ -1172,6 +1172,74 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
 }
 
+TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthWithPipelining) {
+  InSequence s;
+
+  Buffer::OwnedImpl fake_data;
+  Common::Redis::RespValuePtr auth_request(new Common::Redis::RespValue());
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    decoder_callbacks_->onRespValue(std::move(auth_request));
+  }));
+
+  // AUTH expectation
+  EXPECT_CALL(splitter_, makeRequest_(Ref(*auth_request), _, _, _))
+      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
+                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+        // External auth expectation.
+        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, EMPTY_STRING, "password"))
+            .WillOnce(WithArgs<0, 1>(
+                Invoke([&](ExternalAuth::AuthenticateCallback& callback,
+                           CommandSplitter::SplitCallbacks& pending_request) -> void {
+                  ExternalAuth::AuthenticateResponsePtr auth_response =
+                      std::make_unique<ExternalAuth::AuthenticateResponse>(
+                          ExternalAuth::AuthenticateResponse{});
+                  auth_response->status = ExternalAuth::AuthenticationRequestStatus::Authorized;
+                  auto time = time_source_.systemTime() + std::chrono::hours(12);
+                  auth_response->expiration.set_seconds(
+                      duration_cast<std::chrono::seconds>(time.time_since_epoch()).count());
+
+                  // Expect that we receive OK from AUTH first
+                  Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
+                  reply->type(Common::Redis::RespType::SimpleString);
+                  reply->asString() = "OK";
+                  EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
+                  EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+
+                  // PING expectation, will be processed after AUTH.
+                  Common::Redis::RespValuePtr ping_request(new Common::Redis::RespValue());
+                  EXPECT_CALL(splitter_, makeRequest_(Ref(*ping_request), _, _, _))
+                      .WillOnce(Invoke(
+                          [&](const Common::Redis::RespValue&,
+                              CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
+                              const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
+                            // Having connection allowed proves pipelining was respected.
+                            EXPECT_TRUE(filter_->connectionAllowed());
+
+                            Common::Redis::RespValuePtr reply_ping(new Common::Redis::RespValue());
+                            reply_ping->type(Common::Redis::RespType::SimpleString);
+                            reply_ping->asString() = "PONG";
+                            EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply_ping)), _));
+                            EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
+
+                            callbacks.onResponse(std::move(reply_ping));
+                            return nullptr;
+                          }));
+
+                  // Simulate that before the auth response is received, another command is
+                  // pipelined.
+                  decoder_callbacks_->onRespValue(std::move(ping_request));
+
+                  callback.onAuthenticateExternal(pending_request, std::move(auth_response));
+                })));
+
+        callbacks.onAuth("password");
+        return nullptr;
+      }));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
+}
+
 TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrectButThenExpires) {
   InSequence s;
 
@@ -1210,63 +1278,6 @@ TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPasswordCorrec
         time_source_.advanceTimeWait(std::chrono::hours(2));
         // and callbacks are not accessible anymore.
         EXPECT_FALSE(filter_->connectionAllowed());
-        return nullptr;
-      }));
-
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
-}
-
-TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPendingRequest) {
-  InSequence s;
-
-  Buffer::OwnedImpl fake_data;
-  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    decoder_callbacks_->onRespValue(std::move(request));
-  }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
-      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
-                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
-        EXPECT_FALSE(callbacks.connectionAllowed());
-        EXPECT_CALL(*external_auth_client_,
-                    authenticateExternal(_, _, _, EMPTY_STRING, "password"));
-        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-        reply->type(Common::Redis::RespType::Error);
-        reply->asString() = "ERR an existing authentication request is pending";
-        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-        callbacks.onAuth("password");
-        // Call again (pending request will cause error)
-        callbacks.onAuth("password");
-        return nullptr;
-      }));
-
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data, false));
-}
-
-TEST_F(RedisProxyFilterWithExternalAuthAndExpiration, ExternalAuthPendingRequestUsername) {
-  InSequence s;
-
-  Buffer::OwnedImpl fake_data;
-  Common::Redis::RespValuePtr request(new Common::Redis::RespValue());
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    decoder_callbacks_->onRespValue(std::move(request));
-  }));
-  EXPECT_CALL(splitter_, makeRequest_(Ref(*request), _, _, _))
-      .WillOnce(Invoke([&](const Common::Redis::RespValue&,
-                           CommandSplitter::SplitCallbacks& callbacks, Event::Dispatcher&,
-                           const StreamInfo::StreamInfo&) -> CommandSplitter::SplitRequest* {
-        EXPECT_FALSE(callbacks.connectionAllowed());
-        EXPECT_CALL(*external_auth_client_, authenticateExternal(_, _, _, "username", "password"));
-        Common::Redis::RespValuePtr reply(new Common::Redis::RespValue());
-        reply->type(Common::Redis::RespType::Error);
-        reply->asString() = "ERR an existing authentication request is pending";
-        EXPECT_CALL(*encoder_, encode(Eq(ByRef(*reply)), _));
-        EXPECT_CALL(filter_callbacks_.connection_, write(_, _));
-        callbacks.onAuth("username", "password");
-        // Call again (pending request will cause error)
-        callbacks.onAuth("username", "password");
         return nullptr;
       }));
 
