@@ -216,6 +216,10 @@ public:
 
   uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
 
+  bool sendBodyWithoutWaitingForHeaderResponse() const {
+    return send_body_without_waiting_for_header_response_;
+  }
+
   const ExtProcFilterStats& stats() const { return stats_; }
 
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& processingMode() const {
@@ -283,6 +287,7 @@ private:
   const std::chrono::milliseconds deferred_close_timeout_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
+  const bool send_body_without_waiting_for_header_response_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
@@ -485,10 +490,6 @@ private:
   // The state of the filter on both the encoding and decoding side.
   DecodingProcessorState decoding_state_;
   EncodingProcessorState encoding_state_;
-
-  // The gRPC stream to the external processor, which will be opened
-  // when it's time to send the first message.
-  ExternalProcessorStream* stream_ = nullptr;
 
   // Set to true when no more messages need to be sent to the processor.
   // This happens when the processor has closed the stream, or when it has

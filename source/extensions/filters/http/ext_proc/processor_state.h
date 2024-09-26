@@ -40,6 +40,7 @@ public:
   uint32_t bytesEnqueued() const { return bytes_enqueued_; }
   bool empty() const { return queue_.empty(); }
   void push(Buffer::Instance& data, bool end_stream);
+  void clear();
   QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
@@ -272,6 +273,12 @@ protected:
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
+  void sendBufferedDataInStreamedMode(bool end_stream);
+  absl::Status
+  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  void clearStreamingChunk() { chunk_queue_.clear(); }
+  CallbackState getCallbackStateAfterHeaderResp(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
 };
 
 class DecodingProcessorState : public ProcessorState {

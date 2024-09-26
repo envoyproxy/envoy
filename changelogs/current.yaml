@@ -54,6 +54,10 @@ behavior_changes:
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.access_log>`.
     This change can be disabled by setting the runtime guard flag
     ``envoy.reloadable_features.filter_access_loggers_first`` to ``false``.
+- area: monitoring
+  change: |
+    Removed runtime feature flag ``envoy.restart_features.enable_execution_context``. The execution context feature
+    now could be enabled only by setting compile option ``--define=execution_context=enabled``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -77,6 +81,10 @@ minor_behavior_changes:
   change: |
     When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
     by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
+- area: ext_proc
+  change: |
+    Added support for :ref:`send_body_without_waiting_for_header_response
+    <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`.
 - area: http
   change: |
     Modified the authority header value validator to allow the same characters as oghttp2
@@ -292,6 +300,10 @@ new_features:
   change: |
     Added full feature absl::FormatTime() support to the DateFormatter. This allows the timepoint formatters (like
     ``%START_TIME%``) to use ``%E#S``, ``%E*S``, ``%E#f`` and ``%E*f`` to format the subsecond part of the timepoint.
+- area: http
+  change: |
+    Added configuration setting for the :ref:`maximum size of response headers
+    <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_response_headers_kb>` in responses.
 - area: http_11_proxy
   change: |
     Added the option to configure the transport socket via locality or endpoint metadata.

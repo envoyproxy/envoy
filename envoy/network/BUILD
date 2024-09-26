@@ -25,6 +25,7 @@ envoy_cc_library(
         ":filter_interface",
         ":listen_socket_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/common:scope_tracker_interface",
         "//envoy/event:deferred_deletable",
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -174,7 +175,6 @@ envoy_cc_library(
     deps = [
         ":io_handle_interface",
         ":socket_interface",
-        "//envoy/common:scope_tracker_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
