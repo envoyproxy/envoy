@@ -142,7 +142,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       next_query = pending_query_info.pending_query_;
       num_retries = pending_query_info.num_retries_;
       pending_queries_.pop_front();
-      if (reresolve && next_query->isCancelled()) {
+      if (reresolve && next_query->cancelled_) {
         continue;
       }
     }
@@ -218,7 +218,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
     dispatcher_.post([finished_query = std::move(next_query), response = std::move(response),
                       details = std::string(details)]() mutable {
-      if (finished_query->isCancelled()) {
+      if (finished_query->cancelled_) {
         std::cerr << "Dropping cancelled query\n";
         finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Cancelled));
         ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
