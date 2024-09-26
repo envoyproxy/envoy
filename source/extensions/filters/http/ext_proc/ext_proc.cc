@@ -363,15 +363,12 @@ void Filter::sendRequest(ProcessingRequest&& req, bool end_stream) {
 }
 
 void Filter::onComplete(ProcessingResponse& response) {
-  ExtProcHttpClient* http_client = dynamic_cast<ExtProcHttpClient*>(client_.get());
-  http_client->setCallbacks(nullptr);
+  ENVOY_LOG(debug, "Received successful response from server");
   std::unique_ptr<ProcessingResponse> resp_ptr = std::make_unique<ProcessingResponse>(response);
   onReceiveMessage(std::move(resp_ptr));
 }
 
 void Filter::onError() {
-  ExtProcHttpClient* http_client = dynamic_cast<ExtProcHttpClient*>(client_.get());
-  http_client->setCallbacks(nullptr);
   ENVOY_LOG(debug, "Received Error response from server");
   stats_.http_not_ok_resp_received_.inc();
 
