@@ -418,15 +418,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     return primary_host_it->second.get();
   }();
 
-  std::string details_with_maybe_trace = std::string(details);
-  if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
-    if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
-      details_with_maybe_trace = absl::StrCat(
-          details, ":", absl::StrJoin(primary_host_info->active_query_->getTraces(), ","));
-      // primary_host_info->active_query_->removeTraces();
-    }
-  }
-
   bool first_resolve = false;
 
   if (!from_cache) {
@@ -438,6 +429,15 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       stats_.dns_query_failure_.inc();
     } else {
       stats_.dns_query_success_.inc();
+    }
+  }
+
+  std::string details_with_maybe_trace = std::string(details);
+  if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
+    if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
+      details_with_maybe_trace = absl::StrCat(
+          details, ":", absl::StrJoin(primary_host_info->active_query_->getTraces(), ","));
+      primary_host_info->active_query_->clearTraces();
     }
   }
 

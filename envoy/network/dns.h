@@ -45,8 +45,8 @@ public:
     absl::MutexLock lock(&lock_);
     return traces_;
   }
-  /** Remove the DNS query traces. */
-  void removeTraces() {
+  /** Clears the DNS query traces. */
+  void clearTraces() {
     absl::MutexLock lock(&lock_);
     traces_.clear();
   }
