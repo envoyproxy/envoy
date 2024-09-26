@@ -4784,6 +4784,7 @@ envoy_quiche_platform_impl_cc_library(
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/log:absl_check",
         "@com_google_absl//absl/log:absl_log",
+        "@com_google_absl//absl/log:flags",
     ],
 )
 
