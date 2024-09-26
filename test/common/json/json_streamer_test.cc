@@ -39,13 +39,13 @@ TYPED_TEST_SUITE(JsonStreamerTest, OutputBufferTypes);
 TYPED_TEST(JsonStreamerTest, Empty) { EXPECT_EQ("", this->buffer_.toString()); }
 
 TYPED_TEST(JsonStreamerTest, EmptyMap) {
-  this->streamer_.makeRootMap();
+  this->streamer_.addMap();
   EXPECT_EQ("{}", this->buffer_.toString());
 }
 
 TYPED_TEST(JsonStreamerTest, MapOneDouble) {
   {
-    auto map = this->streamer_.makeRootMap();
+    auto map = this->streamer_.addMap();
     map->addEntries({{"a", 3.141592654}});
   }
   EXPECT_EQ(R"EOF({"a":3.141592654})EOF", this->buffer_.toString());
@@ -53,7 +53,7 @@ TYPED_TEST(JsonStreamerTest, MapOneDouble) {
 
 TYPED_TEST(JsonStreamerTest, MapTwoDoubles) {
   {
-    auto map = this->streamer_.makeRootMap();
+    auto map = this->streamer_.addMap();
     map->addEntries({{"a", -989282.1087}, {"b", 1.23456789012345e+67}});
   }
   EXPECT_EQ(R"EOF({"a":-989282.1087,"b":1.23456789012345e+67})EOF", this->buffer_.toString());
@@ -61,7 +61,7 @@ TYPED_TEST(JsonStreamerTest, MapTwoDoubles) {
 
 TYPED_TEST(JsonStreamerTest, MapOneUInt) {
   {
-    auto map = this->streamer_.makeRootMap();
+    auto map = this->streamer_.addMap();
     map->addEntries({{"a", static_cast<uint64_t>(0xffffffffffffffff)}});
   }
   EXPECT_EQ(R"EOF({"a":18446744073709551615})EOF", this->buffer_.toString());
@@ -69,7 +69,7 @@ TYPED_TEST(JsonStreamerTest, MapOneUInt) {
 
 TYPED_TEST(JsonStreamerTest, MapTwoInts) {
   {
-    auto map = this->streamer_.makeRootMap();
+    auto map = this->streamer_.addMap();
     map->addEntries({{"a", static_cast<int64_t>(0x7fffffffffffffff)},
                      {"b", static_cast<int64_t>(0x8000000000000000)}});
   }
@@ -79,7 +79,7 @@ TYPED_TEST(JsonStreamerTest, MapTwoInts) {
 
 TYPED_TEST(JsonStreamerTest, MapOneString) {
   {
-    auto map = this->streamer_.makeRootMap();
+    auto map = this->streamer_.addMap();
     map->addEntries({{"a", "b"}});
   }
   EXPECT_EQ(R"EOF({"a":"b"})EOF", this->buffer_.toString());
@@ -87,7 +87,7 @@ TYPED_TEST(JsonStreamerTest, MapOneString) {
 
 TYPED_TEST(JsonStreamerTest, MapOneBool) {
   {
-    auto map = this->streamer_.makeRootMap();
+    auto map = this->streamer_.addMap();
     map->addEntries({{"a", true}});
   }
   EXPECT_EQ(R"EOF({"a":true})EOF", this->buffer_.toString());
@@ -95,7 +95,7 @@ TYPED_TEST(JsonStreamerTest, MapOneBool) {
 
 TYPED_TEST(JsonStreamerTest, MapTwoBools) {
   {
-    auto map = this->streamer_.makeRootMap();
+    auto map = this->streamer_.addMap();
     map->addEntries({{"a", true}, {"b", false}});
   }
   EXPECT_EQ(R"EOF({"a":true,"b":false})EOF", this->buffer_.toString());
@@ -103,7 +103,7 @@ TYPED_TEST(JsonStreamerTest, MapTwoBools) {
 
 TYPED_TEST(JsonStreamerTest, MapOneSanitized) {
   {
-    auto map = this->streamer_.makeRootMap();
+    auto map = this->streamer_.addMap();
     map->addKey("a");
     map->addString("\b\001");
   }
@@ -112,7 +112,7 @@ TYPED_TEST(JsonStreamerTest, MapOneSanitized) {
 
 TYPED_TEST(JsonStreamerTest, MapTwoSanitized) {
   {
-    auto map = this->streamer_.makeRootMap();
+    auto map = this->streamer_.addMap();
     map->addKey("a");
     map->addString("\b\001");
     map->addKey("b");
@@ -122,7 +122,7 @@ TYPED_TEST(JsonStreamerTest, MapTwoSanitized) {
 }
 
 TYPED_TEST(JsonStreamerTest, SubArray) {
-  auto map = this->streamer_.makeRootMap();
+  auto map = this->streamer_.addMap();
   map->addKey("a");
   auto array = map->addArray();
   array->addEntries({1.0, "two", 3.5, true, false, std::nan("")});
@@ -135,14 +135,14 @@ TYPED_TEST(JsonStreamerTest, SubArray) {
 
 TYPED_TEST(JsonStreamerTest, TopArray) {
   {
-    auto array = this->streamer_.makeRootArray();
+    auto array = this->streamer_.addArray();
     array->addEntries({1.0, "two", 3.5, true, false, std::nan(""), absl::monostate{}});
   }
   EXPECT_EQ(R"EOF([1,"two",3.5,true,false,null,null])EOF", this->buffer_.toString());
 }
 
 TYPED_TEST(JsonStreamerTest, SubMap) {
-  auto map = this->streamer_.makeRootMap();
+  auto map = this->streamer_.addMap();
   map->addKey("a");
   auto sub_map = map->addMap();
   sub_map->addEntries({{"one", 1.0}, {"three.5", 3.5}});

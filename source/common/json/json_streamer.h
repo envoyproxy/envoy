@@ -344,25 +344,17 @@ public:
   };
 
   /**
-   * Makes a root map for the streamer.
-   *
-   * You must create a root map or array before any of the JSON population
-   * functions can be called, as those are only available on Map and Array
-   * objects.
+   * Adds a root map for the streamer.
    */
-  MapPtr makeRootMap() {
+  MapPtr addMap() {
     ASSERT_LEVELS_EMPTY;
     return std::make_unique<Map>(*this);
   }
 
   /**
-   * Makes a root array for the streamer.
-   *
-   * You must create a root map or array before any of the JSON population
-   * functions can be called, as those are only available on Map and Array
-   * objects.
+   * Adds a root array for the streamer.
    */
-  ArrayPtr makeRootArray() {
+  ArrayPtr addArray() {
     ASSERT_LEVELS_EMPTY;
     return std::make_unique<Array>(*this);
   }

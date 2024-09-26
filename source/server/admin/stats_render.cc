@@ -105,7 +105,7 @@ StatsJsonRender::StatsJsonRender(Http::ResponseHeaderMap& response_headers,
 }
 
 StatsJsonRender::JsonContext::JsonContext(Buffer::Instance& response)
-    : streamer_(response), stats_map_(streamer_.makeRootMap()) {
+    : streamer_(response), stats_map_(streamer_.addMap()) {
   // We don't create a JSON data model for the stats output, as that makes
   // streaming difficult. Instead we emit the preamble in the constructor here,
   // and create json models for each stats entry.
