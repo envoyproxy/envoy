@@ -1069,6 +1069,11 @@ public:
   virtual uint32_t maxResponseHeadersCount() const PURE;
 
   /**
+   * @return uint32_t the maximum total size of response headers in KB.
+   */
+  virtual absl::optional<uint16_t> maxResponseHeadersKb() const PURE;
+
+  /**
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
