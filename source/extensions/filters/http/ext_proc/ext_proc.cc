@@ -189,6 +189,8 @@ FilterConfig::FilterConfig(
       deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
                                                          DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
       message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
+      send_body_without_waiting_for_header_response_(
+          config.send_body_without_waiting_for_header_response()),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       processing_mode_(config.processing_mode()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -339,7 +341,7 @@ Filter::StreamOpenState Filter::openStream() {
     ENVOY_LOG(debug, "External processing is completed when trying to open the gRPC stream");
     return StreamOpenState::IgnoreError;
   }
-  if (!stream_) {
+  if (!client_->stream()) {
     ENVOY_LOG(debug, "Opening gRPC stream to external processor");
 
     Http::AsyncClient::ParentContext grpc_context;
@@ -354,32 +356,33 @@ Filter::StreamOpenState Filter::openStream() {
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
-      // Asserts that `stream_` is nullptr since it is not valid to be used any further
+      // Asserts that `stream_object` is nullptr since it is not valid to be used any further
       // beyond this point.
       ASSERT(stream_object == nullptr);
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
     stats_.streams_started_.inc();
 
-    stream_ = config_->threadLocalStreamManager().store(std::move(stream_object), config_->stats(),
-                                                        config_->deferredCloseTimeout());
+    ExternalProcessorStream* stream = config_->threadLocalStreamManager().store(
+        std::move(stream_object), config_->stats(), config_->deferredCloseTimeout());
+    client_->setStream(stream);
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
-      logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
+      logging_info_->setClusterInfo(client_->stream()->streamInfo().upstreamClusterInfo());
     }
   }
   return StreamOpenState::Ok;
 }
 
 void Filter::closeStream() {
-  if (stream_) {
+  if (client_->stream()) {
     ENVOY_LOG(debug, "Calling close on stream");
-    if (stream_->close()) {
+    if (client_->stream()->close()) {
       stats_.streams_closed_.inc();
     }
-    config_->threadLocalStreamManager().erase(stream_);
-    stream_ = nullptr;
+    config_->threadLocalStreamManager().erase(client_->stream());
+    client_->setStream(nullptr);
   } else {
     ENVOY_LOG(debug, "Stream already closed");
   }
@@ -387,7 +390,8 @@ void Filter::closeStream() {
 
 void Filter::deferredCloseStream() {
   ENVOY_LOG(debug, "Calling deferred close on stream");
-  config_->threadLocalStreamManager().deferredErase(stream_, filter_callbacks_->dispatcher());
+  config_->threadLocalStreamManager().deferredErase(client_->stream(),
+                                                    filter_callbacks_->dispatcher());
 }
 
 void Filter::onDestroy() {
@@ -405,8 +409,8 @@ void Filter::onDestroy() {
     // closure is deferred upon filter destruction with a timer.
 
     // First, release the referenced filter resource.
-    if (stream_ != nullptr) {
-      stream_->notifyFilterDestroy();
+    if (client_->stream() != nullptr) {
+      client_->stream()->notifyFilterDestroy();
     }
 
     // Second, perform stream deferred closure.
@@ -436,7 +440,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_LOG(debug, "Sending headers message");
-  stream_->send(std::move(req), false);
+  client_->stream()->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
   state.setPaused(true);
   return FilterHeadersStatus::StopIteration;
@@ -493,16 +497,22 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   }
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
-    // We don't know what to do with the body until the response comes back.
-    // We must buffer it in case we need it when that happens.
-    // Raise a watermark to prevent a buffer overflow until the response comes back.
-    // When end_stream is true, we need to StopIterationAndWatermark as well to stop the
-    // ActiveStream from returning error when the last chunk added to stream buffer exceeds the
-    // buffer limit.
-    state.setPaused(true);
-    state.requestWatermark();
-    return FilterDataStatus::StopIterationAndWatermark;
+    if (state.bodyMode() == ProcessingMode::STREAMED &&
+        config_->sendBodyWithoutWaitingForHeaderResponse()) {
+      ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
+                       "is STREAMED and send_body_without_waiting_for_header_response is enabled");
+    } else {
+      ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
+      // We don't know what to do with the body until the response comes back.
+      // We must buffer it in case we need it when that happens.
+      // Raise a watermark to prevent a buffer overflow until the response comes back.
+      // When end_stream is true, we need to StopIterationAndWatermark as well to stop the
+      // ActiveStream from returning error when the last chunk added to stream buffer exceeds the
+      // buffer limit.
+      state.setPaused(true);
+      state.requestWatermark();
+      return FilterDataStatus::StopIterationAndWatermark;
+    }
   }
 
   FilterDataStatus result;
@@ -564,11 +574,13 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = setupBodyChunk(state, data, end_stream);
     state.enqueueStreamingChunk(data, end_stream);
-    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
-
-    // At this point we will continue, but with no data, because that will come later
-    if (end_stream) {
-      // But we need to stop iteration for the last chunk because it's our last chance to do stuff
+    // If the current state is HeadersCallback, stays in that state.
+    if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+      sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
+    } else {
+      sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
+    }
+    if (end_stream || state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
       state.setPaused(true);
       result = FilterDataStatus::StopIterationNoBuffer;
     } else {
@@ -661,7 +673,7 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
   ProcessingRequest req =
       buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/true);
   ENVOY_LOG(debug, "Sending headers message in observability mode");
-  stream_->send(std::move(req), false);
+  client_->stream()->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 
   return FilterHeadersStatus::Continue;
@@ -686,7 +698,7 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
     // Set up the the body chunk and send.
     auto req = setupBodyChunk(state, data, end_stream);
     req.set_observability_mode(true);
-    stream_->send(std::move(req), false);
+    client_->stream()->send(std::move(req), false);
     stats_.stream_msgs_sent_.inc();
     ENVOY_LOG(debug, "Sending body message in ObservabilityMode");
   } else if (state.bodyMode() != ProcessingMode::NONE) {
@@ -878,7 +890,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
-  stream_->send(std::move(req), false);
+  client_->stream()->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 
@@ -894,20 +906,21 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::TrailersCallback);
   ENVOY_LOG(debug, "Sending trailers message");
-  stream_->send(std::move(req), false);
+  client_->stream()->send(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 
 void Filter::logGrpcStreamInfo() {
-  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
-    const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
+  if (client_->stream() != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
+    const auto& upstream_meter = client_->stream()->streamInfo().getUpstreamBytesMeter();
     if (upstream_meter != nullptr) {
       logging_info_->setBytesSent(upstream_meter->wireBytesSent());
       logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
     }
     // Only set upstream host in logging info once.
     if (logging_info_->upstreamHost() == nullptr) {
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
+      logging_info_->setUpstreamHost(
+          client_->stream()->streamInfo().upstreamInfo()->upstreamHost());
     }
   }
 }
@@ -1068,9 +1081,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // Update processing mode now because filter callbacks check it
   // and the various "handle" methods below may result in callbacks
   // being invoked in line. This only happens when filter has allow_mode_override
-  // set to true and filter is waiting for header processing response.
+  // set to true, send_body_without_waiting_for_header_response set to false,
+  // and filter is waiting for header processing response.
   // Otherwise, the response mode_override proto field is ignored.
-  if (config_->allowModeOverride() && inHeaderProcessState() && response->has_mode_override()) {
+  if (config_->allowModeOverride() && !config_->sendBodyWithoutWaitingForHeaderResponse() &&
+      inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
     const auto& mode_overide = response->mode_override();
     // First, check if mode override allow-list is configured

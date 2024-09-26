@@ -56,7 +56,7 @@ jobs:
             --config=cache-envoy-engflow
             --config=bes-envoy-engflow
           rbe: false
-          runs-on: envoy-arm64-medium
+          runs-on: envoy-arm64-large
           timeout-minutes: 180
         - target: docs
           name: Docs
