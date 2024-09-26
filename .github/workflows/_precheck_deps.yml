@@ -17,12 +17,12 @@ on:
         required: true
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-publish
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-deps
   cancel-in-progress: true
 
 
 jobs:
-  prechecks:
+  deps:
     permissions:
       contents: read
       packages: read
@@ -31,6 +31,7 @@ jobs:
     with:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
       request: ${{ inputs.request }}
       error-match: |
         ERROR
@@ -50,7 +51,7 @@ jobs:
     if: ${{ inputs.dependency-review }}
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
+      uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938  # v4.2.0
       with:
         ref: ${{ fromJSON(inputs.request).request.sha }}
         persist-credentials: false

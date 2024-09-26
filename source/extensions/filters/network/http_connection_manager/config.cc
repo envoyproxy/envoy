@@ -443,6 +443,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = absl::nullopt;
   }
 
+  if (config.common_http_protocol_options().has_max_response_headers_kb()) {
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("Error: max_response_headers_kb cannot be set on http_connection_manager."));
+    return;
+  }
+
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {
     creation_status = absl::InvalidArgumentError(fmt::format(
         "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set."));

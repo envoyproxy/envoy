@@ -86,6 +86,7 @@ jobs:
     with:
       bazel-extra: >-
         --config=cache-envoy-engflow
+        --config=common-envoy-engflow
         --config=bes-envoy-engflow
       downloads: |
         release.${{ matrix.arch }}: release/${{ matrix.arch }}/bin/
