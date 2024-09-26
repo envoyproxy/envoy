@@ -56,7 +56,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:status_lib",
         "//source/common/http:utility_lib",
-        "//source/common/network:common_connection_filter_states_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_github_google_quiche//:http2_adapter",
         "@com_google_absl//absl/algorithm",
