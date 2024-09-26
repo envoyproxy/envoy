@@ -225,9 +225,9 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
       Api::SysCallIntResult result =
           connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &v6_only, &v6_only_len);
       if (result.return_value_ != 0) {
-        ENVOY_LOG_MISC(error,
-                       "Fail to get IPV6_V6ONLY socket option, getsockopt() return {}, errno {}",
-                       result.return_value_, result.errno_);
+        ENVOY_LOG_MISC(
+            error, "Failed to get IPV6_V6ONLY socket option, getsockopt() returned {}, errno {}",
+            result.return_value_, result.errno_);
         connection_socket->close();
         return connection_socket;
       }

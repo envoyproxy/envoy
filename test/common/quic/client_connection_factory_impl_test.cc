@@ -14,6 +14,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
@@ -151,7 +152,39 @@ TEST_P(QuicNetworkConnectionTest, LocalAddress) {
   EXPECT_TRUE(client_connection->connecting());
   EXPECT_EQ(Network::Connection::State::Open, client_connection->state());
   EXPECT_THAT(client_connection->connectionInfoProvider().localAddress(), testing::NotNull());
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    EXPECT_TRUE(client_connection->connectionInfoProvider().localAddress()->ip()->ipv6()->v6only());
+  }
   client_connection->close(Network::ConnectionCloseType::NoFlush);
+}
+
+class MockGetSockOptSysCalls : public Api::OsSysCallsImpl {
+public:
+  MOCK_METHOD(Api::SysCallIntResult, getsockopt,
+              (os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen));
+};
+
+TEST_P(QuicNetworkConnectionTest, GetV6OnlySocketOptionFailure) {
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    return;
+  }
+  initialize();
+  MockGetSockOptSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector{&os_sys_calls};
+
+  EXPECT_CALL(os_sys_calls, getsockopt(_, IPPROTO_IPV6, IPV6_V6ONLY, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
+      nullptr, connection_id_generator_, *factory_);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_TRUE(client_connection->connecting());
+  EXPECT_FALSE(session->connection()->connected());
+  EXPECT_EQ(client_connection->state(), Network::Connection::State::Closed);
 }
 
 TEST_P(QuicNetworkConnectionTest, Srtt) {

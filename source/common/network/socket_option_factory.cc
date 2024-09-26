@@ -182,7 +182,7 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpRecvTosOptions() {
 }
 
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildDoNotFragmentOptions(bool mapped_v6) {
-  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  auto options = std::make_unique<Socket::Options>();
 #ifdef ENVOY_IP_DONTFRAG
   options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_IP_DONTFRAG, ENVOY_IPV6_DONTFRAG,
