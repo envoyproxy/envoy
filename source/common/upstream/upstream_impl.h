@@ -421,7 +421,9 @@ public:
   void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
     lb_policy_data_ = std::move(lb_policy_data);
   }
-  const HostLbPolicyDataPtr& lbPolicyData() const override { return lb_policy_data_; }
+  OptRef<HostLbPolicyData> lbPolicyData() const override {
+    return makeOptRefFromPtr(lb_policy_data_.get());
+  }
 
 protected:
   static CreateConnectionData

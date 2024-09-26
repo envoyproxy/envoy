@@ -3,6 +3,7 @@
 #include <sys/types.h>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 
@@ -80,9 +81,8 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::on
             "LoadBalancerContext::OrcaLoadReportCb "
             "orca_load_report for {} report = {}",
             getHostAddress(host), orca_load_report.DebugString());
-  const auto& lb_policy_data_ptr = host->lbPolicyData();
-  auto* client_side_data = dynamic_cast<ClientSideHostLbPolicyData*>(lb_policy_data_ptr.get());
-  if (client_side_data == nullptr) {
+  auto client_side_data = host->typedLbPolicyData<ClientSideHostLbPolicyData>();
+  if (!client_side_data.has_value()) {
     return absl::NotFoundError("Host does not have ClientSideLbPolicyData");
   }
   return updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data);
@@ -159,9 +159,9 @@ void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
 void ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(
     const HostVector& hosts) {
   for (const auto& host_ptr : hosts) {
-    if (host_ptr->lbPolicyData() == nullptr) {
+    if (!host_ptr->lbPolicyData().has_value()) {
       ENVOY_LOG(trace, "Adding LB policy data to Host {}", getHostAddress(host_ptr.get()));
-      host_ptr->setLbPolicyData(std::make_shared<ClientSideHostLbPolicyData>());
+      host_ptr->setLbPolicyData(std::make_unique<ClientSideHostLbPolicyData>());
     }
   }
 }
@@ -169,9 +169,8 @@ void ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(
 absl::optional<uint32_t>
 ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
     const Host& host, MonotonicTime max_non_empty_since, MonotonicTime min_last_update_time) {
-  const auto& lb_policy_data_ptr = host.lbPolicyData();
-  auto* client_side_data = dynamic_cast<ClientSideHostLbPolicyData*>(lb_policy_data_ptr.get());
-  if (client_side_data == nullptr) {
+  auto client_side_data = host.typedLbPolicyData<ClientSideHostLbPolicyData>();
+  if (!client_side_data.has_value()) {
     ENVOY_LOG(trace, "Host does not have ClientSideHostLbPolicyData {}", getHostAddress(&host));
     return std::nullopt;
   }

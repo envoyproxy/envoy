@@ -92,12 +92,12 @@ void setHostClientSideWeight(HostSharedPtr& host, uint32_t weight,
                              long long non_empty_since_seconds,
                              long long last_update_time_seconds) {
   auto client_side_data =
-      std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
+      std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
           weight, /*non_empty_since=*/
           MonotonicTime(std::chrono::seconds(non_empty_since_seconds)),
           /*last_update_time=*/
           MonotonicTime(std::chrono::seconds(last_update_time_seconds)));
-  host->setLbPolicyData(client_side_data);
+  host->setLbPolicyData(std::move(client_side_data));
 }
 
 class ClientSideWeightedRoundRobinLoadBalancerTest : public LoadBalancerTestBase {
@@ -386,27 +386,28 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooRecent) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  auto client_side_data =
-      std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
+  host.lb_policy_data_ =
+      std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
           42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(5)),
           /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
-  host.lb_policy_data_ = client_side_data;
   // Non empty since is too recent (5 > 2).
   EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
       /*min_non_empty_since=*/MonotonicTime(std::chrono::seconds(2)),
       /*max_last_update_time=*/MonotonicTime(std::chrono::seconds(8))));
   // non_empty_since_ is not updated.
-  EXPECT_EQ(client_side_data->non_empty_since_.load(), MonotonicTime(std::chrono::seconds(5)));
+  EXPECT_EQ(
+      host.typedLbPolicyData<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>()
+          ->non_empty_since_.load(),
+      MonotonicTime(std::chrono::seconds(5)));
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooStale) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  auto client_side_data =
-      std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
+  host.lb_policy_data_ =
+      std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
           42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
           /*last_update_time=*/MonotonicTime(std::chrono::seconds(7)));
-  host.lb_policy_data_ = client_side_data;
   // Last update time is too stale (7 < 8).
   EXPECT_FALSE(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
       host,
@@ -414,17 +415,17 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
       /*max_last_update_time=*/MonotonicTime(std::chrono::seconds(8))));
   // Also resets the non_empty_since_ time.
   EXPECT_EQ(
-      client_side_data->non_empty_since_.load(),
+      host.typedLbPolicyData<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>()
+          ->non_empty_since_.load(),
       ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData::kDefaultNonEmptySince);
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_Valid) {
   NiceMock<Envoy::Upstream::MockHost> host;
-  auto client_side_data =
-      std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
+  host.lb_policy_data_ =
+      std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
           42, /*non_empty_since=*/MonotonicTime(std::chrono::seconds(1)),
           /*last_update_time=*/MonotonicTime(std::chrono::seconds(10)));
-  host.lb_policy_data_ = client_side_data;
   // Not empty since is not too recent (1 < 2) and last update time is not too
   // old (10 > 8).
   EXPECT_EQ(ClientSideWeightedRoundRobinLoadBalancerFriend::getClientSideWeightIfValidFromHost(
@@ -434,7 +435,10 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
                 .value(),
             42);
   // non_empty_since_ is not updated.
-  EXPECT_EQ(client_side_data->non_empty_since_.load(), MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_EQ(
+      host.typedLbPolicyData<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>()
+          ->non_empty_since_.load(),
+      MonotonicTime(std::chrono::seconds(1)));
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
