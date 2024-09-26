@@ -8040,9 +8040,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
   EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
-  EXPECT_THROW_WITH_MESSAGE(
-      listener_impl.addSocketFactory(std::move(socket_factory)), EnvoyException,
-      "Didn't find a registered implementation for type: 'google.protobuf.test'");
+  EXPECT_EQ(listener_impl.addSocketFactory(std::move(socket_factory)).message(),
+            "Didn't find a registered implementation for type: 'google.protobuf.test'");
 #endif
 }
 
@@ -8058,8 +8057,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
   EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
-  EXPECT_THROW_WITH_MESSAGE(listener_impl.addSocketFactory(std::move(socket_factory)),
-                            EnvoyException, "No valid balance type for connection balance");
+  EXPECT_EQ(listener_impl.addSocketFactory(std::move(socket_factory)).message(),
+            "No valid balance type for connection balance");
 #endif
 }
 
