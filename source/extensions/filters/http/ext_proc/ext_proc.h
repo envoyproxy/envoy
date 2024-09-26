@@ -24,7 +24,7 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
-#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
+#include "source/extensions/filters/http/ext_proc/client_base.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 

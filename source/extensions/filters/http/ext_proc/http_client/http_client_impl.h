@@ -7,7 +7,7 @@
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
+#include "source/extensions/filters/http/ext_proc/client_base.h"
 
 namespace Envoy {
 namespace Extensions {

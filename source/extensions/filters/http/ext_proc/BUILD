@@ -10,6 +10,15 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "client_base_interface",
+    hdrs = ["client_base.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "ext_proc",
     srcs = [
         "ext_proc.cc",
@@ -21,6 +30,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        ":client_base_interface",
         ":client_interface",
         ":matching_utils_lib",
         ":mutation_utils_lib",
@@ -34,7 +44,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//source/extensions/filters/http/ext_proc/http_client:client_base_interface",
         "//source/extensions/filters/http/ext_proc/http_client:http_client_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
@@ -65,11 +74,11 @@ envoy_cc_library(
     hdrs = ["client.h"],
     tags = ["skip_on_windows"],
     deps = [
+        ":client_base_interface",
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/grpc:status",
         "//envoy/stream_info:stream_info_interface",
         "//source/common/http:sidestream_watermark_lib",
-        "//source/extensions/filters/http/ext_proc/http_client:client_base_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
