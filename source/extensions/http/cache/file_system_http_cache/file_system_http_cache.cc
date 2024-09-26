@@ -356,8 +356,9 @@ InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& looku
       dynamic_cast<FileLookupContext*>(lookup_context.release()));
   ASSERT(file_lookup_context);
   if (file_lookup_context->workInProgress()) {
+    auto ret = std::make_unique<DontInsertContext>(*file_lookup_context->dispatcher());
     file_lookup_context->onDestroy();
-    return std::make_unique<DontInsertContext>();
+    return ret;
   }
   return std::make_unique<FileInsertContext>(shared_from_this(), std::move(file_lookup_context));
 }
