@@ -33,8 +33,9 @@ public:
 class ClientBase {
 public:
   virtual ~ClientBase() = default;
-  virtual void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& request, bool end_stream,
-                           const uint64_t stream_id, RequestCallbacks* callbacks, StreamBase* stream) PURE;
+  virtual void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& request,
+                           bool end_stream, const uint64_t stream_id, RequestCallbacks* callbacks,
+                           StreamBase* stream) PURE;
 };
 
 using ClientBasePtr = std::unique_ptr<ClientBase>;

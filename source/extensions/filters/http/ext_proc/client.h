@@ -17,7 +17,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-class ExternalProcessorStream: public StreamBase {
+class ExternalProcessorStream : public StreamBase {
 public:
   virtual ~ExternalProcessorStream() = default;
   virtual void send(envoy::service::ext_proc::v3::ProcessingRequest&& request,

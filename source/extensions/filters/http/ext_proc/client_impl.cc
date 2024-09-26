@@ -24,8 +24,9 @@ ExternalProcessorStreamPtr ExternalProcessorClientImpl::start(
                                              sidestream_watermark_callbacks);
 }
 
-void ExternalProcessorClientImpl::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& request, bool end_stream,
-                                              const uint64_t, RequestCallbacks*, StreamBase* stream) {
+void ExternalProcessorClientImpl::sendRequest(
+    envoy::service::ext_proc::v3::ProcessingRequest&& request, bool end_stream, const uint64_t,
+    RequestCallbacks*, StreamBase* stream) {
   ExternalProcessorStream* grpc_stream = dynamic_cast<ExternalProcessorStream*>(stream);
   grpc_stream->send(std::move(request), end_stream);
 }

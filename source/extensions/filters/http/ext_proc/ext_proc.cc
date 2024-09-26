@@ -434,8 +434,8 @@ Filter::StreamOpenState Filter::openStream() {
     }
     stats_.streams_started_.inc();
 
-    stream_ = config_->threadLocalStreamManager().store(
-        std::move(stream_object), config_->stats(), config_->deferredCloseTimeout());
+    stream_ = config_->threadLocalStreamManager().store(std::move(stream_object), config_->stats(),
+                                                        config_->deferredCloseTimeout());
     // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
     // have a proper implementation of streamInfo.
     if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
@@ -464,8 +464,7 @@ void Filter::closeStream() {
 
 void Filter::deferredCloseStream() {
   ENVOY_LOG(debug, "Calling deferred close on stream");
-  config_->threadLocalStreamManager().deferredErase(stream_,
-                                                    filter_callbacks_->dispatcher());
+  config_->threadLocalStreamManager().deferredErase(stream_, filter_callbacks_->dispatcher());
 }
 
 void Filter::onDestroy() {
@@ -1003,8 +1002,7 @@ void Filter::logGrpcStreamInfo() {
     }
     // Only set upstream host in logging info once.
     if (logging_info_->upstreamHost() == nullptr) {
-      logging_info_->setUpstreamHost(
-          stream_->streamInfo().upstreamInfo()->upstreamHost());
+      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
     }
   }
 }
