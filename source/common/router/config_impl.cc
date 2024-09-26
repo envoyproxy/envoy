@@ -380,9 +380,20 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
                                                            *validation_visitor_, num_retries_);
 }
 
+absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>> InternalRedirectPolicyImpl::create(
+    const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
+    ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<InternalRedirectPolicyImpl>(new InternalRedirectPolicyImpl(
+      policy_config, validator, current_route_name, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
-    ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name)
+    ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name,
+    absl::Status& creation_status)
     : current_route_name_(current_route_name),
       redirect_response_codes_(buildRedirectResponseCodes(policy_config)),
       max_internal_redirects_(
@@ -397,7 +408,9 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
   }
   for (const auto& header : policy_config.response_headers_to_copy()) {
     if (!Http::HeaderUtility::isModifiableHeader(header)) {
-      throwEnvoyExceptionOrPanic(":-prefixed headers or Hosts may not be specified here.");
+      creation_status =
+          absl::InvalidArgumentError(":-prefixed headers or Hosts may not be specified here.");
+      return;
     }
     response_headers_to_copy_.emplace_back(header);
   }
@@ -560,7 +573,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                            : nullptr),
       hedge_policy_(buildHedgePolicy(vhost->hedgePolicy(), route.route())),
       internal_redirect_policy_(
-          buildInternalRedirectPolicy(route.route(), validator, route.name())),
+          THROW_OR_RETURN_VALUE(buildInternalRedirectPolicy(route.route(), validator, route.name()),
+                                std::unique_ptr<InternalRedirectPolicyImpl>)),
       config_headers_(
           Http::HeaderUtility::buildHeaderDataVector(route.match().headers(), factory_context)),
       dynamic_metadata_([&]() {
@@ -1186,12 +1200,13 @@ absl::StatusOr<std::unique_ptr<RetryPolicyImpl>> RouteEntryImplBase::buildRetryP
   return nullptr;
 }
 
-std::unique_ptr<InternalRedirectPolicyImpl> RouteEntryImplBase::buildInternalRedirectPolicy(
+absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>>
+RouteEntryImplBase::buildInternalRedirectPolicy(
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name) const {
   if (route_config.has_internal_redirect_policy()) {
-    return std::make_unique<InternalRedirectPolicyImpl>(route_config.internal_redirect_policy(),
-                                                        validator, current_route_name);
+    return InternalRedirectPolicyImpl::create(route_config.internal_redirect_policy(), validator,
+                                              current_route_name);
   }
   envoy::config::route::v3::InternalRedirectPolicy policy_config;
   switch (route_config.internal_redirect_action()) {
@@ -1205,7 +1220,7 @@ std::unique_ptr<InternalRedirectPolicyImpl> RouteEntryImplBase::buildInternalRed
   if (route_config.has_max_internal_redirects()) {
     *policy_config.mutable_max_internal_redirects() = route_config.max_internal_redirects();
   }
-  return std::make_unique<InternalRedirectPolicyImpl>(policy_config, validator, current_route_name);
+  return InternalRedirectPolicyImpl::create(policy_config, validator, current_route_name);
 }
 
 RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(

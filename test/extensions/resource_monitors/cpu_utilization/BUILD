@@ -15,11 +15,11 @@ envoy_extension_cc_test(
     name = "cpu_utilization_monitor_test",
     srcs = ["cpu_utilization_monitor_test.cc"],
     extension_names = ["envoy.resource_monitors.cpu_utilization"],
-    external_deps = ["abseil_optional"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/resource_monitors/cpu_utilization:cpu_utilization_monitor",
         "//source/extensions/resource_monitors/cpu_utilization:linux_cpu_stats_reader",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
     ],
 )
@@ -28,11 +28,11 @@ envoy_extension_cc_test(
     name = "linux_cpu_stats_reader_test",
     srcs = ["linux_cpu_stats_reader_test.cc"],
     extension_names = ["envoy.resource_monitors.cpu_utilization"],
-    external_deps = ["abseil_optional"],
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/resource_monitors/cpu_utilization:linux_cpu_stats_reader",
         "//test/test_common:environment_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 

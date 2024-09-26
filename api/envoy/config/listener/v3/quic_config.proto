@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: QUIC listener config]
 
 // Configuration specific to the UDP QUIC listener.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message QuicProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.QuicProtocolOptions";
@@ -94,4 +94,9 @@ message QuicProtocolOptions {
   // If not specified, no cmsg will be saved to QuicReceivedPacket.
   repeated core.v3.SocketCmsgHeaders save_cmsg_config = 12
       [(validate.rules).repeated = {max_items: 1}];
+
+  // If true, the listener will reject connection-establishing packets at the
+  // QUIC layer by replying with an empty version negotiation packet to the
+  // client.
+  bool reject_new_connections = 13;
 }

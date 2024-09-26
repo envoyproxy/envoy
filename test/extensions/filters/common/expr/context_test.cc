@@ -412,6 +412,14 @@ TEST(Context, ResponseAttributes) {
   }
 
   {
+    info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+    StreamInfo::UpstreamTiming& upstream_timing = info.upstreamInfo()->upstreamTiming();
+    upstream_timing.onFirstUpstreamTxByteSent(info.timeSource());
+    upstream_timing.onLastUpstreamRxByteReceived(info.timeSource());
+    EXPECT_TRUE(response[CelValue::CreateStringView(BackendLatency)].has_value());
+  }
+
+  {
     Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}, {grpc_status, "7"}};
     Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
     Protobuf::Arena arena;

@@ -1069,6 +1069,11 @@ public:
   virtual uint32_t maxResponseHeadersCount() const PURE;
 
   /**
+   * @return uint32_t the maximum total size of response headers in KB.
+   */
+  virtual absl::optional<uint16_t> maxResponseHeadersKb() const PURE;
+
+  /**
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
@@ -1316,9 +1321,19 @@ public:
   virtual UnitFloat dropOverload() const PURE;
 
   /**
+   * @return the cluster drop_category_ configuration.
+   */
+  virtual const std::string& dropCategory() const PURE;
+
+  /**
    * Set up the drop_overload value for the cluster.
    */
   virtual void setDropOverload(UnitFloat drop_overload) PURE;
+
+  /**
+   * Set up the drop_category value for the thread local cluster.
+   */
+  virtual void setDropCategory(absl::string_view drop_category) PURE;
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;

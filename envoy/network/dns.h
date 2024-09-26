@@ -86,11 +86,11 @@ public:
 
   /**
    * Final status for a DNS resolution.
-   * TODO(abeyad): Rename `Success` to `Completed` or something similar. DNS resolution can return
-   * result statuses like NODATA and NONAME, which indicate successful completion of the query but
+   * DNS resolution can return result statuses like NODATA、SERVFAIL and NONAME,
+   * which indicate successful completion of the query but
    * no results, and `Completed` is a more accurate way of reflecting that.
    */
-  enum class ResolutionStatus { Success, Failure };
+  enum class ResolutionStatus { Completed, Failure };
 
   /**
    * Called when a resolution attempt is complete.

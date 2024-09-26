@@ -218,6 +218,10 @@ public:
 
   uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
 
+  bool sendBodyWithoutWaitingForHeaderResponse() const {
+    return send_body_without_waiting_for_header_response_;
+  }
+
   const ExtProcFilterStats& stats() const { return stats_; }
 
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& processingMode() const {
@@ -263,6 +267,11 @@ public:
     return immediate_mutation_checker_;
   }
 
+  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
+  allowedOverrideModes() const {
+    return allowed_override_modes_;
+  }
+
   ThreadLocalStreamManager& threadLocalStreamManager() {
     return thread_local_stream_manager_slot_->getTyped<ThreadLocalStreamManager>();
   }
@@ -285,6 +294,7 @@ private:
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const bool send_body_without_waiting_for_header_response_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
@@ -304,6 +314,8 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
+  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+      allowed_override_modes_;
   const ExpressionManager expression_manager_;
 
   const ImmediateMutationChecker immediate_mutation_checker_;

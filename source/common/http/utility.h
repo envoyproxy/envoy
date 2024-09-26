@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -572,11 +573,11 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const Http::StreamFilterCal
  * and their lifetime is the same as the matched route.
  */
 template <class ConfigType>
-absl::InlinedVector<const ConfigType*, 4>
+absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4>
 getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
   ASSERT(callbacks != nullptr);
 
-  absl::InlinedVector<const ConfigType*, 4> all_configs;
+  absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4> all_configs;
 
   for (const auto* config : callbacks->perFilterConfigs()) {
     const ConfigType* typed_config = dynamic_cast<const ConfigType*>(config);
@@ -584,7 +585,7 @@ getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
       ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
       continue;
     }
-    all_configs.push_back(typed_config);
+    all_configs.push_back(*typed_config);
   }
 
   return all_configs;

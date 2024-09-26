@@ -17,9 +17,9 @@ envoy_cc_library(
     hdrs = [
         "io_uring_impl.h",
     ],
-    external_deps = ["uring"],
     tags = ["nocompdb"],
     deps = [
+        "//bazel/foreign_cc:liburing_linux",
         "//envoy/common/io:io_uring_interface",
         "//envoy/thread_local:thread_local_interface",
     ],

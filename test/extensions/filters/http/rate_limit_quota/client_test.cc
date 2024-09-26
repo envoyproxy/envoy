@@ -18,7 +18,7 @@ public:
 };
 
 TEST_F(RateLimitClientTest, OpenAndCloseStream) {
-  EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
+  EXPECT_OK(test_client.client_->startStream(&test_client.stream_info_));
   EXPECT_CALL(test_client.stream_, closeStream());
   EXPECT_CALL(test_client.stream_, resetStream());
   test_client.client_->closeStream();
@@ -27,7 +27,7 @@ TEST_F(RateLimitClientTest, OpenAndCloseStream) {
 TEST_F(RateLimitClientTest, SendUsageReport) {
   ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
   TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
-  EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
+  EXPECT_OK(test_client.client_->startStream(&test_client.stream_info_));
   bool end_stream = false;
   // Send quota usage report and ensure that we get it.
   EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, end_stream));
@@ -39,7 +39,7 @@ TEST_F(RateLimitClientTest, SendUsageReport) {
 }
 
 TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
-  EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
+  EXPECT_OK(test_client.client_->startStream(&test_client.stream_info_));
   ASSERT_NE(test_client.stream_callbacks_, nullptr);
 
   auto empty_request_headers = Http::RequestHeaderMapImpl::create();
@@ -64,6 +64,33 @@ TEST_F(RateLimitClientTest, SendRequestAndReceiveResponse) {
   EXPECT_CALL(test_client.stream_, resetStream());
   test_client.client_->closeStream();
   test_client.client_->onRemoteClose(0, "");
+}
+
+TEST_F(RateLimitClientTest, RestartStreamWhileInUse) {
+  ::envoy::service::rate_limit_quota::v3::BucketId bucket_id;
+  TestUtility::loadFromYaml(SingleBukcetId, bucket_id);
+  EXPECT_OK(test_client.client_->startStream(&test_client.stream_info_));
+
+  bool end_stream = false;
+  // Send quota usage report and ensure that we get it.
+  EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, end_stream));
+  const size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  test_client.client_->sendUsageReport(bucket_id_hash);
+  EXPECT_CALL(test_client.stream_, closeStream());
+  EXPECT_CALL(test_client.stream_, resetStream());
+  test_client.client_->closeStream();
+
+  // Expect the stream to reopen while trying to send the next usage report.
+  EXPECT_CALL(test_client.stream_, sendMessageRaw_(_, end_stream));
+  test_client.client_->sendUsageReport(bucket_id_hash);
+  EXPECT_CALL(test_client.stream_, closeStream());
+  EXPECT_CALL(test_client.stream_, resetStream());
+  test_client.client_->closeStream();
+
+  // Expect the client to handle a restart failure.
+  EXPECT_CALL(*test_client.async_client_, startRaw(_, _, _, _)).WillOnce(testing::Return(nullptr));
+  WAIT_FOR_LOG_CONTAINS("error", "Failed to start the stream to send reports.",
+                        { test_client.client_->sendUsageReport(bucket_id_hash); });
 }
 
 } // namespace

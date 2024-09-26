@@ -77,6 +77,10 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
     return std::make_unique<InternalAddressConfig>(config.internal_address_config(),
                                                    creation_status);
   }
+  ENVOY_LOG_ONCE_MISC(warn,
+                      "internal_address_config is not configured. The existing default behaviour "
+                      "will trust RFC1918 IP addresses, but this will be changed in next release. "
+                      "Please explictily config internal address config as the migration step.");
 
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
@@ -437,6 +441,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
     idle_timeout_ = absl::nullopt;
+  }
+
+  if (config.common_http_protocol_options().has_max_response_headers_kb()) {
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("Error: max_response_headers_kb cannot be set on http_connection_manager."));
+    return;
   }
 
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {
