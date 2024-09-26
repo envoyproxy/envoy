@@ -2380,9 +2380,50 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
   testLargeRequestHeaders(100, 1, 8192, 100);
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
+TEST_P(ProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
   // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
   testLargeRequestHeaders(100, 70, 8192, 100, TestUtility::DefaultTimeout);
+}
+
+namespace {
+uint32_t adjustMaxSingleHeaderSizeForCodecLimits(uint32_t size,
+                                                 const HttpProtocolTestParams& params) {
+  if (params.http2_implementation == Http2Impl::Nghttp2 &&
+      (params.downstream_protocol == Http::CodecType::HTTP2 ||
+       params.upstream_protocol == Http::CodecType::HTTP2)) {
+    // nghttp2 has a hard-coded, unconfigurable limit of 64k for a header in it's header
+    // decompressor, so this test will always fail when using that codec.
+    // Reduce the size so that it can pass and receive some test coverage.
+    return 100;
+  } else if (params.downstream_protocol == Http::CodecType::HTTP3 ||
+             params.upstream_protocol == Http::CodecType::HTTP3) {
+    // QUICHE has a hard-coded limit of 1024KiB in it's QPACK decoder.
+    // Reduce the size so that it can pass and receive some test coverage.
+    return 1023;
+  }
+
+  return size;
+}
+} // namespace
+
+// Test a single header of the maximum allowed size.
+TEST_P(ProtocolIntegrationTest, VeryLargeRequestHeadersAccepted) {
+  uint32_t size = adjustMaxSingleHeaderSizeForCodecLimits(8191, GetParam());
+
+  testLargeRequestHeaders(size, 1, 8192, 100, TestUtility::DefaultTimeout);
+}
+
+// Test a single header of the maximum allowed size.
+TEST_P(ProtocolIntegrationTest, ManyLargeResponseHeadersAccepted) {
+  // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
+  testLargeResponseHeaders(100, 70, 8192, 100, TestUtility::DefaultTimeout);
+}
+
+// Test a single header of the maximum allowed size.
+TEST_P(ProtocolIntegrationTest, VeryLargeResponseHeadersAccepted) {
+  uint32_t size = adjustMaxSingleHeaderSizeForCodecLimits(8191, GetParam());
+
+  testLargeResponseHeaders(size, 1, 8192, 100, TestUtility::DefaultTimeout);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersRejected) {
