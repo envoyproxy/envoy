@@ -15,8 +15,9 @@ void ExtProcHttpClient::setCallbacks(RequestCallbacks* callbacks) {
   ENVOY_LOG(debug, "ext_proc http client set callbacks_ == nullptr? {}", (callbacks_ == nullptr));
 }
 
-void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req,
-                                    const uint64_t stream_id) {
+void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool,
+                                    const uint64_t stream_id, RequestCallbacks* callbacks, StreamBase*) {
+  setCallbacks(callbacks);
   // Cancel any active requests.
   cancel();
 

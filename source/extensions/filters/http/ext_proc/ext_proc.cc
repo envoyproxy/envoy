@@ -353,13 +353,8 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 }
 
 void Filter::sendRequest(ProcessingRequest&& req, bool end_stream) {
-  if (config_->grpcService().has_value()) {
-    stream_->send(std::move(req), end_stream);
-  } else {
-    ExtProcHttpClient* http_client = dynamic_cast<ExtProcHttpClient*>(client_.get());
-    http_client->setCallbacks(this);
-    http_client->sendRequest(std::move(req), filter_callbacks_->streamId());
-  }
+  // Calling the client send function to send the request.
+  client_->sendRequest(std::move(req), end_stream, filter_callbacks_->streamId(), this, stream_);
 }
 
 void Filter::onComplete(ProcessingResponse& response) {
