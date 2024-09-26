@@ -19,7 +19,9 @@ namespace Network {
  */
 class ActiveDnsQuery {
 public:
-  virtual ~ActiveDnsQuery() = default;
+  virtual ~ActiveDnsQuery() {
+    std::cerr << "Calling ~ActiveDnsQuery\n";
+  }
 
   enum class CancelReason {
     // The caller no longer needs the answer to the query.

@@ -57,6 +57,10 @@ protected:
       absl::MutexLock guard(&mutex_);
       cancelled_ = true;
     }
+    bool isCancelled() const {
+      absl::MutexLock guard(&mutex_);
+      return cancelled_;
+    }
 
     absl::Mutex& mutex_;
     const std::string dns_name_;
