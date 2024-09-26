@@ -1636,7 +1636,7 @@ TEST_F(HostImplTest, HostLbPolicyData) {
     int foo = 42;
   };
 
-  host->setLbPolicyData(std::make_shared<TestLbPolicyData>());
+  host->setLbPolicyData(std::make_unique<TestLbPolicyData>());
   EXPECT_TRUE(host->lbPolicyData().has_value());
   auto test_policy_data = host->typedLbPolicyData<TestLbPolicyData>();
   EXPECT_TRUE(test_policy_data.has_value());
