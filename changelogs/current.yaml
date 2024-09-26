@@ -109,6 +109,9 @@ minor_behavior_changes:
   change: |
     Enhanced listener filter chain execution to include the case that listener filter has maxReadBytes() of 0,
     but may return StopIteration in onAccept to wait for asynchronous callback.
+- area: tracers
+  change: |
+    Set status code based on GRPC status code for OpenTelemetry tracers (previously unset).
 - area: http2
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
