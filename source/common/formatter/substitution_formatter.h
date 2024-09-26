@@ -278,6 +278,8 @@ public:
    * Serializes a integer number.
    * NOTE: All numbers in JSON is float. When loading output of this serializer, the parser's
    * implementation decides if the full precision of big integer could be preserved or not.
+   * See discussion here https://stackoverflow.com/questions/13502398/json-integers-limit-on-size
+   * and spec https://www.rfc-editor.org/rfc/rfc7159#section-6 for more details.
    */
   void addNumber(uint64_t i) { output_buffer_.add(absl::StrCat(i)); }
   void addNumber(int64_t i) { output_buffer_.add(absl::StrCat(i)); }
