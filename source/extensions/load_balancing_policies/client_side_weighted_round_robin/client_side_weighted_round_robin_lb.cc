@@ -81,8 +81,8 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::on
             "LoadBalancerContext::OrcaLoadReportCb "
             "orca_load_report for {} report = {}",
             getHostAddress(host), orca_load_report.DebugString());
-  const auto* client_side_data = host->typedLbPolicyData<ClientSideHostLbPolicyData>();
-  if (client_side_data == nullptr) {
+  auto client_side_data = host->typedLbPolicyData<ClientSideHostLbPolicyData>();
+  if (!client_side_data.has_value()) {
     return absl::NotFoundError("Host does not have ClientSideLbPolicyData");
   }
   return updateClientSideDataFromOrcaLoadReport(orca_load_report, *client_side_data);
@@ -169,8 +169,8 @@ void ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(
 absl::optional<uint32_t>
 ClientSideWeightedRoundRobinLoadBalancer::getClientSideWeightIfValidFromHost(
     const Host& host, MonotonicTime max_non_empty_since, MonotonicTime min_last_update_time) {
-  auto* client_side_data = host.typedLbPolicyData<ClientSideHostLbPolicyData>();
-  if (client_side_data == nullptr) {
+  auto client_side_data = host.typedLbPolicyData<ClientSideHostLbPolicyData>();
+  if (!client_side_data.has_value()) {
     ENVOY_LOG(trace, "Host does not have ClientSideHostLbPolicyData {}", getHostAddress(&host));
     return std::nullopt;
   }
