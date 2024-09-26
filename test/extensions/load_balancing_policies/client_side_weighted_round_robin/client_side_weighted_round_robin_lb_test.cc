@@ -92,12 +92,12 @@ void setHostClientSideWeight(HostSharedPtr& host, uint32_t weight,
                              long long non_empty_since_seconds,
                              long long last_update_time_seconds) {
   auto client_side_data =
-      std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
+      std::make_unique<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>(
           weight, /*non_empty_since=*/
           MonotonicTime(std::chrono::seconds(non_empty_since_seconds)),
           /*last_update_time=*/
           MonotonicTime(std::chrono::seconds(last_update_time_seconds)));
-  host->setLbPolicyData(client_side_data);
+  host->setLbPolicyData(std::move(client_side_data));
 }
 
 class ClientSideWeightedRoundRobinLoadBalancerTest : public LoadBalancerTestBase {
