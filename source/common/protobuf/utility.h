@@ -691,7 +691,7 @@ public:
    * @param value message of type type.googleapis.com/google.protobuf.Value
    * @param dest JSON string.
    */
-  static void toJsonString(const ProtobufWkt::Value& value, std::string& dest);
+  static void appendJsonToString(const ProtobufWkt::Value& value, std::string& dest);
 };
 
 /**

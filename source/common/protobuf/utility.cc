@@ -127,16 +127,12 @@ void valueToJson(const ProtobufWkt::Value& value, JsonStringStreamer::Level& lev
   case ProtobufWkt::Value::kBoolValue:
     level.addBool(value.bool_value());
     break;
-  case ProtobufWkt::Value::kStructValue: {
-    auto map = level.addMap();
-    structValueToJson(value.struct_value(), *map);
+  case ProtobufWkt::Value::kStructValue:
+    structValueToJson(value.struct_value(), *level.addMap());
     break;
-  }
-  case ProtobufWkt::Value::kListValue: {
-    auto array = level.addArray();
-    listValueToJson(value.list_value(), *array);
+  case ProtobufWkt::Value::kListValue:
+    listValueToJson(value.list_value(), *level.addArray());
     break;
-  }
   }
 }
 
@@ -151,7 +147,7 @@ void structValueToJson(const ProtobufWkt::Struct& struct_value, JsonStringStream
   }
   // Sort the keys to make the output deterministic.
   std::sort(sorted_fields.begin(), sorted_fields.end(),
-            [](auto a, auto b) { return a.get().first < b.get().first; });
+            [](PairRefWrapper a, PairRefWrapper b) { return a.get().first < b.get().first; });
 
   for (const PairRefWrapper field : sorted_fields) {
     map.addKey(field.get().first);
@@ -911,7 +907,7 @@ ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& v
   return val;
 }
 
-void ValueUtil::toJsonString(const ProtobufWkt::Value& value, std::string& dest) {
+void ValueUtil::appendJsonToString(const ProtobufWkt::Value& value, std::string& dest) {
   JsonStringStreamer streamer(dest);
   switch (value.kind_case()) {
   case ProtobufWkt::Value::KIND_NOT_SET:
@@ -927,14 +923,11 @@ void ValueUtil::toJsonString(const ProtobufWkt::Value& value, std::string& dest)
   case ProtobufWkt::Value::kBoolValue:
     streamer.addBool(value.bool_value());
     break;
-  case ProtobufWkt::Value::kStructValue: {
-    auto map = streamer.makeRootMap();
-    structValueToJson(value.struct_value(), *map);
+  case ProtobufWkt::Value::kStructValue:
+    structValueToJson(value.struct_value(), *streamer.makeRootMap());
     break;
-  }
   case ProtobufWkt::Value::kListValue:
-    auto arr = streamer.makeRootArray();
-    listValueToJson(value.list_value(), *arr);
+    listValueToJson(value.list_value(), *streamer.makeRootArray());
     break;
   }
 }
