@@ -1252,7 +1252,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
       .Times(0);
   // The reset will be converted into a local reply.
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, testing::Eq(""), _, _,
-                                         "filter_removed_required_request_headers{ResetReason:_2}"))
+                                         "upstream_reset_before_response_started{remote_reset}"))
       .WillOnce(InvokeWithoutArgs([] {}));
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,

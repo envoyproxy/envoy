@@ -68,11 +68,13 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
     // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
     // erroneously remove required headers.
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError);
-    const std::string details = absl::StrCat(
-        StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders, "{",
-        StringUtil::replaceAllEmptySpace(
-            deferred_reset_status_.ok() ? status.message() : deferred_reset_status_.message()),
-        "}");
+    const std::string details =
+        deferred_reset_status_.ok()
+            ? absl::StrCat(
+                  StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders, "{",
+                  StringUtil::replaceAllEmptySpace(status.message()), "}")
+            : absl::StrCat(StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset, "{",
+                           StringUtil::replaceAllEmptySpace(deferred_reset_status_.message()), "}");
     deferred_reset_status_ = absl::OkStatus();
     callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
                                absl::nullopt, details);
@@ -218,7 +220,18 @@ void UpstreamCodecFilter::CodecBridge::maybeEndDecode(bool end_stream) {
 
 void UpstreamCodecFilter::CodecBridge::onResetStream(Http::StreamResetReason reason,
                                                      absl::string_view transport_failure_reason) {
-  std::string failure_reason;
+  if (filter_.calling_encode_headers_) {
+    // If called while still encoding errors, the reset reason won't be appended to the details
+    // string through the reset stream call, so append it here.
+    std::string failure_reason(Http::Utility::resetReasonToString(reason));
+    if (!transport_failure_reason.empty()) {
+      absl::StrAppend(&failure_reason, absl::StrCat("|", transport_failure_reason));
+    }
+    filter_.deferred_reset_status_ = absl::InternalError(failure_reason);
+    return;
+  }
+
+  std::string failure_reason(transport_failure_reason);
   if (reason == Http::StreamResetReason::LocalReset) {
     if (!Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.report_stream_reset_error_code")) {
@@ -228,18 +241,8 @@ void UpstreamCodecFilter::CodecBridge::onResetStream(Http::StreamResetReason rea
     } else {
       failure_reason = absl::StrCat(transport_failure_reason, "|codec_error");
     }
-  } else {
-    failure_reason = absl::StrCat("ResetReason: ", reason);
-    if (!transport_failure_reason.empty()) {
-      absl::StrAppend(&failure_reason, absl::StrCat("|", transport_failure_reason));
-    }
   }
-
-  if (filter_.calling_encode_headers_) {
-    filter_.deferred_reset_status_ = absl::InternalError(failure_reason);
-  } else {
-    filter_.callbacks_->resetStream(reason, failure_reason);
-  }
+  filter_.callbacks_->resetStream(reason, failure_reason);
 }
 
 REGISTER_FACTORY(UpstreamCodecFilterFactory,
