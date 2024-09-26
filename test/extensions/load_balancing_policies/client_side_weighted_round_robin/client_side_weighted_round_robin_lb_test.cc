@@ -396,7 +396,10 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
       /*min_non_empty_since=*/MonotonicTime(std::chrono::seconds(2)),
       /*max_last_update_time=*/MonotonicTime(std::chrono::seconds(8))));
   // non_empty_since_ is not updated.
-  EXPECT_EQ(host.lb_policy_data_->non_empty_since_.load(), MonotonicTime(std::chrono::seconds(5)));
+  EXPECT_EQ(
+      host.typedLbPolicyData<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>()
+          ->non_empty_since_.load(),
+      MonotonicTime(std::chrono::seconds(5)));
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFromHost_TooStale) {
@@ -412,7 +415,8 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
       /*max_last_update_time=*/MonotonicTime(std::chrono::seconds(8))));
   // Also resets the non_empty_since_ time.
   EXPECT_EQ(
-      host.lb_policy_data_->non_empty_since_.load(),
+      host.typedLbPolicyData<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>()
+          ->non_empty_since_.load(),
       ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData::kDefaultNonEmptySince);
 }
 
@@ -431,7 +435,10 @@ TEST(ClientSideWeightedRoundRobinLoadBalancerTest, GetClientSideWeightIfValidFro
                 .value(),
             42);
   // non_empty_since_ is not updated.
-  EXPECT_EQ(host.lb_policy_data_->non_empty_since_.load(), MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_EQ(
+      host.typedLbPolicyData<ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData>()
+          ->non_empty_since_.load(),
+      MonotonicTime(std::chrono::seconds(1)));
 }
 
 TEST(ClientSideWeightedRoundRobinLoadBalancerTest,
