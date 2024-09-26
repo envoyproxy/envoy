@@ -35,7 +35,6 @@ RUNTIME_GUARD(envoy_reloadable_features_check_switch_protocol_websocket_handshak
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_consistent_header_validation);
 RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
-RUNTIME_GUARD(envoy_reloadable_features_dfp_mixed_scheme);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_dns_details);
 RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
@@ -116,9 +115,6 @@ RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
-// Execution context is optional and must be enabled explicitly.
-// See https://github.com/envoyproxy/envoy/issues/32012.
-FALSE_RUNTIME_GUARD(envoy_restart_features_enable_execution_context);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO(paul-r-gall) Make this enabled by default after additional soak time.

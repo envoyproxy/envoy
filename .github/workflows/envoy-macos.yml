@@ -45,6 +45,7 @@ jobs:
     with:
       command:
       container-command:
+      docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       runs-on: macos-14-xlarge
       source: ${{ matrix.source }}
@@ -66,6 +67,7 @@ jobs:
               --flaky_test_attempts=2
               --config=bes-envoy-engflow
               --config=cache-envoy-engflow
+              --config=common-envoy-engflow
               --config=ci)
             export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
 

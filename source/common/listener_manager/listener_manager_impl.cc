@@ -529,7 +529,7 @@ ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
   if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(new_listener.name(), new_listener));
   } else {
-    new_listener.cloneSocketFactoryFrom(existing_listener);
+    RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
   }
   return absl::OkStatus();
 }
@@ -1177,7 +1177,7 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
   }
 
   if (draining_listener_ptr != nullptr) {
-    listener.cloneSocketFactoryFrom(*draining_listener_ptr);
+    RETURN_IF_NOT_OK(listener.cloneSocketFactoryFrom(*draining_listener_ptr));
   } else {
     return createListenSocketFactory(listener);
   }
@@ -1191,25 +1191,32 @@ absl::Status ListenerManagerImpl::createListenSocketFactory(ListenerImpl& listen
     bind_type = listener.reusePort() ? ListenerComponentFactory::BindType::ReusePort
                                      : ListenerComponentFactory::BindType::NoReusePort;
   }
+  absl::Status socket_status = absl::OkStatus();
   TRY_ASSERT_MAIN_THREAD {
     Network::SocketCreationOptions creation_options;
     creation_options.mptcp_enabled_ = listener.mptcpEnabled();
     for (std::vector<Network::Address::InstanceConstSharedPtr>::size_type i = 0;
          i < listener.addresses().size(); i++) {
-      listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
+      socket_status = listener.addSocketFactory(std::make_unique<ListenSocketFactoryImpl>(
           *factory_, listener.addresses()[i], socket_type, listener.listenSocketOptions(i),
           listener.name(), listener.tcpBacklogSize(), bind_type, creation_options,
           server_.options().concurrency()));
+      if (!socket_status.ok()) {
+        break;
+      }
     }
   }
   END_TRY
   CATCH(const EnvoyException& e, {
-    ENVOY_LOG(error, "listener '{}' failed to bind or apply socket options: {}", listener.name(),
-              e.what());
-    incListenerCreateFailureStat();
-    return absl::InvalidArgumentError(e.what());
+    socket_status = absl::InvalidArgumentError(e.what());
+    ;
   });
-  return absl::OkStatus();
+  if (!socket_status.ok()) {
+    ENVOY_LOG(error, "listener '{}' failed to bind or apply socket options: {}", listener.name(),
+              socket_status.message());
+    incListenerCreateFailureStat();
+  }
+  return socket_status;
 }
 
 void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {

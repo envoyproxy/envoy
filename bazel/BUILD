@@ -518,6 +518,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_execution_context",
+    values = {"define": "execution_context=enabled"},
+)
+
+config_setting(
     name = "enable_perf_tracing",
     values = {"define": "perf_tracing=enabled"},
 )
@@ -742,6 +747,11 @@ alias(
         ":oss_fuzz": "@rules_fuzzing_oss_fuzz//:oss_fuzz_engine",
         "//conditions:default": "//test/fuzz:fuzz_runner_engine",
     }),
+)
+
+config_setting(
+    name = "engflow_rbe",
+    define_values = {"engflow_rbe": "true"},
 )
 
 selects.config_setting_group(
