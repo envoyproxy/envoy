@@ -37,23 +37,23 @@ public:
   virtual void cancel(CancelReason reason) PURE;
   /** Add a trace for the DNS query. */
   void addTrace(uint8_t trace) {
-    absl::MutexLock lock(&lock_);
+    // absl::MutexLock lock(&lock_);
     traces_.emplace_back(trace);
   }
   /** Return the DNS query traces. */
-  const std::vector<uint8_t>& getTraces() {
-    absl::MutexLock lock(&lock_);
+  const std::vector<uint8_t>& getTraces() const {
+    // absl::MutexLock lock(&lock_);
     return traces_;
   }
   /** Clears the DNS query traces. */
   void clearTraces() {
-    absl::MutexLock lock(&lock_);
+    // absl::MutexLock lock(&lock_);
     traces_.clear();
   }
 
 private:
-  absl::Mutex lock_;
-  std::vector<uint8_t> traces_ ABSL_GUARDED_BY(lock_);
+  // absl::Mutex lock_;
+  std::vector<uint8_t> traces_; // ABSL_GUARDED_BY(lock_);
 };
 
 /**
