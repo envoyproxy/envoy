@@ -517,12 +517,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
 
     auto extension = factory->createExtension(extension_config.typed_config(), context_);
-    if (!extension) {
+    SET_AND_RETURN_IF_NOT_OK(extension.status(), creation_status);
+    if (!*extension) {
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Original IP detection extension could not be created: '{}'", extension_config.name()));
       return;
     }
-    original_ip_detection_extensions_.push_back(extension);
+    original_ip_detection_extensions_.push_back(*extension);
   }
 
   const auto& header_mutation_extensions = config.early_header_mutation_extensions();
