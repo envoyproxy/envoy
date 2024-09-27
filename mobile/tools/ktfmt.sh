@@ -29,6 +29,18 @@ readonly jdk
 java="${jdk}"/bin/java
 readonly java
 
+case "${OSTYPE}" in
+    darwin*)
+        which -s sha256sum
+        if [[ $? -eq 1 ]]; then
+            # shellcheck disable=SC2120
+            function sha256sum {
+                shasum -a 256 "$@"
+            }
+        fi
+        ;;
+esac
+
 check_sha256sum() {
   sha256="$1"
   binary="$2"

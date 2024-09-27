@@ -9,6 +9,18 @@ if [[ ! -e "$ENVOY_SRCDIR" ]]; then
     exit 1
 fi
 
+case "${OSTYPE}" in
+    darwin*)
+        which -s sha256sum
+        if [[ $? -eq 1 ]]; then
+            # shellcheck disable=SC2120
+            function sha256sum {
+                shasum -a 256 "$@"
+            }
+        fi
+        ;;
+esac
+
 git -C "$ENVOY_SRCDIR" fetch --tags
 
 git -C "$ENVOY_SRCDIR" tag --list 'v[0-9]*.[0-9]*.[0-9]*' \
