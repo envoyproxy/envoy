@@ -145,7 +145,7 @@ private:
       address_list_ = std::move(list);
     }
 
-    void setDetails(std::string details) {
+    void setDetails(absl::string_view details) {
       absl::WriterMutexLock lock{&resolve_lock_};
       details_ = details;
     }

@@ -36,6 +36,8 @@ public:
    */
   virtual void cancel(CancelReason reason) PURE;
 
+  const absl::Mutex& lock() { return lock_; }
+
   /** Add a trace for the DNS query. */
   void addTrace(uint8_t trace) {
     absl::MutexLock lock(&lock_);
@@ -44,13 +46,13 @@ public:
 
   /** Return the DNS query traces. */
   const std::vector<uint8_t>& getTraces() {
-    absl::MutexLock lock(&lock_);
+    // absl::MutexLock lock(&lock_);
     return traces_;
   }
 
   /** Clears the DNS query traces. */
   void clearTraces() {
-    absl::MutexLock lock(&lock_);
+    // absl::MutexLock lock(&lock_);
     traces_.clear();
   }
 
