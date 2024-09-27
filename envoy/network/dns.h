@@ -35,22 +35,29 @@ public:
    * @param reason supplies the cancel reason.
    */
   virtual void cancel(CancelReason reason) PURE;
+
   /** Add a trace for the DNS query. */
   void addTrace(uint8_t trace) {
     absl::MutexLock lock(&lock_);
     traces_.emplace_back(trace);
   }
+
   /** Return the DNS query traces. */
   const std::vector<uint8_t>& getTraces() {
     absl::MutexLock lock(&lock_);
     return traces_;
   }
+
   /** Clears the DNS query traces. */
   void clearTraces() {
     absl::MutexLock lock(&lock_);
     traces_.clear();
   }
+
+  /** Indicate whether this instance should be deleted manually. */
   void deleteThis(bool delete_this) { delete_this_ = delete_this; }
+
+  /** Return true if this instance needs to be deleted manually. */
   bool shouldDeleteThis() const { return delete_this_; }
 
 private:
