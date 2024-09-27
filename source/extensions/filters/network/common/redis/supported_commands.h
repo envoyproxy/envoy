@@ -41,7 +41,8 @@ struct SupportedCommands {
    * @return commands which hash on the fourth argument
    */
   static const absl::flat_hash_set<std::string>& evalCommands() {
-    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "eval", "evalsha", "eval_ro", "evalsha_ro");
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "eval", "evalsha", "eval_ro",
+                           "evalsha_ro");
   }
 
   /**
