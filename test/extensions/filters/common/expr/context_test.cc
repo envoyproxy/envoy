@@ -715,8 +715,7 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
-    auto value =
-        connection[CelValue::CreateStringView(DownstreamBytesReceived)];
+    auto value = connection[CelValue::CreateStringView(DownstreamBytesReceived)];
     EXPECT_TRUE(value.has_value());
     EXPECT_TRUE(value.value().IsInt64());
     EXPECT_EQ(downstream_bytes_received, value.value().Int64OrDie());
