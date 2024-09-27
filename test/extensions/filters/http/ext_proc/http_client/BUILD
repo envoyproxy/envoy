@@ -30,6 +30,7 @@ envoy_extension_cc_test(
     name = "ext_proc_http_integration_test",
     srcs = ["ext_proc_http_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
     shard_count = 8,
     tags = [
         "cpu:3",
