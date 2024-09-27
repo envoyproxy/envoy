@@ -10,7 +10,6 @@
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_protocol_integration.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -270,7 +269,6 @@ public:
   std::vector<FakeUpstream*> http_side_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
-  TestScopedRuntime scoped_runtime_;
   // Number of side stream servers in the test.
   int side_stream_count_ = 2;
 };
