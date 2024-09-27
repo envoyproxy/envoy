@@ -423,7 +423,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
       details_with_maybe_trace = absl::StrCat(
           details, ":", absl::StrJoin(primary_host_info->active_query_->getTraces(), ","));
-      std::cerr << "Clearing traces\n";
       primary_host_info->active_query_->clearTraces();
       if (primary_host_info->active_query_->shouldDeleteThis()) {
         delete primary_host_info->active_query_;
