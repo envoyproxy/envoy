@@ -677,7 +677,7 @@ TEST_P(EnvoyQuicClientSessionTest, WriteBlockedAndUnblock) {
                                              *quic_connection_->connectionSocket());
   EXPECT_FALSE(quic_connection_->writer()->IsWriteBlocked());
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset,
-                                              "tx|QUIC_STREAM_REQUEST_REJECTED"));
+                                              "QUIC_STREAM_REQUEST_REJECTED|FROM_SELF"));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   stream.resetStream(Http::StreamResetReason::LocalReset);
 }
