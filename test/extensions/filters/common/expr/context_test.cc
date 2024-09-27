@@ -513,6 +513,11 @@ TEST(Context, ConnectionAttributes) {
       .WillRepeatedly(ReturnRef(connection_termination_details));
   const std::string downstream_transport_failure_reason = "TlsError";
   info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
+  info.downstream_bytes_meter_ = std::make_shared<Envoy::StreamInfo::BytesMeter>();
+  const int64_t downstream_bytes_sent = 100;
+  const int64_t downstream_bytes_received = 200;
+  info.downstream_bytes_meter_->addWireBytesSent(downstream_bytes_sent);
+  info.downstream_bytes_meter_->addWireBytesReceived(downstream_bytes_received);
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
@@ -700,6 +705,21 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(downstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(DownstreamBytesSent)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(downstream_bytes_sent, value.value().Int64OrDie());
+  }
+
+  {
+    auto value =
+        connection[CelValue::CreateStringView(DownstreamBytesReceived)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(downstream_bytes_received, value.value().Int64OrDie());
   }
 
   {
