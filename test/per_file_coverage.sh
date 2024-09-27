@@ -14,7 +14,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/http/http2:90.0"
 "source/common/io:57.9" # TODO(#32149): CI has stopped executing this code.
 "source/common/json:94.6"
-"source/common/matcher:94.4"
+"source/common/matcher:94.6"
 "source/common/memory:73.6" # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
