@@ -81,8 +81,8 @@ void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
         }
       }
       if (callbacks_) {
-        setCallbacks(nullptr);
         callbacks_->onComplete(response_msg);
+        setCallbacks(nullptr);
       }
     } else {
       ENVOY_LOG(error, "Response status is not OK, status: {}", status_code);
@@ -109,8 +109,8 @@ void ExtProcHttpClient::onError() {
   cancel();
   ENVOY_LOG(error, "ext_proc HTTP client error condition happens.");
   if (callbacks_) {
-    setCallbacks(nullptr);
     callbacks_->onError();
+    setCallbacks(nullptr);
   }
 }
 
