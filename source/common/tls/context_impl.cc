@@ -221,16 +221,18 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       ctx.is_ecdsa_ = pkey_id == EVP_PKEY_EC;
       switch (pkey_id) {
       case EVP_PKEY_EC: {
-        // We only support P-256 ECDSA today.
+        // We only support P-256, P384 or P-521 ECDSA today.
         const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
         // Since we checked the key type above, this should be valid.
         ASSERT(ecdsa_public_key != nullptr);
         const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
         if (ecdsa_group == nullptr ||
-            EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
+            (EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1 &&
+             EC_GROUP_get_curve_name(ecdsa_group) != NID_secp384r1 &&
+             EC_GROUP_get_curve_name(ecdsa_group) != NID_secp521r1)) {
           creation_status = absl::InvalidArgumentError(
-              fmt::format("Failed to load certificate chain from {}, only P-256 "
-                          "ECDSA certificates are supported",
+              fmt::format("Failed to load certificate chain from {}, only P-256, "
+                          "P384 or P-521 ECDSA certificates are supported",
                           ctx.cert_chain_file_path_));
           return;
         }

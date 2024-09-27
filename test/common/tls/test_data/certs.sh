@@ -316,6 +316,13 @@ generate_ecdsa_key selfsigned_ecdsa_p384 secp384r1
 generate_selfsigned_x509_cert selfsigned_ecdsa_p384
 rm -f selfsigned_ecdsa_p384_cert.cfg
 
+# Generate selfsigned_ecdsa_p521_cert.pem.
+cp -f selfsigned_cert.cfg selfsigned_ecdsa_p521_cert.cfg
+generate_ecdsa_key selfsigned_ecdsa_p521 secp521r1
+generate_selfsigned_x509_cert selfsigned_ecdsa_p521
+rm -f selfsigned_ecdsa_p521_cert.cfg
+
+
 # Generate selfsigned_ecdsa_p384_certkey.p12 with no password.
 openssl pkcs12 -export -out selfsigned_ecdsa_p384_certkey.p12 -inkey selfsigned_ecdsa_p384_key.pem -in selfsigned_ecdsa_p384_cert.pem -keypbe NONE -certpbe NONE -nomaciter -passout pass:
 

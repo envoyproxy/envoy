@@ -203,6 +203,9 @@ bug_fixes:
 - area: tracing
   change: |
     Fixed a bug where the OpenTelemetry tracer exports the OTLP request even when no spans are present.
+- area: tls
+  change: |
+    Added support for P-384 and P-521 curves for server certificates.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

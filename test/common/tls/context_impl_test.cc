@@ -1408,8 +1408,8 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
   auto cleanup = cleanUpHelper(context);
 }
 
-// Validate that non-P256 ECDSA certs are rejected.
-TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
+// Validate that P384 ECDSA certs load.
+TEST_F(ClientContextConfigImplTest, P384EcdsaCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:
@@ -1421,16 +1421,12 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
-                  .status()
-                  .message(),
-              testing::ContainsRegex(
-                  "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
-                  "only P-256 ECDSA certificates are supported"));
+  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  auto cleanup = cleanUpHelper(context);
 }
 
-// Validate that non-P256 ECDSA certs are rejected loaded from `pkcs12`.
-TEST_F(ClientContextConfigImplTest, NonP256EcdsaPkcs12) {
+// Validate that P384 ECDSA certs are loaded from `pkcs12`.
+TEST_F(ClientContextConfigImplTest, P384EcdsaPkcs12) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
   pkcs12:
@@ -1440,12 +1436,22 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaPkcs12) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
-                  .status()
-                  .message(),
-              testing::ContainsRegex(
-                  "Failed to load certificate chain from .*selfsigned_ecdsa_p384_certkey.p12, "
-                  "only P-256 ECDSA certificates are supported"));
+}
+
+TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_ecdsa_p521_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_ecdsa_p521_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Stats::IsolatedStoreImpl store;
+  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  auto cleanup = cleanUpHelper(context);
 }
 
 // Multiple TLS certificates are not yet supported.

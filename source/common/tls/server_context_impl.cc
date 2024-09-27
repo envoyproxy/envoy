@@ -401,7 +401,9 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO& ssl_client_
             CBS_len(&signature_algorithms_ext) != 0) {
           return false;
         }
-        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256)) {
+        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256) ||
+            cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP384R1_SHA384) ||
+            cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP521R1_SHA512)) {
           return true;
         }
       }
