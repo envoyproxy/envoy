@@ -98,7 +98,7 @@ private:
                                             std::string& error_details);
 
   void initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
-  std::shared_ptr<SpiffeData> loadTrustBundleMap();
+  std::shared_ptr<SpiffeData> loadTrustBundles();
 
   class ThreadLocalSpiffeState : public Envoy::ThreadLocal::ThreadLocalObject {
   public:

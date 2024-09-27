@@ -33,7 +33,7 @@ namespace Tls {
 
 using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig;
 
-std::shared_ptr<SpiffeData> SPIFFEValidator::loadTrustBundleMap() {
+std::shared_ptr<SpiffeData> SPIFFEValidator::loadTrustBundles() {
     std::ifstream file(trust_bundle_file_name_);
     if (file.fail()) {
       ENVOY_LOG(error, "Failed to open SPIFFE bundle map file '{}'", trust_bundle_file_name_);
@@ -152,7 +152,7 @@ void SPIFFEValidator::initializeCertificateRefresh(Server::Configuration::Common
     THROW_IF_NOT_OK(
         file_watcher_->addWatch(trust_bundle_file_name_, Filesystem::Watcher::Events::Modified, [this](uint32_t) {
             ENVOY_LOG(info, "Updating SPIFFE bundle map from file '{}'", trust_bundle_file_name_);
-            if (auto new_trust_bundle = loadTrustBundleMap()) {
+            if (auto new_trust_bundle = loadTrustBundles()) {
                 updateSpiffeDataAsync(new_trust_bundle);
             } else {
                 ENVOY_LOG(error, "Failed to load SPIFFE bundle map from '{}'", trust_bundle_file_name_);
@@ -190,19 +190,18 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   }
 
   const auto n_trust_domains = message.trust_domains().size();
-  if (message.has_trust_bundle_map() && n_trust_domains > 0 ) {
-      throw EnvoyException(
-          "Cannot configure both trust_domains and trust_bundle_map...");
-  }
 
   tls_->set([](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalSpiffeState>();
   });
 
   // If a trust bundle map is provided, use that...
-  if (message.has_trust_bundle_map()) {
-    trust_bundle_file_name_ = message.trust_bundle_map().filename();
-    spiffe_data_ = loadTrustBundleMap();
+  if (message.has_trust_bundles()) {
+    if (!message.trust_bundles().has_filename()) {
+      throw EnvoyException("SPIFFE Bundle DataSource requires a filename");
+    }
+    trust_bundle_file_name_ = message.trust_bundles().filename();
+    spiffe_data_ = loadTrustBundles();
     if (!spiffe_data_) {
       throw EnvoyException("Failed to load SPIFFE Bundle map");
     }
