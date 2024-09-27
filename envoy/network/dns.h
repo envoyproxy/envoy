@@ -36,23 +36,23 @@ public:
    */
   virtual void cancel(CancelReason reason) PURE;
 
-  const absl::Mutex& lock() { return lock_; }
+  absl::Mutex& lock() { return mutex_; }
 
   /** Add a trace for the DNS query. */
   void addTrace(uint8_t trace) {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(&mutex_);
     traces_.emplace_back(trace);
   }
 
   /** Return the DNS query traces. */
   const std::vector<uint8_t>& getTraces() {
-    // absl::MutexLock lock(&lock_);
+    // absl::MutexLock lock(&mutex_);
     return traces_;
   }
 
   /** Clears the DNS query traces. */
   void clearTraces() {
-    // absl::MutexLock lock(&lock_);
+    // absl::MutexLock lock(&mutex_);
     traces_.clear();
   }
 
@@ -63,8 +63,8 @@ public:
   bool shouldDeleteThis() const { return delete_this_; }
 
 private:
-  absl::Mutex lock_;
-  std::vector<uint8_t> traces_ ABSL_GUARDED_BY(lock_);
+  absl::Mutex mutex_;
+  std::vector<uint8_t> traces_; // ABSL_GUARDED_BY(mutex_);
   bool delete_this_{false};
 };
 
