@@ -39,9 +39,11 @@ public:
   static std::unique_ptr<Socket::Options> buildZeroSoLingerOptions();
   static std::unique_ptr<Socket::Options> buildIpRecvTosOptions();
   /**
-   * @param mapped_v6 true if this option is to be applied to a dual socket.
+   * @param supports_v4_mapped_v6_addresses true if this option is to be applied to a v6 socket with
+   * v4-mapped v6 address(i.e. ::ffff:172.21.0.6) support.
    */
-  static std::unique_ptr<Socket::Options> buildDoNotFragmentOptions(bool mapped_v6);
+  static std::unique_ptr<Socket::Options>
+  buildDoNotFragmentOptions(bool supports_v4_mapped_v6_addresses);
 };
 } // namespace Network
 } // namespace Envoy
