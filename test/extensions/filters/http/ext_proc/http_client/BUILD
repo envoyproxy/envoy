@@ -28,7 +28,6 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "ext_proc_http_integration_test",
-    size = "small",
     srcs = ["ext_proc_http_integration_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
     shard_count = 8,
