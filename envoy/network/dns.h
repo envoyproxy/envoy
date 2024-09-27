@@ -19,7 +19,7 @@ namespace Network {
  */
 class ActiveDnsQuery {
 public:
-  virtual ~ActiveDnsQuery() { std::cerr << "Calling ~ActiveDnsQuery\n"; }
+  virtual ~ActiveDnsQuery() = default;
 
   enum class CancelReason {
     // The caller no longer needs the answer to the query.
@@ -50,10 +50,13 @@ public:
     absl::MutexLock lock(&lock_);
     traces_.clear();
   }
+  void deleteThis(bool delete_this) { delete_this_ = delete_this; }
+  bool shouldDeleteThis() const { return delete_this_; }
 
 private:
   absl::Mutex lock_;
   std::vector<uint8_t> traces_ ABSL_GUARDED_BY(lock_);
+  bool delete_this_{false};
 };
 
 /**

@@ -64,11 +64,9 @@ protected:
     ResolveCb callback_;
     bool cancelled_{false};
   };
-  // Must be a shared_ptr for passing around via post.
-  using PendingQuerySharedPtr = std::shared_ptr<PendingQuery>;
 
   struct PendingQueryInfo {
-    PendingQuerySharedPtr pending_query_;
+    std::unique_ptr<PendingQuery> pending_query_;
     // Empty means it will retry indefinitely until it succeeds.
     absl::optional<uint32_t> num_retries_;
   };

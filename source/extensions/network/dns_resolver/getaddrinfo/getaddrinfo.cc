@@ -122,7 +122,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
   ENVOY_LOG(debug, "starting getaddrinfo resolver thread");
 
   while (true) {
-    PendingQuerySharedPtr next_query;
+    std::unique_ptr<PendingQuery> next_query;
     absl::optional<uint32_t> num_retries;
     const bool reresolve =
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_reresolve_on_eai_again");
@@ -139,7 +139,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       }
 
       PendingQueryInfo pending_query_info = std::move(pending_queries_.front());
-      next_query = pending_query_info.pending_query_;
+      next_query = std::move(pending_query_info.pending_query_);
       num_retries = pending_query_info.num_retries_;
       pending_queries_.pop_front();
       if (reresolve && next_query->cancelled_) {
@@ -219,12 +219,12 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
     dispatcher_.post([finished_query = std::move(next_query), response = std::move(response),
                       details = std::string(details)]() mutable {
       if (finished_query->cancelled_) {
-        std::cerr << "Dropping cancelled query\n";
         finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Cancelled));
         ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
+        finished_query.release();
+        finished_query->deleteThis(true);
       } else {
         finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Callback));
-        std::cerr << "Calling callback\n";
         finished_query->callback_(response.first, std::move(details), std::move(response.second));
       }
     });
