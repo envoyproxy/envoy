@@ -1629,17 +1629,17 @@ TEST_F(HostImplTest, Weight) {
 TEST_F(HostImplTest, HostLbPolicyData) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
-  EXPECT_TRUE(host->lbPolicyData() == nullptr);
+  EXPECT_TRUE(!host->lbPolicyData().has_value());
 
   class TestLbPolicyData : public Host::HostLbPolicyData {
   public:
     int foo = 42;
   };
 
-  host->setLbPolicyData(std::make_shared<TestLbPolicyData>());
-  EXPECT_TRUE(host->lbPolicyData() != nullptr);
-  auto* test_policy_data = dynamic_cast<TestLbPolicyData*>(host->lbPolicyData().get());
-  EXPECT_TRUE(test_policy_data != nullptr);
+  host->setLbPolicyData(std::make_unique<TestLbPolicyData>());
+  EXPECT_TRUE(host->lbPolicyData().has_value());
+  auto test_policy_data = host->typedLbPolicyData<TestLbPolicyData>();
+  EXPECT_TRUE(test_policy_data.has_value());
   EXPECT_EQ(test_policy_data->foo, 42);
 }
 
