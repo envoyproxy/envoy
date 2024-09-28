@@ -10,49 +10,57 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+namespace {
+Http::RequestMessagePtr buildHttpRequest(absl::string_view uri, const uint64_t stream_id,
+                                         absl::string_view req_in_json) {
+  absl::string_view host, path;
+  Envoy::Http::Utility::extractHostPathFromUri(uri, host, path);
+  ENVOY_LOG_MISC(debug, " Ext_Proc HTTP client send request to uri {}, host {}, path {}", uri, host,
+                 path);
+
+  // Construct a HTTP POST message and sends to the ext_proc server cluster.
+  const Envoy::Http::HeaderValues& header_values = Envoy::Http::Headers::get();
+  Http::RequestHeaderMapPtr headers =
+      Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
+          {{header_values.Method, "POST"},
+           {header_values.Scheme, "http"},
+           {header_values.Path, std::string(path)},
+           {header_values.ContentType, "application/json"},
+           {header_values.RequestId, std::to_string(stream_id)},
+           {header_values.Host, std::string(host)}});
+  Http::RequestMessagePtr message =
+      std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+  message->body().add(req_in_json);
+  return message;
+}
+
+} // namespace
+
 void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool,
                                     const uint64_t stream_id, RequestCallbacks* callbacks,
                                     StreamBase*) {
   // Cancel any active requests.
   cancel();
-
   callbacks_ = callbacks;
+
   // Transcode req message into JSON string.
   auto req_in_json = MessageUtil::getJsonStringFromMessage(req);
   if (req_in_json.ok()) {
     const auto http_uri = config_.http_service().http_service().http_uri();
+    Http::RequestMessagePtr message =
+        buildHttpRequest(http_uri.uri(), stream_id, req_in_json.value());
+    auto options = Http::AsyncClient::RequestOptions()
+                       .setTimeout(std::chrono::milliseconds(
+                           DurationUtil::durationToMilliseconds(http_uri.timeout())))
+                       .setSendInternal(false)
+                       .setSendXff(false);
     const std::string cluster = http_uri.cluster();
-    const std::string uri = http_uri.uri();
-    absl::string_view host, path;
-    Envoy::Http::Utility::extractHostPathFromUri(uri, host, path);
-    ENVOY_LOG(debug, " Ext_Proc HTTP client send request to cluster {}, uri {}, host {}, path {}",
-              cluster, uri, host, path);
-
     const auto thread_local_cluster = context().clusterManager().getThreadLocalCluster(cluster);
     if (thread_local_cluster) {
-      // Construct a HTTP POST message and sends to the ext_proc server cluster.
-      Http::RequestHeaderMapPtr headers =
-          Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
-              {{Envoy::Http::Headers::get().Method, "POST"},
-               {Envoy::Http::Headers::get().Scheme, "http"},
-               {Envoy::Http::Headers::get().Path, std::string(path)},
-               {Envoy::Http::Headers::get().ContentType, "application/json"},
-               {Envoy::Http::Headers::get().RequestId, std::to_string(stream_id)},
-               {Envoy::Http::Headers::get().Host, std::string(host)}});
-      Http::RequestMessagePtr message =
-          std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
-      message->body().add(req_in_json.value());
-
-      auto options = Http::AsyncClient::RequestOptions()
-                         .setTimeout(std::chrono::milliseconds(
-                             DurationUtil::durationToMilliseconds(http_uri.timeout())))
-                         .setSendInternal(false)
-                         .setSendXff(false);
-
       active_request_ =
           thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
     } else {
-      ENVOY_LOG(error, "ext_proc cluster {} does not exist", cluster);
+      ENVOY_LOG(error, "ext_proc cluster {} does not exist in the config", cluster);
     }
   }
 }
