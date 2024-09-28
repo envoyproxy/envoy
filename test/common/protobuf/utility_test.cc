@@ -216,10 +216,11 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
   Protobuf::RepeatedPtrField<ProtobufWkt::UInt32Value> repeated;
   EXPECT_EQ("[]", RepeatedPtrUtil::debugString(repeated));
   repeated.Add()->set_value(10);
-  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated), testing::ContainsRegex("\\[value: 10\n\\]"));
+  EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n\\]"));
   repeated.Add()->set_value(20);
   EXPECT_THAT(RepeatedPtrUtil::debugString(repeated),
-              testing::ContainsRegex("\\[value: 10\n, value: 20\n\\]"));
+              testing::ContainsRegex("\\[.*[\n]*value:\\s*10\n,.*[\n]*value:\\s*20\n\\]"));
 }
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
@@ -1357,75 +1358,59 @@ TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObjectWithIgnoredEntries) {
       "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }"));
 }
 
+std::string toJson(const ProtobufWkt::Value& v) {
+  std::string json_string;
+  ValueUtil::appendJsonToString(v, json_string);
+  return json_string;
+}
+
 TEST_F(ProtobufUtilityTest, ValueToJson) {
   {
     // null
     ProtobufWkt::Value v;
-
-    std::string json_string;
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, "null");
-    json_string.clear();
+    EXPECT_EQ(toJson(v), "null");
 
     v.set_null_value(ProtobufWkt::NULL_VALUE);
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, "null");
+    EXPECT_EQ(toJson(v), "null");
   }
 
   {
     // bool
     ProtobufWkt::Value v;
     v.set_bool_value(true);
-
-    std::string json_string;
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, "true");
-    json_string.clear();
+    EXPECT_EQ(toJson(v), "true");
 
     v.set_bool_value(false);
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, "false");
+    EXPECT_EQ(toJson(v), "false");
   }
 
   {
     // number
     ProtobufWkt::Value v;
-    v.set_number_value(1);
 
-    std::string json_string;
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, "1");
-    json_string.clear();
+    v.set_number_value(1);
+    EXPECT_EQ(toJson(v), "1");
 
     v.set_number_value(1.1);
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, "1.1");
+    EXPECT_EQ(toJson(v), "1.1");
   }
 
   {
     // string
     ProtobufWkt::Value v;
-    v.set_string_value("foo");
 
-    std::string json_string;
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, "\"foo\"");
+    v.set_string_value("foo");
+    EXPECT_EQ(toJson(v), "\"foo\"");
   }
 
   {
     // struct
     ProtobufWkt::Value v;
     auto* struct_value = v.mutable_struct_value();
-
-    std::string json_string;
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, R"EOF({})EOF");
-    json_string.clear();
+    EXPECT_EQ(toJson(v), R"EOF({})EOF");
 
     struct_value->mutable_fields()->insert({"foo", ValueUtil::stringValue("bar")});
-
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, R"EOF({"foo":"bar"})EOF");
+    EXPECT_EQ(toJson(v), R"EOF({"foo":"bar"})EOF");
   }
 
   {
@@ -1433,16 +1418,12 @@ TEST_F(ProtobufUtilityTest, ValueToJson) {
     ProtobufWkt::Value v;
     auto* list_value = v.mutable_list_value();
 
-    std::string json_string;
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, R"EOF([])EOF");
-    json_string.clear();
+    EXPECT_EQ(toJson(v), R"EOF([])EOF");
 
     list_value->add_values()->set_string_value("foo");
     list_value->add_values()->set_string_value("bar");
 
-    ValueUtil::toJsonString(v, json_string);
-    EXPECT_EQ(json_string, R"EOF(["foo","bar"])EOF");
+    EXPECT_EQ(toJson(v), R"EOF(["foo","bar"])EOF");
   }
 
   {
@@ -1467,11 +1448,8 @@ TEST_F(ProtobufUtilityTest, ValueToJson) {
     ProtobufWkt::Value v;
     MessageUtil::loadFromYaml(yaml, v, ProtobufMessage::getNullValidationVisitor());
 
-    std::string json_string;
-    ValueUtil::toJsonString(v, json_string);
-
     EXPECT_EQ(
-        json_string,
+        toJson(v),
         R"EOF({"a":{"a":[{"a":1,"b":2}],"b":[{"a":3,"b":4},{"a":5}],"c":true,"d":[5,"3.14"],"e":"foo","f":"1.1"},"b":[1,2,3],"c":"bar"})EOF");
   }
 }
