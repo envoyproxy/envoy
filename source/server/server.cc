@@ -720,7 +720,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     auto typed_admin = dynamic_cast<AdminImpl*>(admin_.get());
     RELEASE_ASSERT(typed_admin != nullptr, "Admin implementation is not an AdminImpl.");
     initial_config.initAdminAccessLog(bootstrap_, typed_admin->factoryContext());
-    ENVOY_LOG(info, "Starting admin HTTP server at {}", initial_config.admin().address()->asString());
+    ENVOY_LOG(info, "Starting admin HTTP server at {}",
+              initial_config.admin().address()->asString());
     admin_->startHttpListener(initial_config.admin().accessLogs(), initial_config.admin().address(),
                               initial_config.admin().socketOptions());
 #else
