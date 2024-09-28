@@ -1,5 +1,8 @@
+#include "test/extensions/filters/common/expr/evaluator_test.h"
+
 #include "source/extensions/filters/common/expr/evaluator.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -49,9 +52,93 @@ TEST(Evaluator, Activation) {
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
   info.upstreamInfo()->setUpstreamFilterState(filter_state);
   ProtobufWkt::Arena arena;
-  const auto activation = createActivation(nullptr, info, nullptr, nullptr, nullptr);
+  const auto activation = createActivation(nullptr, info, nullptr, nullptr, nullptr, 42);
   EXPECT_TRUE(activation->FindValue("filter_state", &arena).has_value());
   EXPECT_TRUE(activation->FindValue("upstream_filter_state", &arena).has_value());
+}
+
+TEST(Evaluator, Matches) {
+  Protobuf::Arena arena;
+  auto builder = createBuilder(&arena);
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Http::TestRequestHeaderMapImpl headers;
+
+  {
+    google::api::expr::v1alpha1::CheckedExpr checked;
+    Protobuf::TextFormat::ParseFromString(TrueCelString, &checked);
+    auto expr = createExpression(*builder, checked.expr());
+
+    auto value = evaluate(*expr, arena, nullptr, info, nullptr, nullptr, nullptr, 42);
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsBool());
+    EXPECT_TRUE(value.value().BoolOrDie());
+    EXPECT_TRUE(matches(*expr, info, headers, 0));
+  }
+
+  {
+    google::api::expr::v1alpha1::CheckedExpr checked;
+    Protobuf::TextFormat::ParseFromString(FalseCelString, &checked);
+    auto expr = createExpression(*builder, checked.expr());
+
+    auto value = evaluate(*expr, arena, nullptr, info, nullptr, nullptr, nullptr, 42);
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsBool());
+    EXPECT_FALSE(value.value().BoolOrDie());
+    EXPECT_FALSE(matches(*expr, info, headers, 0));
+  }
+
+  {
+    google::api::expr::v1alpha1::CheckedExpr checked;
+    Protobuf::TextFormat::ParseFromString(SampleInvalidMap, &checked);
+    auto expr = createExpression(*builder, checked.expr());
+
+    auto value = evaluate(*expr, arena, nullptr, info, nullptr, nullptr, nullptr, 42);
+    EXPECT_FALSE(value.has_value());
+    EXPECT_FALSE(matches(*expr, info, headers, 0));
+  }
+}
+
+TEST(Evaluator, SampleFunction) {
+  Protobuf::Arena arena;
+  auto builder = createBuilder(&arena);
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Http::TestRequestHeaderMapImpl headers;
+
+  {
+    google::api::expr::v1alpha1::CheckedExpr checked;
+    Protobuf::TextFormat::ParseFromString(SampleHalfCelString, &checked);
+    auto expr = createExpression(*builder, checked.expr());
+
+    EXPECT_TRUE(matches(*expr, info, headers, 42));
+    EXPECT_FALSE(matches(*expr, info, headers, 43));
+  }
+
+  {
+    google::api::expr::v1alpha1::CheckedExpr checked;
+    Protobuf::TextFormat::ParseFromString(SampleNeverCelString, &checked);
+    auto expr = createExpression(*builder, checked.expr());
+
+    EXPECT_FALSE(matches(*expr, info, headers, 42));
+    EXPECT_FALSE(matches(*expr, info, headers, 43));
+  }
+
+  {
+    google::api::expr::v1alpha1::CheckedExpr checked;
+    Protobuf::TextFormat::ParseFromString(SampleAlwaysCelString, &checked);
+    auto expr = createExpression(*builder, checked.expr());
+
+    EXPECT_TRUE(matches(*expr, info, headers, 42));
+    EXPECT_TRUE(matches(*expr, info, headers, 43));
+  }
+
+  {
+    google::api::expr::v1alpha1::CheckedExpr checked;
+    Protobuf::TextFormat::ParseFromString(SampleInvalidMap, &checked);
+    auto expr = createExpression(*builder, checked.expr());
+
+    auto value = evaluate(*expr, arena, nullptr, info, nullptr, nullptr, nullptr, 42);
+    EXPECT_FALSE(value.has_value());
+  }
 }
 
 } // namespace

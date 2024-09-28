@@ -53,7 +53,8 @@ public:
   }
 
   Matcher::DataInputFactoryCb<MatchInput>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Random::RandomGenerator&) override {
     return []() { return std::make_unique<ServiceMatchDataInput>(); };
   }
 
@@ -77,7 +78,8 @@ public:
   }
 
   Matcher::DataInputFactoryCb<MatchInput>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Random::RandomGenerator&) override {
     return []() { return std::make_unique<HostMatchDataInput>(); };
   }
 
@@ -101,7 +103,8 @@ public:
   }
 
   Matcher::DataInputFactoryCb<MatchInput>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Random::RandomGenerator&) override {
     return []() { return std::make_unique<PathMatchDataInput>(); };
   }
 
@@ -125,7 +128,8 @@ public:
   }
 
   Matcher::DataInputFactoryCb<MatchInput>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Random::RandomGenerator&) override {
     return []() { return std::make_unique<MethodMatchDataInput>(); };
   }
 
@@ -158,7 +162,8 @@ public:
 
   Matcher::DataInputFactoryCb<MatchInput>
   createDataInputFactoryCb(const Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& visitor) override {
+                           ProtobufMessage::ValidationVisitor& visitor,
+                           Random::RandomGenerator&) override {
     const auto& config =
         MessageUtil::downcastAndValidate<const PropertyDataInputProto&>(message, visitor);
     const std::string name = config.property_name();
@@ -202,7 +207,8 @@ public:
   }
 
   Matcher::DataInputFactoryCb<MatchInput>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Random::RandomGenerator&) override {
     return []() { return std::make_unique<RequestMatchDataInput>(); };
   }
 

@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
@@ -37,6 +38,12 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "evaluator_test_lib",
+    hdrs = ["evaluator_test.h"],
+    tags = ["skip_on_windows"],
+)
+
 envoy_extension_cc_test(
     name = "evaluator_test",
     srcs = ["evaluator_test.cc"],
@@ -44,6 +51,7 @@ envoy_extension_cc_test(
     rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
+        ":evaluator_test_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",

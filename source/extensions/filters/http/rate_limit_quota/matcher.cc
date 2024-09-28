@@ -32,7 +32,8 @@ RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataI
       // Initialize the pointer to input factory on first use.
       if (input_factory_ptr == nullptr) {
         input_factory_ptr = std::make_unique<Matcher::MatchInputFactory<Http::HttpMatchingData>>(
-            factory_context.messageValidationVisitor(), visitor);
+            factory_context.messageValidationVisitor(), visitor,
+            factory_context.serverFactoryContext().api().randomGenerator());
       }
       // Create `DataInput` factory callback from the config.
       Matcher::DataInputFactoryCb<Http::HttpMatchingData> data_input_cb =

@@ -16,7 +16,8 @@ class CELFormatter : public ::Envoy::Formatter::FormatterProvider {
 public:
   CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
                Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr,
-               const google::api::expr::v1alpha1::Expr&, absl::optional<size_t>&);
+               const google::api::expr::v1alpha1::Expr&, absl::optional<size_t>&,
+               Random::RandomGenerator&);
 
   absl::optional<std::string>
   formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
@@ -30,13 +31,15 @@ private:
   const google::api::expr::v1alpha1::Expr parsed_expr_;
   const absl::optional<size_t> max_length_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
+  Random::RandomGenerator& random_;
 };
 
 class CELFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
 public:
   CELFormatterCommandParser(Server::Configuration::CommonFactoryContext& context)
       : local_info_(context.localInfo()),
-        expr_builder_(Extensions::Filters::Common::Expr::getBuilder(context)){};
+        expr_builder_(Extensions::Filters::Common::Expr::getBuilder(context)),
+        random_(context.api().randomGenerator()){};
   ::Envoy::Formatter::FormatterProviderPtr parse(absl::string_view command,
                                                  absl::string_view subcommand,
                                                  absl::optional<size_t> max_length) const override;
@@ -44,6 +47,7 @@ public:
 private:
   const ::Envoy::LocalInfo::LocalInfo& local_info_;
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr expr_builder_;
+  Random::RandomGenerator& random_;
 };
 
 } // namespace Formatter

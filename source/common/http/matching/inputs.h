@@ -55,7 +55,8 @@ public:
 
   Matcher::DataInputFactoryCb<HttpMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
-                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           Random::RandomGenerator&) override {
     const auto& typed_config =
         MessageUtil::downcastAndValidate<const ProtoType&>(config, validation_visitor);
 
@@ -182,7 +183,8 @@ public:
 
   Matcher::DataInputFactoryCb<HttpMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
-                           ProtobufMessage::ValidationVisitor& validation_visitor) override {
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           Random::RandomGenerator&) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::type::matcher::v3::HttpRequestQueryParamMatchInput&>(config,
                                                                           validation_visitor);

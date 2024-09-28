@@ -19,7 +19,8 @@ public:
   std::string name() const override { return "envoy.matching.inputs." + name_; }
 
   Matcher::DataInputFactoryCb<MatchingDataType>
-  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
+  createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                           Random::RandomGenerator&) override {
     return []() { return std::make_unique<InputType>(); };
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
