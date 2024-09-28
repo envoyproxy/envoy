@@ -56,34 +56,41 @@ TEST_F(ExtProcHttpClientTest, Basic) {
   client_->onFailure(async_request_, reason);
   reason = Envoy::Http::AsyncClient::FailureReason::ExceedResponseBufferLimit;
   client_->onFailure(async_request_, reason);
+}
 
-  Http::ResponseHeaderMapPtr resp_headers_ok(new Http::TestResponseHeaderMapImpl({
+TEST_F(ExtProcHttpClientTest, JsonDecodingErrorTest) {
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({
       {":status", "200"},
   }));
-  Http::ResponseMessagePtr response_ok(new Http::ResponseMessageImpl(std::move(resp_headers_ok)));
-  client_->onSuccess(async_request_, std::move(response_ok));
+  Http::ResponseMessagePtr response_ok_with_bad_body(
+      new Http::ResponseMessageImpl(std::move(resp_headers)));
+  response_ok_with_bad_body->body().add("foo-bar");
+  client_->onSuccess(async_request_, std::move(response_ok_with_bad_body));
+}
 
+TEST_F(ExtProcHttpClientTest, EmptyResponseBodyTest) {
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Http::ResponseMessagePtr response_ok_with_empty_body(
+      new Http::ResponseMessageImpl(std::move(resp_headers)));
+  client_->onSuccess(async_request_, std::move(response_ok_with_empty_body));
+}
+
+TEST_F(ExtProcHttpClientTest, ResponseStatusNotOkTest) {
   Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({
       {":status", "403"},
   }));
   Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(std::move(resp_headers)));
   client_->onSuccess(async_request_, std::move(response));
-
-  Http::ResponseHeaderMapPtr resp_headers_foo(new Http::TestResponseHeaderMapImpl({
-      {":status", "foo"},
-  }));
-  Http::ResponseMessagePtr response_foo(new Http::ResponseMessageImpl(std::move(resp_headers_foo)));
-  client_->onSuccess(async_request_, std::move(response_foo));
 }
 
-TEST_F(ExtProcHttpClientTest, JsonDecodingErrorTest) {
-  Http::ResponseHeaderMapPtr resp_headers_new(new Http::TestResponseHeaderMapImpl({
-      {":status", "200"},
+TEST_F(ExtProcHttpClientTest, WrongResponseStatusTest) {
+  Http::ResponseHeaderMapPtr resp_headers(new Http::TestResponseHeaderMapImpl({
+      {":status", "foo"},
   }));
-  Http::ResponseMessagePtr response_ok_with_bad_body(
-      new Http::ResponseMessageImpl(std::move(resp_headers_new)));
-  response_ok_with_bad_body->body().add("foo-bar");
-  client_->onSuccess(async_request_, std::move(response_ok_with_bad_body));
+  Http::ResponseMessagePtr response_foo(new Http::ResponseMessageImpl(std::move(resp_headers)));
+  client_->onSuccess(async_request_, std::move(response_foo));
 }
 
 } // namespace

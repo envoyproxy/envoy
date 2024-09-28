@@ -38,8 +38,6 @@ public:
 
   Server::Configuration::ServerFactoryContext& context() const { return context_; }
 
-  void setCallbacks(RequestCallbacks* callbacks);
-
 private:
   void onError();
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;

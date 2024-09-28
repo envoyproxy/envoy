@@ -15,6 +15,10 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace HttpFilters {
+namespace ExternalProcessing {
+namespace {
 
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::service::ext_proc::v3::BodyResponse;
@@ -37,6 +41,7 @@ struct ConfigOptions {
   bool downstream_filter = true;
   bool failure_mode_allow = false;
   int64_t timeout = 900000000;
+  std::string cluster = "ext_proc_server_0";
 };
 
 struct ExtProcHttpTestParams {
@@ -101,7 +106,7 @@ public:
       auto* http_uri =
           proto_config_.mutable_http_service()->mutable_http_service()->mutable_http_uri();
       http_uri->set_uri("ext_proc_server_0:9000");
-      http_uri->set_cluster("ext_proc_server_0");
+      http_uri->set_cluster(config_option.cluster);
       http_uri->mutable_timeout()->set_nanos(config_option.timeout);
 
       if (config_option.failure_mode_allow) {
@@ -452,4 +457,37 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeadersInBothDirection) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// Wrong ext_proc filter cluster config with fail close.
+TEST_P(ExtProcHttpClientIntegrationTest, WrongClusterConfigWithFailClose) {
+  ConfigOptions config_option = {};
+  config_option.failure_mode_allow = false;
+  config_option.cluster = "foo";
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  verifyDownstreamResponse(*response, 504);
+}
+
+// Wrong ext_proc filter cluster config with fail open
+TEST_P(ExtProcHttpClientIntegrationTest, WrongClusterConfigWithFailOpen) {
+  ConfigOptions config_option = {};
+  config_option.failure_mode_allow = true;
+  config_option.cluster = "foo";
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  // The request is sent to the upstream.
+  handleUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 200);
+}
+
+} // namespace
+} // namespace ExternalProcessing
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
