@@ -35,6 +35,7 @@ public:
   void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& request, bool end_stream,
                    const uint64_t stream_id, RequestCallbacks* callbacks,
                    StreamBase* stream) override;
+  void cancel() override {}
 
 private:
   Grpc::AsyncClientManager& client_manager_;

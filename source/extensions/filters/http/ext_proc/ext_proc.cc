@@ -418,9 +418,9 @@ Filter::StreamOpenState Filter::openStream() {
                        .setParentContext(grpc_context)
                        .setBufferBodyForRetry(grpc_service_.has_retry_policy());
 
-    ExternalProcessorClient* http_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
+    ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
     ExternalProcessorStreamPtr stream_object =
-        http_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
+        grpc_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
     if (processing_complete_) {
       // Stream failed while starting and either onGrpcError or onGrpcClose was already called
@@ -473,8 +473,7 @@ void Filter::onDestroy() {
   encoding_state_.stopMessageTimer();
 
   if (!config_->grpcService().has_value()) {
-    ExtProcHttpClient* http_client = dynamic_cast<ExtProcHttpClient*>(client_.get());
-    http_client->cancel();
+    client_->cancel();
     return;
   }
 

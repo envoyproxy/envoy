@@ -27,7 +27,7 @@ public:
   void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream,
                    const uint64_t stream_id, RequestCallbacks* callbacks,
                    StreamBase* stream) override;
-  void cancel();
+  void cancel() override;
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   // Http::AsyncClient::Callbacks implemented by this class.
