@@ -18,7 +18,7 @@ Http::RequestMessagePtr buildHttpRequest(absl::string_view uri, const uint64_t s
   ENVOY_LOG_MISC(debug, " Ext_Proc HTTP client send request to uri {}, host {}, path {}", uri, host,
                  path);
 
-  // Construct a HTTP POST message and sends to the ext_proc server cluster.
+  // Construct a HTTP POST message.
   const Envoy::Http::HeaderValues& header_values = Envoy::Http::Headers::get();
   Http::RequestHeaderMapPtr headers =
       Envoy::Http::createHeaderMap<Envoy::Http::RequestHeaderMapImpl>(
