@@ -12,6 +12,7 @@
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/server/generic_factory_context.h"
 
 namespace Envoy {
@@ -93,8 +94,15 @@ public:
   createJsonFormatter(const ProtobufWkt::Struct& struct_format, bool preserve_types,
                       bool omit_empty_values, bool sort_properties,
                       const std::vector<CommandParserBasePtr<FormatterContext>>& commands = {}) {
-    return std::make_unique<JsonFormatterBaseImpl<FormatterContext>>(
-        struct_format, preserve_types, omit_empty_values, sort_properties, commands);
+
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.logging_with_fast_json_formatter")) {
+      return std::make_unique<LegacyJsonFormatterBaseImpl<FormatterContext>>(
+          struct_format, preserve_types, omit_empty_values, sort_properties, commands);
+    }
+
+    return std::make_unique<JsonFormatterImplBase<FormatterContext>>(struct_format,
+                                                                     omit_empty_values, commands);
   }
 };
 
