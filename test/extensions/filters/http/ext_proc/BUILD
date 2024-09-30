@@ -149,8 +149,8 @@ envoy_extension_cc_test(
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
     ],
-    rbe_pool = "2core",
-    shard_count = 8,
+    rbe_pool = "4core",
+    shard_count = 16,
     tags = [
         "cpu:3",
         "skip_on_windows",
