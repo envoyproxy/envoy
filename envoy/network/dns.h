@@ -39,18 +39,21 @@ public:
   /** Add a trace for the DNS query. */
   void addTrace(uint8_t trace) {
     absl::MutexLock lock(&mutex_);
+    std::cerr << "Adding traces\n";
     traces_.emplace_back(trace);
   }
 
   /** Return the DNS query traces. */
   const std::vector<uint8_t>& getTraces() {
     absl::MutexLock lock(&mutex_);
+    std::cerr << "Getting traces\n";
     return traces_;
   }
 
   /** Clears the DNS query traces. */
   void clearTraces() {
     absl::MutexLock lock(&mutex_);
+    std::cerr << "Clearing traces\n";
     traces_.clear();
   }
 

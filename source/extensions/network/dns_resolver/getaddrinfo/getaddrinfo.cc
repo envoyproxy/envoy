@@ -143,6 +143,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       num_retries = pending_query_info.num_retries_;
       pending_queries_.pop_front();
       if (reresolve && next_query->cancelled_) {
+        std::cerr << "Skipping Cancelled query\n";
         continue;
       }
     }
