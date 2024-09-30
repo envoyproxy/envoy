@@ -47,18 +47,16 @@ public:
 protected:
   class PendingQuery : public ActiveDnsQuery {
   public:
-    PendingQuery(const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback,
-                 absl::Mutex& mutex)
-        : mutex_(mutex), dns_name_(dns_name), dns_lookup_family_(dns_lookup_family),
-          callback_(callback) {}
+    PendingQuery(const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback)
+        : dns_name_(dns_name), dns_lookup_family_(dns_lookup_family), callback_(callback) {}
 
     void cancel(CancelReason) override {
       ENVOY_LOG(debug, "cancelling query [{}]", dns_name_);
-      absl::MutexLock guard(&mutex_);
+      // absl::MutexLock guard(&mutex_);
       cancelled_ = true;
     }
 
-    absl::Mutex& mutex_;
+    // absl::Mutex& mutex_;
     const std::string dns_name_;
     const DnsLookupFamily dns_lookup_family_;
     ResolveCb callback_;

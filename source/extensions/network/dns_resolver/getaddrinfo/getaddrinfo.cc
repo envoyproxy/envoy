@@ -35,7 +35,7 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
                                                 DnsLookupFamily dns_lookup_family,
                                                 ResolveCb callback) {
   ENVOY_LOG(debug, "adding new query [{}] to pending queries", dns_name);
-  auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback, mutex_);
+  auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback);
   ActiveDnsQuery* active_query;
   {
     absl::MutexLock guard(&mutex_);
@@ -142,9 +142,12 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       next_query = std::move(pending_query_info.pending_query_);
       num_retries = pending_query_info.num_retries_;
       pending_queries_.pop_front();
-      if (reresolve && next_query->cancelled_) {
-        std::cerr << "Skipping Cancelled query\n";
-        continue;
+      {
+        absl::MutexLock lock(&next_query->lock());
+        if (reresolve && next_query->cancelled_) {
+          std::cerr << "Skipping Cancelled query\n";
+          continue;
+        }
       }
     }
 

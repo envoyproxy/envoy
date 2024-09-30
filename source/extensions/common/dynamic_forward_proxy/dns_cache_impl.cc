@@ -72,6 +72,7 @@ DnsCacheImpl::DnsCacheImpl(
 DnsCacheImpl::~DnsCacheImpl() {
   for (const auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
+      absl::MutexLock lock(&primary_host.second->active_query_->lock());
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
     }
@@ -324,6 +325,7 @@ void DnsCacheImpl::forceRefreshHosts() {
     // each host IFF the host is not already refreshing. Cancellation is assumed to be cheap for
     // resolvers.
     if (primary_host.second->active_query_ != nullptr) {
+      absl::MutexLock lock(&primary_host.second->active_query_->lock());
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
       primary_host.second->active_query_ = nullptr;
@@ -350,6 +352,7 @@ void DnsCacheImpl::stop() {
   absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
   for (auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
+      absl::MutexLock lock(&primary_host.second->active_query_->lock());
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
       primary_host.second->active_query_ = nullptr;

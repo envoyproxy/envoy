@@ -36,7 +36,7 @@ public:
 
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override {
-    auto new_query = new PendingQuery(dns_name, dns_lookup_family, callback, mutex_);
+    auto new_query = new PendingQuery(dns_name, dns_lookup_family, callback);
 
     absl::MutexLock guard(&resolution_mutex_);
     blocked_resolutions_.push_back([&, new_query](absl::optional<std::string> dns_override) {
