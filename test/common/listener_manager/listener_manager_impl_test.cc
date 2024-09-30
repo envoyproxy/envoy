@@ -7810,6 +7810,24 @@ TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentFilterChainsAreEquival
   EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
 }
 
+TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, InvalidAddress) {
+  // Worker is not started yet.
+  envoy::config::listener::v3::Listener listener_proto;
+  Protobuf::TextFormat::ParseFromString(R"EOF(
+    name: "foo"
+    address: {
+      socket_address: {
+        address: "127.0.0.1.0"
+        port_value: 1234
+      }
+    }
+    filter_chains: {}
+  )EOF",
+                                        &listener_proto);
+  EXPECT_EQ(manager_->addOrUpdateListener(listener_proto, "", true).status().message(),
+            "malformed IP address: 127.0.0.1.0");
+}
+
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWorkerNotStarted) {
   // Worker is not started yet.
   auto listener_proto = createDefaultListener();

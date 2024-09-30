@@ -251,6 +251,7 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
   if (address_or_error.status().ok()) {
     return address_or_error.value()->asString();
   }
+  // Listener creation will fail shortly when the address is used.
   return absl::StrCat("invalid_address_listener");
 }
 } // namespace
