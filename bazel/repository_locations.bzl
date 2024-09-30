@@ -948,13 +948,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "grpc-httpjson-transcoding",
         project_desc = "Library that supports transcoding so that HTTP/JSON can be converted to gRPC",
         project_url = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
-        version = "20e58e7ef9c3878ae9fc89123b9aba36d6f98a7f",
-        sha256 = "2f0ea248c59f51e5376f23590a986813b96076531ffe27a805f7a37407a81a87",
+        version = "8f0d092ecf60470f504f506e2851173a8033a62c",
+        sha256 = "11f6316192c5fbd967796e46ab2872964cb4f0a2396126c9e7b961295d4768af",
         strip_prefix = "grpc-httpjson-transcoding-{version}",
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder", "envoy.filters.http.grpc_field_extraction", "envoy.filters.http.proto_message_extraction"],
-        release_date = "2024-08-30",
+        release_date = "2024-09-19",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/blob/{version}/LICENSE",
@@ -1453,9 +1453,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
         version = "0.51.0",
-        strip_prefix = "rules_rust-{version}",
-        sha256 = "44ffa703f95fe693c15fefb58432ad009379848d24012338a3c2eb9951b371e7",
-        urls = ["https://github.com/bazelbuild/rules_rust/archive/{version}.tar.gz"],
+        sha256 = "042acfb73469b2d1848fe148d81c3422c61ea47a9e1900f1c9ec36f51e8e7193",
+        # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
+        # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
+        # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
+        urls = ["https://github.com/bazelbuild/rules_rust/releases/download/{version}/rules_rust-v{version}.tar.gz"],
         use_category = [
             "controlplane",
             "dataplane_core",

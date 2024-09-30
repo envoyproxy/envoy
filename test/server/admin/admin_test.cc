@@ -142,6 +142,8 @@ TEST_P(AdminInstanceTest, Help) {
   EXPECT_EQ(Http::Code::OK, getCallback("/help", header_map, response));
   const std::string expected = R"EOF(admin commands are:
   /: Admin home page
+  /allocprofiler (POST): enable/disable the allocation profiler (if supported)
+      enable: enable/disable the allocation profiler; One of (y, n)
   /certs: print certs on machine
   /clusters: upstream cluster status
   /config_dump: dump current Envoy configs (experimental)

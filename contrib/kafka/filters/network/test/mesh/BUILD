@@ -12,6 +12,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_unit_test",
     srcs = ["config_unit_test.cc"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:config_lib",
@@ -23,6 +24,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:filter_lib",
