@@ -223,7 +223,7 @@ private:
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
                      absl::string_view details, std::list<Network::DnsResponse>&& response,
                      absl::optional<MonotonicTime> resolution_time = {},
-                     bool is_proxy_lookup = false);
+                     bool is_proxy_lookup = false, bool cancel_query = false);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runResolutionCompleteCallbacks(const std::string& host,
                                       const DnsHostInfoSharedPtr& host_info,

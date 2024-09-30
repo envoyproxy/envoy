@@ -258,12 +258,13 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   std::cerr << "Inside onResolveTimeout\n";
   ASSERT(main_thread_dispatcher_.isThreadSafe());
 
-  auto& primary_host = getPrimaryHost(host);
+  // auto& primary_host = getPrimaryHost(host);
   ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
-  std::cerr << "Cancelling ActiveQuery\n";
-  primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
-  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, "resolve_timeout", {});
+  // std::cerr << "Cancelling ActiveQuery\n";
+  // primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+  finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, "resolve_timeout", {},
+                absl::nullopt, false, true);
 }
 
 void DnsCacheImpl::onReResolveAlarm(const std::string& host) {
@@ -382,7 +383,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                                  absl::string_view details,
                                  std::list<Network::DnsResponse>&& response,
                                  absl::optional<MonotonicTime> resolution_time,
-                                 bool is_proxy_lookup) {
+                                 bool is_proxy_lookup, bool cancel_query) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
@@ -423,6 +424,11 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   std::string details_with_maybe_trace = std::string(details);
   if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
     if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
+      absl::MutexLock lock(&primary_host_info->active_query_->lock());
+      if (cancel_query) {
+        std::cerr << "Cancelling ActiveQuery\n";
+        primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+      }
       details_with_maybe_trace = absl::StrCat(
           details, ":", absl::StrJoin(primary_host_info->active_query_->getTraces(), ","));
       primary_host_info->active_query_->clearTraces();
