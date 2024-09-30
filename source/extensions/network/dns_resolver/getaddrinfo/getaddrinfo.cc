@@ -221,12 +221,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       if (finished_query->cancelled_) {
         finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Cancelled));
         ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
-        // Set a flag to mark this for a manual deletion to avoid memory leak.
-        finished_query->deleteThis(true);
-        // We need to release the ownership here or else the `finished_query` will be destroyed upon
-        // completing the post callback causing a use-after-free if the `finished_query` is still
-        // used by the main dispatcher thread.
-        finished_query.release();
       } else {
         finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Callback));
         finished_query->callback_(response.first, std::move(details), std::move(response.second));

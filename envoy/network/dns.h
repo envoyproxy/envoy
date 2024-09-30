@@ -54,16 +54,9 @@ public:
     traces_.clear();
   }
 
-  /** Indicate whether this instance should be deleted manually. */
-  void deleteThis(bool delete_this) { delete_this_ = delete_this; }
-
-  /** Return true if this instance needs to be deleted manually. */
-  bool shouldDeleteThis() const { return delete_this_; }
-
 private:
   absl::Mutex mutex_;
-  std::vector<uint8_t> traces_; // ABSL_GUARDED_BY(mutex_);
-  bool delete_this_{false};
+  std::vector<uint8_t> traces_ ABSL_GUARDED_BY(mutex_);
 };
 
 /**
