@@ -345,28 +345,36 @@ public:
 class TestEnvoyQuicConnectionDebugVisitorFactory
     : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
 public:
-  std::string name() const override { return "envoy.quic.connection_debug_visitor.mock"; }
-
-  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<::test::common::config::DummyConfig>();
-  }
   std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(quic::QuicSession* session,
+  createQuicConnectionDebugVisitor(Event::Dispatcher&, quic::QuicSession* session,
                                    const StreamInfo::StreamInfo& stream_info) override {
     auto debug_visitor = std::make_unique<MockQuicConnectionDebugVisitor>(session, stream_info);
     mock_debug_visitor_ = debug_visitor.get();
     return debug_visitor;
   }
 
-  Envoy::ProcessContextOptRef processContext() const { return context_; }
-
   MockQuicConnectionDebugVisitor* mock_debug_visitor_;
 };
 
-DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory);
+class TestEnvoyQuicConnectionDebugVisitorFactoryFactory
+    : public EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface {
+public:
+  std::string name() const override { return "envoy.quic.connection_debug_visitor.mock"; }
 
-REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory,
-                 Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryInterface);
+  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<::test::common::config::DummyConfig>();
+  }
+
+  EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr
+  createFactory(const Protobuf::Message&, Server::Configuration::ListenerFactoryContext&) override {
+    return std::make_unique<TestEnvoyQuicConnectionDebugVisitorFactory>();
+  }
+};
+
+DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory);
+
+REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory,
+                 Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface);
 
 class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
 public:

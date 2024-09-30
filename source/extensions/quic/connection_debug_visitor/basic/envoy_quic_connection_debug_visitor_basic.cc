@@ -23,12 +23,12 @@ void EnvoyQuicConnectionDebugVisitorBasic::OnConnectionClosed(
 
 std::unique_ptr<quic::QuicConnectionDebugVisitor>
 EnvoyQuicConnectionDebugVisitorFactoryBasic::createQuicConnectionDebugVisitor(
-    quic::QuicSession* session, const StreamInfo::StreamInfo& stream_info) {
+    Event::Dispatcher&, quic::QuicSession* session, const StreamInfo::StreamInfo& stream_info) {
   return std::make_unique<EnvoyQuicConnectionDebugVisitorBasic>(session, stream_info);
 }
 
-REGISTER_FACTORY(EnvoyQuicConnectionDebugVisitorFactoryBasic,
-                 EnvoyQuicConnectionDebugVisitorFactoryInterface);
+REGISTER_FACTORY(EnvoyQuicConnectionDebugVisitorFactoryFactoryBasic,
+                 EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface);
 
 } // namespace Quic
 } // namespace Envoy
