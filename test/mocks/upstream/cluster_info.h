@@ -98,7 +98,6 @@ public:
   }
 
   // Upstream::ClusterInfo
-  MOCK_METHOD(bool, ignoreRemoval, (), (const));
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
