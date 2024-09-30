@@ -270,6 +270,7 @@ envoy_cc_test(
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
+        "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
