@@ -219,9 +219,11 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
     dispatcher_.post([finished_query = std::move(next_query), response = std::move(response),
                       details = std::string(details)]() mutable {
       if (finished_query->cancelled_) {
+        std::cerr << "Query already cancelled\n";
         finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Cancelled));
         ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
       } else {
+        std::cerr << "Calling callback\n";
         finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Callback));
         finished_query->callback_(response.first, std::move(details), std::move(response.second));
       }
