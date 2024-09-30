@@ -757,7 +757,7 @@ void ConnectionManagerImpl::onDrainTimeout() {
 }
 
 void ConnectionManagerImpl::sendGoAwayandClose() {
-  if (!codec_->protocol() == Protocol::Http2) {
+  if (!codec_ || codec_->protocol() != Protocol::Http2) {
     return;
   }
   ENVOY_CONN_LOG(trace, "http2 connection manager sendGoAwayandClose",
