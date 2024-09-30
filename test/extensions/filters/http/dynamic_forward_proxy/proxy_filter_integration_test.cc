@@ -1308,7 +1308,8 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithIpHost) {
 
 // Verify that no DFP clusters are removed when CDS Reload is triggered.
 TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "true");
   const std::string cluster_yaml = R"EOF(
     name: fake_cluster
     connect_timeout: 0.250s
