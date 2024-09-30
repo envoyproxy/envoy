@@ -237,15 +237,15 @@ public:
    *
    * @param cluster supplies the cluster configuration.
    * @param version_info supplies the xDS version of the cluster.
-   * @param ignore_removal If set to true, the cluster will be ignored from removal during CDS
-   *                       event. It can be removed by setting `remove_ignored` to true while
+   * @param avoid_cds_removal If set to true, the cluster will be ignored from removal during CDS
+   *                       update. It can be overridden by setting `remove_ignored` to true while
    *                       calling removeCluster(). This is useful for clusters whose lifecycle
-   *                       is managed with custom implementation. Eg. DFP clusters.
+   *                       is managed with custom implementation, e.g., DFP clusters.
    * @return true if the action results in an add/update of a cluster.
    */
   virtual bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                   const std::string& version_info,
-                                  const bool ignore_removal = false) PURE;
+                                  const bool avoid_cds_removal = false) PURE;
 
   /**
    * Set a callback that will be invoked when all primary clusters have been initialized.
@@ -328,7 +328,7 @@ public:
    * Remove a cluster via API. Only clusters added via addOrUpdateCluster() can
    * be removed in this manner. Statically defined clusters present when Envoy starts cannot be
    * removed.
-   * Cluster created using `addOrUpdateCluster()` with `ignore_removal` set to true.
+   * Cluster created using `addOrUpdateCluster()` with `avoid_cds_removal` set to true.
    * can be removed by setting `remove_ignored` to true while removeCluster().
    * @return true if the action results in the removal of a cluster.
    */

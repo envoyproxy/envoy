@@ -251,7 +251,7 @@ public:
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                          const std::string& version_info, const bool ignore_removal) override;
+                          const std::string& version_info, const bool avoid_cds_removal) override;
 
   void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
     init_helper_.setPrimaryClustersInitializedCb(callback);
@@ -726,11 +726,11 @@ private:
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
                 const uint64_t cluster_config_hash, const std::string& version_info,
                 bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
-                TimeSource& time_source, const bool ignore_removal = false)
+                TimeSource& time_source, const bool avoid_cds_removal_ = false)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
-          ignore_removal_(ignore_removal), added_or_updated_{},
+          avoid_cds_removal_(avoid_cds_removal_), added_or_updated_{},
           required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
@@ -764,7 +764,7 @@ private:
     Common::CallbackHandlePtr priority_update_cb_;
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
-    const bool ignore_removal_ : 1;
+    const bool avoid_cds_removal_ : 1;
     bool added_or_updated_ : 1;
     const bool required_for_ads_ : 1;
   };
@@ -843,7 +843,7 @@ private:
                                              const uint64_t cluster_hash,
                                              const std::string& version_info, bool added_via_api,
                                              bool required_for_ads, ClusterMap& cluster_map,
-                                             bool ignore_removal = false);
+                                             bool avoid_cds_removal = false);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();

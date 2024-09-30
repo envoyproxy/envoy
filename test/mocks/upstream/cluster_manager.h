@@ -39,7 +39,7 @@ public:
   MOCK_METHOD(bool, initialized, ());
   MOCK_METHOD(bool, addOrUpdateCluster,
               (const envoy::config::cluster::v3::Cluster& cluster, const std::string& version_info,
-               const bool ignore_removal));
+               const bool avoid_cds_removal));
   MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback));
   MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback));
   MOCK_METHOD(absl::Status, initializeSecondaryClusters,
