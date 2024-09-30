@@ -1,4 +1,4 @@
-#include "source/extensions/quic/connection_debug_visitor/envoy_quic_connection_debug_visitor_basic.h"
+#include "source/extensions/quic/connection_debug_visitor/basic/envoy_quic_connection_debug_visitor_basic.h"
 
 #include <memory>
 
