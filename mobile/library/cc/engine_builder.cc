@@ -268,6 +268,11 @@ EngineBuilder& EngineBuilder::setUpstreamTlsSni(std::string sni) {
 }
 
 EngineBuilder&
+EngineBuilder::setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds) {
+  quic_connection_idle_timeout_seconds_ = quic_connection_idle_timeout_seconds;
+}
+
+EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
@@ -739,7 +744,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->mutable_http3_protocol_options()
         ->mutable_quic_protocol_options()
         ->mutable_idle_network_timeout()
-        ->set_seconds(30);
+        ->set_seconds(quic_connection_idle_timeout_seconds_);
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())

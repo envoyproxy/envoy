@@ -104,6 +104,9 @@ public:
   // outside of this range will be ignored.
   EngineBuilder& setNetworkThreadPriority(int thread_priority);
 
+  // Sets the QUIC connection idle timeout in seconds.
+  EngineBuilder& setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds);
+
 #if defined(__APPLE__)
   // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
   // use in reading and using the system proxy settings.
@@ -201,6 +204,8 @@ private:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_session_pool.cc;l=790-793;drc=7f04a8e033c23dede6beae129cd212e6d4473d72
   // https://source.chromium.org/chromium/chromium/src/+/main:net/third_party/quiche/src/quiche/quic/core/quic_constants.h;l=43-47;drc=34ad7f3844f882baf3d31a6bc6e300acaa0e3fc8
   int32_t udp_socket_send_buffer_size_ = 1452 * 20;
+
+  int quic_connection_idle_timeout_seconds_ = 30;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;
