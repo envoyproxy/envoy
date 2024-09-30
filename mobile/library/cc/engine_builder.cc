@@ -270,6 +270,7 @@ EngineBuilder& EngineBuilder::setUpstreamTlsSni(std::string sni) {
 EngineBuilder&
 EngineBuilder::setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds) {
   quic_connection_idle_timeout_seconds_ = quic_connection_idle_timeout_seconds;
+  return *this;
 }
 
 EngineBuilder&
