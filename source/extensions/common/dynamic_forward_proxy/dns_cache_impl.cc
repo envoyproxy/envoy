@@ -262,8 +262,11 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   // auto& primary_host = getPrimaryHost(host);
   ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
-  // std::cerr << "Cancelling ActiveQuery\n";
-  // primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+  if (!runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
+    std::cerr << "Cancelling ActiveQuery\n";
+    auto& primary_host = getPrimaryHost(host);
+    primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+  }
   finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, "resolve_timeout", {},
                 absl::nullopt, false, true);
 }
