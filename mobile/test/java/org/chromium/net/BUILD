@@ -305,8 +305,7 @@ envoy_mobile_android_test(
     srcs = [
         "BidirectionalStreamTest.java",
     ],
-    # TODO(fredyw): Debug the reason for it being flaky.
-    flaky = True,
+    flaky = True,  # TODO(fredyw): Debug the reason for it being flaky.
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_extensions.so",
     ] + select({
