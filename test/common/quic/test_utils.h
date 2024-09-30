@@ -205,7 +205,7 @@ public:
                              Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                              EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
       : EnvoyQuicClientSession(config, supported_versions, std::move(connection),
-                               quic::QuicServerId("example.com", 443, false),
+                               quic::QuicServerId("example.com", 443),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                dispatcher, send_buffer_limit, crypto_stream_factory,
