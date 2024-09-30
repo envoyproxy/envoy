@@ -88,10 +88,15 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
     main_thread_dispatcher_.post([this, cluster, version_info]() {
       ENVOY_LOG(debug, "initializing dynamic cluster {} creation in main thread", cluster.name());
 
-      // Set avoid_cds_removal to true to prevent the cluster from being removed during a CDS update.
-      // As this cluster lifecycle is managed by DFP cluster, it should not be removed by CDS.
-      // https://github.com/envoyproxy/envoy/issues/35171
-      cluster_manager_.addOrUpdateCluster(cluster, version_info, true);
+      if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update")) {
+        // Set avoid_cds_removal to true to prevent the cluster from being removed during a CDS update.
+        // As this cluster lifecycle is managed by DFP cluster, it should not be removed by CDS.
+        // https://github.com/envoyproxy/envoy/issues/35171
+        cluster_manager_.addOrUpdateCluster(cluster, version_info, true);
+      } else {
+        cluster_manager_.addOrUpdateCluster(cluster, version_info);
+      }
     });
   } else {
     ENVOY_LOG(debug, "cluster='{}' already created, waiting it warming", cluster_name);
