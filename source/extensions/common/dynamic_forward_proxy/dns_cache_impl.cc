@@ -433,11 +433,11 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       details_with_maybe_trace = absl::StrCat(
           details, ":", absl::StrJoin(primary_host_info->active_query_->getTraces(), ","));
       primary_host_info->active_query_->clearTraces();
-    }
-  } else {
-    if (is_timeout) {
-      std::cerr << "Cancelling ActiveQuery\n";
-      primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+    } else {
+      if (is_timeout) {
+        std::cerr << "Cancelling ActiveQuery\n";
+        primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+      }
     }
   }
 
