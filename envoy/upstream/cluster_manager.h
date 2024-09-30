@@ -38,6 +38,14 @@
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
+
+namespace Quic {
+
+class EnvoyQuicNetworkObserverRegistryFactory;
+class EnvoyQuicNetworkObserverRegistry;
+
+} // namespace Quic
+
 namespace Upstream {
 
 /**
@@ -473,6 +481,13 @@ public:
    * Returns an EdsResourcesCache that is unique for the cluster manager.
    */
   virtual Config::EdsResourcesCacheOptRef edsResourcesCache() PURE;
+
+  /**
+   * Create a QUIC network observer registry for each worker thread using the given factory.
+   * @param factory used to create a registry object.
+   */
+  virtual void createNetworkObserverRegistries(
+      Envoy::Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -521,6 +536,8 @@ public:
   /**
    * Allocate an HTTP connection pool for the host. Pools are separated by 'priority',
    * 'protocol', and 'options->hashKey()', if any.
+   * @param network_observer_registry if not null all the QUIC connections created by this pool
+   * should register to it for network events.
    */
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
@@ -530,7 +547,8 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state,
-                   Http::PersistentQuicInfoPtr& quic_info) PURE;
+                   Http::PersistentQuicInfoPtr& quic_info,
+                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and

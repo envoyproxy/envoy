@@ -237,7 +237,7 @@ public:
    * Get a Factory from the registry with a particular name or return nullptr.
    * @param name string identifier for the particular implementation.
    */
-  template <class Factory> static Factory* getFactoryByName(const std::string& name) {
+  template <class Factory> static Factory* getFactoryByName(absl::string_view name) {
     if (name.empty()) {
       return nullptr;
     }

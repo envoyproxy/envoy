@@ -375,7 +375,13 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
     if (entry.raw_string_value_.empty()) {
-      entry.raw_string_value_ = absl::StrCat(value.bool_value());
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.boolean_to_string_fix")) {
+        // Convert boolean to "true"/"false"
+        entry.raw_string_value_ = value.bool_value() ? "true" : "false";
+      } else {
+        // Use absl::StrCat for backward compatibility, which converts to "1"/"0"
+        entry.raw_string_value_ = absl::StrCat(value.bool_value());
+      }
     }
     break;
   case ProtobufWkt::Value::kStructValue:

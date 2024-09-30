@@ -380,9 +380,20 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
                                                            *validation_visitor_, num_retries_);
 }
 
+absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>> InternalRedirectPolicyImpl::create(
+    const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
+    ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<InternalRedirectPolicyImpl>(new InternalRedirectPolicyImpl(
+      policy_config, validator, current_route_name, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
-    ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name)
+    ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name,
+    absl::Status& creation_status)
     : current_route_name_(current_route_name),
       redirect_response_codes_(buildRedirectResponseCodes(policy_config)),
       max_internal_redirects_(
@@ -397,7 +408,9 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
   }
   for (const auto& header : policy_config.response_headers_to_copy()) {
     if (!Http::HeaderUtility::isModifiableHeader(header)) {
-      throwEnvoyExceptionOrPanic(":-prefixed headers or Hosts may not be specified here.");
+      creation_status =
+          absl::InvalidArgumentError(":-prefixed headers or Hosts may not be specified here.");
+      return;
     }
     response_headers_to_copy_.emplace_back(header);
   }
@@ -560,7 +573,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                            : nullptr),
       hedge_policy_(buildHedgePolicy(vhost->hedgePolicy(), route.route())),
       internal_redirect_policy_(
-          buildInternalRedirectPolicy(route.route(), validator, route.name())),
+          THROW_OR_RETURN_VALUE(buildInternalRedirectPolicy(route.route(), validator, route.name()),
+                                std::unique_ptr<InternalRedirectPolicyImpl>)),
       config_headers_(
           Http::HeaderUtility::buildHeaderDataVector(route.match().headers(), factory_context)),
       dynamic_metadata_([&]() {
@@ -1186,12 +1200,13 @@ absl::StatusOr<std::unique_ptr<RetryPolicyImpl>> RouteEntryImplBase::buildRetryP
   return nullptr;
 }
 
-std::unique_ptr<InternalRedirectPolicyImpl> RouteEntryImplBase::buildInternalRedirectPolicy(
+absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>>
+RouteEntryImplBase::buildInternalRedirectPolicy(
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name) const {
   if (route_config.has_internal_redirect_policy()) {
-    return std::make_unique<InternalRedirectPolicyImpl>(route_config.internal_redirect_policy(),
-                                                        validator, current_route_name);
+    return InternalRedirectPolicyImpl::create(route_config.internal_redirect_policy(), validator,
+                                              current_route_name);
   }
   envoy::config::route::v3::InternalRedirectPolicy policy_config;
   switch (route_config.internal_redirect_action()) {
@@ -1205,7 +1220,7 @@ std::unique_ptr<InternalRedirectPolicyImpl> RouteEntryImplBase::buildInternalRed
   if (route_config.has_max_internal_redirects()) {
     *policy_config.mutable_max_internal_redirects() = route_config.max_internal_redirects();
   }
-  return std::make_unique<InternalRedirectPolicyImpl>(policy_config, validator, current_route_name);
+  return InternalRedirectPolicyImpl::create(policy_config, validator, current_route_name);
 }
 
 RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
@@ -1510,15 +1525,15 @@ absl::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config
   return vhost_->filterDisabled(config_name);
 }
 
-void RouteEntryImplBase::traversePerFilterConfig(
-    const std::string& filter_name,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
-  vhost_->traversePerFilterConfig(filter_name, cb);
+RouteSpecificFilterConfigs
+RouteEntryImplBase::perFilterConfigs(absl::string_view filter_name) const {
+  auto result = vhost_->perFilterConfigs(filter_name);
 
-  auto maybe_route_config = per_filter_configs_->get(filter_name);
+  const auto* maybe_route_config = per_filter_configs_->get(filter_name);
   if (maybe_route_config != nullptr) {
-    cb(*maybe_route_config);
+    result.push_back(maybe_route_config);
   }
+  return result;
 }
 
 const envoy::config::core::v3::Metadata& RouteEntryImplBase::metadata() const {
@@ -1598,15 +1613,15 @@ Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderT
   return transforms;
 }
 
-void RouteEntryImplBase::WeightedClusterEntry::traversePerFilterConfig(
-    const std::string& filter_name,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
-  DynamicRouteEntry::traversePerFilterConfig(filter_name, cb);
+RouteSpecificFilterConfigs
+RouteEntryImplBase::WeightedClusterEntry::perFilterConfigs(absl::string_view filter_name) const {
 
+  auto result = DynamicRouteEntry::perFilterConfigs(filter_name);
   const auto* cfg = per_filter_configs_->get(filter_name);
-  if (cfg) {
-    cb(*cfg);
+  if (cfg != nullptr) {
+    result.push_back(cfg);
   }
+  return result;
 }
 
 UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
@@ -1910,23 +1925,25 @@ absl::optional<bool> CommonVirtualHostImpl::filterDisabled(absl::string_view con
 }
 
 const RouteSpecificFilterConfig*
-CommonVirtualHostImpl::mostSpecificPerFilterConfig(const std::string& name) const {
+CommonVirtualHostImpl::mostSpecificPerFilterConfig(absl::string_view name) const {
   auto* per_filter_config = per_filter_configs_->get(name);
   return per_filter_config != nullptr ? per_filter_config
                                       : global_route_config_->perFilterConfig(name);
 }
-void CommonVirtualHostImpl::traversePerFilterConfig(
-    const std::string& filter_name,
-    std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const {
+RouteSpecificFilterConfigs
+CommonVirtualHostImpl::perFilterConfigs(absl::string_view filter_name) const {
+  RouteSpecificFilterConfigs result;
+
   // Parent first.
   if (auto* maybe_rc_config = global_route_config_->perFilterConfig(filter_name);
       maybe_rc_config != nullptr) {
-    cb(*maybe_rc_config);
+    result.push_back(maybe_rc_config);
   }
   if (auto* maybe_vhost_config = per_filter_configs_->get(filter_name);
       maybe_vhost_config != nullptr) {
-    cb(*maybe_vhost_config);
+    result.push_back(maybe_vhost_config);
   }
+  return result;
 }
 
 const envoy::config::core::v3::Metadata& CommonVirtualHostImpl::metadata() const {
@@ -2491,7 +2508,7 @@ PerFilterConfigs::PerFilterConfigs(
   }
 }
 
-const RouteSpecificFilterConfig* PerFilterConfigs::get(const std::string& name) const {
+const RouteSpecificFilterConfig* PerFilterConfigs::get(absl::string_view name) const {
   auto it = configs_.find(name);
   return it == configs_.end() ? nullptr : it->second.config_.get();
 }

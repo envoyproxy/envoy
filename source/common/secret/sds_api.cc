@@ -210,7 +210,7 @@ SdsApi::FileContentMap SdsApi::loadFiles() {
   FileContentMap files;
   for (auto const& filename : getDataSourceFilenames()) {
     auto file_or_error = api_.fileSystem().fileReadToEnd(filename);
-    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    THROW_IF_NOT_OK_REF(file_or_error.status());
     files[filename] = file_or_error.value();
   }
   return files;

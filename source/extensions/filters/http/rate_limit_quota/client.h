@@ -37,7 +37,7 @@ class RateLimitClient {
 public:
   virtual ~RateLimitClient() = default;
 
-  virtual absl::Status startStream(const StreamInfo::StreamInfo& stream_info) PURE;
+  virtual absl::Status startStream(const StreamInfo::StreamInfo* stream_info) PURE;
   virtual void closeStream() PURE;
   virtual void sendUsageReport(absl::optional<size_t> bucket_id) PURE;
 

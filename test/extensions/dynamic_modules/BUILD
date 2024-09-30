@@ -16,7 +16,12 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/c:no_program_init",
         "//test/extensions/dynamic_modules/test_data/c:program_init_fail",
+        "//test/extensions/dynamic_modules/test_data/rust:abi_version_mismatch",
+        "//test/extensions/dynamic_modules/test_data/rust:no_op",
+        "//test/extensions/dynamic_modules/test_data/rust:no_program_init",
+        "//test/extensions/dynamic_modules/test_data/rust:program_init_fail",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//test/test_common:environment_lib",
@@ -30,6 +35,7 @@ envoy_cc_test(
     data = [
         "//source/extensions/dynamic_modules:abi.h",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",

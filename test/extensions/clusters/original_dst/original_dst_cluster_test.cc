@@ -85,7 +85,7 @@ public:
 
     OriginalDstClusterFactory factory;
     auto status_or_pair = factory.createClusterImpl(cluster_config, factory_context);
-    THROW_IF_STATUS_NOT_OK(status_or_pair, throw);
+    THROW_IF_NOT_OK_REF(status_or_pair.status());
 
     cluster_ = std::dynamic_pointer_cast<OriginalDstCluster>(status_or_pair.value().first);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(

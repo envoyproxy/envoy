@@ -36,8 +36,7 @@ public:
   };
 };
 
-INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages,
-                         testing::Values("c"), // TODO: Other languages.
+INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),
                          DynamicModuleTestLanguages::languageParamToTestName);
 
 TEST_P(DynamicModuleTestLanguages, DoNotClose) {
@@ -48,6 +47,7 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   EXPECT_TRUE(module.ok());
   const auto getSomeVariable =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
+  EXPECT_NE(getSomeVariable, nullptr);
   EXPECT_EQ(getSomeVariable(), 1);
   EXPECT_EQ(getSomeVariable(), 2);
   EXPECT_EQ(getSomeVariable(), 3);

@@ -121,6 +121,8 @@ public:
   probeAndMigrateToServerPreferredAddress(const quic::QuicSocketAddress& server_preferred_address);
 
 private:
+  friend class EnvoyQuicClientConnectionPeer;
+
   // Receives notifications from the Quiche layer on path validation results.
   class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
   public:
@@ -146,7 +148,7 @@ private:
 
   void maybeMigratePort();
 
-  void probeWithNewPort(const quic::QuicSocketAddress& peer_address,
+  void probeWithNewPort(const quic::QuicSocketAddress& peer_addr,
                         quic::PathValidationReason reason);
 
   OptRef<PacketsToReadDelegate> delegate_;

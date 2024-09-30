@@ -32,6 +32,11 @@ config:
     cluster: foo
     uri: oauth.com/token
     timeout: 3s
+  retry_policy:
+    retry_back_off:
+      base_interval: 1s
+      max_interval: 10s
+    num_retries: 5
   credentials:
     client_id: "secret"
     token_secret:
@@ -83,6 +88,11 @@ config:
     cluster: foo
     uri: oauth.com/token
     timeout: 3s
+  retry_policy:
+    retry_back_off:
+      base_interval: 1s
+      max_interval: 10s
+    num_retries: 5
   credentials:
     client_id: "secret"
     token_secret:
@@ -166,6 +176,11 @@ config:
     cluster: foo
     uri: oauth.com/token
     timeout: 3s
+  retry_policy:
+    retry_back_off:
+      base_interval: 1s
+      max_interval: 10s
+    num_retries: 5
   credentials:
     client_id: "secret"
     token_secret:
@@ -211,6 +226,11 @@ config:
     cluster: foo
     uri: oauth.com/token
     timeout: 3s
+  retry_policy:
+    retry_back_off:
+      base_interval: 1s
+      max_interval: 10s
+    num_retries: 5
   credentials:
     client_id: "secret"
     token_secret:

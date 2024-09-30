@@ -126,8 +126,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfigSharedPtr co
                                      /*node_id=*/local_info_.node().id(),
                                      /*server_name=*/config_->serverName(),
                                      /*proxy_status_config=*/config_->proxyStatusConfig())),
-      max_requests_during_dispatch_(runtime_.snapshot().getInteger(
-          ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)) {
+      max_requests_during_dispatch_(
+          runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
+      allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
@@ -355,7 +357,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
     stream.deferHeadersAndTrailers();
   } else {
     // For HTTP/1 and HTTP/2, log here as usual.
-    stream.filter_manager_.log(AccessLog::AccessLogType::DownstreamEnd);
+    stream.log(AccessLog::AccessLogType::DownstreamEnd);
   }
 
   stream.filter_manager_.destroyFilters();
@@ -790,6 +792,10 @@ absl::optional<uint64_t> ConnectionManagerImpl::HttpStreamIdProviderImpl::toInte
       *parent_.request_headers_);
 }
 
+namespace {
+constexpr absl::string_view kRouteFactoryName = "envoy.route_config_update_requester.default";
+} // namespace
+
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager,
                                                   uint32_t buffer_limit,
                                                   Buffer::BufferMemoryAccountSharedPtr account)
@@ -821,9 +827,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
          "Either routeConfigProvider or (scopedRouteConfigProvider and scopeKeyBuilder) should be "
          "set in "
          "ConnectionManagerImpl.");
-  for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_->accessLogs()) {
-    filter_manager_.addAccessLogHandler(access_log);
-  }
 
   filter_manager_.streamInfo().setStreamIdProvider(
       std::make_shared<HttpStreamIdProviderImpl>(*this));
@@ -832,9 +835,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       connection_manager.config_->shouldSchemeMatchUpstream());
 
   // TODO(chaoqin-li1123): can this be moved to the on demand filter?
-  static const std::string route_factory = "envoy.route_config_update_requester.default";
-  auto factory =
-      Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(route_factory);
+  auto factory = Envoy::Config::Utility::getFactoryByName<RouteConfigUpdateRequesterFactory>(
+      kRouteFactoryName);
   if (connection_manager_.config_->isRoutable() &&
       connection_manager.config_->routeConfigProvider() != nullptr && factory) {
     route_config_update_requester_ = factory->createRouteConfigUpdateRequester(
@@ -895,7 +897,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       // If the request is complete, we've already done the stream-end access-log, and shouldn't
       // do the periodic log.
       if (!streamInfo().requestComplete().has_value()) {
-        filter_manager_.log(AccessLog::AccessLogType::DownstreamPeriodic);
+        log(AccessLog::AccessLogType::DownstreamPeriodic);
         refreshAccessLogFlushTimer();
       }
       const SystemTime now = connection_manager_.timeSource().systemTime();
@@ -910,6 +912,29 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       }
     });
     refreshAccessLogFlushTimer();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
+  const Formatter::HttpFormatterContext log_context{
+      request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,
+      active_span_.get()};
+
+  const bool filter_access_loggers_first =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.filter_access_loggers_first");
+
+  if (!filter_access_loggers_first) {
+    for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
+      access_logger->log(log_context, filter_manager_.streamInfo());
+    }
+  }
+
+  filter_manager_.log(log_context);
+
+  if (filter_access_loggers_first) {
+    for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
+      access_logger->log(log_context, filter_manager_.streamInfo());
+    }
   }
 }
 
@@ -1365,7 +1390,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   const bool upgrade_rejected = filter_manager_.createFilterChain() == false;
 
   if (connection_manager_.config_->flushAccessLogOnNewRequest()) {
-    filter_manager_.log(AccessLog::AccessLogType::DownstreamStart);
+    log(AccessLog::AccessLogType::DownstreamStart);
   }
 
   // TODO if there are no filters when starting a filter iteration, the connection manager
@@ -1841,7 +1866,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   if (state_.is_tunneling_ &&
       connection_manager_.config_->flushAccessLogOnTunnelSuccessfullyEstablished()) {
-    filter_manager_.log(AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
+    log(AccessLog::AccessLogType::DownstreamTunnelSuccessfullyEstablished);
   }
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);

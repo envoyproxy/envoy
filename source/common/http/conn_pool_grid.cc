@@ -297,7 +297,8 @@ ConnectivityGrid::ConnectivityGrid(
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
     HttpServerPropertiesCacheSharedPtr alternate_protocols,
     ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
+    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
+    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host), options_(options),
       transport_socket_options_(transport_socket_options), state_(state),
       next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
@@ -306,7 +307,8 @@ ConnectivityGrid::ConnectivityGrid(
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
       origin_("https", getTargetHostname(transport_socket_options, host_),
               host_->address()->ip()->port()),
-      quic_info_(quic_info), priority_(priority) {
+      quic_info_(quic_info), priority_(priority),
+      network_observer_registry_(network_observer_registry) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
@@ -386,7 +388,7 @@ ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool(bool attempt_alter
                                  transport_socket_options_, state_, quic_stat_names_,
                                  *alternate_protocols_, scope_,
                                  makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this),
-                                 quic_info_, attempt_alternate_address);
+                                 quic_info_, network_observer_registry_, attempt_alternate_address);
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {

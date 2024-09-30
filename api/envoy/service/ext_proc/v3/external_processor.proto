@@ -180,7 +180,10 @@ message ProcessingResponse {
   // It is also ignored by Envoy when the ext_proc filter config
   // :ref:`allow_mode_override
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allow_mode_override>`
-  // is set to false.
+  // is set to false, or
+  // :ref:`send_body_without_waiting_for_header_response
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
+  // is set to true.
   envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
 
   // When ext_proc server receives a request message, in case it needs more
@@ -285,9 +288,6 @@ message CommonResponse {
   // Instructions on how to manipulate the headers. When responding to an
   // HttpBody request, header mutations will only take effect if
   // the current processing mode for the body is BUFFERED.
-  // [#comment:TODO(yanjunxiang-google) rephrase last sentence once send_body_without_waiting_for_header_response is not hidden:
-  // the current processing mode for the body is: 1) BUFFERED; 2) or STREAMED and
-  // the :ref:`send_body_without_waiting_for_header_response <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>` is enabled.]
   HeaderMutation header_mutation = 2;
 
   // Replace the body of the last message sent to the remote server on this

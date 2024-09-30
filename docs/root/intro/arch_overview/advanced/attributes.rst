@@ -93,6 +93,7 @@ Response attributes are only available after the request completes.
    response.trailers, "map<string, string>", All response trailers indexed by the lower-cased trailer name
    response.size, int, Size of the response body
    response.total_size, int, Total size of the response including the approximate uncompressed size of the headers and the trailers
+   response.backend_latency, duration, Duration between the first byte sent to and the last byte received from the upstream backend
 
 Connection attributes
 ---------------------

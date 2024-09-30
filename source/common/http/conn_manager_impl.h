@@ -45,7 +45,6 @@
 #include "source/common/http/user_agent.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
-#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -157,6 +156,7 @@ private:
       still_alive_.reset();
     }
 
+    void log(AccessLog::AccessLogType type);
     void completeRequest();
 
     const Network::Connection* connection();
@@ -190,7 +190,19 @@ private:
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-      return filter_manager_.accessLogHandlers();
+      std::list<AccessLog::InstanceSharedPtr> combined_log_handlers(
+          filter_manager_.accessLogHandlers());
+      std::list<AccessLog::InstanceSharedPtr> config_log_handlers_(
+          connection_manager_.config_->accessLogs());
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.filter_access_loggers_first")) {
+        combined_log_handlers.insert(combined_log_handlers.begin(), config_log_handlers_.begin(),
+                                     config_log_handlers_.end());
+      } else {
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers_.begin(),
+                                     config_log_handlers_.end());
+      }
+      return combined_log_handlers;
     }
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
     // (i.e. possibly after this stream has been destroyed).
@@ -205,10 +217,9 @@ private:
     }
 
     // ScopeTrackedObject
-    ExecutionContext* executionContext() const override {
-      return getConnectionExecutionContext(connection_manager_.read_callbacks_->connection());
+    OptRef<const StreamInfo::StreamInfo> trackedStream() const override {
+      return filter_manager_.trackedStream();
     }
-
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_);
@@ -283,7 +294,7 @@ private:
     OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
-    bool isHalfCloseEnabled() override { return false; }
+    bool isHalfCloseEnabled() override { return connection_manager_.allow_upstream_half_close_; }
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
@@ -641,6 +652,18 @@ private:
   uint32_t requests_during_dispatch_count_{0};
   const uint32_t max_requests_during_dispatch_{UINT32_MAX};
   Event::SchedulableCallbackPtr deferred_request_processing_callback_;
+
+  // If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3
+  // protocols the stream is destroyed after both request and response are complete i.e. reach their
+  // respective end-of-stream, by receiving trailers or the header/body with end-stream set in both
+  // directions AND response has success (2xx) status code.
+  //
+  // For HTTP/1 upstream protocol or if independent half-close is disabled the stream is destroyed
+  // when the response is complete and reaches its end-of-stream, i.e. when trailers or the response
+  // header/body with end-stream set are received, even if the request has not yet completed. If
+  // request was incomplete at response completion, the stream is reset.
+
+  const bool allow_upstream_half_close_{};
 };
 
 } // namespace Http

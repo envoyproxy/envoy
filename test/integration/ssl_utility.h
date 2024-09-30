@@ -81,7 +81,9 @@ struct ClientSslTransportOptions {
 
 void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
-    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context);
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context,
+    // By default, clients connect to Envoy. Allow configuring to connect to upstreams.
+    bool connect_to_upstream = false);
 
 Network::UpstreamTransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,

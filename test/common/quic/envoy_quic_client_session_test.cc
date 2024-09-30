@@ -2,6 +2,7 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/client_codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
@@ -11,6 +12,7 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 
 #include "test/common/quic/test_utils.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
@@ -36,6 +38,14 @@ using testing::Return;
 
 namespace Envoy {
 namespace Quic {
+
+class EnvoyQuicClientConnectionPeer {
+public:
+  static void onFileEvent(EnvoyQuicClientConnection& connection, uint32_t events,
+                          Network::ConnectionSocket& connection_socket) {
+    connection.onFileEvent(events, connection_socket);
+  }
+};
 
 class TestEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
 public:
@@ -100,13 +110,16 @@ public:
         self_addr_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(TestEnvironment::getIpVersionsForTest()[0]),
             54321)),
-        peer_socket_(createConnectionSocket(self_addr_, peer_addr_, nullptr)),
+        peer_socket_(std::make_unique<Network::UdpListenSocket>(peer_addr_, /*options=*/nullptr,
+                                                                /*bind=*/true)),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
         transport_socket_options_(std::make_shared<Network::TransportSocketOptionsImpl>()),
         stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(store_, "http3."),
                                       POOL_GAUGE_PREFIX(store_, "http3."))}) {
+    // After binding the listen peer socket, set the bound IP address of the peer.
+    peer_addr_ = peer_socket_->connectionInfoProvider().localAddress();
     http3_options_.mutable_quic_protocol_options()
         ->mutable_num_timeouts_to_trigger_port_migration()
         ->set_value(1);
@@ -187,7 +200,7 @@ protected:
   Network::Address::InstanceConstSharedPtr self_addr_;
   // Used in some tests to trigger a read event on the connection to test its full interaction with
   // socket read utility functions.
-  Network::ConnectionSocketPtr peer_socket_;
+  Network::UdpListenSocketPtr peer_socket_;
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   TestEnvoyQuicClientConnection* quic_connection_;
@@ -220,7 +233,6 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
   quic::QuicHeaderList headers;
-  headers.OnHeaderBlockStart();
   headers.OnHeader(":status", "200");
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
@@ -241,7 +253,6 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
 
   quic::QuicHeaderList headers;
-  headers.OnHeaderBlockStart();
   headers.OnHeader(":status", "200");
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
@@ -633,6 +644,42 @@ TEST_P(EnvoyQuicClientSessionTest, UseSocketAddressCache) {
   }
   EXPECT_EQ(last_local_address.get(), quic_connection_->getLastLocalAddress().get());
   EXPECT_EQ(last_peer_address.get(), quic_connection_->getLastPeerAddress().get());
+}
+
+TEST_P(EnvoyQuicClientSessionTest, WriteBlockedAndUnblock) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector{&os_sys_calls};
+
+  // Switch to a real writer, and synthesize a write block on it.
+  quic_connection_->SetQuicPacketWriter(
+      new EnvoyQuicPacketWriter(std::make_unique<Network::UdpDefaultWriter>(
+          quic_connection_->connectionSocket()->ioHandle())),
+      true);
+  if (quic_connection_->connectionSocket()->ioHandle().wasConnected()) {
+    EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+        .Times(2)
+        .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+  } else {
+    EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+        .Times(2)
+        .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+  }
+  // OnCanWrite() would close the connection if the underlying writer is not unblocked.
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_INTERNAL_ERROR, _, _))
+      .Times(0);
+  Http::MockResponseDecoder response_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
+  EXPECT_TRUE(quic_connection_->writer()->IsWriteBlocked());
+
+  // Synthesize a WRITE event.
+  EnvoyQuicClientConnectionPeer::onFileEvent(*quic_connection_, Event::FileReadyType::Write,
+                                             *quic_connection_->connectionSocket());
+  EXPECT_FALSE(quic_connection_->writer()->IsWriteBlocked());
+  EXPECT_CALL(stream_callbacks,
+              onResetStream(Http::StreamResetReason::LocalReset, "QUIC_STREAM_REQUEST_REJECTED"));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  stream.resetStream(Http::StreamResetReason::LocalReset);
 }
 
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {

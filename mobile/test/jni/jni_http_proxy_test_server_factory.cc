@@ -4,6 +4,7 @@
 
 #include "extension_registry.h"
 #include "library/jni/jni_helper.h"
+#include "library/jni/jni_utility.h"
 
 // NOLINT(namespace-envoy)
 
@@ -13,7 +14,7 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
       "io/envoyproxy/envoymobile/engine/testing/HttpProxyTestServerFactory$HttpProxyTestServer",
       /* methods= */
       {
-          {"<init>", "(JI)V"},
+          {"<init>", "(JLjava/lang/String;I)V"},
       },
       /* static_methods= */ {}, /* fields= */
       {
@@ -34,12 +35,13 @@ Java_io_envoyproxy_envoymobile_engine_testing_HttpProxyTestServerFactory_start(J
 
   jclass java_http_proxy_server_factory_class = jni_helper.findClassFromCache(
       "io/envoyproxy/envoymobile/engine/testing/HttpProxyTestServerFactory$HttpProxyTestServer");
-  auto java_init_method_id =
-      jni_helper.getMethodIdFromCache(java_http_proxy_server_factory_class, "<init>", "(JI)V");
+  auto java_init_method_id = jni_helper.getMethodIdFromCache(java_http_proxy_server_factory_class,
+                                                             "<init>", "(JLjava/lang/String;I)V");
+  auto ip_address = Envoy::JNI::cppStringToJavaString(jni_helper, test_server->getIpAddress());
   int port = test_server->getPort();
   return jni_helper
       .newObject(java_http_proxy_server_factory_class, java_init_method_id,
-                 reinterpret_cast<jlong>(test_server), static_cast<jint>(port))
+                 reinterpret_cast<jlong>(test_server), ip_address.get(), static_cast<jint>(port))
       .release();
 }
 

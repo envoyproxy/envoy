@@ -20,15 +20,16 @@ envoy_cc_library(
 envoy_cc_library(
     name = "connection_interface",
     hdrs = ["connection.h"],
-    external_deps = ["abseil_int128"],
     deps = [
         ":address_interface",
         ":filter_interface",
         ":listen_socket_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/common:scope_tracker_interface",
         "//envoy/event:deferred_deletable",
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
+        "@com_google_absl//absl/numeric:int128",
     ],
 )
 
@@ -99,8 +100,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "drain_decision_interface",
     hdrs = ["drain_decision.h"],
-    external_deps = ["abseil_base"],
-    deps = ["//envoy/common:callback"],
+    deps = [
+        "//envoy/common:callback",
+        "@com_google_absl//absl/base",
+    ],
 )
 
 envoy_cc_library(
@@ -126,16 +129,15 @@ envoy_cc_library(
 envoy_cc_library(
     name = "hash_policy_interface",
     hdrs = ["hash_policy.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":connection_interface",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
 envoy_cc_library(
     name = "io_handle_interface",
     hdrs = ["io_handle.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":address_interface",
         "//envoy/api:io_error_interface",
@@ -143,6 +145,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/event:file_event_interface",
         "//source/common/common:assert_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -172,7 +175,6 @@ envoy_cc_library(
     deps = [
         ":io_handle_interface",
         ":socket_interface",
-        "//envoy/common:scope_tracker_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
