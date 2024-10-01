@@ -12,13 +12,21 @@ namespace {
 
 class WasmFilterIntegrationTest
     : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<std::string, std::string, bool>> {
+      public testing::TestWithParam<
+          std::tuple<std::tuple<std::string, std::string, bool>, Http::CodecType>> {
 public:
   WasmFilterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(std::get<1>(GetParam()), Network::Address::IpVersion::v4) {}
 
   void SetUp() override {
-    setUpstreamProtocol(Http::CodecType::HTTP1);
+    setUpstreamProtocol(std::get<1>(GetParam()));
+    if (std::get<1>(GetParam()) == Http::CodecType::HTTP2) {
+      config_helper_.setClientCodec(envoy::extensions::filters::network::http_connection_manager::
+                                        v3::HttpConnectionManager::HTTP2);
+    } else {
+      config_helper_.setClientCodec(envoy::extensions::filters::network::http_connection_manager::
+                                        v3::HttpConnectionManager::HTTP1);
+    }
     // Wasm filters are expensive to setup and sometime default is not enough,
     // It needs to increase timeout to avoid flaky tests
     setListenersBoundTimeout(10 * TestUtility::DefaultTimeout);
@@ -27,7 +35,7 @@ public:
   void TearDown() override { fake_upstream_connection_.reset(); }
 
   void setupWasmFilter(const std::string& config, const std::string& root_id = "") {
-    bool downstream = std::get<2>(GetParam());
+    bool downstream = std::get<2>(std::get<0>(GetParam()));
     const std::string yaml = TestEnvironment::substitute(absl::StrCat(
         R"EOF(
           name: envoy.filters.http.wasm
@@ -40,7 +48,7 @@ public:
               vm_config:
                 vm_id: "vm_id"
                 runtime: envoy.wasm.runtime.)EOF",
-        std::get<0>(GetParam()), R"EOF(
+        std::get<0>(std::get<0>(GetParam())), R"EOF(
                 configuration:
                   "@type": type.googleapis.com/google.protobuf.StringValue
                   value: )EOF",
@@ -68,11 +76,12 @@ public:
     });
   }
 
-  void runTest(const Http::RequestHeaderMap& request_headers, const std::string& request_body,
+  void runTest(const Http::RequestHeaderMap& request_headers,
+               const std::vector<std::string>& request_body,
                const Http::RequestHeaderMap& expected_request_headers,
                const std::string& expected_request_body,
                const Http::ResponseHeaderMap& upstream_response_headers,
-               const std::string& upstream_response_body,
+               const std::vector<std::string>& upstream_response_body,
                const Http::ResponseHeaderMap& expected_response_headers,
                const std::string& expected_response_body) {
 
@@ -84,8 +93,11 @@ public:
       auto encoder_decoder = codec_client_->startRequest(request_headers);
       request_encoder_ = &encoder_decoder.first;
       response = std::move(encoder_decoder.second);
-      Buffer::OwnedImpl buffer(request_body);
-      codec_client_->sendData(*request_encoder_, buffer, true);
+      const auto request_body_size = request_body.size();
+      for (size_t n = 0; n < request_body_size; n++) {
+        Buffer::OwnedImpl buffer(request_body[n]);
+        codec_client_->sendData(*request_encoder_, buffer, n == request_body_size - 1);
+      }
     }
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
@@ -99,8 +111,11 @@ public:
       upstream_request_->encodeHeaders(upstream_response_headers, true /*end_stream*/);
     } else {
       upstream_request_->encodeHeaders(upstream_response_headers, false /*end_stream*/);
-      Buffer::OwnedImpl buffer(upstream_response_body);
-      upstream_request_->encodeData(buffer, true);
+      const auto upstream_response_body_size = upstream_response_body.size();
+      for (size_t n = 0; n < upstream_response_body_size; n++) {
+        Buffer::OwnedImpl buffer(upstream_response_body[n]);
+        upstream_request_->encodeData(buffer, n == upstream_response_body_size - 1);
+      }
     }
 
     ASSERT_TRUE(response->waitForEndStream());
@@ -114,12 +129,21 @@ public:
     ASSERT_TRUE(fake_upstream_connection_->close());
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
+
+  static std::string
+  testParamsToString(const ::testing::TestParamInfo<
+                     std::tuple<std::tuple<std::string, std::string, bool>, Http::CodecType>>& p) {
+    return fmt::format("{}_{}_{}_{}", std::get<2>(std::get<0>(p.param)) ? "downstream" : "upstream",
+                       std::get<0>(std::get<0>(p.param)), std::get<1>(std::get<0>(p.param)),
+                       std::get<1>(p.param) == Http::CodecType::HTTP2 ? "Http2" : "Http");
+  }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    Runtimes, WasmFilterIntegrationTest,
-    Envoy::Extensions::Common::Wasm::dual_filter_sandbox_runtime_and_cpp_values,
-    Envoy::Extensions::Common::Wasm::wasmDualFilterTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFilterIntegrationTest,
+                         testing::Combine(Common::Wasm::dual_filter_sandbox_runtime_and_cpp_values,
+                                          testing::Values(Http::CodecType::HTTP1,
+                                                          Http::CodecType::HTTP2)),
+                         WasmFilterIntegrationTest::testParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmFilterIntegrationTest);
 
 TEST_P(WasmFilterIntegrationTest, HeadersManipulation) {
@@ -143,8 +167,10 @@ TEST_P(WasmFilterIntegrationTest, HeadersManipulation) {
   Http::TestResponseHeaderMapImpl expected_response_headers{
       {":status", "200"}, {"content-type", "application/json"}, {"test-status", "OK"}};
 
-  runTest(request_headers, "", expected_request_headers, "", upstream_response_headers, "",
-          expected_response_headers, "");
+  auto request_body = std::vector<std::string>{};
+  auto upstream_response_body = std::vector<std::string>{};
+  runTest(request_headers, request_body, expected_request_headers, "", upstream_response_headers,
+          upstream_response_body, expected_response_headers, "");
 }
 
 TEST_P(WasmFilterIntegrationTest, BodyManipulation) {
@@ -164,8 +190,34 @@ TEST_P(WasmFilterIntegrationTest, BodyManipulation) {
 
   Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
 
-  runTest(request_headers, "request_body", expected_request_headers, "replace",
-          upstream_response_headers, "response_body", expected_response_headers, "replace");
+  auto request_body = std::vector<std::string>{{"request_body"}};
+  auto upstream_response_body = std::vector<std::string>{{"upstream_body"}};
+  runTest(request_headers, request_body, expected_request_headers, "replace",
+          upstream_response_headers, upstream_response_body, expected_response_headers, "replace");
+}
+
+TEST_P(WasmFilterIntegrationTest, BodyBufferedManipulation) {
+  setupWasmFilter("", "body");
+  HttpIntegrationTest::initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                 {":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":authority", "host"},
+                                                 {"x-test-operation", "SetEndOfBodies"}};
+
+  Http::TestRequestHeaderMapImpl expected_request_headers{{":path", "/"}};
+
+  Http::TestResponseHeaderMapImpl upstream_response_headers{{":status", "200"},
+                                                            {"x-test-operation", "SetEndOfBodies"}};
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
+
+  auto request_body = std::vector<std::string>{{"request_"}, {"body"}};
+  auto upstream_response_body = std::vector<std::string>{{"upstream_"}, {"body"}};
+  runTest(request_headers, request_body, expected_request_headers, "request_body.0",
+          upstream_response_headers, upstream_response_body, expected_response_headers,
+          "upstream_body.0");
 }
 
 } // namespace
