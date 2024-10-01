@@ -320,8 +320,14 @@ void DnsCacheImpl::forceRefreshHosts() {
     // each host IFF the host is not already refreshing. Cancellation is assumed to be cheap for
     // resolvers.
     if (primary_host.second->active_query_ != nullptr) {
-      primary_host.second->active_query_->cancel(
-          Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
+        absl::MutexLock lock(&primary_host.second->active_query_->lock());
+        primary_host.second->active_query_->cancel(
+            Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      } else {
+        primary_host.second->active_query_->cancel(
+            Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      }
       primary_host.second->active_query_ = nullptr;
       primary_host.second->timeout_timer_->disableTimer();
     }
@@ -346,8 +352,14 @@ void DnsCacheImpl::stop() {
   absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
   for (auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
-      primary_host.second->active_query_->cancel(
-          Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
+        absl::MutexLock lock(&primary_host.second->active_query_->lock());
+        primary_host.second->active_query_->cancel(
+            Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      } else {
+        primary_host.second->active_query_->cancel(
+            Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      }
       primary_host.second->active_query_ = nullptr;
     }
 
