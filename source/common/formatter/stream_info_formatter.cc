@@ -192,7 +192,6 @@ FilterStateFormatter::FilterStateFormatter(absl::string_view key, absl::optional
   if (!field_name.empty()) {
     format_ = FilterStateFormat::Field;
     field_name_ = std::string(field_name);
-    factory_ = Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key);
   } else if (serialize_as_string) {
     format_ = FilterStateFormat::String;
   } else {
@@ -264,14 +263,10 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
 #endif
   }
   case FilterStateFormat::Field: {
-    if (!factory_) {
+    if (!state->hasFieldSupport()) {
       return absl::nullopt;
     }
-    const auto reflection = factory_->reflect(state);
-    if (!reflection) {
-      return absl::nullopt;
-    }
-    auto field_value = reflection->getField(field_name_);
+    auto field_value = state->getField(field_name_);
     auto string_value = absl::visit(StringFieldVisitor(), field_value);
     if (!string_value) {
       return absl::nullopt;
@@ -315,14 +310,10 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
     return SubstitutionFormatUtils::unspecifiedValue();
   }
   case FilterStateFormat::Field: {
-    if (!factory_) {
+    if (!state->hasFieldSupport()) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
-    const auto reflection = factory_->reflect(state);
-    if (!reflection) {
-      return SubstitutionFormatUtils::unspecifiedValue();
-    }
-    auto field_value = reflection->getField(field_name_);
+    auto field_value = state->getField(field_name_);
     auto string_value = absl::visit(StringFieldVisitor(), field_value);
     if (!string_value) {
       return SubstitutionFormatUtils::unspecifiedValue();
