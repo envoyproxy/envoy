@@ -62,7 +62,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
 
   auto credentials_provider =
       config.has_credential_provider()
-          ? Extensions::Common::Aws::createCredentialsProvideFromConfig(
+          ? Extensions::Common::Aws::createCredentialsProviderFromConfig(
                 server_context, region, config.credential_provider())
           : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
                 server_context.api(), makeOptRef(server_context), region,
@@ -127,7 +127,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
 
   auto credentials_provider =
       per_route_config.aws_request_signing().has_credential_provider()
-          ? Extensions::Common::Aws::createCredentialsProvideFromConfig(
+          ? Extensions::Common::Aws::createCredentialsProviderFromConfig(
                 context, region, per_route_config.aws_request_signing().credential_provider())
           : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
                 context.api(), makeOptRef(context), region,

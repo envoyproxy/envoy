@@ -335,6 +335,9 @@ public:
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
 
+  const std::string& tokenForTesting() const { return token_; }
+  const std::string& roleArnForTesting() const { return role_arn_; }
+
 private:
   // token_ and token_file_path_ are mutually exclusive. If token_ is set, token_file_path_ is not
   // used.
@@ -471,10 +474,26 @@ private:
 };
 
 /**
+ * Credential provider based on an inline credential.
+ */
+class InlineCredentialProvider : public CredentialsProvider {
+public:
+  explicit InlineCredentialProvider(absl::string_view access_key_id,
+                                    absl::string_view secret_access_key,
+                                    absl::string_view session_token)
+      : credentials_(access_key_id, secret_access_key, session_token) {}
+
+  Credentials getCredentials() override { return credentials_; }
+
+private:
+  const Credentials credentials_;
+};
+
+/**
  * Create an AWS credentials provider from the proto configuration instead of using the default
  * credentials provider chain.
  */
-CredentialsProviderSharedPtr createCredentialsProvideFromConfig(
+CredentialsProviderSharedPtr createCredentialsProviderFromConfig(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& config);
 

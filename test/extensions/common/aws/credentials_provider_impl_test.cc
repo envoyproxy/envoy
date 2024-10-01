@@ -5,6 +5,8 @@
 #include <ios>
 #include <string>
 
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
@@ -2645,6 +2647,48 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
 
   const Credentials ret_creds = chain.getCredentials();
   EXPECT_EQ(creds, ret_creds);
+}
+
+TEST(CreateCredentialsProviderFromConfig, InlineCredential) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::extensions::common::aws::v3::InlineCredentialProvider inline_credential;
+  inline_credential.set_access_key_id("TestAccessKey");
+  inline_credential.set_secret_access_key("TestSecret");
+  inline_credential.set_session_token("TestSessionToken");
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider base;
+  base.mutable_inline_credential()->CopyFrom(inline_credential);
+
+  CredentialsProviderSharedPtr provider =
+      createCredentialsProviderFromConfig(context, "test-region", base);
+  EXPECT_NE(nullptr, provider);
+  const Credentials creds = provider->getCredentials();
+  EXPECT_EQ("TestAccessKey", creds.accessKeyId().value());
+  EXPECT_EQ("TestSecret", creds.secretAccessKey().value());
+  EXPECT_EQ("TestSessionToken", creds.sessionToken().value());
+}
+
+TEST(CreateCredentialsProviderFromConfig, AssumeRoleWithWebIdentity) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider
+      assume_role_provider;
+  assume_role_provider.set_role_arn("arn:aws:iam::123456789012:role/role-name");
+  assume_role_provider.set_web_identity_token("this-is-a-token");
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider base;
+  base.mutable_assume_role_with_web_identity()->CopyFrom(assume_role_provider);
+
+  CredentialsProviderSharedPtr provider =
+      createCredentialsProviderFromConfig(context, "test-region", base);
+  EXPECT_NE(nullptr, provider);
+
+  const auto* web_identity_provider = dynamic_cast<WebIdentityCredentialsProvider*>(provider.get());
+  EXPECT_NE(nullptr, web_identity_provider);
+
+  const std::string& token = web_identity_provider->tokenForTesting();
+  const std::string& role_arn = web_identity_provider->roleArnForTesting();
+  EXPECT_EQ("this-is-a-token", token);
+  EXPECT_EQ("arn:aws:iam::123456789012:role/role-name", role_arn);
 }
 
 } // namespace Aws

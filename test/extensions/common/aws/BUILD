@@ -120,6 +120,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
 

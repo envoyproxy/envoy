@@ -53,6 +53,80 @@ match_excluded_headers:
   cb(filter_callbacks);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_inline) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+credential_provider:
+  inline_credential:
+    access_key_id: access_key
+    secret_access_key: secret_key
+    session_token: session_token
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  auto* credential_provider =
+      expected_config.mutable_credential_provider()->mutable_inline_credential();
+  credential_provider->set_access_key_id("access_key");
+  credential_provider->set_secret_access_key("secret_key");
+  credential_provider->set_session_token("session_token");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_assume_role_web_identity) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+credential_provider:
+  assume_role_with_web_identity:
+    web_identity_token: this-is-token
+    role_arn: arn:aws:iam::123456789012:role/role-name
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  auto credential_provider =
+      expected_config.mutable_credential_provider()->mutable_assume_role_with_web_identity();
+  credential_provider->set_web_identity_token("this-is-token");
+  credential_provider->set_role_arn("arn:aws:iam::123456789012:role/role-name");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigExplicitSigningAlgorithm) {
   const std::string yaml = R"EOF(
 service_name: s3
