@@ -64,3 +64,13 @@ envoy_cc_library(
         "@com_google_absl//absl/strings",
     ],
 )
+
+envoy_cc_library(
+    name = "json_utility_lib",
+    srcs = ["json_utility.cc"],
+    hdrs = ["json_utility.h"],
+    deps = [
+        ":json_streamer_lib",
+        "//source/common/protobuf:utility_lib_header",
+    ],
+)
