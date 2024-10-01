@@ -10,7 +10,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/documentation_url.h"
 #include "source/common/common/fmt.h"
-#include "source/common/json/json_streamer.h"
 #include "source/common/protobuf/deterministic_hash.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
