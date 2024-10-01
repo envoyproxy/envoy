@@ -15,11 +15,9 @@ namespace {
 
 // Creates a CFURLRef from a C++ string URL.
 CFURLRef createCFURL(const std::string& url_string) {
-  auto cf_url_string =
-      CFStringCreateWithCString(kCFAllocatorDefault, url_string.c_str(), kCFStringEncodingUTF8);
-  auto cf_url = CFURLCreateWithString(kCFAllocatorDefault, cf_url_string, /*baseURL=*/nullptr);
-  CFRelease(cf_url_string);
-  return cf_url;
+  return CFURLCreateWithBytes(kCFAllocatorDefault,
+                              reinterpret_cast<const UInt8*>(url_string.c_str()),
+                              url_string.length(), kCFStringEncodingUTF8, nullptr);
 }
 
 } // namespace
@@ -80,10 +78,13 @@ ApplePacProxyResolver::createPacUrlResolverSource(CFURLRef cf_proxy_autoconfigur
 }
 
 void ApplePacProxyResolver::resolveProxies(
-    const std::string& target_url, const std::string& proxy_autoconfiguration_file_url,
+    const std::string& proxy_autoconfiguration_file_url, const std::string& target_url,
     ProxySettingsResolvedCallback proxy_resolution_completed) {
   CFURLRef cf_target_url = createCFURL(target_url);
   CFURLRef cf_proxy_autoconfiguration_file_url = createCFURL(proxy_autoconfiguration_file_url);
+  if (cf_target_url == nullptr || cf_proxy_autoconfiguration_file_url == nullptr) {
+    return;
+  }
 
   std::unique_ptr<ProxySettingsResolvedCallback> completion_callback =
       std::make_unique<ProxySettingsResolvedCallback>(std::move(proxy_resolution_completed));
