@@ -90,15 +90,16 @@ on:
         type: string
         default: |
           - run: |
-              echo "disk space at beginning of build:"
-              df -h
+              # disk space at beginning of build
+              df -h > "${TMP_REPORT}/df-pre"
             shell: bash
       report-post:
         type: string
         default: |
           - run: |
-              echo "disk space at end of build:"
-              df -h
+              # disk space at end of build
+              df -h > "${TMP_REPORT}/df-post"
+              (du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :) > "${TMP_REPORT}/du-post"
             shell: bash
       request:
         type: string
@@ -123,15 +124,15 @@ on:
         type: string
       steps-post:
         type: string
-        default: |
-          - run: |
-              du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :
-            shell: bash
       steps-post-name:
         type: string
       target:
         type: string
         required: true
+      target-name:
+        type: string
+      target-suffix:
+        type: string
       temp-dir:
         type: string
       timeout-minutes:
@@ -173,10 +174,10 @@ jobs:
       packages: read
     if: ${{ ! inputs.skip }}
     runs-on: ${{ inputs.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu }}
-    name: ${{ inputs.command }} ${{ inputs.target }}
+    name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.35
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.36
       id: started
       name: Create timestamp
       with:
@@ -184,7 +185,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.35
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.36
       name: Context
       id: context
       with:
@@ -205,12 +206,12 @@ jobs:
           | . * {$config, $check}
     - if: ${{ inputs.cache-build-image }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.2.35
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.2.36
       with:
         image_tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.35
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.36
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -221,7 +222,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.35
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.36
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -238,7 +239,7 @@ jobs:
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.35
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.36
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -247,7 +248,7 @@ jobs:
         ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
 
     - name: Import GPG key
-      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.2.35
+      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.2.36
       if: ${{ inputs.import-gpg }}
       with:
         key: ${{ secrets.gpg-key }}
@@ -280,7 +281,7 @@ jobs:
         echo "BAZEL_BUILD_EXTRA_OPTIONS=${BAZEL_BUILD_EXTRA_OPTIONS}" >> "$GITHUB_ENV"
         echo "GCP_SERVICE_ACCOUNT_KEY_PATH=${GCP_SERVICE_ACCOUNT_KEY_PATH}" >> "$GITHUB_ENV"
 
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.35
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.36
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}
@@ -297,6 +298,11 @@ jobs:
         fail-match: ${{ inputs.fail-match }}
         notice-match: ${{ inputs.notice-match }}
         output-path: ${{ inputs.output-path }}
+        report-name: >-
+          ci-report-${{
+            inputs.target-suffix
+            && format('{0}-', inputs.target-suffix)
+            || '' }}${{ inputs.target-name || inputs.target }}.json
         report-pre: ${{ inputs.report-pre }}
         report-post: ${{ inputs.report-post }}
         source: ${{ inputs.source }}
