@@ -17,7 +17,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
-        "//source/common/protobuf:utility_lib_header",
+        "//source/common/protobuf:utility_lib",
         "@com_github_nlohmann_json//:json",
     ],
 )
