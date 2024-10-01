@@ -141,18 +141,24 @@ TEST_F(GetAddrInfoDnsImplTest, Cancel) {
       "localhost", DnsLookupFamily::All,
       [](DnsResolver::ResolutionStatus, absl::string_view, std::list<DnsResponse>&&) { FAIL(); });
 
-  query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
+  {
+    absl::MutexLock lock(&query->lock());
+    query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
+  }
 
   active_dns_query_ = resolver_->resolve(
       "localhost", DnsLookupFamily::All,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
         verifyRealGaiResponse(status, std::move(response));
-        EXPECT_THAT(active_dns_query_->getTraces(),
-                    ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Success),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
+        {
+          absl::MutexLock lock(&active_dns_query_->lock());
+          EXPECT_THAT(active_dns_query_->getTraces(),
+                      ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Success),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
+        }
         dispatcher_->exit();
       });
 
@@ -173,12 +179,14 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
         EXPECT_EQ("Non-recoverable failure in name resolution", details);
         EXPECT_TRUE(response.empty());
-        EXPECT_THAT(active_dns_query_->getTraces(),
-                    ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Failed),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
-
+        {
+          absl::MutexLock lock(&active_dns_query_->lock());
+          EXPECT_THAT(active_dns_query_->getTraces(),
+                      ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Failed),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
+        }
         dispatcher_->exit();
       });
 
@@ -198,12 +206,14 @@ TEST_F(GetAddrInfoDnsImplTest, NoData) {
              std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_TRUE(response.empty());
-        EXPECT_THAT(active_dns_query_->getTraces(),
-                    ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::NoResult),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
-
+        {
+          absl::MutexLock lock(&active_dns_query_->lock());
+          EXPECT_THAT(active_dns_query_->getTraces(),
+                      ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::NoResult),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
+        }
         dispatcher_->exit();
       });
 
@@ -223,12 +233,14 @@ TEST_F(GetAddrInfoDnsImplTest, NoName) {
              std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_TRUE(response.empty());
-        EXPECT_THAT(active_dns_query_->getTraces(),
-                    ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::NoResult),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
-
+        {
+          absl::MutexLock lock(&active_dns_query_->lock());
+          EXPECT_THAT(active_dns_query_->getTraces(),
+                      ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::NoResult),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
+        }
         dispatcher_->exit();
       });
 
@@ -305,18 +317,20 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccess) {
              std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_TRUE(response.empty());
-        EXPECT_THAT(active_dns_query_->getTraces(),
-                    ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Success),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
-
+        {
+          absl::MutexLock lock(&active_dns_query_->lock());
+          EXPECT_THAT(active_dns_query_->getTraces(),
+                      ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Success),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
+        }
         dispatcher_->exit();
       });
 
@@ -345,18 +359,20 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailure) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
         EXPECT_FALSE(details.empty());
         EXPECT_TRUE(response.empty());
-        EXPECT_THAT(active_dns_query_->getTraces(),
-                    ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Starting),
-                                static_cast<uint8_t>(GetAddrInfoTrace::DoneRetrying),
-                                static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
-
+        {
+          absl::MutexLock lock(&active_dns_query_->lock());
+          EXPECT_THAT(active_dns_query_->getTraces(),
+                      ElementsAre(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Retrying),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Starting),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::DoneRetrying),
+                                  static_cast<uint8_t>(GetAddrInfoTrace::Callback)));
+        }
         dispatcher_->exit();
       });
 
