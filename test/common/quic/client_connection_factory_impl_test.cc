@@ -146,7 +146,7 @@ TEST_P(QuicNetworkConnectionTest, PreBindSocketOptionsFailure) {
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
       socket_options, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
@@ -168,7 +168,7 @@ TEST_P(QuicNetworkConnectionTest, PostBindSocketOptionsFailure) {
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
       socket_options, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
@@ -219,7 +219,7 @@ TEST_P(QuicNetworkConnectionTest, GetV6OnlySocketOptionFailure) {
       .WillOnce(Return(Api::SysCallIntResult{-1, SOCKET_ERROR_NOT_SUP}));
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
       nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
