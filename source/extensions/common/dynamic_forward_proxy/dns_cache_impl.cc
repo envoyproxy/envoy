@@ -49,8 +49,7 @@ DnsCacheImpl::DnsCacheImpl(
       file_system_(context.serverFactoryContext().api().fileSystem()),
       validation_visitor_(context.messageValidationVisitor()),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
-      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)),
-      runtime_(context.serverFactoryContext().runtime()) {
+      max_hosts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_hosts, 1024)) {
   tls_slot_.set([&](Event::Dispatcher&) { return std::make_shared<ThreadLocalHostInfo>(*this); });
 
   loadCacheEntries(config);
@@ -67,13 +66,21 @@ DnsCacheImpl::DnsCacheImpl(
     ENVOY_LOG(debug, "DNS pre-resolve starting for host {}", host);
     startCacheLoad(host, hostname.port_value(), false, false);
   }
+  enable_dfp_dns_trace_ = context.serverFactoryContext().runtime().snapshot().getBoolean(
+      "envoy.enable_dfp_dns_trace", false);
 }
 
 DnsCacheImpl::~DnsCacheImpl() {
   for (const auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
-      primary_host.second->active_query_->cancel(
-          Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      if (enable_dfp_dns_trace_) {
+        absl::MutexLock lock(&primary_host.second->active_query_->lock());
+        primary_host.second->active_query_->cancel(
+            Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      } else {
+        primary_host.second->active_query_->cancel(
+            Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      }
     }
   }
 
@@ -320,7 +327,7 @@ void DnsCacheImpl::forceRefreshHosts() {
     // each host IFF the host is not already refreshing. Cancellation is assumed to be cheap for
     // resolvers.
     if (primary_host.second->active_query_ != nullptr) {
-      if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
+      if (enable_dfp_dns_trace_) {
         absl::MutexLock lock(&primary_host.second->active_query_->lock());
         primary_host.second->active_query_->cancel(
             Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
@@ -352,7 +359,7 @@ void DnsCacheImpl::stop() {
   absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
   for (auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
-      if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
+      if (enable_dfp_dns_trace_) {
         absl::MutexLock lock(&primary_host.second->active_query_->lock());
         primary_host.second->active_query_->cancel(
             Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
@@ -431,7 +438,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   std::string details_with_maybe_trace = std::string(details);
   if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
-    if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
+    if (enable_dfp_dns_trace_) {
       // It is important to cancel and create the trace string atomically because some DNS resolver
       // implementation, such as `getaddrinfo` will delete the `ActiveQuery` after being cancelled.
       absl::MutexLock lock(&primary_host_info->active_query_->lock());
