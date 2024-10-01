@@ -98,7 +98,7 @@ TEST_P(QuicNetworkConnectionTest, BufferLimits) {
   initialize();
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(), nullptr,
       nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
@@ -125,7 +125,7 @@ TEST_P(QuicNetworkConnectionTest, SocketOptions) {
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
       socket_options, nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
@@ -142,7 +142,7 @@ TEST_P(QuicNetworkConnectionTest, LocalAddress) {
           : Network::Utility::getCanonicalIpv4LoopbackAddress();
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       *quic_info_, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, local_addr, quic_stat_names_, {}, *store_.rootScope(), nullptr,
       nullptr, connection_id_generator_, *factory_);
   EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
@@ -164,7 +164,7 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       info, crypto_config_,
-      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT},
       dispatcher_, test_address_, test_address_, quic_stat_names_, rtt_cache, *store_.rootScope(),
       nullptr, nullptr, connection_id_generator_, *factory_);
 
