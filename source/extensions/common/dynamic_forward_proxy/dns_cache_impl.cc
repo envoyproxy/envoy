@@ -422,10 +422,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   std::string details_with_maybe_trace = std::string(details);
   if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
-    absl::MutexLock lock(&primary_host_info->active_query_->lock());
     if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
       // It is important to cancel and create the trace string atomically because some DNS resolver
       // implementation, such as `getaddrinfo` will delete the `ActiveQuery` after being cancelled.
+      absl::MutexLock lock(&primary_host_info->active_query_->lock());
       if (is_timeout) {
         primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
       }
