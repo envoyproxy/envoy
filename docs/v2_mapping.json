@@ -153,4 +153,3 @@
   "envoy/type/metadata/v3/metadata.proto": "envoy/type/metadata/v2/metadata.proto",
   "envoy/type/tracing/v3/custom_tag.proto": "envoy/type/tracing/v2/custom_tag.proto"
 }
-
