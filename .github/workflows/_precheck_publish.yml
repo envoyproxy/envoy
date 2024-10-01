@@ -39,6 +39,7 @@ jobs:
         error:
         Error:
       target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.target-suffix }}
       trusted: ${{ inputs.trusted }}
     strategy:
       fail-fast: false
@@ -46,10 +47,12 @@ jobs:
         include:
         - target: release.test_only
           name: Release (x64)
+          target-suffix: x64
           arch: x64
           rbe: true
         - target: release.test_only
           name: Release (arm64)
+          target-suffix: arm64
           arch: arm64
           bazel-extra: >-
             --config=common-envoy-engflow
