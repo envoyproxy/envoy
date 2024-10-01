@@ -54,5 +54,95 @@ const re2::RE2& SubstitutionFormatParser::commandWithArgsRegex() {
   // clang-format on
 }
 
+JsonFormatBuilder::FormatElements
+JsonFormatBuilder::fromStruct(const ProtobufWkt::Struct& struct_format) {
+  elements_.clear();
+
+  // This call will iterate through the map tree and serialize the key/values as JSON.
+  // If a string value that contains a substitution commands is found, the current
+  // JSON piece and the substitution command will be pushed into the output list.
+  // After that, the iteration will continue until the whole tree is traversed.
+  formatValueToFormatElements(struct_format.fields());
+  elements_.push_back(FormatElement{std::move(buffer_), false});
+  buffer_.clear();
+
+  return std::move(elements_);
+};
+
+void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& value) {
+  switch (value.kind_case()) {
+  case ProtobufWkt::Value::KIND_NOT_SET:
+  case ProtobufWkt::Value::kNullValue:
+    serializer_.addNull();
+    break;
+  case ProtobufWkt::Value::kNumberValue:
+    serializer_.addNumber(value.number_value());
+    break;
+  case ProtobufWkt::Value::kStringValue: {
+    absl::string_view string_format = value.string_value();
+    if (!absl::StrContains(string_format, '%')) {
+      serializer_.addString(string_format);
+      break;
+    }
+
+    // The string contains a formatter, we need to push the current exist JSON piece
+    // into the output list first.
+    elements_.push_back(FormatElement{std::move(buffer_), false});
+    buffer_.clear();
+
+    // Now a formatter is coming, we need to push the current raw string into
+    // the output list.
+    elements_.push_back(FormatElement{std::string(string_format), true});
+    break;
+  }
+  case ProtobufWkt::Value::kBoolValue:
+    serializer_.addBool(value.bool_value());
+    break;
+  case ProtobufWkt::Value::kStructValue: {
+    formatValueToFormatElements(value.struct_value().fields());
+    break;
+  case ProtobufWkt::Value::kListValue:
+    formatValueToFormatElements(value.list_value().values());
+    break;
+  }
+  }
+}
+
+void JsonFormatBuilder::formatValueToFormatElements(const ProtoList& list_value) {
+  serializer_.addArrayBeginDelimiter(); // Delimiter to start list.
+  for (int i = 0; i < list_value.size(); ++i) {
+    if (i > 0) {
+      serializer_.addElementsDelimiter(); // Delimiter to separate list elements.
+    }
+    formatValueToFormatElements(list_value[i]);
+  }
+  serializer_.addArrayEndDelimiter(); // Delimiter to end list.
+}
+
+void JsonFormatBuilder::formatValueToFormatElements(const ProtoDict& dict_value) {
+  std::vector<std::pair<absl::string_view, ProtoDict::const_iterator>> sorted_fields;
+  sorted_fields.reserve(dict_value.size());
+
+  for (auto it = dict_value.begin(); it != dict_value.end(); ++it) {
+    sorted_fields.push_back({it->first, it});
+  }
+
+  // Sort the keys to make the output deterministic.
+  std::sort(sorted_fields.begin(), sorted_fields.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+
+  serializer_.addMapBeginDelimiter(); // Delimiter to start map.
+  for (size_t i = 0; i < sorted_fields.size(); ++i) {
+    if (i > 0) {
+      serializer_.addElementsDelimiter(); // Delimiter to separate map elements.
+    }
+    // Add the key.
+    serializer_.addString(sorted_fields[i].first);
+    serializer_.addKeyValueDelimiter(); // Delimiter to separate key and value.
+    formatValueToFormatElements(sorted_fields[i].second->second);
+  }
+  serializer_.addMapEndDelimiter(); // Delimiter to end map.
+}
+
 } // namespace Formatter
 } // namespace Envoy
