@@ -13,14 +13,13 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/common/c_smart_ptr.h"
+#include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/san_matcher.h"
 #include "source/common/tls/stats.h"
-
 
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -49,14 +48,11 @@ public:
   SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context)
       : tls_(ThreadLocal::TypedSlot<ThreadLocalSpiffeState>::makeUnique(context.threadLocal())),
         spiffe_data_(std::make_shared<SpiffeData>()),
-        main_thread_dispatcher_(context.mainThreadDispatcher()),
-        stats_(stats),
+        main_thread_dispatcher_(context.mainThreadDispatcher()), stats_(stats),
         time_source_(context.timeSource()) {
-            tls_->set([](Event::Dispatcher&) {
-              return std::make_shared<ThreadLocalSpiffeState>();
-            });
-            updateSpiffeData(spiffe_data_);
-        };
+    tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalSpiffeState>(); });
+    updateSpiffeData(spiffe_data_);
+  };
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                   Server::Configuration::CommonFactoryContext& context);
 
@@ -86,11 +82,8 @@ public:
   X509_STORE* getTrustBundleStore(X509* leaf_cert);
   static std::string extractTrustDomain(const std::string& san);
   static bool certificatePrecheck(X509* leaf_cert);
-  std::shared_ptr<SpiffeData> getSpiffeData() {
-    return spiffe_data_;
-  };
+  std::shared_ptr<SpiffeData> getSpiffeData() { return spiffe_data_; };
   bool matchSubjectAltName(X509& leaf_cert);
-
 
 private:
   bool verifyCertChainUsingTrustBundleStore(X509& leaf_cert, STACK_OF(X509)* cert_chain,
@@ -102,37 +95,34 @@ private:
 
   class ThreadLocalSpiffeState : public Envoy::ThreadLocal::ThreadLocalObject {
   public:
-      std::shared_ptr<SpiffeData> getSpiffeData() const { return spiffe_data_; }
-      void updateSpiffeData(std::shared_ptr<SpiffeData> new_data) {
-        ENVOY_LOG(debug, "updating spiffe data");
-        spiffe_data_ = new_data;
-      }
+    std::shared_ptr<SpiffeData> getSpiffeData() const { return spiffe_data_; }
+    void updateSpiffeData(std::shared_ptr<SpiffeData> new_data) {
+      ENVOY_LOG(debug, "updating spiffe data");
+      spiffe_data_ = new_data;
+    }
 
   private:
-      std::shared_ptr<SpiffeData> spiffe_data_;
+    std::shared_ptr<SpiffeData> spiffe_data_;
   };
 
   void updateSpiffeDataAsync(std::shared_ptr<SpiffeData> new_spiffe_data) {
     ENVOY_LOG(debug, "Posting new SPIFFE data update to main thread dispatcher");
     main_thread_dispatcher_.post([this, new_spiffe_data]() {
-        ENVOY_LOG(debug, "Updating spiffe_data_ for all threads");
-        tls_->runOnAllThreads([new_spiffe_data](OptRef<ThreadLocalSpiffeState> obj) {
-            ENVOY_LOG(debug, "loading new spiffe data");
-            obj->updateSpiffeData(new_spiffe_data);
-        });
+      ENVOY_LOG(debug, "Updating spiffe_data_ for all threads");
+      tls_->runOnAllThreads([new_spiffe_data](OptRef<ThreadLocalSpiffeState> obj) {
+        ENVOY_LOG(debug, "loading new spiffe data");
+        obj->updateSpiffeData(new_spiffe_data);
+      });
     });
   };
 
   void updateSpiffeData(std::shared_ptr<SpiffeData> new_spiffe_data) {
     tls_->runOnAllThreads(
         [new_spiffe_data](OptRef<ThreadLocalSpiffeState> obj) {
-            ENVOY_LOG(debug, "loading new spiffe data");
-            obj->updateSpiffeData(new_spiffe_data);
+          ENVOY_LOG(debug, "loading new spiffe data");
+          obj->updateSpiffeData(new_spiffe_data);
         },
-        []() {
-            ENVOY_LOG(debug, "SPIFFE data update completed on all threads");
-        }
-    );
+        []() { ENVOY_LOG(debug, "SPIFFE data update completed on all threads"); });
   }
 
   bool allow_expired_certificate_{false};

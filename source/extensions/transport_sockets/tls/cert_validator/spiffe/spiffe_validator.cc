@@ -11,11 +11,11 @@
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
-#include "source/common/config/datasource.h"
-#include "source/common/json/json_loader.h"
 #include "source/common/common/base64.h"
-#include "source/common/config/utility.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/datasource.h"
+#include "source/common/config/utility.h"
+#include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/factory.h"
@@ -34,140 +34,150 @@ namespace Tls {
 using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertValidatorConfig;
 
 std::shared_ptr<SpiffeData> SPIFFEValidator::loadTrustBundles() {
-    std::ifstream file(trust_bundle_file_name_);
-    if (file.fail()) {
-      ENVOY_LOG(error, "Failed to open SPIFFE bundle map file '{}'", trust_bundle_file_name_);
-      return nullptr;
+  std::ifstream file(trust_bundle_file_name_);
+  if (file.fail()) {
+    ENVOY_LOG(error, "Failed to open SPIFFE bundle map file '{}'", trust_bundle_file_name_);
+    return nullptr;
+  }
+
+  std::stringstream file_string;
+  file_string << file.rdbuf();
+
+  Json::ObjectSharedPtr parsed_json_bundle;
+  try {
+    parsed_json_bundle = Envoy::Json::Factory::loadFromString(file_string.str());
+  } catch (const Json::Exception& jsonEx) {
+    ENVOY_LOG(error, "Failed to parse SPIFFE bundle map JSON in file '{}'",
+              trust_bundle_file_name_);
+    return nullptr;
+  }
+
+  std::shared_ptr<SpiffeData> spiffeDataPtr = std::make_shared<SpiffeData>();
+  if (!spiffeDataPtr) {
+    ENVOY_LOG(error, "Failed to allocate SPIFFE data");
+    return nullptr;
+  }
+
+  const auto trust_domains = parsed_json_bundle->getObject("trust_domains");
+
+  if (!trust_domains || trust_domains->empty()) {
+    ENVOY_LOG(error, "No trust domains found in SPIFFE bundle map '{}'", trust_bundle_file_name_);
+    return nullptr;
+  }
+
+  bool error = false;
+
+  trust_domains->iterate([&](const std::string& domain_name,
+                             const Envoy::Json::Object& domain_object) -> bool {
+    if (spiffeDataPtr->trust_bundle_stores.find(domain_name) !=
+        spiffeDataPtr->trust_bundle_stores.end()) {
+      ENVOY_LOG(warn, "Duplicate domain in SPIFFE bundle map '{}'", trust_bundle_file_name_);
+    } else {
+      spiffeDataPtr->trust_bundle_stores[domain_name] = X509StorePtr(X509_STORE_new());
     }
 
-    std::stringstream file_string;
-    file_string << file.rdbuf();
+    ENVOY_LOG(info, "Loading domain '{}' from SPIFFE bundle map '{}'", domain_name,
+              trust_bundle_file_name_);
 
-    Json::ObjectSharedPtr parsed_json_bundle;
-    try {
-        parsed_json_bundle = Envoy::Json::Factory::loadFromString(file_string.str());
-    } catch (const Json::Exception& jsonEx) {
-        ENVOY_LOG(error, "Failed to parse SPIFFE bundle map JSON in file '{}'", trust_bundle_file_name_);
-        return nullptr;
+    const auto keys = domain_object.getObjectArray("keys");
+
+    if (keys.empty()) {
+      ENVOY_LOG(error, "No keys found in SPIFFE bundle for domain '{}'", domain_name);
+      error = true;
+      return false;
     }
 
-    std::shared_ptr<SpiffeData> spiffeDataPtr = std::make_shared<SpiffeData>();
-    if (!spiffeDataPtr) {
-        ENVOY_LOG(error, "Failed to allocate SPIFFE data");
-        return nullptr;
-    }
+    ENVOY_LOG(info, "Found '{}' keys for domain '{}'", keys.size(), domain_name);
 
-    const auto trust_domains = parsed_json_bundle->getObject("trust_domains");
-
-    if (!trust_domains || trust_domains->empty()) {
-        ENVOY_LOG(error, "No trust domains found in SPIFFE bundle map '{}'", trust_bundle_file_name_);
-        return nullptr;
-    }
-
-    bool error = false;
-
-    trust_domains->iterate([&](const std::string& domain_name, const Envoy::Json::Object& domain_object) -> bool {
-        if (spiffeDataPtr->trust_bundle_stores.find(domain_name) != spiffeDataPtr->trust_bundle_stores.end()) {
-            ENVOY_LOG(warn, "Duplicate domain in SPIFFE bundle map '{}'", trust_bundle_file_name_);
-        } else {
-            spiffeDataPtr->trust_bundle_stores[domain_name] = X509StorePtr(X509_STORE_new());
-        }
-
-        ENVOY_LOG(info, "Loading domain '{}' from SPIFFE bundle map '{}'", domain_name, trust_bundle_file_name_);
-
-        const auto keys = domain_object.getObjectArray("keys");
-
-        if (keys.empty()) {
-            ENVOY_LOG(error, "No keys found in SPIFFE bundle for domain '{}'", domain_name);
+    for (const auto& key : keys) {
+      if (key->getString("use") == "x509-svid") {
+        const auto& certs = key->getStringArray("x5c");
+        for (const auto& cert : certs) {
+          std::string decoded_cert = Envoy::Base64::decode(cert);
+          if (decoded_cert.empty()) {
+            ENVOY_LOG(error, "Empty cert decoded in '{}'", trust_bundle_file_name_);
             error = true;
             return false;
-        }
+          }
 
-        ENVOY_LOG(info, "Found '{}' keys for domain '{}'", keys.size(), domain_name);
+          const unsigned char* cert_data =
+              reinterpret_cast<const unsigned char*>(decoded_cert.data());
+          bssl::UniquePtr<X509> x509(d2i_X509(nullptr, &cert_data, decoded_cert.size()));
+          if (!x509) {
+            ENVOY_LOG(error, "Failed to create x509 object while loading '{}'",
+                      trust_bundle_file_name_);
+            error = true;
+            return false;
+          }
 
-        for (const auto& key : keys) {
-            if (key->getString("use") == "x509-svid") {
-                const auto& certs = key->getStringArray("x5c");
-                for (const auto& cert : certs) {
-                    std::string decoded_cert = Envoy::Base64::decode(cert);
-                    if (decoded_cert.empty()) {
-                        ENVOY_LOG(error, "Empty cert decoded in '{}'", trust_bundle_file_name_);
-                        error = true;
-                        return false;
-                    }
+          STACK_OF(GENERAL_NAME)* san_names = static_cast<STACK_OF(GENERAL_NAME)*>(
+              X509_get_ext_d2i(x509.get(), NID_subject_alt_name, nullptr, nullptr));
+          if (san_names != nullptr) {
+            for (size_t i = 0; i < sk_GENERAL_NAME_num(san_names); i++) {
+              const GENERAL_NAME* current_name = sk_GENERAL_NAME_value(san_names, i);
+              if (current_name->type == GEN_URI) {
+                const char* uri = reinterpret_cast<const char*>(
+                    ASN1_STRING_get0_data(current_name->d.uniformResourceIdentifier));
+                if (absl::StartsWith(uri, "spiffe://")) {
+                  std::string san_string(uri);
+                  const std::string& san_domain = extractTrustDomain(san_string);
+                  if (domain_name != san_domain) {
+                    ENVOY_LOG(error, "Domain specified in bundle '{}' and in SAN '{}' do not match",
+                              domain_name, san_domain);
+                    error = true;
+                    return false;
+                  }
 
-                    const unsigned char* cert_data = reinterpret_cast<const unsigned char*>(decoded_cert.data());
-                    bssl::UniquePtr<X509> x509(d2i_X509(nullptr, &cert_data, decoded_cert.size()));
-                    if (!x509) {
-                        ENVOY_LOG(error, "Failed to create x509 object while loading '{}'", trust_bundle_file_name_);
-                        error = true;
-                        return false;
-                    }
-
-                    STACK_OF(GENERAL_NAME) *san_names = static_cast<STACK_OF(GENERAL_NAME)*>(X509_get_ext_d2i(x509.get(), NID_subject_alt_name, nullptr, nullptr));
-                    if (san_names != nullptr) {
-                        for (size_t i = 0; i < sk_GENERAL_NAME_num(san_names); i++) {
-                            const GENERAL_NAME *current_name = sk_GENERAL_NAME_value(san_names, i);
-                            if (current_name->type == GEN_URI) {
-                                const char *uri = reinterpret_cast<const char*>(ASN1_STRING_get0_data(current_name->d.uniformResourceIdentifier));
-                                if (absl::StartsWith(uri, "spiffe://")) {
-                                    std::string san_string(uri);
-                                    const std::string& san_domain = extractTrustDomain(san_string);
-                                    if (domain_name != san_domain) {
-                                        ENVOY_LOG(error, "Domain specified in bundle '{}' and in SAN '{}' do not match", domain_name, san_domain);
-                                        error = true;
-                                        return false;
-                                    }
-
-                                    if (X509_STORE_add_cert(spiffeDataPtr->trust_bundle_stores[domain_name].get(), x509.get()) != 1) {
-                                        ENVOY_LOG(error, "Failed to add x509 object while loading '{}'", trust_bundle_file_name_);
-                                        error = true;
-                                        return false;
-                                    }
-                                    X509_up_ref(x509.get());
-                                    spiffeDataPtr->ca_certs.push_back(std::move(x509));
-                                    break;
-                                }
-                            }
-                        }
-                        sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
-                    }
+                  if (X509_STORE_add_cert(spiffeDataPtr->trust_bundle_stores[domain_name].get(),
+                                          x509.get()) != 1) {
+                    ENVOY_LOG(error, "Failed to add x509 object while loading '{}'",
+                              trust_bundle_file_name_);
+                    error = true;
+                    return false;
+                  }
+                  X509_up_ref(x509.get());
+                  spiffeDataPtr->ca_certs.push_back(std::move(x509));
+                  break;
                 }
+              }
             }
+            sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
+          }
         }
-
-        return true;
-    });
-
-    if (error) {
-        return nullptr;
+      }
     }
 
-    ENVOY_LOG(info, "Successfully loaded SPIFFE bundle map from file '{}'", trust_bundle_file_name_);
-    return spiffeDataPtr;
+    return true;
+  });
+
+  if (error) {
+    return nullptr;
+  }
+
+  ENVOY_LOG(info, "Successfully loaded SPIFFE bundle map from file '{}'", trust_bundle_file_name_);
+  return spiffeDataPtr;
 }
 
-void SPIFFEValidator::initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context) {
-    file_watcher_ = context.mainThreadDispatcher().createFilesystemWatcher();
-    THROW_IF_NOT_OK(
-        file_watcher_->addWatch(trust_bundle_file_name_, Filesystem::Watcher::Events::Modified, [this](uint32_t) {
-            ENVOY_LOG(info, "Updating SPIFFE bundle map from file '{}'", trust_bundle_file_name_);
-            if (auto new_trust_bundle = loadTrustBundles()) {
-                updateSpiffeDataAsync(new_trust_bundle);
-            } else {
-                ENVOY_LOG(error, "Failed to load SPIFFE bundle map from '{}'", trust_bundle_file_name_);
-            }
-            return absl::OkStatus();
-        })
-    );
+void SPIFFEValidator::initializeCertificateRefresh(
+    Server::Configuration::CommonFactoryContext& context) {
+  file_watcher_ = context.mainThreadDispatcher().createFilesystemWatcher();
+  THROW_IF_NOT_OK(file_watcher_->addWatch(
+      trust_bundle_file_name_, Filesystem::Watcher::Events::Modified, [this](uint32_t) {
+        ENVOY_LOG(info, "Updating SPIFFE bundle map from file '{}'", trust_bundle_file_name_);
+        if (auto new_trust_bundle = loadTrustBundles()) {
+          updateSpiffeDataAsync(new_trust_bundle);
+        } else {
+          ENVOY_LOG(error, "Failed to load SPIFFE bundle map from '{}'", trust_bundle_file_name_);
+        }
+        return absl::OkStatus();
+      }));
 }
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                  SslStats& stats,
                                  Server::Configuration::CommonFactoryContext& context)
     : tls_(ThreadLocal::TypedSlot<ThreadLocalSpiffeState>::makeUnique(context.threadLocal())),
-      main_thread_dispatcher_(context.mainThreadDispatcher()),
-      stats_(stats),
+      main_thread_dispatcher_(context.mainThreadDispatcher()), stats_(stats),
       time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
@@ -191,9 +201,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
   const auto n_trust_domains = message.trust_domains().size();
 
-  tls_->set([](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalSpiffeState>();
-  });
+  tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalSpiffeState>(); });
 
   // If a trust bundle map is provided, use that...
   if (message.has_trust_bundles()) {
@@ -215,7 +223,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   spiffe_data_ = std::make_shared<SpiffeData>();
   spiffe_data_->trust_bundle_stores.reserve(n_trust_domains);
   for (auto& domain : message.trust_domains()) {
-    if (spiffe_data_->trust_bundle_stores.find(domain.name()) != spiffe_data_->trust_bundle_stores.end()) {
+    if (spiffe_data_->trust_bundle_stores.find(domain.name()) !=
+        spiffe_data_->trust_bundle_stores.end()) {
       throw EnvoyException(absl::StrCat(
           "Multiple trust bundles are given for one trust domain for ", domain.name()));
     }
@@ -401,7 +410,8 @@ X509_STORE* SPIFFEValidator::getTrustBundleStore(X509* leaf_cert) {
 
   auto spiffe_data = tls_->get()->getSpiffeData();
   auto target_store = spiffe_data->trust_bundle_stores.find(trust_domain);
-  return target_store != spiffe_data->trust_bundle_stores.end() ? target_store->second.get() : nullptr;
+  return target_store != spiffe_data->trust_bundle_stores.end() ? target_store->second.get()
+                                                                : nullptr;
 }
 
 bool SPIFFEValidator::certificatePrecheck(X509* leaf_cert) {

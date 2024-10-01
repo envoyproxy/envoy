@@ -229,7 +229,8 @@ TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
   EXPECT_FALSE(validator().getTrustBundleStore(cert.get()));
 
   // Trust bundle provided.
-  validator().getSpiffeData()->trust_bundle_stores.emplace("example.com", X509StorePtr(X509_STORE_new()));
+  validator().getSpiffeData()->trust_bundle_stores.emplace("example.com",
+                                                           X509StorePtr(X509_STORE_new()));
   EXPECT_TRUE(validator().getTrustBundleStore(cert.get()));
 }
 
