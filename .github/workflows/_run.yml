@@ -90,15 +90,16 @@ on:
         type: string
         default: |
           - run: |
-              echo "disk space at beginning of build:"
-              df -h
+              # disk space at beginning of build
+              df -h > "${TMP_REPORT}/df-pre"
             shell: bash
       report-post:
         type: string
         default: |
           - run: |
-              echo "disk space at end of build:"
-              df -h
+              # disk space at end of build
+              df -h > "${TMP_REPORT}/df-post"
+              (du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :) > "${TMP_REPORT}/du-post"
             shell: bash
       request:
         type: string
@@ -123,15 +124,13 @@ on:
         type: string
       steps-post:
         type: string
-        default: |
-          - run: |
-              du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :
-            shell: bash
       steps-post-name:
         type: string
       target:
         type: string
         required: true
+      target-suffix:
+        type: string
       temp-dir:
         type: string
       timeout-minutes:
@@ -173,7 +172,7 @@ jobs:
       packages: read
     if: ${{ ! inputs.skip }}
     runs-on: ${{ inputs.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu }}
-    name: ${{ inputs.command }} ${{ inputs.target }}
+    name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
     - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.36
@@ -297,6 +296,7 @@ jobs:
         fail-match: ${{ inputs.fail-match }}
         notice-match: ${{ inputs.notice-match }}
         output-path: ${{ inputs.output-path }}
+        report-name: ci-report-${{ inputs.target-suffix && format('{0}-', inputs.target-suffix) || '' }}${{ inputs.target }}.json
         report-pre: ${{ inputs.report-pre }}
         report-post: ${{ inputs.report-post }}
         source: ${{ inputs.source }}

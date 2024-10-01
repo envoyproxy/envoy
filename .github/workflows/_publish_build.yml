@@ -41,6 +41,7 @@ jobs:
     with:
       bazel-extra: ${{ matrix.bazel-extra }}
       target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.arch }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       concurrency-suffix: -${{ matrix.arch }}
@@ -91,6 +92,7 @@ jobs:
       downloads: |
         release.${{ matrix.arch }}: release/${{ matrix.arch }}/bin/
       target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.arch }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.cache-build-image-key-suffix }}
       concurrency-suffix: -${{ matrix.arch }}
