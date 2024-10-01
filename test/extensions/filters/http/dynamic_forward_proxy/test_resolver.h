@@ -36,17 +36,19 @@ public:
 
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override {
-    auto new_query = new PendingQuery(dns_name, dns_lookup_family, callback);
-
+    std::unique_ptr<PendingQuery> new_query =
+        std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback);
+    PendingQuery* raw_new_query = new_query.get();
     absl::MutexLock guard(&resolution_mutex_);
-    blocked_resolutions_.push_back([&, new_query](absl::optional<std::string> dns_override) {
-      absl::MutexLock guard(&mutex_);
-      if (dns_override.has_value()) {
-        *const_cast<std::string*>(&new_query->dns_name_) = dns_override.value();
-      }
-      pending_queries_.push_back({std::unique_ptr<PendingQuery>{new_query}, absl::nullopt});
-    });
-    return new_query;
+    blocked_resolutions_.push_back(
+        [&, new_query = std::move(new_query)](absl::optional<std::string> dns_override) {
+          absl::MutexLock guard(&mutex_);
+          if (dns_override.has_value()) {
+            *const_cast<std::string*>(&new_query->dns_name_) = dns_override.value();
+          }
+          pending_queries_.push_back({std::move(new_query), absl::nullopt});
+        });
+    return raw_new_query;
   }
 
   static absl::Mutex resolution_mutex_;
