@@ -129,6 +129,8 @@ on:
       target:
         type: string
         required: true
+      target-name:
+        type: string
       target-suffix:
         type: string
       temp-dir:
@@ -296,7 +298,7 @@ jobs:
         fail-match: ${{ inputs.fail-match }}
         notice-match: ${{ inputs.notice-match }}
         output-path: ${{ inputs.output-path }}
-        report-name: ci-report-${{ inputs.target-suffix && format('{0}-', inputs.target-suffix) || '' }}${{ inputs.target }}.json
+        report-name: ci-report-${{ inputs.target-suffix && format('{0}-', inputs.target-suffix) || '' }}${{ inputs.target-name || inputs.target }}.json
         report-pre: ${{ inputs.report-pre }}
         report-post: ${{ inputs.report-post }}
         source: ${{ inputs.source }}
