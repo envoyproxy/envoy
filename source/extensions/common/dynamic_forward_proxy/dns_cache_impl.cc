@@ -323,9 +323,10 @@ void DnsCacheImpl::forceRefreshHosts() {
     // resolvers.
     if (primary_host.second->active_query_ != nullptr) {
       absl::MutexLock lock(&primary_host.second->active_query_->lock());
-            Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
-            primary_host.second->active_query_ = nullptr;
-            primary_host.second->timeout_timer_->disableTimer();
+      primary_host.second->active_query_->cancel(
+          Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      primary_host.second->active_query_ = nullptr;
+      primary_host.second->timeout_timer_->disableTimer();
     }
 
     ASSERT(!primary_host.second->timeout_timer_->enabled());
