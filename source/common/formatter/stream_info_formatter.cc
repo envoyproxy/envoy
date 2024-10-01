@@ -263,9 +263,6 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
 #endif
   }
   case FilterStateFormat::Field: {
-    if (!state->hasFieldSupport()) {
-      return absl::nullopt;
-    }
     auto field_value = state->getField(field_name_);
     auto string_value = absl::visit(StringFieldVisitor(), field_value);
     if (!string_value) {
@@ -310,9 +307,6 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
     return SubstitutionFormatUtils::unspecifiedValue();
   }
   case FilterStateFormat::Field: {
-    if (!state->hasFieldSupport()) {
-      return SubstitutionFormatUtils::unspecifiedValue();
-    }
     auto field_value = state->getField(field_name_);
     auto string_value = absl::visit(StringFieldVisitor(), field_value);
     if (!string_value) {
