@@ -52,11 +52,9 @@ protected:
 
     void cancel(CancelReason) override {
       ENVOY_LOG(debug, "cancelling query [{}]", dns_name_);
-      // absl::MutexLock guard(&mutex_);
       cancelled_ = true;
     }
 
-    // absl::Mutex& mutex_;
     const std::string dns_name_;
     const DnsLookupFamily dns_lookup_family_;
     ResolveCb callback_;

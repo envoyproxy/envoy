@@ -19,7 +19,7 @@ namespace Network {
  */
 class ActiveDnsQuery {
 public:
-  virtual ~ActiveDnsQuery() { std::cerr << "Calling ~ActiveDnsQuery\n"; };
+  virtual ~ActiveDnsQuery() = default;
 
   enum class CancelReason {
     // The caller no longer needs the answer to the query.
@@ -30,32 +30,23 @@ public:
     Timeout
   };
 
+  /** Return the lock of this instance. */
+  absl::Mutex& lock() { return mutex_; }
+
   /**
    * Cancel an outstanding DNS request.
    * @param reason supplies the cancel reason.
    */
   virtual void cancel(CancelReason reason) PURE;
 
-  absl::Mutex& lock() { return mutex_; }
-
   /** Add a trace for the DNS query. */
-  void addTrace(uint8_t trace) {
-    absl::MutexLock lock(&mutex_);
-    // std::cerr << "Adding traces\n";
-    traces_.emplace_back(trace);
-  }
+  void addTrace(uint8_t trace) { traces_.emplace_back(trace); }
 
   /** Return the DNS query traces. */
-  const std::vector<uint8_t>& getTraces() {
-    std::cerr << "Getting traces\n";
-    return traces_;
-  }
+  const std::vector<uint8_t>& getTraces() { return traces_; }
 
-  /** Clears the DNS query traces. */
-  void clearTraces() {
-    std::cerr << "Clearing traces\n";
-    traces_.clear();
-  }
+  /** Clear the DNS query traces. */
+  void clearTraces() { traces_.clear(); }
 
 private:
   absl::Mutex mutex_;

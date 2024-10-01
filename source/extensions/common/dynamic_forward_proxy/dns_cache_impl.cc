@@ -256,10 +256,8 @@ DnsCacheImpl::PrimaryHostInfo& DnsCacheImpl::getPrimaryHost(const std::string& h
 }
 
 void DnsCacheImpl::onResolveTimeout(const std::string& host) {
-  std::cerr << "Inside onResolveTimeout\n";
   ASSERT(main_thread_dispatcher_.isThreadSafe());
 
-  // auto& primary_host = getPrimaryHost(host);
   ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
   finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, "resolve_timeout", {},
@@ -427,7 +425,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     absl::MutexLock lock(&primary_host_info->active_query_->lock());
     if (runtime_.snapshot().getBoolean("envoy.enable_dfp_dns_trace", false)) {
       if (is_timeout) {
-        std::cerr << "Cancelling ActiveQuery\n";
         primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
       }
       details_with_maybe_trace = absl::StrCat(
@@ -435,7 +432,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       primary_host_info->active_query_->clearTraces();
     } else {
       if (is_timeout) {
-        std::cerr << "Cancelling ActiveQuery\n";
         primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
       }
     }
