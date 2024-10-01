@@ -6,6 +6,12 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/event/dispatcher.h"
+
+#include "source/common/common/posix/thread_impl.h"
+#include "source/common/common/thread.h"
+
+#include "absl/container/flat_hash_map.h"
 #include "library/common/network/apple_pac_proxy_resolver.h"
 #include "library/common/network/apple_system_proxy_settings_monitor.h"
 #include "library/common/network/proxy_resolver_interface.h"
@@ -20,7 +26,7 @@ namespace Network {
 class AppleProxyResolver : public ProxyResolver {
 public:
   AppleProxyResolver();
-  virtual ~AppleProxyResolver() = default;
+  virtual ~AppleProxyResolver();
 
   /**
    * Starts proxy resolver. It needs to be called prior to any proxy resolution attempt.
@@ -38,6 +44,8 @@ public:
   resolveProxy(const std::string& target_url_string, std::vector<ProxySettings>& proxies,
                ProxySettingsResolvedCallback proxy_resolution_completed) override;
 
+  virtual void setDispatcher(Event::Dispatcher* dispatcher) override;
+
   /*
    * Supplies a function that updates this instance's proxy settings.
    */
@@ -49,6 +57,9 @@ private:
   std::unique_ptr<AppleSystemProxySettingsMonitor> proxy_settings_monitor_;
   std::unique_ptr<ApplePacProxyResolver> pac_proxy_resolver_;
   absl::optional<SystemProxySettings> proxy_settings_;
+  std::unique_ptr<Thread::PosixThreadFactory> thread_factory_;
+  absl::flat_hash_map<Thread::ThreadId, Thread::PosixThreadPtr> pac_resolution_threads_;
+  Event::Dispatcher* dispatcher_;
   absl::Mutex mutex_;
   bool started_ = false;
 };

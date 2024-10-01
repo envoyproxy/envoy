@@ -191,6 +191,7 @@ public:
   MOCK_METHOD(Network::ProxyResolutionResult, resolveProxy,
               (const std::string& target_url_string, std::vector<Network::ProxySettings>& proxies,
                Network::ProxySettingsResolvedCallback proxy_resolution_completed));
+  MOCK_METHOD(void, setDispatcher, (Event::Dispatcher * dispatcher));
 };
 
 class NetworkConfigurationFilterProxyResolverApiTest : public NetworkConfigurationFilterTest {
