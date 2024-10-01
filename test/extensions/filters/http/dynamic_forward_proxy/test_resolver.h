@@ -27,7 +27,7 @@ public:
       if (blocked_resolutions_.empty()) {
         continue;
       }
-      auto run = blocked_resolutions_.front();
+      auto run = std::move(blocked_resolutions_.front());
       blocked_resolutions_.pop_front();
       run(dns_override);
       return;
@@ -41,18 +41,18 @@ public:
     PendingQuery* raw_new_query = new_query.get();
     absl::MutexLock guard(&resolution_mutex_);
     blocked_resolutions_.push_back(
-        [&, new_query = std::move(new_query)](absl::optional<std::string> dns_override) {
+        [&, query = std::move(new_query)](absl::optional<std::string> dns_override) mutable {
           absl::MutexLock guard(&mutex_);
           if (dns_override.has_value()) {
-            *const_cast<std::string*>(&new_query->dns_name_) = dns_override.value();
+            *const_cast<std::string*>(&query->dns_name_) = dns_override.value();
           }
-          pending_queries_.push_back({std::move(new_query), absl::nullopt});
+          pending_queries_.push_back(PendingQueryInfo{std::move(query), absl::nullopt});
         });
     return raw_new_query;
   }
 
   static absl::Mutex resolution_mutex_;
-  static std::list<std::function<void(absl::optional<std::string> dns_override)>>
+  static std::list<absl::AnyInvocable<void(absl::optional<std::string> dns_override)>>
       blocked_resolutions_ ABSL_GUARDED_BY(resolution_mutex_);
 };
 
