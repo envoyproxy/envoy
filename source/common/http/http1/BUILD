@@ -60,7 +60,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:status_lib",
         "//source/common/http:utility_lib",
-        "//source/common/network:common_connection_filter_states_lib",
         "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -115,9 +114,9 @@ envoy_cc_library(
     name = "legacy_parser_lib",
     srcs = ["legacy_parser_impl.cc"],
     hdrs = ["legacy_parser_impl.h"],
-    external_deps = ["http_parser"],
     deps = [
         ":parser_interface",
+        "//bazel/external/http_parser",
         "//source/common/common:assert_lib",
     ],
 )

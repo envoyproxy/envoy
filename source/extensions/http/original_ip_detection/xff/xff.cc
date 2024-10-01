@@ -9,13 +9,19 @@ namespace Http {
 namespace OriginalIPDetection {
 namespace Xff {
 
+absl::StatusOr<std::unique_ptr<XffIPDetection>> XffIPDetection::create(
+    const envoy::extensions::http::original_ip_detection::xff::v3::XffConfig& config) {
+
+  if (config.has_xff_trusted_cidrs() && config.xff_num_trusted_hops() > 0) {
+    return absl::InvalidArgumentError("Cannot set both xff_num_trusted_hops and xff_trusted_cidrs");
+  }
+  return std::unique_ptr<XffIPDetection>(new XffIPDetection(config));
+}
+
 XffIPDetection::XffIPDetection(
     const envoy::extensions::http::original_ip_detection::xff::v3::XffConfig& config)
     : xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, skip_xff_append, true)) {
-  if (config.has_xff_trusted_cidrs() && config.xff_num_trusted_hops() > 0) {
-    throwEnvoyExceptionOrPanic("Cannot set both xff_num_trusted_hops and xff_trusted_cidrs");
-  }
   if (config.has_xff_trusted_cidrs()) {
     xff_trusted_cidrs_.reserve(config.xff_trusted_cidrs().cidrs().size());
     for (const envoy::config::core::v3::CidrRange& entry : config.xff_trusted_cidrs().cidrs()) {

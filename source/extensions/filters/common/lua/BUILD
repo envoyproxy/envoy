@@ -12,10 +12,8 @@ envoy_cc_library(
     name = "lua_lib",
     srcs = ["lua.cc"],
     hdrs = ["lua.h"],
-    external_deps = [
-        "luajit",
-    ],
     deps = [
+        "//bazel/foreign_cc:luajit",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",

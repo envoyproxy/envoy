@@ -127,13 +127,13 @@ public:
   HeaderUpdateContext(Event::Dispatcher& dispatcher, const FileSystemHttpCache& cache,
                       const Key& key, std::shared_ptr<Cleanup> cleanup,
                       const Http::ResponseHeaderMap& response_headers,
-                      const ResponseMetadata& metadata, std::function<void(bool)> on_complete)
+                      const ResponseMetadata& metadata, UpdateHeadersCallback on_complete)
       : dispatcher_(dispatcher),
         filepath_(absl::StrCat(cache.cachePath(), cache.generateFilename(key))),
         cache_path_(cache.cachePath()), cleanup_(cleanup),
         async_file_manager_(cache.asyncFileManager()),
         response_headers_(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers)),
-        response_metadata_(metadata), on_complete_(on_complete) {}
+        response_metadata_(metadata), on_complete_(std::move(on_complete)) {}
 
   void begin(std::shared_ptr<HeaderUpdateContext> ctx) {
     async_file_manager_->openExistingFile(
@@ -278,14 +278,14 @@ private:
             fail("failed to link new cache file", link_result);
             return;
           }
-          on_complete_(true);
+          std::move(on_complete_)(true);
         });
     ASSERT(queued.ok());
   }
   void fail(absl::string_view msg, absl::Status status) {
     ENVOY_LOG(warn, "file_system_http_cache: {} for update cache file {}: {}", msg, filepath_,
               status);
-    on_complete_(false);
+    std::move(on_complete_)(false);
   }
   Event::Dispatcher* dispatcher() { return &dispatcher_; }
   Event::Dispatcher& dispatcher_;
@@ -300,13 +300,13 @@ private:
   CacheFileHeader header_proto_;
   AsyncFileHandle read_handle_;
   AsyncFileHandle write_handle_;
-  std::function<void(bool)> on_complete_;
+  UpdateHeadersCallback on_complete_;
 };
 
 void FileSystemHttpCache::updateHeaders(const LookupContext& base_lookup_context,
                                         const Http::ResponseHeaderMap& response_headers,
                                         const ResponseMetadata& metadata,
-                                        std::function<void(bool)> on_complete) {
+                                        UpdateHeadersCallback on_complete) {
   const FileLookupContext& lookup_context =
       dynamic_cast<const FileLookupContext&>(base_lookup_context);
   const Key& key = lookup_context.key();
@@ -314,8 +314,9 @@ void FileSystemHttpCache::updateHeaders(const LookupContext& base_lookup_context
   if (!cleanup) {
     return;
   }
-  auto ctx = std::make_shared<HeaderUpdateContext>(
-      *lookup_context.dispatcher(), *this, key, cleanup, response_headers, metadata, on_complete);
+  auto ctx =
+      std::make_shared<HeaderUpdateContext>(*lookup_context.dispatcher(), *this, key, cleanup,
+                                            response_headers, metadata, std::move(on_complete));
   ctx->begin(ctx);
 }
 

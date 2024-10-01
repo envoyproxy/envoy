@@ -170,10 +170,15 @@ void CodecClient::onData(Buffer::Instance& data) {
   if (!status.ok()) {
     ENVOY_CONN_LOG(debug, "Error dispatching received data: {}", *connection_, status.message());
 
-    // Don't count 408 responses where we have no active requests as protocol errors
-    if (!isPrematureResponseError(status) ||
-        (!active_requests_.empty() ||
-         getPrematureResponseHttpCode(status) != Code::RequestTimeout)) {
+    // Don't count 408 responses where we have no active requests as protocol errors.
+    // Don't count graceful GOAWAY closes.
+    const bool not_408 =
+        !isPrematureResponseError(status) ||
+        (!active_requests_.empty() || getPrematureResponseHttpCode(status) != Code::RequestTimeout);
+    const bool is_goaway = isGoAwayGracefulCloseError(status);
+    if (not_408 &&
+        (!is_goaway || !Runtime::runtimeFeatureEnabled(
+                           "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close"))) {
       host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
       protocol_error_ = true;
     }
@@ -277,13 +282,14 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
     }
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
         *connection_, host->cluster().http1CodecStats(), *this, host->cluster().http1Settings(),
-        host->cluster().maxResponseHeadersCount(), proxied);
+        host->cluster().maxResponseHeadersKb(), host->cluster().maxResponseHeadersCount(), proxied);
     break;
   }
   case CodecType::HTTP2:
     codec_ = std::make_unique<Http2::ClientConnectionImpl>(
         *connection_, *this, host->cluster().http2CodecStats(), random_generator,
-        host->cluster().http2Options(), Http::DEFAULT_MAX_REQUEST_HEADERS_KB,
+        host->cluster().http2Options(),
+        host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
         host->cluster().maxResponseHeadersCount(), Http2::ProdNghttp2SessionFactory::get());
     break;
   case CodecType::HTTP3: {
@@ -291,7 +297,8 @@ CodecClientProd::CodecClientProd(CodecType type, Network::ClientConnectionPtr&& 
     auto& quic_session = dynamic_cast<Quic::EnvoyQuicClientSession&>(*connection_);
     codec_ = std::make_unique<Quic::QuicHttpClientConnectionImpl>(
         quic_session, *this, host->cluster().http3CodecStats(), host->cluster().http3Options(),
-        Http::DEFAULT_MAX_REQUEST_HEADERS_KB, host->cluster().maxResponseHeadersCount());
+        host->cluster().maxResponseHeadersKb().value_or(Http::DEFAULT_MAX_REQUEST_HEADERS_KB),
+        host->cluster().maxResponseHeadersCount());
     // Initialize the session after max request header size is changed in above http client
     // connection creation.
     quic_session.Initialize();

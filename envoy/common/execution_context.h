@@ -3,10 +3,17 @@
 #include <cstddef>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/scope_tracker.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/non_copyable.h"
 
 namespace Envoy {
+
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+
+static constexpr absl::string_view kConnectionExecutionContextFilterStateName =
+    "envoy.network.connection_execution_context";
 
 class ScopedExecutionContext;
 
@@ -14,11 +21,7 @@ class ScopedExecutionContext;
 // with the execution of a piece of code. activate/deactivate are called when the said execution
 // starts/ends. For an example usage, please see
 // https://github.com/envoyproxy/envoy/issues/32012.
-class ExecutionContext : NonCopyable {
-public:
-  ExecutionContext() = default;
-  virtual ~ExecutionContext() = default;
-
+class ExecutionContext : public StreamInfo::FilterState::Object, NonCopyable {
 protected:
   // Called when the current thread starts to run code on behalf of the owner of this object.
   // protected because it should only be called by ScopedExecutionContext.
@@ -43,7 +46,8 @@ protected:
 class ScopedExecutionContext : NonCopyable {
 public:
   ScopedExecutionContext() : ScopedExecutionContext(nullptr) {}
-  ScopedExecutionContext(ExecutionContext* context) : context_(context) {
+  ScopedExecutionContext(const ScopeTrackedObject* object)
+      : context_(object != nullptr ? getExecutionContext(object->trackedStream()) : nullptr) {
     if (context_ != nullptr) {
       context_->activate();
     }
@@ -62,7 +66,18 @@ public:
   bool isNull() const { return context_ == nullptr; }
 
 private:
+  ExecutionContext* getExecutionContext(OptRef<const StreamInfo::StreamInfo> info) {
+    if (!info.has_value()) {
+      return nullptr;
+    }
+    const auto* const_context = info->filterState().getDataReadOnly<ExecutionContext>(
+        kConnectionExecutionContextFilterStateName);
+    return const_cast<ExecutionContext*>(const_context);
+  }
+
   ExecutionContext* context_;
 };
+
+#endif
 
 } // namespace Envoy
