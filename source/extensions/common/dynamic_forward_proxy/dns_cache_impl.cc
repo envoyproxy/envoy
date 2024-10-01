@@ -427,14 +427,19 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       if (is_timeout) {
         primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
       }
-      details_with_maybe_trace = absl::StrCat(
-          details, ":", absl::StrJoin(primary_host_info->active_query_->getTraces(), ","));
-      primary_host_info->active_query_->clearTraces();
+      auto& traces = primary_host_info->active_query_->getTraces();
+      std::vector<std::string> string_traces;
+      string_traces.reserve(traces.size());
+      std::transform(traces.begin(), traces.end(), string_traces.begin(), [](const auto& trace) {
+        return absl::StrCat(trace.trace_, "=", trace.time_.time_since_epoch().count());
+      });
+      details_with_maybe_trace = absl::StrCat(details, ":", absl::StrJoin(string_traces, ","));
     } else {
       if (is_timeout) {
         primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
       }
     }
+    primary_host_info->active_query_->clearTraces();
   }
 
   bool first_resolve = false;

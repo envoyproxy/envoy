@@ -59,7 +59,7 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     host_ttl: {}s
-    dns_query_timeout: {:.6f}s
+    dns_query_timeout: {:.9f}s
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
 )EOF",
@@ -165,7 +165,7 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     host_ttl: {}s
-    dns_query_timeout: {:.6f}s
+    dns_query_timeout: {:.9f}s
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
 )EOF",
@@ -459,7 +459,7 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
       name: envoy.network.dns_resolver.getaddrinfo
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
-  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000001);
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000000001);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -487,7 +487,7 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
       name: envoy.network.dns_resolver.getaddrinfo
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
-  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000001);
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000000001);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);

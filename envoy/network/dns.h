@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
 #include "absl/types/variant.h"
@@ -30,6 +31,17 @@ public:
     Timeout
   };
 
+  /** Store the trace information. */
+  struct Trace {
+    /**
+     * An identifier to store the trace information. The trace is `uint8_t` because the value can
+     * vary depending on the DNS resolver implementation.
+     */
+    uint8_t trace_;
+    /** Store the current time of this trace. */
+    MonotonicTime time_;
+  };
+
   /** Return the lock of this instance. */
   absl::Mutex& lock() { return mutex_; }
 
@@ -40,17 +52,19 @@ public:
   virtual void cancel(CancelReason reason) PURE;
 
   /** Add a trace for the DNS query. */
-  void addTrace(uint8_t trace) { traces_.emplace_back(trace); }
+  void addTrace(uint8_t trace) {
+    traces_.push_back(Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
+  }
 
   /** Return the DNS query traces. */
-  const std::vector<uint8_t>& getTraces() { return traces_; }
+  const std::vector<Trace>& getTraces() { return traces_; }
 
   /** Clear the DNS query traces. */
   void clearTraces() { traces_.clear(); }
 
 private:
   absl::Mutex mutex_;
-  std::vector<uint8_t> traces_; // ABSL_GUARDED_BY(mutex_);
+  std::vector<Trace> traces_;
 };
 
 /**
