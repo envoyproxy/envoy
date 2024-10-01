@@ -59,7 +59,7 @@ jobs:
 
   coverage:
     secrets:
-      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      gcp-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED || secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read
