@@ -59,9 +59,6 @@ public:
   /** Return the DNS query traces. */
   const std::vector<Trace>& getTraces() { return traces_; }
 
-  /** Clear the DNS query traces. */
-  void clearTraces() { traces_.clear(); }
-
 private:
   absl::Mutex mutex_;
   std::vector<Trace> traces_;
