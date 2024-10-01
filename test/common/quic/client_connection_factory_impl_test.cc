@@ -135,6 +135,49 @@ TEST_P(QuicNetworkConnectionTest, SocketOptions) {
   client_connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
+TEST_P(QuicNetworkConnectionTest, PreBindSocketOptionsFailure) {
+  initialize();
+
+  auto socket_option = std::make_shared<Network::MockSocketOption>();
+  auto socket_options = std::make_shared<Network::ConnectionSocket::Options>();
+  socket_options->push_back(socket_option);
+  EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
+      .WillOnce(Return(false));
+
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
+      socket_options, nullptr, connection_id_generator_, *factory_);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_FALSE(session->connection()->connected());
+  EXPECT_EQ(client_connection->state(), Network::Connection::State::Closed);
+}
+
+TEST_P(QuicNetworkConnectionTest, PostBindSocketOptionsFailure) {
+  initialize();
+
+  auto socket_option = std::make_shared<Network::MockSocketOption>();
+  auto socket_options = std::make_shared<Network::ConnectionSocket::Options>();
+  socket_options->push_back(socket_option);
+  EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
+  EXPECT_CALL(*socket_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
+      .WillOnce(Return(false));
+
+  std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
+      *quic_info_, crypto_config_,
+      quic::QuicServerId{factory_->clientContextConfig()->serverNameIndication(), PEER_PORT, false},
+      dispatcher_, test_address_, test_address_, quic_stat_names_, {}, *store_.rootScope(),
+      socket_options, nullptr, connection_id_generator_, *factory_);
+  EnvoyQuicClientSession* session = static_cast<EnvoyQuicClientSession*>(client_connection.get());
+  session->Initialize();
+  client_connection->connect();
+  EXPECT_FALSE(session->connection()->connected());
+  EXPECT_EQ(client_connection->state(), Network::Connection::State::Closed);
+}
+
 TEST_P(QuicNetworkConnectionTest, LocalAddress) {
   initialize();
   Network::Address::InstanceConstSharedPtr local_addr =
