@@ -77,7 +77,7 @@ private:
 // ScopedRouteConfiguration and corresponding RouteConfigProvider.
 class ScopedRouteInfo {
 public:
-  ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration config_proto,
+  ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration&& config_proto,
                   ConfigConstSharedPtr route_config);
 
   const ConfigConstSharedPtr& routeConfig() const { return route_config_; }
@@ -89,9 +89,9 @@ public:
   uint64_t configHash() const { return config_hash_; }
 
 private:
-  envoy::config::route::v3::ScopedRouteConfiguration config_proto_;
+  const envoy::config::route::v3::ScopedRouteConfiguration config_proto_;
   ScopeKey scope_key_;
-  ConfigConstSharedPtr route_config_;
+  const ConfigConstSharedPtr route_config_;
   const uint64_t config_hash_;
 };
 using ScopedRouteInfoConstSharedPtr = std::shared_ptr<const ScopedRouteInfo>;

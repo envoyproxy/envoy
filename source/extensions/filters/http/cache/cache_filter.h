@@ -164,6 +164,8 @@ private:
   FilterState filter_state_ = FilterState::Initial;
 
   bool is_head_request_ = false;
+  // This toggle is used to detect callbacks being called directly and not posted.
+  bool callback_called_directly_ = false;
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
   absl::optional<InsertStatus> insert_status_;

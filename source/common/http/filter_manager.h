@@ -651,6 +651,7 @@ public:
   }
 
   // ScopeTrackedObject
+  OptRef<const StreamInfo::StreamInfo> trackedStream() const override { return streamInfo(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_)
@@ -696,15 +697,7 @@ public:
   // FilterChainManager
   void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
-  void log(AccessLog::AccessLogType access_log_type) {
-    const Formatter::HttpFormatterContext log_context{
-        filter_manager_callbacks_.requestHeaders().ptr(),
-        filter_manager_callbacks_.responseHeaders().ptr(),
-        filter_manager_callbacks_.responseTrailers().ptr(),
-        {},
-        access_log_type,
-        &filter_manager_callbacks_.activeSpan()};
-
+  void log(const Formatter::HttpFormatterContext log_context) {
     for (const auto& log_handler : access_log_handlers_) {
       log_handler->log(log_context, streamInfo());
     }
