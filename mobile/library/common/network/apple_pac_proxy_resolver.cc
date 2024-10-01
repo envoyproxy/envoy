@@ -13,13 +13,16 @@ namespace Network {
 
 namespace {
 
+CFStringRef pacRunLoopMode() {
+  static const CFStringRef runloop_mode = CFSTR("envoy.PacProxyResolver");
+  return runloop_mode;
+}
+
 // Creates a CFURLRef from a C++ string URL.
 CFURLRef createCFURL(const std::string& url_string) {
-  auto cf_url_string =
-      CFStringCreateWithCString(kCFAllocatorDefault, url_string.c_str(), kCFStringEncodingUTF8);
-  auto cf_url = CFURLCreateWithString(kCFAllocatorDefault, cf_url_string, /*baseURL=*/nullptr);
-  CFRelease(cf_url_string);
-  return cf_url;
+  return CFURLCreateWithBytes(kCFAllocatorDefault,
+                              reinterpret_cast<const UInt8*>(url_string.c_str()),
+                              url_string.length(), kCFStringEncodingUTF8, nullptr);
 }
 
 } // namespace
@@ -28,15 +31,21 @@ void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFEr
   // `ptr` contains the unowned pointer to the ProxySettingsResolvedCallback. We extract it from the
   // void* and wrap it in a unique_ptr so the memory gets reclaimed at the end of the function when
   // `completion_callback` goes out of scope.
+  std::cerr << "=========>>>> AAB proxyAutoConfigurationResultCallback" << std::endl;
   std::unique_ptr<ProxySettingsResolvedCallback> completion_callback(
       static_cast<ProxySettingsResolvedCallback*>(ptr));
+  if (cf_proxies != nullptr) std::cerr << "=========>>>> AAB proxyAutoConfigurationResultCallback proxies.size=" << CFArrayGetCount(cf_proxies) << std::endl;
+  else std::cerr << "=========>>>> AAB proxyAutoConfigurationResultCallback cf_proxies IS NULL" << std::endl;
+  if (cf_error != nullptr) std::cerr << "=========>>>> AAB proxyAutoConfigurationResultCallback ERROR: " << Apple::toString(CFErrorCopyDescription(cf_error)) << std::endl;
 
   std::vector<ProxySettings> proxies;
   if (cf_error != nullptr || cf_proxies == nullptr) {
+    if (cf_error != nullptr) std::cerr << "=========>>>> AAB proxyAutoConfigurationResultCallback ERROR: " << Apple::toString(CFErrorCopyDescription(cf_error)) << std::endl;
     ENVOY_BUG(cf_error != nullptr, Apple::toString(CFErrorCopyDescription(cf_error)));
     // Treat the error case as if no proxy was configured. Seems to be consistent with what iOS
     // system (URLSession) is doing.
     (*completion_callback)(proxies);
+    CFRunLoopStop(CFRunLoopGetCurrent());
     return;
   }
 
@@ -64,7 +73,10 @@ void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFEr
     }
   }
 
+  std::cerr << "========>>>> AAB proxyAutoConfigurationResultCallback, size=" << proxies.size() << std::endl;
+  for (const auto& x : proxies) std::cerr << "========>>>> AAB proxyAutoConfigurationResultCallback, proxy setting=" << x.asString() << std::endl;
   (*completion_callback)(proxies);
+  CFRunLoopStop(CFRunLoopGetCurrent());
 }
 
 CFRunLoopSourceRef
@@ -80,13 +92,28 @@ ApplePacProxyResolver::createPacUrlResolverSource(CFURLRef cf_proxy_autoconfigur
 }
 
 void ApplePacProxyResolver::resolveProxies(
-    const std::string& target_url, const std::string& proxy_autoconfiguration_file_url,
+    const std::string& proxy_autoconfiguration_file_url, const std::string& target_url,
     ProxySettingsResolvedCallback proxy_resolution_completed) {
+  std::cerr << "=========>>>> AAB ApplePacProxyResolver::resolveProxies, target_url=" << target_url << ", proxy url: " << proxy_autoconfiguration_file_url << std::endl;
   CFURLRef cf_target_url = createCFURL(target_url);
   CFURLRef cf_proxy_autoconfiguration_file_url = createCFURL(proxy_autoconfiguration_file_url);
+  if (cf_target_url == nullptr || cf_proxy_autoconfiguration_file_url == nullptr) {
+    return;
+  }
 
   std::unique_ptr<ProxySettingsResolvedCallback> completion_callback =
       std::make_unique<ProxySettingsResolvedCallback>(std::move(proxy_resolution_completed));
+
+  // Work around <rdar://problem/5530166>. This dummy call to CFNetworkCopyProxiesForURL
+  // initializes some state within CFNetwork that is required by
+  // CFNetworkExecuteProxyAutoConfigurationURL.
+  CFDictionaryRef empty_dictionary = CFDictionaryCreate(nullptr, nullptr, nullptr, 0, nullptr, nullptr);
+  CFArrayRef empty_result = CFNetworkCopyProxiesForURL(cf_target_url, empty_dictionary);
+  if (empty_result) {
+    CFRelease(empty_result);
+  }
+  CFRelease(empty_dictionary);
+
   // According to https://developer.apple.com/documentation/corefoundation/cfstreamclientcontext,
   // the version must be 0.
   auto context = std::make_unique<CFStreamClientContext>(
@@ -102,7 +129,9 @@ void ApplePacProxyResolver::resolveProxies(
   CFRunLoopSourceRef run_loop_source = createPacUrlResolverSource(
       cf_proxy_autoconfiguration_file_url, cf_target_url, context.release());
 
-  CFRunLoopAddSource(CFRunLoopGetCurrent(), run_loop_source, kCFRunLoopDefaultMode);
+  CFRunLoopAddSource(CFRunLoopGetCurrent(), run_loop_source, pacRunLoopMode());
+  CFRunLoopRunInMode(pacRunLoopMode(), DBL_MAX, false);
+  CFRunLoopRemoveSource(CFRunLoopGetCurrent(), run_loop_source, pacRunLoopMode());
 
   CFRelease(cf_target_url);
   CFRelease(cf_proxy_autoconfiguration_file_url);

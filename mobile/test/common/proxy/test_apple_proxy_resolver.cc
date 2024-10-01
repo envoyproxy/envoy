@@ -8,10 +8,5 @@ void TestAppleProxyResolver::setSettingsMonitorForTest(
   proxy_settings_monitor_ = std::move(monitor);
 }
 
-void TestAppleProxyResolver::setPacResolverForTest(
-    std::unique_ptr<Network::ApplePacProxyResolver>&& resolver) {
-  pac_proxy_resolver_ = std::move(resolver);
-}
-
 } // namespace Network
 } // namespace Envoy
