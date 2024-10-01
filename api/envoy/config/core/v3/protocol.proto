@@ -209,7 +209,7 @@ message AlternateProtocolsCacheOptions {
   repeated string canonical_suffixes = 5;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";
@@ -259,10 +259,27 @@ message HttpProtocolOptions {
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
   google.protobuf.Duration max_connection_duration = 3;
 
-  // The maximum number of headers. If unconfigured, the default
-  // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
-  // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
+  // The maximum number of headers (request headers if configured on HttpConnectionManager,
+  // response headers when configured on a cluster).
+  // If unconfigured, the default maximum number of headers allowed is 100.
+  // Downstream requests that exceed this limit will receive a 431 response for HTTP/1.x and cause a stream
+  // reset for HTTP/2.
+  // Upstream responses that exceed this limit will result in a 503 response.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
+
+  // The maximum size of response headers.
+  // If unconfigured, the default is 60 KiB, except for HTTP/1 response headers which have a default
+  // of 80KiB.
+  // Responses that exceed this limit will result in a 503 response.
+  // In Envoy, this setting is only valid when configured on an upstream cluster, not on the
+  // :ref:`HTTP Connection Manager
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`.
+  //
+  // Note: currently some protocol codecs impose limits on the maximum size of a single header:
+  //   HTTP/2 (when using nghttp2) limits a single header to around 100kb.
+  //   HTTP/3 limits a single header to around 1024kb.
+  google.protobuf.UInt32Value max_response_headers_kb = 7
+      [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
   // Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
   // reset independent of any other timeouts. If not specified, this value is not set.

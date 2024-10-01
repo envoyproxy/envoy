@@ -13,7 +13,7 @@ namespace Http {
 namespace OriginalIPDetection {
 namespace Xff {
 
-Envoy::Http::OriginalIPDetectionSharedPtr
+absl::StatusOr<Envoy::Http::OriginalIPDetectionSharedPtr>
 XffIPDetectionFactory::createExtension(const Protobuf::Message& message,
                                        Server::Configuration::FactoryContext& context) {
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
@@ -21,7 +21,7 @@ XffIPDetectionFactory::createExtension(const Protobuf::Message& message,
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::http::original_ip_detection::xff::v3::XffConfig&>(
       *mptr, context.messageValidationVisitor());
-  return std::make_shared<XffIPDetection>(proto_config);
+  return XffIPDetection::create(proto_config);
 }
 
 REGISTER_FACTORY(XffIPDetectionFactory, Envoy::Http::OriginalIPDetectionFactory);

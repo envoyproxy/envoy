@@ -996,6 +996,27 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
   EXPECT_EQ(200, config.maxRequestHeadersCount());
 }
 
+// Check that max response header size is invalid on HCM.
+TEST_F(HttpConnectionManagerConfigTest, MaxResponseHeaderKbInvalid) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_response_headers_kb: 200
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+}
+
 // Checking that default max_requests_per_connection is 0.
 TEST_F(HttpConnectionManagerConfigTest, DefaultMaxRequestPerConnection) {
   const std::string yaml_string = R"EOF(
@@ -2565,7 +2586,7 @@ namespace {
 
 class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
 public:
-  Http::OriginalIPDetectionSharedPtr
+  absl::StatusOr<Http::OriginalIPDetectionSharedPtr>
   createExtension(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
     return nullptr;
   }

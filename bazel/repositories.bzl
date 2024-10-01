@@ -79,6 +79,13 @@ def _cc_deps():
         name = "com_google_protoconverter",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:com_google_protoconverter.patch"],
+        patch_cmds = [
+            "rm src/google/protobuf/stubs/common.cc",
+            "rm src/google/protobuf/stubs/common.h",
+            "rm src/google/protobuf/stubs/common_unittest.cc",
+            "rm src/google/protobuf/util/converter/port_def.inc",
+            "rm src/google/protobuf/util/converter/port_undef.inc",
+        ],
     )
     external_http_archive("com_google_protofieldextraction")
     external_http_archive("com_google_protoprocessinglib")
