@@ -157,15 +157,14 @@ docker run --rm \
        -e ENVOY_PUBLISH_DRY_RUN \
        -e ENVOY_REPO \
        -e ENVOY_TARBALL_DIR \
-       -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
        -e GCS_ARTIFACT_BUCKET \
+       -e GCS_REDIRECT_PATH \
        -e GITHUB_REF_NAME \
        -e GITHUB_REF_TYPE \
        -e GITHUB_TOKEN \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \
        -e MOBILE_DOCS_CHECKOUT_DIR \
-       -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \
        -e SYSTEM_STAGEDISPLAYNAME \

@@ -57,6 +57,7 @@ FETCH_PROTO_TARGETS=(
     @com_github_bufbuild_buf//:bin/buf
     //tools/proto_format/...)
 
+
 retry () {
     local n wait iterations
     wait="${1}"
