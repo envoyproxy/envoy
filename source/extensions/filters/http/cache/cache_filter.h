@@ -132,6 +132,9 @@ private:
   // from the filter and still complete the cache-write in the event that the
   // downstream disconnects. The filter and the UpstreamRequest must communicate to
   // each other their separate destruction-triggers.
+  // When CacheFilter is destroyed first it should call
+  // upstream_request_->disconnectFilter()
+  // and if upstream_request_ is destroyed first, it will call onUpstreamRequestReset.
   UpstreamRequest* upstream_request_ = nullptr;
   std::shared_ptr<HttpCache> cache_;
   LookupContextPtr lookup_;
