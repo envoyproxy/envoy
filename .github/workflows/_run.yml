@@ -69,6 +69,8 @@ on:
           Error:
       fail-match:
         type: string
+      gcs-only:
+        type: string
       import-gpg:
         type: boolean
         default: false
@@ -129,6 +131,8 @@ on:
       target:
         type: string
         required: true
+      target-name:
+        type: string
       target-suffix:
         type: string
       temp-dir:
@@ -275,9 +279,12 @@ jobs:
         GCP_SERVICE_ACCOUNT_KEY_PATH=$(mktemp -p "${{ runner.temp }}" -t gcp_service_account.XXXXXX.json)
         echo "${{ secrets.gcp-key }}" | base64 --decode > "${GCP_SERVICE_ACCOUNT_KEY_PATH}"
         GCP_SERVICE_ACCOUNT_KEY_FILE="$(basename "${GCP_SERVICE_ACCOUNT_KEY_PATH}")"
+        echo "GCP_SERVICE_ACCOUNT_KEY_PATH=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE}" >> "$GITHUB_ENV"
+        if [[ "${{ inputs.gcs-only }}" != "" ]]; then
+            exit 0
+        fi
         BAZEL_BUILD_EXTRA_OPTIONS="--google_credentials=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE} --config=remote-ci --config=rbe-google"
         echo "BAZEL_BUILD_EXTRA_OPTIONS=${BAZEL_BUILD_EXTRA_OPTIONS}" >> "$GITHUB_ENV"
-        echo "GCP_SERVICE_ACCOUNT_KEY_PATH=${GCP_SERVICE_ACCOUNT_KEY_PATH}" >> "$GITHUB_ENV"
 
     - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.36
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
@@ -296,7 +303,11 @@ jobs:
         fail-match: ${{ inputs.fail-match }}
         notice-match: ${{ inputs.notice-match }}
         output-path: ${{ inputs.output-path }}
-        report-name: ci-report-${{ inputs.target-suffix && format('{0}-', inputs.target-suffix) || '' }}${{ inputs.target }}.json
+        report-name: >-
+          ci-report-${{
+            inputs.target-suffix
+            && format('{0}-', inputs.target-suffix)
+            || '' }}${{ inputs.target-name || inputs.target }}.json
         report-pre: ${{ inputs.report-pre }}
         report-post: ${{ inputs.report-post }}
         source: ${{ inputs.source }}
