@@ -1699,6 +1699,10 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
     return false;
   }
 
+  parent_.state_.decoder_filter_chain_aborted_ = true;
+  parent_.state_.encoder_filter_chain_aborted_ = true;
+  parent_.state_.recreated_stream_ = true;
+
   parent_.streamInfo().setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().InternalRedirect);
 
@@ -1765,6 +1769,12 @@ void ActiveStreamEncoderFilter::drainSavedResponseMetadata() {
 }
 
 void ActiveStreamEncoderFilter::handleMetadataAfterHeadersCallback() {
+  if (parent_.state_.recreated_stream_) {
+    // The stream has been recreated. In this case, there's no reason to encode saved metadata.
+    getSavedResponseMetadata()->clear();
+    return;
+  }
+
   // If we drain accumulated metadata, the iteration must start with the current filter.
   const bool saved_state = iterate_from_current_filter_;
   iterate_from_current_filter_ = true;
