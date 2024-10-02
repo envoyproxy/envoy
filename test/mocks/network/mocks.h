@@ -411,7 +411,6 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
-  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
 
   IoHandlePtr io_handle_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
@@ -446,7 +445,7 @@ public:
   MOCK_METHOD(bool, reusePort, (), (const));
   MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
   MOCK_METHOD(void, closeAllSockets, ());
-  MOCK_METHOD(void, doFinalPreWorkerInit, ());
+  MOCK_METHOD(absl::Status, doFinalPreWorkerInit, ());
 };
 
 class MockUdpPacketWriterFactory : public UdpPacketWriterFactory {

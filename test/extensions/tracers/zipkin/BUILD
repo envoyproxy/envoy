@@ -21,7 +21,7 @@ envoy_extension_cc_test(
         "zipkin_tracer_impl_test.cc",
     ],
     extension_names = ["envoy.tracers.zipkin"],
-    external_deps = ["abseil_optional"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/common:time_interface",
         "//envoy/runtime:runtime_interface",
@@ -44,6 +44,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -52,6 +53,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.zipkin"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/tracers/zipkin:config",
         "//test/mocks/server:tracer_factory_context_mocks",

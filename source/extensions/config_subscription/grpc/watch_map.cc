@@ -96,7 +96,7 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
     // operations, but this implementation provides a reference for later optimization while we
     // adopt xdstp://.
     auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource_name);
-    THROW_IF_STATUS_NOT_OK(resource_or_error, throw);
+    THROW_IF_NOT_OK_REF(resource_or_error.status());
     xdstp_resource = resource_or_error.value();
   }
   auto watches_interested = watch_interest_.find(
@@ -154,7 +154,7 @@ void WatchMap::onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
   }
 
   // Execute external config validators.
-  config_validators_.executeValidators(type_url_, resources);
+  config_validators_->executeValidators(type_url_, resources);
 
   const bool map_is_single_wildcard = (watches_.size() == 1 && wildcard_watches_.size() == 1);
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
@@ -206,6 +206,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   }
 
   std::vector<DecodedResourcePtr> decoded_resources;
+  decoded_resources.reserve(resources.size());
   for (const auto& r : resources) {
     decoded_resources.emplace_back(
         DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info));
@@ -227,6 +228,10 @@ void WatchMap::onConfigUpdate(
   // into the individual onConfigUpdate()s.
   std::vector<DecodedResourcePtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_added;
+  // If the server behaves according to the protocol, it will only send the
+  // resources the watch map is interested in. Reserve the correct amount of
+  // space for the vector for the good case.
+  decoded_resources.reserve(added_resources.size());
   for (const auto& r : added_resources) {
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
     // If there are no watches, then we don't need to decode. If there are watches, they should all
@@ -249,7 +254,7 @@ void WatchMap::onConfigUpdate(
   }
 
   // Execute external config validators.
-  config_validators_.executeValidators(type_url_, decoded_resources, removed_resources);
+  config_validators_->executeValidators(type_url_, decoded_resources, removed_resources);
 
   // We just bundled up the updates into nice per-watch packages. Now, deliver them.
   for (const auto& [cur_watch, resource_to_add] : per_watch_added) {

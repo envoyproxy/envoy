@@ -324,14 +324,6 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
           "envoy.reloadable_features.internal_authority_header_validator")) {
     return check_authority_h1_h2(header_value);
   }
-
-#ifdef ENVOY_NGHTTP2
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http2_validate_authority_with_quiche")) {
-    return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                   header_value.size()) != 0;
-  }
-#endif
   return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
 }
 

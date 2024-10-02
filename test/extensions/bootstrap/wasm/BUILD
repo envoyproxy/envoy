@@ -31,7 +31,7 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:logging_rust.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    external_deps = ["abseil_optional"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -45,6 +45,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -56,6 +57,7 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:http_cpp.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/bootstrap/wasm:config",
@@ -73,6 +75,7 @@ envoy_extension_cc_test(
         "//test/extensions/bootstrap/wasm/test_data:start_cpp.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
@@ -97,10 +100,7 @@ envoy_extension_cc_test_binary(
         "//test/extensions/bootstrap/wasm/test_data:speed_cpp.wasm",
     ]),
     extension_names = ["envoy.bootstrap.wasm"],
-    external_deps = [
-        "abseil_optional",
-        "benchmark",
-    ],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/event:dispatcher_lib",
@@ -114,5 +114,7 @@ envoy_extension_cc_test_binary(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@com_github_google_benchmark//:benchmark",
+        "@com_google_absl//absl/types:optional",
     ],
 )

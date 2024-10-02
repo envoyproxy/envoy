@@ -128,7 +128,7 @@ public:
           EXPECT_FALSE(capsule_protocol.empty());
           EXPECT_EQ(capsule_protocol[0]->value().getStringView(), "?1");
         }));
-    spdy::Http2HeaderBlock request_headers;
+    quiche::HttpHeaderBlock request_headers;
     request_headers[":authority"] = host_;
     request_headers[":method"] = "CONNECT";
     request_headers[":protocol"] = "connect-udp";
@@ -232,10 +232,10 @@ protected:
   EnvoyQuicServerStream* quic_stream_;
   Http::MockRequestDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
-  spdy::Http2HeaderBlock spdy_request_headers_;
+  quiche::HttpHeaderBlock spdy_request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
-  spdy::Http2HeaderBlock spdy_trailers_;
+  quiche::HttpHeaderBlock spdy_trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
@@ -263,7 +263,7 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
                   headers->get(Http::Headers::get().Cookie)[0]->value().getStringView());
       }));
   EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
-  spdy::Http2HeaderBlock spdy_headers;
+  quiche::HttpHeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";
   spdy_headers[":path"] = "/";
@@ -710,7 +710,7 @@ TEST_F(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
-  spdy::Http2HeaderBlock spdy_headers;
+  quiche::HttpHeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "POST";
   spdy_headers[":path"] = "/";
@@ -734,7 +734,7 @@ TEST_F(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
-  spdy::Http2HeaderBlock spdy_trailers;
+  quiche::HttpHeaderBlock spdy_trailers;
   // This header exceeds max header size limit and should cause stream reset.
   spdy_trailers["long_header"] = std::string(16 * 1024 + 1, 'a');
   std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers);
@@ -896,7 +896,7 @@ TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
 #endif
 
 TEST_F(EnvoyQuicServerStreamTest, RegularHeaderBeforePseudoHeader) {
-  spdy::Http2HeaderBlock spdy_headers;
+  quiche::HttpHeaderBlock spdy_headers;
   spdy_headers["foo"] = "bar";
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";

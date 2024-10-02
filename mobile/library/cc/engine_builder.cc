@@ -56,6 +56,11 @@ EngineBuilder& EngineBuilder::setUseCares(bool use_cares) {
   use_cares_ = use_cares;
   return *this;
 }
+
+EngineBuilder& EngineBuilder::addCaresFallbackResolver(std::string host, int port) {
+  cares_fallback_resolvers_.emplace_back(std::move(host), port);
+  return *this;
+}
 #endif
 EngineBuilder& EngineBuilder::setLogLevel(Logger::Logger::Levels log_level) {
   log_level_ = log_level;
@@ -217,8 +222,8 @@ EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::enablePortMigration(bool enable_port_migration) {
-  enable_port_migration_ = enable_port_migration;
+EngineBuilder& EngineBuilder::setNumTimeoutsToTriggerPortMigration(int num_timeouts) {
+  num_timeouts_to_trigger_port_migration_ = num_timeouts;
   return *this;
 }
 
@@ -259,6 +264,12 @@ EngineBuilder& EngineBuilder::enforceTrustChainVerification(bool trust_chain_ver
 
 EngineBuilder& EngineBuilder::setUpstreamTlsSni(std::string sni) {
   upstream_tls_sni_ = std::move(sni);
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds) {
+  quic_connection_idle_timeout_seconds_ = quic_connection_idle_timeout_seconds;
   return *this;
 }
 
@@ -491,6 +502,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 #else
   if (use_cares_) {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig resolver_config;
+    if (!cares_fallback_resolvers_.empty()) {
+      for (const auto& [host, port] : cares_fallback_resolvers_) {
+        auto* address = resolver_config.add_resolvers();
+        address->mutable_socket_address()->set_address(host);
+        address->mutable_socket_address()->set_port_value(port);
+      }
+      resolver_config.set_use_resolvers_as_fallback(true);
+    }
     dns_cache_config->mutable_typed_dns_resolver_config()->set_name(
         "envoy.network.dns_resolver.cares");
     dns_cache_config->mutable_typed_dns_resolver_config()->mutable_typed_config()->PackFrom(
@@ -554,6 +573,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   if (platform_certificates_validation_on_) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator
         validator;
+    if (network_thread_priority_.has_value()) {
+      validator.mutable_thread_priority()->set_value(*network_thread_priority_);
+    }
     validation->mutable_custom_validator_config()->set_name(
         "envoy_mobile.cert_validator.platform_bridge_cert_validator");
     validation->mutable_custom_validator_config()->mutable_typed_config()->PackFrom(validator);
@@ -711,19 +733,19 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           ->add_canonical_suffixes(suffix);
     }
 
-    if (enable_port_migration_) {
+    if (num_timeouts_to_trigger_port_migration_ > 0) {
       alpn_options.mutable_auto_config()
           ->mutable_http3_protocol_options()
           ->mutable_quic_protocol_options()
           ->mutable_num_timeouts_to_trigger_port_migration()
-          ->set_value(4);
+          ->set_value(num_timeouts_to_trigger_port_migration_);
     }
 
     alpn_options.mutable_auto_config()
         ->mutable_http3_protocol_options()
         ->mutable_quic_protocol_options()
         ->mutable_idle_network_timeout()
-        ->set_seconds(30);
+        ->set_seconds(quic_connection_idle_timeout_seconds_);
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())

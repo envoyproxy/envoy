@@ -30,7 +30,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
       cache-build-image: ${{ matrix.cache-build-image }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ${{ matrix.container-command }}
@@ -85,7 +85,7 @@ jobs:
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
-      bazel-extra: ${{ matrix.bazel-extra || '--config=rbe-envoy-engflow' }}
+      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ./ci/run_envoy_docker.sh
@@ -99,10 +99,11 @@ jobs:
         export NO_BUILD_SETUP=1
         export ENVOY_DOCKER_IN_DOCKER=1
       target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.arch }}
       trusted: ${{ inputs.trusted }}
       steps-pre: |
         - run: |
-            echo ARCH=${{ matrix.arch || 'x64' }} >> $GITHUB_ENV
+            echo ARCH=${{ matrix.arch }} >> $GITHUB_ENV
             echo DEB_ARCH=${{ matrix.arch == 'arm64' && 'arm64' || 'amd64' }} >> $GITHUB_ENV
           shell: bash
         - run: |
@@ -124,6 +125,7 @@ jobs:
 
         - name: verify_distro_x64
           target: verify_distro
+          arch: x64
           rbe: true
 
         - name: verify_distro_arm64
@@ -131,5 +133,6 @@ jobs:
           arch: arm64
           bazel-extra: >-
             --config=cache-envoy-engflow
+            --config=common-envoy-engflow
             --config=bes-envoy-engflow
           runs-on: envoy-arm64-small

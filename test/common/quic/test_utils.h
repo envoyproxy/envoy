@@ -205,7 +205,7 @@ public:
                              Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                              EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
       : EnvoyQuicClientSession(config, supported_versions, std::move(connection),
-                               quic::QuicServerId("example.com", 443, false),
+                               quic::QuicServerId("example.com", 443),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                dispatcher, send_buffer_limit, crypto_stream_factory,
@@ -274,7 +274,7 @@ void setQuicConfigWithDefaultValues(quic::QuicConfig* config) {
       config, quic::kMinimumFlowControlSendWindow);
 }
 
-std::string spdyHeaderToHttp3StreamPayload(const spdy::Http2HeaderBlock& header) {
+std::string spdyHeaderToHttp3StreamPayload(const quiche::HttpHeaderBlock& header) {
   quic::test::NoopQpackStreamSenderDelegate encoder_stream_sender_delegate;
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
   auto qpack_encoder = std::make_unique<quic::QpackEncoder>(&decoder_stream_error_delegate,
