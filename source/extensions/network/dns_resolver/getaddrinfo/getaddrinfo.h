@@ -52,13 +52,32 @@ protected:
 
     void cancel(CancelReason) override {
       ENVOY_LOG(debug, "cancelling query [{}]", dns_name_);
+      absl::MutexLock lock(&mutex_);
       cancelled_ = true;
     }
 
+    void addTrace(uint8_t trace) override {
+      absl::MutexLock lock(&mutex_);
+      traces_.push_back(
+          Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
+    }
+
+    const std::vector<Trace>& getTraces() override {
+      absl::MutexLock lock(&mutex_);
+      return traces_;
+    }
+
+    bool isCancelled() {
+      absl::MutexLock lock(&mutex_);
+      return cancelled_;
+    }
+
+    absl::Mutex mutex_;
     const std::string dns_name_;
     const DnsLookupFamily dns_lookup_family_;
     ResolveCb callback_;
     bool cancelled_{false};
+    std::vector<Trace> traces_;
   };
 
   struct PendingQueryInfo {

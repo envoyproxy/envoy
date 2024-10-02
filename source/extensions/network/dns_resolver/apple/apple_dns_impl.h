@@ -101,6 +101,12 @@ private:
     // Network::ActiveDnsQuery
     void cancel(Network::ActiveDnsQuery::CancelReason reason) override;
 
+    // Network::ActiveDnsQuery
+    void addTrace(uint8_t) override {}
+
+    // Network::ActiveDnsQuery
+    const std::vector<Trace>& getTraces() override { return traces_; }
+
     static DnsResponse buildDnsResponse(const struct sockaddr* address, uint32_t ttl);
 
     void onEventCallback(uint32_t events);
@@ -167,6 +173,7 @@ private:
   Stats::ScopeSharedPtr scope_;
   AppleDnsResolverStats stats_;
   bool include_unroutable_families_;
+  std::vector<Trace> traces_;
 };
 
 DECLARE_FACTORY(AppleDnsResolverFactory);

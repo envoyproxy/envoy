@@ -42,9 +42,6 @@ public:
     MonotonicTime time_;
   };
 
-  /** Return the lock of this instance. */
-  absl::Mutex& lock() { return mutex_; }
-
   /**
    * Cancel an outstanding DNS request.
    * @param reason supplies the cancel reason.
@@ -52,12 +49,10 @@ public:
   virtual void cancel(CancelReason reason) PURE;
 
   /** Add a trace for the DNS query. */
-  void addTrace(uint8_t trace) {
-    traces_.push_back(Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
-  }
+  virtual void addTrace(uint8_t trace) PURE;
 
   /** Return the DNS query traces. */
-  const std::vector<Trace>& getTraces() { return traces_; }
+  virtual const std::vector<Trace>& getTraces() PURE;
 
 private:
   absl::Mutex mutex_;

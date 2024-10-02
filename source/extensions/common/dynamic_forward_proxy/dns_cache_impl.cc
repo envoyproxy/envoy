@@ -73,7 +73,6 @@ DnsCacheImpl::DnsCacheImpl(
 DnsCacheImpl::~DnsCacheImpl() {
   for (const auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
-      absl::MutexLock lock(&primary_host.second->active_query_->lock());
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
     }
@@ -322,7 +321,6 @@ void DnsCacheImpl::forceRefreshHosts() {
     // each host IFF the host is not already refreshing. Cancellation is assumed to be cheap for
     // resolvers.
     if (primary_host.second->active_query_ != nullptr) {
-      absl::MutexLock lock(&primary_host.second->active_query_->lock());
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
       primary_host.second->active_query_ = nullptr;
@@ -349,7 +347,6 @@ void DnsCacheImpl::stop() {
   absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
   for (auto& primary_host : primary_hosts_) {
     if (primary_host.second->active_query_ != nullptr) {
-      absl::MutexLock lock(&primary_host.second->active_query_->lock());
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
       primary_host.second->active_query_ = nullptr;
@@ -423,14 +420,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   std::string details_with_maybe_trace = std::string(details);
   if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
-    absl::MutexLock lock(&primary_host_info->active_query_->lock());
     if (enable_dfp_dns_trace_) {
-      // It is important to cancel and create the trace string atomically because some DNS resolver
-      // implementation, such as `getaddrinfo` will delete the `ActiveQuery` after being cancelled.
-      if (is_timeout) {
-        primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
-      }
-      auto& traces = primary_host_info->active_query_->getTraces();
+      const auto& traces = primary_host_info->active_query_->getTraces();
       std::vector<std::string> string_traces;
       string_traces.reserve(traces.size());
       std::transform(
@@ -438,6 +429,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
             return absl::StrCat(trace.trace_, "=", trace.time_.time_since_epoch().count());
           });
       details_with_maybe_trace = absl::StrCat(details, ":", absl::StrJoin(string_traces, ","));
+      // `cancel` must be called last because the `ActiveQuery` will be destroyed afterward.
+      if (is_timeout) {
+        primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
+      }
     } else {
       if (is_timeout) {
         primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
