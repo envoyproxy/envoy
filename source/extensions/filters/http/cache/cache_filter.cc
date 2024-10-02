@@ -71,8 +71,9 @@ void CacheFilter::sendUpstreamRequest(Http::RequestHeaderMap& request_headers) {
   if (thread_local_cluster == nullptr) {
     return sendNoClusterResponse(route_entry->clusterName());
   }
-  upstream_request_ = UpstreamRequest::create(this, cache_, thread_local_cluster->httpAsyncClient(),
-                                              config_->upstreamOptions());
+  upstream_request_ =
+      UpstreamRequest::create(this, std::move(lookup_), std::move(lookup_result_), cache_,
+                              thread_local_cluster->httpAsyncClient(), config_->upstreamOptions());
   upstream_request_->sendHeaders(request_headers);
 }
 

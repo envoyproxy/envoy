@@ -35,11 +35,13 @@ public:
   void insertQueueUnderLowWatermark() override;
   void insertQueueAborted() override;
 
-  static UpstreamRequest* create(CacheFilter* filter, std::shared_ptr<HttpCache> cache,
+  static UpstreamRequest* create(CacheFilter* filter, LookupContextPtr lookup,
+                                 LookupResultPtr lookup_result, std::shared_ptr<HttpCache> cache,
                                  Http::AsyncClient& async_client,
                                  const Http::AsyncClient::StreamOptions& options);
-  UpstreamRequest(CacheFilter* filter, std::shared_ptr<HttpCache> cache,
-                  Http::AsyncClient& async_client, const Http::AsyncClient::StreamOptions& options);
+  UpstreamRequest(CacheFilter* filter, LookupContextPtr lookup, LookupResultPtr lookup_result,
+                  std::shared_ptr<HttpCache> cache, Http::AsyncClient& async_client,
+                  const Http::AsyncClient::StreamOptions& options);
   ~UpstreamRequest() override;
 
 private:
@@ -65,8 +67,8 @@ private:
   bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const;
 
   CacheFilter* filter_ = nullptr;
-  LookupResultPtr lookup_result_;
   LookupContextPtr lookup_;
+  LookupResultPtr lookup_result_;
   bool is_head_request_;
   bool request_allows_inserts_;
   std::shared_ptr<const CacheFilterConfig> config_;

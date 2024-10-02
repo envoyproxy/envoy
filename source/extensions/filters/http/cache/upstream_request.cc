@@ -112,21 +112,24 @@ bool UpstreamRequest::shouldUpdateCachedEntry(
                                                response_etag->value().getStringView());
 }
 
-UpstreamRequest* UpstreamRequest::create(CacheFilter* filter, std::shared_ptr<HttpCache> cache,
+UpstreamRequest* UpstreamRequest::create(CacheFilter* filter, LookupContextPtr lookup,
+                                         LookupResultPtr lookup_result,
+                                         std::shared_ptr<HttpCache> cache,
                                          Http::AsyncClient& async_client,
                                          const Http::AsyncClient::StreamOptions& options) {
-  auto upstream_request =
-      std::make_unique<UpstreamRequest>(filter, std::move(cache), async_client, options);
+  auto upstream_request = std::make_unique<UpstreamRequest>(
+      filter, std::move(lookup), std::move(lookup_result), std::move(cache), async_client, options);
   UpstreamRequest* ret = upstream_request.get();
   ret->self_ownership_ = std::move(upstream_request);
   return ret;
 }
 
-UpstreamRequest::UpstreamRequest(CacheFilter* filter, std::shared_ptr<HttpCache> cache,
+UpstreamRequest::UpstreamRequest(CacheFilter* filter, LookupContextPtr lookup,
+                                 LookupResultPtr lookup_result, std::shared_ptr<HttpCache> cache,
                                  Http::AsyncClient& async_client,
                                  const Http::AsyncClient::StreamOptions& options)
-    : filter_(filter), lookup_result_(std::move(filter_->lookup_result_)),
-      lookup_(std::move(filter->lookup_)), is_head_request_(filter->is_head_request_),
+    : filter_(filter), lookup_(std::move(lookup)), lookup_result_(std::move(lookup_result)),
+      is_head_request_(filter->is_head_request_),
       request_allows_inserts_(filter->request_allows_inserts_), config_(filter->config_),
       filter_state_(filter->filter_state_), cache_(std::move(cache)),
       stream_(async_client.start(*this, options)) {
