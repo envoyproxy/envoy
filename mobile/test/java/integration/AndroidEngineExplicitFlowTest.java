@@ -481,7 +481,7 @@ public class AndroidEngineExplicitFlowTest {
           mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
           RequestScenario requestScenario =
               new RequestScenario()
-                  .setHttpMethod(RequestMethod.GET)
+                  .setHttpMethod(RequestMethod.POST)
                   .setUrl(mockWebServer.url("get/flowers").toString())
                   .addBody("This is my body part 1")
                   .addBody("This is my body part 2")
