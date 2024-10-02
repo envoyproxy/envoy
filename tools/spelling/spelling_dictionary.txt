@@ -1713,6 +1713,7 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+fifo
 hotplug
 cgroup
 cgroupv1

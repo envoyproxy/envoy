@@ -658,6 +658,11 @@ EXTENSIONS = {
 
     # Local address selectors
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",
+
+    #
+    # Queue strategy
+    #
+    "envoy.queue_strategy.fifo":   "//source/extensions/queue_strategy/fifo:fifo_queue_strategy_impl",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
