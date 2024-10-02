@@ -105,6 +105,9 @@ minor_behavior_changes:
     Connect the QUIC UDP client connection sockets before use and sockets will only bind if
     the local address is specified. This behavior change can be reverted by setting the
     ``envoy_reloadable_features_quic_connect_client_udp_sockets`` runtime flag to ``false``.
+- area: http_11_proxy
+  change: |
+    Make the inner ``transport_socket`` field optional in the proto configuration.
 - area: conn_handler
   change: |
     Enhanced listener filter chain execution to include the case that listener filter has maxReadBytes() of 0,
