@@ -56,7 +56,6 @@ public:
 
 private:
   absl::Mutex mutex_;
-  std::vector<Trace> traces_;
 };
 
 /**
