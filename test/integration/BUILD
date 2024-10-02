@@ -807,6 +807,7 @@ envoy_cc_test(
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:encoder_recreate_stream_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
+        "//test/integration/filters:local_reply_during_decoding_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_data_filter_lib",
         "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:local_reply_with_metadata_filter_lib",
