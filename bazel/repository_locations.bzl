@@ -1370,12 +1370,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2024-07-23",
         use_category = ["test_only"],
     ),
+    # TEST: https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/pull/157/
     proxy_wasm_cpp_sdk = dict(
         project_name = "WebAssembly for Proxies (C++ SDK)",
         project_desc = "WebAssembly for Proxies (C++ SDK)",
         project_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk",
-        version = "921039ae983ce053bf5cba78a85a3c08ff9791e5",
-        sha256 = "a11adfe4e6346d3318ff72643aa5569dc8439d7e8927ed148f93226fa255cc7a",
+        version = "816e4031830e09684875113fc9dd573854bdf968",
+        sha256 = "20bdc387370b740a513c8ae4d305ce619ebc291c94679b9568189dbb97011955",
         strip_prefix = "proxy-wasm-cpp-sdk-{version}",
         urls = ["https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1390,7 +1391,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wamr",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2023-05-01",
+        release_date = "2024-10-01",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/blob/{version}/LICENSE",
@@ -1438,9 +1439,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Emscripten SDK",
         project_desc = "Emscripten SDK (use by Wasm)",
         project_url = "https://github.com/emscripten-core/emsdk",
-        # v3.1.7 with Bazel fixes
-        version = "0ea8f8a8707070e9a7c83fbb4a3065683bcf1799",
-        sha256 = "1ca0ff918d476c55707bb99bc0452be28ac5fb8f22a9260a8aae8a38d1bc0e27",
+        # v3.1.67
+        version = "a2383b33581adb7383c8f874d2dc34e07d055332",
+        sha256 = "d9e084ef352adaa4a15470f0dfc675fe8cab1a4e4d1720fb2e7547f31c3b5d40",
         strip_prefix = "emsdk-{version}/bazel",
         urls = ["https://github.com/emscripten-core/emsdk/archive/{version}.tar.gz"],
         use_category = ["test_only"],
