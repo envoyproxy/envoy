@@ -307,7 +307,7 @@ public class JniLibrary {
       boolean forceV6, boolean useGro, String http3ConnectionOptions,
       String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
       boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      int numPtosToTriggerPortMigration, boolean enableSocketTagging,
+      int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
       boolean enableInterfaceBinding, long h2ConnectionKeepaliveIdleIntervalMilliseconds,
       long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost,
       long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,

@@ -46,7 +46,7 @@ public class EnvoyConfiguration {
   public final List<String> quicCanonicalSuffixes;
   public final boolean enableGzipDecompression;
   public final boolean enableBrotliDecompression;
-  public final int numPtosToTriggerPortMigration;
+  public final int numTimeoutsToTriggerPortMigration;
   public final boolean enableSocketTagging;
   public final boolean enableInterfaceBinding;
   public final int h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -106,7 +106,8 @@ public class EnvoyConfiguration {
    *     decompression.
    * @param enableBrotliDecompression                     whether to enable response brotli
    *     decompression.
-   * @param numPtosToTriggerPortMigration                 number of PTOs to trigger port migration.
+   * @param numTimeoutsToTriggerPortMigration                 number of timeouts to trigger port
+   *     migration.
    * @param enableSocketTagging                           whether to enable socket tagging.
    * @param enableInterfaceBinding                        whether to allow interface binding.
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
@@ -139,7 +140,7 @@ public class EnvoyConfiguration {
       boolean forceV6, boolean useGro, String http3ConnectionOptions,
       String http3ClientConnectionOptions, Map<String, Integer> quicHints,
       List<String> quicCanonicalSuffixes, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, int numPtosToTriggerPortMigration,
+      boolean enableBrotliDecompression, int numTimeoutsToTriggerPortMigration,
       boolean enableSocketTagging, boolean enableInterfaceBinding,
       int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
       int maxConnectionsPerHost, int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
@@ -180,7 +181,7 @@ public class EnvoyConfiguration {
     this.quicCanonicalSuffixes = quicCanonicalSuffixes;
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
-    this.numPtosToTriggerPortMigration = numPtosToTriggerPortMigration;
+    this.numTimeoutsToTriggerPortMigration = numTimeoutsToTriggerPortMigration;
     this.enableSocketTagging = enableSocketTagging;
     this.enableInterfaceBinding = enableInterfaceBinding;
     this.h2ConnectionKeepaliveIdleIntervalMilliseconds =
@@ -234,7 +235,7 @@ public class EnvoyConfiguration {
         enableDNSCache, dnsCacheSaveIntervalSeconds, dnsNumRetries, enableDrainPostDnsRefresh,
         enableHttp3, useCares, forceV6, useGro, http3ConnectionOptions,
         http3ClientConnectionOptions, quicHints, quicSuffixes, enableGzipDecompression,
-        enableBrotliDecompression, numPtosToTriggerPortMigration, enableSocketTagging,
+        enableBrotliDecompression, numTimeoutsToTriggerPortMigration, enableSocketTagging,
         enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,

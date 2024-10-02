@@ -222,8 +222,8 @@ EngineBuilder& EngineBuilder::addQuicCanonicalSuffix(std::string suffix) {
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setNumPtosToTriggerPortMigration(int num_ptos) {
-  num_ptos_to_trigger_port_migration_ = num_ptos;
+EngineBuilder& EngineBuilder::setNumTimeoutsToTriggerPortMigration(int num_timeouts) {
+  num_timeouts_to_trigger_port_migration_ = num_timeouts;
   return *this;
 }
 
@@ -733,12 +733,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
           ->add_canonical_suffixes(suffix);
     }
 
-    if (num_ptos_to_trigger_port_migration_ > 0) {
+    if (num_timeouts_to_trigger_port_migration_ > 0) {
       alpn_options.mutable_auto_config()
           ->mutable_http3_protocol_options()
           ->mutable_quic_protocol_options()
           ->mutable_num_timeouts_to_trigger_port_migration()
-          ->set_value(num_ptos_to_trigger_port_migration_);
+          ->set_value(num_timeouts_to_trigger_port_migration_);
     }
 
     alpn_options.mutable_auto_config()

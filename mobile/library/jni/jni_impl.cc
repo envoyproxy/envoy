@@ -1223,7 +1223,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jstring http3_client_connection_options, jobjectArray quic_hints,
                       jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
                       jboolean enable_brotli_decompression,
-                      jlong num_ptos_to_trigger_port_migration, jboolean enable_socket_tagging,
+                      jlong num_timeouts_to_trigger_port_migration, jboolean enable_socket_tagging,
                       jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
@@ -1271,7 +1271,7 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   for (const std::string& suffix : suffixes) {
     builder.addQuicCanonicalSuffix(suffix);
   }
-  builder.setNumPtosToTriggerPortMigration(num_ptos_to_trigger_port_migration);
+  builder.setNumTimeoutsToTriggerPortMigration(num_timeouts_to_trigger_port_migration);
   builder.setUseCares(use_cares == JNI_TRUE);
   if (use_cares == JNI_TRUE) {
     auto resolvers = javaObjectArrayToStringPairVector(jni_helper, cares_fallback_resolvers);
@@ -1327,7 +1327,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jboolean force_v6, jboolean use_gro, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
     jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
-    jboolean enable_brotli_decompression, jlong num_ptos_to_trigger_port_migration,
+    jboolean enable_brotli_decompression, jlong num_timeouts_to_trigger_port_migration,
     jboolean enable_socket_tagging, jboolean enable_interface_binding,
     jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
@@ -1345,7 +1345,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
                    enable_drain_post_dns_refresh, enable_http3, use_cares, force_v6, use_gro,
                    http3_connection_options, http3_client_connection_options, quic_hints,
                    quic_canonical_suffixes, enable_gzip_decompression, enable_brotli_decompression,
-                   num_ptos_to_trigger_port_migration, enable_socket_tagging,
+                   num_timeouts_to_trigger_port_migration, enable_socket_tagging,
                    enable_interface_binding, h2_connection_keepalive_idle_interval_milliseconds,
                    h2_connection_keepalive_timeout_seconds, max_connections_per_host,
                    stream_idle_timeout_seconds, per_try_idle_timeout_seconds, app_version, app_id,

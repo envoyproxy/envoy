@@ -49,7 +49,7 @@ open class EngineBuilder() {
   private var quicCanonicalSuffixes = mutableListOf<String>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
-  private var numPtosToTriggerPortMigration = 0
+  private var numTimeoutsToTriggerPortMigration = 0
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -270,12 +270,12 @@ open class EngineBuilder() {
   /**
    * Configure QUIC port migration. Defaults to disabled.
    *
-   * @param numPtosToTriggerPortMigration number of PTOs to trigger port migration. If 0, port
-   *   migration is disabled.
+   * @param numTimeoutsToTriggerPortMigration number of timeouts to trigger port migration. If 0,
+   *   port migration is disabled.
    * @return This builder.
    */
-  fun setNumPtosToTriggerPortMigration(numPtosToTriggerPortMigration: Int): EngineBuilder {
-    this.numPtosToTriggerPortMigration = numPtosToTriggerPortMigration
+  fun setNumTimeoutsToTriggerPortMigration(numTimeoutsToTriggerPortMigration: Int): EngineBuilder {
+    this.numTimeoutsToTriggerPortMigration = numTimeoutsToTriggerPortMigration
     return this
   }
 
@@ -579,7 +579,7 @@ open class EngineBuilder() {
         quicCanonicalSuffixes,
         enableGzipDecompression,
         enableBrotliDecompression,
-        numPtosToTriggerPortMigration,
+        numTimeoutsToTriggerPortMigration,
         enableSocketTagging,
         enableInterfaceBinding,
         h2ConnectionKeepaliveIdleIntervalMilliseconds,

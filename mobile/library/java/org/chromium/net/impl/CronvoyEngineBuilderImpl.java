@@ -62,7 +62,7 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   private String mQuicClientConnectionOptions = "";
   private boolean mHttp2Enabled;
   private boolean mBrotiEnabled;
-  private int mNumPtosToTriggerPortMigration;
+  private int mNumTimeoutsToTriggerPortMigration;
   private boolean mDisableCache;
   private int mHttpCacheMode;
   private long mHttpCacheMaxSize;
@@ -241,12 +241,12 @@ public abstract class CronvoyEngineBuilderImpl extends ICronetEngineBuilder {
   List<String> quicCanonicalSuffixes() { return mQuicCanonicalSuffixes; }
 
   public CronvoyEngineBuilderImpl
-  setNumPtosToTriggerPortMigration(int numPtosToTriggerPortMigration) {
-    mNumPtosToTriggerPortMigration = numPtosToTriggerPortMigration;
+  setNumTimeoutsToTriggerPortMigration(int numTimeoutsToTriggerPortMigration) {
+    mNumTimeoutsToTriggerPortMigration = numTimeoutsToTriggerPortMigration;
     return this;
   }
 
-  int numPtosToTriggerPortMigration() { return mNumPtosToTriggerPortMigration; }
+  int numTimeoutsToTriggerPortMigration() { return mNumTimeoutsToTriggerPortMigration; }
 
   @Override
   public CronvoyEngineBuilderImpl addPublicKeyPins(String hostName, Set<byte[]> pinsSha256,
