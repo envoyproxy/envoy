@@ -158,8 +158,16 @@ void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, s
     fragments_.clear();
     // Clearing self-ownership might provoke the destructor, so take a copy of the
     // abort callback to avoid reading from 'this' after it may be deleted.
+    //
+    // This complexity is necessary because if the queue *is not* currently
+    // self-owned, it will be deleted during insertQueueAborted, so
+    // clearing self_ownership_ second would be a write-after-destroy error.
+    // If it *is* currently self-owned, then we must still call the callback if
+    // any, but clearing self_ownership_ *first* would mean we got destroyed
+    // so we would no longer have access to the callback.
+    // Since destroying first *or* second can be an error, rearrange things
+    // so that destroying first *is not* an error. :)
     auto callbacks = std::move(callbacks_);
-    callbacks_.reset();
     self_ownership_.reset();
     if (callbacks.has_value()) {
       callbacks->insertQueueAborted();
