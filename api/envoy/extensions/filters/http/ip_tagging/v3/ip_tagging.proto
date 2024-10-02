@@ -18,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // IP tagging :ref:`configuration overview <config_http_filters_ip_tagging>`.
 // [#extension: envoy.filters.http.ip_tagging]
 
+// [#next-free-field: 6]
 message IPTagging {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ip_tagging.v2.IPTagging";
@@ -39,11 +40,6 @@ message IPTagging {
     EXTERNAL = 2;
   }
 
-  // optional header to use for ip-tagging instead of default
-  string ip_tagging_header = 5 [
-    (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}
-  ];
-
   // Supplies the IP tag name and the IP address subnets.
   message IPTag {
     option (udpa.annotations.versioning).previous_message_type =
@@ -56,6 +52,10 @@ message IPTagging {
     // ip_tag_name. Both IPv4 and IPv6 are supported.
     repeated config.core.v3.CidrRange ip_list = 2;
   }
+
+  // optional header to use for ip-tagging instead of default
+  string ip_tagging_header = 5
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The type of request the filter should apply to.
   RequestType request_type = 1 [(validate.rules).enum = {defined_only: true}];
