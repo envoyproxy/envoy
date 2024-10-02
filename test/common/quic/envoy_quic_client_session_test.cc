@@ -137,7 +137,7 @@ public:
     envoy_quic_session_ = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, quic_version_,
         std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-        quic::QuicServerId("example.com", 443, false), crypto_config_, *dispatcher_,
+        quic::QuicServerId("example.com", 443), crypto_config_, *dispatcher_,
         /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, cache,
         *store_.rootScope(), transport_socket_options_, uts_factory);
 
@@ -676,8 +676,8 @@ TEST_P(EnvoyQuicClientSessionTest, WriteBlockedAndUnblock) {
   EnvoyQuicClientConnectionPeer::onFileEvent(*quic_connection_, Event::FileReadyType::Write,
                                              *quic_connection_->connectionSocket());
   EXPECT_FALSE(quic_connection_->writer()->IsWriteBlocked());
-  EXPECT_CALL(stream_callbacks,
-              onResetStream(Http::StreamResetReason::LocalReset, "QUIC_STREAM_REQUEST_REJECTED"));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset,
+                                              "QUIC_STREAM_REQUEST_REJECTED|FROM_SELF"));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   stream.resetStream(Http::StreamResetReason::LocalReset);
 }

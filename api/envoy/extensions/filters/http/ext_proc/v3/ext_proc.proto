@@ -12,6 +12,8 @@ import "envoy/type/matcher/v3/string.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -131,8 +133,39 @@ message ExternalProcessor {
   // Only one of ``http_service`` or
   // :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.grpc_service>`.
   // can be set. It is required that one of them must be set.
-  ExtProcHttpService http_service = 20
-      [(udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type"];
+  //
+  // If ``http_service`` is set, the
+  // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+  // can not be configured to send any body or trailers. i.e, http_service only supports
+  // sending request or response headers to the side stream server.
+  //
+  // With this configuration, Envoy behavior:
+  //
+  // 1. The headers are first put in a proto message
+  // :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>`.
+  //
+  // 2. This proto message is then transcoded into a JSON text.
+  //
+  // 3. Envoy then sends a HTTP POST message with content-type as "application/json",
+  // and this JSON text as body to the side stream server.
+  //
+  // After the side-stream receives this HTTP request message, it is expected to do as follows:
+  //
+  // 1. It converts the body, which is a JSON string, into a ``ProcessingRequest``
+  // proto message to examine and mutate the headers.
+  //
+  // 2. It then sets the mutated headers into a new proto message
+  // :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>`.
+  //
+  // 3. It converts ``ProcessingResponse`` proto message into a JSON text.
+  //
+  // 4. It then sends a HTTP response back to Envoy with status code as "200",
+  // content-type as "application/json" and sets the JSON text as the body.
+  //
+  ExtProcHttpService http_service = 20 [
+    (udpa.annotations.field_migrate).oneof_promotion = "ext_proc_service_type",
+    (xds.annotations.v3.field_status).work_in_progress = true
+  ];
 
   // By default, if the gRPC stream cannot be established, or if it is closed
   // prematurely with an error, the filter will fail. Specifically, if the

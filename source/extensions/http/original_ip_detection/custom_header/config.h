@@ -18,7 +18,7 @@ namespace CustomHeader {
  */
 class CustomHeaderIPDetectionFactory : public Envoy::Http::OriginalIPDetectionFactory {
 public:
-  Envoy::Http::OriginalIPDetectionSharedPtr
+  absl::StatusOr<Envoy::Http::OriginalIPDetectionSharedPtr>
   createExtension(const Protobuf::Message& message,
                   Server::Configuration::FactoryContext& context) override;
 

@@ -67,6 +67,8 @@ jobs:
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
 
   publish:
+    secrets:
+      gcp-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED || secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read

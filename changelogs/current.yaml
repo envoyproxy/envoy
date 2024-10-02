@@ -116,6 +116,10 @@ minor_behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
     requests and responses to address to address stability concerns. This behavior can be reverted by setting the feature to ``true``.
+- area: udp
+  change: |
+    Set Don't Fragment (DF) flag bit on IP packet header on UDP listener sockets and QUIC upstream connection sockets. This behavior
+    can be reverted by setting ``envoy.reloadable_features.udp_set_do_not_fragment`` to false.
 - area: access_log
   change: |
     Sanitize SNI for potential log injection. The invalid character will be replaced by ``_`` with an ``invalid:`` marker. If runtime
@@ -397,6 +401,17 @@ new_features:
 - area: geoip
   change: |
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
+- area: access_log
+  change: |
+    Added new JSON access log formatter implementation which provides 16-25x performance improvement over the old
+    implementation. The legacy implementation will be enabled by default for now but will be deprecated and removed
+    in a future release.
+    The :ref:`sort_properties <envoy_v3_api_field_config.core.v3.JsonFormatOptions.sort_properties>` field will
+    be ignored in the new implementation because the new implementation always sorts properties. And the new implementation
+    will always keep the value type in the JSON output. For example, the duration field will always be rendered as a number
+    instead of a string.
+    The new JSON formatter could be enabled by setting the runtime guard
+    ``envoy.reloadable_features.logging_with_fast_json_formatter`` to true.
 - area: access_logs
   change: |
     Added support for %UPSTREAM_CONNECTION_ID% access log substitution string in TCP and UDP tunneling flows.
