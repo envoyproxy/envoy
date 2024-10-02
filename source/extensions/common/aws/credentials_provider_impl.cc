@@ -1042,8 +1042,9 @@ CredentialsProviderSharedPtr createCredentialsProviderFromConfig(
                                                       inline_credential.session_token());
   }
   case envoy::extensions::common::aws::v3::AwsCredentialProvider::ProviderCase::PROVIDER_NOT_SET:
-    return nullptr;
+    break;
   }
+  return nullptr;
 }
 
 } // namespace Aws
