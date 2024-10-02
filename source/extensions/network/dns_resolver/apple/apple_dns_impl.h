@@ -165,6 +165,7 @@ private:
     // be accumulated before firing callback_.
     PendingResponse pending_response_;
     DnsLookupFamily dns_lookup_family_;
+    std::vector<Trace> traces_;
   };
 
   Event::Dispatcher& dispatcher_;
@@ -173,7 +174,6 @@ private:
   Stats::ScopeSharedPtr scope_;
   AppleDnsResolverStats stats_;
   bool include_unroutable_families_;
-  std::vector<Trace> traces_;
 };
 
 DECLARE_FACTORY(AppleDnsResolverFactory);
