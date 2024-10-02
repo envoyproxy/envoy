@@ -175,25 +175,6 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 #define ENVOY_ATTACH_REUSEPORT_CBPF Network::SocketOptionName()
 #endif
 
-#if !defined(ANDROID) && defined(__APPLE__)
-// Only include TargetConditionals after testing ANDROID as some Android builds
-// on the Mac have this header available and it's not needed unless the target
-// is really an Apple platform.
-#include <TargetConditionals.h>
-#if !defined(TARGET_OS_IPHONE) || !TARGET_OS_IPHONE
-// MAC_OS
-#define ENVOY_IP_DONTFRAG ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_DONTFRAG)
-#define ENVOY_IPV6_DONTFRAG ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_DONTFRAG)
-#endif
-#endif
-
-#if !defined(ENVOY_IP_DONTFRAG) && defined(IP_PMTUDISC_DO)
-#define ENVOY_IP_MTU_DISCOVER ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_MTU_DISCOVER)
-#define ENVOY_IP_MTU_DISCOVER_VALUE IP_PMTUDISC_DO
-#define ENVOY_IPV6_MTU_DISCOVER ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_MTU_DISCOVER)
-#define ENVOY_IPV6_MTU_DISCOVER_VALUE IPV6_PMTUDISC_DO
-#endif
-
 /**
  * Interface representing a single filter chain info.
  */
