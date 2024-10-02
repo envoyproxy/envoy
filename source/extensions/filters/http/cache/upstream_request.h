@@ -18,6 +18,9 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::cache_filter>,
                         public InsertQueueCallbacks {
 public:
   void sendHeaders(Http::RequestHeaderMap& request_headers);
+  // Called by filter_ when filter_ is destroyed first.
+  // UpstreamRequest will make no more calls to filter_ once disconnectFilter
+  // has been called.
   void disconnectFilter();
 
   // StreamCallbacks

@@ -74,10 +74,12 @@ private:
   // send a 503 locally.
   void sendNoClusterResponse(absl::string_view cluster_name);
 
-  // Called by UpstreamRequest if it is reset.
+  // Called by UpstreamRequest if it is reset before CacheFilter is destroyed.
+  // CacheFilter must make no more calls to upstream_request_ once this has been called.
   void onUpstreamRequestReset();
 
-  // Called by UpstreamRequest if it finishes without reset.
+  // Called by UpstreamRequest if it finishes without reset before CacheFilter is destroyed.
+  // CacheFilter must make no more calls to upstream_request_ once this has been called.
   void onUpstreamRequestComplete();
 
   // Utility functions; make any necessary checks and call the corresponding lookup_ functions
