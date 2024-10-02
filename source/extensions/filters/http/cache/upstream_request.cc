@@ -133,10 +133,7 @@ UpstreamRequest::UpstreamRequest(CacheFilter* filter, LookupContextPtr lookup,
       request_allows_inserts_(filter->request_allows_inserts_), config_(filter->config_),
       filter_state_(filter->filter_state_), cache_(std::move(cache)),
       stream_(async_client.start(*this, options)) {
-  // std::move doesn't always guarantee nulling the old value, so do it manually to be safe.
   ASSERT(stream_ != nullptr);
-  filter->lookup_ = nullptr;
-  filter->lookup_result_ = nullptr;
 }
 
 void UpstreamRequest::insertQueueOverHighWatermark() {
