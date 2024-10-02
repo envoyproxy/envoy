@@ -128,6 +128,7 @@ envoy_cc_library(
         ":pure_lib",
         ":scope_tracker_interface",
         "//source/common/common:cleanup_lib",
+        "//source/common/common:macros",
     ],
 )
 

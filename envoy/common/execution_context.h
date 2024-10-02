@@ -7,6 +7,7 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/cleanup.h"
+#include "source/common/common/macros.h"
 #include "source/common/common/non_copyable.h"
 
 namespace Envoy {
@@ -45,12 +46,12 @@ public:
     return const_cast<ExecutionContext*>(const_context);
   }
 
-  // Called when enters a scope in which |span| is active.
+  // Called when enters a scope in which |*span| is active.
   // Returns an object that can do some cleanup when exits the scope.
-  virtual Envoy::Cleanup onScopeEnter(Envoy::Tracing::Span& span) PURE;
-  // Called when enters a scope in which |filter_context| is active.
+  virtual Envoy::Cleanup onScopeEnter(Envoy::Tracing::Span* span) PURE;
+  // Called when enters a scope in which |*filter_context| is active.
   // Returns an object that can do some cleanup when exits the scope.
-  virtual Envoy::Cleanup onScopeEnter(const Http::FilterContext& filter_context) PURE;
+  virtual Envoy::Cleanup onScopeEnter(const Http::FilterContext* filter_context) PURE;
 
 protected:
   // Called when the current thread starts to run code on behalf of the owner of this object.
@@ -61,10 +62,7 @@ protected:
   virtual void deactivate() PURE;
 
 private:
-  static std::atomic<bool>& enabled() {
-    static std::atomic<bool> value = false;
-    return value;
-  }
+  static std::atomic<bool>& enabled() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<bool>); }
 
   friend class ScopedExecutionContext;
 };
@@ -115,10 +113,10 @@ private:
   Envoy::Cleanup ENVOY_EXECUTION_SCOPE_CAT(on_scope_exit_, __LINE__) =                             \
       [execution_context = ExecutionContext::fromStreamInfo(trackedStream),                        \
        scoped_object = (scopedObject)] {                                                           \
-        if (execution_context == nullptr || scoped_object == nullptr) {                            \
+        if (execution_context == nullptr) {                                                        \
           return Envoy::Cleanup::Noop();                                                           \
         }                                                                                          \
-        return execution_context->onScopeEnter(*scoped_object);                                    \
+        return execution_context->onScopeEnter(scoped_object);                                     \
       }()
 #else
 #define ENVOY_EXECUTION_SCOPE(trackedStream, scopedObject)

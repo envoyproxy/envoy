@@ -22,11 +22,14 @@ thread_local const Http::FilterContext* current_filter_context = nullptr;
 
 class TestExecutionContext : public ExecutionContext {
 public:
-  Envoy::Cleanup onScopeEnter(Envoy::Tracing::Span&) override { return Envoy::Cleanup::Noop(); }
+  Envoy::Cleanup onScopeEnter(Envoy::Tracing::Span*) override { return Envoy::Cleanup::Noop(); }
 
-  Envoy::Cleanup onScopeEnter(const Http::FilterContext& filter_context) override {
+  Envoy::Cleanup onScopeEnter(const Http::FilterContext* filter_context) override {
+    if (filter_context == nullptr) {
+      return Envoy::Cleanup::Noop();
+    }
     const Http::FilterContext* old_filter_context = current_filter_context;
-    current_filter_context = &filter_context;
+    current_filter_context = filter_context;
     return Envoy::Cleanup([old_filter_context]() { current_filter_context = old_filter_context; });
   }
 
