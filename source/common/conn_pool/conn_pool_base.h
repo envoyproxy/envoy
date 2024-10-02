@@ -10,12 +10,16 @@
 #include "source/common/common/debug_recursion_checker.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/linked_object.h"
+#include "source/extensions/queue_strategy/common/queue_strategy_base.h"
+#include "source/common/conn_pool/pending_stream.h"
 
 #include "absl/strings/string_view.h"
 #include "fmt/ostream.h"
 
 namespace Envoy {
 namespace ConnectionPool {
+
+using PendingStreamQueuePtr = std::unique_ptr<Envoy::Extensions::QueueStrategy::QueueBase<PendingStream>>;
 
 class ConnPoolImplBase;
 
@@ -154,27 +158,6 @@ private:
   State state_{State::Connecting};
 };
 
-// PendingStream is the base class tracking streams for which a connection has been created but not
-// yet established.
-class PendingStream : public LinkedObject<PendingStream>, public ConnectionPool::Cancellable {
-public:
-  PendingStream(ConnPoolImplBase& parent, bool can_send_early_data);
-  ~PendingStream() override;
-
-  // ConnectionPool::Cancellable
-  void cancel(Envoy::ConnectionPool::CancelPolicy policy) override;
-
-  // The context here returns a pointer to whatever context is provided with newStream(),
-  // which will be passed back to the parent in onPoolReady or onPoolFailure.
-  virtual AttachContext& context() PURE;
-
-  ConnPoolImplBase& parent_;
-  // The request can be sent as early data.
-  bool can_send_early_data_;
-};
-
-using PendingStreamPtr = std::unique_ptr<PendingStream>;
-
 using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
 // Base class that handles stream queueing logic shared between connection pool implementations.
@@ -278,7 +261,7 @@ public:
   const Network::TransportSocketOptionsConstSharedPtr& transportSocketOptions() {
     return transport_socket_options_;
   }
-  bool hasPendingStreams() const { return !pending_streams_.empty(); }
+  bool hasPendingStreams() const { return !pending_streams_->empty(); }
 
   void decrClusterStreamCapacity(uint32_t delta) {
     cluster_connectivity_state_.decrConnectingAndConnectedStreamCapacity(delta);
@@ -294,7 +277,7 @@ public:
        << DUMP_MEMBER(busy_clients_.size()) << DUMP_MEMBER(connecting_clients_.size())
        << DUMP_MEMBER(connecting_stream_capacity_)
        << DUMP_MEMBER(connecting_and_connected_stream_capacity_) << DUMP_MEMBER(num_active_streams_)
-       << DUMP_MEMBER(pending_streams_.size())
+       << DUMP_MEMBER(pending_streams_->size())
        << " per upstream preconnect ratio: " << perUpstreamPreconnectRatio();
   }
 
@@ -349,9 +332,12 @@ protected:
 
   ConnectionPool::Cancellable*
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
-    LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
+    const auto stream_added = pending_streams_->add(std::move(pending_stream));
     cluster_connectivity_state_.incrPendingStreams(1);
-    return pending_streams_.front().get();
+    if (pending_streams_->isOverloaded()) {
+        host_->cluster().trafficStats()->upstream_queue_overloaded_.inc();
+      }
+    return stream_added;
   }
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
@@ -400,7 +386,7 @@ private:
 
   Upstream::ClusterConnectivityState& cluster_connectivity_state_;
 
-  std::list<PendingStreamPtr> pending_streams_;
+  PendingStreamQueuePtr pending_streams_;
 
   // The number of streams that can be immediately dispatched from the current
   // `ready_clients_` plus `connecting_stream_capacity_`.

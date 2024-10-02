@@ -756,6 +756,7 @@ public:
   GAUGE(upstream_cx_active, Accumulate)                                                            \
   GAUGE(upstream_cx_rx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
+  GAUGE(upstream_queue_overloaded, Accumulate)                                                     \
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
@@ -1211,6 +1212,12 @@ public:
    * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * @return OptRef<const envoy::config::cluster::v3::Cluster::QueueStrategyConfig>
+   * an optional value of the configuration for the pending requests queue strategy for this cluster.
+   */
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::QueueStrategyConfig> queueStrategyConfig() const PURE;
 
   /**
    * @return whether to skip waiting for health checking before draining connections

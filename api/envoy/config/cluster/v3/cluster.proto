@@ -755,6 +755,20 @@ message Cluster {
         [(validate.rules).double = {lte: 3.0 gte: 1.0}];
   }
 
+  // Common configuration for FIFO strategy for the pending requests queue.
+  message FifoQueueStrategyConfig {
+  }
+
+  // Common configuration for queieing strategy for pending requests per cluster.
+  message QueueStrategyConfig {
+    // Queueing strategy to apply to the pending requests. By default FIFO strategy will be used.
+    oneof queue_strategy_config {
+      // Specifies using a FIFO queue for the pending requests.
+      // [#extension: envoy.queue_strategy.fifo]
+      FifoQueueStrategyConfig fifo_strategy_config = 1;
+    }
+  }
+
   reserved 12, 15, 7, 11, 35;
 
   reserved "hosts", "tls_context", "extension_protocol_options";
@@ -1297,6 +1311,9 @@ message Cluster {
   // If ``connection_pool_per_downstream_connection`` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
+
+  // Queueing config for cluster pending requests.
+  QueueStrategyConfig queue_strategy_config = 60;
 }
 
 // Extensible load balancing policy configuration.

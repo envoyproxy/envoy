@@ -406,6 +406,10 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
 /*/extensions/router/cluster_specifiers/matcher @wbpcode @agrawroh
 
+#Queue strategy
+/*/extensions/queue_strategy/common @nezdolik @yanavlasov @balrawi-figma
+/*/extensions/queue_strategy/fifo   @nezdolik @yanavlasov @balrawi-figma
+
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED
 /*/extensions/filters/http/common @UNOWNED @UNOWNED

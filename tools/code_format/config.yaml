@@ -219,6 +219,8 @@ paths:
     - source/extensions/load_balancing_policies/subset
     - source/extensions/matching
     - source/extensions/network/dns_resolver/cares/
+    - source/extensions/queue_strategy/common/
+    - source/extensions/queue_strategy/fifo/
     - source/extensions/quic/server_preferred_address
     - source/extensions/quic/connection_id_generator
     - source/extensions/resource_monitors

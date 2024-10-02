@@ -150,6 +150,7 @@ public:
               (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
+  MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::QueueStrategyConfig>, queueStrategyConfig, (), (const));
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
   MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
@@ -262,6 +263,7 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
+  std::unique_ptr<envoy::config::cluster::v3::Cluster::QueueStrategyConfig> queue_strategy_config_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   Stats::ScopeSharedPtr stats_scope_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;

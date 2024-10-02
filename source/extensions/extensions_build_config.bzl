@@ -303,12 +303,12 @@ EXTENSIONS = {
     # Tracers
     #
 
-    "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
-    "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
-    "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
-    "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
-    "envoy.tracers.opentelemetry":                      "//source/extensions/tracers/opentelemetry:config",
-    "envoy.tracers.fluentd":                            "//source/extensions/tracers/fluentd:config",
+    # "envoy.tracers.datadog":                            "//source/extensions/tracers/datadog:config",
+    # "envoy.tracers.zipkin":                             "//source/extensions/tracers/zipkin:config",
+    # "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
+    # "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
+    # "envoy.tracers.opentelemetry":                      "//source/extensions/tracers/opentelemetry:config",
+    # "envoy.tracers.fluentd":                            "//source/extensions/tracers/fluentd:config",
 
     #
     # OpenTelemetry Resource Detectors
@@ -332,15 +332,15 @@ EXTENSIONS = {
     # Transport sockets
     #
 
-    "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
-    "envoy.transport_sockets.http_11_proxy":            "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
-    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
-    "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
-    "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
-    "envoy.transport_sockets.tcp_stats":                "//source/extensions/transport_sockets/tcp_stats:config",
-    "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
-    "envoy.transport_sockets.internal_upstream":        "//source/extensions/transport_sockets/internal_upstream:config",
+    # "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
+    # "envoy.transport_sockets.http_11_proxy":            "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
+    # "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
+    # "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
+    # "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
+    # "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
+    # "envoy.transport_sockets.tcp_stats":                "//source/extensions/transport_sockets/tcp_stats:config",
+    # "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
+    # "envoy.transport_sockets.internal_upstream":        "//source/extensions/transport_sockets/internal_upstream:config",
 
     #
     # Retry host predicates
@@ -603,6 +603,11 @@ EXTENSIONS = {
 
     # Local address selectors
     "envoy.upstream.local_address_selector.filter_state_override": "//source/extensions/local_address_selectors/filter_state_override:config",
+
+    #
+    # Queue strategy
+    #
+    "envoy.queue_strategy.fifo":   "//source/extensions/queue_strategy/fifo:fifo_queue_strategy_impl",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

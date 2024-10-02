@@ -1167,6 +1167,13 @@ envoy.udp_packet_writer.gso:
   status: stable
   type_urls:
   - envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+envoy.queue_strategy.fifo:
+  categories:
+  - envoy.queue_strategy
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.queue_strategy.fifo.v3.FifoQueueStrategyConfig
 envoy.quic.deterministic_connection_id_generator:
   categories:
   - envoy.quic.connection_id_generator
@@ -2120,3 +2127,4 @@ envoy.filters.http.dynamic_modules:
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+

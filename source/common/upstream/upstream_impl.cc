@@ -1152,6 +1152,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       typed_metadata_(config.has_metadata()
                           ? std::make_unique<ClusterTypedMetadata>(config.metadata())
                           : nullptr),
+      queue_strategy_config_(config.has_queue_strategy_config() ?
+          std::make_unique<envoy::config::cluster::v3::Cluster::QueueStrategyConfig>(
+            config.queue_strategy_config()) : nullptr),
       common_lb_config_(
           factory_context.serverFactoryContext().clusterManager().getCommonLbConfigPtr(
               config.common_lb_config())),
