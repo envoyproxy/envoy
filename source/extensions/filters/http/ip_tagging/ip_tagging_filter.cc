@@ -20,7 +20,8 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
       no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
-      unknown_tag_(stat_name_set_->add("unknown_tag.hit")) {
+      unknown_tag_(stat_name_set_->add("unknown_tag.hit")),
+      header_(config.ip_tagging_header()) {
 
   // Once loading IP tags from a file system is supported, the restriction on the size
   // of the set should be removed and observability into what tags are loaded needs
@@ -82,7 +83,14 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
 
   if (!tags.empty()) {
     const std::string tags_join = absl::StrJoin(tags, ",");
-    headers.appendEnvoyIpTags(tags_join, ",");
+
+    // use the optional header instead of the default if it's provided.
+    if (!config_->ip_tagging_header().get().empty()) {
+        headers.appendCopy(config_->ip_tagging_header(), tags_join);
+    }
+    else {
+        headers.appendEnvoyIpTags(tags_join, ",");
+    }
 
     // We must clear the route cache or else we can't match on x-envoy-ip-tags.
     callbacks_->downstreamCallbacks()->clearRouteCache();
