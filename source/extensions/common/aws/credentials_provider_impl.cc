@@ -1018,6 +1018,8 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
 CredentialsProviderSharedPtr createCredentialsProviderFromConfig(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& config) {
+
+  CredentialsProviderSharedPtr provider;
   switch (config.provider_case()) {
   case envoy::extensions::common::aws::v3::AwsCredentialProvider::ProviderCase::
       kAssumeRoleWithWebIdentity: {
@@ -1030,21 +1032,23 @@ CredentialsProviderSharedPtr createCredentialsProviderFromConfig(
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     // This "two seconds" is a bit arbitrary, but matches the other places in the codebase.
     const auto initialization_timer = std::chrono::seconds(2);
-    return std::make_shared<WebIdentityCredentialsProvider>(
+    provider = std::make_shared<WebIdentityCredentialsProvider>(
         context.api(), context, Extensions::Common::Aws::Utility::fetchMetadata,
         MetadataFetcher::create, "", token, sts_endpoint, role_arn, role_session_name,
         refresh_state, initialization_timer, cluster_name);
+    break;
   }
   case envoy::extensions::common::aws::v3::AwsCredentialProvider::ProviderCase::kInlineCredential: {
     const auto& inline_credential = config.inline_credential();
-    return std::make_shared<InlineCredentialProvider>(inline_credential.access_key_id(),
-                                                      inline_credential.secret_access_key(),
-                                                      inline_credential.session_token());
-  }
-  case envoy::extensions::common::aws::v3::AwsCredentialProvider::ProviderCase::PROVIDER_NOT_SET:
+    provider = std::make_shared<InlineCredentialProvider>(inline_credential.access_key_id(),
+                                                          inline_credential.secret_access_key(),
+                                                          inline_credential.session_token());
     break;
   }
-  return nullptr;
+  case envoy::extensions::common::aws::v3::AwsCredentialProvider::ProviderCase::PROVIDER_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
+  }
+  return provider;
 }
 
 } // namespace Aws

@@ -2691,6 +2691,12 @@ TEST(CreateCredentialsProviderFromConfig, AssumeRoleWithWebIdentity) {
   EXPECT_EQ("arn:aws:iam::123456789012:role/role-name", role_arn);
 }
 
+TEST(CreateCredentialsProviderFromConfig, InvalidEnum) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::extensions::common::aws::v3::AwsCredentialProvider base;
+  EXPECT_DEATH(createCredentialsProviderFromConfig(context, "foo", base), ".*panic: unset oneof.*");
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions
