@@ -62,7 +62,8 @@ public:
   EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
   EngineBuilder& addQuicHint(std::string host, int port);
   EngineBuilder& addQuicCanonicalSuffix(std::string suffix);
-  EngineBuilder& enablePortMigration(bool enable_port_migration);
+  // 0 means port migration is disabled.
+  EngineBuilder& setNumTimeoutsToTriggerPortMigration(int num_timeouts);
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   // Sets whether to use GRO for upstream UDP sockets (QUIC/HTTP3).
@@ -179,7 +180,7 @@ private:
   std::string http3_client_connection_options_ = "";
   std::vector<std::pair<std::string, int>> quic_hints_;
   std::vector<std::string> quic_suffixes_;
-  bool enable_port_migration_ = false;
+  int num_timeouts_to_trigger_port_migration_ = 0;
   bool always_use_v6_ = false;
 #if defined(__APPLE__)
   // TODO(abeyad): once stable, consider setting the default to true.
