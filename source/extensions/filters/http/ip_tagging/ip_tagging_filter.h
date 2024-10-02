@@ -39,7 +39,7 @@ public:
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
 
-  const Http::LowerCaseString& ip_tagging_header() const {return header_; }
+  const Http::LowerCaseString& ip_tagging_header() const { return header_; }
 
   void incHit(absl::string_view tag) {
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
