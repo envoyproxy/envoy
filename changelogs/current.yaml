@@ -116,10 +116,6 @@ minor_behavior_changes:
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
     requests and responses to address to address stability concerns. This behavior can be reverted by setting the feature to ``true``.
-- area: udp
-  change: |
-    Set Don't Fragment (DF) flag bit on IP packet header on UDP listener sockets and QUIC upstream connection sockets. This behavior
-    can be reverted by setting ``envoy.reloadable_features.udp_set_do_not_fragment`` to false.
 - area: access_log
   change: |
     Sanitize SNI for potential log injection. The invalid character will be replaced by ``_`` with an ``invalid:`` marker. If runtime

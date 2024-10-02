@@ -24,21 +24,6 @@ public:
 
 class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {
 public:
-  size_t expectedNumSocketOptions() {
-    // SO_REUSEPORT, IP_PKTINFO and IP_MTU_DISCOVER/IP_DONTFRAG.
-    const size_t num_platform_independent_socket_options =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment") ? 3 : 2;
-    size_t num_platform_dependent_socket_options = 0;
-#ifdef SO_RXQ_OVFL
-    ++num_platform_dependent_socket_options;
-#endif
-    if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-      // SO_REUSEPORT
-      ++num_platform_dependent_socket_options;
-    }
-    return num_platform_dependent_socket_options + num_platform_independent_socket_options;
-  }
-
   NiceMock<MockSupportsUdpGso> udp_gso_syscall_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&udp_gso_syscall_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
@@ -121,7 +106,13 @@ filter_chain_matcher:
       .WillByDefault(Return(os_sys_calls_actual_.supportsUdpGso()));
   EXPECT_CALL(server_.api_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-                           expectedNumSocketOptions(),
+#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
+#else
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
+#endif
                            ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
@@ -145,18 +136,6 @@ filter_chain_matcher:
                      /* expected_value */ 1,
                      /* expected_num_calls */ 1);
   }
-#endif
-
-#ifdef ENVOY_IP_DONTFRAG
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_DONTFRAG,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#else
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
-                   /* expected_value */ IP_PMTUDISC_DO,
-                   /* expected_num_calls */ 1);
 #endif
 
   addOrUpdateListener(listener_proto);
@@ -216,7 +195,13 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
   ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
   EXPECT_CALL(server_.api_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-                           expectedNumSocketOptions(),
+#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
+#else
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
+#endif
                            ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
@@ -240,18 +225,6 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
                      /* expected_value */ 1,
                      /* expected_num_calls */ 1);
   }
-#endif
-
-#ifdef ENVOY_IP_DONTFRAG
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_DONTFRAG,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#else
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
-                   /* expected_value */ IP_PMTUDISC_DO,
-                   /* expected_num_calls */ 1);
 #endif
 
   addOrUpdateListener(listener_proto);
@@ -330,7 +303,13 @@ udp_listener_config:
   ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
   EXPECT_CALL(server_.api_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-                           expectedNumSocketOptions(),
+#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
+#else
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
+#endif
                            ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
@@ -354,18 +333,6 @@ udp_listener_config:
                      /* expected_value */ 1,
                      /* expected_num_calls */ 1);
   }
-#endif
-
-#ifdef ENVOY_IP_DONTFRAG
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_DONTFRAG,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#else
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
-                   /* expected_value */ IP_PMTUDISC_DO,
-                   /* expected_num_calls */ 1);
 #endif
 
   addOrUpdateListener(listener_proto);
@@ -392,7 +359,13 @@ listener_filters:
   ON_CALL(udp_gso_syscall_, supportsUdpGso()).WillByDefault(Return(true));
   EXPECT_CALL(server_.api_.random_, uuid());
   expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
-                           expectedNumSocketOptions(),
+#ifdef SO_RXQ_OVFL // SO_REUSEPORT is on as configured
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 4 : 3,
+#else
+                           /* expected_num_options */
+                           Api::OsSysCallsSingleton::get().supportsUdpGro() ? 3 : 2,
+#endif
                            ListenerComponentFactory::BindType::ReusePort);
 
   expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
@@ -416,18 +389,6 @@ listener_filters:
                      /* expected_value */ 1,
                      /* expected_num_calls */ 1);
   }
-#endif
-
-#ifdef ENVOY_IP_DONTFRAG
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_DONTFRAG,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#else
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
-                   /* expected_value */ IP_PMTUDISC_DO,
-                   /* expected_num_calls */ 1);
 #endif
 
   addOrUpdateListener(listener_proto);
