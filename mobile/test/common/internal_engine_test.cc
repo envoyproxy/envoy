@@ -503,8 +503,8 @@ TEST_F(ThreadPriorityInternalEngineTest, SetThreadPriority) {
 }
 
 TEST_F(ThreadPriorityInternalEngineTest, SetOutOfRangeThreadPriority) {
-  // 42 is outside the range of acceptable thread priorities.
-  const int expected_thread_priority = 42;
+  // 102 is outside the range of acceptable thread priorities on all platforms.
+  const int expected_thread_priority = 102;
   const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
   // The `setpriority` system call doesn't define what happens when the thread priority is out of
   // range, and the behavior could be system dependent. On Linux, if the supplied priority value
