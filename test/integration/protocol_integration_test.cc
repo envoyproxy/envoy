@@ -1850,8 +1850,6 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
-  // response->decodeHeaders(Http::ResponseHeaderMapPtr(new
-  // Http::TestResponseHeaderMapImpl{{":status", "400"}}), true);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("400", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));

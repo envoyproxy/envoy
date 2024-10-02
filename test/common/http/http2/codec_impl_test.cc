@@ -64,7 +64,8 @@ namespace {
 // the MockRequestDecoder::decodeHeaders() method. With UHV enabled it invokes UHV's
 // validateRequestHeaderMap() method. This will validate and apply transformations expected by the
 // test, before passing it to the base class MockRequestDecoder::decodeHeaders() method. If UHV
-// validation fails it calls the `sendLocalReply` on the decoder, indicating validation error.
+// validation fails it calls the `sendLocalReply` on the decoder and sends 400,
+// indicating a validation error.
 class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
 public:
   MockRequestDecoderShimWithUhv() = default;
