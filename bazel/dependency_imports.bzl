@@ -7,6 +7,7 @@ load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonsche
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
+load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
@@ -61,7 +62,8 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         oss_fuzz = True,
         honggfuzz = False,
     )
-    emscripten_deps(emscripten_version = "3.1.7")
+    emscripten_deps(emscripten_version = "3.1.67")
+    register_emscripten_toolchains()
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
     parser_deps()

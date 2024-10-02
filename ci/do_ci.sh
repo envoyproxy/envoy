@@ -37,7 +37,7 @@ FETCH_GCC_TARGETS=(
 #  but its not really possible to filter their needs so move
 #  to a shared precache
 FETCH_TEST_TARGETS=(
-    @nodejs//...
+    @nodejs//:node_files
     //test/...)
 FETCH_ALL_TEST_TARGETS=(
     @com_github_google_quiche//:ci_tests
