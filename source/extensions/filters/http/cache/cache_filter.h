@@ -1,8 +1,6 @@
 #pragma once
 
-#include <functional>
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
@@ -10,7 +8,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
-#include "source/extensions/filters/http/cache/cache_insert_queue.h"
+#include "source/extensions/filters/http/cache/filter_state.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -19,30 +17,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-enum class FilterState {
-  Initial,
-
-  // Cache lookup found a cached response that requires validation.
-  ValidatingCachedResponse,
-
-  // Cache lookup found a fresh or validated cached response and it is being added to the encoding
-  // stream.
-  ServingFromCache,
-
-  // The cached response was successfully added to the encoding stream (either during decoding or
-  // encoding).
-  ResponseServedFromCache,
-
-  // The filter won't serve a response from the cache, whether because the request wasn't cacheable,
-  // there was no response in cache, the response in cache couldn't be served, or the request was
-  // terminated before the cached response could be written. This may be set during decoding or
-  // encoding.
-  NotServingFromCache,
-
-  // CacheFilter::onDestroy has been called, the filter will be destroyed soon. Any triggered
-  // callbacks should be ignored.
-  Destroyed
-};
+class UpstreamRequest;
 
 class CacheFilterConfig {
 public:
@@ -87,66 +62,6 @@ public:
                                           FilterState filter_state);
 
 private:
-  class UpstreamRequest : public Http::AsyncClient::StreamCallbacks, public InsertQueueCallbacks {
-  public:
-    void sendHeaders(Http::RequestHeaderMap& request_headers);
-    void disconnectFilter();
-
-    // StreamCallbacks
-    void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
-    void onData(Buffer::Instance& data, bool end_stream) override;
-    void onTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
-    void onComplete() override;
-    void onReset() override;
-
-    // InsertQueueCallbacks
-    void insertQueueOverHighWatermark() override;
-    void insertQueueUnderLowWatermark() override;
-    void insertQueueAborted() override;
-
-    static UpstreamRequest* create(CacheFilter* filter, std::shared_ptr<HttpCache> cache,
-                                   Http::AsyncClient& async_client,
-                                   const Http::AsyncClient::StreamOptions& options);
-    UpstreamRequest(CacheFilter* filter, std::shared_ptr<HttpCache> cache,
-                    Http::AsyncClient& async_client,
-                    const Http::AsyncClient::StreamOptions& options);
-    ~UpstreamRequest() override;
-
-  private:
-    // Precondition: lookup_result_ points to a cache lookup result that requires validation.
-    //               filter_state_ is ValidatingCachedResponse.
-    // Serves a validated cached response after updating it with a 304 response.
-    void processSuccessfulValidation(Http::ResponseHeaderMapPtr response_headers);
-
-    // Updates the filter state belonging to the UpstreamRequest, and the one belonging to
-    // the filter if it has not been destroyed.
-    void setFilterState(FilterState fs);
-
-    // Updates the insert status belonging to the filter, if it has not been destroyed.
-    void setInsertStatus(InsertStatus is);
-
-    // If an error occurs while the stream is active, abort will reset the stream, which
-    // in turn provokes the rest of the destruction process.
-    void abort();
-
-    // Precondition: lookup_result_ points to a cache lookup result that requires validation.
-    //               filter_state_ is ValidatingCachedResponse.
-    // Checks if a cached entry should be updated with a 304 response.
-    bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const;
-
-    CacheFilter* filter_ = nullptr;
-    LookupResultPtr lookup_result_;
-    LookupContextPtr lookup_;
-    bool is_head_request_;
-    bool request_allows_inserts_;
-    std::shared_ptr<const CacheFilterConfig> config_;
-    FilterState filter_state_;
-    std::shared_ptr<HttpCache> cache_;
-    Http::AsyncClient::Stream* stream_ = nullptr;
-    std::unique_ptr<UpstreamRequest> self_ownership_;
-    std::unique_ptr<CacheInsertQueue> insert_queue_;
-  };
-
   // For a cache miss that may be cacheable, the upstream request is sent outside of the usual
   // filter chain so that the request can continue even if the downstream client disconnects.
   void sendUpstreamRequest(Http::RequestHeaderMap& request_headers);
@@ -242,6 +157,8 @@ private:
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
   absl::optional<InsertStatus> insert_status_;
+
+  friend class UpstreamRequest;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
