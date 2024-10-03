@@ -46,6 +46,8 @@ const char MaxResponseHeadersCountOverrideKey[] =
     "envoy.reloadable_features.max_response_headers_count";
 const char MaxRequestHeadersSizeOverrideKey[] =
     "envoy.reloadable_features.max_request_headers_size_kb";
+const char MaxResponseHeadersSizeOverrideKey[] =
+    "envoy.reloadable_features.max_response_headers_size_kb";
 
 class Stream;
 class RequestDecoder;

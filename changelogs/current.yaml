@@ -306,7 +306,8 @@ new_features:
 - area: http
   change: |
     Added configuration setting for the :ref:`maximum size of response headers
-    <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_response_headers_kb>` in responses.
+    <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_response_headers_kb>` in responses. The default can
+    be overridden with runtime key ``envoy.reloadable_features.max_response_headers_size_kb``.
 - area: http_11_proxy
   change: |
     Added the option to configure the transport socket via locality or endpoint metadata.
