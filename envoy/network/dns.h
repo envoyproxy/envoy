@@ -53,9 +53,6 @@ public:
 
   /** Return the DNS query traces. */
   virtual const std::vector<Trace>& getTraces() PURE;
-
-private:
-  absl::Mutex mutex_;
 };
 
 /**
