@@ -36,14 +36,14 @@ public:
   void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
     if (decode_callback_ != nullptr) {
       // Sidestream subscribes to downstream watermark events.
-      decoder_callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+      decode_callback_->addDownstreamWatermarkCallbacks(callbacks);
     }
   }
 
   void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
     if (decode_callback_ != nullptr) {
       // Sidestream stops subscribing to downstream watermark events.
-      decoder_callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
+      decode_callback_->removeDownstreamWatermarkCallbacks(callbacks);
     }
   }
 
