@@ -154,6 +154,9 @@ void UpstreamRequest::insertQueueAborted() {
 }
 
 void UpstreamRequest::sendHeaders(Http::RequestHeaderMap& request_headers) {
+  // If this request had a body or trailers, CacheFilter::decodeHeaders
+  // would have bypassed cache lookup and insertion, so this class wouldn't
+  // be instantiated. So end_stream will always be true.
   stream_->sendHeaders(request_headers, true);
 }
 
