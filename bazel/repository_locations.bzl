@@ -153,7 +153,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         #
         # !!! NOTE !!!
         # Anytime the FIPS BoringSSL version is upgraded, `bazel/external/boringssl_fips.genrule_cmd` must be updated to use the toolchain
-        # specified in the associated accredidation certificate, which can be found linked from
+        # specified in the associated accreditation certificate, which can be found linked from
         # https://boringssl.googlesource.com/boringssl/+/refs/heads/master/crypto/fipsmodule/FIPS.md, for example
         # https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735.
         version = "fips-20220613",
