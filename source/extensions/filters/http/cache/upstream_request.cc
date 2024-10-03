@@ -77,7 +77,7 @@ void UpstreamRequest::processSuccessfulValidation(Http::ResponseHeaderMapPtr res
   }
 
   // A cache entry was successfully validated, so abort the upstream request, send
-  // the merged-modified headers, and encode cached body and trailers.
+  // encode the merged-modified headers, and encode cached body and trailers.
   if (filter_ != nullptr) {
     lookup_result_->headers_ = std::move(response_headers);
     filter_->lookup_result_ = std::move(lookup_result_);
