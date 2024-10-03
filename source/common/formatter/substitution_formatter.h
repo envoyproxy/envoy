@@ -245,7 +245,7 @@ private:
 };
 
 // Helper class to write value to output buffer in JSON style.
-// NOTE: This helper class has duplicated logic with the Json::Streamer class but
+// NOTE: This helper class has duplicated logic with the Json::BufferStreamer class but
 // provides lower level of APIs to operate on the output buffer (like control the
 // delimiters). This is designed for special scenario of substitution formatter and
 // is not intended to be used by other parts of the code.

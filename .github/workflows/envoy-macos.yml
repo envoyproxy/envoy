@@ -52,6 +52,7 @@ jobs:
       steps-post:
       steps-pre: ${{ matrix.steps-pre }}
       target: ${{ matrix.target }}
+      target-name: ${{ matrix.target-name }}
       timeout-minutes: 90
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
     strategy:
@@ -60,6 +61,7 @@ jobs:
         include:
         - target: ci/mac_ci_steps.sh
           name: macOS
+          target-name: mac_ci_steps
           source: |
             source ./ci/mac_ci_setup.sh
             _BAZEL_BUILD_EXTRA_OPTIONS=(

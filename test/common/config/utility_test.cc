@@ -20,6 +20,7 @@
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -29,6 +30,7 @@
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
+using Envoy::StatusHelpers::HasStatusMessage;
 using testing::ContainsRegex;
 using testing::Eq;
 using testing::HasSubstr;
@@ -892,6 +894,43 @@ TEST(UtilityTest, GetGrpcControlPlane) {
     TestUtility::loadFromYaml(config_yaml, api_config_source);
     EXPECT_EQ(absl::nullopt, Utility::getGrpcControlPlane(api_config_source));
   }
+}
+
+TEST(UtilityTest, ValidateTerminalFiltersSucceeds) {
+  EXPECT_OK(Utility::validateTerminalFilters("filter_name", "filter_type", "chain_type",
+                                             /*is_terminal_filter=*/true,
+                                             /*last_filter_in_current_config=*/true));
+  EXPECT_OK(Utility::validateTerminalFilters("filter_name", "filter_type", "chain_type",
+                                             /*is_terminal_filter=*/false,
+                                             /*last_filter_in_current_config=*/false));
+}
+
+TEST(UtilityTest, ValidateTerminalFilterFailsWithMisplacedTerminalFilter) {
+  EXPECT_THAT(
+      Utility::validateTerminalFilters("filter_name", "filter_type", "chain_type",
+                                       /*is_terminal_filter=*/true,
+                                       /*last_filter_in_current_config=*/false),
+      HasStatusMessage("Error: terminal filter named filter_name of type filter_type must be the "
+                       "last filter in a chain_type filter chain."));
+}
+
+TEST(UtilityTest, ValidateTerminalFilterFailsWithMissingTerminalFilter) {
+  EXPECT_THAT(Utility::validateTerminalFilters("filter_name", "filter_type", "chain_type",
+                                               /*is_terminal_filter=*/false,
+                                               /*last_filter_in_current_config=*/true),
+              HasStatusMessage("Error: non-terminal filter named filter_name of type "
+                               "filter_type is the last filter in a chain_type filter chain."));
+}
+
+TEST(UtilityTest, ValidateTerminalFilterFailsWithMissingUpstreamTerminalFilter) {
+  EXPECT_THAT(
+      Utility::validateTerminalFilters("filter_name", "filter_type", "router upstream http",
+                                       /*is_terminal_filter=*/false,
+                                       /*last_filter_in_current_config=*/true),
+      HasStatusMessage("Error: non-terminal filter named filter_name of type "
+                       "filter_type is the last filter in a router upstream http filter chain. "
+                       "When upstream_http_filters are specified, they must explicitly end with an "
+                       "UpstreamCodec filter."));
 }
 
 } // namespace

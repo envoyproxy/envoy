@@ -103,7 +103,7 @@ makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
         config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(
             scoped_route_config.route_configuration(), factory_context,
             factory_context.messageValidationContext().staticValidationVisitor());
-    scopes.push_back(std::make_shared<const ScopedRouteInfo>(scoped_route_config,
+    scopes.push_back(std::make_shared<const ScopedRouteInfo>(std::move(scoped_route_config),
                                                              route_config_provider->configCast()));
   }
 

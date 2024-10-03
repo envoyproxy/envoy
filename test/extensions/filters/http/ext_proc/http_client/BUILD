@@ -25,3 +25,24 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "ext_proc_http_integration_test",
+    srcs = ["ext_proc_http_integration_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "2core",
+    shard_count = 8,
+    tags = [
+        "cpu:3",
+        "skip_on_windows",
+    ],
+    deps = [
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/common/http:common_lib",
+        "//test/extensions/filters/http/ext_proc:utils_lib",
+        "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
