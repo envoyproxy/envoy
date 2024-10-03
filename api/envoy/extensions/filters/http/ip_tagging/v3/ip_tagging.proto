@@ -54,7 +54,7 @@ message IPTagging {
   }
 
   // optional header to use for ip-tagging instead of default
-  string ip_tagging_header = 5
+  string ip_tag_header = 5
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // The type of request the filter should apply to.

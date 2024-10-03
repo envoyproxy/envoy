@@ -196,7 +196,7 @@ TEST_F(IpTaggingFilterTest, AppendEntry) {
 TEST_F(IpTaggingFilterTest, AppendEntryOptionalHeader) {
   const std::string internal_request_yaml = R"EOF(
 request_type: internal
-ip_tagging_header: x-envoy-optional-header
+ip_tag_header: x-envoy-optional-header
 ip_tags:
   - ip_tag_name: internal_request_with_optional_header
     ip_list:
