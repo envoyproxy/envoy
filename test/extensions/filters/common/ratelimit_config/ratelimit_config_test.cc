@@ -95,7 +95,7 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
-TEST_F(RateLimitConfigTest, MeaninglessAndForCoverage) {
+TEST_F(RateLimitConfigTest, DisableKeyIsNotAllowed) {
   {
     const std::string yaml = R"EOF(
   rate_limits:
@@ -113,6 +113,30 @@ TEST_F(RateLimitConfigTest, MeaninglessAndForCoverage) {
 
     factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
     setupTest(yaml);
+    EXPECT_FALSE(creation_status_.ok());
+    EXPECT_EQ(creation_status_.message(),
+              "'stage' field and 'disable_key' field are not supported");
+  }
+}
+
+TEST_F(RateLimitConfigTest, LimitIsNotAllowed) {
+  {
+    const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    limit:
+      dynamic_metadata:
+        metadata_key:
+          key: key
+          path:
+          - key: key
+  )EOF";
+
+    factory_context_.cluster_manager_.initializeClusters({"www2"}, {});
+    setupTest(yaml);
+    EXPECT_FALSE(creation_status_.ok());
+    EXPECT_EQ(creation_status_.message(), "'limit' field is not supported");
   }
 }
 

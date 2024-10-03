@@ -14,13 +14,15 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
                                  Server::Configuration::CommonFactoryContext& context,
                                  absl::Status& creation_status, bool no_limit) {
   if (config.has_stage() || !config.disable_key().empty()) {
-    ENVOY_LOG(warn, "'stage' field and 'disable_key' field are not supported");
+    creation_status =
+        absl::InvalidArgumentError("'stage' field and 'disable_key' field are not supported");
+    return;
   }
 
   if (config.has_limit()) {
     if (no_limit) {
-      ENVOY_LOG(warn, "'limit' field is only supported in filter that calls remote rate "
-                      "limit service.");
+      creation_status = absl::InvalidArgumentError("'limit' field is not supported");
+      return;
     }
   }
 
