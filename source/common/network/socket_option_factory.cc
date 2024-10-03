@@ -203,7 +203,7 @@ SocketOptionFactory::buildDoNotFragmentOptions(bool supports_v4_mapped_v6_addres
   }
 #else
   (void)supports_v4_mapped_v6_addresses;
-  static_assert(false, "Platform supports neither socket option IP_DONTFRAG nor IP_MTU_DISCOVER");
+  ENVOY_LOG_MISC(trace, "Platform supports neither socket option IP_DONTFRAG nor IP_MTU_DISCOVER");
 #endif
   return options;
 }
