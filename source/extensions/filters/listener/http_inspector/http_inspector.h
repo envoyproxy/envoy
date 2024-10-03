@@ -1,7 +1,5 @@
 #pragma once
 
-#include <http_parser.h>
-
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
@@ -9,6 +7,8 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
+#include "source/common/http/http1/parser.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -85,8 +85,9 @@ private:
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{nullptr};
   absl::string_view protocol_;
-  http_parser parser_;
-  static http_parser_settings settings_;
+
+  std::unique_ptr<Http::Http1::Parser> parser_;
+  ssize_t nread_ = 0;
 };
 
 } // namespace HttpInspector

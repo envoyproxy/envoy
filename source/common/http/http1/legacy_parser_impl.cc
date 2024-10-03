@@ -34,50 +34,56 @@ public:
 
   Impl(http_parser_type type, void* data) : Impl(type) {
     parser_.data = data;
-    settings_ = {
-        [](http_parser* parser) -> int {
-          auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return static_cast<int>(conn_impl->onMessageBegin());
-        },
-        [](http_parser* parser, const char* at, size_t length) -> int {
-          auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return static_cast<int>(conn_impl->onUrl(at, length));
-        },
-        [](http_parser* parser, const char* at, size_t length) -> int {
-          auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return static_cast<int>(conn_impl->onStatus(at, length));
-        },
-        [](http_parser* parser, const char* at, size_t length) -> int {
-          auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return static_cast<int>(conn_impl->onHeaderField(at, length));
-        },
-        [](http_parser* parser, const char* at, size_t length) -> int {
-          auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return static_cast<int>(conn_impl->onHeaderValue(at, length));
-        },
-        [](http_parser* parser) -> int {
-          auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return static_cast<int>(conn_impl->onHeadersComplete());
-        },
-        [](http_parser* parser, const char* at, size_t length) -> int {
-          static_cast<ParserCallbacks*>(parser->data)->bufferBody(at, length);
-          return 0;
-        },
-        [](http_parser* parser) -> int {
-          auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
-          return static_cast<int>(conn_impl->onMessageComplete());
-        },
-        [](http_parser* parser) -> int {
-          // A 0-byte chunk header is used to signal the end of the chunked body.
-          // When this function is called, http-parser holds the size of the chunk in
-          // parser->content_length. See
-          // https://github.com/nodejs/http-parser/blob/v2.9.3/http_parser.h#L336
-          const bool is_final_chunk = (parser->content_length == 0);
-          static_cast<ParserCallbacks*>(parser->data)->onChunkHeader(is_final_chunk);
-          return 0;
-        },
-        nullptr // on_chunk_complete
-    };
+    if (data == nullptr) {
+      settings_ = {
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+      };
+    } else {
+      settings_ = {
+          [](http_parser* parser) -> int {
+            auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
+            return static_cast<int>(conn_impl->onMessageBegin());
+          },
+          [](http_parser* parser, const char* at, size_t length) -> int {
+            auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
+            return static_cast<int>(conn_impl->onUrl(at, length));
+          },
+          [](http_parser* parser, const char* at, size_t length) -> int {
+            auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
+            return static_cast<int>(conn_impl->onStatus(at, length));
+          },
+          [](http_parser* parser, const char* at, size_t length) -> int {
+            auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
+            return static_cast<int>(conn_impl->onHeaderField(at, length));
+          },
+          [](http_parser* parser, const char* at, size_t length) -> int {
+            auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
+            return static_cast<int>(conn_impl->onHeaderValue(at, length));
+          },
+          [](http_parser* parser) -> int {
+            auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
+            return static_cast<int>(conn_impl->onHeadersComplete());
+          },
+          [](http_parser* parser, const char* at, size_t length) -> int {
+            static_cast<ParserCallbacks*>(parser->data)->bufferBody(at, length);
+            return 0;
+          },
+          [](http_parser* parser) -> int {
+            auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
+            return static_cast<int>(conn_impl->onMessageComplete());
+          },
+          [](http_parser* parser) -> int {
+            // A 0-byte chunk header is used to signal the end of the chunked body.
+            // When this function is called, http-parser holds the size of the chunk in
+            // parser->content_length. See
+            // https://github.com/nodejs/http-parser/blob/v2.9.3/http_parser.h#L336
+            const bool is_final_chunk = (parser->content_length == 0);
+            static_cast<ParserCallbacks*>(parser->data)->onChunkHeader(is_final_chunk);
+            return 0;
+          },
+          nullptr // on_chunk_complete
+      };
+    }
   }
 
   size_t execute(const char* slice, int len) {
