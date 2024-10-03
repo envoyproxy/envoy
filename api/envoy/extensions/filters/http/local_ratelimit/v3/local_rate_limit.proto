@@ -149,8 +149,8 @@ message LocalRateLimit {
   // HTTP code will be 200 for a gRPC response.
   bool rate_limited_as_resource_exhausted = 15;
 
-  // Rate limit configuration that used to generate a list of description entries based on
-  // the request context. And the generated entries will be used to find one or multiple matched rate
+  // Rate limit configuration that is used to generate a list of descriptor entries based on
+  // the request context. The generated entries will be used to find one or multiple matched rate
   // limit rule from the ``descriptors``.
   // If this is set, then
   // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
