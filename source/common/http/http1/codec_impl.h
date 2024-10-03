@@ -272,7 +272,7 @@ public:
   Envoy::Http::Status codec_status_;
 
   // ScopeTrackedObject
-  ExecutionContext* executionContext() const override;
+  OptRef<const StreamInfo::StreamInfo> trackedStream() const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
 protected:
@@ -590,6 +590,7 @@ class ClientConnectionImpl : public ClientConnection, public ConnectionImpl {
 public:
   ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                        ConnectionCallbacks& callbacks, const Http1Settings& settings,
+                       absl::optional<uint16_t> max_response_headers_kb,
                        const uint32_t max_response_headers_count,
                        bool passing_through_proxy = false);
   // Http::ClientConnection
@@ -618,7 +619,7 @@ private:
   Status onStatusBase(const char* data, size_t length) override;
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
-  void onEncodeComplete() override {}
+  void onEncodeComplete() override { encode_complete_ = true; }
   StreamInfo::BytesMeter& getBytesMeter() override {
     if (pending_response_.has_value()) {
       return *(pending_response_->encoder_.getStream().bytesMeter());
@@ -686,6 +687,9 @@ private:
   // True if the upstream connection is pointed at an HTTP/1.1 proxy, and
   // plaintext HTTP should be sent with fully qualified URLs.
   bool passing_through_proxy_ = false;
+
+  const bool force_reset_on_premature_upstream_half_close_{};
+  bool encode_complete_{false};
 };
 
 } // namespace Http1

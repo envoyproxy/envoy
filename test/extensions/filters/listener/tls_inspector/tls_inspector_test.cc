@@ -56,7 +56,7 @@ public:
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
         *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-        cfg_->initialReadBufferSize());
+        cfg_->initialReadBufferSize() == 0, cfg_->initialReadBufferSize());
     filter_->onAccept(cb_);
   }
 
@@ -275,7 +275,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
           DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
   buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
       *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-      cfg_->maxClientHelloSize());
+      cfg_->maxClientHelloSize() == 0, cfg_->maxClientHelloSize());
 
   filter_->onAccept(cb_);
   mockSysCallForPeek(client_hello, true);
@@ -452,7 +452,7 @@ TEST_P(TlsInspectorTest, RequestedMaxReadSizeDoesNotGoBeyondMaxSize) {
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config, max_size);
   buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
       *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-      cfg_->initialReadBufferSize());
+      cfg_->initialReadBufferSize() == 0, cfg_->initialReadBufferSize());
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
       std::get<0>(GetParam()), std::get<1>(GetParam()), "example.com", "\x02h2");
 

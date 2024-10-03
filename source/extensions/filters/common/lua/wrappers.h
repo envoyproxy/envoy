@@ -135,6 +135,8 @@ public:
             {"subjectLocalCertificate", static_luaSubjectLocalCertificate},
             {"dnsSansPeerCertificate", static_luaDnsSansPeerCertificate},
             {"dnsSansLocalCertificate", static_luaDnsSansLocalCertificate},
+            {"oidsPeerCertificate", static_luaOidsPeerCertificate},
+            {"oidsLocalCertificate", static_luaOidsLocalCertificate},
             {"validFromPeerCertificate", static_luaValidFromPeerCertificate},
             {"expirationPeerCertificate", static_luaExpirationPeerCertificate},
             {"sessionId", static_luaSessionId},
@@ -222,6 +224,18 @@ private:
    * there is no local certificate, or no SAN field, or no DNS entries in SAN.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaDnsSansLocalCertificate);
+
+  /**
+   * Returns the OIDs (ASN.1 Object Identifiers) of the peer certificate. Returns an empty table if
+   * there is no peer certificate or no OIDs.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaOidsPeerCertificate);
+
+  /**
+   * Returns the OIDs (ASN.1 Object Identifiers) of the peer certificate. Returns an empty table if
+   * there is no peer certificate or no OIDs.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaOidsLocalCertificate);
 
   /**
    * Returns the timestamp-since-epoch (in seconds) that the peer certificate was issued and should

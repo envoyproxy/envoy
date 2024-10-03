@@ -89,6 +89,13 @@ std::string getIssuerFromCertificate(X509& cert);
 std::string getSubjectFromCertificate(X509& cert);
 
 /**
+ * Retrieves the extension OIDs from certificate.
+ * @param cert the certificate
+ * @return std::vector returns the string list of ASN.1 object identifiers.
+ */
+std::vector<std::string> getCertificateExtensionOids(X509& cert);
+
+/**
  * Retrieves the value of a specific X509 extension from the cert, if present.
  * @param cert the certificate.
  * @param extension_name the name of the extension to extract in dotted number format

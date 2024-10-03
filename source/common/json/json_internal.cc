@@ -787,7 +787,7 @@ ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& proto
 
 std::string Factory::serialize(absl::string_view str) {
   nlohmann::json j(str);
-  return j.dump();
+  return j.dump(-1, ' ', false, nlohmann::detail::error_handler_t::replace);
 }
 
 std::vector<uint8_t> Factory::jsonToMsgpack(const std::string& json_string) {

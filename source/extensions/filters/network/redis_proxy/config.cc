@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/redis_proxy/config.h"
 
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
@@ -52,7 +53,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   auto filter_config = std::make_shared<ProxyFilterConfig>(
       proto_config, context.scope(), context.drainDecision(), server_context.runtime(),
-      server_context.api(), cache_manager_factory);
+      server_context.api(), context.serverFactoryContext().timeSource(), cache_manager_factory);
 
   envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
@@ -94,11 +95,32 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       std::make_shared<CommandSplitter::InstanceImpl>(
           std::move(router), context.scope(), filter_config->stat_prefix_,
           server_context.timeSource(), proto_config.latency_in_micros(), std::move(fault_manager));
-  return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
-    Common::Redis::DecoderFactoryImpl factory;
+
+  auto has_external_auth_provider_ = proto_config.has_external_auth_provider();
+  auto grpc_service = proto_config.external_auth_provider().grpc_service();
+  auto timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(grpc_service, timeout, 200);
+
+  return [has_external_auth_provider_, grpc_service, &context, splitter, filter_config,
+          timeout_ms](Network::FilterManager& filter_manager) -> void {
+    Common::Redis::DecoderFactoryImpl decoder_factory;
+
+    ExternalAuth::ExternalAuthClientPtr&& auth_client{nullptr};
+    if (has_external_auth_provider_) {
+      auto auth_client_factory_or_error =
+          context.serverFactoryContext()
+              .clusterManager()
+              .grpcAsyncClientManager()
+              .factoryForGrpcService(grpc_service, context.scope(), true);
+      THROW_IF_NOT_OK_REF(auth_client_factory_or_error.status());
+
+      auth_client = std::make_unique<ExternalAuth::GrpcExternalAuthClient>(
+          auth_client_factory_or_error.value()->createUncachedRawAsyncClient(),
+          std::chrono::milliseconds(timeout_ms));
+    }
+
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(
-        factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
-        filter_config));
+        decoder_factory, Common::Redis::EncoderPtr{new Common::Redis::EncoderImpl()}, *splitter,
+        filter_config, std::move(auth_client)));
   };
 }
 

@@ -239,6 +239,34 @@ absl::Span<const std::string> ConnectionInfoImplBase::ipSansPeerCertificate() co
   return cached_ip_san_peer_certificate_;
 }
 
+absl::Span<const std::string> ConnectionInfoImplBase::oidsPeerCertificate() const {
+  if (!cached_oid_peer_certificate_.empty()) {
+    return cached_oid_peer_certificate_;
+  }
+
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  if (!cert) {
+    ASSERT(cached_oid_peer_certificate_.empty());
+    return cached_oid_peer_certificate_;
+  }
+  cached_oid_peer_certificate_ = Utility::getCertificateExtensionOids(*cert);
+  return cached_oid_peer_certificate_;
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::oidsLocalCertificate() const {
+  if (!cached_oid_local_certificate_.empty()) {
+    return cached_oid_local_certificate_;
+  }
+
+  X509* cert = SSL_get_certificate(ssl());
+  if (!cert) {
+    ASSERT(cached_oid_local_certificate_.empty());
+    return cached_oid_local_certificate_;
+  }
+  cached_oid_local_certificate_ = Utility::getCertificateExtensionOids(*cert);
+  return cached_oid_local_certificate_;
+}
+
 uint16_t ConnectionInfoImplBase::ciphersuiteId() const {
   const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl());
   if (cipher == nullptr) {

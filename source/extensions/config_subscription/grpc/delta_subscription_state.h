@@ -89,7 +89,11 @@ public:
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const;
 
-  void markStreamFresh() { any_request_sent_yet_in_current_stream_ = false; }
+  // Marks the stream as fresh for the next reconnection attempt. If
+  // should_send_initial_resource_versions is true, then the next request will
+  // also populate the initial_resource_versions field in the first request (if
+  // there are relevant resources).
+  void markStreamFresh(bool should_send_initial_resource_versions);
 
   UpdateAck handleResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
 
@@ -169,6 +173,7 @@ private:
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};
+  bool should_send_initial_resource_versions_{true};
   bool must_send_discovery_request_{};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.

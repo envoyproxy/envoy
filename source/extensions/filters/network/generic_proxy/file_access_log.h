@@ -59,8 +59,9 @@ public:
       } else {
         envoy::config::core::v3::SubstitutionFormatString sff_config;
         sff_config.mutable_text_format_source()->set_inline_string(typed_config.format());
-        formatter =
-            Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(sff_config, context);
+        formatter = THROW_OR_RETURN_VALUE(
+            Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(sff_config, context),
+            Formatter::FormatterBasePtr<Context>);
       }
       break;
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
@@ -72,14 +73,17 @@ public:
         kTypedJsonFormat: {
       envoy::config::core::v3::SubstitutionFormatString sff_config;
       *sff_config.mutable_json_format() = typed_config.typed_json_format();
-      formatter =
-          Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(sff_config, context);
+      formatter = THROW_OR_RETURN_VALUE(
+          Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(sff_config, context),
+          Formatter::FormatterBasePtr<Context>);
       break;
     }
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
         kLogFormat:
-      formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(
-          typed_config.log_format(), context);
+      formatter =
+          THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(
+                                    typed_config.log_format(), context),
+                                Formatter::FormatterBasePtr<Context>);
       break;
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
         ACCESS_LOG_FORMAT_NOT_SET:

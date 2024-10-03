@@ -23,7 +23,7 @@ cd "${SRCDIR}"
 # Fetching is mostly for robustness rather than optimization.
 FETCH_TARGETS=(
     @bazel_tools//tools/jdk:remote_jdk11
-    @envoy_build_tools//...
+    //bazel/rbe/toolchains/...
     //tools/gsutil
     //tools/zstd)
 FETCH_BUILD_TARGETS=(
@@ -57,7 +57,6 @@ FETCH_PROTO_TARGETS=(
     @com_github_bufbuild_buf//:bin/buf
     //tools/proto_format/...)
 
-GCS_REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
 
 retry () {
     local n wait iterations
@@ -225,7 +224,7 @@ function bazel_binary_build() {
     //test/tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" external:su-exec
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @com_github_ncopa_suexec//:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -351,22 +350,19 @@ case $CI_TARGET in
 
     asan)
         setup_clang_toolchain
+        if [[ -n "$ENVOY_RBE" ]]; then
+            ASAN_CONFIG="--config=rbe-toolchain-asan"
+        else
+            ASAN_CONFIG="--config=clang-asan"
+        fi
         BAZEL_BUILD_OPTIONS+=(
             -c dbg
-            "--config=clang-asan"
+            "${ASAN_CONFIG}"
             "--build_tests_only"
             "--remote_download_minimal")
         echo "bazel ASAN/UBSAN debug build with tests"
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
-        if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
-            echo "Building and testing envoy-filter-example tests..."
-            pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-            bazel_with_collection \
-                test "${BAZEL_BUILD_OPTIONS[@]}" \
-                "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
-            popd
-        fi
         # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
         # due to sandboxing issue. Debug and enable it again.
         # if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
@@ -380,7 +376,7 @@ case $CI_TARGET in
         # fi
         ;;
 
-    check_and_fix_proto_format)
+    format-api|check_and_fix_proto_format)
         setup_clang_toolchain
         echo "Check and fix proto format ..."
         "${ENVOY_SRCDIR}/ci/check_and_fix_format.sh"
@@ -424,7 +420,6 @@ case $CI_TARGET in
         setup_clang_toolchain
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
-        cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
         # Building all the dependencies from scratch to link them against libc++.
         echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
@@ -591,6 +586,7 @@ case $CI_TARGET in
         else
             ENVOY_RELEASE_TARBALL="/build/release/arm64/bin/release.tar.zst"
         fi
+
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/zstd \
               -- --stdout \
@@ -899,7 +895,9 @@ case $CI_TARGET in
 
         # Build
         echo "Building with:"
+        echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
         echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+        echo "  binary dir:  ${ENVOY_BINARY_DIR}"
 
         # Build release binaries
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -939,12 +937,6 @@ case $CI_TARGET in
         setup_clang_toolchain
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
-        bazel run //tools/gcs:upload \
-              "${GCS_ARTIFACT_BUCKET}" \
-              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-              "${BUILD_DIR}/envoy" \
-              "release" \
-              "${GCS_REDIRECT_PATH}"
         ;;
 
     sizeopt)
@@ -975,16 +967,6 @@ case $CI_TARGET in
              --build_tests_only \
              --remote_download_minimal \
              "${TEST_TARGETS[@]}"
-        if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
-            echo "Building and testing envoy-filter-example tests..."
-            pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-            bazel_with_collection \
-                test "${BAZEL_BUILD_OPTIONS[@]}" \
-                -c dbg \
-                --config=clang-tsan \
-                "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
-            popd
-        fi
         ;;
 
     verify_distro)
@@ -1041,6 +1023,30 @@ case $CI_TARGET in
                  --trigger-ref="$ENVOY_BRANCH" \
                  --trigger-workflow="$WORKFLOW" \
                  --trigger-inputs="$INPUTS"
+        ;;
+
+    refresh_compdb)
+        # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
+        # So the compdb headers won't be overwritten by another bazel run.
+        for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do
+            if [[ ${BAZEL_STARTUP_OPTIONS[i]} == "--output_base"* ]]; then
+                COMPDB_OUTPUT_BASE="${BAZEL_STARTUP_OPTIONS[i]}"-envoy-compdb
+                BAZEL_STARTUP_OPTIONS[i]="${COMPDB_OUTPUT_BASE}"
+                BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
+                export BAZEL_STARTUP_OPTION_LIST
+            fi
+        done
+
+        if [[ -z "${SKIP_PROTO_FORMAT}" ]]; then
+            "${CURRENT_SCRIPT_DIR}/../tools/proto_format/proto_format.sh" fix
+        fi
+
+        read -ra ENVOY_GEN_COMPDB_OPTIONS <<< "${ENVOY_GEN_COMPDB_OPTIONS:-}"
+
+        "${CURRENT_SCRIPT_DIR}/../tools/gen_compilation_database.py" \
+            "${ENVOY_GEN_COMPDB_OPTIONS[@]}"
+        # Kill clangd to reload the compilation database
+        pkill clangd || :
         ;;
 
     *)

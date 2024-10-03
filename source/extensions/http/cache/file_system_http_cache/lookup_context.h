@@ -19,8 +19,9 @@ using Envoy::Extensions::Common::AsyncFiles::CancelFunction;
 
 class FileLookupContext : public LookupContext {
 public:
-  FileLookupContext(FileSystemHttpCache& cache, LookupRequest&& lookup)
-      : cache_(cache), key_(lookup.key()), lookup_(std::move(lookup)) {}
+  FileLookupContext(Event::Dispatcher& dispatcher, FileSystemHttpCache& cache,
+                    LookupRequest&& lookup)
+      : dispatcher_(dispatcher), cache_(cache), key_(lookup.key()), lookup_(std::move(lookup)) {}
 
   // From LookupContext
   void getHeaders(LookupHeadersCallback&& cb) final;
@@ -34,28 +35,34 @@ public:
   const LookupRequest& lookup() const { return lookup_; }
   const Key& key() const { return key_; }
   bool workInProgress() const;
+  Event::Dispatcher* dispatcher() const { return &dispatcher_; }
 
 private:
-  void getHeadersWithLock(LookupHeadersCallback cb) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  void tryOpenCacheFile();
+  void doCacheMiss();
+  void doCacheEntryInvalid();
+  void getHeaderBlockFromFile();
+  void getHeadersFromFile();
+  void closeFileAndGetHeadersAgainWithNewVaryKey();
 
   // In the event that the cache failed to retrieve, remove the cache entry from the
   // cache so we don't keep repeating the same failure.
-  void invalidateCacheEntry() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  void invalidateCacheEntry();
 
-  std::string filepath() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  std::string filepath();
+
+  Event::Dispatcher& dispatcher_;
 
   // We can safely use a reference here, because the shared_ptr to a cache is guaranteed to outlive
   // all filters that use it.
   FileSystemHttpCache& cache_;
 
-  // File actions may be initiated in the file thread or the filter thread, and cancelled or
-  // completed from either, therefore must be guarded by a mutex.
-  absl::Mutex mu_;
-  AsyncFileHandle file_handle_ ABSL_GUARDED_BY(mu_);
-  CancelFunction cancel_action_in_flight_ ABSL_GUARDED_BY(mu_);
-  CacheFileFixedBlock header_block_ ABSL_GUARDED_BY(mu_);
-  Key key_ ABSL_GUARDED_BY(mu_);
+  AsyncFileHandle file_handle_;
+  CancelFunction cancel_action_in_flight_;
+  CacheFileFixedBlock header_block_;
+  Key key_;
 
+  LookupHeadersCallback lookup_headers_callback_;
   const LookupRequest lookup_;
 };
 

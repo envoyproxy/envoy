@@ -1238,6 +1238,20 @@ TEST_P(TcpProxyTest, AccessLogUpstreamSSLConnection) {
             filter_->getStreamInfo().upstreamInfo()->upstreamSslConnection()->sessionId());
 }
 
+TEST_P(TcpProxyTest, AccessLogUpstreamConnectionId) {
+  int connection_id = 20;
+  setup(1, accessLogConfig("%UPSTREAM_CONNECTION_ID%"));
+
+  EXPECT_CALL(*upstream_connections_.at(0), id()).WillRepeatedly(Return(connection_id));
+  raiseEventUpstreamConnected(0);
+
+  EXPECT_EQ(connection_id, filter_->getStreamInfo().upstreamInfo()->upstreamConnectionId());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+
+  EXPECT_EQ(access_log_data_.value(), std::to_string(connection_id));
+}
+
 // Tests that upstream flush works properly with no idle timeout configured.
 TEST_P(TcpProxyTest, UpstreamFlushNoTimeout) {
   setup(1);

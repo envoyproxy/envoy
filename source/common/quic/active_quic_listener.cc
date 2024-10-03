@@ -37,14 +37,17 @@ ActiveQuicListener::ActiveQuicListener(
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
-    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+    bool reject_new_connections)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           std::make_unique<Network::UdpListenerImpl>(
               dispatcher, listen_socket, *this, dispatcher.timeSource(),
               listener_config.udpListenerConfig()->config().downstream_socket_config()),
           &listener_config),
-      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedHttp3Versions()),
+      dispatcher_(dispatcher),
+      version_manager_(reject_new_connections ? quic::ParsedQuicVersionVector()
+                                              : quic::CurrentSupportedHttp3Versions()),
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
       crypto_server_stream_factory_(crypto_server_stream_factory),
@@ -112,6 +115,22 @@ ActiveQuicListener::ActiveQuicListener(
   } else {
     quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
   }
+
+  if (listener_config.udpListenerConfig()) {
+    const auto& save_cmsg_configs =
+        listener_config.udpListenerConfig()->config().quic_options().save_cmsg_config();
+    if (save_cmsg_configs.size() > 0) {
+      // QUIC only supports a single cmsg config.
+      const envoy::config::core::v3::SocketCmsgHeaders save_cmsg_config = save_cmsg_configs.at(0);
+      if (save_cmsg_config.has_level()) {
+        udp_save_cmsg_config_.level = save_cmsg_config.level().value();
+      }
+      if (save_cmsg_config.has_type()) {
+        udp_save_cmsg_config_.type = save_cmsg_config.type().value();
+      }
+      udp_save_cmsg_config_.expected_size = save_cmsg_config.expected_size();
+    }
+  }
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
@@ -139,11 +158,11 @@ void ActiveQuicListener::onDataWorker(Network::UdpRecvData&& data) {
   Buffer::RawSlice slice = data.buffer_->frontSlice();
   ASSERT(data.buffer_->length() == slice.len_);
   // TODO(danzh): pass in TTL and UDP header.
-  quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
-                                  /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
-                                  /*packet_headers=*/nullptr, /*headers_length=*/0,
-                                  /*owns_header_buffer*/ false,
-                                  getQuicEcnCodepointFromTosByte(data.tos_));
+  quic::QuicReceivedPacket packet(
+      reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
+      /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
+      reinterpret_cast<char*>(data.saved_cmsg_.mem_), data.saved_cmsg_.len_,
+      /*owns_header_buffer*/ false, getQuicEcnCodepointFromTosByte(data.tos_));
   if (!quic_dispatcher_->processPacket(self_address, peer_address, packet)) {
     if (non_dispatched_udp_packet_handler_.has_value()) {
       non_dispatched_udp_packet_handler_->handle(worker_index_, std::move(data));
@@ -248,7 +267,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
       receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")),
-      context_(context) {
+      context_(context), reject_new_connections_(config.reject_new_connections()) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -418,7 +437,7 @@ ActiveQuicListenerFactory::createActiveQuicListener(
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, receive_ecn_, crypto_server_stream_factory,
       proof_source_factory, std::move(cid_generator), worker_selector_,
-      connection_debug_visitor_factory_);
+      connection_debug_visitor_factory_, reject_new_connections_);
 }
 
 } // namespace Quic

@@ -87,6 +87,8 @@ public:
 
   class Object {
   public:
+    using FieldType = absl::variant<absl::monostate, absl::string_view, int64_t>;
+
     virtual ~Object() = default;
 
     /**
@@ -102,21 +104,17 @@ public:
      * This method can be used to get an unstructured serialization result.
      */
     virtual absl::optional<std::string> serializeAsString() const { return absl::nullopt; }
-  };
-
-  /**
-   * Generic reflection support for the filter state objects.
-   */
-  class ObjectReflection {
-  public:
-    virtual ~ObjectReflection() = default;
-
-    using FieldType = absl::variant<absl::monostate, absl::string_view, int64_t>;
 
     /**
-     * @return FieldType a field value for a field name.
+     * @return bool true if the object supports field access. False if the object does not support
+     * field access. Default implementation returns false.
      */
-    virtual FieldType getField(absl::string_view) const PURE;
+    virtual bool hasFieldSupport() const { return false; }
+
+    /**
+     * @return FieldType a single state property or field value for a name.
+     */
+    virtual FieldType getField(absl::string_view) const { return absl::monostate{}; }
   };
 
   /**
@@ -134,12 +132,6 @@ public:
      * is malformed.
      */
     virtual std::unique_ptr<Object> createFromBytes(absl::string_view data) const PURE;
-
-    /**
-     * @return std::unique_ptr<ObjectReflection> for the runtime object
-     * Note that the reflection object is a view and should not outlive the object.
-     */
-    virtual std::unique_ptr<ObjectReflection> reflect(const Object*) const { return nullptr; }
   };
 
   struct FilterObject {

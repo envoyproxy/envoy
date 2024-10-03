@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "original_dst_cluster_test",
     srcs = ["original_dst_cluster_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:filter_state_dst_address_lib",
