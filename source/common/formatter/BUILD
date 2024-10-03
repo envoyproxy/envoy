@@ -26,6 +26,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/json:json_streamer_lib",
         "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -55,6 +56,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:utility_lib",
     ],
 )

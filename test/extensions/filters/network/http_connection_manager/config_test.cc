@@ -2586,7 +2586,7 @@ namespace {
 
 class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
 public:
-  Http::OriginalIPDetectionSharedPtr
+  absl::StatusOr<Http::OriginalIPDetectionSharedPtr>
   createExtension(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
     return nullptr;
   }

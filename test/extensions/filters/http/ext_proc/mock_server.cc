@@ -5,12 +5,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-MockClient::MockClient() {
-  EXPECT_CALL(*this, stream()).WillRepeatedly(testing::Invoke([this]() { return stream_; }));
+using ::testing::_;
+using ::testing::Invoke;
 
-  EXPECT_CALL(*this, setStream(testing::_))
+MockClient::MockClient() {
+  EXPECT_CALL(*this, sendRequest(_, _, _, _, _))
       .WillRepeatedly(
-          testing::Invoke([this](ExternalProcessorStream* stream) -> void { stream_ = stream; }));
+          Invoke([](envoy::service::ext_proc::v3::ProcessingRequest&& request, bool end_stream,
+                    const uint64_t, RequestCallbacks*, StreamBase* stream) {
+            ExternalProcessorStream* grpc_stream = dynamic_cast<ExternalProcessorStream*>(stream);
+            grpc_stream->send(std::move(request), end_stream);
+          }));
 }
 MockClient::~MockClient() = default;
 
