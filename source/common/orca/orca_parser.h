@@ -11,7 +11,10 @@ namespace Orca {
 // Headers used to send ORCA load metrics from the backend.
 static constexpr absl::string_view kEndpointLoadMetricsHeader = "endpoint-load-metrics";
 static constexpr absl::string_view kEndpointLoadMetricsHeaderBin = "endpoint-load-metrics-bin";
-static constexpr absl::string_view kEndpointLoadMetricsHeaderJson = "endpoint-load-metrics-json";
+// Prefix used to determine format expected in kEndpointLoadMetricsHeader.
+static constexpr absl::string_view kHeaderFormatPrefixBin = "BIN";
+static constexpr absl::string_view kHeaderFormatPrefixJson = "JSON";
+static constexpr absl::string_view kHeaderFormatPrefixText = "TEXT";
 // The following fields are the names of the metrics tracked in the ORCA load
 // report proto.
 static constexpr absl::string_view kApplicationUtilizationField = "application_utilization";

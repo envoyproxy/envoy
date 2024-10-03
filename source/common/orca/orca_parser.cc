@@ -39,10 +39,6 @@ const Http::LowerCaseString& endpointLoadMetricsHeaderBin() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, kEndpointLoadMetricsHeaderBin);
 }
 
-const Http::LowerCaseString& endpointLoadMetricsHeaderJson() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, kEndpointLoadMetricsHeaderJson);
-}
-
 absl::Status tryCopyNamedMetricToOrcaLoadReport(absl::string_view metric_name, double metric_value,
                                                 OrcaLoadReport& orca_load_report) {
   if (metric_name.empty()) {
@@ -53,14 +49,11 @@ absl::Status tryCopyNamedMetricToOrcaLoadReport(absl::string_view metric_name, d
   return absl::OkStatus();
 }
 
-std::vector<absl::string_view> parseCommaDelimitedHeader(const HeaderMap::GetResult& entry) {
+std::vector<absl::string_view> parseCommaDelimitedHeader(const absl::string_view entry) {
   std::vector<absl::string_view> values;
-  values.reserve(entry.size());
-  for (size_t i = 0; i < entry.size(); ++i) {
-    std::vector<absl::string_view> tokens =
-        Envoy::Http::HeaderUtility::parseCommaDelimitedHeader(entry[i]->value().getStringView());
-    values.insert(values.end(), tokens.begin(), tokens.end());
-  }
+  std::vector<absl::string_view> tokens =
+      Envoy::Http::HeaderUtility::parseCommaDelimitedHeader(entry);
+  values.insert(values.end(), tokens.begin(), tokens.end());
   return values;
 }
 
@@ -112,7 +105,7 @@ absl::Status tryCopyMetricToOrcaLoadReport(absl::string_view metric_name,
   return absl::OkStatus();
 }
 
-absl::Status tryParseNativeHttpEncoded(const HeaderMap::GetResult& header,
+absl::Status tryParseNativeHttpEncoded(const absl::string_view header,
                                        OrcaLoadReport& orca_load_report) {
   const std::vector<absl::string_view> values = parseCommaDelimitedHeader(header);
 
@@ -133,41 +126,53 @@ absl::Status tryParseNativeHttpEncoded(const HeaderMap::GetResult& header,
   return absl::OkStatus();
 }
 
+absl::Status tryParseSerializedBinary(const absl::string_view header,
+                                      OrcaLoadReport& orca_load_report) {
+  if (header.empty()) {
+    return absl::InvalidArgumentError("ORCA binary header value is empty");
+  }
+  const std::string decoded_value = Envoy::Base64::decode(header);
+  if (decoded_value.empty()) {
+    return absl::InvalidArgumentError(
+        fmt::format("unable to decode ORCA binary header value: {}", header));
+  }
+  if (!orca_load_report.ParseFromString(decoded_value)) {
+    return absl::InvalidArgumentError(
+        fmt::format("unable to parse binaryheader to OrcaLoadReport: {}", header));
+  }
+  return absl::OkStatus();
+}
+
 } // namespace
 
 absl::StatusOr<OrcaLoadReport> parseOrcaLoadReportHeaders(const HeaderMap& headers) {
   OrcaLoadReport load_report;
 
-  // Binary protobuf format.
+  // Binary protobuf format. Lagacy header from gRPC implementation.
   if (const auto header_bin = headers.get(endpointLoadMetricsHeaderBin()); !header_bin.empty()) {
     const auto header_value = header_bin[0]->value().getStringView();
-    if (header_value.empty()) {
-      return absl::InvalidArgumentError("ORCA binary header value is empty");
-    }
-    const std::string decoded_value = Envoy::Base64::decode(header_value);
-    if (decoded_value.empty()) {
-      return absl::InvalidArgumentError(
-          fmt::format("unable to decode ORCA binary header value: {}", header_value));
-    }
-    if (!load_report.ParseFromString(decoded_value)) {
-      return absl::InvalidArgumentError(
-          fmt::format("unable to parse binaryheader to OrcaLoadReport: {}", header_value));
-    }
-  } else if (const auto header_native_http = headers.get(endpointLoadMetricsHeader());
-             !header_native_http.empty()) {
-    // Native HTTP format.
-    RETURN_IF_NOT_OK(tryParseNativeHttpEncoded(header_native_http, load_report));
-  } else if (const auto header_json = headers.get(endpointLoadMetricsHeaderJson());
-             !header_json.empty()) {
-    // JSON format.
+    RETURN_IF_NOT_OK(tryParseSerializedBinary(header_value, load_report));
+  } else if (const auto header = headers.get(endpointLoadMetricsHeader()); !header.empty()) {
+    std::pair<absl::string_view, absl::string_view> split_header =
+        absl::StrSplit(header[0]->value().getStringView(), absl::MaxSplits(' ', 1));
+
+    if (split_header.first == kHeaderFormatPrefixBin) { // Binary protobuf format.
+      RETURN_IF_NOT_OK(tryParseSerializedBinary(split_header.second, load_report));
+    } else if (split_header.first == kHeaderFormatPrefixText) { // Native HTTP format.
+      RETURN_IF_NOT_OK(tryParseNativeHttpEncoded(split_header.second, load_report));
+    } else if (split_header.first == kHeaderFormatPrefixJson) { // JSON format.
 #if defined(ENVOY_ENABLE_FULL_PROTOS) && defined(ENVOY_ENABLE_YAML)
-    bool has_unknown_field = false;
-    const std::string json_string = std::string(header_json[0]->value().getStringView());
-    RETURN_IF_ERROR(
-        Envoy::MessageUtil::loadFromJsonNoThrow(json_string, load_report, has_unknown_field));
+      const std::string json_string = std::string(split_header.second);
+      bool has_unknown_field = false;
+      RETURN_IF_ERROR(
+          Envoy::MessageUtil::loadFromJsonNoThrow(json_string, load_report, has_unknown_field));
 #else
-    IS_ENVOY_BUG("JSON formatted ORCA header support not implemented for this build");
+      IS_ENVOY_BUG("JSON formatted ORCA header support not implemented for this build");
 #endif // !ENVOY_ENABLE_FULL_PROTOS || !ENVOY_ENABLE_YAML
+    } else {
+      return absl::InvalidArgumentError(
+          fmt::format("unsupported ORCA header format: {}", split_header.first));
+    }
   } else {
     return absl::NotFoundError("no ORCA data sent from the backend");
   }
