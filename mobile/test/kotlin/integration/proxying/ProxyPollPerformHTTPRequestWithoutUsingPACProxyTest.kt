@@ -53,7 +53,7 @@ class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
       HttpTestServerFactory.start(
         HttpTestServerFactory.Type.HTTP1_WITHOUT_TLS,
         0,
-        // http://go/mdn/HTTP/Proxy_servers_and_tunneling/Proxy_Auto-Configuration_PAC_file
+        // https://developer.mozilla.org/en-US/docs/Web/HTTP/Proxy_servers_and_tunneling/Proxy_Auto-Configuration_PAC_file
         mapOf("Content-Type" to "application/x-ns-proxy-autoconfig"),
         """
 function FindProxyForURL(url, host) {
