@@ -192,7 +192,6 @@ TEST_F(IpTaggingFilterTest, AppendEntry) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-
 TEST_F(IpTaggingFilterTest, AppendEntryOptionalHeader) {
   const std::string internal_request_yaml = R"EOF(
 request_type: internal
@@ -213,7 +212,8 @@ ip_tags:
       remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ("foo,internal_request_with_optional_header", request_headers.get_("x-envoy-optional-header"));
+  EXPECT_EQ("foo,internal_request_with_optional_header",
+            request_headers.get_("x-envoy-optional-header"));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;
