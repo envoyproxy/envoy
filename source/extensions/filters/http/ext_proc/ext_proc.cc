@@ -585,7 +585,6 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       // ActiveStream from returning error when the last chunk added to stream buffer exceeds the
       // buffer limit.
       state.setPaused(true);
-      state.requestWatermark();
       return FilterDataStatus::StopIterationAndWatermark;
     }
   }
