@@ -205,7 +205,7 @@ TEST(OrcaParserUtilTest, JsonHeaderIncorrectFieldType) {
 
 TEST(OrcaParserUtilTest, LegacyBinaryHeader) {
   // Verify processing of headers sent in legacy ORCA header inherited from gRPC
-  // implmentation works as intended.
+  // implementation works as intended.
   const std::string proto_string =
       TestUtility::getProtobufBinaryStringFromMessage(exampleOrcaLoadReport());
   const auto orca_load_report_header_bin =

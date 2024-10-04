@@ -148,7 +148,7 @@ absl::Status tryParseSerializedBinary(const absl::string_view header,
 absl::StatusOr<OrcaLoadReport> parseOrcaLoadReportHeaders(const HeaderMap& headers) {
   OrcaLoadReport load_report;
 
-  // Binary protobuf format. Lagacy header from gRPC implementation.
+  // Binary protobuf format. Legacy header from gRPC implementation.
   if (const auto header_bin = headers.get(endpointLoadMetricsHeaderBin()); !header_bin.empty()) {
     const auto header_value = header_bin[0]->value().getStringView();
     RETURN_IF_NOT_OK(tryParseSerializedBinary(header_value, load_report));
