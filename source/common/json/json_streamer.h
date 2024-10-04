@@ -454,7 +454,7 @@ private:
 /**
  * A Streamer that streams to a Buffer::Instance.
  */
-using Streamer = StreamerBase<BufferOutput>;
+using BufferStreamer = StreamerBase<BufferOutput>;
 
 } // namespace Json
 } // namespace Envoy

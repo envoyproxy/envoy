@@ -123,18 +123,10 @@ public:
     message->set_value(raw_string_ + " By TYPED");
     return message;
   }
-
-private:
-  std::string raw_string_;
-  friend class TestSerializedStringReflection;
-};
-
-class TestSerializedStringReflection : public StreamInfo::FilterState::ObjectReflection {
-public:
-  TestSerializedStringReflection(const TestSerializedStringFilterState* data) : data_(data) {}
+  bool hasFieldSupport() const override { return true; }
   FieldType getField(absl::string_view field_name) const override {
     if (field_name == "test_field") {
-      return data_->raw_string_;
+      return raw_string_;
     } else if (field_name == "test_num") {
       return 137;
     }
@@ -142,24 +134,8 @@ public:
   }
 
 private:
-  const TestSerializedStringFilterState* data_;
+  std::string raw_string_;
 };
-
-class TestSerializedStringFilterStateFactory : public StreamInfo::FilterState::ObjectFactory {
-public:
-  std::string name() const override { return "test_key"; }
-  std::unique_ptr<StreamInfo::FilterState::Object>
-  createFromBytes(absl::string_view) const override {
-    return nullptr;
-  }
-  std::unique_ptr<StreamInfo::FilterState::ObjectReflection>
-  reflect(const StreamInfo::FilterState::Object* data) const override {
-    return std::make_unique<TestSerializedStringReflection>(
-        dynamic_cast<const TestSerializedStringFilterState*>(data));
-  }
-};
-
-REGISTER_FACTORY(TestSerializedStringFilterStateFactory, StreamInfo::FilterState::ObjectFactory);
 
 // Test tests multiple versions of variadic template method parseSubcommand
 // extracting tokens.
