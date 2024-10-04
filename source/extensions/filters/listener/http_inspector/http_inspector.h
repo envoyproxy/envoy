@@ -58,6 +58,41 @@ private:
   HttpInspectorStats stats_;
 };
 
+class NoOpParserCallbacks : public Http::Http1::ParserCallbacks {
+public:
+  Http::Http1::CallbackResult onMessageBegin() override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onUrl(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onStatus(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onHeaderField(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onHeaderValue(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onHeadersComplete() override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  void bufferBody(const char* /*data*/, size_t /*length*/) override {}
+
+  Http::Http1::CallbackResult onMessageComplete() override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  void onChunkHeader(bool /*is_final_chunk*/) override {}
+};
+
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
@@ -87,6 +122,7 @@ private:
   absl::string_view protocol_;
 
   std::unique_ptr<Http::Http1::Parser> parser_;
+  std::unique_ptr<NoOpParserCallbacks> no_op_callbacks_;
   ssize_t nread_ = 0;
 };
 
