@@ -1268,7 +1268,7 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvo
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
   cleanupUpstreamAndDownstream();
 
-  // Subcluster expected to be removed after ttl
+  // Sub cluster expected to be removed after ttl
   // > 5m
   simTime().advanceTimeWait(std::chrono::milliseconds(300001));
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
@@ -1278,7 +1278,7 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvo
   response = sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
 
-  // subcluster added again
+  // sub cluster added again
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
   cleanupUpstreamAndDownstream();
@@ -1287,7 +1287,7 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvo
   cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
 
-  // subcluster removed due to dfp cluster update
+  // sub cluster removed due to dfp cluster update
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 2);
 }
