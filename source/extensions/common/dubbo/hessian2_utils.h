@@ -5,15 +5,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "absl/strings/string_view.h"
-
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdangling-reference"
-#endif
 #include "hessian2/basic_codec/object_codec.hpp"
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
 #include "hessian2/codec.hpp"
 #include "hessian2/object.hpp"
 #include "hessian2/reader.hpp"
