@@ -1230,6 +1230,68 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
+// Verify that we expire sub clusters and not remove on CDS.
+TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvoidCDSRemoval) {
+  const std::string cluster_yaml = R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  auto cluster = Upstream::parseClusterFromV3Yaml(cluster_yaml);
+  // make runtime guard false
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "false");
+  initializeWithArgs(1024, 1024, "", "", true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  // one more cluster
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+  cleanupUpstreamAndDownstream();
+
+  // Subcluster expected to be removed after ttl
+  // > 5m
+  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  response = sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+
+  // subcluster added again
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+  cleanupUpstreamAndDownstream();
+
+  // Make update to DFP cluster
+  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
+  cds_helper_.setCds({cluster_});
+
+  // subcluster removed due to dfp cluster update
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 2);
+}
+
 // Verify that we expire sub clusters.
 TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveSubClusterViaTTL) {
   initializeWithArgs(1024, 1024, "", "", true);
