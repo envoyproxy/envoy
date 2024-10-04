@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.dynamic_modules.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Dynamic Modules common configuration]
+
+// Configuration of a dynamic module. A dynamic module is a shared object file that can be loaded via dlopen
+// by a various Envoy extension points. Currently, only HTTP filter (envoy.filters.http.dynamic_modules) is supported.
+//
+// How the module is loaded is determined by the extension point that uses it. For example, the HTTP filter
+// loads the module with dlopen on the first creation of the filter chain for the same shared object file.
+//
+// Whether or not the shared object is the same is determined by the file path as well as the file's inode depending
+// on the platform. Notably, if the file path and the content of the file are the same, the shared object will be reused.
+//
+// A module must be compatible with the ABI specified in :repo:`abi.h <source/extensions/dynamic_modules/abi.h>`.
+// Currently, compatibility is only guaranteed by an exact version match between the Envoy
+// codebase and the dynamic module SDKs. In the future, after the ABI is stabilized, we will revisit
+// this restriction and hopefully provide a wider compatibility guarantee. Until then, Envoy
+// checks the hash of the ABI header files to ensure that the dynamic modules are built against the
+// same version of the ABI.
+//
+// Currently, the implementation is work in progress and not usable.
+// [#next-free-field: 8]
+message DynamicModuleConfig {
+  // The location of the object file. Currently, only the local path is supported.
+  config.core.v3.DataSource object_file = 7;
+
+  // Set true to prevent the module from being unloaded with dlclose.
+  // This is useful for modules that have global state that should not be unloaded.
+  bool do_not_close = 3;
+}
