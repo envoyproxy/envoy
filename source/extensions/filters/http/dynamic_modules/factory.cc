@@ -15,8 +15,9 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
 
   const auto& module_config = proto_config.dynamic_module_config();
   // TODO(mathetake): add support for other data source.
-  if (module_config.object_file().filename().empty()) {
-    return absl::InvalidArgumentError("No object file specified in dynamic module config.");
+  if (!module_config.object_file().has_filename()) {
+    return absl::InvalidArgumentError(
+        "Only filename is supported as a data source of dynamic module object file");
   }
   const auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       module_config.object_file().filename(), module_config.do_not_close());
