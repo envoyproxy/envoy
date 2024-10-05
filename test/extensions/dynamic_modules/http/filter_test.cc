@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -27,7 +28,11 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
       std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
           filter_config_ptr);
 
-  // The followings are for mostly coverage at the moment.
+  // The followings are mostly for coverage at the moment.
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
   filter->onStreamComplete();
   filter->onDestroy();
   TestRequestHeaderMapImpl headers{{}};
