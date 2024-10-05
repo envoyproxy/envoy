@@ -80,11 +80,7 @@ FilterConfig::FilterConfig(
     if (!config.descriptors().empty()) {
       ENVOY_LOG_FIRST_N(
           warn, 20,
-          "'descriptors' is set but no valid 'rate_limits' in LocalRateLimit config. Note that "
-          "'descriptors' only makes sense when 'rate_limits' in LocalRateLimit config or route "
-          "config is specified. And please take the 'rate_limits' in the LocalRateLimit config as "
-          "priority because the 'rate_limits' in the route config may be ignored by the filter in "
-          "the future.");
+          "'descriptors' is set but only used by route configuration. Please configure the local rate limit filter using the embedded 'rate_limits' field as route level configuration for local rate limits will be ignored in the future.");
     }
   }
 
