@@ -188,7 +188,6 @@ FilterConfig::FilterConfig(
       deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
                                                          DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
       message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
-      enable_more_chunks_(config.enable_more_chunks()),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       processing_mode_(config.processing_mode()),
       mutation_checker_(config.mutation_rules(), context.regexEngine()),
@@ -530,7 +529,9 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     state.setPaused(true);
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
-  case ProcessingMode::STREAMED: {
+  case ProcessingMode::STREAMED:
+  case ProcessingMode::MXN:
+  {
     // STREAMED body mode works as follows:
     //
     // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it
@@ -668,7 +669,7 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
   // For the body processing mode in observability mode, only STREAMED body processing mode is
   // supported and any other body processing modes will be ignored. NONE mode(i.e., skip body
   // processing) will still work as expected.
-  if (state.bodyMode() == ProcessingMode::STREAMED) {
+  if (state.bodyMode() == ProcessingMode::STREAMED || state.bodyMode() == ProcessingMode::MXN) {
     // Try to open the stream if the connection has not been established.
     switch (openStream()) {
     case StreamOpenState::Error:

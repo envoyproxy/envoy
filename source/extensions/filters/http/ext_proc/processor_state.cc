@@ -148,7 +148,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         // let the doData callback handle body chunks until the end is reached.
         clearWatermark();
         return absl::OkStatus();
-      } else if (body_mode_ == ProcessingMode::STREAMED) {
+      } else if (body_mode_ == ProcessingMode::STREAMED || body_mode_ == ProcessingMode::MXN) {
         if (hasBufferedData()) {
           // We now know that we need to process what we have buffered in streaming mode.
           // Move the current buffer into the queue for remote processing and clear the
@@ -263,18 +263,15 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::Ok);
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      if (common_response.has_body_mutation() && common_response.body_mutation().more_chunks()) {
+      if (common_response.has_body_mutation() && common_response.body_mutation().has_mxn_resp()) {
         ENVOY_LOG(debug,
-                  "Streamed mode body response has more_chunks set to true. "
-                  "enableMoreChunks {}",
-                  filter_.config().enableMoreChunks());
-        // more_chunks will only be supported if the ext_proc filter has enable_more_chunks set to
-        // true.
-        if (!filter_.config().enableMoreChunks()) {
+                  "MxN body response is received and body mode is {} ", body_mode_);
+        // mxn_resp will only be supported if the ext_proc filter has body_mode set to MXN.
+        if (body_mode_ != ProcessingMode::MXN) {
           return absl::FailedPreconditionError("spurious message");
         }
 
-        handleMultipleChunksInBodyResponse(common_response);
+        handleMxnBodyResponse(common_response);
       } else {
         should_continue = handleSingleChunkInBodyResponse(common_response);
       }
@@ -362,10 +359,14 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
 }
 
 void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream) {
-  chunk_queue_.push(data, end_stream);
+  chunk_queue_.push(data, end_stream, body_mode_);
   if (queueOverHighLimit()) {
     requestWatermark();
   }
+}
+
+QueuedChunkPtr ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
+  return chunk_queue_.pop(out_data, body_mode_);
 }
 
 void ProcessorState::clearAsyncState() {
@@ -415,19 +416,37 @@ bool ProcessorState::handleSingleChunkInBodyResponse(const CommonResponse& commo
   return should_continue;
 }
 
-void ProcessorState::handleMultipleChunksInBodyResponse(const CommonResponse& common_response) {
-  Buffer::OwnedImpl buffer;
+bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response) {
+  uint32_t confirmed_chunks_count = common_response.body_mutation().mxn_resp().confirmed_chunks_count();
+  if (confirmed_chunks_count > 0 && confirmed_chunks_count <= chunk_queue_.size() ) {
+    ENVOY_LOG(trace, "MxN: Clearing {} chunks of HTTP body", confirmed_chunks_count);
+    for (uint32_t i = 0; i < confirmed_chunks_count; i++) {
+      Buffer::OwnedImpl chunk_data;
+      (void)dequeueStreamingChunk(chunk_data);
+      chunk_data.drain(chunk_data.length());
+      if (queueBelowLowLimit()) {
+        clearWatermark();
+      }
+    }
+    onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+    return false;
+  }
   auto body = common_response.body_mutation().body();
   if (body.size() > 0) {
+    Buffer::OwnedImpl buffer;
     buffer.add(body);
     ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream with more data coming",
               buffer.length());
     injectDataToFilterChain(buffer, false);
   }
-  onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+
+  auto callback_state = /*chunk_queue_.empty() ? CallbackState::Idle :*/ callback_state_;
+  onFinishProcessorCall(Grpc::Status::Ok, callback_state);
   // Need to start a new gRPC call timer.
   onStartProcessorCall(std::bind(&Filter::onMessageTimeout, &(this->filter_)),
                        filter_.config().messageTimeout(), callback_state_);
+  bool should_continue =  common_response.body_mutation().mxn_resp().end_of_stream();
+  return should_continue;
 }
 
 void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
@@ -520,7 +539,8 @@ void EncodingProcessorState::clearWatermark() {
   }
 }
 
-void ChunkQueue::push(Buffer::Instance& data, bool end_stream) {
+void ChunkQueue::push(Buffer::Instance& data, bool end_stream,
+                      ProcessingMode_BodySendMode body_mode) {
   // Adding the chunk into the queue.
   auto next_chunk = std::make_unique<QueuedChunk>();
   next_chunk->length = data.length();
@@ -529,10 +549,13 @@ void ChunkQueue::push(Buffer::Instance& data, bool end_stream) {
   bytes_enqueued_ += data.length();
 
   // Adding the data to the buffer.
-  received_data_.move(data);
+  if (body_mode != ProcessingMode::MXN) {
+    received_data_.move(data);
+  }
 }
 
-QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data) {
+QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data,
+                               ProcessingMode_BodySendMode body_mode) {
   if (queue_.empty()) {
     return nullptr;
   }
@@ -541,8 +564,10 @@ QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data) {
   queue_.pop_front();
   bytes_enqueued_ -= chunk->length;
 
-  // Move the corresponding data out.
-  out_data.move(received_data_, chunk->length);
+  if (body_mode != ProcessingMode::MXN) {
+    // Move the corresponding data out.
+    out_data.move(received_data_, chunk->length);
+  }
   return chunk;
 }
 

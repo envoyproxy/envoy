@@ -3976,11 +3976,8 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    response_body_mode: "STREAMED"
-  enable_more_chunks: true
+    response_body_mode: "MXN"
   )EOF");
-
-  EXPECT_EQ(config_->enableMoreChunks(), true);
 
   // Create synthetic HTTP request
   HttpTestUtility::addDefaultHeaders(request_headers_);
@@ -4012,38 +4009,36 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
   }
 
-  for (int i = 0; i < 6; i++) {
-    // clear_body response is sent back for the 1st~6th request chunk.
-    processResponseBody(
-        [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-          auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-          body_mut->set_clear_body(true);
-          body_mut->set_more_chunks(false);
-        },
-        false);
-  }
-  // Then the ext_proc server sent back 3 mutated data chunks for the 7th request chunk.
+  // clear_body response is sent back for the 1st~6th request chunk.
+  processResponseBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->mutable_mxn_resp()->set_confirmed_chunks_count(7);
+      },
+      false);
+
+  // Then the ext_proc server sent back 3 mutated data chunks
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->mutable_mxn_resp()->set_end_of_stream(false);
         body_mut->set_body(" AAAAA ");
-        body_mut->set_more_chunks(true);
         want_response_body.add(" AAAAA ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->mutable_mxn_resp()->set_end_of_stream(false);
         body_mut->set_body(" BBBB ");
-        body_mut->set_more_chunks(true);
         want_response_body.add(" BBBB ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->mutable_mxn_resp()->set_end_of_stream(false);
         body_mut->set_body(" CCC ");
-        body_mut->set_more_chunks(false);
         want_response_body.add(" CCC ");
       },
       false);
@@ -4070,62 +4065,57 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
   EXPECT_FALSE(encoding_watermarked);
 
-  // Now do another 3x4 streaming.
+  // Now send another 3 chunks.
   for (int i = 0; i < 3; i++) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 10);
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
-
-    if (i < 2) {
-      // clear_body response is sent back for the 1st~2th request chunk.
-      processResponseBody(
-          [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-            body_mut->set_clear_body(true);
-            body_mut->set_more_chunks(false);
-          },
-          false);
-    } else {
-      // The ext_proc server sent back 4 mutated data chunks for the 3th request chunk.
-      processResponseBody(
-          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-            body_mut->set_body(" EEEEEEE ");
-            body_mut->set_more_chunks(true);
-            want_response_body.add(" EEEEEEE ");
-          },
-          false);
-      processResponseBody(
-          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-            body_mut->set_body(" F ");
-            body_mut->set_more_chunks(true);
-            want_response_body.add(" F ");
-          },
-          false);
-      processResponseBody(
-          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-            body_mut->set_body(" GGGGGGGGG ");
-            body_mut->set_more_chunks(true);
-            want_response_body.add(" GGGGGGGGG ");
-          },
-          false);
-      processResponseBody(
-          [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-            auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-            body_mut->set_body(" HH ");
-            body_mut->set_more_chunks(false);
-            want_response_body.add(" HH ");
-          },
-          false);
-    }
   }
-
-  // Send the last empty request chunk.
+  // Send the last chunk.
   Buffer::OwnedImpl last_resp_chunk;
+  TestUtility::feedBufferWithRandomCharacters(last_resp_chunk, 10);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
-  processResponseBody(absl::nullopt, true);
+
+  processResponseBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->mutable_mxn_resp()->set_confirmed_chunks_count(4);
+      },
+      false);
+
+  // The ext_proc server sent back 4 mutated data chunks for the 3th request chunk.
+  processResponseBody(
+      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->mutable_mxn_resp()->set_end_of_stream(false);
+        body_mut->set_body(" EEEEEEE ");
+        want_response_body.add(" EEEEEEE ");
+      },
+      false);
+  processResponseBody(
+      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->mutable_mxn_resp()->set_end_of_stream(false);
+        body_mut->set_body(" F ");
+        want_response_body.add(" F ");
+      },
+      false);
+  processResponseBody(
+      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->mutable_mxn_resp()->set_end_of_stream(false);
+        body_mut->set_body(" GGGGGGGGG ");
+        want_response_body.add(" GGGGGGGGG ");
+      },
+      false);
+  processResponseBody(
+      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body(" HH ");
+        body_mut->mutable_mxn_resp()->set_end_of_stream(true);
+        want_response_body.add(" HH ");
+      },
+      false);
 
   // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
@@ -4143,8 +4133,6 @@ TEST_F(HttpFilterTest, SendMoreChunksWithFeatureDisabled) {
   processing_mode:
     response_body_mode: "STREAMED"
   )EOF");
-
-  EXPECT_EQ(config_->enableMoreChunks(), false);
 
   // Create synthetic HTTP request
   HttpTestUtility::addDefaultHeaders(request_headers_);
@@ -4174,7 +4162,7 @@ TEST_F(HttpFilterTest, SendMoreChunksWithFeatureDisabled) {
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
         body_mut->set_body(" AAAAA ");
-        body_mut->set_more_chunks(true);
+        body_mut->mutable_mxn_resp()->set_confirmed_chunks_count(2);
       },
       false);
 

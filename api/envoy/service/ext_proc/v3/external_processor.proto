@@ -375,6 +375,11 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
+message MxnBodyResponse {
+  uint32 confirmed_chunks_count = 1;
+  bool end_of_stream = 2;
+}
+
 // Replace the entire message body chunk received in the corresponding
 // HttpBody message with this new body, or clear the body.
 message BodyMutation {
@@ -385,20 +390,6 @@ message BodyMutation {
     // Clear the corresponding body chunk
     bool clear_body = 2;
   }
-
-  // This is to support M:N streaming from the external processor to Envoy.
-  // In some cases, like for compression purpose, the external processor might need to buffer M requests from Envoy
-  // before sending back the real response. And it might need to send N responses back after it processed those M requests.
-  // To make this work with the ext_proc STREAMED mode state machine, the external processor can send back a
-  // :ref:`clear_body <envoy_v3_api_field_service.ext_proc.v3.BodyMutation.clear_body>` for the 1st to (M-1)-th request with the ``more_chunks`` set to false.
-  // After the external processor receives the (M)-th request, it can send back N responses in total corresponding to that M requests.
-  // During the process of sending the N responses, the external processor set the ``more_chunks`` of each response to true for the 1st to the (N-1)-th response.
-  // And set ``more_chunks`` to false for the Nth response.
-  // This feature is only supported if
-  // :ref:`enable_more_chunks <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.enable_more_chunks>`
-  // is set to true. If ``enable_more_chunks`` is false, and response with ``more_chunks`` is received,
-  // such response message will be marked as spurious and the external processing will be shut down.
-  // ``more_chunks`` is only meaningful when Envoy ext_proc filter is working in the STREAMED mode:
-  // Please check https://github.com/envoyproxy/envoy/issues/32090 for more details on this.
-  bool more_chunks = 3;
+  // MxN body mode responses.
+  MxnBodyResponse mxn_resp = 3;
 }

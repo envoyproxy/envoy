@@ -68,6 +68,14 @@ message ProcessingMode {
     // chunk. If the body exceeds the configured buffer limit, then the body contents
     // up to the buffer limit will be sent.
     BUFFERED_PARTIAL = 3;
+
+    // Envoy streams the body to the server in pieces as they arrive. The data is not
+    // stored in the internal queue. Only bytes tracking is stored there.
+    // Server may buffer the M chunks of data, processing them then split the processed
+    // data into N chunks, and stream them back.
+    // During server buffering stage, it must send ACK to Envoy as indication how many chunks
+    // it has received.
+    MXN = 4;
   }
 
   // How to handle the request header. Default is "SEND".
