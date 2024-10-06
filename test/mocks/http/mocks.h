@@ -239,6 +239,8 @@ public:
 
   MOCK_METHOD(void, onSidestreamAboveHighWatermark, ());
   MOCK_METHOD(void, onSidestreamBelowLowWatermark, ());
+  MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
+  MOCK_METHOD(void, removeDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
 };
 
 class MockStreamDecoderFilterCallbacks : public StreamDecoderFilterCallbacks,
