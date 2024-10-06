@@ -455,8 +455,8 @@ message RemoteJwks {
   config.core.v3.RetryPolicy retry_policy = 4;
 
   // Refetch JWKS if extracted JWT has no KID or a KID that does not match cached JWKS's KID.
-  // Async fetching is independent to refetching. New JWKS is fetched on demand and the cache
-  // is isolated to the fetched worker thread.
+  // Async JWKS fetching is independent to this refetching process. New JWKS is fetched on
+  // demand and the cache is isolated to the fetched worker thread.
   //
   // If all cached JWKS have no KID, each request will trigger a JWKS refetch.
   bool refetch_jwks_on_kid_mismatch = 5;

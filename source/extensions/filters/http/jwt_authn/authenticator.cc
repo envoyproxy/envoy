@@ -268,9 +268,7 @@ void AuthenticatorImpl::startVerify() {
 
   auto jwks_obj = jwks_data_->getJwksObj();
   if (jwks_obj != nullptr && !jwks_data_->isExpired()) {
-    // TODO(arulthileeban): Add rate limiting when refetching JWKS.
-    // This would help with untrusted downstream requests limiting DoS.
-    // Additional features discussed in #14557 could be added.
+    // TODO(arulthileeban): Additional features discussed in #14557 could be added.
     if (jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch()) {
       if (!jwt_->kid_.empty()) {
         for (const auto& jwk : jwks_obj->keys()) {

@@ -469,5 +469,10 @@ new_features:
     WIP: Added implementation of :ref:`client_side_weighted_round_robin
     <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
     load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
+- area: jwt_authn
+  change: |
+    Added  :ref:`refetch_jwks_on_kid_mismatch
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.refetch_jwks_on_kid_mismatch>`
+    to allow filter to refetch JWKS when extracted JWT's KID does not match cached JWKS's KID.
 
 deprecated:
