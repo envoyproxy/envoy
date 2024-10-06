@@ -152,13 +152,17 @@ private:
 
 using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
-class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
+class PluginHandleThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle_(handle){};
+  PluginHandleThreadLocal(PluginHandleSharedPtr handle, Event::Dispatcher& worker_dispatcher)
+      : handle_(std::move(handle)), worker_dispatcher_(worker_dispatcher) {}
+
   PluginHandleSharedPtr& handle() { return handle_; }
+  Event::Dispatcher& workerDispatcher() { return worker_dispatcher_; }
 
 private:
   PluginHandleSharedPtr handle_;
+  Event::Dispatcher& worker_dispatcher_;
 };
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
