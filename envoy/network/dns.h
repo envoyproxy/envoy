@@ -113,6 +113,16 @@ public:
                                   ResolveCb callback) PURE;
 
   /**
+   * Initiate an async DNS resolution for an SRV record.
+   * @param dns_name supplies the DNS name to lookup.
+   * @param dns_lookup_family the DNS IP version lookup policy.
+   * @param callback supplies the callback to invoke when the resolution is complete.
+   * @return if non-null, a handle that can be used to cancel the resolution.
+   *         This is only valid until the invocation of callback or ~DnsResolver().
+   */
+  virtual ActiveDnsQuery* resolveSrv(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
+                                     ResolveCb callback) PURE;
+  /**
    * Tell the resolver to reset networking, typically in response to a network switch (e.g., from
    * WiFi to cellular). What the resolver does is resolver dependent but might involve creating
    * new resolver connections, re-reading resolver targets, etc.
