@@ -39,13 +39,15 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
 }
 
 std::string getAsyncFetchFilterConfig(const std::string& config_str, bool fast_listener,
-                                      bool strip_failure_response) {
+                                      bool strip_failure_response,
+                                      bool refetch_jwks_on_kid_mismatch) {
   JwtAuthentication proto_config;
   TestUtility::loadFromYaml(config_str, proto_config);
   proto_config.set_strip_failure_response(strip_failure_response);
 
   auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
   auto* async_fetch = provider0.mutable_remote_jwks()->mutable_async_fetch();
+  provider0.mutable_remote_jwks()->set_refetch_jwks_on_kid_mismatch(refetch_jwks_on_kid_mismatch);
   async_fetch->set_fast_listener(fast_listener);
   // Set failed_refetch_duration to a big value to disable failed refetch.
   // as it interferes the two FailedAsyncFetch integration tests.
@@ -394,8 +396,9 @@ public:
     initialize();
   }
 
-  void initializeAsyncFetchFilter(bool fast_listener) {
-    config_helper_.prependFilter(getAsyncFetchFilterConfig(ExampleConfig, fast_listener, false));
+  void initializeAsyncFetchFilter(bool fast_listener, bool refetch_jwks_on_kid_mismatch) {
+    config_helper_.prependFilter(getAsyncFetchFilterConfig(ExampleConfig, fast_listener, false,
+                                                           refetch_jwks_on_kid_mismatch));
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -533,7 +536,7 @@ TEST_P(RemoteJwksIntegrationTest, FetchFailedMissingCluster) {
 
 TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetch) {
   on_server_init_function_ = [this]() { waitForJwksResponse("200", PublicKey); };
-  initializeAsyncFetchFilter(false);
+  initializeAsyncFetchFilter(false, false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -563,9 +566,51 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetch) {
   cleanup();
 }
 
+// Test to validate refetching of JWKS on KID mismatch.
+TEST_P(RemoteJwksIntegrationTest, RefetchJwksWithDifferentKidJwts) {
+  on_server_init_function_ = [this]() { waitForJwksResponse("200", PublicKey1); };
+  initializeAsyncFetchFilter(false, true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(GoodTokenWithKid1)},
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  test_server_->waitForCounterEq("http.config_test.jwt_authn.jwks_fetch_success", 1);
+
+  auto response2 = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(GoodTokenWithKid2)},
+  });
+
+  waitForJwksResponse("200", PublicKey2);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response2->waitForEndStream());
+  ASSERT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+  test_server_->waitForCounterEq("http.config_test.jwt_authn.jwks_fetch_success", 2);
+  cleanup();
+}
+
 TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetchFast) {
   on_server_init_function_ = [this]() { waitForJwksResponse("200", PublicKey); };
-  initializeAsyncFetchFilter(true);
+  initializeAsyncFetchFilter(true, false);
 
   // This test is only expecting one jwks fetch, but there is a race condition in the test:
   // In fast fetch mode, the listener is activated without waiting for jwks fetch to be
@@ -606,7 +651,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetchFast) {
 
 TEST_P(RemoteJwksIntegrationTest, WithFailedJwksAsyncFetch) {
   on_server_init_function_ = [this]() { waitForJwksResponse("500", ""); };
-  initializeAsyncFetchFilter(false);
+  initializeAsyncFetchFilter(false, false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -627,7 +672,7 @@ TEST_P(RemoteJwksIntegrationTest, WithFailedJwksAsyncFetch) {
 
 TEST_P(RemoteJwksIntegrationTest, WithFailedJwksAsyncFetchFast) {
   on_server_init_function_ = [this]() { waitForJwksResponse("500", ""); };
-  initializeAsyncFetchFilter(true);
+  initializeAsyncFetchFilter(true, false);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

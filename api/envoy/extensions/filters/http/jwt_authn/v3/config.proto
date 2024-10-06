@@ -383,6 +383,7 @@ message JwtCacheConfig {
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
+// [#next-free-field: 6]
 message RemoteJwks {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.RemoteJwks";
@@ -453,7 +454,11 @@ message RemoteJwks {
   //
   config.core.v3.RetryPolicy retry_policy = 4;
 
+  // Refetch JWKS if extracted JWT has no KID or a KID that does not match cached JWKS's KID.
+  // Async fetching is independent to refetching. New JWKS is fetched on demand and the cache
+  // is isolated to the fetched worker thread.
   //
+  // If all cached JWKS have no KID, each request will trigger a JWKS refetch.
   bool refetch_jwks_on_kid_mismatch = 5;
 }
 

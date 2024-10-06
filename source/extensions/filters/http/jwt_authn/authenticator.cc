@@ -268,25 +268,19 @@ void AuthenticatorImpl::startVerify() {
 
   auto jwks_obj = jwks_data_->getJwksObj();
   if (jwks_obj != nullptr && !jwks_data_->isExpired()) {
-    // TODO(qiwzhang): It would seem there's a window of error whereby if the JWT issuer
-    // has started signing with a new key that's not in our cache, then the
-    // verification will fail even though the JWT is valid. A simple fix
-    // would be to check the JWS kid header field; if present check we have
-    // the key cached, if we do proceed to verify else try a new JWKS retrieval.
-    // JWTs without a kid header field in the JWS we might be best to get each
-    // time? This all only matters for remote JWKS.
-
-    // If extracted JWT's kid does not match with the JWKS kid, refetch JWKS.
-    // If extracted JWT does not have a kid, always refetch JWKS.
+    // TODO(arulthileeban): Add rate limiting when refetching JWKS.
+    // This would help with untrusted downstream requests limiting DoS.
+    // Additional features discussed in #14557 could be added.
     if (jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch()) {
-      for (const auto& jwk : jwks_obj->keys()) {
-        if (!jwk->kid_.empty() && !jwt_->kid_.empty() && (jwk->kid_ == jwt_->kid_)) {
-          verifyKey();
-          return;
+      if (!jwt_->kid_.empty()) {
+        for (const auto& jwk : jwks_obj->keys()) {
+          if (jwk->kid_ == jwt_->kid_) {
+            verifyKey();
+            return;
+          }
         }
       }
-    }
-    else {
+    } else {
       verifyKey();
       return;
     }
@@ -311,7 +305,6 @@ void AuthenticatorImpl::startVerify() {
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   jwks_cache_.stats().jwks_fetch_success_.inc();
-  ENVOY_LOG(info, "NEW JWKS with KID {}", jwks->keys()[0]->kid_);
   const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
   if (status != Status::Ok) {
     doneWithStatus(status);
