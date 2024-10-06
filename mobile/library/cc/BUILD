@@ -20,11 +20,11 @@ envoy_cc_library(
         "//bazel:exclude_certificates": ["-DEXCLUDE_CERTIFICATES"],
         "//conditions:default": [],
     }),
-    external_deps = ["abseil_optional"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
         ":envoy_engine_cc_lib_no_stamp",
+        "@com_google_absl//absl/types:optional",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/common/protobuf",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -75,7 +75,6 @@ envoy_cc_library(
         "stream_prototype.h",
         "string_accessor.h",
     ],
-    external_deps = ["abseil_optional"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
@@ -84,6 +83,7 @@ envoy_cc_library(
         "//library/common/api:c_types",
         "//library/common/bridge:utility_lib",
         "//library/common/extensions/key_value/platform:config",
+        "@com_google_absl//absl/types:optional",
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/http:header_map_lib",
         "@envoy//source/common/http:utility_lib",

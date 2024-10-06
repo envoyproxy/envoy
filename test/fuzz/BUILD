@@ -26,9 +26,6 @@ exports_files(["headers.dict"])
 envoy_cc_test_library(
     name = "main",
     srcs = ["main.cc"],
-    external_deps = [
-        "abseil_symbolize",
-    ],
     deps = [
         ":fuzz_runner_lib",
         "//source/common/common:assert_lib",
@@ -37,6 +34,7 @@ envoy_cc_test_library(
         "//test:test_listener_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/synchronization",
     ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 
@@ -61,9 +59,7 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = [
-        "quiche_http2_adapter",
-    ],
+    rbe_pool = "2core",
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
@@ -74,6 +70,7 @@ envoy_cc_test_library(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:http2_adapter",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -120,6 +117,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "random_test",
     srcs = ["random_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//test/fuzz:random_lib",
     ],

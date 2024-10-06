@@ -57,7 +57,6 @@ FETCH_PROTO_TARGETS=(
     @com_github_bufbuild_buf//:bin/buf
     //tools/proto_format/...)
 
-GCS_REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
 
 retry () {
     local n wait iterations
@@ -225,7 +224,7 @@ function bazel_binary_build() {
     //test/tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" external:su-exec
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @com_github_ncopa_suexec//:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -377,7 +376,7 @@ case $CI_TARGET in
         # fi
         ;;
 
-    check_and_fix_proto_format)
+    format-api|check_and_fix_proto_format)
         setup_clang_toolchain
         echo "Check and fix proto format ..."
         "${ENVOY_SRCDIR}/ci/check_and_fix_format.sh"

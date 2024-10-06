@@ -1575,5 +1575,85 @@ TEST_P(FilterIntegrationTest, FilterAddsDataToHeaderOnlyRequestWithIndependentHa
   testFilterAddsDataAndTrailersToHeaderOnlyRequest();
 }
 
+// Add metadata in the first filter before recreate the stream in the second filter,
+// on response path.
+TEST_P(FilterIntegrationTest, RecreateStreamAfterEncodeMetadata) {
+  // recreateStream is not supported in Upstream filter chain.
+  if (!testing_downstream_filter_) {
+    return;
+  }
+
+  prependFilter("{ name: add-metadata-encode-headers-filter }");
+  prependFilter("{ name: encoder-recreate-stream-filter }");
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Second upstream request is triggered by recreateStream.
+  FakeStreamPtr upstream_request_2;
+  // Wait for the next stream on the upstream connection.
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_2));
+  // Wait for the stream to be completely received.
+  ASSERT_TRUE(upstream_request_2->waitForEndStream(*dispatcher_));
+  upstream_request_2->encodeHeaders(default_response_headers_, true);
+
+  // Wait for the response to be completely received.
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  // Verify the metadata is received.
+  std::set<std::string> expected_metadata_keys = {"headers", "duplicate"};
+  EXPECT_EQ(response->metadataMap().size(), expected_metadata_keys.size());
+  for (const auto& key : expected_metadata_keys) {
+    // keys are the same as their corresponding values.
+    auto it = response->metadataMap().find(key);
+    ASSERT_FALSE(it == response->metadataMap().end()) << "key: " << key;
+    EXPECT_EQ(response->metadataMap().find(key)->second, key);
+  }
+}
+
+// Add metadata in the first filter on local reply path.
+TEST_P(FilterIntegrationTest, EncodeMetadataOnLocalReply) {
+  // Local replies are not seen by upstream HTTP filters. add-metadata-encode-headers-filter will
+  // not be invoked if it is installed in upstream filter chain.
+  // Thus, this test is only applicable to downstream filter chain.
+  if (!testing_downstream_filter_) {
+    return;
+  }
+
+  prependFilter("{ name: local-reply-during-decode }");
+  prependFilter("{ name: add-metadata-encode-headers-filter }");
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+
+  // Verify the metadata is received.
+  std::set<std::string> expected_metadata_keys = {"headers", "duplicate"};
+  EXPECT_EQ(response->metadataMap().size(), expected_metadata_keys.size());
+  for (const auto& key : expected_metadata_keys) {
+    // keys are the same as their corresponding values.
+    auto it = response->metadataMap().find(key);
+    ASSERT_FALSE(it == response->metadataMap().end()) << "key: " << key;
+    EXPECT_EQ(response->metadataMap().find(key)->second, key);
+  }
+}
+
 } // namespace
 } // namespace Envoy

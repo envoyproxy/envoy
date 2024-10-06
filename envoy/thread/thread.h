@@ -88,7 +88,7 @@ public:
   /**
    * Return the current system thread ID
    */
-  virtual ThreadId currentThreadId() PURE;
+  virtual ThreadId currentThreadId() const PURE;
 };
 
 using ThreadFactoryPtr = std::unique_ptr<ThreadFactory>;

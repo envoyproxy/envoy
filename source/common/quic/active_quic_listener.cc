@@ -37,14 +37,17 @@ ActiveQuicListener::ActiveQuicListener(
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
-    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+    bool reject_new_connections)
     : Server::ActiveUdpListenerBase(
           worker_index, concurrency, parent, *listen_socket,
           std::make_unique<Network::UdpListenerImpl>(
               dispatcher, listen_socket, *this, dispatcher.timeSource(),
               listener_config.udpListenerConfig()->config().downstream_socket_config()),
           &listener_config),
-      dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedHttp3Versions()),
+      dispatcher_(dispatcher),
+      version_manager_(reject_new_connections ? quic::ParsedQuicVersionVector()
+                                              : quic::CurrentSupportedHttp3Versions()),
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
       crypto_server_stream_factory_(crypto_server_stream_factory),
@@ -264,7 +267,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)),
       receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")),
-      context_(context) {
+      context_(context), reject_new_connections_(config.reject_new_connections()) {
   const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
@@ -434,7 +437,7 @@ ActiveQuicListenerFactory::createActiveQuicListener(
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, receive_ecn_, crypto_server_stream_factory,
       proof_source_factory, std::move(cid_generator), worker_selector_,
-      connection_debug_visitor_factory_);
+      connection_debug_visitor_factory_, reject_new_connections_);
 }
 
 } // namespace Quic

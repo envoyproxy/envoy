@@ -303,38 +303,19 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
 
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
-
-  // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
-  // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
-  // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
-  // is captured and used to make sure the CacheFilter is still alive before accessing it in the
-  // posted callback.
-  // TODO(yosrym93): Look into other options for handling this (also in getBody and getTrailers) as
-  // they arise, e.g. cancellable posts, guaranteed ordering of posted callbacks and deletions, etc.
-  CacheFilterWeakPtr self = weak_from_this();
-
-  // The dispatcher needs to be captured because there's no guarantee that
-  // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getHeaders([self, &request_headers, &dispatcher = decoder_callbacks_->dispatcher()](
+  callback_called_directly_ = true;
+  lookup_->getHeaders([this, &request_headers, &dispatcher = decoder_callbacks_->dispatcher()](
                           LookupResult&& result, bool end_stream) {
-    // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    dispatcher.post([self, &request_headers, result = std::move(result), end_stream]() mutable {
-      if (CacheFilterSharedPtr cache_filter = self.lock()) {
-        cache_filter->onHeaders(std::move(result), request_headers, end_stream);
-      }
-    });
+    ASSERT(!callback_called_directly_ && dispatcher.isThreadSafe(),
+           "caches must post the callback to the filter's dispatcher");
+    onHeaders(std::move(result), request_headers, end_stream);
   });
+  callback_called_directly_ = false;
 }
 
 void CacheFilter::getBody() {
   ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_ranges_.empty(), "No reason to call getBody when there's no body to get.");
-  // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
-  // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
-  // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
-  // is captured and used to make sure the CacheFilter is still alive before accessing it in the
-  // posted callback.
-  CacheFilterWeakPtr self = weak_from_this();
 
   // We don't want to request more than a buffer-size at a time from the cache.
   uint64_t fetch_size_limit = encoder_callbacks_->encoderBufferLimit();
@@ -347,41 +328,27 @@ void CacheFilter::getBody() {
                                        ? (remaining_ranges_[0].begin() + fetch_size_limit)
                                        : remaining_ranges_[0].end()};
 
-  // The dispatcher needs to be captured because there's no guarantee that
-  // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getBody(fetch_range, [self, &dispatcher = decoder_callbacks_->dispatcher()](
+  callback_called_directly_ = true;
+  lookup_->getBody(fetch_range, [this, &dispatcher = decoder_callbacks_->dispatcher()](
                                     Buffer::InstancePtr&& body, bool end_stream) {
-    // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    dispatcher.post([self, body = std::move(body), end_stream]() mutable {
-      if (CacheFilterSharedPtr cache_filter = self.lock()) {
-        cache_filter->onBody(std::move(body), end_stream);
-      }
-    });
+    ASSERT(!callback_called_directly_ && dispatcher.isThreadSafe(),
+           "caches must post the callback to the filter's dispatcher");
+    onBody(std::move(body), end_stream);
   });
+  callback_called_directly_ = false;
 }
 
 void CacheFilter::getTrailers() {
   ASSERT(lookup_, "CacheFilter is trying to call getTrailers with no LookupContext");
 
-  // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
-  // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
-  // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
-  // is captured and used to make sure the CacheFilter is still alive before accessing it in the
-  // posted callback.
-  CacheFilterWeakPtr self = weak_from_this();
-
-  // The dispatcher needs to be captured because there's no guarantee that
-  // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getTrailers([self, &dispatcher = decoder_callbacks_->dispatcher()](
+  callback_called_directly_ = true;
+  lookup_->getTrailers([this, &dispatcher = decoder_callbacks_->dispatcher()](
                            Http::ResponseTrailerMapPtr&& trailers) {
-    // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    // The lambda must be mutable as it captures trailers as a unique_ptr.
-    dispatcher.post([self, trailers = std::move(trailers)]() mutable {
-      if (CacheFilterSharedPtr cache_filter = self.lock()) {
-        cache_filter->onTrailers(std::move(trailers));
-      }
-    });
+    ASSERT(!callback_called_directly_ && dispatcher.isThreadSafe(),
+           "caches must post the callback to the filter's dispatcher");
+    onTrailers(std::move(trailers));
   });
+  callback_called_directly_ = false;
 }
 
 void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers,

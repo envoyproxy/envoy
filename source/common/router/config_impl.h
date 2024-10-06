@@ -478,7 +478,6 @@ private:
   // that should be used when with this policy.
   std::vector<std::pair<Upstream::RetryHostPredicateFactory&, ProtobufTypes::MessagePtr>>
       retry_host_predicate_configs_;
-  Upstream::RetryPrioritySharedPtr retry_priority_;
   // Name and config proto to use to create the RetryPriority to use with this policy. Default
   // initialized when no RetryPriority should be used.
   std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
@@ -598,11 +597,11 @@ private:
  */
 class InternalRedirectPolicyImpl : public InternalRedirectPolicy {
 public:
+  static absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>>
+  create(const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
+         ProtobufMessage::ValidationVisitor& validator, absl::string_view current_route_name);
   // Constructor that enables internal redirect with policy_config controlling the configurable
   // behaviors.
-  InternalRedirectPolicyImpl(const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
-                             ProtobufMessage::ValidationVisitor& validator,
-                             absl::string_view current_route_name);
   // Default constructor that disables internal redirect.
   InternalRedirectPolicyImpl() = default;
 
@@ -620,6 +619,9 @@ public:
   bool isCrossSchemeRedirectAllowed() const override { return allow_cross_scheme_redirect_; }
 
 private:
+  InternalRedirectPolicyImpl(const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
+                             ProtobufMessage::ValidationVisitor& validator,
+                             absl::string_view current_route_name, absl::Status& creation_status);
   absl::flat_hash_set<Http::Code> buildRedirectResponseCodes(
       const envoy::config::route::v3::InternalRedirectPolicy& policy_config) const;
 
@@ -1175,7 +1177,7 @@ private:
                    ProtobufMessage::ValidationVisitor& validation_visitor,
                    Server::Configuration::ServerFactoryContext& factory_context) const;
 
-  std::unique_ptr<InternalRedirectPolicyImpl>
+  absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>>
   buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
                               ProtobufMessage::ValidationVisitor& validator,
                               absl::string_view current_route_name) const;

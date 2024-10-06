@@ -16,11 +16,7 @@ envoy_cc_extension(
     hdrs = [
         "spiffe_validator.h",
     ],
-    external_deps = [
-        "ssl",
-        "abseil_base",
-        "abseil_hash",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//envoy/ssl:context_config_interface",
         "//envoy/ssl:ssl_socket_extended_info_interface",
@@ -36,6 +32,8 @@ envoy_cc_extension(
         "//source/common/tls:stats_lib",
         "//source/common/tls:utility_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/hash",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
