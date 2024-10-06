@@ -188,8 +188,8 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithMultipleKidJwks) {
       ->set_refetch_jwks_on_kid_mismatch(true);
   createAuthenticator();
 
-  // Test with JWT signed by KID1. Fetches the first JWKS, PublicKey that contains both KID1 and
-  // KID2.
+  // JWT signed by KID1. Authenticator fetches the first JWKS, PublicKey that contains both KID1
+  // and KID2.
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -199,14 +199,13 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithMultipleKidJwks) {
   expectVerifyStatus(Status::Ok, headers);
   jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
 
-  // Test with JWT signed by KID2. Since cached JWKS already contains KID2, no refetching would be
-  // done.
+  // JWT signed by KID2. Since cached JWKS already contains KID2, no refetching would be done.
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
   headers =
       Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodTokenWithKid2)}};
   expectVerifyStatus(Status::Ok, headers);
 
-  // Test with JWT signed by KID3. Since cached JWKS doesn't contain KID3, refetching would be done.
+  // JWT signed by KID3. Since cached JWKS doesn't contain KID3, refetching would be done.
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -224,7 +223,7 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithSingleKidJwks) {
   createAuthenticator();
 
   jwks_ = Jwks::createFrom(PublicKey1, Jwks::JWKS);
-  // Test with JWT signed by KID1. Fetches the first JWKS, PublicKey1 that contains KID1.
+  // JWT signed by KID1. Authenticator fetches the first JWKS, PublicKey1 that contains KID1.
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -234,7 +233,7 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithSingleKidJwks) {
   expectVerifyStatus(Status::Ok, headers);
   jwks_ = Jwks::createFrom(PublicKey1, Jwks::JWKS);
 
-  // Test with JWT signed by KID2. Refetches the current JWKS, PublicKey1 that fails target JWT.
+  // JWT signed by KID2. Authenticator refetches the current JWKS, PublicKey1 that fails target JWT.
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -244,7 +243,7 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithSingleKidJwks) {
   expectVerifyStatus(Status::JwksKidAlgMismatch, headers);
   jwks_ = Jwks::createFrom(PublicKey2, Jwks::JWKS);
 
-  // Test with JWT signed by KID2. Refetches the new JWKS, PublicKey2 that contains KID2.
+  // JWT signed by KID2. Authenticator refetches the new JWKS, PublicKey2 that contains KID2.
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
