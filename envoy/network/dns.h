@@ -50,9 +50,8 @@ public:
   virtual void cancel(CancelReason reason) PURE;
 
   /**
-   * Add a trace for the DNS query. There is no `clearTraces` because the trace lifetime is tied to
-   * the lifetime of `ActiveQuery` and `ActiveQuery` is destroyed upon query completion or
-   * cancellation.
+   * Add a trace for the DNS query. The trace lifetime is tied to the lifetime of `ActiveQuery` and
+   * `ActiveQuery` will be destroyed upon query completion or cancellation.
    */
   virtual void addTrace(uint8_t trace) PURE;
 
