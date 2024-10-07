@@ -429,14 +429,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
             return absl::StrCat(trace.trace_, "=", trace.time_.time_since_epoch().count());
           });
       details_with_maybe_trace = absl::StrCat(details, ":", absl::StrJoin(string_traces, ","));
-      // `cancel` must be called last because the `ActiveQuery` will be destroyed afterward.
-      if (is_timeout) {
-        primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
-      }
-    } else {
-      if (is_timeout) {
-        primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
-      }
+    }
+    // `cancel` must be called last because the `ActiveQuery` will be destroyed afterward.
+    if (is_timeout) {
+      primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
     }
   }
 
