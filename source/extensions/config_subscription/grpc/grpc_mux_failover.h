@@ -207,6 +207,8 @@ public:
   }
 
 private:
+  friend class GrpcMuxFailoverTest;
+
   // A helper class that proxies the callbacks of GrpcStreamCallbacks for the primary service.
   class PrimaryGrpcStreamCallbacks : public GrpcStreamCallbacks<ResponseType> {
   public:
@@ -395,7 +397,15 @@ private:
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
     PANIC("not implemented");
   }
-  void closeStream() override { PANIC("not implemented"); }
+  void closeStream() override {
+    if (connectingToOrConnectedToPrimary()) {
+      ENVOY_LOG_MISC(debug, "Intentionally closing the primary gRPC stream");
+      primary_grpc_stream_->closeStream();
+    } else if (connectingToOrConnectedToFailover()) {
+      ENVOY_LOG_MISC(debug, "Intentionally closing the failover gRPC stream");
+      failover_grpc_stream_->closeStream();
+    }
+  }
 
   // The stream callbacks that will be invoked on the GrpcMux object, to notify
   // about the state of the underlying primary/failover stream.
