@@ -13,7 +13,6 @@ import "envoy/config/core/v3/health_check.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/config/core/v3/resolver.proto";
 import "envoy/config/endpoint/v3/endpoint.proto";
-import "envoy/extensions/clusters/dns/v3/cluster.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 import "envoy/type/v3/percent.proto";
 
@@ -142,6 +141,13 @@ message Cluster {
   // this setting is
   // ignored.
   // [#next-major-version: deprecate AUTO in favor of a V6_PREFERRED option.]
+  enum DnsLookupFamily {
+    AUTO = 0;
+    V4_ONLY = 1;
+    V6_ONLY = 2;
+    V4_PREFERRED = 3;
+    ALL = 4;
+  }
 
   enum ClusterProtocolSelection {
     // Cluster can only operate on one of the possible upstream protocols (HTTP1.1, HTTP2).
@@ -672,6 +678,24 @@ message Cluster {
     core.v3.HealthStatusSet override_host_status = 8;
   }
 
+  message RefreshRate {
+    option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster.RefreshRate";
+
+    // Specifies the base interval between refreshes. This parameter is required and must be greater
+    // than zero and less than
+    // :ref:`max_interval <envoy_v3_api_field_config.cluster.v3.Cluster.RefreshRate.max_interval>`.
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true
+      gt {nanos: 1000000}
+    }];
+
+    // Specifies the maximum interval between refreshes. This parameter is optional, but must be
+    // greater than or equal to the
+    // :ref:`base_interval <envoy_v3_api_field_config.cluster.v3.Cluster.RefreshRate.base_interval>`  if set. The default
+    // is 10 times the :ref:`base_interval <envoy_v3_api_field_config.cluster.v3.Cluster.RefreshRate.base_interval>`.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
+  }
+
   message PreconnectPolicy {
     // Indicates how many streams (rounded up) can be anticipated per-upstream for each
     // incoming stream. This is useful for high-QPS or latency-sensitive services. Preconnecting
@@ -920,9 +944,6 @@ message Cluster {
   // [#next-major-version: make this a list of typed extensions.]
   map<string, google.protobuf.Any> typed_extension_protocol_options = 36;
 
-  // [#extension-category: envoy.clusters.dns]
-  envoy.extensions.clusters.dns.v3.DnsConfig dns_config = 59;
-
   // If the DNS refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
   // or :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
@@ -964,7 +985,7 @@ message Cluster {
   // ignored.
   // This field is deprecated in favor of ``dns_config``
   // which aggregates all of the DNS configuration in a single message.
-  envoy.extensions.clusters.dns.v3.DnsConfig.RefreshRate dns_failure_refresh_rate = 44
+  RefreshRate dns_failure_refresh_rate = 44
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
@@ -978,7 +999,7 @@ message Cluster {
   // The DNS IP address resolution policy. If this setting is not specified, the
   // value defaults to
   // :ref:`AUTO<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.AUTO>`.
-  envoy.extensions.clusters.dns.v3.DnsConfig.DnsLookupFamily dns_lookup_family = 17 [
+  DnsLookupFamily dns_lookup_family = 17 [
     deprecated = true,
     (validate.rules).enum = {defined_only: true},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
