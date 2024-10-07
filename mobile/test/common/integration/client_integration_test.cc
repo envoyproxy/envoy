@@ -694,7 +694,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
                        true);
   Network::TestResolver::unblockResolve();
   terminal_callback_.waitReady();
-  EXPECT_GE(2, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
+  EXPECT_LE(2, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
 }
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
