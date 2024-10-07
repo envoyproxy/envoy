@@ -153,7 +153,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         #
         # !!! NOTE !!!
         # Anytime the FIPS BoringSSL version is upgraded, `bazel/external/boringssl_fips.genrule_cmd` must be updated to use the toolchain
-        # specified in the associated accredidation certificate, which can be found linked from
+        # specified in the associated accreditation certificate, which can be found linked from
         # https://boringssl.googlesource.com/boringssl/+/refs/heads/master/crypto/fipsmodule/FIPS.md, for example
         # https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735.
         version = "fips-20220613",
@@ -1208,12 +1208,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "42b2e66c721f442bb439b40a1e037897360cf1b2",
-        sha256 = "f72f78d7fa57154ad302d559fee6b72e0695d51391684891ec991b2b5d90491f",
+        version = "eaeaa74b2b4bf4cd9f7a2f44ba8f323fdc55f66a",
+        sha256 = "1383267a64cb18fca62868e7b54118c223e164d9c0533b11a9a31c779c626f95",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-09-17",
+        release_date = "2024-10-02",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",

@@ -29,7 +29,7 @@ TEST(CustomHeaderFactoryTest, Basic) {
   TestUtility::loadFromYaml(yaml, typed_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_NE(factory->createExtension(typed_config.typed_config(), context), nullptr);
+  EXPECT_NE(*factory->createExtension(typed_config.typed_config(), context), nullptr);
 }
 
 TEST(CustomHeaderFactoryTest, InvalidHeaderName) {
@@ -47,7 +47,7 @@ TEST(CustomHeaderFactoryTest, InvalidHeaderName) {
   TestUtility::loadFromYaml(yaml, typed_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW_WITH_REGEX(factory->createExtension(typed_config.typed_config(), context),
+  EXPECT_THROW_WITH_REGEX(*factory->createExtension(typed_config.typed_config(), context),
                           EnvoyException,
                           "Proto constraint validation failed.*does not match regex pattern.*");
 }

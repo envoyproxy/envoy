@@ -12,6 +12,7 @@ import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpProxyTestServerFactory
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -42,16 +43,32 @@ class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
   }
 
   private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
 
   @Before
   fun setUp() {
     httpProxyTestServer =
       HttpProxyTestServerFactory.start(HttpProxyTestServerFactory.Type.HTTP_PROXY)
+    httpTestServer =
+      HttpTestServerFactory.start(
+        HttpTestServerFactory.Type.HTTP1_WITHOUT_TLS,
+        0,
+        // https://developer.mozilla.org/en-US/docs/Web/HTTP/Proxy_servers_and_tunneling/Proxy_Auto-Configuration_PAC_file
+        mapOf("Content-Type" to "application/x-ns-proxy-autoconfig"),
+        """
+function FindProxyForURL(url, host) {
+  return "PROXY ${httpProxyTestServer.ipAddress}:${httpProxyTestServer.port}";
+}
+      """
+          .trimIndent(),
+        mapOf()
+      )
   }
 
   @After
   fun tearDown() {
     httpProxyTestServer.shutdown()
+    httpTestServer.shutdown()
   }
 
   @Test
@@ -63,7 +80,7 @@ class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
     Shadows.shadowOf(connectivityManager)
       .setProxyForNetwork(
         connectivityManager.activeNetwork,
-        ProxyInfo.buildPacProxy(Uri.parse("https://example.com"))
+        ProxyInfo.buildPacProxy(Uri.parse("http://${httpTestServer.address}"))
       )
 
     val onEngineRunningLatch = CountDownLatch(1)
@@ -85,8 +102,8 @@ class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "http",
-          authority = "api.lyft.com",
-          path = "/ping"
+          authority = httpTestServer.address,
+          path = "/"
         )
         .build()
 
@@ -95,7 +112,7 @@ class ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest {
       .newStreamPrototype()
       .setOnResponseHeaders { responseHeaders, _, _ ->
         val status = responseHeaders.httpStatus ?: 0L
-        assertThat(status).isEqualTo(301)
+        assertThat(status).isEqualTo(200)
         assertThat(responseHeaders.value("x-proxy-response")).isNull()
         onResponseHeadersLatch.countDown()
       }

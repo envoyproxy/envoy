@@ -99,10 +99,11 @@ jobs:
         export NO_BUILD_SETUP=1
         export ENVOY_DOCKER_IN_DOCKER=1
       target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.arch }}
       trusted: ${{ inputs.trusted }}
       steps-pre: |
         - run: |
-            echo ARCH=${{ matrix.arch || 'x64' }} >> $GITHUB_ENV
+            echo ARCH=${{ matrix.arch }} >> $GITHUB_ENV
             echo DEB_ARCH=${{ matrix.arch == 'arm64' && 'arm64' || 'amd64' }} >> $GITHUB_ENV
           shell: bash
         - run: |
@@ -124,6 +125,7 @@ jobs:
 
         - name: verify_distro_x64
           target: verify_distro
+          arch: x64
           rbe: true
 
         - name: verify_distro_arm64

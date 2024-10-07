@@ -220,7 +220,6 @@ paths:
     - source/extensions/http/custom_response
     - source/extensions/http/early_header_mutation
     - source/extensions/http/injected_credentials
-    - source/extensions/http/original_ip_detection
     - source/extensions/http/stateful_session
     - source/extensions/io_socket/user_space
     - source/extensions/key_value

@@ -300,13 +300,12 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
 
 class FilterStateObjectWrapper : public google::api::expr::runtime::CelMap {
 public:
-  FilterStateObjectWrapper(const StreamInfo::FilterState::ObjectReflection* reflection)
-      : reflection_(reflection) {}
+  FilterStateObjectWrapper(const StreamInfo::FilterState::Object* object) : object_(object) {}
   absl::optional<CelValue> operator[](CelValue key) const override {
-    if (reflection_ == nullptr || !key.IsString()) {
+    if (object_ == nullptr || !key.IsString()) {
       return {};
     }
-    auto field_value = reflection_->getField(key.StringOrDie().value());
+    auto field_value = object_->getField(key.StringOrDie().value());
     return absl::visit(Visitor{}, field_value);
   }
   // Default stubs.
@@ -325,7 +324,7 @@ private:
     }
     absl::optional<CelValue> operator()(absl::monostate) { return {}; }
   };
-  const StreamInfo::FilterState::ObjectReflection* reflection_;
+  const StreamInfo::FilterState::Object* object_;
 };
 
 absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
@@ -339,17 +338,11 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
     if (cel_state) {
       return cel_state->exprValue(&arena_, false);
     } else if (object != nullptr) {
-      // Attempt to find the reflection object.
-      auto factory =
-          Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(value);
-      if (factory) {
-        auto reflection = factory->reflect(object);
-        if (reflection) {
-          auto* raw_reflection = reflection.release();
-          arena_.Own(raw_reflection);
-          return CelValue::CreateMap(
-              ProtobufWkt::Arena::Create<FilterStateObjectWrapper>(&arena_, raw_reflection));
-        }
+      // TODO(wbpcode): the implementation of cannot handle the case where the object has provided
+      // field support, but callers only want to access the whole object.
+      if (object->hasFieldSupport()) {
+        return CelValue::CreateMap(
+            ProtobufWkt::Arena::Create<FilterStateObjectWrapper>(&arena_, object));
       }
       absl::optional<std::string> serialized = object->serializeAsString();
       if (serialized.has_value()) {
