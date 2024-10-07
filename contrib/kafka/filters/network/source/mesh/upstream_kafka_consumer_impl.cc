@@ -138,8 +138,8 @@ std::vector<InboundRecordSharedPtr> RichKafkaConsumer::receiveRecordBatch() {
   } else {
     // Nothing extraordinary (timeout because there is nothing upstream),
     // or upstream connectivity failure.
-    ENVOY_LOG(trace, "No message received in consumer [{}]: {}/{}", topic_, message->err(),
-              RdKafka::err2str(message->err()));
+    ENVOY_LOG(trace, "No message received in consumer [{}]: {}/{}", topic_,
+              static_cast<int>(message->err()), RdKafka::err2str(message->err()));
     return {};
   }
 }

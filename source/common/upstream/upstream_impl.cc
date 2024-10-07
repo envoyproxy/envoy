@@ -956,7 +956,7 @@ void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& upd
                                       HostMapConstSharedPtr cross_priority_host_map) {
   ASSERT(cross_priority_host_map == nullptr,
          "External cross-priority host map is meaningless to MainPrioritySetImpl");
-  updateCrossPriorityHostMap(hosts_added, hosts_removed);
+  updateCrossPriorityHostMap(priority, hosts_added, hosts_removed);
 
   PrioritySetImpl::updateHosts(priority, std::move(update_hosts_params), locality_weights,
                                hosts_added, hosts_removed, seed, weighted_priority_health,
@@ -972,7 +972,8 @@ HostMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
   return const_cross_priority_host_map_;
 }
 
-void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_added,
+void MainPrioritySetImpl::updateCrossPriorityHostMap(uint32_t priority,
+                                                     const HostVector& hosts_added,
                                                      const HostVector& hosts_removed) {
   if (hosts_added.empty() && hosts_removed.empty()) {
     // No new hosts have been added and no old hosts have been removed.
@@ -987,7 +988,16 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(const HostVector& hosts_add
   }
 
   for (const auto& host : hosts_removed) {
-    mutable_cross_priority_host_map_->erase(addressToString(host->address()));
+    const auto host_address = addressToString(host->address());
+    const auto existing_host = mutable_cross_priority_host_map_->find(host_address);
+    if (existing_host != mutable_cross_priority_host_map_->end()) {
+      // Only delete from the current priority to protect from situations where
+      // the add operation was already executed and has already moved the metadata of the host
+      // from a higher priority value to a lower priority value.
+      if (existing_host->second->priority() == priority) {
+        mutable_cross_priority_host_map_->erase(host_address);
+      }
+    }
   }
 
   for (const auto& host : hosts_added) {
@@ -1219,6 +1229,17 @@ ClusterInfoImpl::ClusterInfoImpl(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
+      max_response_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http_protocol_options_->common_http_protocol_options_, max_response_headers_kb,
+          [&]() -> absl::optional<uint16_t> {
+            constexpr uint64_t unspecified = 0;
+            uint64_t runtime_val = runtime_.snapshot().getInteger(
+                Http::MaxResponseHeadersSizeOverrideKey, unspecified);
+            if (runtime_val == unspecified) {
+              return absl::nullopt;
+            }
+            return runtime_val;
+          }())),
       type_(config.type()),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       connection_pool_per_downstream_connection_(
@@ -1378,7 +1399,8 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
       codec_filter->set_name("envoy.filters.http.upstream_codec");
-      codec_filter->mutable_typed_config()->set_type_url(upstream_codec_type_url);
+      codec_filter->mutable_typed_config()->set_type_url(
+          absl::StrCat("type.googleapis.com/", upstream_codec_type_url));
     } else {
       const auto last_type_url =
           Config::Utility::getFactoryType(http_filters[http_filters.size() - 1].typed_config());
@@ -1797,7 +1819,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
   default:
     return absl::InvalidArgumentError(fmt::format(
         "Cluster drop_overloads config denominator setting is invalid : {}. Valid range 0~2.",
-        drop_percentage.denominator()));
+        static_cast<int>(drop_percentage.denominator())));
   }
 
   // If DropOverloadRuntimeKey is not enabled, honor the EDS drop_overload config.
@@ -1821,6 +1843,7 @@ absl::Status ClusterImplBase::parseDropOverloadConfig(
 
   drop_ratio = std::min(drop_ratio, float(drop_ratio_runtime) / float(MAX_DROP_OVERLOAD_RUNTIME));
   drop_overload_ = UnitFloat(drop_ratio);
+  drop_category_ = policy.drop_overloads(0).category();
   return absl::OkStatus();
 }
 
@@ -2536,7 +2559,7 @@ Network::Address::InstanceConstSharedPtr resolveHealthCheckAddress(
   const auto& port_value = health_check_config.port_value();
   if (health_check_config.has_address()) {
     auto address_or_error = Network::Address::resolveProtoAddress(health_check_config.address());
-    THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+    THROW_IF_NOT_OK_REF(address_or_error.status());
     auto address = address_or_error.value();
     health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);

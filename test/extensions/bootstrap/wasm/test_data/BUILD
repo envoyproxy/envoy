@@ -15,7 +15,7 @@ wasm_rust_binary(
     wasi = True,
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
@@ -27,10 +27,10 @@ envoy_cc_test_library(
     ],
     copts = ["-DNULL_PLUGIN=1"],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_lib",
+        "@com_google_absl//absl/container:node_hash_map",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -43,11 +43,11 @@ envoy_cc_test_library(
     ],
     copts = ["-DNULL_PLUGIN=1"],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",
+        "@com_google_absl//absl/container:node_hash_map",
     ],
 )
 
@@ -59,11 +59,11 @@ envoy_cc_test_library(
     ],
     copts = ["-DNULL_PLUGIN=1"],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",
+        "@com_google_absl//absl/container:node_hash_map",
     ],
 )
 

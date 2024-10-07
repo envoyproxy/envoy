@@ -59,6 +59,9 @@ HttpFilterDsoImpl::HttpFilterDsoImpl(const std::string dso_name) : HttpFilterDso
       envoy_go_filter_on_http_data_, handler_, dso_name, "envoyGoFilterOnHttpData");
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_log_)>(
       envoy_go_filter_on_http_log_, handler_, dso_name, "envoyGoFilterOnHttpLog");
+  loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_stream_complete_)>(
+      envoy_go_filter_on_http_stream_complete_, handler_, dso_name,
+      "envoyGoFilterOnHttpStreamComplete");
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_on_http_destroy_)>(
       envoy_go_filter_on_http_destroy_, handler_, dso_name, "envoyGoFilterOnHttpDestroy");
   loaded_ &= dlsymInternal<decltype(envoy_go_filter_go_request_sema_dec_)>(
@@ -101,6 +104,11 @@ void HttpFilterDsoImpl::envoyGoFilterOnHttpLog(httpRequest* p0, int p1, processS
                                                GoUint64 p10, GoUint64 p11) {
   ASSERT(envoy_go_filter_on_http_log_ != nullptr);
   envoy_go_filter_on_http_log_(p0, GoUint64(p1), p2, p3, p4, p5, p6, p7, p8, p9, p10, p11);
+}
+
+void HttpFilterDsoImpl::envoyGoFilterOnHttpStreamComplete(httpRequest* p0) {
+  ASSERT(envoy_go_filter_on_http_stream_complete_ != nullptr);
+  envoy_go_filter_on_http_stream_complete_(p0);
 }
 
 void HttpFilterDsoImpl::envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) {

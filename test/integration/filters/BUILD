@@ -129,7 +129,6 @@ envoy_cc_test_library(
     hdrs = [
         "tee_filter.h",
     ],
-    external_deps = ["abseil_synchronization"],
     deps = [
         "//envoy/http:filter_interface",
         "//envoy/registry",
@@ -139,6 +138,7 @@ envoy_cc_test_library(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -872,6 +872,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "remove_response_trailers_lib",
+    srcs = [
+        "remove_response_trailers.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "repick_cluster_filter_lib",
     srcs = [
         "repick_cluster_filter.cc",
@@ -960,5 +975,74 @@ envoy_cc_test_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/tcp:async_tcp_client_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "non_terminal_encoding_filter_proto",
+    srcs = ["non_terminal_encoding_filter.proto"],
+)
+
+envoy_cc_test_library(
+    name = "non_terminal_encoding_filter_lib",
+    srcs = [
+        "non_terminal_encoding_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        ":non_terminal_encoding_filter_proto_cc_proto",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/integration:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "stop_in_headers_continue_in_data_filter_lib",
+    srcs = ["stop_in_headers_continue_in_data_filter.cc"],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/protobuf",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "add_encode_metadata_filter_lib",
+    srcs = [
+        "add_encode_metadata_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/event:timer_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "encoder_recreate_stream_filter_lib",
+    srcs = [
+        "encoder_recreate_stream_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/event:timer_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )

@@ -131,6 +131,13 @@ public:
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
 
   MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
+
+  MOCK_METHOD(absl::Status, updateMuxSource,
+              (Grpc::RawAsyncClientPtr && primary_async_client,
+               Grpc::RawAsyncClientPtr&& failover_async_client,
+               CustomConfigValidatorsPtr&& custom_config_validators, Stats::Scope& scope,
+               BackOffStrategyPtr&& backoff_strategy,
+               const envoy::config::core::v3::ApiConfigSource& ads_config_source));
 };
 
 class MockGrpcStreamCallbacks
@@ -140,7 +147,7 @@ public:
   ~MockGrpcStreamCallbacks() override;
 
   MOCK_METHOD(void, onStreamEstablished, ());
-  MOCK_METHOD(void, onEstablishmentFailure, ());
+  MOCK_METHOD(void, onEstablishmentFailure, (bool));
   MOCK_METHOD(void, onDiscoveryResponse,
               (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message,
                ControlPlaneStats& control_plane_stats));

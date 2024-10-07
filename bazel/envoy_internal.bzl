@@ -125,6 +125,7 @@ def envoy_copts(repository, test = False):
            envoy_select_static_extension_registration(["-DENVOY_STATIC_EXTENSION_REGISTRATION"], repository) + \
            envoy_select_disable_logging(["-DENVOY_DISABLE_LOGGING"], repository) + \
            _envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
+           _envoy_select_execution_context() + \
            _envoy_select_perfetto(["-DENVOY_PERFETTO"]) + \
            envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
            envoy_select_signal_trace(["-DENVOY_HANDLE_SIGNALS"], repository) + \
@@ -166,15 +167,15 @@ def tcmalloc_external_dep(repository):
         repository + "//bazel:disable_tcmalloc": None,
         repository + "//bazel:disable_tcmalloc_on_linux_x86_64": None,
         repository + "//bazel:disable_tcmalloc_on_linux_aarch64": None,
-        repository + "//bazel:debug_tcmalloc": envoy_external_dep_path("gperftools"),
-        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": envoy_external_dep_path("gperftools"),
-        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": envoy_external_dep_path("gperftools"),
-        repository + "//bazel:gperftools_tcmalloc": envoy_external_dep_path("gperftools"),
-        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": envoy_external_dep_path("gperftools"),
-        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": envoy_external_dep_path("gperftools"),
-        repository + "//bazel:linux_x86_64": envoy_external_dep_path("tcmalloc"),
-        repository + "//bazel:linux_aarch64": envoy_external_dep_path("tcmalloc"),
-        "//conditions:default": envoy_external_dep_path("gperftools"),
+        repository + "//bazel:debug_tcmalloc": repository + "//bazel/foreign_cc:gperftools",
+        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": repository + "//bazel/foreign_cc:gperftools",
+        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": repository + "//bazel/foreign_cc:gperftools",
+        repository + "//bazel:gperftools_tcmalloc": repository + "//bazel/foreign_cc:gperftools",
+        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": repository + "//bazel/foreign_cc:gperftools",
+        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": repository + "//bazel/foreign_cc:gperftools",
+        repository + "//bazel:linux_x86_64": "@com_github_google_tcmalloc//tcmalloc",
+        repository + "//bazel:linux_aarch64": "@com_github_google_tcmalloc//tcmalloc",
+        "//conditions:default": repository + "//bazel/foreign_cc:gperftools",
     })
 
 # Select the given values if default path normalization is on in the current build.
@@ -187,6 +188,12 @@ def _envoy_select_path_normalization_by_default(xs, repository = ""):
 def _envoy_select_perf_annotation(xs):
     return select({
         "@envoy//bazel:enable_perf_annotation": xs,
+        "//conditions:default": [],
+    })
+
+def _envoy_select_execution_context():
+    return select({
+        "@envoy//bazel:enable_execution_context": ["-DENVOY_ENABLE_EXECUTION_CONTEXT"],
         "//conditions:default": [],
     })
 

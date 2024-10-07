@@ -63,14 +63,9 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
                                                   action_validation_visitor_)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
           proto_config, context, validation_visitor, action_validation_visitor_)),
-      enforcement_type_(proto_config.enforcement_type()),
-      delay_deny_ms_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, delay_deny, 0)) {}
+      enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
-  if (is_delay_denied_) {
-    return Network::FilterStatus::StopIteration;
-  }
-
   ENVOY_LOG(
       debug,
       "checking connection: requestedServerName: {}, sourceIP: {}, directRemoteIP: {},"
@@ -123,42 +118,12 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   } else if (engine_result_ == Deny) {
     callbacks_->connection().streamInfo().setConnectionTerminationDetails(
         Filters::Common::RBAC::responseDetail(log_policy_id));
-
-    std::chrono::milliseconds duration = config_->delayDenyMs();
-    if (duration > std::chrono::milliseconds(0)) {
-      ENVOY_LOG(debug, "connection will be delay denied in {}ms", duration.count());
-      delay_timer_ = callbacks_->connection().dispatcher().createTimer(
-          [this]() -> void { closeConnection(); });
-      ASSERT(!is_delay_denied_);
-      is_delay_denied_ = true;
-      callbacks_->connection().readDisable(true);
-      delay_timer_->enableTimer(duration);
-    } else {
-      closeConnection();
-    }
+    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "rbac_deny_close");
     return Network::FilterStatus::StopIteration;
   }
 
   ENVOY_LOG(debug, "no engine, allowed by default");
   return Network::FilterStatus::Continue;
-}
-
-void RoleBasedAccessControlFilter::closeConnection() {
-  callbacks_->connection().close(Network::ConnectionCloseType::NoFlush, "rbac_deny_close");
-}
-
-void RoleBasedAccessControlFilter::resetTimerState() {
-  if (delay_timer_) {
-    delay_timer_->disableTimer();
-    delay_timer_.reset();
-  }
-}
-
-void RoleBasedAccessControlFilter::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
-    resetTimerState();
-  }
 }
 
 void RoleBasedAccessControlFilter::setDynamicMetadata(std::string shadow_engine_result,

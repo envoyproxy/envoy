@@ -203,7 +203,7 @@ The following command operators are supported:
     Downstream bytes received on connection.
 
   UDP
-    Not implemented (0).
+    Bytes received from the downstream in the UDP session.
 
   Renders a numeric value in typed JSON logs.
 
@@ -304,7 +304,7 @@ The following command operators are supported:
     Downstream bytes sent on connection.
 
   UDP
-    Not implemented (0).
+    Bytes sent to the downstream in the UDP session.
 
 %UPSTREAM_REQUEST_ATTEMPT_COUNT%
   HTTP
@@ -328,7 +328,7 @@ The following command operators are supported:
     Total number of bytes sent to the upstream by the tcp proxy.
 
   UDP
-    Not implemented (0).
+    Total number of bytes sent to the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.
 
 %UPSTREAM_WIRE_BYTES_RECEIVED%
   HTTP
@@ -338,21 +338,27 @@ The following command operators are supported:
     Total number of bytes received from the upstream by the tcp proxy.
 
   UDP
-    Not implemented (0).
+    Total number of bytes received from the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.
 
 %UPSTREAM_HEADER_BYTES_SENT%
   HTTP
     Number of header bytes sent to the upstream by the http stream.
 
-  TCP/UDP
+  TCP
     Not implemented (0).
+
+  UDP
+    Total number of HTTP header bytes sent to the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.
 
 %UPSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the upstream by the http stream.
 
-  TCP/UDP
+  TCP
     Not implemented (0).
+
+  UDP
+    Total number of HTTP header bytes received from the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.
 
 %DOWNSTREAM_WIRE_BYTES_SENT%
   HTTP
@@ -427,6 +433,10 @@ The following command operators are supported:
     * ``ms``: Millisecond precision.
     * ``us``: Microsecond precision.
     * ``ns``: Nanosecond precision.
+
+    NOTE: enabling independent half-close behavior for H/2 and H/3 protocols can produce
+    ``*_TX_END`` values lower than ``*_RX_END`` values, in cases where upstream peer has half-closed
+    its stream before downstream peer. In these cases ``COMMON_DURATION`` value will become negative.
 
   TCP/UDP
     Not implemented ("-").
@@ -814,11 +824,11 @@ UDP
     when NAMESPACE is set to "udp.proxy.session", optional KEYs are as follows:
 
     * ``cluster_name``: Name of the cluster.
-    * ``bytes_sent``: Total number of downstream bytes sent to the upstream in the session.
-    * ``bytes_received``: Total number of downstream bytes received from the upstream in the session.
-    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the upstream in the session.
-    * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in the session.
-    * ``datagrams_received``: Number of datagrams received from the upstream successfully in the session.
+    * ``bytes_sent``: Total number of bytes sent to the downstream in the session. *Deprecated, use %BYTES_SENT% instead.*
+    * ``bytes_received``: Total number of bytes received from the downstream in the session. *Deprecated, use %BYTES_RECEIVED% instead.*
+    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in the session.
+    * ``datagrams_sent``: Number of datagrams sent to the downstream in the session.
+    * ``datagrams_received``: Number of datagrams received from the downstream in the session.
 
     Recommended session access log format for UDP proxy:
 
@@ -833,12 +843,12 @@ UDP
 
     when NAMESPACE is set to "udp.proxy.proxy", optional KEYs are as follows:
 
-    * ``bytes_sent``: Total number of downstream bytes sent to the upstream in UDP proxy.
-    * ``bytes_received``: Total number of downstream bytes received from the upstream in UDP proxy.
-    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the upstream in UDP proxy.
-    * ``errors_received``: Number of errors that have occurred when receiving datagrams from the upstream in UDP proxy.
-    * ``datagrams_sent``: Number of datagrams sent to the upstream successfully in UDP proxy.
-    * ``datagrams_received``: Number of datagrams received from the upstream successfully in UDP proxy.
+    * ``bytes_sent``: Total number of bytes sent to the downstream in UDP proxy. *Deprecated, use %BYTES_SENT% instead.*
+    * ``bytes_received``: Total number of bytes received from the downstream in UDP proxy. *Deprecated, use %BYTES_RECEIVED% instead.*
+    * ``errors_sent``: Number of errors that have occurred when sending datagrams to the downstream in UDP proxy.
+    * ``errors_received``: Number of errors that have occurred when receiving datagrams from the downstream in UDP proxy.
+    * ``datagrams_sent``: Number of datagrams sent to the downstream in UDP proxy.
+    * ``datagrams_received``: Number of datagrams received from the downstream in UDP proxy.
     * ``no_route``: Number of times that no upstream cluster found in UDP proxy.
     * ``session_total``: Total number of sessions in UDP proxy.
     * ``idle_timeout``: Number of times that sessions idle timeout occurred in UDP proxy.

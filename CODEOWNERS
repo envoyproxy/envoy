@@ -29,14 +29,14 @@ extensions/filters/common/original_src @klarose @mattklein123
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @htuch @yanavlasov
-/*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @htuch @yanavlasov
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
+/*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia @yanavlasov
 # grpc_field_extraction http filter extension
 /*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
-# proto_message_logging http filter extension
-/*/extensions/filters/http/proto_message_logging @dchakarwarti @taoxuy @yanavlasov
+# proto_message_extraction http filter extension
+/*/extensions/filters/http/proto_message_extraction @dchakarwarti @taoxuy @shuoyang2016 @yanavlasov
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
@@ -68,7 +68,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @Shikugawa
 # tracers.opentelemetry extension
-/*/extensions/tracers/opentelemetry @alexanderellis @htuch
+/*/extensions/tracers/opentelemetry @alexanderellis @yanavlasov
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # UDP packet writer
@@ -128,8 +128,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/connect_grpc_bridge @jchadwick-buf @mattklein123
 /*/extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
-/*/extensions/grpc_credentials/example @wozz @htuch
-/*/extensions/grpc_credentials/file_based_metadata @wozz @htuch
+/*/extensions/grpc_credentials/example @wozz @yanavlasov
+/*/extensions/grpc_credentials/file_based_metadata @wozz @yanavlasov
 /*/extensions/internal_redirect @alyssawilk @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
@@ -138,22 +138,23 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @lizan @UNOWNED
-/*/extensions/resource_monitors/injected_resource @eziskind @htuch
-/*/extensions/resource_monitors/common @eziskind @htuch @nezdolik
-/*/extensions/resource_monitors/fixed_heap @eziskind @htuch @nezdolik
+/*/extensions/resource_monitors/injected_resource @eziskind @yanavlasov
+/*/extensions/resource_monitors/common @eziskind @yanavlasov @nezdolik
+/*/extensions/resource_monitors/fixed_heap @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
+/*/extensions/resource_monitors/cpu_utilization @cancecen @kbaichoo
 /*/extensions/retry/priority @alyssawilk @mattklein123
 /*/extensions/retry/priority/previous_priorities @alyssawilk @mattklein123
 /*/extensions/retry/host @alyssawilk @mattklein123
 /*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
 /*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
-/*/extensions/filters/network/echo @htuch @alyssawilk
+/*/extensions/filters/network/echo @yanavlasov @alyssawilk
 /*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @mattklein123
 # support for on-demand VHDS requests
-/*/extensions/filters/http/on_demand @dmitri-d @htuch @kyessenov
+/*/extensions/filters/http/on_demand @dmitri-d @yanavlasov @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
 /*/extensions/filters/http/aws_request_signing @derekargueta @suniltheta @mattklein123 @marcomagdy @nbaws
 /*/extensions/filters/http/aws_lambda @suniltheta @mattklein123 @marcomagdy @nbaws
@@ -170,7 +171,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/local_ratelimit @mattklein123 @wbpcode
 /*/extensions/filters/common/local_ratelimit @mattklein123 @wbpcode
 # HTTP Kill Request
-/*/extensions/filters/http/kill_request @qqustc @htuch
+/*/extensions/filters/http/kill_request @qqustc @yanavlasov
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @cpakulski
 # hash input matcher
@@ -223,7 +224,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
 # Config Validators
-/*/extensions/config/validators/minimum_clusters @adisuissa @htuch
+/*/extensions/config/validators/minimum_clusters @adisuissa @yanavlasov
 # File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblackx
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
@@ -328,6 +329,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/load_balancing_policies/maglev @wbpcode @nezdolik
 /*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
+/*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
@@ -335,7 +337,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # String matching extensions
 /*/extensions/string_matcher/ @ggreenway @cpakulski
 # Header mutation
-/*/extensions/filters/http/header_mutation @wbpcode @htuch @soulxu
+/*/extensions/filters/http/header_mutation @wbpcode @yanavlasov @soulxu
 # Health checkers
 /*/extensions/health_checkers/grpc @zuercher @botengyao
 /*/extensions/health_checkers/http @zuercher @botengyao

@@ -1,0 +1,23 @@
+type: google.api.Service
+config_version: 3
+name: extraction_util_test.googleapis.com
+title: Extraction Util Test API
+apis:
+- name: ExtractionUtilTestService
+
+documentation:
+  overview: |
+    (== suppress_warning quota-presence ==)
+    (== suppress_warning usage_manager-presence ==)
+    (== suppress_warning http-rest ==)
+    (== suppress_warning versioning-http-version-prefix ==)
+    (== suppress_warning documentation-presence ==)
+    (== suppress_warning legacy-contacts ==)
+    (== suppress_warning versioning-config ==)
+  summary:
+    Extraction Util Test
+
+backend:
+  rules:
+  - selector: '*'
+    address: <external>

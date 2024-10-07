@@ -117,6 +117,10 @@ func (f *filter) OnLogDownstreamPeriodic(reqHeader api.RequestHeaderMap, reqTrai
 	}()
 }
 
+func (f *filter) OnStreamComplete() {
+	f.callbacks.StreamInfo().DynamicMetadata().Set("golang", "access_log_var", "access_log_var written by Golang filter")
+}
+
 func (f *filter) OnLog(reqHeader api.RequestHeaderMap, reqTrailer api.RequestTrailerMap, respHeader api.ResponseHeaderMap, respTrailer api.ResponseTrailerMap) {
 	referer, err := f.callbacks.GetProperty("request.referer")
 	if err != nil {

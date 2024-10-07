@@ -83,6 +83,7 @@ cc_library(
     }),
     deps = [
         "//library/jni:jni_helper_lib",
+        "//library/jni:jni_utility_lib",
         "//test/common/integration:test_server_lib",
         "@envoy//test/test_common:test_version_linkstamp",
         "@envoy_build_config//:extension_registry",

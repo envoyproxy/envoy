@@ -88,5 +88,25 @@ TEST_P(AdminInstanceTest, AdminHeapDump) {
 #endif
 }
 
+TEST_P(AdminInstanceTest, AdminAllocationDump) {
+  Buffer::OwnedImpl data;
+  Http::TestResponseHeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::BadRequest, postCallback("/allocprofiler", header_map, data));
+
+#ifdef TCMALLOC
+  EXPECT_EQ(Http::Code::OK, postCallback("/allocprofiler?enable=y", header_map, data));
+  EXPECT_EQ(Http::Code::OK, postCallback("/allocprofiler?enable=n", header_map, data));
+
+  // Out-of-order calls
+  EXPECT_EQ(Http::Code::BadRequest, postCallback("/allocprofiler?enable=n", header_map, data));
+  EXPECT_EQ(Http::Code::OK, postCallback("/allocprofiler?enable=y", header_map, data));
+  EXPECT_EQ(Http::Code::BadRequest, postCallback("/allocprofiler?enable=y", header_map, data));
+  EXPECT_EQ(Http::Code::OK, postCallback("/allocprofiler?enable=n", header_map, data));
+#else
+  EXPECT_EQ(Http::Code::BadRequest, postCallback("/allocprofiler?enable=y", header_map, data));
+  EXPECT_EQ(Http::Code::BadRequest, postCallback("/allocprofiler?enable=n", header_map, data));
+#endif
+}
+
 } // namespace Server
 } // namespace Envoy

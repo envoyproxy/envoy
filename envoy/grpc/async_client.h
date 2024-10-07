@@ -29,6 +29,11 @@ public:
    * Signals that the request should be cancelled. No further callbacks will be invoked.
    */
   virtual void cancel() PURE;
+
+  /**
+   * Returns the underlying stream info.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 /**
@@ -70,6 +75,7 @@ public:
    * @returns the stream info object associated with this stream.
    */
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /***
    * Register a callback to be called when high/low write buffer watermark events occur on the

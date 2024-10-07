@@ -15,8 +15,8 @@ envoy_cc_library(
     name = "http_inspector_lib",
     srcs = ["http_inspector.cc"],
     hdrs = ["http_inspector.h"],
-    external_deps = ["http_parser"],
     deps = [
+        "//bazel/external/http_parser",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/network:filter_interface",

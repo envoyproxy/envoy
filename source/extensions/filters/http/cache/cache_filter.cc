@@ -219,7 +219,6 @@ Http::FilterTrailersStatus CacheFilter::encodeTrailers(Http::ResponseTrailerMap&
     // Stop the encoding stream until the cached response is fetched & added to the encoding stream.
     return Http::FilterTrailersStatus::StopIteration;
   }
-  response_has_trailers_ = !trailers.empty();
   if (insert_queue_ != nullptr) {
     ENVOY_STREAM_LOG(debug, "CacheFilter::encodeTrailers inserting trailers", *encoder_callbacks_);
     insert_queue_->insertTrailers(trailers);
@@ -304,43 +303,19 @@ CacheFilter::resolveLookupStatus(absl::optional<CacheEntryStatus> cache_entry_st
 
 void CacheFilter::getHeaders(Http::RequestHeaderMap& request_headers) {
   ASSERT(lookup_, "CacheFilter is trying to call getHeaders with no LookupContext");
-
-  // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
-  // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
-  // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
-  // is captured and used to make sure the CacheFilter is still alive before accessing it in the
-  // posted callback.
-  // TODO(yosrym93): Look into other options for handling this (also in getBody and getTrailers) as
-  // they arise, e.g. cancellable posts, guaranteed ordering of posted callbacks and deletions, etc.
-  CacheFilterWeakPtr self = weak_from_this();
-
-  // The dispatcher needs to be captured because there's no guarantee that
-  // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getHeaders([self, &request_headers,
-                       &dispatcher = decoder_callbacks_->dispatcher()](LookupResult&& result) {
-    // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    dispatcher.post(
-        [self, &request_headers, status = result.cache_entry_status_,
-         headers = std::move(result.headers_), range_details = std::move(result.range_details_),
-         content_length = result.content_length_, has_trailers = result.has_trailers_]() mutable {
-          if (CacheFilterSharedPtr cache_filter = self.lock()) {
-            cache_filter->onHeaders(LookupResult{status, std::move(headers), content_length,
-                                                 range_details, has_trailers},
-                                    request_headers);
-          }
-        });
+  callback_called_directly_ = true;
+  lookup_->getHeaders([this, &request_headers, &dispatcher = decoder_callbacks_->dispatcher()](
+                          LookupResult&& result, bool end_stream) {
+    ASSERT(!callback_called_directly_ && dispatcher.isThreadSafe(),
+           "caches must post the callback to the filter's dispatcher");
+    onHeaders(std::move(result), request_headers, end_stream);
   });
+  callback_called_directly_ = false;
 }
 
 void CacheFilter::getBody() {
   ASSERT(lookup_, "CacheFilter is trying to call getBody with no LookupContext");
   ASSERT(!remaining_ranges_.empty(), "No reason to call getBody when there's no body to get.");
-  // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
-  // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
-  // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
-  // is captured and used to make sure the CacheFilter is still alive before accessing it in the
-  // posted callback.
-  CacheFilterWeakPtr self = weak_from_this();
 
   // We don't want to request more than a buffer-size at a time from the cache.
   uint64_t fetch_size_limit = encoder_callbacks_->encoderBufferLimit();
@@ -353,45 +328,31 @@ void CacheFilter::getBody() {
                                        ? (remaining_ranges_[0].begin() + fetch_size_limit)
                                        : remaining_ranges_[0].end()};
 
-  // The dispatcher needs to be captured because there's no guarantee that
-  // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getBody(fetch_range, [self, &dispatcher = decoder_callbacks_->dispatcher()](
-                                    Buffer::InstancePtr&& body) {
-    // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    dispatcher.post([self, body = std::move(body)]() mutable {
-      if (CacheFilterSharedPtr cache_filter = self.lock()) {
-        cache_filter->onBody(std::move(body));
-      }
-    });
+  callback_called_directly_ = true;
+  lookup_->getBody(fetch_range, [this, &dispatcher = decoder_callbacks_->dispatcher()](
+                                    Buffer::InstancePtr&& body, bool end_stream) {
+    ASSERT(!callback_called_directly_ && dispatcher.isThreadSafe(),
+           "caches must post the callback to the filter's dispatcher");
+    onBody(std::move(body), end_stream);
   });
+  callback_called_directly_ = false;
 }
 
 void CacheFilter::getTrailers() {
   ASSERT(lookup_, "CacheFilter is trying to call getTrailers with no LookupContext");
-  ASSERT(response_has_trailers_, "No reason to call getTrailers when there's no trailers to get.");
 
-  // If the cache posts a callback to the dispatcher then the CacheFilter is destroyed for any
-  // reason (e.g client disconnected and HTTP stream terminated), then there is no guarantee that
-  // the posted callback will run before the filter is deleted. Hence, a weak_ptr to the CacheFilter
-  // is captured and used to make sure the CacheFilter is still alive before accessing it in the
-  // posted callback.
-  CacheFilterWeakPtr self = weak_from_this();
-
-  // The dispatcher needs to be captured because there's no guarantee that
-  // decoder_callbacks_->dispatcher() is thread-safe.
-  lookup_->getTrailers([self, &dispatcher = decoder_callbacks_->dispatcher()](
+  callback_called_directly_ = true;
+  lookup_->getTrailers([this, &dispatcher = decoder_callbacks_->dispatcher()](
                            Http::ResponseTrailerMapPtr&& trailers) {
-    // The callback is posted to the dispatcher to make sure it is called on the worker thread.
-    // The lambda must be mutable as it captures trailers as a unique_ptr.
-    dispatcher.post([self, trailers = std::move(trailers)]() mutable {
-      if (CacheFilterSharedPtr cache_filter = self.lock()) {
-        cache_filter->onTrailers(std::move(trailers));
-      }
-    });
+    ASSERT(!callback_called_directly_ && dispatcher.isThreadSafe(),
+           "caches must post the callback to the filter's dispatcher");
+    onTrailers(std::move(trailers));
   });
+  callback_called_directly_ = false;
 }
 
-void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers) {
+void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers,
+                            bool end_stream) {
   if (filter_state_ == FilterState::Destroyed) {
     // The filter is being destroyed, any callbacks should be ignored.
     return;
@@ -419,7 +380,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
       handleCacheHitWithRangeRequest();
       return;
     }
-    handleCacheHit();
+    handleCacheHit(/* end_stream_after_headers = */ end_stream);
     return;
   case CacheEntryStatus::Unusable:
     decoder_callbacks_->continueDecoding();
@@ -437,7 +398,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
 }
 
 // TODO(toddmgreer): Handle downstream backpressure.
-void CacheFilter::onBody(Buffer::InstancePtr&& body) {
+void CacheFilter::onBody(Buffer::InstancePtr&& body, bool end_stream) {
   // Can be called during decoding if a valid cache hit is found,
   // or during encoding if a cache entry was being validated.
   if (filter_state_ == FilterState::Destroyed) {
@@ -447,6 +408,11 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
   ASSERT(!remaining_ranges_.empty(),
          "CacheFilter doesn't call getBody unless there's more body to get, so this is a "
          "bogus callback.");
+  if (remaining_ranges_[0].end() == std::numeric_limits<uint64_t>::max() && body == nullptr) {
+    ASSERT(!end_stream);
+    getTrailers();
+    return;
+  }
   ASSERT(body, "Cache said it had a body, but isn't giving it to us.");
 
   const uint64_t bytes_from_cache = body->length();
@@ -461,18 +427,23 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
     return;
   }
 
-  const bool end_stream = remaining_ranges_.empty() && !response_has_trailers_;
-
   filter_state_ == FilterState::DecodeServingFromCache
       ? decoder_callbacks_->encodeData(*body, end_stream)
       : encoder_callbacks_->addEncodedData(*body, true);
 
-  if (!remaining_ranges_.empty()) {
-    getBody();
-  } else if (response_has_trailers_) {
-    getTrailers();
-  } else {
+  if (end_stream) {
     finalizeEncodingCachedResponse();
+  } else if (!remaining_ranges_.empty()) {
+    getBody();
+  } else if (lookup_result_->range_details_.has_value()) {
+    // If a range was requested we don't send trailers.
+    // (It is unclear from the spec whether we should, but pragmatically we
+    // don't have any indication of whether trailers are present or not, and
+    // range requests in general are for filling in missing chunks so including
+    // trailers with every chunk would be wasteful.)
+    finalizeEncodingCachedResponse();
+  } else {
+    getTrailers();
   }
 }
 
@@ -500,16 +471,16 @@ void CacheFilter::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   finalizeEncodingCachedResponse();
 }
 
-void CacheFilter::handleCacheHit() {
+void CacheFilter::handleCacheHit(bool end_stream_after_headers) {
   filter_state_ = FilterState::DecodeServingFromCache;
   insert_status_ = InsertStatus::NoInsertCacheHit;
-  encodeCachedResponse();
+  encodeCachedResponse(end_stream_after_headers);
 }
 
 void CacheFilter::handleCacheHitWithRangeRequest() {
   if (!lookup_result_->range_details_.has_value()) {
     ENVOY_LOG(error, "handleCacheHitWithRangeRequest() should not be called without "
-                     "range_details being populated in lookup_result_");
+                     "range_details_ being populated in lookup_result_");
     return;
   }
   if (!lookup_result_->range_details_->satisfiable_) {
@@ -517,12 +488,21 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
     insert_status_ = InsertStatus::NoInsertCacheHit;
     lookup_result_->headers_->setStatus(
         static_cast<uint64_t>(Envoy::Http::Code::RangeNotSatisfiable));
-    lookup_result_->headers_->addCopy(Envoy::Http::Headers::get().ContentRange,
-                                      absl::StrCat("bytes */", lookup_result_->content_length_));
+    if (lookup_result_->content_length_.has_value()) {
+      lookup_result_->headers_->addCopy(
+          Envoy::Http::Headers::get().ContentRange,
+          absl::StrCat("bytes */", lookup_result_->content_length_.value()));
+    } else {
+      IS_ENVOY_BUG(
+          "handleCacheHitWithRangeRequest() should not be called with satisfiable_=false "
+          "without content_length_ being populated in lookup_result_. Cache implementation "
+          "should wait to respond to getHeaders in this case until content_length_ is known, "
+          "declaring a miss, or should strip range_details_ from the lookup result.");
+    }
     // We shouldn't serve any of the body, so the response content length
     // is 0.
     lookup_result_->setContentLength(0);
-    encodeCachedResponse();
+    encodeCachedResponse(/* end_stream_after_headers = */ true);
     decoder_callbacks_->continueDecoding();
     return;
   }
@@ -536,7 +516,7 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
     // each part. Would need to keep track if the current range is over or
     // not to know when to insert the separator, and calculate the length
     // based on length of ranges + extra headers and separators.
-    handleCacheHit();
+    handleCacheHit(/* end_stream_after_headers = */ false);
     return;
   }
 
@@ -544,15 +524,17 @@ void CacheFilter::handleCacheHitWithRangeRequest() {
   insert_status_ = InsertStatus::NoInsertCacheHit;
 
   lookup_result_->headers_->setStatus(static_cast<uint64_t>(Envoy::Http::Code::PartialContent));
-  lookup_result_->headers_->addCopy(Envoy::Http::Headers::get().ContentRange,
-                                    absl::StrCat("bytes ", ranges[0].begin(), "-",
-                                                 ranges[0].end() - 1, "/",
-                                                 lookup_result_->content_length_));
+  lookup_result_->headers_->addCopy(
+      Envoy::Http::Headers::get().ContentRange,
+      absl::StrCat("bytes ", ranges[0].begin(), "-", ranges[0].end() - 1, "/",
+                   lookup_result_->content_length_.has_value()
+                       ? absl::StrCat(lookup_result_->content_length_.value())
+                       : "*"));
   // We serve only the desired range, so adjust the length
   // accordingly.
   lookup_result_->setContentLength(ranges[0].length());
   remaining_ranges_ = std::move(ranges);
-  encodeCachedResponse();
+  encodeCachedResponse(/* end_stream_after_headers = */ false);
   decoder_callbacks_->continueDecoding();
 }
 
@@ -609,7 +591,7 @@ void CacheFilter::processSuccessfulValidation(Http::ResponseHeaderMap& response_
   }
 
   // A cache entry was successfully validated -> encode cached body and trailers.
-  encodeCachedResponse();
+  encodeCachedResponse(/* end_stream_after_headers = */ false);
 }
 
 // TODO(yosrym93): Write a test that exercises this when SimpleHttpCache implements updateHeaders
@@ -662,13 +644,9 @@ void CacheFilter::injectValidationHeaders(Http::RequestHeaderMap& request_header
   }
 }
 
-void CacheFilter::encodeCachedResponse() {
+void CacheFilter::encodeCachedResponse(bool end_stream_after_headers) {
   ASSERT(lookup_result_, "encodeCachedResponse precondition unsatisfied: lookup_result_ "
                          "does not point to a cache lookup result");
-
-  response_has_trailers_ = lookup_result_->has_trailers_;
-  const bool end_stream =
-      (lookup_result_->content_length_ == 0 && !response_has_trailers_) || is_head_request_;
 
   // Set appropriate response flags and codes.
   Http::StreamFilterCallbacks* callbacks =
@@ -683,7 +661,8 @@ void CacheFilter::encodeCachedResponse() {
   // If the filter is encoding, 304 response headers and cached headers are merged in encodeHeaders.
   // If the filter is decoding, we need to serve response headers from cache directly.
   if (filter_state_ == FilterState::DecodeServingFromCache) {
-    decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_), end_stream,
+    decoder_callbacks_->encodeHeaders(std::move(lookup_result_->headers_),
+                                      is_head_request_ || end_stream_after_headers,
                                       CacheResponseCodeDetails::get().ResponseFromCacheFilter);
     // Filter can potentially be destroyed during encodeHeaders.
     if (filter_state_ == FilterState::Destroyed) {
@@ -694,13 +673,17 @@ void CacheFilter::encodeCachedResponse() {
     filter_state_ = FilterState::ResponseServedFromCache;
     return;
   }
-  if (lookup_result_->content_length_ > 0 && !is_head_request_) {
+  if (end_stream_after_headers || is_head_request_) {
+    return;
+  }
+  if (remaining_ranges_.empty() && lookup_result_->content_length_.value_or(1) > 0) {
     // No range has been added, so we add entire body to the response.
-    if (remaining_ranges_.empty()) {
-      remaining_ranges_.emplace_back(0, lookup_result_->content_length_);
-    }
+    remaining_ranges_.emplace_back(
+        0, lookup_result_->content_length_.value_or(std::numeric_limits<uint64_t>::max()));
+  }
+  if (!remaining_ranges_.empty()) {
     getBody();
-  } else if (response_has_trailers_) {
+  } else {
     getTrailers();
   }
 }

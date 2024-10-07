@@ -223,6 +223,7 @@ public:
   }
 
   // Http::StreamFilterBase
+  void onStreamComplete() override;
   void onDestroy() ABSL_LOCKS_EXCLUDED(mutex_) override;
   Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override;
 
@@ -254,8 +255,6 @@ public:
   // AccessLog::Instance
   void log(const Formatter::HttpFormatterContext& log_context,
            const StreamInfo::StreamInfo& info) override;
-
-  void onStreamComplete() override {}
 
   CAPIStatus clearRouteCache();
   CAPIStatus continueStatus(ProcessorState& state, GolangStatus status);
