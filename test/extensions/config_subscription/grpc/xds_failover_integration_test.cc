@@ -1002,8 +1002,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
   // Immediately fail the connection.
   failover_xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 
-  // Ensure that Envoy still attempts to connect to the primary,
-  // and keep disconnecting a few times and validate that the failover
+  // Ensure that Envoy still attempts to connect to the failover,
+  // and keep disconnecting a few times and validate that the primary
   // connection isn't attempted.
   for (int i = 1; i < 5; ++i) {
     ASSERT_TRUE(failover_xds_connection_->waitForDisconnect());
