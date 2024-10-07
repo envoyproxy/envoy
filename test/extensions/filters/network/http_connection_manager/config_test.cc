@@ -869,6 +869,29 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfiguredViaRunti
   EXPECT_EQ(9000, config.maxRequestHeadersKb());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersCountMaxConfiguredViaRuntime) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  ON_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+          getInteger("envoy.reloadable_features.max_request_headers_count", _))
+      .WillByDefault(Return(42));
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_EQ(42, config.maxRequestHeadersCount());
+}
+
 // Validated that an explicit zero stream idle timeout disables.
 TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   const std::string yaml_string = R"EOF(

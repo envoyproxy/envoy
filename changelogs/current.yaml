@@ -309,7 +309,8 @@ new_features:
 - area: http
   change: |
     Added configuration setting for the :ref:`maximum size of response headers
-    <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_response_headers_kb>` in responses.
+    <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_response_headers_kb>` in responses. The default can
+    be overridden with runtime key ``envoy.reloadable_features.max_response_headers_size_kb``.
 - area: http_11_proxy
   change: |
     Added the option to configure the transport socket via locality or endpoint metadata.
@@ -434,6 +435,14 @@ new_features:
   change: |
       Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
       connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
+- area: local_ratelimit
+  change: |
+    Add the :ref:`rate_limits
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limits>`
+    field to generate rate limit descriptors. If this field is set, the
+    :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+    :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+    will be ignored.
 - area: basic_auth
   change: |
     Added support to provide an override

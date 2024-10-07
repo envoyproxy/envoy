@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package test.extensions.filters.common.ratelimit_config;
+
+import "envoy/config/route/v3/route_components.proto";
+
+message TestRateLimitConfig {
+  repeated envoy.config.route.v3.RateLimit rate_limits = 1;
+}
