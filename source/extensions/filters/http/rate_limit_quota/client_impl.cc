@@ -77,6 +77,20 @@ void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
   stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
 }
 
+bool cacheHasTokenBucket(const ::envoy::type::v3::TokenBucket& token_bucket,
+                         const absl::optional<BucketAction> cached_action) {
+  if (!cached_action.has_value() || !cached_action->has_quota_assignment_action() ||
+      !cached_action->quota_assignment_action().has_rate_limit_strategy() ||
+      !cached_action->quota_assignment_action().rate_limit_strategy().has_token_bucket()) {
+    return false;
+  }
+  const ::envoy::type::v3::TokenBucket& cached_tb =
+      cached_action->quota_assignment_action().rate_limit_strategy().token_bucket();
+  return (cached_tb.max_tokens() == token_bucket.max_tokens() &&
+          cached_tb.tokens_per_fill().value() == token_bucket.tokens_per_fill().value() &&
+          cached_tb.fill_interval().nanos() == token_bucket.fill_interval().nanos());
+}
+
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
   ENVOY_LOG(debug, "The response that is received from RLQS server:\n{}", response->DebugString());
   for (const auto& action : response->bucket_action()) {
@@ -100,6 +114,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
       switch (action.bucket_action_case()) {
       case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
           kQuotaAssignmentAction: {
+        absl::optional<BucketAction> cached_action = quota_buckets_[bucket_id]->cached_action;
         quota_buckets_[bucket_id]->cached_action = action;
         quota_buckets_[bucket_id]->current_assignment_time = time_source_.monotonicTime();
         if (quota_buckets_[bucket_id]->cached_action->has_quota_assignment_action()) {
@@ -108,6 +123,16 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
                                          .rate_limit_strategy();
 
           if (rate_limit_strategy.has_token_bucket()) {
+            // If a matching TokenBucket is already in place, do not reset it by replacing it with a
+            // duplicate one.
+            if (cacheHasTokenBucket(rate_limit_strategy.token_bucket(), cached_action)) {
+              ENVOY_LOG(trace,
+                        "Token bucket already exists in cache and does not require re-creation for "
+                        "id: {}.",
+                        bucket_id);
+              break;
+            }
+
             const auto& interval_proto = rate_limit_strategy.token_bucket().fill_interval();
             // Convert absl::duration to int64_t seconds
             int64_t fill_interval_sec =
