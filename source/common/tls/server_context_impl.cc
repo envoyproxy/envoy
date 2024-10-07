@@ -380,7 +380,8 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 // We want to return a list of client capabilities for ECDSA now that we support curves other
 // than P-256. An empty optional is used to represent a client that is unable to handle ECDSA
 // the vector inside that optional is a list of `ssl.h` constants representing ECDSA group NIDs
-absl::optional<std::vector<int>> ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const {
+absl::optional<std::vector<int>>
+ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const {
   std::vector<int> client_capabilities;
   CBS client_hello;
   CBS_init(&client_hello, ssl_client_hello.client_hello, ssl_client_hello.client_hello_len);
@@ -438,7 +439,7 @@ absl::optional<std::vector<int>> ServerContextImpl::getClientEcdsaCapabilities(c
 
   // We support P256, P384 and P521 ECDSA curves today.
   if (cbsContainsU16(curvelist, SSL_CURVE_SECP256R1)) {
-    client_capabilities.push_back(NID_X9_62_prime256v1);  
+    client_capabilities.push_back(NID_X9_62_prime256v1);
   }
   if (cbsContainsU16(curvelist, SSL_CURVE_SECP384R1)) {
     client_capabilities.push_back(NID_secp384r1);
@@ -482,10 +483,11 @@ bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_h
 }
 
 std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-ServerContextImpl::findTlsContext(absl::string_view sni, absl::optional<std::vector<int>> client_ecdsa_capabilities,
+ServerContextImpl::findTlsContext(absl::string_view sni,
+                                  absl::optional<std::vector<int>> client_ecdsa_capabilities,
                                   bool client_ocsp_capable, bool* cert_matched_sni) {
-  return tls_certificate_selector_->findTlsContext(sni, client_ecdsa_capabilities, client_ocsp_capable,
-                                                   cert_matched_sni);
+  return tls_certificate_selector_->findTlsContext(sni, client_ecdsa_capabilities,
+                                                   client_ocsp_capable, cert_matched_sni);
 }
 
 enum ssl_select_cert_result_t

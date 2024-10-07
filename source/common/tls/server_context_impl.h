@@ -60,11 +60,11 @@ public:
 
   // Finds the best matching context. The returned context will have the same lifetime as
   // this ``ServerContextImpl``.
-  std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction> findTlsContext(absl::string_view sni,
-                                                                          absl::optional<std::vector<int>> client_ecdsa_capable,
-                                                                          bool client_ocsp_capable,
-                                                                          bool* cert_matched_sni);
-  absl::optional<std::vector<int>> getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const;
+  std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
+  findTlsContext(absl::string_view sni, absl::optional<std::vector<int>> client_ecdsa_capable,
+                 bool client_ocsp_capable, bool* cert_matched_sni);
+  absl::optional<std::vector<int>>
+  getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const;
   bool isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const;
 
 private:

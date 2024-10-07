@@ -91,7 +91,8 @@ DefaultTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_clie
                                                 Ssl::CertificateSelectionCallbackPtr) {
   absl::string_view sni =
       absl::NullSafeStringView(SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
-  absl::optional<std::vector<int>> client_ecdsa_capabilities = server_ctx_.getClientEcdsaCapabilities(ssl_client_hello);
+  absl::optional<std::vector<int>> client_ecdsa_capabilities =
+      server_ctx_.getClientEcdsaCapabilities(ssl_client_hello);
   const bool client_ocsp_capable = server_ctx_.isClientOcspCapable(ssl_client_hello);
 
   auto [selected_ctx, ocsp_staple_action] =
@@ -164,8 +165,9 @@ Ssl::OcspStapleAction DefaultTlsCertificateSelector::ocspStapleAction(const Ssl:
 }
 
 std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, absl::optional<std::vector<int>> client_ecdsa_capabilities,
-                                              bool client_ocsp_capable, bool* cert_matched_sni) {
+DefaultTlsCertificateSelector::findTlsContext(
+    absl::string_view sni, absl::optional<std::vector<int>> client_ecdsa_capabilities,
+    bool client_ocsp_capable, bool* cert_matched_sni) {
   bool unused = false;
   if (cert_matched_sni == nullptr) {
     // Avoid need for nullptr checks when this is set.
@@ -184,8 +186,8 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, absl::optio
       // The selected ctx must adhere to OCSP policy
       return false;
     }
-    // if the client is ECDSA-capable and the context is ECDSA, we check if it is capable of handling 
-    // the curves in the cert in a given TlsContext
+    // if the client is ECDSA-capable and the context is ECDSA, we check if it is capable of
+    // handling the curves in the cert in a given TlsContext
     if (client_ecdsa_capabilities.has_value() && ctx.is_ecdsa_) {
       bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
       // we're doing this with a guard that the `ctx` is ECDSA - this should be safe
@@ -199,8 +201,7 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, absl::optio
         selected_ctx = &ctx;
         ocsp_staple_action = action;
         return true;
-      }
-      else {
+      } else {
         return false;
       }
     }
@@ -272,7 +273,8 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, absl::optio
   if (selected_ctx == nullptr) {
     candidate_ctx = nullptr;
     // Skip loop when there is no cert compatible to key type
-    if (client_ecdsa_capabilities.has_value() || (!client_ecdsa_capabilities.has_value() && has_rsa_)) {
+    if (client_ecdsa_capabilities.has_value() ||
+        (!client_ecdsa_capabilities.has_value() && has_rsa_)) {
       for (const auto& ctx : tls_contexts_) {
         if (selected(ctx)) {
           break;

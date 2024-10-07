@@ -1,6 +1,5 @@
 #pragma once
 
-#include "absl/types/optional.h"
 #include "envoy/api/api.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/network/connection.h"
@@ -10,6 +9,7 @@
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 
+#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -232,8 +232,8 @@ public:
    * @return context will have the same lifetime as ``ServerContextImpl``.
    */
   virtual std::pair<const Ssl::TlsContext&, OcspStapleAction>
-  findTlsContext(absl::string_view sni, absl::optional<std::vector<int>> client_ecdsa_capabilies, bool client_ocsp_capable,
-                 bool* cert_matched_sni) PURE;
+  findTlsContext(absl::string_view sni, absl::optional<std::vector<int>> client_ecdsa_capabilies,
+                 bool client_ocsp_capable, bool* cert_matched_sni) PURE;
 };
 
 using TlsCertificateSelectorPtr = std::unique_ptr<TlsCertificateSelector>;
