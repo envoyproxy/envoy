@@ -68,7 +68,6 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
     return absl::OkStatus();
   }
-  absl::optional<bool> g(absl::nullopt_t);
 
   if (headers.Method() == nullptr) {
     return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :method header"};
