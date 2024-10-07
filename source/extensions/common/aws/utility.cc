@@ -8,7 +8,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
-#include "source/common/http/path_utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
