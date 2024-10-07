@@ -76,19 +76,14 @@ private:
       cancelled_ = true;
       cancel_reason_ = reason;
     }
-
-    // Network::ActiveDnsQuery
     void addTrace(uint8_t) override {}
-
-    // Network::ActiveDnsQuery
-    const std::vector<Trace>& getTraces() override { return traces_; }
+    OptRef<const std::vector<Trace>> getTraces() override { return {}; }
 
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.
     bool owned_ = false;
     // Has the query completed? Only meaningful if !owned_;
     bool completed_ = false;
-    std::vector<Trace> traces_;
 
   protected:
     // Network::ActiveDnsQuery

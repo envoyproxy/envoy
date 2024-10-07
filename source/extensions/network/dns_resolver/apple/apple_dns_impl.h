@@ -100,12 +100,8 @@ private:
 
     // Network::ActiveDnsQuery
     void cancel(Network::ActiveDnsQuery::CancelReason reason) override;
-
-    // Network::ActiveDnsQuery
     void addTrace(uint8_t) override {}
-
-    // Network::ActiveDnsQuery
-    const std::vector<Trace>& getTraces() override { return traces_; }
+    OptRef<const std::vector<Trace>> getTraces() override { return {}; }
 
     static DnsResponse buildDnsResponse(const struct sockaddr* address, uint32_t ttl);
 
@@ -165,7 +161,6 @@ private:
     // be accumulated before firing callback_.
     PendingResponse pending_response_;
     DnsLookupFamily dns_lookup_family_;
-    std::vector<Trace> traces_;
   };
 
   Event::Dispatcher& dispatcher_;
