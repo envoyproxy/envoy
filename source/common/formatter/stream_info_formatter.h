@@ -110,7 +110,6 @@ private:
   const bool is_upstream_;
   FilterStateFormat format_;
   std::string field_name_;
-  StreamInfo::FilterState::ObjectFactory* factory_;
 };
 
 class CommonDurationFormatter : public StreamInfoFormatterProvider {
