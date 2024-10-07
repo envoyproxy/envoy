@@ -33,6 +33,7 @@
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
+#include "absl/types/optional.h"
 #include "cert_validator/cert_validator.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
@@ -376,7 +377,11 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   }
 }
 
-bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const {
+// We want to return a list of client capabilities for ECDSA now that we support curves other
+// than P-256. An empty optional is used to represent a client that is unable to handle ECDSA
+// the vector inside that optional is a list of `ssl.h` constants representing ECDSA group NIDs
+absl::optional<std::vector<int>> ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const {
+  std::vector<int> client_capabilities;
   CBS client_hello;
   CBS_init(&client_hello, ssl_client_hello.client_hello, ssl_client_hello.client_hello_len);
 
@@ -399,16 +404,23 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO& ssl_client_
         CBS_init(&signature_algorithms_ext, signature_algorithms_data, signature_algorithms_len);
         if (!CBS_get_u16_length_prefixed(&signature_algorithms_ext, &signature_algorithms) ||
             CBS_len(&signature_algorithms_ext) != 0) {
-          return false;
+          return {};
         }
-        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256) ||
-            cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP384R1_SHA384) ||
-            cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP521R1_SHA512)) {
-          return true;
+        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256)) {
+          client_capabilities.push_back(NID_X9_62_prime256v1);
+        }
+        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP384R1_SHA384)) {
+          client_capabilities.push_back(NID_secp384r1);
+        }
+        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP521R1_SHA512)) {
+          client_capabilities.push_back(NID_secp521r1);
+        }
+        if (client_capabilities.size() != 0) {
+          return client_capabilities;
         }
       }
 
-      return false;
+      return {};
     }
   }
 
@@ -418,15 +430,25 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO& ssl_client_
   size_t curvelist_len;
   if (!SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_supported_groups,
                                             &curvelist_data, &curvelist_len)) {
-    return false;
+    return {};
   }
 
   CBS curvelist;
   CBS_init(&curvelist, curvelist_data, curvelist_len);
 
-  // We only support P256 ECDSA curves today.
-  if (!cbsContainsU16(curvelist, SSL_CURVE_SECP256R1)) {
-    return false;
+  // We support P256, P384 and P521 ECDSA curves today.
+  if (cbsContainsU16(curvelist, SSL_CURVE_SECP256R1)) {
+    client_capabilities.push_back(NID_X9_62_prime256v1);  
+  }
+  if (cbsContainsU16(curvelist, SSL_CURVE_SECP384R1)) {
+    client_capabilities.push_back(NID_secp384r1);
+  }
+  if (cbsContainsU16(curvelist, SSL_CURVE_SECP521R1)) {
+    client_capabilities.push_back(NID_secp521r1);
+  }
+  // if we haven't got any curves in common with the client, return empty optional
+  if (client_capabilities.size() == 0) {
+    return {};
   }
 
   // The client must have offered an ECDSA ciphersuite that we like.
@@ -436,16 +458,16 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO& ssl_client_
   while (CBS_len(&cipher_suites) > 0) {
     uint16_t cipher_id;
     if (!CBS_get_u16(&cipher_suites, &cipher_id)) {
-      return false;
+      return {};
     }
     // All tls_context_ share the same set of enabled ciphers, so we can just look at the base
     // context.
     if (tls_contexts_[0].isCipherEnabled(cipher_id, client_version)) {
-      return true;
+      return client_capabilities;
     }
   }
 
-  return false;
+  return {};
 }
 
 bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const {
@@ -460,9 +482,9 @@ bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_h
 }
 
 std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-ServerContextImpl::findTlsContext(absl::string_view sni, bool client_ecdsa_capable,
+ServerContextImpl::findTlsContext(absl::string_view sni, absl::optional<std::vector<int>> client_ecdsa_capabilities,
                                   bool client_ocsp_capable, bool* cert_matched_sni) {
-  return tls_certificate_selector_->findTlsContext(sni, client_ecdsa_capable, client_ocsp_capable,
+  return tls_certificate_selector_->findTlsContext(sni, client_ecdsa_capabilities, client_ocsp_capable,
                                                    cert_matched_sni);
 }
 

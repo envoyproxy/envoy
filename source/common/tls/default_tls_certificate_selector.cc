@@ -2,6 +2,8 @@
 
 #include "source/common/tls/utility.h"
 
+#include "openssl/evp.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -89,11 +91,11 @@ DefaultTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_clie
                                                 Ssl::CertificateSelectionCallbackPtr) {
   absl::string_view sni =
       absl::NullSafeStringView(SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
-  const bool client_ecdsa_capable = server_ctx_.isClientEcdsaCapable(ssl_client_hello);
+  absl::optional<std::vector<int>> client_ecdsa_capabilities = server_ctx_.getClientEcdsaCapabilities(ssl_client_hello);
   const bool client_ocsp_capable = server_ctx_.isClientOcspCapable(ssl_client_hello);
 
   auto [selected_ctx, ocsp_staple_action] =
-      findTlsContext(sni, client_ecdsa_capable, client_ocsp_capable, nullptr);
+      findTlsContext(sni, client_ecdsa_capabilities, client_ocsp_capable, nullptr);
 
   auto stats = server_ctx_.stats();
   if (client_ocsp_capable) {
@@ -162,7 +164,7 @@ Ssl::OcspStapleAction DefaultTlsCertificateSelector::ocspStapleAction(const Ssl:
 }
 
 std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, bool client_ecdsa_capable,
+DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, absl::optional<std::vector<int>> client_ecdsa_capabilities,
                                               bool client_ocsp_capable, bool* cert_matched_sni) {
   bool unused = false;
   if (cert_matched_sni == nullptr) {
@@ -182,14 +184,35 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, bool client
       // The selected ctx must adhere to OCSP policy
       return false;
     }
+    // if the client is ECDSA-capable and the context is ECDSA, we check if it is capable of handling 
+    // the curves in the cert in a given TlsContext
+    if (client_ecdsa_capabilities.has_value() && ctx.is_ecdsa_) {
+      bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
+      // we're doing this with a guard that the `ctx` is ECDSA - this should be safe
+      const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
+      ASSERT(ecdsa_public_key != nullptr);
+      const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
+      const int ecdsa_curve_nid = EC_GROUP_get_curve_name(ecdsa_group);
+      // if we have a matching curve NID in our client capabilities, return `true`
+      const std::vector<int> cec_vec = client_ecdsa_capabilities.value();
+      if (std::find(cec_vec.begin(), cec_vec.end(), ecdsa_curve_nid) != cec_vec.end()) {
+        selected_ctx = &ctx;
+        ocsp_staple_action = action;
+        return true;
+      }
+      else {
+        return false;
+      }
+    }
 
-    if (client_ecdsa_capable == ctx.is_ecdsa_) {
+    // if the client is not ECDSA-capable and the `ctx` is non-ECDSA, then select this `ctx`
+    if (!client_ecdsa_capabilities.has_value() && !ctx.is_ecdsa_) {
       selected_ctx = &ctx;
       ocsp_staple_action = action;
       return true;
     }
 
-    if (client_ecdsa_capable && !ctx.is_ecdsa_ && candidate_ctx == nullptr) {
+    if (client_ecdsa_capabilities.has_value() && !ctx.is_ecdsa_ && candidate_ctx == nullptr) {
       // ECDSA cert is preferred if client is ECDSA capable, so RSA cert is marked as a candidate,
       // searching will continue until exhausting all certs or find a exact match.
       candidate_ctx = &ctx;
@@ -249,7 +272,7 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, bool client
   if (selected_ctx == nullptr) {
     candidate_ctx = nullptr;
     // Skip loop when there is no cert compatible to key type
-    if (client_ecdsa_capable || (!client_ecdsa_capable && has_rsa_)) {
+    if (client_ecdsa_capabilities.has_value() || (!client_ecdsa_capabilities.has_value() && has_rsa_)) {
       for (const auto& ctx : tls_contexts_) {
         if (selected(ctx)) {
           break;

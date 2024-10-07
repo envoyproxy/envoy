@@ -232,7 +232,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
              EC_GROUP_get_curve_name(ecdsa_group) != NID_secp521r1)) {
           creation_status = absl::InvalidArgumentError(
               fmt::format("Failed to load certificate chain from {}, only P-256, "
-                          "P384 or P-521 ECDSA certificates are supported",
+                          "P-384 or P-521 ECDSA certificates are supported",
                           ctx.cert_chain_file_path_));
           return;
         }

@@ -29,7 +29,7 @@ public:
                                         Ssl::CertificateSelectionCallbackPtr cb) override;
 
   // It's only for quic.
-  std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction> findTlsContext(absl::string_view, bool,
+  std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction> findTlsContext(absl::string_view, absl::optional<std::vector<int>>,
                                                                           bool, bool*) override {
     PANIC("unreachable");
   };
