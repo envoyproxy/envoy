@@ -34,9 +34,6 @@ envoy_cc_library(
         "zipkin_json_field_names.h",
         "zipkin_tracer_impl.h",
     ],
-    external_deps = [
-        "abseil_optional",
-    ],
     deps = [
         "//envoy/common:time_interface",
         "//envoy/local_info:local_info_interface",
@@ -59,6 +56,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
         "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

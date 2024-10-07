@@ -40,6 +40,7 @@ envoy_cc_test(
         "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar",
         "GODEBUG": "cgocheck=0",
     },
+    rbe_pool = "2core",
     deps = [
         ":example_configs_test_lib",
     ],
@@ -49,6 +50,7 @@ envoy_cc_test_library(
     name = "config_test_lib",
     srcs = ["config_test.cc"],
     hdrs = ["config_test.h"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/api:api_lib",
         "//source/common/protobuf:utility_lib",
@@ -67,6 +69,7 @@ envoy_cc_test_library(
         "//bazel:enable_http3_on_linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//bazel:disable_http3_on_windows_x86_64": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS + WINDOWS_SKIP_TARGETS),
         "//bazel:disable_http3_on_linux_ppc": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS + PPC_SKIP_TARGETS),
+        "//bazel:disable_http3": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )

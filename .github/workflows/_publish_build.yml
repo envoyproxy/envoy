@@ -1,0 +1,184 @@
+name: Build
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      dockerhub-username:
+        required: false
+      dockerhub-password:
+        required: false
+      gpg-key:
+        required: true
+      gpg-key-password:
+        required: true
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: >-
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.event.workflow.id }}-publish
+  cancel-in-progress: true
+
+
+jobs:
+  binary:
+    permissions:
+      contents: read
+      packages: read
+    name: ${{ matrix.name || matrix.target }}
+    uses: ./.github/workflows/_run.yml
+    with:
+      bazel-extra: ${{ matrix.bazel-extra }}
+      target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.arch }}
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
+      concurrency-suffix: -${{ matrix.arch }}
+      rbe: ${{ matrix.rbe }}
+      request: ${{ inputs.request }}
+      runs-on: ${{ matrix.runs-on }}
+      timeout-minutes: 120
+      trusted: ${{ inputs.trusted }}
+      upload-name: release.${{ matrix.arch }}
+      upload-path: envoy/${{ matrix.arch }}/bin/
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: release.server_only
+          name: Release (x64)
+          arch: x64
+          bazel-extra: >-
+            --config=remote-envoy-engflow
+          rbe: true
+          runs-on: ubuntu-24.04
+        - target: release.server_only
+          name: Release (arm64)
+          arch: arm64
+          bazel-extra: >-
+            --config=cache-envoy-engflow
+            --config=common-envoy-engflow
+            --config=bes-envoy-engflow
+          rbe: false
+          runs-on: envoy-arm64-medium
+
+  distribution:
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      gpg-key: ${{ secrets.gpg-key }}
+      gpg-key-password: ${{ secrets.gpg-key-password }}
+    name: ${{ matrix.name || matrix.target }}
+    needs:
+    - binary
+    uses: ./.github/workflows/_run.yml
+    with:
+      bazel-extra: >-
+        --config=cache-envoy-engflow
+        --config=common-envoy-engflow
+        --config=bes-envoy-engflow
+      downloads: |
+        release.${{ matrix.arch }}: release/${{ matrix.arch }}/bin/
+      target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.arch }}
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      cache-build-image-key-suffix: ${{ matrix.cache-build-image-key-suffix }}
+      concurrency-suffix: -${{ matrix.arch }}
+      import-gpg: true
+      rbe: false
+      request: ${{ inputs.request }}
+      runs-on: ${{ matrix.runs-on }}
+      trusted: ${{ inputs.trusted }}
+      upload-name: packages.${{ matrix.arch }}
+      upload-path: envoy/${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: distribution
+          name: Package debs (x64)
+          arch: x64
+          runs-on: ubuntu-24.04
+        - target: distribution
+          name: Package debs (arm64)
+          arch: arm64
+          cache-build-image-key-suffix: -arm64
+          runs-on: envoy-arm64-small
+
+  docker:
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      dockerhub-username: ${{ secrets.dockerhub-username }}
+      dockerhub-password: ${{ secrets.dockerhub-password }}
+    name: ${{ matrix.name || matrix.target }}
+    needs:
+    - binary
+    uses: ./.github/workflows/_run.yml
+    with:
+      target: ${{ matrix.target }}
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      downloads: |
+        release.arm64: envoy/arm64/bin/
+        release.x64: envoy/x64/bin/
+      request: ${{ inputs.request }}
+      runs-on: ${{ matrix.runs-on }}
+      source: |
+        export NO_BUILD_SETUP=1
+        export ENVOY_DOCKER_IN_DOCKER=1
+      trusted: ${{ inputs.trusted }}
+      upload-name: docker
+      upload-path: build_images
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: docker
+          name: Docker (Linux multiarch)
+          runs-on: ubuntu-24.04
+
+  sign:
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      gpg-key: ${{ secrets.gpg-key }}
+      gpg-key-password: ${{ secrets.gpg-key-password }}
+    name: ${{ matrix.name || matrix.target }}
+    needs:
+    - distribution
+    uses: ./.github/workflows/_run.yml
+    with:
+      target: release.signed
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      downloads: |
+        packages.arm64: envoy/arm64/
+        packages.x64: envoy/x64/
+        release.arm64: envoy/arm64/bin/
+        release.x64: envoy/x64/bin/
+      import-gpg: true
+      request: ${{ inputs.request }}
+      runs-on: ubuntu-24.04
+      source: |
+        export NO_BUILD_SETUP=1
+      trusted: ${{ inputs.trusted }}
+      upload-name: release.signed
+      upload-path: envoy/release.signed.tar.zst
+      steps-pre: |
+        - run: |
+            mkdir distribution/custom
+            cp -a %{{ runner.temp }}/envoy/x64 %{{ runner.temp }}/envoy/arm64 distribution/custom
+          shell: bash

@@ -78,6 +78,7 @@ envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
+    rbe_pool = "2core",
     deps = [
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
@@ -113,6 +114,7 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/router:context_lib",
         "//source/common/router:shadow_writer_lib",
@@ -226,9 +228,7 @@ envoy_cc_library(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
-    external_deps = [
-        "grpc_health_proto",
-    ],
+    external_deps = ["grpc_health_proto"],
     deps = [
         ":health_checker_event_logger_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -364,6 +364,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
+    rbe_pool = "2core",
     deps = [
         ":cluster_factory_lib",
         ":default_local_address_selector_factory",
@@ -426,7 +427,6 @@ envoy_cc_library(
         "transport_socket_match_impl.h",
         "upstream_impl.h",
     ],
-    external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_context_base_lib",
         ":resource_manager_lib",
@@ -466,6 +466,7 @@ envoy_cc_library(
         "//source/extensions/upstreams/http:config",
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
+        "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
@@ -553,9 +554,9 @@ envoy_cc_library(
     hdrs = [
         "default_local_address_selector.h",
     ],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/upstream:upstream_interface",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -567,7 +568,6 @@ envoy_cc_library(
     hdrs = [
         "default_local_address_selector_factory.h",
     ],
-    external_deps = ["abseil_optional"],
     deps = [
         ":default_local_address_selector",
         "//envoy/network:address_interface",
@@ -575,6 +575,7 @@ envoy_cc_library(
         "//envoy/registry",
         "//envoy/upstream:upstream_interface",
         "//source/common/network:resolver_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/upstream/local_address_selector/v3:pkg_cc_proto",
     ],
     # Ensure this factory in the source is always linked in.

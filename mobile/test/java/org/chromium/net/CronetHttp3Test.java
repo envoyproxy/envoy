@@ -1,6 +1,5 @@
 package org.chromium.net;
 
-import static org.chromium.net.testing.CronetTestRule.getContext;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -11,17 +10,14 @@ import org.chromium.net.impl.CronvoyLogger;
 import androidx.test.core.app.ApplicationProvider;
 import org.chromium.net.testing.TestUploadDataProvider;
 import androidx.test.filters.SmallTest;
-import org.chromium.net.impl.CronvoyUrlRequestContext;
+
 import org.chromium.net.impl.NativeCronvoyEngineBuilderImpl;
 import org.chromium.net.testing.CronetTestRule;
-import org.chromium.net.testing.CronetTestRule.CronetTestFramework;
-import org.chromium.net.testing.CronetTestRule.RequiresMinApi;
 import org.chromium.net.testing.Feature;
 import org.chromium.net.testing.TestUrlRequestCallback;
-import org.chromium.net.testing.TestUrlRequestCallback.ResponseStep;
+
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 import org.junit.After;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -138,7 +134,7 @@ public class CronetHttp3Test {
     return callback;
   }
 
-  void doInitialHttp2Request() {
+  private void doInitialHttp2Request() {
     // Do a request to https://127.0.0.1:test_server_port/
     TestUrlRequestCallback callback = doBasicGetRequest();
 
@@ -231,7 +227,7 @@ public class CronetHttp3Test {
 
   // Set up to use HTTP/3, then force HTTP/3 to fail post-handshake. The request should
   // be retried on HTTP/2 and HTTP/3 will be marked broken.
-  public void retryPostHandshake() throws Exception {
+  private void retryPostHandshake() throws Exception {
     // Do the initial HTTP/2 request to get the alt-svc response.
     doInitialHttp2Request();
 
@@ -288,7 +284,9 @@ public class CronetHttp3Test {
     assertTrue(preStats.contains("cluster.base.upstream_cx_http3_total: 1"));
 
     // This should change QUIC brokenness to "failed recently".
-    cronvoyEngine.getEnvoyEngine().setPreferredNetwork(EnvoyNetworkType.WLAN);
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkUnavailable();
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
+    cronvoyEngine.getEnvoyEngine().onDefaultNetworkAvailable();
 
     // The next request may go out over HTTP/2 or HTTP/3 (depends on who wins the race)
     // but HTTP/3 will be tried.

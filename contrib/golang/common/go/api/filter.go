@@ -87,7 +87,7 @@ type StreamFilter interface {
 
 	// destroy filter
 	OnDestroy(DestroyReason)
-	// TODO add more for stream complete
+	OnStreamComplete()
 }
 
 func (*PassThroughStreamFilter) OnLog(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap) {
@@ -100,6 +100,9 @@ func (*PassThroughStreamFilter) OnLogDownstreamPeriodic(RequestHeaderMap, Reques
 }
 
 func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
+}
+
+func (*PassThroughStreamFilter) OnStreamComplete() {
 }
 
 type StreamFilterConfigParser interface {

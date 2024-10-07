@@ -86,14 +86,14 @@ public:
       socket->close();
     }
   }
-  void doFinalPreWorkerInit() override;
+  absl::Status doFinalPreWorkerInit() override;
 
 private:
   ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone);
 
-  Network::SocketSharedPtr createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
-                                                             Network::Socket::Type socket_type,
-                                                             uint32_t worker_index);
+  absl::StatusOr<Network::SocketSharedPtr>
+  createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
+                                    Network::Socket::Type socket_type, uint32_t worker_index);
 
   ListenerComponentFactory& factory_;
   // Initially, its port number might be 0. Once a socket is created, its port
@@ -250,7 +250,7 @@ public:
   DrainManager& localDrainManager() const {
     return listener_factory_context_->listener_factory_context_base_->drainManager();
   }
-  void addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
+  absl::Status addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions(uint32_t address_index) {
     ASSERT(listen_socket_options_list_.size() > address_index);
@@ -328,7 +328,7 @@ public:
     }
   }
 
-  void cloneSocketFactoryFrom(const ListenerImpl& other);
+  absl::Status cloneSocketFactoryFrom(const ListenerImpl& other);
   void closeAllSockets();
 
   Network::Socket::Type socketType() const { return socket_type_; }
@@ -387,25 +387,25 @@ private:
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
   // Helpers for constructor.
   void buildAccessLog(const envoy::config::listener::v3::Listener& config);
-  void buildInternalListener(const envoy::config::listener::v3::Listener& config);
-  void validateConfig();
+  absl::Status buildInternalListener(const envoy::config::listener::v3::Listener& config);
+  absl::Status validateConfig();
   bool buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
-  void buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
-                               uint32_t concurrency);
+  absl::Status buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
+                                       uint32_t concurrency);
   void buildListenSocketOptions(const envoy::config::listener::v3::Listener& config,
                                 std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
                                     envoy::config::core::v3::SocketOption>>>& address_opts_list);
-  void createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
-  void validateFilterChains(const envoy::config::listener::v3::Listener& config);
-  void buildFilterChains(const envoy::config::listener::v3::Listener& config);
-  void buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
-                               const Network::Address::Instance& address);
+  absl::Status createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
+  absl::Status validateFilterChains(const envoy::config::listener::v3::Listener& config);
+  absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);
+  absl::Status buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
+                                       const Network::Address::Instance& address);
   void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
   void buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config);
   void buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config);
-  void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
-                              const envoy::config::core::v3::Address& proto_address);
+  absl::Status checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
+                                      const envoy::config::core::v3::Address& proto_address);
 
   void addListenSocketOptions(Network::Socket::OptionsSharedPtr& options,
                               const Network::Socket::OptionsSharedPtr& append_options) {

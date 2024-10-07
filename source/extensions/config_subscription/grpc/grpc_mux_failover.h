@@ -70,7 +70,8 @@ public:
                   Event::Dispatcher& dispatcher)
       : grpc_mux_callbacks_(grpc_mux_callbacks), primary_callbacks_(*this),
         primary_grpc_stream_(std::move(primary_stream_creator(&primary_callbacks_))),
-        connection_state_(ConnectionState::None), ever_connected_to_primary_(false) {
+        connection_state_(ConnectionState::None), ever_connected_to_primary_(false),
+        previously_connected_to_(ConnectedTo::None) {
     ASSERT(primary_grpc_stream_ != nullptr);
     if (failover_stream_creator.has_value()) {
       ENVOY_LOG(warn, "Using xDS-Failover. Note that the implementation is currently considered "
@@ -187,6 +188,8 @@ public:
   }
 
 private:
+  friend class GrpcMuxFailoverTest;
+
   // A helper class that proxies the callbacks of GrpcStreamCallbacks for the primary service.
   class PrimaryGrpcStreamCallbacks : public GrpcStreamCallbacks<ResponseType> {
   public:
@@ -202,7 +205,7 @@ private:
       parent_.grpc_mux_callbacks_.onStreamEstablished();
     }
 
-    void onEstablishmentFailure() override {
+    void onEstablishmentFailure(bool) override {
       // This will be called when the primary stream fails to establish a connection, or after the
       // connection was closed.
       ASSERT(parent_.connectingToOrConnectedToPrimary());
@@ -221,11 +224,11 @@ private:
                              "in a row. Attempting to connect to the failover stream.");
             // This will close the stream and prevent the retry timer from
             // reconnecting to the primary source.
-            // TODO(adisuissa): need to ensure that when moving between primary and failover,
-            // the initial_resource_versions that are sent are empty. This will be
-            // done in a followup PR.
             parent_.primary_grpc_stream_->closeStream();
-            parent_.grpc_mux_callbacks_.onEstablishmentFailure();
+            // Next attempt will be to the failover, set the value that
+            // determines whether to set initial_resource_versions or not.
+            parent_.grpc_mux_callbacks_.onEstablishmentFailure(parent_.previously_connected_to_ ==
+                                                               ConnectedTo::Failover);
             parent_.connection_state_ = ConnectionState::ConnectingToFailover;
             parent_.failover_grpc_stream_->establishNewStream();
             return;
@@ -237,7 +240,10 @@ private:
       ENVOY_LOG_MISC(trace, "Not trying to connect to failover. Will try again to reconnect to the "
                             "primary (upon retry).");
       parent_.connection_state_ = ConnectionState::ConnectingToPrimary;
-      parent_.grpc_mux_callbacks_.onEstablishmentFailure();
+      // Next attempt will be to the primary, set the value that
+      // determines whether to set initial_resource_versions or not.
+      parent_.grpc_mux_callbacks_.onEstablishmentFailure(parent_.previously_connected_to_ ==
+                                                         ConnectedTo::Primary);
     }
 
     void onDiscoveryResponse(ResponseProtoPtr<ResponseType>&& message,
@@ -249,6 +255,7 @@ private:
       parent_.ever_connected_to_primary_ = true;
       primary_consecutive_failures_ = 0;
       parent_.connection_state_ = ConnectionState::ConnectedToPrimary;
+      parent_.previously_connected_to_ = ConnectedTo::Primary;
       parent_.grpc_mux_callbacks_.onDiscoveryResponse(std::move(message), control_plane_stats);
     }
 
@@ -278,7 +285,7 @@ private:
       parent_.grpc_mux_callbacks_.onStreamEstablished();
     }
 
-    void onEstablishmentFailure() override {
+    void onEstablishmentFailure(bool) override {
       // This will be called when the failover stream fails to establish a connection, or after the
       // connection was closed.
       ASSERT(parent_.connectingToOrConnectedToFailover());
@@ -288,12 +295,13 @@ private:
                        "before). Attempting to connect to the primary stream.");
 
       // This will close the stream and prevent the retry timer from
-      // reconnecting to the failover source.
-      // TODO(adisuissa): need to ensure that when moving between primary and failover,
-      // the initial_resource_versions that are sent are empty. This will be
-      // done in a followup PR.
+      // reconnecting to the failover source. The next attempt will be to the
+      // primary source.
       parent_.failover_grpc_stream_->closeStream();
-      parent_.grpc_mux_callbacks_.onEstablishmentFailure();
+      // Next attempt will be to the primary, set the value that
+      // determines whether to set initial_resource_versions or not.
+      parent_.grpc_mux_callbacks_.onEstablishmentFailure(parent_.previously_connected_to_ ==
+                                                         ConnectedTo::Primary);
       // Setting the connection state to None, and when the retry timer will
       // expire, Envoy will try to connect to the primary source.
       parent_.connection_state_ = ConnectionState::None;
@@ -312,6 +320,7 @@ private:
       // Received a response from the failover. The failover is now considered available (no going
       // back to the primary will be attempted).
       parent_.connection_state_ = ConnectionState::ConnectedToFailover;
+      parent_.previously_connected_to_ = ConnectedTo::Failover;
       parent_.grpc_mux_callbacks_.onDiscoveryResponse(std::move(message), control_plane_stats);
     }
 
@@ -349,7 +358,15 @@ private:
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
     PANIC("not implemented");
   }
-  void closeStream() override { PANIC("not implemented"); }
+  void closeStream() override {
+    if (connectingToOrConnectedToPrimary()) {
+      ENVOY_LOG_MISC(debug, "Intentionally closing the primary gRPC stream");
+      primary_grpc_stream_->closeStream();
+    } else if (connectingToOrConnectedToFailover()) {
+      ENVOY_LOG_MISC(debug, "Intentionally closing the failover gRPC stream");
+      failover_grpc_stream_->closeStream();
+    }
+  }
 
   // The stream callbacks that will be invoked on the GrpcMux object, to notify
   // about the state of the underlying primary/failover stream.
@@ -395,6 +412,10 @@ private:
   // primary or failover source. Envoy is considered successfully connected to a source
   // once it receives a response from it.
   bool ever_connected_to_primary_{false};
+
+  enum class ConnectedTo { None, Primary, Failover };
+  // Used to track the most recent source that Envoy was connected to.
+  ConnectedTo previously_connected_to_;
 };
 
 } // namespace Config

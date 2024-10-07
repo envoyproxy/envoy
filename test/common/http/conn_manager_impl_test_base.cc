@@ -172,7 +172,7 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
   // method only.
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
 
-  ip_detection_extensions_.push_back(getXFFExtension(0));
+  ip_detection_extensions_.push_back(getXFFExtension(0, false));
 }
 
 HttpConnectionManagerImplMixin::~HttpConnectionManagerImplMixin() {
@@ -260,14 +260,16 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
           for (int i = 0; i < num_decoder_filters; i++) {
             auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
-            manager.applyFilterFactoryCb({}, factory);
+            std::string name = absl::StrCat(req * num_decoder_filters + i);
+            manager.applyFilterFactoryCb({name}, factory);
             applied_filters = true;
           }
 
           for (int i = 0; i < num_encoder_filters; i++) {
             auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
-            manager.applyFilterFactoryCb({}, factory);
+            std::string name = absl::StrCat(req * num_decoder_filters + i);
+            manager.applyFilterFactoryCb({name}, factory);
             applied_filters = true;
           }
           return applied_filters;
@@ -392,21 +394,15 @@ void HttpConnectionManagerImplMixin::expectOnDestroy(bool deferred) {
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onStreamComplete());
   }
-  {
-    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
-      EXPECT_CALL(*filter, onStreamComplete());
-    };
-    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  for (auto filter : encoder_filters_) {
+    EXPECT_CALL(*filter, onStreamComplete());
   }
 
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onDestroy());
   }
-  {
-    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
-      EXPECT_CALL(*filter, onDestroy());
-    };
-    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  for (auto filter : encoder_filters_) {
+    EXPECT_CALL(*filter, onDestroy());
   }
 
   if (deferred) {

@@ -28,13 +28,11 @@ public:
   const Router::RouteTracing* tracingConfig() const override;
 
   const RouteSpecificFilterConfig*
-  mostSpecificPerFilterConfig(const std::string& name) const override {
+  mostSpecificPerFilterConfig(absl::string_view name) const override {
     return base_route_->mostSpecificPerFilterConfig(name);
   }
-  void traversePerFilterConfig(
-      const std::string& filter_name,
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
-    base_route_->traversePerFilterConfig(filter_name, cb);
+  RouteSpecificFilterConfigs perFilterConfigs(absl::string_view filter_name) const override {
+    return base_route_->perFilterConfigs(filter_name);
   }
 
   const envoy::config::core::v3::Metadata& metadata() const override {

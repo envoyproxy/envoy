@@ -348,6 +348,15 @@ func envoyGoFilterOnHttpLog(r *C.httpRequest, logType uint64,
 	}
 }
 
+//export envoyGoFilterOnHttpStreamComplete
+func envoyGoFilterOnHttpStreamComplete(r *C.httpRequest) {
+	req := getRequest(r)
+	defer req.recoverPanic()
+
+	f := req.httpFilter
+	f.OnStreamComplete()
+}
+
 //export envoyGoFilterOnHttpDestroy
 func envoyGoFilterOnHttpDestroy(r *C.httpRequest, reason uint64) {
 	req := getRequest(r)

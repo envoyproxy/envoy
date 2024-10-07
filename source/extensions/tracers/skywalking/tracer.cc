@@ -71,7 +71,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string&, Sy
 
 Tracer::Tracer(TraceSegmentReporterPtr reporter) : reporter_(std::move(reporter)) {}
 
-void Tracer::sendSegment(TracingContextPtr segment_context) {
+void Tracer::sendSegment(TracingContextSharedPtr segment_context) {
   ASSERT(reporter_);
   if (segment_context->readyToSend()) {
     reporter_->report(std::move(segment_context));
@@ -79,7 +79,7 @@ void Tracer::sendSegment(TracingContextPtr segment_context) {
 }
 
 Tracing::SpanPtr Tracer::startSpan(absl::string_view name, absl::string_view protocol,
-                                   TracingContextPtr tracing_context) {
+                                   TracingContextSharedPtr tracing_context) {
   return std::make_unique<Span>(name, protocol, tracing_context, *this);
 }
 } // namespace SkyWalking

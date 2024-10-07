@@ -74,7 +74,8 @@ public:
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
-                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos) override;
+                     Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                     Buffer::RawSlice saved_cmsg) override;
   uint64_t maxDatagramSize() const override;
   void onDatagramsDropped(uint32_t) override {
     // TODO(mattklein123): Emit a stat for this.
@@ -87,6 +88,10 @@ public:
     }
     return DEFAULT_PACKETS_TO_READ_PER_CONNECTION;
   }
+  const Network::IoHandle::UdpSaveCmsgConfig& saveCmsgConfig() const override {
+    static const Network::IoHandle::UdpSaveCmsgConfig empty_config{};
+    return empty_config;
+  };
 
   // Register file event and apply socket options.
   void setUpConnectionSocket(Network::ConnectionSocket& connection_socket,
@@ -116,6 +121,8 @@ public:
   probeAndMigrateToServerPreferredAddress(const quic::QuicSocketAddress& server_preferred_address);
 
 private:
+  friend class EnvoyQuicClientConnectionPeer;
+
   // Receives notifications from the Quiche layer on path validation results.
   class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
   public:
@@ -141,7 +148,7 @@ private:
 
   void maybeMigratePort();
 
-  void probeWithNewPort(const quic::QuicSocketAddress& peer_address,
+  void probeWithNewPort(const quic::QuicSocketAddress& peer_addr,
                         quic::PathValidationReason reason);
 
   OptRef<PacketsToReadDelegate> delegate_;

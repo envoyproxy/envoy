@@ -78,6 +78,16 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
                                                    creation_status);
   }
 
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.explicit_internal_address_config")) {
+    ENVOY_LOG_ONCE_MISC(
+        warn, "internal_address_config is not configured. The existing default behaviour "
+              "will trust RFC1918 IP addresses, but this will be changed in next release. "
+              "Please explictily config internal address config as the migration step or "
+              "config the envoy.reloadable_features.explicit_internal_address_config to "
+              "true to untrust all ips by default");
+  }
+
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
@@ -439,6 +449,12 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = absl::nullopt;
   }
 
+  if (config.common_http_protocol_options().has_max_response_headers_kb()) {
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("Error: max_response_headers_kb cannot be set on http_connection_manager."));
+    return;
+  }
+
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {
     creation_status = absl::InvalidArgumentError(fmt::format(
         "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set."));
@@ -501,12 +517,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
 
     auto extension = factory->createExtension(extension_config.typed_config(), context_);
-    if (!extension) {
+    SET_AND_RETURN_IF_NOT_OK(extension.status(), creation_status);
+    if (!*extension) {
       creation_status = absl::InvalidArgumentError(fmt::format(
           "Original IP detection extension could not be created: '{}'", extension_config.name()));
       return;
     }
-    original_ip_detection_extensions_.push_back(extension);
+    original_ip_detection_extensions_.push_back(*extension);
   }
 
   const auto& header_mutation_extensions = config.early_header_mutation_extensions();
@@ -783,7 +800,7 @@ bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& ma
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainManager& callbacks, const Http::FilterChainOptions& option) const {
+    Http::FilterChainManager& callbacks, const Http::FilterChainOptions& options) const {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
@@ -808,7 +825,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     filters_to_use = it->second.filter_factories.get();
   }
 
-  Http::FilterChainUtility::createFilterChainForFactories(callbacks, option, *filters_to_use);
+  Http::FilterChainUtility::createFilterChainForFactories(callbacks, options, *filters_to_use);
   return true;
 }
 

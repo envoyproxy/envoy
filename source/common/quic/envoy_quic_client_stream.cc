@@ -58,8 +58,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   quiche::HttpHeaderBlock spdy_headers;
 #ifndef ENVOY_ENABLE_UHV
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      Http::Utility::isUpgrade(headers)) {
+  if (Http::Utility::isUpgrade(headers)) {
     // In Envoy, both upgrade requests and extended CONNECT requests are
     // represented as their HTTP/1 forms, regardless of the HTTP version used.
     // Therefore, these need to be transformed into their HTTP/3 form, before
@@ -188,8 +187,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      !upgrade_protocol_.empty()) {
+  if (!upgrade_protocol_.empty()) {
     Http::Utility::transformUpgradeResponseFromH3toH1(*headers, upgrade_protocol_);
   }
 #else
@@ -244,7 +242,8 @@ void EnvoyQuicClientStream::OnStreamFrame(const quic::QuicStreamFrame& frame) {
 
 bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
   // Only called in IETF Quic to close write side.
-  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this, error.internal_code());
+  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this,
+                   static_cast<int>(error.internal_code()));
   bool end_stream_encoded = local_end_stream_;
   // This call will close write.
   if (!quic::QuicSpdyClientStream::OnStopSending(error)) {
@@ -259,7 +258,8 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? quic::QuicRstStreamErrorCodeToString(error.internal_code())
+            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
+                           "|FROM_PEER")
             : absl::string_view());
   }
   return true;
@@ -351,7 +351,7 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
 }
 
 void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
-  ENVOY_STREAM_LOG(debug, "received reset code={}", *this, frame.error_code);
+  ENVOY_STREAM_LOG(debug, "received reset code={}", *this, static_cast<int>(frame.error_code));
   stats_.rx_reset_.inc();
   bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
   // This closes read side in IETF Quic, but doesn't close write side.
@@ -361,13 +361,13 @@ void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? quic::QuicRstStreamErrorCodeToString(frame.error_code)
+            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER")
             : absl::string_view());
   }
 }
 
 void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
-  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error.internal_code());
+  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, static_cast<int>(error.internal_code()));
   stats_.tx_reset_.inc();
   filterManagerConnection()->incrementSentQuicResetStreamErrorStats(error, /*from_self*/ true,
                                                                     /*is_upstream*/ true);
@@ -375,7 +375,7 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
   runResetCallbacks(
       quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-          ? quic::QuicRstStreamErrorCodeToString(error.internal_code())
+          ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_SELF")
           : absl::string_view());
   if (session()->connection()->connected()) {
     quic::QuicSpdyClientStream::ResetWithError(error);

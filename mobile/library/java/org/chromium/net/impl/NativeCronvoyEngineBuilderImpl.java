@@ -4,6 +4,7 @@ import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVeri
 
 import java.nio.charset.StandardCharsets;
 import android.content.Context;
+import android.util.Pair;
 import androidx.annotation.VisibleForTesting;
 import com.google.protobuf.Struct;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
@@ -23,6 +24,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+
 import org.chromium.net.ExperimentalCronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
 import com.google.protobuf.Any;
@@ -44,9 +47,12 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final List<String> mDnsPreresolveHostnames = Collections.emptyList();
   private final boolean mEnableDNSCache = false;
   private final int mDnsCacheSaveIntervalSeconds = 1;
+  private Optional<Integer> mDnsNumRetries = Optional.empty();
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mUseCares = false;
+  private final List<Pair<String, Integer>> mCaresFallbackResolvers = new ArrayList<>();
+  private boolean mForceV6 = true;
   private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
@@ -91,6 +97,27 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setUseCares(boolean enable) {
     mUseCares = enable;
+    return this;
+  }
+
+  /**
+   * Add a fallback resolver to c_cares.
+   *
+   * @param host ip address string
+   * @param port port for the resolver
+   */
+  public NativeCronvoyEngineBuilderImpl addCaresFallbackResolver(String host, int port) {
+    mCaresFallbackResolvers.add(new Pair<String, Integer>(host, port));
+    return this;
+  }
+
+  /**
+   * Set whether to map v4 address to v6.
+   *
+   * @param enable If true, map v4 address to v6.
+   */
+  public NativeCronvoyEngineBuilderImpl setForceV6(boolean enable) {
+    mForceV6 = enable;
     return this;
   }
 
@@ -140,6 +167,18 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setMinDnsRefreshSeconds(int minRefreshSeconds) {
     mDnsMinRefreshSeconds = minRefreshSeconds;
+    return this;
+  }
+
+  /**
+   * Specifies the number of retries before the resolver gives up. If not specified, the resolver
+   * will retry indefinitely until it succeeds or the DNS query times out.
+   *
+   * @param dnsNumRetries the number of retries
+   * @return this builder
+   */
+  public NativeCronvoyEngineBuilderImpl setDnsNumRetries(int dnsNumRetries) {
+    mDnsNumRetries = Optional.of(dnsNumRetries);
     return this;
   }
 
@@ -250,13 +289,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro, quicConnectionOptions(),
-        quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
-        mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(), mEnableSocketTag,
-        mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
-        mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
-        mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
-        platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation, mUpstreamTlsSni);
+        mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mForceV6,
+        mUseGro, quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
+        quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(),
+        numTimeoutsToTriggerPortMigration(), mEnableSocketTag, mEnableInterfaceBinding,
+        mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
+        mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
+        mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
+        keyValueStores, mRuntimeGuards, mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
+        mCaresFallbackResolvers);
   }
 }

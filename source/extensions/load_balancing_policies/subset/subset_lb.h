@@ -200,6 +200,10 @@ public:
       return wrapped_->overrideHostToSelect();
     }
 
+    void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) override {
+      wrapped_->setOrcaLoadReportCallbacks(callbacks);
+    }
+
   private:
     LoadBalancerContext* wrapped_;
     Router::MetadataMatchCriteriaConstPtr metadata_match_;

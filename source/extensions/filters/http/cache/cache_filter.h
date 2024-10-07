@@ -93,12 +93,12 @@ private:
   void getTrailers();
 
   // Callbacks for HttpCache to call when headers/body/trailers are ready.
-  void onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers);
-  void onBody(Buffer::InstancePtr&& body);
+  void onHeaders(LookupResult&& result, Http::RequestHeaderMap& request_headers, bool end_stream);
+  void onBody(Buffer::InstancePtr&& bod, bool end_stream);
   void onTrailers(Http::ResponseTrailerMapPtr&& trailers);
 
   // Set required state in the CacheFilter for handling a cache hit.
-  void handleCacheHit();
+  void handleCacheHit(bool end_stream_after_headers);
 
   // Set up the required state in the CacheFilter for handling a range
   // request.
@@ -128,7 +128,7 @@ private:
   // Adds a cache lookup result to the response encoding stream.
   // Can be called during decoding if a valid cache hit is found,
   // or during encoding if a cache entry was validated successfully.
-  void encodeCachedResponse();
+  void encodeCachedResponse(bool end_stream_after_headers);
 
   // Precondition: finished adding a response from cache to the response encoding stream.
   // Updates filter_state_ and continues the encoding stream if necessary.
@@ -157,10 +157,6 @@ private:
 
   const std::shared_ptr<const CacheFilterConfig> config_;
 
-  // True if the response has trailers.
-  // TODO(toddmgreer): cache trailers.
-  bool response_has_trailers_ = false;
-
   // True if a request allows cache inserts according to:
   // https://httpwg.org/specs/rfc7234.html#response.cacheability
   bool request_allows_inserts_ = false;
@@ -168,6 +164,8 @@ private:
   FilterState filter_state_ = FilterState::Initial;
 
   bool is_head_request_ = false;
+  // This toggle is used to detect callbacks being called directly and not posted.
+  bool callback_called_directly_ = false;
   // The status of the insert operation or header update, or decision not to insert or update.
   // If it's too early to determine the final status, this is empty.
   absl::optional<InsertStatus> insert_status_;

@@ -53,6 +53,7 @@ namespace UdpProxy {
   COUNTER(downstream_sess_tx_datagrams)                                                            \
   COUNTER(downstream_sess_tx_errors)                                                               \
   COUNTER(idle_timeout)                                                                            \
+  COUNTER(session_filter_config_missing)                                                           \
   GAUGE(downstream_sess_active, Accumulate)
 
 /**
@@ -561,8 +562,8 @@ private:
     virtual void writeUpstream(Network::UdpRecvData& data) PURE;
     virtual void onIdleTimer() PURE;
 
-    void createFilterChain() {
-      cluster_.filter_.config_->sessionFilterFactory().createFilterChain(*this);
+    bool createFilterChain() {
+      return cluster_.filter_.config_->sessionFilterFactory().createFilterChain(*this);
     }
 
     uint64_t sessionId() const { return session_id_; };
@@ -654,8 +655,8 @@ private:
     // Network::UdpPacketProcessor
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                        Network::Address::InstanceConstSharedPtr peer_address,
-                       Buffer::InstancePtr buffer, MonotonicTime receive_time,
-                       uint8_t tos) override;
+                       Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
+                       Buffer::RawSlice saved_csmg) override;
 
     uint64_t maxDatagramSize() const override {
       return cluster_.filter_.config_->upstreamSocketConfig().max_rx_datagram_size_;
@@ -669,6 +670,11 @@ private:
       // TODO(mattklein123) change this to a reasonable number if needed.
       return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
     }
+
+    const Network::IoHandle::UdpSaveCmsgConfig& saveCmsgConfig() const override {
+      static const Network::IoHandle::UdpSaveCmsgConfig empty_config{};
+      return empty_config;
+    };
 
   private:
     void onReadReady();

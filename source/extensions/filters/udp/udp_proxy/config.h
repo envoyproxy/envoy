@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.validate.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
@@ -106,6 +107,12 @@ private:
   bool propagate_response_trailers_;
 };
 
+using UdpSessionFilterConfigProviderManager =
+    Filter::FilterConfigProviderManager<Network::UdpSessionFilterFactoryCb,
+                                        Server::Configuration::FactoryContext>;
+using UdpSessionFilterFactoriesList =
+    std::vector<Filter::FilterConfigProviderPtr<Network::UdpSessionFilterFactoryCb>>;
+
 class UdpProxyFilterConfigImpl : public UdpProxyFilterConfig,
                                  public UdpSessionFilterChainFactory,
                                  Logger::Loggable<Logger::Id::config> {
@@ -150,10 +157,18 @@ public:
   Random::RandomGenerator& randomGenerator() const override { return random_generator_; }
 
   // UdpSessionFilterChainFactory
-  void createFilterChain(Network::UdpSessionFilterChainFactoryCallbacks& callbacks) const override {
-    for (const Network::UdpSessionFilterFactoryCb& factory : filter_factories_) {
+  bool createFilterChain(Network::UdpSessionFilterChainFactoryCallbacks& callbacks) const override {
+    for (const auto& filter_config_provider : filter_factories_) {
+      auto config = filter_config_provider->config();
+      if (!config.has_value()) {
+        return false;
+      }
+
+      Network::UdpSessionFilterFactoryCb& factory = config.value();
       factory(callbacks);
     }
+
+    return true;
   };
 
 private:
@@ -163,6 +178,10 @@ private:
     return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                            POOL_GAUGE_PREFIX(scope, final_prefix))};
   }
+
+  std::shared_ptr<UdpSessionFilterConfigProviderManager>
+  createSingletonUdpSessionFilterConfigProviderManager(
+      Server::Configuration::ServerFactoryContext& context);
 
   Upstream::ClusterManager& cluster_manager_;
   TimeSource& time_source_;
@@ -178,7 +197,9 @@ private:
   std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
   std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
   UdpTunnelingConfigPtr tunneling_config_;
-  std::list<Network::UdpSessionFilterFactoryCb> filter_factories_;
+  std::shared_ptr<UdpSessionFilterConfigProviderManager>
+      udp_session_filter_config_provider_manager_;
+  UdpSessionFilterFactoriesList filter_factories_;
   Random::RandomGenerator& random_generator_;
 };
 

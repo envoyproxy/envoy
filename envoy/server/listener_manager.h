@@ -226,8 +226,10 @@ public:
    * Start all workers accepting new connections on all added listeners.
    * @param guard_dog supplies the optional guard dog to use for thread watching.
    * @param callback supplies the callback to complete server initialization.
+   * @return a status indicating if the operation succeeded.
    */
-  virtual void startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) PURE;
+  virtual absl::Status startWorkers(OptRef<GuardDog> guard_dog,
+                                    std::function<void()> callback) PURE;
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This

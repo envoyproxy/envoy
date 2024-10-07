@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.formatter.cel"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",

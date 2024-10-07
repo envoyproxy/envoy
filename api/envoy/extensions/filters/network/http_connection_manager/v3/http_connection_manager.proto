@@ -58,9 +58,8 @@ message HttpConnectionManager {
     // Prior knowledge is allowed).
     HTTP2 = 2;
 
-    // [#not-implemented-hide:] QUIC implementation is not production ready yet. Use this enum with
-    // caution to prevent accidental execution of QUIC code. I.e. `!= HTTP2` is no longer sufficient
-    // to distinguish HTTP1 and HTTP2 traffic.
+    // The connection manager will assume that the client is speaking HTTP/3.
+    // This needs to be consistent with listener and transport socket config.
     HTTP3 = 3;
   }
 
@@ -474,7 +473,6 @@ message HttpConnectionManager {
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Additional HTTP/3 settings that are passed directly to the HTTP/3 codec.
-  // [#not-implemented-hide:]
   config.core.v3.Http3ProtocolOptions http3_protocol_options = 44;
 
   // An optional override that the connection manager will write to the server
@@ -495,7 +493,12 @@ message HttpConnectionManager {
 
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.
+  // The default value can be overridden by setting runtime key ``envoy.reloadable_features.max_request_headers_size_kb``.
   // Requests that exceed this limit will receive a 431 response.
+  //
+  // Note: currently some protocol codecs impose limits on the maximum size of a single header:
+  //   HTTP/2 (when using nghttp2) limits a single header to around 100kb.
+  //   HTTP/3 limits a single header to around 1024kb.
   google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
@@ -686,6 +689,34 @@ message HttpConnectionManager {
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
   // See the documentation for :ref:`config_http_conn_man_headers_x-envoy-internal` for more
   // information about internal/external addresses.
+  //
+  // .. warning::
+  //     In the next release, no IP addresses will be considered trusted. If you have tooling such as probes
+  //     on your private network which need to be treated as trusted (e.g. changing arbitrary x-envoy headers)
+  //     you will have to manually include those addresses or CIDR ranges like:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: envoy.extensions.filters.network.http_connection_manager.v3.InternalAddressConfig
+  //
+  //   cidr_ranges:
+  //       address_prefix: 10.0.0.0
+  //       prefix_len: 8
+  //   cidr_ranges:
+  //       address_prefix: 192.168.0.0
+  //       prefix_len: 16
+  //   cidr_ranges:
+  //       address_prefix: 172.16.0.0
+  //       prefix_len: 12
+  //   cidr_ranges:
+  //       address_prefix: 127.0.0.1
+  //       prefix_len: 32
+  //   cidr_ranges:
+  //       address_prefix: fd00::
+  //       prefix_len: 8
+  //   cidr_ranges:
+  //       address_prefix: ::1
+  //       prefix_len: 128
+  //
   InternalAddressConfig internal_address_config = 25;
 
   // If set, Envoy will not append the remote address to the
