@@ -677,6 +677,13 @@ void ListenerImpl::buildListenSocketOptions(
         addListenSocketOptions(listen_socket_options_list_[i],
                                Network::SocketOptionFactory::buildUdpGroOptions());
       }
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+        addListenSocketOptions(
+            listen_socket_options_list_[i],
+            Network::SocketOptionFactory::buildDoNotFragmentOptions(
+                /*mapped_v6*/ addresses_[i]->ip()->version() == Network::Address::IpVersion::v6 &&
+                !addresses_[i]->ip()->ipv6()->v6only()));
+      }
 
       // Additional factory specific options.
       ASSERT(udp_listener_config_->listener_factory_ != nullptr,

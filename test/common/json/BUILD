@@ -91,6 +91,15 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "json_utility_test",
+    srcs = ["json_utility_test.cc"],
+    deps = [
+        "//source/common/json:json_utility_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
+
 envoy_cc_test_binary(
     name = "gen_excluded_unicodes",
     srcs = ["gen_excluded_unicodes.cc"],
