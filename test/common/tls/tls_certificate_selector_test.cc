@@ -59,6 +59,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -78,6 +79,8 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+using CurveNIDSupportedVector = absl::InlinedVector<int, 3>;
 
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:
@@ -108,7 +111,7 @@ public:
   };
 
   std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-  findTlsContext(absl::string_view, absl::optional<std::vector<int>>, bool, bool*) override {
+  findTlsContext(absl::string_view, const absl::InlinedVector<int, 3>&, bool, bool*) override {
     PANIC("unreachable");
   };
 

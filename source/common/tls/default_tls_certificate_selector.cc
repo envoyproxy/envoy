@@ -91,7 +91,7 @@ DefaultTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_clie
                                                 Ssl::CertificateSelectionCallbackPtr) {
   absl::string_view sni =
       absl::NullSafeStringView(SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
-  absl::optional<std::vector<int>> client_ecdsa_capabilities =
+  const CurveNIDSupportedVector client_ecdsa_capabilities =
       server_ctx_.getClientEcdsaCapabilities(ssl_client_hello);
   const bool client_ocsp_capable = server_ctx_.isClientOcspCapable(ssl_client_hello);
 
@@ -166,7 +166,7 @@ Ssl::OcspStapleAction DefaultTlsCertificateSelector::ocspStapleAction(const Ssl:
 
 std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
 DefaultTlsCertificateSelector::findTlsContext(
-    absl::string_view sni, absl::optional<std::vector<int>> client_ecdsa_capabilities,
+    absl::string_view sni, const CurveNIDSupportedVector& client_ecdsa_capabilities,
     bool client_ocsp_capable, bool* cert_matched_sni) {
   bool unused = false;
   if (cert_matched_sni == nullptr) {
@@ -180,24 +180,20 @@ DefaultTlsCertificateSelector::findTlsContext(
   const Ssl::TlsContext* candidate_ctx = nullptr;
   Ssl::OcspStapleAction ocsp_staple_action;
 
+  int cec_count = client_ecdsa_capabilities.size();
+
   auto selected = [&](const Ssl::TlsContext& ctx) -> bool {
     auto action = ocspStapleAction(ctx, client_ocsp_capable);
     if (action == Ssl::OcspStapleAction::Fail) {
       // The selected ctx must adhere to OCSP policy
       return false;
     }
-    // if the client is ECDSA-capable and the context is ECDSA, we check if it is capable of
-    // handling the curves in the cert in a given TlsContext
-    if (client_ecdsa_capabilities.has_value() && ctx.is_ecdsa_) {
-      bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
-      // we're doing this with a guard that the `ctx` is ECDSA - this should be safe
-      const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
-      ASSERT(ecdsa_public_key != nullptr);
-      const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
-      const int ecdsa_curve_nid = EC_GROUP_get_curve_name(ecdsa_group);
-      // if we have a matching curve NID in our client capabilities, return `true`
-      const std::vector<int> cec_vec = client_ecdsa_capabilities.value();
-      if (std::find(cec_vec.begin(), cec_vec.end(), ecdsa_curve_nid) != cec_vec.end()) {
+    // If the client is ECDSA-capable and the context is ECDSA, we check if it is capable of
+    // handling the curves in the cert in a given TlsContext.
+    if (cec_count != 0 && ctx.ec_group_curve_name_ != 0) {
+      // if we have a matching curve NID in our client capabilities, return `true`.
+      if (std::find(client_ecdsa_capabilities.begin(), client_ecdsa_capabilities.end(),
+                    ctx.ec_group_curve_name_) != client_ecdsa_capabilities.end()) {
         selected_ctx = &ctx;
         ocsp_staple_action = action;
         return true;
@@ -206,14 +202,14 @@ DefaultTlsCertificateSelector::findTlsContext(
       }
     }
 
-    // if the client is not ECDSA-capable and the `ctx` is non-ECDSA, then select this `ctx`
-    if (!client_ecdsa_capabilities.has_value() && !ctx.is_ecdsa_) {
+    // If the client is not ECDSA-capable and the `ctx` is non-ECDSA, then select this `ctx`.
+    if (cec_count == 0 && ctx.ec_group_curve_name_ == 0) {
       selected_ctx = &ctx;
       ocsp_staple_action = action;
       return true;
     }
 
-    if (client_ecdsa_capabilities.has_value() && !ctx.is_ecdsa_ && candidate_ctx == nullptr) {
+    if (cec_count != 0 && ctx.ec_group_curve_name_ == 0 && candidate_ctx == nullptr) {
       // ECDSA cert is preferred if client is ECDSA capable, so RSA cert is marked as a candidate,
       // searching will continue until exhausting all certs or find a exact match.
       candidate_ctx = &ctx;
@@ -273,8 +269,7 @@ DefaultTlsCertificateSelector::findTlsContext(
   if (selected_ctx == nullptr) {
     candidate_ctx = nullptr;
     // Skip loop when there is no cert compatible to key type
-    if (client_ecdsa_capabilities.has_value() ||
-        (!client_ecdsa_capabilities.has_value() && has_rsa_)) {
+    if (cec_count != 0 || (cec_count == 0 && has_rsa_)) {
       for (const auto& ctx : tls_contexts_) {
         if (selected(ctx)) {
           break;

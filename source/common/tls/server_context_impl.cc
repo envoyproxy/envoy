@@ -33,7 +33,6 @@
 #include "absl/container/node_hash_set.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
-#include "absl/types/optional.h"
 #include "cert_validator/cert_validator.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
@@ -379,10 +378,10 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
 // We want to return a list of client capabilities for ECDSA now that we support curves other
 // than P-256. An empty optional is used to represent a client that is unable to handle ECDSA
-// the vector inside that optional is a list of `ssl.h` constants representing ECDSA group NIDs
-absl::optional<std::vector<int>>
+// the vector inside that optional is a list of `ssl.h` constants representing ECDSA group NIDs.
+CurveNIDSupportedVector
 ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const {
-  std::vector<int> client_capabilities;
+  CurveNIDSupportedVector client_capabilities;
   CBS client_hello;
   CBS_init(&client_hello, ssl_client_hello.client_hello, ssl_client_hello.client_hello_len);
 
@@ -405,14 +404,18 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
         CBS_init(&signature_algorithms_ext, signature_algorithms_data, signature_algorithms_len);
         if (!CBS_get_u16_length_prefixed(&signature_algorithms_ext, &signature_algorithms) ||
             CBS_len(&signature_algorithms_ext) != 0) {
-          return {};
+          return CurveNIDSupportedVector{};
         }
         if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256)) {
           client_capabilities.push_back(NID_X9_62_prime256v1);
         }
+        CBS_init(&signature_algorithms_ext, signature_algorithms_data, signature_algorithms_len);
+        CBS_get_u16_length_prefixed(&signature_algorithms_ext, &signature_algorithms);
         if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP384R1_SHA384)) {
           client_capabilities.push_back(NID_secp384r1);
         }
+        CBS_init(&signature_algorithms_ext, signature_algorithms_data, signature_algorithms_len);
+        CBS_get_u16_length_prefixed(&signature_algorithms_ext, &signature_algorithms);
         if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP521R1_SHA512)) {
           client_capabilities.push_back(NID_secp521r1);
         }
@@ -421,7 +424,7 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
         }
       }
 
-      return {};
+      return CurveNIDSupportedVector{};
     }
   }
 
@@ -431,25 +434,27 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
   size_t curvelist_len;
   if (!SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_supported_groups,
                                             &curvelist_data, &curvelist_len)) {
-    return {};
+    return CurveNIDSupportedVector{};
   }
 
   CBS curvelist;
   CBS_init(&curvelist, curvelist_data, curvelist_len);
 
-  // We support P256, P384 and P521 ECDSA curves today.
+  // We support P-256, P-384 and P-521 ECDSA curves today.
   if (cbsContainsU16(curvelist, SSL_CURVE_SECP256R1)) {
     client_capabilities.push_back(NID_X9_62_prime256v1);
   }
+  CBS_init(&curvelist, curvelist_data, curvelist_len);
   if (cbsContainsU16(curvelist, SSL_CURVE_SECP384R1)) {
     client_capabilities.push_back(NID_secp384r1);
   }
+  CBS_init(&curvelist, curvelist_data, curvelist_len);
   if (cbsContainsU16(curvelist, SSL_CURVE_SECP521R1)) {
     client_capabilities.push_back(NID_secp521r1);
   }
-  // if we haven't got any curves in common with the client, return empty optional
+  // if we haven't got any curves in common with the client, return empty CurveNIDSupportedVector.
   if (client_capabilities.size() == 0) {
-    return {};
+    return CurveNIDSupportedVector{};
   }
 
   // The client must have offered an ECDSA ciphersuite that we like.
@@ -459,7 +464,7 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
   while (CBS_len(&cipher_suites) > 0) {
     uint16_t cipher_id;
     if (!CBS_get_u16(&cipher_suites, &cipher_id)) {
-      return {};
+      return CurveNIDSupportedVector{};
     }
     // All tls_context_ share the same set of enabled ciphers, so we can just look at the base
     // context.
@@ -468,7 +473,7 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
     }
   }
 
-  return {};
+  return CurveNIDSupportedVector{};
 }
 
 bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const {
@@ -484,7 +489,7 @@ bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_h
 
 std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
 ServerContextImpl::findTlsContext(absl::string_view sni,
-                                  absl::optional<std::vector<int>> client_ecdsa_capabilities,
+                                  const CurveNIDSupportedVector& client_ecdsa_capabilities,
                                   bool client_ocsp_capable, bool* cert_matched_sni) {
   return tls_certificate_selector_->findTlsContext(sni, client_ecdsa_capabilities,
                                                    client_ocsp_capable, cert_matched_sni);

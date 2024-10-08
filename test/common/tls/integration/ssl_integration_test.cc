@@ -706,6 +706,32 @@ public:
     }
   }
 
+  ClientSslTransportOptions ecdsaP384OnlyClientOptions() {
+    auto options = ClientSslTransportOptions();
+    if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+      return options.setSigningAlgorithms({"ecdsa_secp384r1_sha384", "rsa_pss_rsae_sha256"});
+    } else {
+      return options
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256", "ECDHE-ECDSA-AES128-GCM-SHA256"})
+          .setSigningAlgorithms({"rsa_pss_rsae_sha256", "ecdsa_secp384r1_sha384"})
+          .setCurves({"P-384"});
+    }
+  }
+
+  ClientSslTransportOptions ecdsaP256P384OnlyClientOptions() {
+    auto options = ClientSslTransportOptions();
+    if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+      return options.setSigningAlgorithms(
+          {"ecdsa_secp256r1_sha256", "ecdsa_secp384r1_sha384", "rsa_pss_rsae_sha256"});
+    } else {
+      return options
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256", "ECDHE-ECDSA-AES128-GCM-SHA256"})
+          .setSigningAlgorithms(
+              {"rsa_pss_rsae_sha256", "ecdsa_secp256r1_sha256", "ecdsa_secp384r1_sha384"})
+          .setCurves({"P-256", "P-384"});
+    }
+  }
+
   static std::string ipClientVersionTestParamsToString(
       const ::testing::TestParamInfo<
           std::tuple<Network::Address::IpVersion,
@@ -867,6 +893,41 @@ TEST_P(SslCertficateIntegrationTest, ServerEcdsaClientEcdsaOnly) {
   checkStats();
 }
 
+// Server has RSA and ECDSA P-256 certificates, client only supports
+// P-384 curve. We fall back to RSA certificate.
+TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP256EcdsaClientEcdsaP384Only) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  // We have to set the server curves to allow for ECDH negotiation where client
+  // doesn't support P-256
+  server_curves_.push_back("P-256");
+  server_curves_.push_back("P-384");
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaP384OnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  const std::string counter_name = listenerStatPrefix("ssl.sigalgs.rsa_pss_rsae_sha256");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  test_server_->waitForCounterGe(counter_name, 1);
+  EXPECT_EQ(1U, counter->value());
+  checkStats();
+}
+
+TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP521EcdsaClientEcdsaP256P384Only) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_name_ = "server_ecdsa_p521";
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaP256P384OnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  const std::string counter_name = listenerStatPrefix("ssl.sigalgs.rsa_pss_rsae_sha256");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  test_server_->waitForCounterGe(counter_name, 1);
+  EXPECT_EQ(1U, counter->value());
+  checkStats();
+}
+
 // Server has RSA/ECDSA certificates, client is only ECDSA capable works.
 TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
   server_rsa_cert_ = true;
@@ -876,6 +937,11 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
     return makeSslClientConnection(ecdsaOnlyClientOptions());
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  // validate that we use the ECDSA signing algorithm
+  const std::string counter_name = listenerStatPrefix("ssl.sigalgs.ecdsa_secp256r1_sha256");
+  Stats::CounterSharedPtr counter = test_server_->counter(counter_name);
+  test_server_->waitForCounterGe(counter_name, 1);
+  EXPECT_EQ(1U, counter->value());
   checkStats();
 }
 

@@ -144,7 +144,7 @@ Certificate selection rules:
   is false or true.
 * Full scan execuates OCSP and key type checking on each cert which is the same as described above in exact SNI matching.
   It falls back to the first cert in the whole list if there is no cert selected.
-* Currently only two kinds of key type are supported, RSA or ECDSA. If the client supports P-256, P384 or P-521 ECDSA, the P-256, P384 or P-521 ECDSA certificate
+* Currently only two kinds of key type are supported, RSA or ECDSA. If the client supports P-256, P-384 or P-521 ECDSA, the P-256, P-384 or P-521 ECDSA certificate
   is preferred over RSA. The certificate that it falls back to might result in a failed handshake. For instance, a client only supports
   RSA certificates and the certificate only support ECDSA.
 * The final selected certificate must adhere to the OCSP policy. If no such certificate is found, the connection is refused.
