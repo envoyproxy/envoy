@@ -153,25 +153,27 @@ absl::StatusOr<OrcaLoadReport> parseOrcaLoadReportHeaders(const HeaderMap& heade
     const auto header_value = header_bin[0]->value().getStringView();
     RETURN_IF_NOT_OK(tryParseSerializedBinary(header_value, load_report));
   } else if (const auto header = headers.get(endpointLoadMetricsHeader()); !header.empty()) {
-    std::pair<absl::string_view, absl::string_view> split_header =
-        absl::StrSplit(header[0]->value().getStringView(), absl::MaxSplits(' ', 1));
+    absl::string_view header_value = header[0]->value().getStringView();
 
-    if (split_header.first == kHeaderFormatPrefixBin) { // Binary protobuf format.
-      RETURN_IF_NOT_OK(tryParseSerializedBinary(split_header.second, load_report));
-    } else if (split_header.first == kHeaderFormatPrefixText) { // Native HTTP format.
-      RETURN_IF_NOT_OK(tryParseNativeHttpEncoded(split_header.second, load_report));
-    } else if (split_header.first == kHeaderFormatPrefixJson) { // JSON format.
+    if (absl::StartsWith(header_value, kHeaderFormatPrefixBin)) {
+      // Binary protobuf format.
+      RETURN_IF_NOT_OK(tryParseSerializedBinary(header_value.substr(kHeaderFormatPrefixBin.size()),
+                                                load_report));
+    } else if (absl::StartsWith(header_value, kHeaderFormatPrefixText)) {
+      // Native HTTP format.
+      RETURN_IF_NOT_OK(tryParseNativeHttpEncoded(
+          header_value.substr(kHeaderFormatPrefixText.size()), load_report));
+    } else if (absl::StartsWith(header_value, kHeaderFormatPrefixJson)) {
+      // JSON format.
 #if defined(ENVOY_ENABLE_FULL_PROTOS) && defined(ENVOY_ENABLE_YAML)
-      const std::string json_string = std::string(split_header.second);
       bool has_unknown_field = false;
-      RETURN_IF_ERROR(
-          Envoy::MessageUtil::loadFromJsonNoThrow(json_string, load_report, has_unknown_field));
+      RETURN_IF_ERROR(Envoy::MessageUtil::loadFromJsonNoThrow(
+          header_value.substr(kHeaderFormatPrefixJson.size()), load_report, has_unknown_field));
 #else
       IS_ENVOY_BUG("JSON formatted ORCA header support not implemented for this build");
 #endif // !ENVOY_ENABLE_FULL_PROTOS || !ENVOY_ENABLE_YAML
     } else {
-      return absl::InvalidArgumentError(
-          fmt::format("unsupported ORCA header format: {}", split_header.first));
+      return absl::InvalidArgumentError(fmt::format("unsupported ORCA header format"));
     }
   } else {
     return absl::NotFoundError("no ORCA data sent from the backend");

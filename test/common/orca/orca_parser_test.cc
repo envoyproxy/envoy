@@ -14,17 +14,11 @@ namespace Envoy {
 namespace Orca {
 namespace {
 
-const std::string formattedHeaderPrefixText() {
-  CONSTRUCT_ON_FIRST_USE(std::string, absl::StrCat(kHeaderFormatPrefixText, " "));
-}
+absl::string_view formattedHeaderPrefixText() { return kHeaderFormatPrefixText; }
 
-const std::string formattedHeaderPrefixJson() {
-  CONSTRUCT_ON_FIRST_USE(std::string, absl::StrCat(kHeaderFormatPrefixJson, " "));
-}
+absl::string_view formattedHeaderPrefixJson() { return kHeaderFormatPrefixJson; }
 
-const std::string formattedHeaderPrefixBin() {
-  CONSTRUCT_ON_FIRST_USE(std::string, absl::StrCat(kHeaderFormatPrefixBin, " "));
-}
+absl::string_view formattedHeaderPrefixBin() { return kHeaderFormatPrefixBin; }
 
 // Returns an example OrcaLoadReport proto with all fields populated.
 static xds::data::orca::v3::OrcaLoadReport exampleOrcaLoadReport() {
@@ -62,14 +56,14 @@ TEST(OrcaParserUtilTest, InvalidOrcaHeaderPrefix) {
       {std::string(kEndpointLoadMetricsHeader), "BAD random-value"}};
   EXPECT_THAT(
       parseOrcaLoadReportHeaders(headers),
-      StatusHelpers::HasStatus(absl::InvalidArgumentError("unsupported ORCA header format: BAD")));
+      StatusHelpers::HasStatus(absl::InvalidArgumentError("unsupported ORCA header format")));
 }
 
 TEST(OrcaParserUtilTest, EmptyOrcaHeader) {
   Http::TestRequestHeaderMapImpl headers{{std::string(kEndpointLoadMetricsHeader), ""}};
   EXPECT_THAT(
       parseOrcaLoadReportHeaders(headers),
-      StatusHelpers::HasStatus(absl::InvalidArgumentError("unsupported ORCA header format: ")));
+      StatusHelpers::HasStatus(absl::InvalidArgumentError("unsupported ORCA header format")));
 }
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeader) {
