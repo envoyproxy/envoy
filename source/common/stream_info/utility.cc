@@ -200,6 +200,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamTxByteSent
   return duration(timing.value().get().lastDownstreamTxByteSent(), stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamHeaderRxByteReceived() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().lastDownstreamHeaderRxByteReceived(), stream_info_);
+}
+
 absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteReceived() {
   OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
   if (!timing) {
