@@ -101,7 +101,7 @@ private:
     // Network::ActiveDnsQuery
     void cancel(Network::ActiveDnsQuery::CancelReason reason) override;
     void addTrace(uint8_t) override {}
-    OptRef<const std::vector<Trace>> getTraces() override { return {}; }
+    absl::optional<std::vector<Trace>> getTraces() override { return {}; }
 
     static DnsResponse buildDnsResponse(const struct sockaddr* address, uint32_t ttl);
 

@@ -44,7 +44,7 @@ public:
   // Network::ActiveDnsQuery
   MOCK_METHOD(void, cancel, (CancelReason reason));
   MOCK_METHOD(void, addTrace, (uint8_t));
-  MOCK_METHOD(OptRef<const std::vector<Trace>>, getTraces, ());
+  MOCK_METHOD(absl::optional<std::vector<Trace>>, getTraces, ());
 };
 
 class MockFilterManager : public FilterManager {

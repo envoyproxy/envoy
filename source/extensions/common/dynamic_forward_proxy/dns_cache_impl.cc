@@ -421,12 +421,12 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   std::string details_with_maybe_trace = std::string(details);
   if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
     if (enable_dfp_dns_trace_) {
-      OptRef<const std::vector<Network::ActiveDnsQuery::Trace>> traces =
+      absl::optional<std::vector<Network::ActiveDnsQuery::Trace>> traces =
           primary_host_info->active_query_->getTraces();
       if (traces.has_value()) {
         std::vector<std::string> string_traces;
-        string_traces.reserve(traces.ref().size());
-        std::transform(traces.ref().begin(), traces.ref().end(), std::back_inserter(string_traces),
+        string_traces.reserve(traces->size());
+        std::transform(traces->begin(), traces->end(), std::back_inserter(string_traces),
                        [](const auto& trace) {
                          return absl::StrCat(trace.trace_, "=",
                                              trace.time_.time_since_epoch().count());

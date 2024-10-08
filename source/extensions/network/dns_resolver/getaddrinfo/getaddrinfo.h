@@ -62,7 +62,7 @@ protected:
           Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
     }
 
-    OptRef<const std::vector<Trace>> getTraces() override {
+    absl::optional<std::vector<Trace>> getTraces() override {
       absl::MutexLock lock(&mutex_);
       return traces_;
     }

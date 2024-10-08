@@ -124,7 +124,7 @@ TEST_F(GetAddrInfoDnsImplTest, LocalhostResolve) {
                          [this](DnsResolver::ResolutionStatus status, absl::string_view,
                                 std::list<DnsResponse>&& response) {
                            verifyRealGaiResponse(status, std::move(response));
-                           EXPECT_THAT(active_dns_query_->getTraces().ref(),
+                           EXPECT_THAT(*active_dns_query_->getTraces(),
                                        ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                    HasTrace(GetAddrInfoTrace::Starting),
                                                    HasTrace(GetAddrInfoTrace::Success),
@@ -152,7 +152,7 @@ TEST_F(GetAddrInfoDnsImplTest, Cancel) {
                          [this](DnsResolver::ResolutionStatus status, absl::string_view,
                                 std::list<DnsResponse>&& response) {
                            verifyRealGaiResponse(status, std::move(response));
-                           EXPECT_THAT(active_dns_query_->getTraces().ref(),
+                           EXPECT_THAT(*active_dns_query_->getTraces(),
                                        ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                    HasTrace(GetAddrInfoTrace::Starting),
                                                    HasTrace(GetAddrInfoTrace::Success),
@@ -177,7 +177,7 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
                            EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
                            EXPECT_EQ("Non-recoverable failure in name resolution", details);
                            EXPECT_TRUE(response.empty());
-                           EXPECT_THAT(active_dns_query_->getTraces().ref(),
+                           EXPECT_THAT(*active_dns_query_->getTraces(),
                                        ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                    HasTrace(GetAddrInfoTrace::Starting),
                                                    HasTrace(GetAddrInfoTrace::Failed),
@@ -201,7 +201,7 @@ TEST_F(GetAddrInfoDnsImplTest, NoData) {
                                 std::list<DnsResponse>&& response) {
                            EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
                            EXPECT_TRUE(response.empty());
-                           EXPECT_THAT(active_dns_query_->getTraces().ref(),
+                           EXPECT_THAT(*active_dns_query_->getTraces(),
                                        ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                    HasTrace(GetAddrInfoTrace::Starting),
                                                    HasTrace(GetAddrInfoTrace::NoResult),
@@ -225,7 +225,7 @@ TEST_F(GetAddrInfoDnsImplTest, NoName) {
                                 std::list<DnsResponse>&& response) {
                            EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
                            EXPECT_TRUE(response.empty());
-                           EXPECT_THAT(active_dns_query_->getTraces().ref(),
+                           EXPECT_THAT(*active_dns_query_->getTraces(),
                                        ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                    HasTrace(GetAddrInfoTrace::Starting),
                                                    HasTrace(GetAddrInfoTrace::NoResult),
@@ -253,7 +253,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccess) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_TRUE(response.empty());
         EXPECT_THAT(
-            active_dns_query_->getTraces().ref(),
+            *active_dns_query_->getTraces(),
             ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                         HasTrace(GetAddrInfoTrace::Starting), HasTrace(GetAddrInfoTrace::Retrying),
                         HasTrace(GetAddrInfoTrace::Starting), HasTrace(GetAddrInfoTrace::Success),
@@ -305,7 +305,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccess) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_TRUE(response.empty());
         EXPECT_THAT(
-            active_dns_query_->getTraces().ref(),
+            *active_dns_query_->getTraces(),
             ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                         HasTrace(GetAddrInfoTrace::Starting), HasTrace(GetAddrInfoTrace::Retrying),
                         HasTrace(GetAddrInfoTrace::Starting), HasTrace(GetAddrInfoTrace::Retrying),
@@ -341,7 +341,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailure) {
         EXPECT_FALSE(details.empty());
         EXPECT_TRUE(response.empty());
         EXPECT_THAT(
-            active_dns_query_->getTraces().ref(),
+            *active_dns_query_->getTraces(),
             ElementsAre(
                 HasTrace(GetAddrInfoTrace::NotStarted), HasTrace(GetAddrInfoTrace::Starting),
                 HasTrace(GetAddrInfoTrace::Retrying), HasTrace(GetAddrInfoTrace::Starting),

@@ -77,7 +77,7 @@ private:
       cancel_reason_ = reason;
     }
     void addTrace(uint8_t) override {}
-    OptRef<const std::vector<Trace>> getTraces() override { return {}; }
+    absl::optional<std::vector<Trace>> getTraces() override { return {}; }
 
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.
