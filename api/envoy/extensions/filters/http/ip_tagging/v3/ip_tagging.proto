@@ -53,7 +53,8 @@ message IPTagging {
     repeated config.core.v3.CidrRange ip_list = 2;
   }
 
-  // optional header to use for ip-tagging instead of default
+  // Optional header to use for ip-tagging instead of using
+  // default header x-envoy-ip-tags.
   string ip_tag_header = 5
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 

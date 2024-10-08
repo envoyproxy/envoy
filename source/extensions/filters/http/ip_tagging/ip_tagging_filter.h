@@ -39,7 +39,8 @@ public:
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
 
-  const Http::LowerCaseString& ip_tag_header() const { return header_; }
+  // No ip_tag_header is set in case of an empty string.
+  const Http::LowerCaseString& ip_tag_header() const { return ip_tag_header_; }
 
   void incHit(absl::string_view tag) {
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
@@ -73,7 +74,7 @@ private:
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
-  const Http::LowerCaseString header_;
+  const Http::LowerCaseString ip_tag_header_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;
