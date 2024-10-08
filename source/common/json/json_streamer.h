@@ -456,5 +456,10 @@ private:
  */
 using BufferStreamer = StreamerBase<BufferOutput>;
 
+/**
+ * A Streamer that streams to a string.
+ */
+using StringStreamer = StreamerBase<StringOutput>;
+
 } // namespace Json
 } // namespace Envoy

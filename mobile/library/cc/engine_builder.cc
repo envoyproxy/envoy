@@ -851,6 +851,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   }
 
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
+  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
