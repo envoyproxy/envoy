@@ -115,24 +115,23 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
       case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
           kQuotaAssignmentAction: {
         absl::optional<BucketAction> cached_action = quota_buckets_[bucket_id]->cached_action;
-        quota_buckets_[bucket_id]->cached_action = action;
         quota_buckets_[bucket_id]->current_assignment_time = time_source_.monotonicTime();
+
+        if (cached_action.has_value() &&
+            Protobuf::util::MessageDifferencer::Equals(*cached_action, action)) {
+          ENVOY_LOG(debug,
+                    "Cached action matches the incoming response so only TTL is updated for bucket "
+                    "id: {}",
+                    bucket_id);
+          break;
+        }
+        quota_buckets_[bucket_id]->cached_action = action;
         if (quota_buckets_[bucket_id]->cached_action->has_quota_assignment_action()) {
           auto rate_limit_strategy = quota_buckets_[bucket_id]
                                          ->cached_action->quota_assignment_action()
                                          .rate_limit_strategy();
 
           if (rate_limit_strategy.has_token_bucket()) {
-            // If a matching TokenBucket is already in place, do not reset it by replacing it with a
-            // duplicate one.
-            if (cacheHasTokenBucket(rate_limit_strategy.token_bucket(), cached_action)) {
-              ENVOY_LOG(trace,
-                        "Token bucket already exists in cache and does not require re-creation for "
-                        "id: {}.",
-                        bucket_id);
-              break;
-            }
-
             const auto& interval_proto = rate_limit_strategy.token_bucket().fill_interval();
             // Convert absl::duration to int64_t seconds
             int64_t fill_interval_sec =
