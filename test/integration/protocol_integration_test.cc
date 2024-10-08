@@ -1463,6 +1463,36 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimitNoEndStream) 
   }
 }
 
+TEST_P(ProtocolIntegrationTest, TestLargeResposneBody) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_client_3ms_poll", "true");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(1024 * 200, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+}
+
+TEST_P(ProtocolIntegrationTest, TestLargeResposneBodyFive) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_client_5ms_poll", "true");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(1024 * 200, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+}
+
 // Test hitting the encoder buffer filter with too many response bytes to buffer. Given the request
 // headers are sent on early, the stream/connection will be reset.
 TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {

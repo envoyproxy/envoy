@@ -168,6 +168,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_logging_with_fast_json_formatter);
 // before downstream.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
 
+// TODO(abeyad): Remove the polling timer flags once the Envoy Mobile experiment is finished.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_client_3ms_poll);
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_client_5ms_poll);
+
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT
