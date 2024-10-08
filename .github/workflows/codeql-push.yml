@@ -32,7 +32,7 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - name: Checkout repository
-      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
+      uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938  # v4.2.0
       with:
         fetch-depth: 2
 
@@ -61,11 +61,11 @@ jobs:
 
     - name: Free disk space
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.35
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.36
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/init@294a9d92911152fe08befb9ec03e240add280cb3  # codeql-bundle-v3.26.8
+      uses: github/codeql-action/init@6db8d6351fd0be61f9ed8ebd12ccd35dcec51fea  # codeql-bundle-v3.26.11
       with:
         languages: cpp
 
@@ -96,6 +96,7 @@ jobs:
            --spawn_strategy=local \
            --discard_analysis_cache \
            --nouse_action_cache \
+           --features="-layering_check" \
            --config=clang-libc++ \
            --config=ci \
            $BUILD_TARGETS
@@ -108,4 +109,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/analyze@294a9d92911152fe08befb9ec03e240add280cb3  # codeql-bundle-v3.26.8
+      uses: github/codeql-action/analyze@6db8d6351fd0be61f9ed8ebd12ccd35dcec51fea  # codeql-bundle-v3.26.11

@@ -94,6 +94,7 @@ RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_strict_duration_validation);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunneling_send_downstream_fin_on_upstream_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
+RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_udp_socket_apply_aggregated_read_limit);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_upstream_remote_address_use_connection);
@@ -115,9 +116,6 @@ RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
-// Execution context is optional and must be enabled explicitly.
-// See https://github.com/envoyproxy/envoy/issues/32012.
-FALSE_RUNTIME_GUARD(envoy_restart_features_enable_execution_context);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO(paul-r-gall) Make this enabled by default after additional soak time.
@@ -162,6 +160,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 
+// A flag to enable the usage of the latest JSON formatter for logging.
+// TODO(wbpcode): flip to true after Envoy v1.32.0 is released.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_logging_with_fast_json_formatter);
 // TODO(yanavlasov): Flip to true after prod testing.
 // Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
 // before downstream.

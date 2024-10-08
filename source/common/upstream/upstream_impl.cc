@@ -1229,6 +1229,17 @@ ClusterInfoImpl::ClusterInfoImpl(
           http_protocol_options_->common_http_protocol_options_, max_headers_count,
           runtime_.snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey,
                                          Http::DEFAULT_MAX_HEADERS_COUNT))),
+      max_response_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http_protocol_options_->common_http_protocol_options_, max_response_headers_kb,
+          [&]() -> absl::optional<uint16_t> {
+            constexpr uint64_t unspecified = 0;
+            uint64_t runtime_val = runtime_.snapshot().getInteger(
+                Http::MaxResponseHeadersSizeOverrideKey, unspecified);
+            if (runtime_val == unspecified) {
+              return absl::nullopt;
+            }
+            return runtime_val;
+          }())),
       type_(config.type()),
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       connection_pool_per_downstream_connection_(

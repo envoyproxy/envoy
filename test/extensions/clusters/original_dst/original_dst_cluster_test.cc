@@ -1163,10 +1163,8 @@ TEST(DestinationAddress, ObjectFactory) {
   auto object = factory->createFromBytes(address);
   ASSERT_NE(nullptr, object);
   EXPECT_EQ(address, object->serializeAsString());
-  auto mirror = factory->reflect(object.get());
-  ASSERT_NE(nullptr, mirror);
-  EXPECT_THAT(mirror->getField("ip"), testing::VariantWith<absl::string_view>("10.0.0.10"));
-  EXPECT_THAT(mirror->getField("port"), testing::VariantWith<int64_t>(8080));
+  EXPECT_THAT(object->getField("ip"), testing::VariantWith<absl::string_view>("10.0.0.10"));
+  EXPECT_THAT(object->getField("port"), testing::VariantWith<int64_t>(8080));
   EXPECT_EQ(nullptr, factory->createFromBytes("foo"));
 }
 

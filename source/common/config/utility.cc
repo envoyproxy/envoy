@@ -346,5 +346,28 @@ Utility::buildJitteredExponentialBackOffStrategy(
       default_base_interval_ms, default_base_interval_ms * 10, random);
 }
 
+absl::Status Utility::validateTerminalFilters(const std::string& name,
+                                              const std::string& filter_type,
+                                              const std::string& filter_chain_type,
+                                              bool is_terminal_filter,
+                                              bool last_filter_in_current_config) {
+  if (is_terminal_filter && !last_filter_in_current_config) {
+    return absl::InvalidArgumentError(
+        fmt::format("Error: terminal filter named {} of type {} must be the "
+                    "last filter in a {} filter chain.",
+                    name, filter_type, filter_chain_type));
+  } else if (!is_terminal_filter && last_filter_in_current_config) {
+    absl::string_view extra = "";
+    if (filter_chain_type == "router upstream http") {
+      extra = " When upstream_http_filters are specified, they must explicitly end with an "
+              "UpstreamCodec filter.";
+    }
+    return absl::InvalidArgumentError(fmt::format("Error: non-terminal filter named {} of type "
+                                                  "{} is the last filter in a {} filter chain.{}",
+                                                  name, filter_type, filter_chain_type, extra));
+  }
+  return absl::OkStatus();
+}
+
 } // namespace Config
 } // namespace Envoy

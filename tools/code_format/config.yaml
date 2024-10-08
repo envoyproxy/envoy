@@ -100,7 +100,6 @@ paths:
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/router/route_config_update_receiver_impl.cc
-    - source/common/listener_manager/listener_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/network/listen_socket_impl.cc
@@ -221,7 +220,6 @@ paths:
     - source/extensions/http/custom_response
     - source/extensions/http/early_header_mutation
     - source/extensions/http/injected_credentials
-    - source/extensions/http/original_ip_detection
     - source/extensions/http/stateful_session
     - source/extensions/io_socket/user_space
     - source/extensions/key_value
