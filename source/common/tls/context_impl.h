@@ -49,8 +49,8 @@ struct TlsContext {
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
   std::unique_ptr<OcspResponseWrapper> ocsp_response_;
-  // ec_group_curve_name_ is initialized to zero, which is used as a sentinel value
-  // for "not an ECDSA context"
+  // We initialize the curve name variable to zero, which is used as a sentinel value
+  // for "not an ECDSA context".
   CurveNID ec_group_curve_name_ = 0;
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
