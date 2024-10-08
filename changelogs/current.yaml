@@ -270,6 +270,10 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed ``envoy.reloadable_features.use_http3_header_normalisation`` runtime flag and legacy code paths.
+- area: access_log
+  change: |
+    Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
+    %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
 
 new_features:
 - area: dns
