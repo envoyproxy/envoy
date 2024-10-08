@@ -9,7 +9,7 @@ Envoy for the foreseeable future. You should have domain expertise and be extrem
   that your organization is interested in and willing to sponsoring a maintainer.
 * We will expect you to start contributing increasingly complicated PRs, under the guidance
   of the existing maintainers.
-* We may ask you to do some issues from our backlog.
+* We may ask you to fix some issues from our backlog.
 * As you gain experience with the code base and our standards, we will ask you to do code reviews
   for incoming PRs (i.e., all maintainers are expected to shoulder a proportional share of
   community reviews).
