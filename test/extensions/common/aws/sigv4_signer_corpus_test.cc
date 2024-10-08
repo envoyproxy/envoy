@@ -23,13 +23,13 @@ namespace Common {
 namespace Aws {
 
 std::vector<std::string> directoryListing() {
-  std::vector<std::string> directories_;
+  std::vector<std::string> directories;
   for (auto const& entry :
        std::filesystem::directory_iterator(TestEnvironment::runfilesDirectory() +
                                            "/test/extensions/common/aws/signer_corpuses/v4")) {
-    directories_.push_back(entry.path().string());
+    directories.push_back(entry.path().string());
   }
-  return directories_;
+  return directories;
 }
 
 class SigV4SignerCorpusTest : public ::testing::TestWithParam<std::string> {
@@ -263,31 +263,32 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusHeaderSigning) {
   signer_friend.addRequiredHeaders(message_->headers(), long_date_,
                                    absl::optional<std::string>(token_), region_);
 
-  const auto calculated_canonical_headers_ = Utility::canonicalizeHeaders(message_->headers(), {});
+  const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_->headers(), {});
 
   if (content_hash_.empty()) {
     content_hash_ = SignatureConstants::HashedEmptyString;
   }
 
-  auto calculated_canonical_request_ = Utility::createCanonicalRequest(
-      method_, message_->headers().Path()->value().getStringView(), calculated_canonical_headers_,
+  const auto calculated_canonical_request = Utility::createCanonicalRequest(
+      method_, message_->headers().Path()->value().getStringView(), calculated_canonical_headers,
       content_hash_, normalize_, true);
 
-  auto source_canonical_request_ = readStringFile("header-canonical-request.txt");
-  EXPECT_EQ(source_canonical_request_, calculated_canonical_request_);
+  const auto source_canonical_request_ = readStringFile("header-canonical-request.txt");
+  EXPECT_EQ(source_canonical_request_, calculated_canonical_request);
 
-  auto calculated_credential_scope = signer_friend.createCredentialScope(short_date_, region_);
-  auto calculated_string_to_sign = signer_friend.createStringToSign(
-      calculated_canonical_request_, long_date_, calculated_credential_scope);
+  const auto calculated_credential_scope =
+      signer_friend.createCredentialScope(short_date_, region_);
+  const auto calculated_string_to_sign = signer_friend.createStringToSign(
+      calculated_canonical_request, long_date_, calculated_credential_scope);
 
-  auto source_string_to_sign_ = readStringFile("header-string-to-sign.txt");
-  EXPECT_EQ(source_string_to_sign_, calculated_string_to_sign);
+  const auto source_string_to_sign = readStringFile("header-string-to-sign.txt");
+  EXPECT_EQ(source_string_to_sign, calculated_string_to_sign);
 
-  auto calculated_signature =
+  const auto calculated_signature =
       signer_friend.createSignature(akid_, skid_, short_date_, calculated_string_to_sign, region_);
 
-  auto source_header_signature_ = readStringFile("header-signature.txt");
-  EXPECT_EQ(source_header_signature_, calculated_signature);
+  const auto source_header_signature = readStringFile("header-signature.txt");
+  EXPECT_EQ(source_header_signature, calculated_signature);
 }
 
 TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
@@ -311,7 +312,7 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
   setDate();
   addBodySigningIfRequired();
 
-  const auto calculated_canonical_headers_ = Utility::canonicalizeHeaders(message_->headers(), {});
+  const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_->headers(), {});
 
   SigV4SignerImpl querysigner_(
       service_, region_, CredentialsProviderSharedPtr{credentials_provider_}, context_,
@@ -319,7 +320,8 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
 
   auto signer_friend = SigV4SignerImplFriend(&querysigner_);
 
-  auto calculated_credential_scope = signer_friend.createCredentialScope(short_date_, region_);
+  const auto calculated_credential_scope =
+      signer_friend.createCredentialScope(short_date_, region_);
 
   auto query_params =
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message_->headers().getPathValue());
@@ -327,7 +329,7 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
   signer_friend.createQueryParams(
       query_params, signer_friend.createAuthorizationCredential(akid_, calculated_credential_scope),
       long_date_, token_.empty() ? absl::optional<std::string>(absl::nullopt) : token_,
-      calculated_canonical_headers_, expiration_);
+      calculated_canonical_headers, expiration_);
 
   message_->headers().setPath(query_params.replaceQueryString(message_->headers().Path()->value()));
 
@@ -335,23 +337,23 @@ TEST_P(SigV4SignerCorpusTest, SigV4SignerCorpusQueryStringSigning) {
     content_hash_ = SignatureConstants::HashedEmptyString;
   }
 
-  auto calculated_canonical_request_ = Utility::createCanonicalRequest(
-      method_, message_->headers().Path()->value().getStringView(), calculated_canonical_headers_,
+  const auto calculated_canonical_request = Utility::createCanonicalRequest(
+      method_, message_->headers().Path()->value().getStringView(), calculated_canonical_headers,
       content_hash_, normalize_, true);
 
-  auto source_canonical_request_ = readStringFile("query-canonical-request.txt");
-  EXPECT_EQ(source_canonical_request_, calculated_canonical_request_);
+  const auto source_canonical_request_ = readStringFile("query-canonical-request.txt");
+  EXPECT_EQ(source_canonical_request_, calculated_canonical_request);
 
-  auto calculated_string_to_sign = signer_friend.createStringToSign(
-      calculated_canonical_request_, long_date_, calculated_credential_scope);
+  const auto calculated_string_to_sign = signer_friend.createStringToSign(
+      calculated_canonical_request, long_date_, calculated_credential_scope);
 
-  auto source_string_to_sign_ = readStringFile("query-string-to-sign.txt");
-  EXPECT_EQ(source_string_to_sign_, calculated_string_to_sign);
+  const auto source_string_to_sign = readStringFile("query-string-to-sign.txt");
+  EXPECT_EQ(source_string_to_sign, calculated_string_to_sign);
 
-  auto calculated_signature =
+  const auto calculated_signature =
       signer_friend.createSignature(akid_, skid_, short_date_, calculated_string_to_sign, region_);
 
-  auto source_query_signature_ = readStringFile("query-signature.txt");
+  const auto source_query_signature_ = readStringFile("query-signature.txt");
   EXPECT_EQ(source_query_signature_, calculated_signature);
 }
 

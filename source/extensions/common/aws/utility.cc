@@ -585,10 +585,10 @@ bool Utility::useDoubleUriEncode(const std::string service_name) {
   constexpr absl::string_view S3_OUTPOSTS_SERVICE_NAME = "s3-outposts";
   constexpr absl::string_view S3_EXPRESS_SERVICE_NAME = "s3-express";
 
-  const std::vector<absl::string_view> do_not_normalize_ = {
+  const std::vector<absl::string_view> do_not_normalize = {
       S3_SERVICE_NAME, S3_OUTPOSTS_SERVICE_NAME, S3_EXPRESS_SERVICE_NAME};
 
-  for (auto& it : do_not_normalize_) {
+  for (auto& it : do_not_normalize) {
     if (absl::EqualsIgnoreCase(service_name, it)) {
       return false;
     }
