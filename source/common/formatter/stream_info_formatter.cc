@@ -1435,6 +1435,22 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return absl::StrJoin(connection_info.ipSansPeerCertificate(), ",");
                   });
             }}},
+          {"DOWNSTREAM_PEER_EMAIL_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.emailSansPeerCertificate(), ",");
+                  });
+            }}},
+          {"DOWNSTREAM_PEER_OTHERNAME_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.othernameSansPeerCertificate(), ",");
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_URI_SAN",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1457,6 +1473,22 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
                   [](const Ssl::ConnectionInfo& connection_info) {
                     return absl::StrJoin(connection_info.ipSansLocalCertificate(), ",");
+                  });
+            }}},
+          {"DOWNSTREAM_LOCAL_EMAIL_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.emailSansLocalCertificate(), ",");
+                  });
+            }}},
+          {"DOWNSTREAM_LOCAL_OTHERNAME_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.othernameSansLocalCertificate(), ",");
                   });
             }}},
           {"DOWNSTREAM_PEER_SUBJECT",

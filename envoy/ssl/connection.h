@@ -139,6 +139,30 @@ public:
   virtual absl::Span<const std::string> ipSansLocalCertificate() const PURE;
 
   /**
+   * @return absl::Span<const std::string> the Email entries in the SAN field of the peer certificate.
+   *         Returns {} if there is no peer certificate, or no SAN field, or no Emails.
+   **/
+  virtual absl::Span<const std::string> emailSansPeerCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the Email entries in the SAN field of the local
+   *certificate. Returns {} if there is no local certificate, or no SAN field, or no Emails.
+   **/
+  virtual absl::Span<const std::string> emailSansLocalCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the OtherName entries in the SAN field of the peer certificate.
+   *         Returns {} if there is no peer certificate, or no SAN field, or no OtherNames.
+   **/
+  virtual absl::Span<const std::string> othernameSansPeerCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the OtherName entries in the SAN field of the local
+   *certificate. Returns {} if there is no local certificate, or no SAN field, or no OtherNames.
+   **/
+  virtual absl::Span<const std::string> othernameSansLocalCertificate() const PURE;
+
+  /**
    * @return absl::Span<const std::string> the OID entries of the peer certificate extensions.
    *         Returns {} if there is no peer certificate, or no extensions.
    **/

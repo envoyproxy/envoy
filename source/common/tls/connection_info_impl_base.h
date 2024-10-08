@@ -20,7 +20,6 @@ class ConnectionInfoImplBase : public Ssl::ConnectionInfo {
 public:
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
-  absl::Span<const std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   absl::Span<const std::string> sha256PeerCertificateChainDigests() const override;
   const std::string& sha1PeerCertificateDigest() const override;
@@ -30,13 +29,18 @@ public:
   const std::string& issuerPeerCertificate() const override;
   const std::string& subjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
-  absl::Span<const std::string> uriSanPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
+  absl::Span<const std::string> uriSanPeerCertificate() const override;
+  absl::Span<const std::string> uriSanLocalCertificate() const override;
   absl::Span<const std::string> dnsSansPeerCertificate() const override;
   absl::Span<const std::string> dnsSansLocalCertificate() const override;
   absl::Span<const std::string> ipSansPeerCertificate() const override;
   absl::Span<const std::string> ipSansLocalCertificate() const override;
+  absl::Span<const std::string> emailSansPeerCertificate() const override;
+  absl::Span<const std::string> emailSansLocalCertificate() const override;
+  absl::Span<const std::string> othernameSansPeerCertificate() const override;
+  absl::Span<const std::string> othernameSansLocalCertificate() const override;
   absl::Span<const std::string> oidsPeerCertificate() const override;
   absl::Span<const std::string> oidsLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
@@ -51,7 +55,6 @@ public:
   virtual SSL* ssl() const PURE;
 
 protected:
-  mutable std::vector<std::string> cached_uri_san_local_certificate_;
   mutable std::string cached_sha_256_peer_certificate_digest_;
   mutable std::vector<std::string> cached_sha_256_peer_certificate_digests_;
   mutable std::string cached_sha_1_peer_certificate_digest_;
@@ -61,13 +64,18 @@ protected:
   mutable std::string cached_issuer_peer_certificate_;
   mutable std::string cached_subject_peer_certificate_;
   mutable std::string cached_subject_local_certificate_;
-  mutable std::vector<std::string> cached_uri_san_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
+  mutable std::vector<std::string> cached_uri_san_peer_certificate_;
+  mutable std::vector<std::string> cached_uri_san_local_certificate_;
   mutable std::vector<std::string> cached_dns_san_peer_certificate_;
   mutable std::vector<std::string> cached_dns_san_local_certificate_;
   mutable std::vector<std::string> cached_ip_san_peer_certificate_;
   mutable std::vector<std::string> cached_ip_san_local_certificate_;
+  mutable std::vector<std::string> cached_email_san_peer_certificate_;
+  mutable std::vector<std::string> cached_email_san_local_certificate_;
+  mutable std::vector<std::string> cached_othername_san_peer_certificate_;
+  mutable std::vector<std::string> cached_othername_san_local_certificate_;
   mutable std::vector<std::string> cached_oid_peer_certificate_;
   mutable std::vector<std::string> cached_oid_local_certificate_;
   mutable std::string cached_session_id_;
