@@ -77,20 +77,6 @@ void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
   stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
 }
 
-bool cacheHasTokenBucket(const ::envoy::type::v3::TokenBucket& token_bucket,
-                         const absl::optional<BucketAction> cached_action) {
-  if (!cached_action.has_value() || !cached_action->has_quota_assignment_action() ||
-      !cached_action->quota_assignment_action().has_rate_limit_strategy() ||
-      !cached_action->quota_assignment_action().rate_limit_strategy().has_token_bucket()) {
-    return false;
-  }
-  const ::envoy::type::v3::TokenBucket& cached_tb =
-      cached_action->quota_assignment_action().rate_limit_strategy().token_bucket();
-  return (cached_tb.max_tokens() == token_bucket.max_tokens() &&
-          cached_tb.tokens_per_fill().value() == token_bucket.tokens_per_fill().value() &&
-          cached_tb.fill_interval().nanos() == token_bucket.fill_interval().nanos());
-}
-
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
   ENVOY_LOG(debug, "The response that is received from RLQS server:\n{}", response->DebugString());
   for (const auto& action : response->bucket_action()) {

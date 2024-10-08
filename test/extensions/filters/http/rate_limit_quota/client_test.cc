@@ -96,7 +96,7 @@ TEST_F(RateLimitClientTest, RestartStreamWhileInUse) {
 }
 
 TEST_F(RateLimitClientTest, HandlingDuplicateTokenBucketAssignments) {
-  EXPECT_OK(test_client.client_->startStream(test_client.stream_info_));
+  EXPECT_OK(test_client.client_->startStream(&test_client.stream_info_));
   ASSERT_NE(test_client.stream_callbacks_, nullptr);
 
   auto empty_request_headers = Http::RequestHeaderMapImpl::create();
