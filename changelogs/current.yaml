@@ -399,6 +399,9 @@ new_features:
     to configure the number of retries. If this field is not provided, the ``getaddrinfo`` resolver will retry indefinitely until it
     succeeds or the DNS query times out. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.getaddrinfo_num_retries`` to false.
+- area: getaddrinfo
+  change: |
+    Added ``envoy.enable_dfp_dns_trace`` runtime flag to enable DNS query trace in the DNS resolution details.
 - area: geoip
   change: |
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
