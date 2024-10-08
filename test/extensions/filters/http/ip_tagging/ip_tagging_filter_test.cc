@@ -192,7 +192,7 @@ TEST_F(IpTaggingFilterTest, AppendEntry) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-TEST_F(IpTaggingFilterTest, AppendEntryOptionalHeader) {
+TEST_F(IpTaggingFilterTest, AppendEntryAlternateHeader) {
   const std::string internal_request_yaml = R"EOF(
 request_type: internal
 ip_tag_header: x-envoy-optional-header
