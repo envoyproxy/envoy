@@ -273,7 +273,7 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
         /*fallback_action=*/cached_bucket->fallback_action,
         /*fallback_ttl=*/cached_bucket->fallback_ttl,
         /*default_action=*/cached_bucket->default_action,
-        /*token_bucket_limiter=*/cached_bucket->token_bucket_limiter);
+        /*token_bucket_limiter=*/nullptr);
 
     // Translate `quota_assignment_action` to a TokenBucket or a blanket
     // assignment as appropriate.
@@ -292,6 +292,12 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
           ENVOY_LOG(info,
                     "A new TokenBucket has been configured by the RLQS "
                     "filter for id: {}",
+                    bucket_id);
+        } else {
+          bucket->token_bucket_limiter = cached_bucket->token_bucket_limiter;
+          ENVOY_LOG(info,
+                    "The TokenBucket for id: {} is carried over during "
+                    "response processing as the assignment hasn't changed.",
                     bucket_id);
         }
         break;
