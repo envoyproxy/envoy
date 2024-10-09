@@ -291,8 +291,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
       if (common_response.has_body_mutation() && common_response.body_mutation().has_mxn_resp()) {
-        ENVOY_LOG(debug,
-                  "MxN body response is received and body_mode_== ProcessingMode::MXN?  {} ", (body_mode_ == ProcessingMode::MXN));
+        ENVOY_LOG(debug, "MxN body response is received and body_mode_== ProcessingMode::MXN?  {} ",
+                  (body_mode_ == ProcessingMode::MXN));
         // mxn_resp will only be supported if the ext_proc filter has body_mode set to MXN.
         if (body_mode_ != ProcessingMode::MXN) {
           return absl::FailedPreconditionError("spurious message");
@@ -439,8 +439,9 @@ bool ProcessorState::handleSingleChunkInBodyResponse(const CommonResponse& commo
 
 bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response) {
   // If confirmed_chunks_count is encoded, clear the chunks from the queue, and clear the watermark.
-  const uint32_t confirmed_chunks_count = common_response.body_mutation().mxn_resp().confirmed_chunks_count();
-  if (confirmed_chunks_count > 0 && confirmed_chunks_count <= chunk_queue_.size() ) {
+  const uint32_t confirmed_chunks_count =
+      common_response.body_mutation().mxn_resp().confirmed_chunks_count();
+  if (confirmed_chunks_count > 0 && confirmed_chunks_count <= chunk_queue_.size()) {
     ENVOY_LOG(trace, "MxN: Clearing {} chunks of HTTP body", confirmed_chunks_count);
     for (uint32_t i = 0; i < confirmed_chunks_count; i++) {
       Buffer::OwnedImpl chunk_data;
@@ -470,7 +471,7 @@ bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response
     onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
   }
 
-  bool should_continue =  end_of_stream;
+  bool should_continue = end_of_stream;
   return should_continue;
 }
 
@@ -579,8 +580,7 @@ void ChunkQueue::push(Buffer::Instance& data, bool end_stream,
   }
 }
 
-QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data,
-                               ProcessingMode_BodySendMode body_mode) {
+QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data, ProcessingMode_BodySendMode body_mode) {
   if (queue_.empty()) {
     return nullptr;
   }

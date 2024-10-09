@@ -389,6 +389,7 @@ message BodyMutation {
     // Clear the corresponding body chunk
     bool clear_body = 2;
   }
+
   // Sending this body mutation for the MXN body mode.
   // Only one of ``mxn_resp`` or above ``mutation`` can be set.
   MxnBodyResponse mxn_resp = 3;

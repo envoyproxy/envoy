@@ -42,10 +42,11 @@ public:
   bool empty() const { return queue_.empty(); }
   void push(Buffer::Instance& data, bool end_stream,
             envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
-            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
-  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data,
-                     envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
-                     envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
+                envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
+  QueuedChunkPtr
+  pop(Buffer::OwnedImpl& out_data,
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
+          envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
   void clear();
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
@@ -282,8 +283,7 @@ private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
   bool handleSingleChunkInBodyResponse(
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
-  bool handleMxnBodyResponse(
-      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  bool handleMxnBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);

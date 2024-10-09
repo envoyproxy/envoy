@@ -621,8 +621,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
   case ProcessingMode::STREAMED:
-  case ProcessingMode::MXN:
-  {
+  case ProcessingMode::MXN: {
     // STREAMED body mode works as follows:
     //
     // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it

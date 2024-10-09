@@ -477,8 +477,8 @@ new_features:
 - area: ext_proc
   change: |
     implemented API
-    :ref:`MxnBodyResponse <envoy_v3_api_field_service.ext_proc.v3.BodyMutation.MxnBodyResponse>`
-    to support M:N streaming for Envoy external processing.
+    :ref:`MxnBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.MxnBodyResponse>`
+    to support MXN streaming for Envoy external processing.
 - area: load_balancing
   change: |
     WIP: Added implementation of :ref:`client_side_weighted_round_robin
