@@ -6,7 +6,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/network/address.h"
