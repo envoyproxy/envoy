@@ -77,7 +77,7 @@ private:
       cancel_reason_ = reason;
     }
     void addTrace(uint8_t) override {}
-    absl::optional<std::string> getTraces() override { return {}; }
+    std::string getTraces() override { return {}; }
 
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.

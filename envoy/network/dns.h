@@ -56,7 +56,7 @@ public:
   virtual void addTrace(uint8_t trace) PURE;
 
   /** Return the DNS query traces. */
-  virtual absl::optional<std::string> getTraces() PURE;
+  virtual std::string getTraces() PURE;
 };
 
 /**

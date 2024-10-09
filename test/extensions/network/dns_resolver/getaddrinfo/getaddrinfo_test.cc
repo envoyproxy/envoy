@@ -126,9 +126,8 @@ TEST_F(GetAddrInfoDnsImplTest, LocalhostResolve) {
                          [this](DnsResolver::ResolutionStatus status, absl::string_view,
                                 std::list<DnsResponse>&& response) {
                            verifyRealGaiResponse(status, std::move(response));
-                           ASSERT_TRUE(active_dns_query_->getTraces().has_value());
                            std::vector<std::string> traces =
-                               absl::StrSplit(*active_dns_query_->getTraces(), ',');
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
                            EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                            HasTrace(GetAddrInfoTrace::Starting),
                                                            HasTrace(GetAddrInfoTrace::Success),
@@ -156,9 +155,8 @@ TEST_F(GetAddrInfoDnsImplTest, Cancel) {
                          [this](DnsResolver::ResolutionStatus status, absl::string_view,
                                 std::list<DnsResponse>&& response) {
                            verifyRealGaiResponse(status, std::move(response));
-                           ASSERT_TRUE(active_dns_query_->getTraces().has_value());
                            std::vector<std::string> traces =
-                               absl::StrSplit(*active_dns_query_->getTraces(), ',');
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
                            EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                            HasTrace(GetAddrInfoTrace::Starting),
                                                            HasTrace(GetAddrInfoTrace::Success),
@@ -183,9 +181,8 @@ TEST_F(GetAddrInfoDnsImplTest, Failure) {
                            EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
                            EXPECT_EQ("Non-recoverable failure in name resolution", details);
                            EXPECT_TRUE(response.empty());
-                           ASSERT_TRUE(active_dns_query_->getTraces().has_value());
                            std::vector<std::string> traces =
-                               absl::StrSplit(*active_dns_query_->getTraces(), ',');
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
                            EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                            HasTrace(GetAddrInfoTrace::Starting),
                                                            HasTrace(GetAddrInfoTrace::Failed),
@@ -209,9 +206,8 @@ TEST_F(GetAddrInfoDnsImplTest, NoData) {
                                 std::list<DnsResponse>&& response) {
                            EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
                            EXPECT_TRUE(response.empty());
-                           ASSERT_TRUE(active_dns_query_->getTraces().has_value());
                            std::vector<std::string> traces =
-                               absl::StrSplit(*active_dns_query_->getTraces(), ',');
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
                            EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                            HasTrace(GetAddrInfoTrace::Starting),
                                                            HasTrace(GetAddrInfoTrace::NoResult),
@@ -235,9 +231,8 @@ TEST_F(GetAddrInfoDnsImplTest, NoName) {
                                 std::list<DnsResponse>&& response) {
                            EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
                            EXPECT_TRUE(response.empty());
-                           ASSERT_TRUE(active_dns_query_->getTraces().has_value());
                            std::vector<std::string> traces =
-                               absl::StrSplit(*active_dns_query_->getTraces(), ',');
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
                            EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                            HasTrace(GetAddrInfoTrace::Starting),
                                                            HasTrace(GetAddrInfoTrace::NoResult),
@@ -264,9 +259,8 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccess) {
                                 std::list<DnsResponse>&& response) {
                            EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
                            EXPECT_TRUE(response.empty());
-                           ASSERT_TRUE(active_dns_query_->getTraces().has_value());
                            std::vector<std::string> traces =
-                               absl::StrSplit(*active_dns_query_->getTraces(), ',');
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
                            EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
                                                            HasTrace(GetAddrInfoTrace::Starting),
                                                            HasTrace(GetAddrInfoTrace::Retrying),
@@ -319,8 +313,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccess) {
              std::list<DnsResponse>&& response) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_TRUE(response.empty());
-        ASSERT_TRUE(active_dns_query_->getTraces().has_value());
-        std::vector<std::string> traces = absl::StrSplit(*active_dns_query_->getTraces(), ',');
+        std::vector<std::string> traces = absl::StrSplit(active_dns_query_->getTraces(), ',');
         EXPECT_THAT(
             traces,
             ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
@@ -357,8 +350,7 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailure) {
         EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
         EXPECT_FALSE(details.empty());
         EXPECT_TRUE(response.empty());
-        ASSERT_TRUE(active_dns_query_->getTraces().has_value());
-        std::vector<std::string> traces = absl::StrSplit(*active_dns_query_->getTraces(), ',');
+        std::vector<std::string> traces = absl::StrSplit(active_dns_query_->getTraces(), ',');
         EXPECT_THAT(
             traces,
             ElementsAre(
