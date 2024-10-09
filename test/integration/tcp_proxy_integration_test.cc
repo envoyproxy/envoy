@@ -12,8 +12,6 @@
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/utility.h"
-#include "source/common/stream_info/bool_accessor_impl.h"
-#include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -1301,27 +1299,18 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool) override {
     if (!metadata_set_) {
       // To allow testing a write that returns `StopIteration`, only proceed
-      // when more than 1 word is received.
+      // when more than 1 byte is received.
+      if (data.length() < 2) {
+        ASSERT(data.length() == 1);
 
-      // locate the first space in data
-      char space = ' ';
-      ssize_t index = data.search(&space, sizeof(space), 0);
-      if (index < 0) {
-        // When returning StopIteration the received data remains in the buffer
-        // so that we can get to it later when enough data has been received.
+        // Echo data back to test can verify it was received.
+        Buffer::OwnedImpl copy(data);
+        read_callbacks_->connection().write(copy, false);
         return Network::FilterStatus::StopIteration;
       }
 
-      void* p = data.linearize(index);
-      std::string first_word(static_cast<char*>(p), index);
-
-      // Echo first word back so tests can verify it was received
-      Buffer::OwnedImpl copy(first_word);
-      read_callbacks_->connection().write(copy, false);
-
-      // Use the first word as dynamic metadata value
       ProtobufWkt::Value val;
-      val.set_string_value(first_word);
+      val.set_string_value(data.toString());
 
       ProtobufWkt::Struct& map =
           (*read_callbacks_->connection()
@@ -1330,25 +1319,24 @@ public:
                 .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB];
       (*map.mutable_fields())[key_] = val;
 
+      // Put this back in the state that TcpProxy expects.
+      read_callbacks_->connection().readDisable(true);
+
       metadata_set_ = true;
     }
     return Network::FilterStatus::Continue;
   }
 
   Network::FilterStatus onNewConnection() override {
+    // TcpProxy disables read; must re-enable so we can read headers.
+    read_callbacks_->connection().readDisable(false);
+
     // Stop until we read the value and can set the metadata for TcpProxy.
-    // TcpProxy proceeds with upstream connection once onData() returns FilterStatus::Continue.
     return Network::FilterStatus::StopIteration;
   }
 
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
-
-    // Tell TcpProxy to not disable read so that we can read headers
-    read_callbacks_->connection().streamInfo().filterState()->setData(
-        TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-        StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   const std::string key_;
@@ -1406,25 +1394,14 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
   initialize();
 
   expectEndpointToMatchRoute([](IntegrationTcpClient& tcp_client) -> std::string {
-    // Break the write into multiple chunks; validate that the first word is received before sending
-    // the rest. This validates that a downstream network filter can use this functionality, even if it
-    // can't make a decision after the first `onData()`.
-    EXPECT_TRUE(tcp_client.write("pri", false));
-    // Writing additional data in multiple chunks to show that buffering of early data in tcp_buffer
-    // works properly
-    EXPECT_TRUE(tcp_client.write("mary is ", false));
-    EXPECT_TRUE(tcp_client.write("selected ", false));
-    EXPECT_TRUE(tcp_client.write("before ", false));
-    // check that the 1st word is returned
-    tcp_client.waitForData("primary");
+    // Break the write into two; validate that the first is received before sending the second. This
+    // validates that a downstream network filter can use this functionality, even if it can't make
+    // a decision after the first `onData()`.
+    EXPECT_TRUE(tcp_client.write("p", false));
+    tcp_client.waitForData("p");
     tcp_client.clearData();
-    // some more data, most likely the upstream connection has already been established as we waited
-    // for the return data above.
-    EXPECT_TRUE(tcp_client.write("upstream connection ", false));
-    EXPECT_TRUE(tcp_client.write("exists", false));
-
-    // All data expected at the destination
-    return "primary is selected before upstream connection exists";
+    EXPECT_TRUE(tcp_client.write("rimary", false));
+    return "primary";
   });
 }
 
@@ -1441,7 +1418,7 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataNonMatch) {
 
   initialize();
 
-  expectEndpointNotToMatchRoute("does not match role primary");
+  expectEndpointNotToMatchRoute("does_not_match_role_primary");
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxySslIntegrationTest,
