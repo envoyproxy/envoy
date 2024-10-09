@@ -77,7 +77,7 @@ message ProcessingMode {
     // it has received.
     //
     // When bodying mode is set to ``MXN``, the corresponding trailer mode has to be set to ``SEND``.
-    MXN = 4;
+    MXN = 4 [(xds.annotations.v3.field_status).work_in_progress = true];
   }
 
   // How to handle the request header. Default is "SEND".

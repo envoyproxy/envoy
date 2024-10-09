@@ -362,6 +362,7 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
+// [#not-implemented-hide:]
 message MxnBodyResponse {
   // Envoy sends the body out as it is.
   bytes body = 1;
@@ -392,5 +393,5 @@ message BodyMutation {
 
   // Sending this body mutation for the MXN body mode.
   // Only one of ``mxn_resp`` or above ``mutation`` can be set.
-  MxnBodyResponse mxn_resp = 3;
+  MxnBodyResponse mxn_resp = 3 [(xds.annotations.v3.field_status).work_in_progress = true];
 }

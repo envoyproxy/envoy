@@ -474,11 +474,6 @@ new_features:
     Added allow list
     :ref:`allowed_override_modes <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.allowed_override_modes>`
     for :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`.
-- area: ext_proc
-  change: |
-    implemented API
-    :ref:`MxnBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.MxnBodyResponse>`
-    to support MXN streaming for Envoy external processing.
 - area: load_balancing
   change: |
     WIP: Added implementation of :ref:`client_side_weighted_round_robin
