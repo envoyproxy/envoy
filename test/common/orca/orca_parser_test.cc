@@ -56,14 +56,22 @@ TEST(OrcaParserUtilTest, InvalidOrcaHeaderPrefix) {
       {std::string(kEndpointLoadMetricsHeader), "BAD random-value"}};
   EXPECT_THAT(
       parseOrcaLoadReportHeaders(headers),
-      StatusHelpers::HasStatus(absl::InvalidArgumentError("unsupported ORCA header format")));
+      StatusHelpers::HasStatus(absl::InvalidArgumentError("unsupported ORCA header format: BAD")));
+}
+
+TEST(OrcaParserUtilTest, InvalidOrcaHeaderPrefixWithLargePrefix) {
+  Http::TestRequestHeaderMapImpl headers{
+      {std::string(kEndpointLoadMetricsHeader), "BADBAD random-value"}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::HasStatus(
+                  absl::InvalidArgumentError("unsupported ORCA header format: BADBA")));
 }
 
 TEST(OrcaParserUtilTest, EmptyOrcaHeader) {
   Http::TestRequestHeaderMapImpl headers{{std::string(kEndpointLoadMetricsHeader), ""}};
   EXPECT_THAT(
       parseOrcaLoadReportHeaders(headers),
-      StatusHelpers::HasStatus(absl::InvalidArgumentError("unsupported ORCA header format")));
+      StatusHelpers::HasStatus(absl::InvalidArgumentError("unsupported ORCA header format: ")));
 }
 
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeader) {

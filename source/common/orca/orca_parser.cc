@@ -173,7 +173,12 @@ absl::StatusOr<OrcaLoadReport> parseOrcaLoadReportHeaders(const HeaderMap& heade
       IS_ENVOY_BUG("JSON formatted ORCA header support not implemented for this build");
 #endif // !ENVOY_ENABLE_FULL_PROTOS || !ENVOY_ENABLE_YAML
     } else {
-      return absl::InvalidArgumentError(fmt::format("unsupported ORCA header format"));
+      // Unknown format. Get the first 5 characters or the prefix before the first space to
+      // generate the error message.
+      absl::string_view prefix = header_value.substr(0, std::min<size_t>(5, header_value.size()));
+      prefix = prefix.substr(0, prefix.find_first_of(' '));
+
+      return absl::InvalidArgumentError(fmt::format("unsupported ORCA header format: {}", prefix));
     }
   } else {
     return absl::NotFoundError("no ORCA data sent from the backend");
