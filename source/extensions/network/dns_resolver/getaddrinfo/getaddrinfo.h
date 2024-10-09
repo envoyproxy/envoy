@@ -62,18 +62,15 @@ protected:
           Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
     }
 
-    OptRef<const std::vector<Trace>> getTraces() override {
-      absl::MutexLock lock(&mutex_);
-      return traces_;
-    }
-
-    absl::optional<std::vector<std::string>>
-    getTraces(absl::AnyInvocable<std::string(const Trace&)> func) override {
+    absl::optional<std::vector<std::string>> getTraces() override {
       absl::MutexLock lock(&mutex_);
       std::vector<std::string> string_traces;
       string_traces.reserve(traces_.size());
       std::transform(traces_.begin(), traces_.end(), std::back_inserter(string_traces),
-                     [f = std::move(func)](const Trace& trace) mutable { return f(trace); });
+                     [](const Trace& trace) {
+                       return absl::StrCat(trace.trace_, "=",
+                                           trace.time_.time_since_epoch().count());
+                     });
       return string_traces;
     }
 
