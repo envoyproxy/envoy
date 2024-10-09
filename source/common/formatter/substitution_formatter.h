@@ -16,6 +16,7 @@
 #include "source/common/formatter/http_formatter_context.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/json/json_streamer.h"
+#include "source/common/json/json_utility.h"
 
 #include "absl/types/optional.h"
 #include "re2/re2.h"
@@ -439,7 +440,8 @@ public:
       } else {
         // 3. Handle the formatter element with a single provider and value
         //    type needs to be kept.
-        typedValueToLogLine(formatters, context, info, serializer);
+        auto value = formatters[0]->formatValueWithContext(context, info);
+        Json::Utility::appendValueToString(value, log_line);
       }
     }
 
@@ -465,48 +467,6 @@ private:
       serializer.addSanitized({}, value.value(), {});
     }
     serializer.addRawString(Json::Constants::DoubleQuote); // End the JSON string.
-  }
-
-  void typedValueToLogLine(const Formatters& formatters, const FormatterContext& context,
-                           const StreamInfo::StreamInfo& info,
-                           JsonStringSerializer& serializer) const {
-
-    const ProtobufWkt::Value value = formatters[0]->formatValueWithContext(context, info);
-
-    switch (value.kind_case()) {
-    case ProtobufWkt::Value::KIND_NOT_SET:
-    case ProtobufWkt::Value::kNullValue:
-      serializer.addNull();
-      break;
-    case ProtobufWkt::Value::kNumberValue:
-      serializer.addNumber(value.number_value());
-      break;
-    case ProtobufWkt::Value::kStringValue:
-      serializer.addString(value.string_value());
-      break;
-    case ProtobufWkt::Value::kBoolValue:
-      serializer.addBool(value.bool_value());
-      break;
-    case ProtobufWkt::Value::kStructValue:
-    case ProtobufWkt::Value::kListValue:
-      // Convert the struct or list to string. This may result in a performance
-      // degradation. But We rarely hit this case.
-      // Basically only metadata or filter state formatter may hit this case.
-#ifdef ENVOY_ENABLE_YAML
-      absl::StatusOr<std::string> json_or =
-          MessageUtil::getJsonStringFromMessage(value, false, true);
-      if (json_or.ok()) {
-        // We assume the output of getJsonStringFromMessage is a valid JSON string piece.
-        serializer.addRawString(json_or.value());
-      } else {
-        serializer.addString(json_or.status().ToString());
-      }
-#else
-      IS_ENVOY_BUG("Json support compiled out");
-      serializer.addRawString(R"EOF("Json support compiled out")EOF");
-#endif
-      break;
-    }
   }
 
   const std::string empty_value_;

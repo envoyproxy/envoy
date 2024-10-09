@@ -124,6 +124,10 @@ minor_behavior_changes:
   change: |
     Sanitize SNI for potential log injection. The invalid character will be replaced by ``_`` with an ``invalid:`` marker. If runtime
     flag ``envoy.reloadable_features.sanitize_sni_in_access_log`` is set to ``false``, the sanitize behavior is disabled.
+- area: formatter
+  change: |
+    The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the
+    metadata (``DYNAMIC_METADATA``, ``CLUSTER_METADATA``, etc.) formatter.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
