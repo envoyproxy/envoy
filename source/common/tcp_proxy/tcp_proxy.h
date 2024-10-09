@@ -40,8 +40,6 @@
 namespace Envoy {
 namespace TcpProxy {
 
-constexpr absl::string_view PerConnectionIdleTimeoutMs =
-    "envoy.tcp_proxy.per_connection_idle_timeout_ms";
 constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_before_connect";
 
 /**
@@ -54,6 +52,7 @@ constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_b
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
+  COUNTER(early_data_received_count_total)                                                            \
   COUNTER(idle_timeout)                                                                            \
   COUNTER(max_downstream_connection_duration)                                                      \
   COUNTER(upstream_flush_total)                                                                    \
@@ -556,7 +555,9 @@ protected:
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
-  HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
+  bool receive_before_connect_{false};
+  bool early_data_end_stream_{false};
+  Buffer::OwnedImpl early_data_buffer_{};
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream
