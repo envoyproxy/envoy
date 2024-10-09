@@ -10,6 +10,7 @@
 #include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
+#include "absl/types/optional.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -55,7 +56,7 @@ public:
   virtual void addTrace(uint8_t trace) PURE;
 
   /** Return the DNS query traces. */
-  virtual absl::optional<std::vector<std::string>> getTraces() PURE;
+  virtual absl::optional<std::string> getTraces() PURE;
 };
 
 /**
