@@ -325,6 +325,21 @@ public:
   std::unique_ptr<FluentdAccessLoggerCacheImpl> logger_cache_;
 };
 
+TEST_F(FluentdAccessLoggerCacheImplTest, CreateLoggerWhenClusterNotFound) {
+  tls_.setDispatcher(&dispatcher_);
+  logger_cache_ = std::make_unique<FluentdAccessLoggerCacheImpl>(cluster_manager_, scope_, tls_);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(nullptr));
+
+  envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig config;
+  config.set_cluster(cluster_name_);
+  config.set_tag("test.tag");
+  config.mutable_buffer_size_bytes()->set_value(123);
+  auto logger =
+      logger_cache_->getOrCreateLogger(std::make_shared<FluentdAccessLogConfig>(config), random_);
+
+  EXPECT_TRUE(logger == nullptr);
+}
+
 TEST_F(FluentdAccessLoggerCacheImplTest, CreateNonExistingLogger) {
   init();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(cluster_name_)).WillOnce(Return(&cluster_));

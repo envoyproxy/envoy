@@ -55,6 +55,7 @@
 #include "source/common/http/http3/codec_stats.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/orca/orca_load_metrics.h"
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/edf_scheduler.h"
@@ -89,11 +90,13 @@ public:
   };
 
   static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProtoWithoutSubset(const ClusterProto& cluster,
+  getTypedLbConfigFromLegacyProtoWithoutSubset(LoadBalancerFactoryContext& lb_factory_context,
+                                               const ClusterProto& cluster,
                                                ProtobufMessage::ValidationVisitor& visitor);
 
   static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProto(const ClusterProto& cluster,
+  getTypedLbConfigFromLegacyProto(LoadBalancerFactoryContext& lb_factory_context,
+                                  const ClusterProto& cluster,
                                   ProtobufMessage::ValidationVisitor& visitor);
 };
 
@@ -223,6 +226,7 @@ public:
   const std::string& hostnameForHealthChecks() const override { return health_checks_hostname_; }
   const std::string& hostname() const override { return hostname_; }
   const envoy::config::core::v3::Locality& locality() const override { return locality_; }
+  const MetadataConstSharedPtr localityMetadata() const override { return locality_metadata_; }
   Stats::StatName localityZoneStatName() const override {
     return locality_zone_stat_name_.statName();
   }
@@ -417,7 +421,9 @@ public:
   void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
     lb_policy_data_ = std::move(lb_policy_data);
   }
-  const HostLbPolicyDataPtr& lbPolicyData() const override { return lb_policy_data_; }
+  OptRef<HostLbPolicyData> lbPolicyData() const override {
+    return makeOptRefFromPtr(lb_policy_data_.get());
+  }
 
 protected:
   static CreateConnectionData
@@ -428,6 +434,9 @@ protected:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                    HostDescriptionConstSharedPtr host);
+  static absl::optional<Network::Address::InstanceConstSharedPtr> maybeGetProxyRedirectAddress(
+      const Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
+      HostDescriptionConstSharedPtr host);
 
 private:
   // Helper function to check multiple health flags at once.
@@ -720,7 +729,6 @@ protected:
                                          overprovisioning_factor);
   }
 
-protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed));
   }
@@ -788,7 +796,8 @@ public:
   HostMapConstSharedPtr crossPriorityHostMap() const override;
 
 protected:
-  void updateCrossPriorityHostMap(const HostVector& hosts_added, const HostVector& hosts_removed);
+  void updateCrossPriorityHostMap(uint32_t priority, const HostVector& hosts_added,
+                                  const HostVector& hosts_removed);
 
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
 };
@@ -906,6 +915,9 @@ public:
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
+  absl::optional<uint16_t> maxResponseHeadersKb() const override {
+    return max_response_headers_kb_;
+  }
   const std::string& name() const override { return name_; }
   const std::string& observabilityName() const override {
     if (observability_name_ != nullptr) {
@@ -999,8 +1011,8 @@ public:
         manager, Http::EmptyFilterChainOptions{}, http_filter_factories_);
     return true;
   }
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
-                                Http::FilterChainManager&) const override {
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
+                                const Http::FilterChainOptions&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
@@ -1010,9 +1022,19 @@ public:
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
-  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const override {
-    return happy_eyeballs_config_;
+    if (happy_eyeballs_config_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *happy_eyeballs_config_;
+  }
+
+  OptRef<const Envoy::Orca::LrsReportMetricNames> lrsReportMetricNames() const override {
+    if (lrs_report_metric_names_ == nullptr) {
+      return absl::nullopt;
+    }
+    return *lrs_report_metric_names_;
   }
 
 protected:
@@ -1101,11 +1123,15 @@ private:
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   UpstreamFactoryContextImpl upstream_context_;
+  std::unique_ptr<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      happy_eyeballs_config_;
+  const std::unique_ptr<Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
 
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint32_t max_response_headers_count_;
+  const absl::optional<uint16_t> max_response_headers_kb_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
   const bool drain_connections_on_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
@@ -1115,8 +1141,6 @@ private:
   // true iff the cluster proto specified upstream http filters.
   bool has_configured_http_filters_ : 1;
   const bool per_endpoint_stats_ : 1;
-  const absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
-      happy_eyeballs_config_;
 };
 
 /**
@@ -1182,7 +1206,9 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
   UnitFloat dropOverload() const override { return drop_overload_; }
+  const std::string& dropCategory() const override { return drop_category_; }
   void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
+  void setDropCategory(absl::string_view drop_category) override { drop_category_ = drop_category; }
 
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
@@ -1253,6 +1279,7 @@ private:
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
   UnitFloat drop_overload_{0};
+  std::string drop_category_;
   static constexpr int kDropOverloadSize = 1;
 };
 

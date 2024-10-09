@@ -8,6 +8,7 @@ load(
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
+    "envoy_extension_cc_test_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -18,6 +19,7 @@ envoy_extension_cc_test(
     name = "ext_authz_test",
     srcs = ["ext_authz_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/http:codes_interface",
         "//source/common/buffer:buffer_lib",
@@ -50,6 +52,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/network:address_lib",
@@ -72,7 +75,10 @@ envoy_extension_cc_test(
         "ext_authz.yaml",
     ],
     extension_names = ["envoy.filters.http.ext_authz"],
+    rbe_pool = "2core",
     deps = [
+        ":ext_authz_fuzz_proto_cc_proto",
+        ":logging_test_filter_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/ext_authz:config",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
@@ -103,6 +109,7 @@ envoy_cc_fuzz_test(
     name = "ext_authz_grpc_fuzz_test",
     srcs = ["ext_authz_grpc_fuzz_test.cc"],
     corpus = "ext_authz_grpc_corpus",
+    rbe_pool = "2core",
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -120,6 +127,7 @@ envoy_cc_fuzz_test(
     name = "ext_authz_http_fuzz_test",
     srcs = ["ext_authz_http_fuzz_test.cc"],
     corpus = "ext_authz_http_corpus",
+    rbe_pool = "2core",
     deps = [
         ":ext_authz_fuzz_lib",
         ":ext_authz_fuzz_proto_cc_proto",
@@ -139,6 +147,7 @@ envoy_cc_test_library(
     name = "ext_authz_fuzz_lib",
     srcs = ["ext_authz_fuzz_lib.cc"],
     hdrs = ["ext_authz_fuzz_lib.h"],
+    rbe_pool = "2core",
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         "//source/common/http:context_lib",
@@ -147,5 +156,29 @@ envoy_cc_test_library(
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "logging_test_filter_proto",
+    srcs = ["logging_test_filter.proto"],
+)
+
+envoy_extension_cc_test_library(
+    name = "logging_test_filter_lib",
+    srcs = [
+        "logging_test_filter.cc",
+    ],
+    extension_names = ["envoy.filters.http.ext_authz"],
+    deps = [
+        ":logging_test_filter_proto_cc_proto",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/ext_authz",
+        "//test/test_common:utility_lib",
     ],
 )

@@ -34,7 +34,7 @@ public:
       auto file_or_error = context.serverFactoryContext().accessLogManager().createAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File,
                                       health_check_config.event_log_path()});
-      THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+      THROW_IF_NOT_OK_REF(file_or_error.status());
       file_ = file_or_error.value();
     }
     for (const auto& config : health_check_config.event_logger()) {

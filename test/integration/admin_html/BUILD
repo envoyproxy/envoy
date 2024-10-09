@@ -13,15 +13,15 @@ envoy_package()
 envoy_cc_test_binary(
     name = "test_server",
     srcs = ["test_server.cc"],
-    external_deps = [
-        "abseil_symbolize",
-    ],
+    rbe_pool = "2core",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/server/admin:admin_html_util",
+        "@com_google_absl//absl/debugging:symbolize",
     ],
 )
 
@@ -37,6 +37,7 @@ envoy_sh_test(
         "//source/server/admin/html:admin_web_files",
         "//test/integration:test_utility.sh",
     ],
+    rbe_pool = "2core",
 
     # This test fails on windows trying to poll the server for the admin
     # address. Failure is:

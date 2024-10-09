@@ -64,6 +64,13 @@ For HTTP filters, HTTP connection manager supports :ref:`dynamic filter
 re-configuration<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.config_discovery>`.
 If the configuration is missing a local HTTP response with '500' status code will be returned.
 
+UDP Session filters
+^^^^^^^^^^^^^^^^^^^
+
+For UDP session filters, UDP proxy supports :ref:`dynamic filter
+re-configuration<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>`.
+If the configuration is missing the UDP session will be removed
+
 Statistics
 ^^^^^^^^^^
 
@@ -75,6 +82,7 @@ are supported for listener filters, downstream network filters, and HTTP filters
 - For upstream network filters, the value of *<stat_prefix>* is *upstream_network_filter*.
 - For downstream HTTP filters, the value of *<stat_prefix>* is *http_filter*.
 - For upstream HTTP filters, the value of *<stat_prefix>* is *upstream_http_filter*.
+- For UDP session filters the value of *<stat_prefix>* is *udp_session_filter*.
 
 .. csv-table::
   :header: Name, Type, Description

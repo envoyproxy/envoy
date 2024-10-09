@@ -28,18 +28,18 @@ import sys
 def decode_stacktrace_log(object_file, input_source, address_offset=0):
     # Match something like:
     #     [backtrace] [bazel-out/local-dbg/bin/source/server/_virtual_includes/backtrace_lib/server/backtrace.h:84]
-    backtrace_marker = "\[backtrace\] [^\s]+"
+    backtrace_marker = r'\[backtrace\] [^\s]+'
     # Match something like:
     #     ${backtrace_marker} Address mapping: 010c0000-02a77000
-    offset_re = re.compile("%s Address mapping: ([0-9A-Fa-f]+)-([0-9A-Fa-f]+)" % backtrace_marker)
+    offset_re = re.compile(r"%s Address mapping: ([0-9A-Fa-f]+)-([0-9A-Fa-f]+)" % backtrace_marker)
     # Match something like:
     #     ${backtrace_marker} #10: SYMBOL [0xADDR]
     # or:
     #     ${backtrace_marker} #10: [0xADDR]
-    stackaddr_re = re.compile("%s #\d+:(?: .*)? \[(0x[0-9a-fA-F]+)\]$" % backtrace_marker)
+    stackaddr_re = re.compile(r"%s #\d+:(?: .*)? \[(0x[0-9a-fA-F]+)\]$" % backtrace_marker)
     # Match something like:
     #     #10 0xLOCATION (BINARY+0xADDR)
-    asan_re = re.compile(" *#\d+ *0x[0-9a-fA-F]+ *\([^+]*\+(0x[0-9a-fA-F]+)\)")
+    asan_re = re.compile(r" *#\d+ *0x[0-9a-fA-F]+ *\([^+]*\+(0x[0-9a-fA-F]+)\)")
 
     try:
         while True:

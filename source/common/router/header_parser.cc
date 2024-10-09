@@ -45,7 +45,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
   final_header_value = HeaderParser::translatePerRequestState(final_header_value);
 
   // Let the substitution formatter parse the final_header_value.
-  return std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true);
+  return Envoy::Formatter::FormatterImpl::create(final_header_value, true);
 }
 
 } // namespace
@@ -89,7 +89,7 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
   HeaderParserPtr header_parser(new HeaderParser());
   for (const auto& header_value_option : headers_to_add) {
     auto entry_or_error = HeadersToAddEntry::create(header_value_option);
-    RETURN_IF_STATUS_NOT_OK(entry_or_error);
+    RETURN_IF_NOT_OK_REF(entry_or_error.status());
     header_parser->headers_to_add_.emplace_back(
         Http::LowerCaseString(header_value_option.header().key()),
         std::move(entry_or_error.value()));
@@ -105,7 +105,7 @@ absl::StatusOr<HeaderParserPtr> HeaderParser::configure(
 
   for (const auto& header_value : headers_to_add) {
     auto entry_or_error = HeadersToAddEntry::create(header_value, append_action);
-    RETURN_IF_STATUS_NOT_OK(entry_or_error);
+    RETURN_IF_NOT_OK_REF(entry_or_error.status());
     header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
                                                 std::move(entry_or_error.value()));
   }
@@ -117,7 +117,7 @@ absl::StatusOr<HeaderParserPtr>
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add,
                         const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
   auto parser_or_error = configure(headers_to_add);
-  RETURN_IF_STATUS_NOT_OK(parser_or_error);
+  RETURN_IF_NOT_OK_REF(parser_or_error.status());
   HeaderParserPtr header_parser = std::move(parser_or_error.value());
 
   for (const auto& header : headers_to_remove) {

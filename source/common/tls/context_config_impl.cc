@@ -9,6 +9,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/certificate_validation_context_config_impl.h"

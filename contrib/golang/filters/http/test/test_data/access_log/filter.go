@@ -22,6 +22,9 @@ var (
 	canRunAsynclyForDownstreamPeriodic bool
 
 	referers = []string{}
+
+	xReqTrailer  string
+	xRespTrailer string
 )
 
 type filter struct {
@@ -61,15 +64,23 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		// the counter will be 0 when this request is ended
 		counter = -1
 
+		header.Set("x-req-trailer", xReqTrailer)
+		header.Set("x-resp-trailer", xRespTrailer)
 	}
 
 	return api.Continue
 }
 
-func (f *filter) OnLogDownstreamStart() {
+func (f *filter) OnLogDownstreamStart(reqHeader api.RequestHeaderMap) {
 	referer, err := f.callbacks.GetProperty("request.referer")
 	if err != nil {
 		api.LogErrorf("err: %s", err)
+		return
+	}
+
+	refererFromHdr, _ := reqHeader.Get("referer")
+	if referer != refererFromHdr {
+		api.LogErrorf("referer from property: %s, referer from header: %s", referer, refererFromHdr)
 		return
 	}
 
@@ -83,10 +94,16 @@ func (f *filter) OnLogDownstreamStart() {
 	}()
 }
 
-func (f *filter) OnLogDownstreamPeriodic() {
+func (f *filter) OnLogDownstreamPeriodic(reqHeader api.RequestHeaderMap, reqTrailer api.RequestTrailerMap, respHeader api.ResponseHeaderMap, respTrailer api.ResponseTrailerMap) {
 	referer, err := f.callbacks.GetProperty("request.referer")
 	if err != nil {
 		api.LogErrorf("err: %s", err)
+		return
+	}
+
+	refererFromHdr, _ := reqHeader.Get("referer")
+	if referer != refererFromHdr {
+		api.LogErrorf("referer from property: %s, referer from header: %s", referer, refererFromHdr)
 		return
 	}
 
@@ -100,13 +117,44 @@ func (f *filter) OnLogDownstreamPeriodic() {
 	}()
 }
 
-func (f *filter) OnLog() {
+func (f *filter) OnStreamComplete() {
+	f.callbacks.StreamInfo().DynamicMetadata().Set("golang", "access_log_var", "access_log_var written by Golang filter")
+}
+
+func (f *filter) OnLog(reqHeader api.RequestHeaderMap, reqTrailer api.RequestTrailerMap, respHeader api.ResponseHeaderMap, respTrailer api.ResponseTrailerMap) {
+	referer, err := f.callbacks.GetProperty("request.referer")
+	if err != nil {
+		api.LogErrorf("err: %s", err)
+		return
+	}
+
+	refererFromHdr, _ := reqHeader.Get("referer")
+	if referer != refererFromHdr {
+		api.LogErrorf("referer from property: %s, referer from header: %s", referer, refererFromHdr)
+		return
+	}
+
+	if reqTrailer != nil {
+		xReqTrailer, _ = reqTrailer.Get("x-trailer")
+	}
+
 	code, ok := f.callbacks.StreamInfo().ResponseCode()
 	if !ok {
 		return
 	}
 	respCode = strconv.Itoa(int(code))
 	api.LogCritical(respCode)
+
+	status, _ := respHeader.Get(":status")
+	if status != respCode {
+		api.LogErrorf("status from StreamInfo: %s, status from header: %s", respCode, status)
+		return
+	}
+
+	if respTrailer != nil {
+		xRespTrailer, _ = respTrailer.Get("x-trailer")
+	}
+
 	size, err := f.callbacks.GetProperty("response.size")
 	if err != nil {
 		api.LogErrorf("err: %s", err)

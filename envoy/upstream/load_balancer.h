@@ -10,6 +10,8 @@
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
+#include "xds/data/orca/v3/orca_load_report.pb.h"
+
 namespace Envoy {
 namespace Http {
 namespace ConnectionPool {
@@ -103,6 +105,29 @@ public:
    * and return the corresponding host directly.
    */
   virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
+
+  // Interface for callbacks when ORCA load reports are received from upstream.
+  class OrcaLoadReportCallbacks {
+  public:
+    virtual ~OrcaLoadReportCallbacks() = default;
+    /**
+     * Invoked when a new orca report is received for this LB context.
+     * @param orca_load_report supplies the ORCA load report.
+     * @param host supplies the upstream host, which provided the load report.
+     * @return absl::Status the result of ORCA load report processing by the load balancer.
+     */
+    virtual absl::Status
+    onOrcaLoadReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                     const HostDescription& host) PURE;
+  };
+
+  /**
+   * Install a callback to be invoked when ORCA Load report is received for this
+   * LB context.
+   * Note: LB Context keeps a weak pointer to `callbacks` and doesn't invoke the callback
+   * if it is `expired()`.
+   */
+  virtual void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) PURE;
 };
 
 /**
@@ -244,6 +269,19 @@ public:
 using LoadBalancerConfigPtr = std::unique_ptr<LoadBalancerConfig>;
 
 /**
+ * Context information passed to a load balancer factory to use when creating a load balancer.
+ */
+class LoadBalancerFactoryContext {
+public:
+  virtual ~LoadBalancerFactoryContext() = default;
+
+  /**
+   * @return Event::Dispatcher& the main thread dispatcher.
+   */
+  virtual Event::Dispatcher& mainThreadDispatcher() PURE;
+};
+
+/**
  * Factory config for load balancers. To support a load balancing policy of
  * LOAD_BALANCING_POLICY_CONFIG, at least one load balancer factory corresponding to a policy in
  * load_balancing_policy must be registered with Envoy. Envoy will use the first policy for which
@@ -273,12 +311,14 @@ public:
    *
    * @return LoadBalancerConfigPtr a new load balancer config.
    *
+   * @param lb_factory_context supplies the load balancer factory context.
    * @param config supplies the typed proto config of the load balancer. A dynamic_cast could
    *        be performed on the config to the expected proto type.
    * @param visitor supplies the validation visitor that will be used to validate the embedded
    *        Any proto message.
    */
-  virtual LoadBalancerConfigPtr loadConfig(const Protobuf::Message& config,
+  virtual LoadBalancerConfigPtr loadConfig(LoadBalancerFactoryContext& lb_factory_context,
+                                           const Protobuf::Message& config,
                                            ProtobufMessage::ValidationVisitor& visitor) PURE;
 
   std::string category() const override { return "envoy.load_balancing_policies"; }

@@ -64,7 +64,7 @@ response_headers_to_add:
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
-  EXPECT_TRUE(config->requestAllowed({}));
+  EXPECT_TRUE(config->requestAllowed({}).allowed);
 }
 
 TEST(Factory, EnabledEnforcedDisabledByDefault) {
@@ -222,7 +222,7 @@ descriptors:
   const auto route_config = factory.createRouteSpecificFilterConfig(
       *proto_config, context, ProtobufMessage::getNullValidationVisitor());
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
-  EXPECT_TRUE(config->requestAllowed({}));
+  EXPECT_TRUE(config->requestAllowed({}).allowed);
 }
 
 TEST(Factory, RouteSpecificFilterConfigWithDescriptorsTimerNotDivisible) {

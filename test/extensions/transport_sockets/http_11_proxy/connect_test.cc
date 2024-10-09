@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/address.pb.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_state_proxy_info.h"
@@ -36,33 +38,13 @@ namespace {
 class Http11ConnectTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   Http11ConnectTest() = default;
-  void initialize(bool no_proxy_protocol = false) {
-    std::string address_string =
-        absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
-    Network::Address::InstanceConstSharedPtr address =
-        Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
-    auto info =
-        std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>("www.foo.com", address);
-    if (no_proxy_protocol) {
-      info.reset();
-    }
 
-    options_ = std::make_shared<const Network::TransportSocketOptionsImpl>(
-        "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
-        absl::nullopt, nullptr, std::move(info));
-
-    setAddress();
-    auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
-    inner_socket_ = inner_socket.get();
-    EXPECT_CALL(*inner_socket_, ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
-    EXPECT_CALL(Const(*inner_socket_), ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
-
-    ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
-    connect_socket_ =
-        std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options_);
-    connect_socket_->setTransportSocketCallbacks(transport_callbacks_);
-    connect_socket_->onConnected();
+  void initialize(bool no_proxy_protocol = false, absl::optional<uint32_t> target_port = {}) {
+    initializeInternal(no_proxy_protocol, false, target_port);
   }
+
+  // Initialize the test with the proxy address provided via endpoint metadata.
+  void initializeWithMetadataProxyAddr() { initializeInternal(false, true, {}); }
 
   void setAddress() {
     std::string address_string =
@@ -75,6 +57,27 @@ public:
         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
+  void injectHeaderOnceTest() {
+    EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
+        .WillOnce(Invoke([&](Buffer::Instance& buffer) {
+          auto length = buffer.length();
+          buffer.drain(length);
+          return Api::IoCallUint64Result(length, Api::IoError::none());
+        }));
+    Buffer::OwnedImpl msg("initial data");
+
+    Network::IoResult rc1 = connect_socket_->doWrite(msg, false);
+    // Only the connect will be written initially. All other writes should be
+    // buffered in the Network::Connection buffer until the connect has been
+    // processed.
+    EXPECT_EQ(connect_data_.length(), rc1.bytes_processed_);
+    Network::IoResult rc2 = connect_socket_->doWrite(msg, false);
+    EXPECT_EQ(0, rc2.bytes_processed_);
+
+    EXPECT_CALL(*inner_socket_, onConnected());
+    connect_socket_->onConnected();
+  }
+
   Network::TransportSocketOptionsConstSharedPtr options_;
   NiceMock<Network::MockTransportSocket>* inner_socket_;
   NiceMock<Network::MockIoHandle> io_handle_;
@@ -83,30 +86,85 @@ public:
   Buffer::OwnedImpl connect_data_{"CONNECT www.foo.com:443 HTTP/1.1\r\n\r\n"};
   Ssl::ConnectionInfoConstSharedPtr ssl_{
       std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>()};
+
+private:
+  void initializeInternal(bool no_proxy_protocol, bool use_metadata_proxy_addr,
+                          absl::optional<uint32_t> target_port) {
+    std::string address_string =
+        absl::StrCat(Network::Test::getLoopbackAddressUrlString(GetParam()), ":1234");
+    Network::Address::InstanceConstSharedPtr address =
+        Network::Utility::parseInternetAddressAndPortNoThrow(address_string);
+
+    const std::string port = target_port.has_value() ? absl::StrCat(":", *target_port) : "";
+    const std::string proxy_info_hostname = absl::StrCat("www.foo.com", port);
+    auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    std::unique_ptr<Network::TransportSocketOptions::Http11ProxyInfo> info;
+
+    if (!no_proxy_protocol) {
+      if (use_metadata_proxy_addr) {
+        // In the case of endpoint metadata configuring the proxy address, we expect the hostname
+        // used to be that of the host.
+        connect_data_ = Buffer::OwnedImpl{
+            fmt::format("CONNECT {} HTTP/1.1\r\n\r\n", host->address()->asStringView())};
+
+        auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+        const std::string metadata_key =
+            Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR;
+        envoy::config::core::v3::Address addr_proto;
+        addr_proto.mutable_socket_address()->set_address(proxy_info_hostname);
+        addr_proto.mutable_socket_address()->set_port_value(1234);
+        ProtobufWkt::Any anypb;
+        anypb.PackFrom(addr_proto);
+        metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, anypb));
+        EXPECT_CALL(*host, metadata()).Times(AnyNumber()).WillRepeatedly(Return(metadata));
+      } else {
+        info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
+            proxy_info_hostname, address);
+        setAddress();
+      }
+    }
+
+    options_ = std::make_shared<const Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+        absl::nullopt, nullptr, std::move(info));
+
+    auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
+    inner_socket_ = inner_socket.get();
+    EXPECT_CALL(*inner_socket_, ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
+    EXPECT_CALL(Const(*inner_socket_), ssl()).Times(AnyNumber()).WillRepeatedly(Return(ssl_));
+
+    ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
+
+    connect_socket_ =
+        std::make_unique<UpstreamHttp11ConnectSocket>(std::move(inner_socket), options_, host);
+    connect_socket_->setTransportSocketCallbacks(transport_callbacks_);
+    connect_socket_->onConnected();
+  }
 };
 
-// Test injects CONNECT only once
-TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnce) {
+// Test injects CONNECT only once. Configured via transport socket options.
+TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceTransportSocketOpts) {
   initialize();
+  injectHeaderOnceTest();
+}
 
-  EXPECT_CALL(io_handle_, write(BufferStringEqual(connect_data_.toString())))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer) {
-        auto length = buffer.length();
-        buffer.drain(length);
-        return Api::IoCallUint64Result(length, Api::IoError::none());
-      }));
-  Buffer::OwnedImpl msg("initial data");
+TEST_P(Http11ConnectTest, HostWithPort) {
+  initialize(false, 443);
+  injectHeaderOnceTest();
+}
 
-  Network::IoResult rc1 = connect_socket_->doWrite(msg, false);
-  // Only the connect will be written initially. All other writes should be
-  // buffered in the Network::Connection buffer until the connect has been
-  // processed.
-  EXPECT_EQ(connect_data_.length(), rc1.bytes_processed_);
-  Network::IoResult rc2 = connect_socket_->doWrite(msg, false);
-  EXPECT_EQ(0, rc2.bytes_processed_);
+TEST_P(Http11ConnectTest, ProxySslPortRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.proxy_ssl_port", "false"}});
 
-  EXPECT_CALL(*inner_socket_, onConnected());
-  connect_socket_->onConnected();
+  initialize();
+  injectHeaderOnceTest();
+}
+
+// Test injects CONNECT only once. Configured via endpoint metadata.
+TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceEndpointMetadata) {
+  initializeWithMetadataProxyAddr();
+  injectHeaderOnceTest();
 }
 
 // Test the socket is a no-op if there's no header proto.

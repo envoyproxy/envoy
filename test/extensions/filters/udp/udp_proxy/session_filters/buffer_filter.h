@@ -7,7 +7,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.validate.h"
@@ -18,6 +17,12 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 namespace SessionFilters {
+
+using Filter = Network::UdpSessionFilter;
+using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
+using WriteFilterStatus = Network::UdpSessionWriteFilterStatus;
+using ReadFilterCallbacks = Network::UdpSessionReadFilterCallbacks;
+using WriteFilterCallbacks = Network::UdpSessionWriteFilterCallbacks;
 
 using BufferingFilterConfig =
     test::extensions::filters::udp::udp_proxy::session_filters::BufferingFilterConfig;
@@ -128,7 +133,7 @@ private:
   FilterFactoryCb
   createFilterFactoryFromProtoTyped(const BufferingFilterConfig& config,
                                     Server::Configuration::FactoryContext&) override {
-    return [config](FilterChainFactoryCallbacks& callbacks) -> void {
+    return [config](Network::UdpSessionFilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addFilter(std::make_shared<BufferingSessionFilter>(
           config.downstream_datagrams_to_buffer(), config.upstream_datagrams_to_buffer(),
           config.continue_after_inject()));

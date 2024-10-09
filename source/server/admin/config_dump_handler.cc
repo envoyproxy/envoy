@@ -309,7 +309,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
     float value = cluster.dropOverload().value() * 1000000;
     if (value > 0) {
       auto* drop_overload = policy.add_drop_overloads();
-      drop_overload->set_category("drop_overload");
+      drop_overload->set_category(cluster.dropCategory());
       auto* percent = drop_overload->mutable_drop_percentage();
       percent->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
       percent->set_numerator(uint32_t(value));
@@ -384,10 +384,13 @@ void ConfigDumpHandler::addLbEndpoint(
   endpoint.set_hostname(host->hostname());
   Network::Utility::addressToProtobufAddress(*host->address(), *endpoint.mutable_address());
   if (host->addressListOrNull() != nullptr) {
-    for (auto& additional_address : *host->addressListOrNull()) {
-      auto& new_address = *endpoint.mutable_additional_addresses()->Add();
-      Network::Utility::addressToProtobufAddress(*additional_address,
-                                                 *new_address.mutable_address());
+    const auto& address_list = *host->addressListOrNull();
+    if (address_list.size() > 1) {
+      // skip first address of the list as the default address is not an additional one.
+      for (auto it = std::next(address_list.begin()); it != address_list.end(); ++it) {
+        auto& new_address = *endpoint.mutable_additional_addresses()->Add();
+        Network::Utility::addressToProtobufAddress(**it, *new_address.mutable_address());
+      }
     }
   }
   auto& health_check_config = *endpoint.mutable_health_check_config();

@@ -24,6 +24,7 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/client_base.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
@@ -47,7 +48,8 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_ignored)                                                               \
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
-  COUNTER(send_immediate_resp_upstream_ignored)
+  COUNTER(send_immediate_resp_upstream_ignored)                                                    \
+  COUNTER(http_not_ok_resp_received)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -158,9 +160,9 @@ struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
       : stream_(std::move(stream)), parent(stream_manager), stats(stat),
         deferred_close_timeout(timeout) {}
 
-  void deferredClose(Envoy::Event::Dispatcher& dispatcher, uint64_t stream_id);
+  void deferredClose(Envoy::Event::Dispatcher& dispatcher);
+  void closeStreamOnTimer();
 
-  void closeStreamOnTimer(uint64_t stream_id);
   ExternalProcessorStreamPtr stream_;
   ThreadLocalStreamManager& parent;
   ExtProcFilterStats stats;
@@ -174,28 +176,28 @@ class ThreadLocalStreamManager : public Envoy::ThreadLocal::ThreadLocalObject {
 public:
   // Store the ExternalProcessorStreamPtr (as a wrapper object) in the map and return the raw
   // pointer of ExternalProcessorStream.
-  ExternalProcessorStream* store(uint64_t stream_id, ExternalProcessorStreamPtr stream,
-                                 const ExtProcFilterStats& stat,
+  ExternalProcessorStream* store(ExternalProcessorStreamPtr stream, const ExtProcFilterStats& stat,
                                  const std::chrono::milliseconds& timeout) {
-    stream_manager_[stream_id] =
+    auto deferred_stream =
         std::make_unique<DeferredDeletableStream>(std::move(stream), *this, stat, timeout);
-    return stream_manager_[stream_id]->stream_.get();
+    ExternalProcessorStream* raw_stream = deferred_stream->stream_.get();
+    stream_manager_[raw_stream] = std::move(deferred_stream);
+    return stream_manager_[raw_stream]->stream_.get();
   }
 
-  void erase(uint64_t stream_id) { stream_manager_.erase(stream_id); }
-
-  void deferredErase(uint64_t stream_id, Envoy::Event::Dispatcher& dispatcher) {
-    auto it = stream_manager_.find(stream_id);
+  void erase(ExternalProcessorStream* stream) { stream_manager_.erase(stream); }
+  void deferredErase(ExternalProcessorStream* stream, Envoy::Event::Dispatcher& dispatcher) {
+    auto it = stream_manager_.find(stream);
     if (it == stream_manager_.end()) {
       return;
     }
 
-    it->second->deferredClose(dispatcher, stream_id);
+    it->second->deferredClose(dispatcher);
   }
 
 private:
-  // Map of DeferredDeletableStreamPtrs with stream id as key.
-  absl::flat_hash_map<uint64_t, DeferredDeletableStreamPtr> stream_manager_;
+  // Map of DeferredDeletableStreamPtrs with ExternalProcessorStream pointer as key.
+  absl::flat_hash_map<ExternalProcessorStream*, DeferredDeletableStreamPtr> stream_manager_;
 };
 
 class FilterConfig {
@@ -215,6 +217,10 @@ public:
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
   uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
+
+  bool sendBodyWithoutWaitingForHeaderResponse() const {
+    return send_body_without_waiting_for_header_response_;
+  }
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
@@ -261,8 +267,17 @@ public:
     return immediate_mutation_checker_;
   }
 
+  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
+  allowedOverrideModes() const {
+    return allowed_override_modes_;
+  }
+
   ThreadLocalStreamManager& threadLocalStreamManager() {
     return thread_local_stream_manager_slot_->getTyped<ThreadLocalStreamManager>();
+  }
+
+  const absl::optional<const envoy::config::core::v3::GrpcService> grpcService() const {
+    return grpc_service_;
   }
 
 private:
@@ -278,6 +293,8 @@ private:
   const std::chrono::milliseconds deferred_close_timeout_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
+  const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const bool send_body_without_waiting_for_header_response_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
@@ -297,6 +314,8 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
+  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+      allowed_override_modes_;
   const ExpressionManager expression_manager_;
 
   const ImmediateMutationChecker immediate_mutation_checker_;
@@ -367,10 +386,11 @@ class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
   };
 
 public:
-  Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client,
-         const envoy::config::core::v3::GrpcService& grpc_service)
+  Filter(const FilterConfigSharedPtr& config, ClientBasePtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
+        grpc_service_(config->grpcService().has_value() ? config->grpcService().value()
+                                                        : envoy::config::core::v3::GrpcService()),
+        config_with_hash_key_(grpc_service_),
         decoding_state_(*this, config->processingMode(),
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
@@ -432,6 +452,8 @@ public:
 
   const ProcessorState& encodingState() { return encoding_state_; }
   const ProcessorState& decodingState() { return decoding_state_; }
+  void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) override;
+  void onError() override;
 
 private:
   void mergePerRouteConfig();
@@ -468,8 +490,10 @@ private:
   buildHeaderRequest(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
                      bool end_stream, bool observability_mode);
 
+  void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream);
+
   const FilterConfigSharedPtr config_;
-  const ExternalProcessorClientPtr client_;
+  const ClientBasePtr client_;
   ExtProcFilterStats stats_;
   ExtProcLoggingInfo* logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
@@ -499,6 +523,7 @@ private:
   std::vector<std::string> typed_forwarding_namespaces_{};
   std::vector<std::string> untyped_receiving_namespaces_{};
   Http::StreamFilterCallbacks* filter_callbacks_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 };
 
 extern std::string responseCaseToString(

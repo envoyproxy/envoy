@@ -381,7 +381,6 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
     return;
   }
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.quic_fix_filter_manager_uaf", "true"}});
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* proof_source_config = bootstrap.mutable_static_resources()
@@ -404,6 +403,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
   test_server_->waitForGaugeGe("overload.envoy.overload_actions.reduce_timeouts.scale_percent", 50);
   // Create an HTTP connection without finishing the handshake.
   codec_client_ = makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                        absl::nullopt,
                                         /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client_->connected());
 
@@ -419,8 +419,9 @@ TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHa
                                100);
 
   // Create another HTTP connection without finishing handshake.
-  IntegrationCodecClientPtr codec_client2 = makeRawHttpConnection(
-      makeClientConnection((lookupPort("http"))), absl::nullopt, /*wait_till_connected=*/false);
+  IntegrationCodecClientPtr codec_client2 =
+      makeRawHttpConnection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                            absl::nullopt, /*wait_till_connected=*/false);
   EXPECT_FALSE(codec_client2->connected());
   // Advancing past the minimum time and wait for the proxy to notice and close both connections.
   timeSystem().advanceTimeWait(std::chrono::seconds(3));

@@ -24,6 +24,7 @@ envoy_cc_test(
         "internal_listener.yaml",
         "internal_listener_missing_bootstrap.yaml",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -42,6 +43,7 @@ envoy_cc_test_library(
     data = ["//test/common/tls/test_data:certs"],
     deps = [
         ":config_cc_proto",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/init:manager_lib",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/common/tls:server_context_lib",
@@ -70,6 +72,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/common/api:os_sys_calls_lib",
@@ -106,9 +109,11 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = ["listener_manager_impl_quic_only_test.cc"],
+    rbe_pool = "2core",
     tags = ["nofips"],
     deps = [
         ":listener_manager_impl_test_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
@@ -128,6 +133,7 @@ envoy_cc_test(
     name = "filter_chain_manager_impl_test",
     srcs = ["filter_chain_manager_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
@@ -163,6 +169,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/listener_manager:lds_api_lib",
         "//source/common/protobuf:utility_lib",
@@ -182,12 +189,8 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "filter_chain_benchmark_test",
     srcs = ["filter_chain_benchmark_test.cc"],
-    external_deps = [
-        "benchmark",
-        "googletest",
-    ],
+    rbe_pool = "2core",
     deps = [
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
@@ -195,6 +198,9 @@ envoy_cc_benchmark_binary(
         "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
+        "@com_github_google_benchmark//:benchmark",
+        "@com_google_googletest//:gtest",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

@@ -26,12 +26,19 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 
 static constexpr uint32_t kDefaultTimeoutMs = 300;
 
-std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                   Network::UpstreamTransportSocketFactory& transport_socket_factory) {
+std::string getTargetHostname(const Network::TransportSocketOptionsConstSharedPtr& options,
+                              Upstream::HostConstSharedPtr& host) {
   if (options && options->serverNameOverride().has_value()) {
     return options->serverNameOverride().value();
   }
-  return std::string(transport_socket_factory.defaultServerNameIndication());
+  std::string default_sni =
+      std::string(host->transportSocketFactory().defaultServerNameIndication());
+  if (!default_sni.empty() ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_alt_svc_for_ips")) {
+    return default_sni;
+  }
+  // If there's no configured SNI the hostname is probably an IP address. Return it here.
+  return host->hostname();
 }
 
 } // namespace
@@ -79,13 +86,14 @@ void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailu
   parent_.onConnectionAttemptFailed(this, reason, transport_failure_reason, host);
 }
 
-void ConnectivityGrid::WrapperCallbacks::attemptSecondHttp3Connection() {
+ConnectivityGrid::StreamCreationResult
+ConnectivityGrid::WrapperCallbacks::attemptSecondHttp3Connection() {
   has_tried_http3_alternate_address_ = true;
   auto attempt =
       std::make_unique<ConnectionAttemptCallbacks>(*this, *grid_.getOrCreateHttp3AlternativePool());
   LinkedList::moveIntoList(std::move(attempt), connection_attempts_);
   // Kick off a new stream attempt.
-  connection_attempts_.front()->newStream();
+  return connection_attempts_.front()->newStream();
 }
 
 bool ConnectivityGrid::WrapperCallbacks::shouldAttemptSecondHttp3Connection() {
@@ -132,6 +140,11 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
 
   // If there is another connection attempt in flight then let that proceed.
   if (!connection_attempts_.empty()) {
+    if (!grid_.isPoolHttp3(attempt->pool())) {
+      // TCP pool failed before HTTP/3 pool.
+      prev_tcp_pool_failure_reason_ = reason;
+      prev_tcp_pool_transport_failure_reason_ = transport_failure_reason;
+    }
     return;
   }
 
@@ -153,6 +166,15 @@ void ConnectivityGrid::WrapperCallbacks::signalFailureAndDeleteSelf(
   deleteThis();
   if (callbacks != nullptr) {
     ENVOY_LOG(trace, "Passing pool failure up to caller.");
+    std::string failure_str;
+    if (prev_tcp_pool_failure_reason_.has_value()) {
+      // TCP pool failed early on, log its error details as well.
+      failure_str = fmt::format("{} (with earlier TCP attempt failure reason {}, {})",
+                                transport_failure_reason,
+                                static_cast<int>(prev_tcp_pool_failure_reason_.value()),
+                                prev_tcp_pool_transport_failure_reason_);
+      transport_failure_reason = failure_str;
+    }
     callbacks->onPoolFailure(reason, transport_failure_reason, host);
   }
 }
@@ -200,7 +222,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   }
   if (callbacks != nullptr) {
     callbacks->onPoolReady(encoder, host, info, protocol);
-  } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.avoid_zombie_streams")) {
+  } else {
     encoder.getStream().resetStream(StreamResetReason::LocalReset);
   }
 }
@@ -275,16 +297,18 @@ ConnectivityGrid::ConnectivityGrid(
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
     HttpServerPropertiesCacheSharedPtr alternate_protocols,
     ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
+    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
+    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host), options_(options),
       transport_socket_options_(transport_socket_options), state_(state),
       next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
       time_source_(time_source), alternate_protocols_(alternate_protocols),
       quic_stat_names_(quic_stat_names), scope_(scope),
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
-      origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
+      origin_("https", getTargetHostname(transport_socket_options, host_),
               host_->address()->ip()->port()),
-      quic_info_(quic_info), priority_(priority) {
+      quic_info_(quic_info), priority_(priority),
+      network_observer_registry_(network_observer_registry) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
@@ -364,7 +388,7 @@ ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool(bool attempt_alter
                                  transport_socket_options_, state_, quic_stat_names_,
                                  *alternate_protocols_, scope_,
                                  makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this),
-                                 quic_info_, attempt_alternate_address);
+                                 quic_info_, network_observer_registry_, attempt_alternate_address);
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
@@ -391,10 +415,19 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   ConnectionPool::Instance* pool = getOrCreateHttp3Pool();
   Instance::StreamOptions overriding_options = options;
   bool delay_tcp_attempt = true;
+  bool delay_alternate_http3_attempt = true;
   if (shouldAttemptHttp3() && options.can_use_http3_) {
     if (getHttp3StatusTracker().hasHttp3FailedRecently()) {
       overriding_options.can_send_early_data_ = false;
       delay_tcp_attempt = false;
+    }
+    if (http3_pool_ && http3_alternate_pool_ && !http3_pool_->hasActiveConnections() &&
+        http3_alternate_pool_->hasActiveConnections()) {
+      // If it looks like the main HTTP/3 pool is not functional and the
+      // alternate works, don't wait 300ms before attempting to use the
+      // alternate pool.
+      // TODO(alyssawilk) look into skipping the original pool if this is the case.
+      delay_alternate_http3_attempt = false;
     }
   } else {
     pool = getOrCreateHttp2Pool();
@@ -408,6 +441,11 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     // callback and does not need a cancellable handle. At this point the
     // WrappedCallbacks object is queued to be deleted.
     return nullptr;
+  }
+  if (!delay_alternate_http3_attempt && ret->shouldAttemptSecondHttp3Connection()) {
+    if (ret->attemptSecondHttp3Connection() == StreamCreationResult::ImmediateResult) {
+      return nullptr;
+    }
   }
   if (!delay_tcp_attempt) {
     // Immediately start TCP attempt if HTTP/3 failed recently.

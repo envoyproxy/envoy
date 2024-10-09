@@ -13,10 +13,11 @@
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_stats_gatherer.h"
+#include "source/common/runtime/runtime_features.h"
 
+#include "quiche/common/http/http_header_block.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
-#include "quiche/spdy/core/http2_header_block.h"
 #include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 namespace Envoy {
@@ -65,8 +66,7 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   std::unique_ptr<Http::ResponseHeaderMapImpl> modified_headers;
 #ifndef ENVOY_ENABLE_UHV
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      Http::Utility::isUpgrade(headers)) {
+  if (Http::Utility::isUpgrade(headers)) {
     modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
     Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
     header_map = modified_headers.get();
@@ -92,6 +92,15 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_trailers")) {
+    if (trailers.empty()) {
+      ENVOY_STREAM_LOG(debug, "skipping submitting empty trailers", *this);
+      // Instead of submitting empty trailers, we send empty data with end_stream=true instead.
+      Buffer::OwnedImpl empty_buffer;
+      encodeData(empty_buffer, true);
+      return;
+    }
+  }
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   encodeTrailersImpl(envoyHeadersToHttp2HeaderBlock(trailers));
 }
@@ -180,8 +189,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 
   // Extended CONNECT to H/1 upgrade transformation has moved to UHV
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_http3_header_normalisation") &&
-      Http::Utility::isH3UpgradeRequest(*headers)) {
+  if (Http::Utility::isH3UpgradeRequest(*headers)) {
     // Transform Request from H3 to H1
     Http::Utility::transformUpgradeRequestFromH3toH1(*headers);
   }
@@ -313,7 +321,8 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
 
 bool EnvoyQuicServerStream::OnStopSending(quic::QuicResetStreamError error) {
   // Only called in IETF Quic to close write side.
-  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this, error.internal_code());
+  ENVOY_STREAM_LOG(debug, "received STOP_SENDING with reset code={}", *this,
+                   static_cast<int>(error.internal_code()));
   stats_.rx_reset_.inc();
   bool end_stream_encoded = local_end_stream_;
   // This call will close write.
@@ -328,14 +337,19 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicResetStreamError error) {
   if (!end_stream_encoded) {
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
-    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
-                      absl::string_view());
+    runResetCallbacks(
+        quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
+            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
+                           "|FROM_PEER")
+            : absl::string_view());
   }
   return true;
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
-  ENVOY_STREAM_LOG(debug, "received RESET_STREAM with reset code={}", *this, frame.error_code);
+  ENVOY_STREAM_LOG(debug, "received RESET_STREAM with reset code={}", *this,
+                   static_cast<int>(frame.error_code));
   stats_.rx_reset_.inc();
   bool end_stream_decoded_and_encoded = read_side_closed() && local_end_stream_;
   // This closes read side in IETF Quic, but doesn't close write side.
@@ -344,17 +358,27 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
     // If both directions are closed but upstream hasn't received or sent end stream, run reset
     // stream callback.
-    runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code), absl::string_view());
+    runResetCallbacks(
+        quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
+            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER")
+            : absl::string_view());
   }
 }
 
 void EnvoyQuicServerStream::ResetWithError(quic::QuicResetStreamError error) {
-  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error.internal_code());
+  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, static_cast<int>(error.internal_code()));
   stats_.tx_reset_.inc();
+  filterManagerConnection()->incrementSentQuicResetStreamErrorStats(error, /*from_self*/ true,
+                                                                    /*is_upstream*/ false);
   if (!local_end_stream_) {
     // Upper layers expect calling resetStream() to immediately raise reset callbacks.
-    runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
-                      absl::string_view());
+    runResetCallbacks(
+        quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
+            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
+                           "|FROM_SELF")
+            : absl::string_view());
   }
   quic::QuicSpdyServerStreamBase::ResetWithError(error);
 }
@@ -364,12 +388,13 @@ void EnvoyQuicServerStream::OnConnectionClosed(const quic::QuicConnectionCloseFr
   // Run reset callback before closing the stream so that the watermark change will not trigger
   // callbacks.
   if (!local_end_stream_) {
-    runResetCallbacks(
-        source == quic::ConnectionCloseSource::FROM_SELF
-            ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
-                                                   session()->OneRttKeysAvailable())
-            : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
-        absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code), "|", frame.error_details));
+    runResetCallbacks(source == quic::ConnectionCloseSource::FROM_SELF
+                          ? quicErrorCodeToEnvoyLocalResetReason(frame.quic_error_code,
+                                                                 session()->OneRttKeysAvailable())
+                          : quicErrorCodeToEnvoyRemoteResetReason(frame.quic_error_code),
+                      absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code), "|",
+                                   quic::ConnectionCloseSourceToString(source), "|",
+                                   frame.error_details));
   }
   quic::QuicSpdyServerStreamBase::OnConnectionClosed(frame, source);
 }

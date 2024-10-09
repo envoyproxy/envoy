@@ -236,7 +236,7 @@ pkg_tar(
         ":extensions_security_rst",
         ":external_deps_rst",
         ":version_history_rst",
-        "//examples:docs",
+        "@envoy_examples//:docs",
     ],
 )
 

@@ -12,9 +12,11 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/event/real_time_system.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/filters/network/common/redis/codec.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
+#include "source/extensions/filters/network/redis_proxy/external_auth.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,7 +53,7 @@ public:
   ProxyFilterConfig(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
       Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
-      Api::Api& api,
+      Api::Api& api, TimeSource& time_source,
       Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory);
 
   const Network::DrainDecision& drain_decision_;
@@ -61,6 +63,9 @@ public:
   ProxyStats stats_;
   const std::string downstream_auth_username_;
   std::vector<std::string> downstream_auth_passwords_;
+  TimeSource& timeSource() const { return time_source_; };
+  const bool external_auth_enabled_;
+  const bool external_auth_expiration_enabled_;
 
   // DNS cache used for ASK/MOVED responses.
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
@@ -70,6 +75,7 @@ private:
   static ProxyStats generateStats(const std::string& prefix, Stats::Scope& scope);
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr
   getCache(const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config);
+  TimeSource& time_source_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -81,10 +87,12 @@ using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
 class ProxyFilter : public Network::ReadFilter,
                     public Common::Redis::DecoderCallbacks,
                     public Network::ConnectionCallbacks,
-                    public Logger::Loggable<Logger::Id::redis> {
+                    public Logger::Loggable<Logger::Id::redis>,
+                    public ExternalAuth::AuthenticateCallback {
 public:
   ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
-              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config);
+              CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config,
+              ExternalAuth::ExternalAuthClientPtr&& auth_client);
   ~ProxyFilter() override;
 
   // Network::ReadFilter
@@ -100,12 +108,18 @@ public:
   // Common::Redis::DecoderCallbacks
   void onRespValue(Common::Redis::RespValuePtr&& value) override;
 
-  bool connectionAllowed() { return connection_allowed_; }
+  // AuthenticateCallback
+  void onAuthenticateExternal(CommandSplitter::SplitCallbacks& request,
+                              ExternalAuth::AuthenticateResponsePtr&& response) override;
+
+  bool connectionAllowed();
 
   Common::Redis::Client::Transaction& transaction() { return transaction_; }
 
 private:
   friend class RedisProxyFilterTest;
+
+  enum class ExternalAuthCallStatus { Pending, Ready };
 
   struct PendingRequest : public CommandSplitter::SplitCallbacks {
     PendingRequest(ProxyFilter& parent);
@@ -125,6 +139,8 @@ private:
     Common::Redis::Client::Transaction& transaction() override { return parent_.transaction(); }
 
     ProxyFilter& parent_;
+    // This value is set when the request is on hold, waiting for an external auth response.
+    Common::Redis::RespValuePtr pending_request_value_;
     Common::Redis::RespValuePtr pending_response_;
     CommandSplitter::SplitRequestPtr request_handle_;
   };
@@ -134,6 +150,7 @@ private:
   void onAuth(PendingRequest& request, const std::string& username, const std::string& password);
   void onResponse(PendingRequest& request, Common::Redis::RespValuePtr&& value);
   bool checkPassword(const std::string& password);
+  void processRespValue(Common::Redis::RespValuePtr&& value, PendingRequest& request);
 
   Common::Redis::DecoderPtr decoder_;
   Common::Redis::EncoderPtr encoder_;
@@ -145,6 +162,9 @@ private:
   bool connection_allowed_;
   Common::Redis::Client::Transaction transaction_;
   bool connection_quit_;
+  ExternalAuth::ExternalAuthClientPtr auth_client_;
+  ExternalAuthCallStatus external_auth_call_status_;
+  long external_auth_expiration_epoch_;
 };
 
 } // namespace RedisProxy

@@ -14,12 +14,14 @@ involved and how Envoy plays a role, read the CNCF
 [![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=main)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=main)
 [![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
 [![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
+[![Jenkins](https://ibmz-ci.osuosl.org/buildStatus/icon?job=Envoy_IBMZ_CI&subject=s390x%20build)](https://ibmz-ci.osuosl.org/job/Envoy_IBMZ_CI/)
 
 ## Documentation
 
 * [Official documentation](https://www.envoyproxy.io/)
 * [FAQ](https://www.envoyproxy.io/docs/envoy/latest/faq/overview)
 * [Unofficial Chinese documentation](https://cloudnative.to/envoy/)
+* [Example documentation](https://github.com/envoyproxy/examples/)
 * [Blog](https://medium.com/@mattklein123/envoy-threading-model-a8d44b922310) about the threading model
 * [Blog](https://medium.com/@mattklein123/envoy-hot-restart-1d16b14555b5) about hot restart
 * [Blog](https://medium.com/@mattklein123/envoy-stats-b65c7f363342) about stats architecture
@@ -67,11 +69,13 @@ have prior experience. To get started:
 
 ## Community Meeting
 
-The Envoy team meets twice per month on Tuesday at 9am PT. The public
-Google calendar is here: https://goo.gl/PkDijT
-
-* Meeting minutes are [here](https://goo.gl/5Cergb)
-* Recorded videos are posted [here](https://www.youtube.com/channel/UC5z5mvPgqMs1xo5VuIWzYTA)
+The Envoy team has a scheduled meeting time twice per month on Tuesday at 9am PT. The public
+Google calendar is [here](https://goo.gl/PkDijT).  The meeting will only be held
+if there are agenda items listed in the [meeting
+minutes](https://goo.gl/5Cergb).  Any member of the community should be able to
+propose agenda items by adding to the minutes.  The maintainers will either confirm
+the additions to the agenda, or will cancel the meeting within 24 hours of the scheduled
+date if there is no confirmed agenda.
 
 ## Security
 
@@ -89,3 +93,7 @@ email to acknowledge your report, and we'll send an additional email when we've 
 positively or negatively.
 
 For further details please see our complete [security release process](SECURITY.md).
+
+## Releases
+
+For further details please see our [release process](https://github.com/envoyproxy/envoy/blob/main/RELEASES.md).

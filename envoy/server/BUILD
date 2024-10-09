@@ -30,11 +30,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "configuration_interface",
     hdrs = ["configuration.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:context_interface",
         "//envoy/stats:sink_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
@@ -181,6 +181,7 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/http:context_interface",
         "//envoy/http:filter_interface",
+        "//envoy/http:http_server_properties_cache_interface",
         "//envoy/init:manager_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:drain_decision_interface",

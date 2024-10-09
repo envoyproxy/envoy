@@ -24,6 +24,7 @@ public:
     return Api::ioCallUint64ResultNoError();
   }
   bool isOpen() const override { return !closed_; }
+  bool wasConnected() const override { return io_handle_.wasConnected(); }
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override {
     if (closed_) {
@@ -59,20 +60,22 @@ public:
     return io_handle_.sendmsg(slices, num_slice, flags, self_ip, peer_address);
   }
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override {
+                                  uint32_t self_port, const UdpSaveCmsgConfig& udp_save_cmsg_config,
+                                  RecvMsgOutput& output) override {
     if (closed_) {
       ASSERT(false, "recvmmsg is called after close.");
       return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
-    return io_handle_.recvmsg(slices, num_slice, self_port, output);
+    return io_handle_.recvmsg(slices, num_slice, self_port, udp_save_cmsg_config, output);
   }
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   const UdpSaveCmsgConfig& udp_save_cmsg_config,
                                    RecvMsgOutput& output) override {
     if (closed_) {
       ASSERT(false, "recvmmsg is called after close.");
       return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
-    return io_handle_.recvmmsg(slices, self_port, output);
+    return io_handle_.recvmmsg(slices, self_port, udp_save_cmsg_config, output);
   }
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override {
     if (closed_) {

@@ -40,7 +40,7 @@ absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, boo
   }
 
   auto file_content_or_error = file_system.fileReadToEnd(path);
-  RETURN_IF_STATUS_NOT_OK(file_content_or_error);
+  RETURN_IF_NOT_OK_REF(file_content_or_error.status());
 
   if (!allow_empty && file_content_or_error.value().empty()) {
     return absl::InvalidArgumentError(fmt::format("file {} is empty", path));
@@ -73,8 +73,8 @@ absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& sour
   }
   default:
     if (!allow_empty) {
-      return absl::InvalidArgumentError(
-          fmt::format("Unexpected DataSource::specifier_case(): {}", source.specifier_case()));
+      return absl::InvalidArgumentError(fmt::format("Unexpected DataSource::specifier_case(): {}",
+                                                    static_cast<int>(source.specifier_case())));
     }
   }
   if (!allow_empty && data.empty()) {
@@ -118,7 +118,7 @@ absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoData
                                                                  Api::Api& api, bool allow_empty,
                                                                  uint64_t max_size) {
   auto initial_data_or_error = read(source, allow_empty, api, max_size);
-  RETURN_IF_STATUS_NOT_OK(initial_data_or_error);
+  RETURN_IF_NOT_OK_REF(initial_data_or_error.status());
 
   // read() only validates the size of the file and does not check the size of inline data.
   // We check the size of inline data here.

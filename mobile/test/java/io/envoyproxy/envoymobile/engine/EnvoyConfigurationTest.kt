@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile.engine
 
-import com.google.protobuf.Struct
-import com.google.protobuf.Value
+import android.util.Pair
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
@@ -80,9 +79,12 @@ class EnvoyConfigurationTest {
     dnsPreresolveHostnames: MutableList<String> = mutableListOf("hostname1", "hostname2"),
     enableDNSCache: Boolean = false,
     dnsCacheSaveIntervalSeconds: Int = 101,
+    dnsNumRetries: Int? = 3,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
     enableCares: Boolean = false,
+    caresFallbackResolvers: MutableList<Pair<String, Int>> = mutableListOf(Pair("1.2.3.4", 88)),
+    forceV6: Boolean = true,
     enableGro: Boolean = false,
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
@@ -90,7 +92,7 @@ class EnvoyConfigurationTest {
     quicCanonicalSuffixes: MutableList<String> = mutableListOf(".opq.com", ".xyz.com"),
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
-    enablePortMigration: Boolean = true,
+    numTimeoutsToTriggerPortMigration: Int = 4,
     enableSocketTagging: Boolean = false,
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
@@ -126,9 +128,11 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames,
       enableDNSCache,
       dnsCacheSaveIntervalSeconds,
+      dnsNumRetries ?: -1,
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableCares,
+      forceV6,
       enableGro,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
@@ -136,7 +140,7 @@ class EnvoyConfigurationTest {
       quicCanonicalSuffixes,
       enableGzipDecompression,
       enableBrotliDecompression,
-      enablePortMigration,
+      numTimeoutsToTriggerPortMigration,
       enableSocketTagging,
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
@@ -154,6 +158,7 @@ class EnvoyConfigurationTest {
       runtimeGuards,
       enablePlatformCertificatesValidation,
       upstreamTlsSni,
+      caresFallbackResolvers,
     )
   }
 
@@ -163,6 +168,7 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
+    println(resolvedTemplate)
     assertThat(resolvedTemplate).contains("connect_timeout { seconds: 123 }")
 
     // DNS
@@ -175,6 +181,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("preresolve_hostnames")
     assertThat(resolvedTemplate).contains("hostname1")
     assertThat(resolvedTemplate).contains("hostname1")
+    assertThat(resolvedTemplate).contains("num_retries { value: 3 }")
 
     // Forcing IPv6
     assertThat(resolvedTemplate).contains("key: \"always_use_v6\" value { bool_value: true }")
@@ -257,6 +264,8 @@ class EnvoyConfigurationTest {
 
     // enableCares = true
     assertThat(resolvedTemplate).contains("envoy.network.dns_resolver.cares")
+    assertThat(resolvedTemplate).contains("address: \"1.2.3.4\"");
+    assertThat(resolvedTemplate).contains("port_value: 88");
 
     // enableGro = true
     assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")

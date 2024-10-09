@@ -128,6 +128,7 @@ public:
               (const));
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
+  MOCK_METHOD(absl::optional<uint16_t>, maxResponseHeadersKb, (), (const));
   MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
@@ -166,12 +167,13 @@ public:
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type,
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
-               Http::FilterChainManager& manager),
+               Http::FilterChainManager& manager, const Http::FilterChainOptions&),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
-  MOCK_METHOD(const absl::optional<
-                  envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
-              happyEyeballsConfig, (), (const));
+  MOCK_METHOD(
+      OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
+      happyEyeballsConfig, (), (const));
+  MOCK_METHOD(OptRef<const std::vector<std::string>>, lrsReportMetricNames, (), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;
@@ -235,6 +237,7 @@ public:
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
   absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
+  const std::unique_ptr<Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
 };
 
 class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {

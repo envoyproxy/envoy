@@ -53,8 +53,8 @@ CELFormatter::formatValueWithContext(const Envoy::Formatter::HttpFormatterContex
 }
 
 ::Envoy::Formatter::FormatterProviderPtr
-CELFormatterCommandParser::parse(const std::string& command, const std::string& subcommand,
-                                 absl::optional<size_t>& max_length) const {
+CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
+                                 absl::optional<size_t> max_length) const {
 #if defined(USE_CEL_PARSER)
   if (command == "CEL") {
     auto parse_status = google::api::expr::parser::Parse(subcommand);

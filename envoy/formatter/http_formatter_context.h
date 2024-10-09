@@ -127,6 +127,14 @@ public:
    */
   const Tracing::Span& activeSpan() const;
 
+  /**
+   * @return short category name of the HttpFormatterContext. This may be used to create
+   * an actual fully qualified category name for other factory classes that use this context.
+   * For example the http specific built-in formatters will have a category of
+   * "envoy.built_in_formatters.http".
+   */
+  static constexpr absl::string_view category() { return "http"; }
+
 private:
   const Http::RequestHeaderMap* request_headers_{};
   const Http::ResponseHeaderMap* response_headers_{};

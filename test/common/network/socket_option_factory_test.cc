@@ -148,6 +148,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   auto linger_option =
       absl::StrFormat(linger_option_format, SOL_SOCKET, SO_LINGER, linger_bstr_formatted);
   ASSERT_TRUE(parser.ParseFromString(linger_option, &socket_option_proto));
+
   *socket_options_proto.Add() = socket_option_proto;
   static const char keepalive_option_format[] = R"proto(
     state: STATE_PREBIND
@@ -159,8 +160,74 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   ASSERT_TRUE(parser.ParseFromString(keepalive_option, &socket_option_proto));
   *socket_options_proto.Add() = socket_option_proto;
 
+  static constexpr char socket_type_not_set_option_format[] = R"proto(
+    state: STATE_PREBIND
+    level: %d
+    name: %d
+    int_value: 1
+  )proto";
+  auto socket_type_not_set_textproto =
+      absl::StrFormat(socket_type_not_set_option_format, SOL_SOCKET, SO_KEEPALIVE);
+  ASSERT_TRUE(parser.ParseFromString(socket_type_not_set_textproto, &socket_option_proto));
+  *socket_options_proto.Add() = socket_option_proto;
+
+  static constexpr char empty_socket_type_option_format[] = R"proto(
+    state: STATE_PREBIND
+    level: %d
+    name: %d
+    int_value: 1
+    type: {}
+  )proto";
+  auto empty_socket_type_textproto =
+      absl::StrFormat(empty_socket_type_option_format, SOL_SOCKET, SO_KEEPALIVE);
+  ASSERT_TRUE(parser.ParseFromString(empty_socket_type_textproto, &socket_option_proto));
+  *socket_options_proto.Add() = socket_option_proto;
+
+  static constexpr char all_socket_types_set_option_format[] = R"proto(
+    state: STATE_PREBIND
+    level: %d
+    name: %d
+    int_value: 1
+    type: {
+      stream: {}
+      datagram: {}
+    }
+  )proto";
+  auto all_socket_types_set_textproto =
+      absl::StrFormat(all_socket_types_set_option_format, SOL_SOCKET, SO_KEEPALIVE);
+  ASSERT_TRUE(parser.ParseFromString(all_socket_types_set_textproto, &socket_option_proto));
+  *socket_options_proto.Add() = socket_option_proto;
+
+  static constexpr char stream_socket_type_option_format[] = R"proto(
+    state: STATE_PREBIND
+    level: %d
+    name: %d
+    int_value: 1
+    type: {
+      stream: {}
+    }
+  )proto";
+  auto stream_socket_type_textproto =
+      absl::StrFormat(stream_socket_type_option_format, SOL_SOCKET, SO_KEEPALIVE);
+  ASSERT_TRUE(parser.ParseFromString(stream_socket_type_textproto, &socket_option_proto));
+  *socket_options_proto.Add() = socket_option_proto;
+
+  static constexpr char datagram_socket_type_option_format[] = R"proto(
+    state: STATE_PREBIND
+    level: %d
+    name: %d
+    int_value: 1
+    type: {
+      datagram: {}
+    }
+  )proto";
+  auto datagram_socket_type_textproto =
+      absl::StrFormat(datagram_socket_type_option_format, SOL_SOCKET, SO_KEEPALIVE);
+  ASSERT_TRUE(parser.ParseFromString(datagram_socket_type_textproto, &socket_option_proto));
+  *socket_options_proto.Add() = socket_option_proto;
+
   auto socket_options = SocketOptionFactory::buildLiteralOptions(socket_options_proto);
-  EXPECT_EQ(2, socket_options->size());
+  EXPECT_EQ(7, socket_options->size());
   auto option_details = socket_options->at(0)->getOptionDetails(
       socket_mock_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   EXPECT_TRUE(option_details.has_value());
@@ -176,6 +243,29 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   int value = 1;
   absl::string_view value_bstr{reinterpret_cast<const char*>(&value), sizeof(int)};
   EXPECT_EQ(value_bstr, option_details->value_);
+
+  auto socket_type_not_set_option =
+      dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(2));
+  EXPECT_FALSE(socket_type_not_set_option->socketType().has_value());
+
+  auto empty_socket_type_option =
+      dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(3));
+  EXPECT_FALSE(empty_socket_type_option->socketType().has_value());
+
+  auto all_socket_types_option =
+      dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(4));
+  EXPECT_TRUE(all_socket_types_option->socketType().has_value());
+  EXPECT_EQ(Socket::Type::Stream, *all_socket_types_option->socketType());
+
+  auto stream_socket_type_option =
+      dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(5));
+  EXPECT_TRUE(stream_socket_type_option->socketType().has_value());
+  EXPECT_EQ(Socket::Type::Stream, *stream_socket_type_option->socketType());
+
+  auto datagram_socket_type_option =
+      dynamic_pointer_cast<const SocketOptionImpl>(socket_options->at(6));
+  EXPECT_TRUE(datagram_socket_type_option->socketType().has_value());
+  EXPECT_EQ(Socket::Type::Datagram, *datagram_socket_type_option->socketType());
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildZeroSoLingerOptions) {

@@ -33,7 +33,7 @@ jobs:
           pool-id: 17
     steps:
     - name: Remove dead AZP agents (${{ matrix.target }})
-      uses: envoyproxy/toolshed/gh-actions/azp/agent-cleanup@actions-v0.2.30
+      uses: envoyproxy/toolshed/gh-actions/azp/agent-cleanup@actions-v0.2.36
       with:
         azp-org: cncf
         azp-token: ${{ secrets.AZP_TOKEN }}

@@ -300,6 +300,7 @@ public:
     const std::string RetriableStatusCodes{"retriable-status-codes"};
     const std::string RetriableHeaders{"retriable-headers"};
     const std::string Reset{"reset"};
+    const std::string ResetBeforeRequest{"reset-before-request"};
     const std::string Http3PostConnectFailure{"http3-post-connect-failure"};
   } EnvoyRetryOnValues;
 
@@ -349,6 +350,7 @@ public:
 
   struct {
     const std::string EnvoyHealthChecker{"Envoy/HC"};
+    const std::string GoBrowser{"Go-browser"};
   } UserAgentValues;
 
   struct {

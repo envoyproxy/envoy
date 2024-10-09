@@ -209,7 +209,7 @@ public:
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
-               FilterChainManager& manager),
+               FilterChainManager& manager, const FilterChainOptions&),
               (const));
 };
 
@@ -231,6 +231,14 @@ public:
   MOCK_METHOD(void, clearRouteCache, ());
 
   std::shared_ptr<Router::MockRoute> route_;
+};
+
+class MockSidestreamWatermarkCallbacks : public SidestreamWatermarkCallbacks {
+public:
+  ~MockSidestreamWatermarkCallbacks() override = default;
+
+  MOCK_METHOD(void, onSidestreamAboveHighWatermark, ());
+  MOCK_METHOD(void, onSidestreamBelowLowWatermark, ());
 };
 
 class MockStreamDecoderFilterCallbacks : public StreamDecoderFilterCallbacks,
@@ -264,8 +272,7 @@ public:
   MOCK_METHOD(void, addUpstreamSocketOptions, (const Network::Socket::OptionsSharedPtr& options));
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, getUpstreamSocketOptions, (), (const));
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
-  MOCK_METHOD(void, traversePerFilterConfig,
-              (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
+  MOCK_METHOD(Router::RouteSpecificFilterConfigs, perFilterConfigs, (), (const));
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
   MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
@@ -361,8 +368,7 @@ public:
   MOCK_METHOD(uint32_t, encoderBufferLimit, ());
   MOCK_METHOD(void, restoreContextOnContinue, (ScopeTrackedObjectStack&));
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
-  MOCK_METHOD(void, traversePerFilterConfig,
-              (std::function<void(const Router::RouteSpecificFilterConfig&)> cb), (const));
+  MOCK_METHOD(Router::RouteSpecificFilterConfigs, perFilterConfigs, (), (const));
   MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
   MOCK_METHOD(OptRef<DownstreamStreamFilterCallbacks>, downstreamCallbacks, ());
   MOCK_METHOD(OptRef<UpstreamStreamFilterCallbacks>, upstreamCallbacks, ());
@@ -565,10 +571,11 @@ public:
     destructor_callback_ = callback;
   }
   void removeDestructorCallback() override { destructor_callback_.reset(); }
-  MOCK_METHOD(void, setWatermarkCallbacks, (DecoderFilterWatermarkCallbacks & callback),
+  MOCK_METHOD(void, setWatermarkCallbacks, (Http::SidestreamWatermarkCallbacks & callback),
               (override));
   MOCK_METHOD(void, removeWatermarkCallbacks, (), (override));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
 
 private:
   absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
@@ -630,6 +637,7 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
   MOCK_METHOD(bool, isRoutable, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
+  MOCK_METHOD(bool, http1SafeMaxConnectionDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, streamIdleTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, requestTimeout, (), (const));
@@ -687,8 +695,15 @@ public:
   MOCK_METHOD(bool, appendXForwardedPort, (), (const));
   MOCK_METHOD(bool, addProxyProtocolConnectionState, (), (const));
 
+  class AllowInternalAddressConfig : public Http::InternalAddressConfig {
+  public:
+    bool isInternalAddress(const Network::Address::Instance& address) const override {
+      return Network::Utility::isInternalAddress(address);
+    }
+  };
+
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
-      std::make_unique<DefaultInternalAddressConfig>();
+      std::make_unique<AllowInternalAddressConfig>();
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
   absl::optional<std::string> scheme_;
   bool scheme_match_upstream_;

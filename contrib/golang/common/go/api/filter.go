@@ -81,25 +81,28 @@ type StreamFilter interface {
 	StreamEncoderFilter
 
 	// log
-	OnLog()
-	OnLogDownstreamStart()
-	OnLogDownstreamPeriodic()
+	OnLog(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap)
+	OnLogDownstreamStart(RequestHeaderMap)
+	OnLogDownstreamPeriodic(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap)
 
 	// destroy filter
 	OnDestroy(DestroyReason)
-	// TODO add more for stream complete
+	OnStreamComplete()
 }
 
-func (*PassThroughStreamFilter) OnLog() {
+func (*PassThroughStreamFilter) OnLog(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap) {
 }
 
-func (*PassThroughStreamFilter) OnLogDownstreamStart() {
+func (*PassThroughStreamFilter) OnLogDownstreamStart(RequestHeaderMap) {
 }
 
-func (*PassThroughStreamFilter) OnLogDownstreamPeriodic() {
+func (*PassThroughStreamFilter) OnLogDownstreamPeriodic(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap) {
 }
 
 func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
+}
+
+func (*PassThroughStreamFilter) OnStreamComplete() {
 }
 
 type StreamFilterConfigParser interface {

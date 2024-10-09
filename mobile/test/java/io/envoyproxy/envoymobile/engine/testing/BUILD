@@ -67,6 +67,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "io.envoyproxy.envoymobile.engine.testing.QuicTestServerTest",
     deps = [
         ":http_test_server_factory_lib",
         ":testing",

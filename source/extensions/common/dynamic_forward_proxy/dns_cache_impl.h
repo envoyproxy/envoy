@@ -70,6 +70,7 @@ public:
   Upstream::ResourceAutoIncDecPtr canCreateDnsRequest() override;
   void forceRefreshHosts() override;
   void setIpVersionToRemove(absl::optional<Network::Address::IpVersion> ip_version) override;
+  void stop() override;
 
 private:
   DnsCacheImpl(Server::Configuration::GenericFactoryContext& context,
@@ -140,15 +141,11 @@ private:
     void setAddresses(Network::Address::InstanceConstSharedPtr address,
                       std::vector<Network::Address::InstanceConstSharedPtr>&& list) {
       absl::WriterMutexLock lock{&resolve_lock_};
-      if (!(Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.dns_cache_set_first_resolve_complete"))) {
-        first_resolve_complete_ = true;
-      }
       address_ = address;
       address_list_ = std::move(list);
     }
 
-    void setDetails(std::string details) {
+    void setDetails(absl::string_view details) {
       absl::WriterMutexLock lock{&resolve_lock_};
       details_ = details;
     }
@@ -226,7 +223,7 @@ private:
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
                      absl::string_view details, std::list<Network::DnsResponse>&& response,
                      absl::optional<MonotonicTime> resolution_time = {},
-                     bool is_proxy_lookup = false);
+                     bool is_proxy_lookup = false, bool is_timeout = false);
   void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
   void runResolutionCompleteCallbacks(const std::string& host,
                                       const DnsHostInfoSharedPtr& host_info,
@@ -273,6 +270,7 @@ private:
   absl::Mutex ip_version_to_remove_lock_;
   absl::optional<Network::Address::IpVersion>
       ip_version_to_remove_ ABSL_GUARDED_BY(ip_version_to_remove_lock_) = absl::nullopt;
+  bool enable_dfp_dns_trace_;
 };
 
 } // namespace DynamicForwardProxy

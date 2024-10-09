@@ -712,7 +712,7 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
 
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_);
+        tls_context, factory_context_, false);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
                std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),

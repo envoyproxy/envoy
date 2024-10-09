@@ -332,11 +332,11 @@ bool RouterCheckTool::compareVirtualCluster(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   const bool has_virtual_cluster =
       has_route_entry &&
-      tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_) != nullptr;
+      tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_) != nullptr;
   std::string actual = "";
   if (has_virtual_cluster) {
     Stats::StatName stat_name =
-        tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_)->statName();
+        tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_)->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =
@@ -362,7 +362,7 @@ bool RouterCheckTool::compareVirtualHost(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   std::string actual = "";
   if (has_route_entry) {
-    Stats::StatName stat_name = tool_config.route_->routeEntry()->virtualHost().statName();
+    Stats::StatName stat_name = tool_config.route_->virtualHost().statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =

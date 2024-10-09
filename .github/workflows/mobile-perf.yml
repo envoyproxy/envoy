@@ -94,8 +94,9 @@ jobs:
       request: ${{ needs.load.outputs.request }}
       runs-on: ubuntu-22.04
       source: |
-        strip -s -o dist/main.stripped dist/sizemain/size-main
-        strip -s -o dist/current.stripped dist/sizecurrent/size-current
+        mkdir dist
+        strip -s -o dist/main.stripped /home/runner/work/_temp/dist/sizemain/size-main
+        strip -s -o dist/current.stripped /home/runner/work/_temp/dist/sizecurrent/size-current
         zip -9 dist/main.zip dist/main.stripped
         zip -9 dist/current.zip dist/current.stripped
       target: size-compare

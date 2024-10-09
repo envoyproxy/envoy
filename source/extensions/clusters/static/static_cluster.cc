@@ -25,11 +25,22 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
     THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
+      std::vector<Network::Address::InstanceConstSharedPtr> address_list;
+      if (!lb_endpoint.endpoint().additional_addresses().empty()) {
+        address_list.emplace_back(
+            THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
+                                  const Network::Address::InstanceConstSharedPtr));
+        for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
+          address_list.emplace_back(
+              THROW_OR_RETURN_VALUE(resolveProtoAddress(additional_address.address()),
+                                    const Network::Address::InstanceConstSharedPtr));
+        }
+      }
       priority_state_manager_->registerHostForPriority(
           lb_endpoint.endpoint().hostname(),
           THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
                                 const Network::Address::InstanceConstSharedPtr),
-          {}, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
+          address_list, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
     }
   }
 }

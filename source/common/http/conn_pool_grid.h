@@ -127,7 +127,6 @@ public:
                                     absl::string_view transport_failure_reason,
                                     Upstream::HostDescriptionConstSharedPtr host);
 
-  private:
     // Called if the initial HTTP/3 connection fails.
     // Returns true if an HTTP/3 happy eyeballs attempt can be kicked off
     // (runtime guard is on, IPv6 and IPv6 addresses are present, happy eyeballs
@@ -135,8 +134,9 @@ public:
     bool shouldAttemptSecondHttp3Connection();
     // This kicks off an HTTP/3 happy eyeballs attempt, connecting to the second
     // address in the host's address list.
-    void attemptSecondHttp3Connection();
+    ConnectivityGrid::StreamCreationResult attemptSecondHttp3Connection();
 
+  private:
     // Removes this from the owning list, deleting it.
     void deleteThis();
 
@@ -172,6 +172,8 @@ public:
     bool tcp_attempt_succeeded_{};
     // Latch the passed-in stream options.
     const Instance::StreamOptions stream_options_{};
+    absl::optional<ConnectionPool::PoolFailureReason> prev_tcp_pool_failure_reason_;
+    std::string prev_tcp_pool_transport_failure_reason_;
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;
 
@@ -182,7 +184,8 @@ public:
                    Upstream::ClusterConnectivityState& state, TimeSource& time_source,
                    HttpServerPropertiesCacheSharedPtr alternate_protocols,
                    ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-                   Stats::Scope& scope, Http::PersistentQuicInfo& quic_info);
+                   Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
+                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry);
   ~ConnectivityGrid() override;
 
   // Event::DeferredDeletable
@@ -296,6 +299,8 @@ private:
 
   // True iff this pool is being deferred deleted.
   bool deferred_deleting_{};
+
+  OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry_;
 };
 
 } // namespace Http

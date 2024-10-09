@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstdint>
 #include <ios>
+#include <limits>
 #include <set>
 #include <sstream>
 #include <string>
@@ -17,6 +18,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/node_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -44,14 +46,17 @@ const std::string errorDetails(int error_code);
  */
 class DateFormatter {
 public:
-  DateFormatter(const std::string& format_string) : raw_format_string_(format_string) {
+  DateFormatter(absl::string_view format_string, bool local_time = false)
+      : raw_format_string_(format_string),
+        raw_format_hash_(CachedTimes::hasher{}(raw_format_string_)), local_time_(local_time) {
     parse(format_string);
   }
 
   /**
-   * @return std::string representing the GMT/UTC time based on the input time.
+   * @return std::string representing the GMT/UTC time based on the input time,
+   * or local zone time when local_time_ is true.
    */
-  std::string fromTime(const SystemTime& time) const;
+  std::string fromTime(SystemTime time) const;
 
   /**
    * @param time_source time keeping source.
@@ -65,45 +70,101 @@ public:
   const std::string& formatString() const { return raw_format_string_; }
 
 private:
-  void parse(const std::string& format_string);
-
-  using SpecifierOffsets = std::vector<int32_t>;
-  std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
-                                                 const absl::string_view seconds_str) const;
+  void parse(absl::string_view format_string);
 
   // A container to hold a specifiers (%f, %Nf, %s) found in a format string.
-  struct Specifier {
-    // To build a subsecond-specifier.
-    Specifier(const size_t position, const size_t width, const std::string& segment)
-        : position_(position), width_(width), segment_(segment), second_(false) {}
+  class Specifier {
+  public:
+    enum class SpecifierType : uint8_t {
+      String = 0,     // means the specifier is a string specifier.
+      Second,         // means the specifier is a seconds specifier.
+      EnvoySubsecond, // subseconds specifiers %f, %#f and %*f that supported by Envoy.
+      AbslSubsecondS, // subseconds specifiers %E#S, %E*S.
+      AbslSubsecondF, // subseconds specifiers %E#f, %E*f.
+    };
 
-    // To build a second-specifier (%s), the number of characters to be replaced is always 2.
-    Specifier(const size_t position, const std::string& segment)
-        : position_(position), width_(2), segment_(segment), second_(true) {}
+    // To build a seconds or subseconds specifier.
+    Specifier(SpecifierType specifier, uint8_t width) : specifier_(specifier), width_(width) {
+      // String specifier should call another constructor.
+      ASSERT(specifier != SpecifierType::String);
 
-    // The position/index of a specifier in a format string.
-    const size_t position_;
+      if (specifier == SpecifierType::Second) {
+        // Seconds specifier.
+        ASSERT(width == 0);
+      } else {
+        ASSERT(width >= 1);
+        ASSERT(width <= 9 || width == std::numeric_limits<uint8_t>::max());
+      }
+    }
 
-    // The width of a specifier, e.g. given %3f, the width is 3. If %f is set as the
-    // specifier, the width value should be 9 (the number of nanosecond digits).
-    const size_t width_;
+    // To build a string specifier.
+    Specifier(absl::string_view string)
+        : string_(string), absl_format_(string_.find('%') != std::string::npos),
+          specifier_(SpecifierType::String) {
+      ASSERT(!string.empty());
+    }
 
-    // The string before the current specifier's position and after the previous found specifier. A
-    // segment may include absl::FormatTime accepted specifiers. E.g. given
+    // Format a time point based on the specifier.
+    std::string toString(SystemTime time, std::chrono::seconds epoch_time_seconds,
+                         bool local_time_zone) const;
+
+    // Format a time point based on the specifier. This should only be called for subseconds
+    // specifiers.
+    std::string subsecondsToString(SystemTime time) const;
+
+    /**
+     * @return bool whether the specifier is a subseconds specifier.
+     */
+    bool subsecondsSpecifier() const { return specifier_ > SpecifierType::Second; }
+
+  private:
+    // The format string before the current specifier's position and after the previous found
+    // specifier. The string may include absl::FormatTime accepted specifiers. E.g. given
     // "%3f-this-i%s-a-segment-%4f", the current specifier is "%4f" and the segment is
-    // "-this-i%s-a-segment-".
-    const std::string segment_;
+    // "-a-segment-".
+    const std::string string_;
+    // If the string_ contains absl::FormatTime accepted specifiers, this is true. Or string_
+    // will be treated as raw string.
+    const bool absl_format_{};
 
-    // As an indication that this specifier is a %s (expect to be replaced by seconds since the
-    // epoch).
-    const bool second_;
+    // Specifier type.
+    const SpecifierType specifier_{};
+
+    // The width of a sub-second specifier, e.g. given %3f, the width is 3. If %f is set as the
+    // specifier, the width value should be 9 (the number of nanosecond digits).
+    // The allowed values are:
+    // 0: only when the specifier is seconds specifier or string specifier.
+    // 1-9: fixed width of subseconds specifier.
+    // 255: std::numeric_limits<uint8_t>::max(), full subseconds precision with dynamic width.
+    const uint8_t width_{};
   };
 
-  // This holds all specifiers found in a given format string.
-  std::vector<Specifier> specifiers_;
+  // A struct to hold the offset and length of a specifier result in the format string.
+  struct SpecifierOffset {
+    size_t offset{};
+    size_t length{};
+  };
+
+  struct CacheableTime {
+    std::chrono::seconds epoch_time_seconds;
+
+    std::string formatted;
+    std::vector<SpecifierOffset> offsets;
+  };
+  using CachedTimes = absl::node_hash_map<std::string, const CacheableTime>;
+
+  CacheableTime formatTimeAndOffsets(SystemTime time,
+                                     std::chrono::seconds epoch_time_seconds) const;
 
   // This is the format string as supplied in configuration, e.g. "foo %3f bar".
   const std::string raw_format_string_;
+  const size_t raw_format_hash_{};
+
+  // Use local time zone instead of UTC if this is set to true.
+  const bool local_time_{};
+
+  // This holds all specifiers found in a given format string.
+  std::vector<Specifier> specifiers_;
 };
 
 /**
@@ -111,7 +172,7 @@ private:
  */
 class AccessLogDateTimeFormatter {
 public:
-  static std::string fromTime(const SystemTime& time);
+  static std::string fromTime(const SystemTime& time, bool local_time = false);
 };
 
 /**
@@ -428,6 +489,15 @@ public:
    * @param view a string view to output
    */
   static void escapeToOstream(std::ostream& os, absl::string_view view);
+
+  /**
+   * Sanitize host name strings for logging purposes. Replace invalid hostname characters (anything
+   * that's not alphanumeric, hyphen, or period) with underscore. The sanitized string is not a
+   * valid host name.
+   * @param source supplies the string to sanitize.
+   * @return sanitized string.
+   */
+  static std::string sanitizeInvalidHostname(const absl::string_view source);
 
   /**
    * Provide a default value for a string if empty.

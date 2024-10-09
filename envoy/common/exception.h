@@ -30,8 +30,8 @@ public:
 };
 
 #define SET_AND_RETURN_IF_NOT_OK(check_status, set_status)                                         \
-  if (!check_status.ok()) {                                                                        \
-    set_status = check_status;                                                                     \
+  if (const absl::Status temp_status = check_status; !temp_status.ok()) {                          \
+    set_status = temp_status;                                                                      \
     return;                                                                                        \
   }
 
@@ -42,33 +42,27 @@ public:
     }                                                                                              \
   } while (0)
 
+// Simple macro to handle bridging functions which return absl::StatusOr, and
+// functions which throw errors.
 #define THROW_IF_NOT_OK(status_fn)                                                                 \
   do {                                                                                             \
     const absl::Status status = (status_fn);                                                       \
     THROW_IF_NOT_OK_REF(status);                                                                   \
   } while (0)
 
-// Simple macro to handle bridging functions which return absl::StatusOr, and
-// functions which throw errors.
-//
-// The completely unnecessary throw_action argument was just so 'throw' appears
-// at the call site, so format checks about use of exceptions would be triggered.
-// This didn't work, so the variable is no longer used and is not duplicated in
-// the macros above.
-#define THROW_IF_STATUS_NOT_OK(variable, throw_action) THROW_IF_NOT_OK_REF(variable.status());
-
-#define RETURN_IF_STATUS_NOT_OK(variable)                                                          \
-  if (!variable.status().ok()) {                                                                   \
-    return variable.status();                                                                      \
+#define RETURN_IF_NOT_OK_REF(variable)                                                             \
+  if (const absl::Status& temp_status = variable; !temp_status.ok()) {                             \
+    return temp_status;                                                                            \
   }
 
-#define RETURN_IF_NOT_OK(variable)                                                                 \
-  if (!variable.ok()) {                                                                            \
-    return variable;                                                                               \
+// Make sure this works for functions without calling the functoin twice as well.
+#define RETURN_IF_NOT_OK(status_fn)                                                                \
+  if (absl::Status temp_status = (status_fn); !temp_status.ok()) {                                 \
+    return temp_status;                                                                            \
   }
 
 template <class Type> Type returnOrThrow(absl::StatusOr<Type> type_or_error) {
-  THROW_IF_STATUS_NOT_OK(type_or_error, throw);
+  THROW_IF_NOT_OK_REF(type_or_error.status());
   return std::move(type_or_error.value());
 }
 

@@ -13,6 +13,7 @@
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/common/tls/utility.h"
 
 #include "test/common/tls/ssl_certs_test.h"
@@ -139,6 +140,56 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
             "Failed to initialize cipher suites "
             "-ALL:+[AES128-SHA|BOGUS1-SHA256]:BOGUS2-SHA:AES256-SHA. The following "
             "ciphers were rejected when tried individually: BOGUS1-SHA256, BOGUS2-SHA");
+}
+
+// Envoy's default cipher preference is server's.
+TEST_F(SslContextImplTest, TestServerCipherPreference) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, false).value();
+  ASSERT_FALSE(cfg.get()->preferClientCiphers());
+
+  auto socket_factory = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+      std::move(cfg), manager_, *store_.rootScope(), {});
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory->createDownstreamTransportSocket();
+  SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
+
+  EXPECT_TRUE(SSL_CTX_get_options(ssl_ctx) & SSL_OP_CIPHER_SERVER_PREFERENCE);
+}
+
+TEST_F(SslContextImplTest, TestPreferClientCiphers) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  prefer_client_ciphers: true
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = ServerContextConfigImpl::create(tls_context, factory_context_, false).value();
+  ASSERT_TRUE(cfg.get()->preferClientCiphers());
+
+  auto socket_factory = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+      std::move(cfg), manager_, *store_.rootScope(), {});
+  std::unique_ptr<Network::TransportSocket> socket =
+      socket_factory->createDownstreamTransportSocket();
+  SSL_CTX* ssl_ctx = extractSslCtx(socket.get());
+
+  EXPECT_FALSE(SSL_CTX_get_options(ssl_ctx) & SSL_OP_CIPHER_SERVER_PREFERENCE);
 }
 
 TEST_F(SslContextImplTest, TestExpiringCert) {
@@ -481,7 +532,8 @@ TEST_F(SslContextImplTest, DuplicateRsaCertSameExactDNSSan) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_NO_THROW(loadConfig(*server_context_config));
 }
 
@@ -501,7 +553,8 @@ TEST_F(SslContextImplTest, DuplicateRsaCertSameWildcardDNSSan) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_1_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_NO_THROW(loadConfig(*server_context_config));
 }
 
@@ -521,7 +574,8 @@ TEST_F(SslContextImplTest, AcceptableMultipleRsaCerts) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_rsa_2_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_NO_THROW(loadConfig(*server_context_config));
 }
 
@@ -541,7 +595,8 @@ TEST_F(SslContextImplTest, DuplicateEcdsaCert) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_ecdsa_p256_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_NO_THROW(loadConfig(*server_context_config));
 }
 
@@ -561,7 +616,8 @@ TEST_F(SslContextImplTest, AcceptableMultipleEcdsaCerts) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_ecdsa_2_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_NO_THROW(loadConfig(*server_context_config));
 }
 
@@ -580,7 +636,8 @@ TEST_F(SslContextImplTest, CertDuplicatedSansAndCN) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_multiple_dns_1_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_NO_THROW(loadConfig(*server_context_config));
 }
 
@@ -604,7 +661,8 @@ TEST_F(SslContextImplTest, MultipleCertsSansAndCN) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_wildcard_dns_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_NO_THROW(loadConfig(*server_context_config));
 }
 
@@ -620,10 +678,13 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/no_subject_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
-  EXPECT_THROW_WITH_REGEX(
-      *manager_.createSslServerContext(*store_.rootScope(), *server_context_config, {}, nullptr),
-      EnvoyException, "has neither subject CN nor SAN names");
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  EXPECT_EQ(
+      manager_.createSslServerContext(*store_.rootScope(), *server_context_config, {}, nullptr)
+          .status()
+          .message(),
+      "Invalid TLS context has neither subject CN nor SAN names");
 }
 
 class SslServerContextImplOcspTest : public SslContextImplTest {
@@ -637,8 +698,9 @@ public:
   Envoy::Ssl::ServerContextSharedPtr loadConfigYaml(const std::string& yaml) {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-    auto cfg = THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(tls_context, factory_context_),
-                                     std::unique_ptr<ServerContextConfigImpl>);
+    auto cfg =
+        THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(tls_context, factory_context_, false),
+                              std::unique_ptr<ServerContextConfigImpl>);
     return loadConfig(*cfg);
   }
 };
@@ -831,8 +893,10 @@ TEST_F(SslServerContextImplOcspTest, TestGetCertInformationWithOCSP) {
 class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   void loadConfig(ServerContextConfigImpl& cfg) {
-    Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager_.createSslServerContext(
-        *store_.rootScope(), cfg, std::vector<std::string>{}, nullptr));
+    Envoy::Ssl::ServerContextSharedPtr server_ctx(
+        THROW_OR_RETURN_VALUE(manager_.createSslServerContext(*store_.rootScope(), cfg,
+                                                              std::vector<std::string>{}, nullptr),
+                              Ssl::ServerContextSharedPtr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
 
@@ -846,7 +910,7 @@ public:
         "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"));
 
     auto server_context_config =
-        THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(cfg, factory_context_),
+        THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(cfg, factory_context_, false),
                               std::unique_ptr<ServerContextConfigImpl>);
     loadConfig(*server_context_config);
   }
@@ -854,8 +918,9 @@ public:
   void loadConfigYaml(const std::string& yaml) {
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
-    auto cfg = THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(tls_context, factory_context_),
-                                     std::unique_ptr<ServerContextConfigImpl>);
+    auto cfg =
+        THROW_OR_RETURN_VALUE(ServerContextConfigImpl::create(tls_context, factory_context_, false),
+                              std::unique_ptr<ServerContextConfigImpl>);
     loadConfig(*cfg);
   }
 };
@@ -973,7 +1038,8 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySdsNotReady) {
   auto* sds_secret_configs = tls_context.mutable_session_ticket_keys_sds_secret_config();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   // When sds secret is not downloaded, config is not ready.
   EXPECT_FALSE(server_context_config->isReady());
   // Set various callbacks to config.
@@ -1009,7 +1075,8 @@ session_ticket_keys:
 
   tls_context.mutable_session_ticket_keys_sds_secret_config()->set_name("abc.com");
 
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
 
   EXPECT_TRUE(server_context_config->isReady());
   ASSERT_EQ(server_context_config->sessionTicketKeys().size(), 2);
@@ -1097,7 +1164,8 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledByDefaul
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
 
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_FALSE(server_context_config->disableStatelessSessionResumption());
 }
 
@@ -1114,7 +1182,8 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionExplicitlyEnabl
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
 
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_FALSE(server_context_config->disableStatelessSessionResumption());
 }
 
@@ -1131,7 +1200,8 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionDisabled) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
 
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_TRUE(server_context_config->disableStatelessSessionResumption());
 }
 
@@ -1150,7 +1220,8 @@ TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledWhenKeyI
 )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
 
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_FALSE(server_context_config->disableStatelessSessionResumption());
 }
 
@@ -1227,8 +1298,9 @@ TEST_F(ClientContextConfigImplTest, RSA2048Cert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate that 1024-bit RSA certificates are rejected.
@@ -1299,8 +1371,9 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate that 4096-bit RSA certificates load successfully.
@@ -1316,8 +1389,9 @@ TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate that P256 ECDSA certs load.
@@ -1333,8 +1407,9 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate that non-P256 ECDSA certs are rejected.
@@ -1785,8 +1860,9 @@ public:
 // Multiple TLS certificates are supported.
 TEST_F(ServerContextConfigImplTest, MultipleTlsCertificates) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "No TLS certificates found for server context");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "No TLS certificates found for server context");
   const std::string rsa_tls_certificate_yaml = R"EOF(
   certificate_chain:
     filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
@@ -1803,7 +1879,8 @@ TEST_F(ServerContextConfigImplTest, MultipleTlsCertificates) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   TestUtility::loadFromYaml(TestEnvironment::substitute(ecdsa_tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   auto tls_certs = server_context_config->tlsCertificates();
   ASSERT_EQ(2, tls_certs.size());
   EXPECT_THAT(tls_certs[0].get().privateKeyPath(), EndsWith("selfsigned_key.pem"));
@@ -1812,8 +1889,9 @@ TEST_F(ServerContextConfigImplTest, MultipleTlsCertificates) {
 
 TEST_F(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "No TLS certificates found for server context");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "No TLS certificates found for server context");
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:
     filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
@@ -1823,8 +1901,9 @@ TEST_F(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "SDS and non-SDS TLS certificates may not be mixed in server contexts");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "SDS and non-SDS TLS certificates may not be mixed in server contexts");
 }
 
 TEST_F(ServerContextConfigImplTest, SdsConfigNoName) {
@@ -1862,7 +1941,8 @@ TEST_F(ServerContextConfigImplTest, SecretNotReady) {
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   // When sds secret is not downloaded, config is not ready.
   EXPECT_FALSE(server_context_config->isReady());
   // Set various callbacks to config.
@@ -1893,7 +1973,8 @@ TEST_F(ServerContextConfigImplTest, ValidationContextNotReady) {
       tls_context.mutable_common_tls_context()->mutable_validation_context_sds_secret_config();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   // When sds secret is not downloaded, config is not ready.
   EXPECT_FALSE(server_context_config->isReady());
   // Set various callbacks to config.
@@ -1907,13 +1988,16 @@ TEST_F(ServerContextConfigImplTest, ValidationContextNotReady) {
 TEST_F(ServerContextConfigImplTest, TlsCertificateNonEmpty) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager.createSslServerContext(
-          *store.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr)),
-      EnvoyException, "Server TlsCertificates must have a certificate specified");
+  EXPECT_EQ(manager
+                .createSslServerContext(*store.rootScope(), *server_context_config,
+                                        std::vector<std::string>{}, nullptr)
+                .status()
+                .message(),
+            "Server TlsCertificates must have a certificate specified");
 }
 
 // Cannot ignore certificate expiration without a trusted CA.
@@ -1926,8 +2010,9 @@ TEST_F(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
 
   server_validation_ctx->set_allow_expired_certificate(true);
 
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "Certificate validity period is always ignored without trusted CA");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "Certificate validity period is always ignored without trusted CA");
 
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -1939,19 +2024,20 @@ TEST_F(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
   server_validation_ctx->set_allow_expired_certificate(false);
 
   EXPECT_NO_THROW(auto server_context_config =
-                      *ServerContextConfigImpl::create(tls_context, factory_context_));
+                      *ServerContextConfigImpl::create(tls_context, factory_context_, false));
 
   server_validation_ctx->set_allow_expired_certificate(true);
 
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "Certificate validity period is always ignored without trusted CA");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "Certificate validity period is always ignored without trusted CA");
 
   // But once you add a trusted CA, you should be able to create the context.
   server_validation_ctx->mutable_trusted_ca()->set_filename(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
 
   EXPECT_NO_THROW(auto server_context_config =
-                      *ServerContextConfigImpl::create(tls_context, factory_context_));
+                      *ServerContextConfigImpl::create(tls_context, factory_context_, false));
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
@@ -1974,8 +2060,9 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
             test_value: 100
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "Failed to load private key provider: mock_provider");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "Failed to load private key provider: mock_provider");
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderFallback) {
@@ -1999,8 +2086,9 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderFallbac
         fallback: true
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "Failed to load private key provider: mock_provider");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "Failed to load private key provider: mock_provider");
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
@@ -2031,11 +2119,14 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
             test_value: 100
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
-  EXPECT_THROW_WITH_MESSAGE(
-      Envoy::Ssl::ServerContextSharedPtr server_ctx(*manager.createSslServerContext(
-          *store.rootScope(), *server_context_config, std::vector<std::string>{}, nullptr)),
-      EnvoyException, "Failed to get BoringSSL private key method from provider");
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  EXPECT_EQ(manager
+                .createSslServerContext(*store.rootScope(), *server_context_config,
+                                        std::vector<std::string>{}, nullptr)
+                .status()
+                .message(),
+            "Failed to get BoringSSL private key method from provider");
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
@@ -2063,7 +2154,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
             test_value: 100
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
 }
 
 TEST_F(ServerContextConfigImplTest, PrivateKeyMethodFallback) {
@@ -2094,7 +2186,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodFallback) {
         fallback: true
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
 }
 
 // Test that if both typed and untyped matchers for sans are specified, we
@@ -2130,7 +2223,7 @@ TEST_F(ServerContextConfigImplTest, DeprecatedSanMatcher) {
                       "Ignoring match_subject_alt_names as match_typed_subject_alt_names is also "
                       "specified, and the former is deprecated.",
                       server_context_config =
-                          *ServerContextConfigImpl::create(tls_context, factory_context_));
+                          *ServerContextConfigImpl::create(tls_context, factory_context_, false));
   EXPECT_EQ(server_context_config->certificateValidationContext()->subjectAltNameMatchers().size(),
             1);
   EXPECT_EQ(
@@ -2162,8 +2255,9 @@ TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndMethod) {
             test_value: 100
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "Certificate configuration can't have both pkcs12 and private_key_provider");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "Certificate configuration can't have both pkcs12 and private_key_provider");
 }
 
 TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndKey) {
@@ -2177,8 +2271,9 @@ TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndKey) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "Certificate configuration can't have both pkcs12 and private_key");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "Certificate configuration can't have both pkcs12 and private_key");
 }
 
 TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndCertChain) {
@@ -2192,8 +2287,9 @@ TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndCertChain) {
         filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_certkeychain.p12"
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
-  EXPECT_EQ(ServerContextConfigImpl::create(tls_context, factory_context_).status().message(),
-            "Certificate configuration can't have both pkcs12 and certificate_chain");
+  EXPECT_EQ(
+      ServerContextConfigImpl::create(tls_context, factory_context_, false).status().message(),
+      "Certificate configuration can't have both pkcs12 and certificate_chain");
 }
 
 // TODO: test throw from additional_init

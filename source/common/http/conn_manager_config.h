@@ -83,6 +83,7 @@ namespace Http {
   GAUGE(downstream_cx_ssl_active, Accumulate)                                                      \
   GAUGE(downstream_cx_tx_bytes_buffered, Accumulate)                                               \
   GAUGE(downstream_cx_upgrades_active, Accumulate)                                                 \
+  GAUGE(downstream_cx_http1_soft_drain, Accumulate)                                                \
   GAUGE(downstream_rq_active, Accumulate)                                                          \
   HISTOGRAM(downstream_cx_length_ms, Milliseconds)                                                 \
   HISTOGRAM(downstream_rq_time, Milliseconds)
@@ -190,6 +191,10 @@ public:
 class DefaultInternalAddressConfig : public Http::InternalAddressConfig {
 public:
   bool isInternalAddress(const Network::Address::Instance& address) const override {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.explicit_internal_address_config")) {
+      return false;
+    }
     return Network::Utility::isInternalAddress(address);
   }
 };
@@ -289,6 +294,12 @@ public:
    * @return optional maximum connection duration timeout for manager connections.
    */
   virtual absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+
+  /**
+   * @return whether maxConnectionDuration allows HTTP1 clients to choose when to close connection
+   *         (rather than Envoy closing the connection itself when there are no active streams).
+   */
+  virtual bool http1SafeMaxConnectionDuration() const PURE;
 
   /**
    * @return maximum request headers size the connection manager will accept.

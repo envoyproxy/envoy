@@ -25,9 +25,10 @@ public:
   void OnDecoderStreamError(quic::QuicErrorCode, absl::string_view) override{};
 };
 
-static std::string encodeHeaders(const spdy::Http2HeaderBlock& headers) {
+static std::string encodeHeaders(const quiche::HttpHeaderBlock& headers) {
   static Delegate delegate;
-  quic::QpackEncoder encoder(&delegate, quic::HuffmanEncoding::kEnabled);
+  quic::QpackEncoder encoder(&delegate, quic::HuffmanEncoding::kEnabled,
+                             quic::CookieCrumbling::kEnabled);
   return encoder.EncodeHeaderList(0, headers, nullptr);
 }
 
@@ -95,7 +96,7 @@ std::string H3Serializer::serialize(bool unidirectional, uint32_t type, uint32_t
   }
   case H3Frame::kHeaders: {
     const auto& f = h3frame.headers();
-    spdy::Http2HeaderBlock headers;
+    quiche::HttpHeaderBlock headers;
     for (const auto& hdr : f.headers().headers()) {
       headers.AppendValueOrAddHeader(hdr.key(), hdr.value());
     }
@@ -119,7 +120,7 @@ std::string H3Serializer::serialize(bool unidirectional, uint32_t type, uint32_t
   case H3Frame::kPushPromise: {
     const auto& f = h3frame.push_promise();
     uint64_t push_id = f.push_id();
-    spdy::Http2HeaderBlock headers;
+    quiche::HttpHeaderBlock headers;
     for (auto& hdr : f.headers().headers()) {
       headers.AppendValueOrAddHeader(hdr.key(), hdr.value());
     }

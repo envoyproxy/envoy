@@ -14,6 +14,7 @@ envoy_mobile_android_test(
         "//test/jni:libenvoy_jni_helper_test.so",
     ],
     native_lib_name = "envoy_jni_helper_test",
+    test_class = "io.envoyproxy.envoymobile.jni.JniHelperTest",
 )
 
 envoy_mobile_android_test(
@@ -25,6 +26,7 @@ envoy_mobile_android_test(
         "//test/jni:libenvoy_jni_utility_test.so",
     ],
     native_lib_name = "envoy_jni_utility_test",
+    test_class = "io.envoyproxy.envoymobile.jni.JniUtilityTest",
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         "@maven//:com_google_protobuf_protobuf_javalite",

@@ -102,7 +102,7 @@ void ApplePacProxyResolver::resolveProxies(
   CFRunLoopSourceRef run_loop_source = createPacUrlResolverSource(
       cf_proxy_autoconfiguration_file_url, cf_target_url, context.release());
 
-  CFRunLoopAddSource(CFRunLoopGetMain(), run_loop_source, kCFRunLoopDefaultMode);
+  CFRunLoopAddSource(CFRunLoopGetCurrent(), run_loop_source, kCFRunLoopDefaultMode);
 
   CFRelease(cf_target_url);
   CFRelease(cf_proxy_autoconfiguration_file_url);

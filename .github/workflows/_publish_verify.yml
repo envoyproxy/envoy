@@ -1,0 +1,138 @@
+name: Verify
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: >-
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.event.workflow.id }}-verify
+  cancel-in-progress: true
+
+
+jobs:
+  examples:
+    permissions:
+      contents: read
+      packages: read
+    name: ${{ matrix.name || matrix.target }}
+    uses: ./.github/workflows/_run.yml
+    with:
+      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      cache-build-image: ${{ matrix.cache-build-image }}
+      cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
+      container-command: ${{ matrix.container-command }}
+      concurrency-suffix: -${{ matrix.arch || 'x64' }}
+      downloads: ${{ matrix.downloads }}
+      rbe: ${{ matrix.rbe }}
+      request: ${{ inputs.request }}
+      runs-on: ubuntu-24.04
+      steps-pre: ${{ matrix.steps-pre }}
+      source: ${{ matrix.source }}
+      target: ${{ matrix.target }}
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: examples
+          target: verify_examples
+          downloads: |
+            docker: build_images
+          rbe: false
+          source: |
+            export NO_BUILD_SETUP=1
+          steps-pre: |
+            - run: |
+                # Install expected host packages
+                export DEBIAN_FRONTEND=noninteractive
+                sudo apt-get -qq update -y
+                sudo apt-get -qq install -y --no-install-recommends expect gettext yq whois
+              shell: bash
+            - run: |
+                IMAGES=(
+                    envoy:dev
+                    envoy-contrib:contrib-dev
+                    envoy-google-vrp:google-vrp-dev)
+                for image in "${IMAGES[@]}"; do
+                    src_name="$(echo ${image} | cut -d: -f1)"
+                    dest_name="$(echo ${image} | cut -d: -f2)"
+                    src="oci-archive:%{{ runner.temp }}/build_images/${src_name}.tar"
+                    dest="docker-daemon:envoyproxy/envoy:${dest_name}"
+                    echo "Copy image: ${src} ${dest}"
+                    skopeo copy -q "${src}" "${dest}"
+                done
+              shell: bash
+            - run: docker images | grep envoy
+              shell: bash
+
+  distro:
+    permissions:
+      contents: read
+      packages: read
+    name: ${{ matrix.name || matrix.target }}
+    uses: ./.github/workflows/_run.yml
+    with:
+      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
+      container-command: ./ci/run_envoy_docker.sh
+      concurrency-suffix: -${{ matrix.arch || 'x64' }}
+      downloads: |
+        release.signed: release.signed
+      rbe: ${{ matrix.rbe && matrix.rbe || false }}
+      request: ${{ inputs.request }}
+      runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
+      source: |
+        export NO_BUILD_SETUP=1
+        export ENVOY_DOCKER_IN_DOCKER=1
+      target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.arch }}
+      trusted: ${{ inputs.trusted }}
+      steps-pre: |
+        - run: |
+            echo ARCH=${{ matrix.arch }} >> $GITHUB_ENV
+            echo DEB_ARCH=${{ matrix.arch == 'arm64' && 'arm64' || 'amd64' }} >> $GITHUB_ENV
+          shell: bash
+        - run: |
+            TEMP_DIR=$(mktemp -d)
+            zstd --stdout -d %{{ runner.temp }}/release.signed/release.signed.tar.zst | tar --warning=no-timestamp -xf - -C "${TEMP_DIR}"
+            mkdir ${TEMP_DIR}/debs
+            tar xf ${TEMP_DIR}/bin/debs.tar.gz -C ${TEMP_DIR}/debs
+            mkdir -p ${TEMP_DIR}/distribution/deb
+            cp -a ${TEMP_DIR}/debs/*_${DEB_ARCH}* ${TEMP_DIR}/distribution/deb
+            cp -a ${TEMP_DIR}/signing.key ${TEMP_DIR}/distribution
+            mkdir -p %{{ runner.temp }}/distribution/${ARCH}
+            tar czf %{{ runner.temp }}/distribution/${ARCH}/packages.${ARCH}.tar.gz -C ${TEMP_DIR}/distribution .
+          shell: bash
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+
+        - name: verify_distro_x64
+          target: verify_distro
+          arch: x64
+          rbe: true
+
+        - name: verify_distro_arm64
+          target: verify_distro
+          arch: arm64
+          bazel-extra: >-
+            --config=cache-envoy-engflow
+            --config=common-envoy-engflow
+            --config=bes-envoy-engflow
+          runs-on: envoy-arm64-small

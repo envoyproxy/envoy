@@ -34,6 +34,9 @@ on:
       run-id:
         type: string
         default: ${{ github.event.workflow_run.id }}
+      runs-after:
+        type: boolean
+        default: false
       template-request-summary:
         type: string
         default: |
@@ -87,28 +90,41 @@ jobs:
       trusted: ${{ fromJSON(steps.request-output.outputs.value).request.trusted }}
       skip: ${{ fromJSON(steps.request-output.outputs.value).check.action != 'RUN' }}
     steps:
+    - run: |
+        gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ github.repository }}/actions/runs/${{ inputs.run-id }} \
+          | jq '.'
+        RUNID=$(gh run view ${{ inputs.run-id }} --repo ${{ github.repository }} --json databaseId | jq -r '.databaseId')
+        echo "value=${RUNID}" >> "$GITHUB_OUTPUT"
+      id: run-id
+      if: ${{ inputs.runs-after == true }}
+      env:
+        GH_TOKEN: ${{ github.token }}
+
     # Load env data
     # Handle any failure in triggering job
     # Remove any `checks` we dont care about
     # Prepare a check request
-    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.2.30
+    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.2.36
       name: Load env
       id: data
       with:
-        run-id: ${{ inputs.run-id }}
+        run-id: ${{ steps.run-id.outputs.value || inputs.run-id }}
         check-name: ${{ inputs.check-name }}
         head-sha: ${{ inputs.head-sha }}
       env:
         GH_TOKEN: ${{ github.token }}
 
     #  Update the check
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.30
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.36
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.2.30
+    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.2.36
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
@@ -116,7 +132,7 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.data.outputs.data).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.30
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.36
       name: Print request summary
       with:
         input: |
@@ -136,7 +152,7 @@ jobs:
           | $summary.summary as $summary
           | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.30
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.36
       id: request-output
       name: Load request
       with:
@@ -157,9 +173,25 @@ jobs:
     secrets:
       app-id: ${{ secrets.lock-app-id }}
       app-key: ${{ secrets.lock-app-key }}
-    uses: ./.github/workflows/_cache.yml
+    name: ${{ matrix.name || matrix.target }}
     needs: request
+    uses: ./.github/workflows/_cache.yml
     if: ${{ inputs.cache-docker && ! fromJSON(needs.request.outputs.skip) }}
     with:
-      request: ${{ toJSON(needs.request.outputs) }}
+      arch: ${{ matrix.arch }}
+      cache-suffix: ${{ matrix.cache-suffix }}
       image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}
+      request: ${{ toJSON(needs.request.outputs) }}
+      runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: docker-x64
+          name: Docker (x64)
+          arch: x64
+        - target: docker-arm64
+          name: Docker (arm64)
+          arch: arm64
+          cache-suffix: -arm64
+          runs-on: envoy-arm64-small

@@ -11,6 +11,13 @@ final class SendTrailersTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testSendTrailers() throws {
     // swiftlint:disable:next line_length
     let assertionFilterType = "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion"
@@ -40,7 +47,7 @@ final class SendTrailersTests: XCTestCase {
 
     let client = engine.streamClient()
 
-    let port = String(EnvoyTestServer.getEnvoyPort())
+    let port = String(EnvoyTestServer.getHttpPort())
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
                                                authority: "localhost:" + port, path: "/simple.txt")
       .build()
@@ -66,6 +73,6 @@ final class SendTrailersTests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

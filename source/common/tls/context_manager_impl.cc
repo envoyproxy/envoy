@@ -48,10 +48,12 @@ absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> ContextManagerImpl::createSsl
     IS_ENVOY_BUG("No envoy.ssl.server_context_factory registered");
     return nullptr;
   }
-  Envoy::Ssl::ServerContextSharedPtr context = factory->createServerContext(
-      scope, config, server_names, factory_context_, std::move(additional_init));
-  contexts_.insert(context);
-  return context;
+  absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> context_or_error =
+      factory->createServerContext(scope, config, server_names, factory_context_,
+                                   std::move(additional_init));
+  RETURN_IF_NOT_OK(context_or_error.status());
+  contexts_.insert(*context_or_error);
+  return *context_or_error;
 }
 
 absl::optional<uint32_t> ContextManagerImpl::daysUntilFirstCertExpires() const {

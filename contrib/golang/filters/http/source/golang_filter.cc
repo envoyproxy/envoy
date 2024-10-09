@@ -19,6 +19,7 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/expr/context.h"
 
@@ -77,6 +78,8 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   ProcessorState& state = decoding_state_;
   ENVOY_LOG(debug, "golang filter decodeTrailers, decoding state: {}", state.stateStr());
 
+  request_trailers_ = &trailers;
+
   bool done = doTrailer(state, trailers);
 
   return done ? Http::FilterTrailersStatus::Continue : Http::FilterTrailersStatus::StopIteration;
@@ -91,10 +94,10 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   activation_response_headers_ = dynamic_cast<const Http::ResponseHeaderMap*>(&headers);
 
   // NP: may enter encodeHeaders in any state,
-  // since other filters or filtermanager could call encodeHeaders or sendLocalReply in any time.
-  // eg. filtermanager may invoke sendLocalReply, when scheme is invalid,
-  // with "Sending local reply with details // http1.invalid_scheme" details.
-  // This means DecodeXXX & EncodeXXX may run concurrently in Golang side.
+  // since other filters or filtermanager could call encodeHeaders or sendLocalReply in any
+  // time. eg. filtermanager may invoke sendLocalReply, when scheme is invalid, with "Sending
+  // local reply with details // http1.invalid_scheme" details. This means DecodeXXX & EncodeXXX
+  // may run concurrently in Golang side.
 
   bool done = doHeaders(encoding_state_, headers, end_stream);
 
@@ -129,6 +132,14 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
   return done ? Http::FilterTrailersStatus::Continue : Http::FilterTrailersStatus::StopIteration;
 }
 
+void Filter::onStreamComplete() {
+  // We reuse the same flag for both onStreamComplete & log to save the space,
+  // since they are exclusive and serve for the access log purpose.
+  req_->is_golang_processing_log = 1;
+  dynamic_lib_->envoyGoFilterOnHttpStreamComplete(req_);
+  req_->is_golang_processing_log = 0;
+}
+
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
@@ -159,6 +170,18 @@ void Filter::onDestroy() {
 // access_log is executed before the log of the stream filter
 void Filter::log(const Formatter::HttpFormatterContext& log_context,
                  const StreamInfo::StreamInfo&) {
+  uint64_t req_header_num = 0;
+  uint64_t req_header_bytes = 0;
+  uint64_t req_trailer_num = 0;
+  uint64_t req_trailer_bytes = 0;
+  uint64_t resp_header_num = 0;
+  uint64_t resp_header_bytes = 0;
+  uint64_t resp_trailer_num = 0;
+  uint64_t resp_trailer_bytes = 0;
+
+  auto decoding_state = dynamic_cast<processState*>(&decoding_state_);
+  auto encoding_state = dynamic_cast<processState*>(&encoding_state_);
+
   // `log` may be called multiple times with different log type
   switch (log_context.accessLogType()) {
   case Envoy::AccessLog::AccessLogType::DownstreamStart:
@@ -166,14 +189,42 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
   case Envoy::AccessLog::AccessLogType::DownstreamEnd:
     // log called by AccessLogDownstreamStart will happen before doHeaders
     if (initRequest()) {
-      request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
-          const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders()));
+      request_headers_ = const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders());
     }
 
-    // This only run in the work thread, it's safe even without lock.
-    is_golang_processing_log_ = true;
-    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
-    is_golang_processing_log_ = false;
+    if (request_headers_ != nullptr) {
+      req_header_num = request_headers_->size();
+      req_header_bytes = request_headers_->byteSize();
+      decoding_state_.headers = request_headers_;
+    }
+
+    if (request_trailers_ != nullptr) {
+      req_trailer_num = request_trailers_->size();
+      req_trailer_bytes = request_trailers_->byteSize();
+      decoding_state_.trailers = request_trailers_;
+    }
+
+    activation_response_headers_ = &log_context.responseHeaders();
+    if (activation_response_headers_ != nullptr) {
+      resp_header_num = activation_response_headers_->size();
+      resp_header_bytes = activation_response_headers_->byteSize();
+      encoding_state_.headers = const_cast<Http::ResponseHeaderMap*>(activation_response_headers_);
+    }
+
+    activation_response_trailers_ = &log_context.responseTrailers();
+    if (activation_response_trailers_ != nullptr) {
+      resp_trailer_num = activation_response_trailers_->size();
+      resp_trailer_bytes = activation_response_trailers_->byteSize();
+      encoding_state_.trailers =
+          const_cast<Http::ResponseTrailerMap*>(activation_response_trailers_);
+    }
+
+    req_->is_golang_processing_log = 1;
+    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()), decoding_state,
+                                         encoding_state, req_header_num, req_header_bytes,
+                                         req_trailer_num, req_trailer_bytes, resp_header_num,
+                                         resp_header_bytes, resp_trailer_num, resp_trailer_bytes);
+    req_->is_golang_processing_log = 0;
     break;
   default:
     // skip calling with unsupported log types
@@ -505,8 +556,9 @@ CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint6
 void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
   auto i = 0;
   m.iterate([&i, &go_strs, &go_buf](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    auto key = std::string(header.key().getStringView());
-    auto value = std::string(header.value().getStringView());
+    // It's safe to use StringView here, since we will copy them into Golang.
+    auto key = header.key().getStringView();
+    auto value = header.value().getStringView();
 
     auto len = key.length();
     // go_strs is the heap memory of go, and the length is twice the number of headers. So range it
@@ -521,9 +573,12 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
 
     len = value.length();
     go_strs[i].n = len;
-    go_strs[i].p = go_buf;
-    memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
-    go_buf += len;
+    // go_buf may be an invalid pointer in Golang side when len is 0.
+    if (len > 0) {
+      go_strs[i].p = go_buf;
+      memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
+      go_buf += len;
+    }
     i++;
     return Http::HeaderMap::Iterate::Continue;
   });
@@ -1127,7 +1182,7 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, uint64_t* value_dat
   }
 
   // to access the headers_ and its friends we need to hold the lock
-  activation_request_headers_ = dynamic_cast<const Http::RequestHeaderMap*>(request_headers_);
+  activation_request_headers_ = request_headers_;
 
   if (isThreadSafe()) {
     return getStringPropertyCommon(path, value_data, value_len);
@@ -1322,19 +1377,13 @@ void Filter::deferredDeleteRequest(HttpRequestInternal* req) {
 uint64_t Filter::getMergedConfigId() {
   Http::StreamFilterCallbacks* callbacks = decoding_state_.getFilterCallbacks();
 
-  // get all of the per route config
-  std::list<const FilterConfigPerRoute*> route_config_list;
-  callbacks->traversePerFilterConfig(
-      [&route_config_list](const Router::RouteSpecificFilterConfig& cfg) {
-        route_config_list.push_back(dynamic_cast<const FilterConfigPerRoute*>(&cfg));
-      });
-
-  ENVOY_LOG(debug, "golang filter route config list length: {}.", route_config_list.size());
-
   auto id = config_->getConfigId();
-  for (auto it : route_config_list) {
-    auto route_config = *it;
-    id = route_config.getPluginConfigId(id, config_->pluginName());
+
+  // get all of the per route config
+  auto route_config_list = Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(callbacks);
+  ENVOY_LOG(debug, "golang filter route config list length: {}.", route_config_list.size());
+  for (const FilterConfigPerRoute& typed_config : route_config_list) {
+    id = typed_config.getPluginConfigId(id, config_->pluginName());
   }
 
   return id;

@@ -46,6 +46,8 @@ public:
   QueuedChunkPtr pop(Buffer::OwnedImpl& out_data,
                      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
                      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
+  void clear();
+  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
   // the total number of chunks in the queue.
@@ -283,6 +285,12 @@ private:
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
   bool handleMxnBodyResponse(
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  void sendBufferedDataInStreamedMode(bool end_stream);
+  absl::Status
+  processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  void clearStreamingChunk() { chunk_queue_.clear(); }
+  CallbackState getCallbackStateAfterHeaderResp(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
 };
 
 class DecodingProcessorState : public ProcessorState {

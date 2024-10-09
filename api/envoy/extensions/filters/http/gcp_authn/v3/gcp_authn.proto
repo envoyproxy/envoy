@@ -5,8 +5,10 @@ package envoy.extensions.filters.http.gcp_authn.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/http_uri.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -21,12 +23,21 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.gcp_authn]
 
 // Filter configuration.
+// [#next-free-field: 7]
 message GcpAuthnFilterConfig {
   // The HTTP URI to fetch tokens from GCE Metadata Server(https://cloud.google.com/compute/docs/metadata/overview).
   // The URL format is "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=[AUDIENCE]"
-  config.core.v3.HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
+  //
+  // This field is deprecated because it does not match the API surface provided by the google auth libraries.
+  // Control planes should not attempt to override the metadata server URI.
+  // The cluster and timeout can be configured using the ``cluster`` and ``timeout`` fields instead.
+  // For backward compatibility, the cluster and timeout configured in this field will be used
+  // if the new ``cluster`` and ``timeout`` fields are not set.
+  config.core.v3.HttpUri http_uri = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // Retry policy for fetching tokens. This field is optional.
+  // Retry policy for fetching tokens.
+  // Not supported by all data planes.
   config.core.v3.RetryPolicy retry_policy = 2;
 
   // Token cache configuration. This field is optional.
@@ -34,7 +45,20 @@ message GcpAuthnFilterConfig {
 
   // Request header location to extract the token. By default (i.e. if this field is not specified), the token
   // is extracted to the Authorization HTTP header, in the format "Authorization: Bearer <token>".
+  // Not supported by all data planes.
   TokenHeader token_header = 4;
+
+  // Cluster to send traffic to the GCE metadata server. Not supported
+  // by all data planes; a data plane may instead have its own mechanism
+  // for contacting the metadata server.
+  string cluster = 5;
+
+  // Timeout for fetching the tokens from the GCE metadata server.
+  // Not supported by all data planes.
+  google.protobuf.Duration timeout = 6 [(validate.rules).duration = {
+    lt {seconds: 4294967296}
+    gte {}
+  }];
 }
 
 // Audience is the URL of the receiving service that performs token authentication.
