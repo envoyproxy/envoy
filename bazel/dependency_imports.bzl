@@ -42,7 +42,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         exec_triple = "s390x-unknown-linux-gnu",
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
         ],
         versions = [rust_common.default_version],
     )
@@ -50,7 +50,7 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     rust_register_toolchains(
         extra_target_triples = [
             "wasm32-unknown-unknown",
-            "wasm32-wasi",
+            "wasm32-wasip1",
         ],
     )
     crate_universe_dependencies()
