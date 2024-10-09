@@ -51,7 +51,7 @@ TEST_F(OdCdsApiImplTest, FollowingClusterNamesHitAwaitingList) {
   InSequence s;
 
   EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(ElementsAre("fake_cluster")));
-  EXPECT_CALL(*cm_.subscription_factory_.subscription_, requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(*cm_.subscription_factory_.subscription_, updateResourceInterest(_)).Times(0);
   odcds_->updateOnDemand("fake_cluster");
   odcds_->updateOnDemand("another_cluster");
 }
@@ -70,7 +70,7 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdate) {
   const auto decoded_resources = TestUtility::decodeResources({cluster});
   EXPECT_CALL(
       *cm_.subscription_factory_.subscription_,
-      requestOnDemandUpdate(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
+      updateResourceInterest(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
   ASSERT_TRUE(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0").ok());
 }
 
@@ -85,7 +85,7 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnConfigUpdateFailed) {
 
   EXPECT_CALL(
       *cm_.subscription_factory_.subscription_,
-      requestOnDemandUpdate(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
+      updateResourceInterest(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                          nullptr);
 }
@@ -101,7 +101,7 @@ TEST_F(OdCdsApiImplTest, AwaitingListIsProcessedOnceOnly) {
 
   EXPECT_CALL(
       *cm_.subscription_factory_.subscription_,
-      requestOnDemandUpdate(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
+      updateResourceInterest(UnorderedElementsAre("another_cluster_1", "another_cluster_2")));
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                          nullptr);
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
@@ -114,7 +114,7 @@ TEST_F(OdCdsApiImplTest, NothingIsRequestedOnEmptyAwaitingList) {
 
   odcds_->updateOnDemand("fake_cluster");
 
-  EXPECT_CALL(*cm_.subscription_factory_.subscription_, requestOnDemandUpdate(_)).Times(0);
+  EXPECT_CALL(*cm_.subscription_factory_.subscription_, updateResourceInterest(_)).Times(0);
   odcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                          nullptr);
 }
@@ -130,7 +130,7 @@ TEST_F(OdCdsApiImplTest, OnDemandUpdateIsRequestedAfterInitialFetch) {
   const auto decoded_resources = TestUtility::decodeResources({cluster});
   ASSERT_TRUE(odcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "0").ok());
   EXPECT_CALL(*cm_.subscription_factory_.subscription_,
-              requestOnDemandUpdate(UnorderedElementsAre("another_cluster")));
+              updateResourceInterest(UnorderedElementsAre("another_cluster")));
   odcds_->updateOnDemand("another_cluster");
 }
 

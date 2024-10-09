@@ -89,7 +89,7 @@ void OdCdsApiImpl::sendAwaiting() {
   // used any more.
   ENVOY_LOG(debug, "odcds: sending request for awaiting cluster names {}",
             fmt::join(awaiting_names_, ", "));
-  subscription_->requestOnDemandUpdate(awaiting_names_);
+  subscription_->updateResourceInterest(awaiting_names_);
   awaiting_names_.clear();
 }
 
@@ -108,7 +108,7 @@ void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
 
   case StartStatus::InitialFetchDone:
     ENVOY_LOG(trace, "odcds: requesting for cluster name {}", cluster_name);
-    subscription_->requestOnDemandUpdate({std::move(cluster_name)});
+    subscription_->updateResourceInterest({std::move(cluster_name)});
     return;
   }
   PANIC("corrupt enum");
