@@ -376,13 +376,25 @@ message HeaderMutation {
 }
 
 message MxnBodyResponse {
-  uint32 confirmed_chunks_count = 1;
+  // Envoy sends the body out as it is.
+  bytes body = 1;
+
+  // Set ``end_of_stream`` to true of this is the last chunk of body.
+  // Envoy will continue filter chain operation if this flag is enabled.
   bool end_of_stream = 2;
+
+  // The ext_proc server sends this number to notify Envoy how many body chunks are received.
+  // After receives this, Envoy will clear those chunks in it's queue. So more date chunks can come into Envoy.
+  // The ext_proc server may send a ``confirmed_chunks_count``  message with or without the ``body``.
+  // In the situation the ext_proc server needs to buffer large amount of data before sending back body response,
+  // it can send standalone ``confirmed_chunks_count``  message as confirmation .
+  uint32 confirmed_chunks_count = 3;
 }
 
-// Replace the entire message body chunk received in the corresponding
-// HttpBody message with this new body, or clear the body.
+// Body mutation
 message BodyMutation {
+  // Sending this response for none MxN body mode, i.e, STREAMED, BUFFERED
+  // or BUFFERED_PARTIAL body mode.
   oneof mutation {
     // The entire body to replace
     bytes body = 1;
@@ -390,6 +402,7 @@ message BodyMutation {
     // Clear the corresponding body chunk
     bool clear_body = 2;
   }
-  // MxN body mode responses.
+  // Sending this body mutation for the MxN body mode.
+  // Only one of ``mxn_resp`` or above ``mutation`` can be set.
   MxnBodyResponse mxn_resp = 3;
 }

@@ -40,8 +40,12 @@ public:
   ChunkQueue& operator=(const ChunkQueue&) = delete;
   uint32_t bytesEnqueued() const { return bytes_enqueued_; }
   bool empty() const { return queue_.empty(); }
-  void push(Buffer::Instance& data, bool end_stream, envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
-  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data, envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
+  void push(Buffer::Instance& data, bool end_stream,
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
+  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data,
+                     envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
+                     envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
   // the total number of chunks in the queue.

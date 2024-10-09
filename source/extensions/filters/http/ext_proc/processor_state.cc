@@ -270,8 +270,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         if (body_mode_ != ProcessingMode::MXN) {
           return absl::FailedPreconditionError("spurious message");
         }
-
-        handleMxnBodyResponse(common_response);
+        should_continue = handleMxnBodyResponse(common_response);
       } else {
         should_continue = handleSingleChunkInBodyResponse(common_response);
       }
@@ -417,35 +416,39 @@ bool ProcessorState::handleSingleChunkInBodyResponse(const CommonResponse& commo
 }
 
 bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response) {
-  uint32_t confirmed_chunks_count = common_response.body_mutation().mxn_resp().confirmed_chunks_count();
+  // If confirmed_chunks_count is encoded, clear the chunks from the queue, and clear the watermark.
+  const uint32_t confirmed_chunks_count = common_response.body_mutation().mxn_resp().confirmed_chunks_count();
   if (confirmed_chunks_count > 0 && confirmed_chunks_count <= chunk_queue_.size() ) {
     ENVOY_LOG(trace, "MxN: Clearing {} chunks of HTTP body", confirmed_chunks_count);
     for (uint32_t i = 0; i < confirmed_chunks_count; i++) {
       Buffer::OwnedImpl chunk_data;
       (void)dequeueStreamingChunk(chunk_data);
       chunk_data.drain(chunk_data.length());
-      if (queueBelowLowLimit()) {
-        clearWatermark();
-      }
     }
-    onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
-    return false;
+    if (queueBelowLowLimit()) {
+      clearWatermark();
+    }
   }
-  auto body = common_response.body_mutation().body();
+
+  // If body mutation is encoded, send the body out.
+  const auto& mxn_resp = common_response.body_mutation().mxn_resp();
+  const auto& body = mxn_resp.body();
+  bool end_of_stream = mxn_resp.end_of_stream();
   if (body.size() > 0) {
     Buffer::OwnedImpl buffer;
     buffer.add(body);
-    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream with more data coming",
-              buffer.length());
-    injectDataToFilterChain(buffer, false);
+    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}",
+              buffer.length(), end_of_stream);
+    injectDataToFilterChain(buffer, end_of_stream);
   }
 
-  auto callback_state = /*chunk_queue_.empty() ? CallbackState::Idle :*/ callback_state_;
-  onFinishProcessorCall(Grpc::Status::Ok, callback_state);
-  // Need to start a new gRPC call timer.
-  onStartProcessorCall(std::bind(&Filter::onMessageTimeout, &(this->filter_)),
-                       filter_.config().messageTimeout(), callback_state_);
-  bool should_continue =  common_response.body_mutation().mxn_resp().end_of_stream();
+  if (end_of_stream) {
+    onFinishProcessorCall(Grpc::Status::Ok);
+  } else {
+    onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+  }
+
+  bool should_continue =  end_of_stream;
   return should_continue;
 }
 

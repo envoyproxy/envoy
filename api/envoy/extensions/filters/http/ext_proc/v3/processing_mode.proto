@@ -73,8 +73,10 @@ message ProcessingMode {
     // stored in the internal queue. Only bytes tracking is stored there.
     // Server may buffer the M chunks of data, processing them then split the processed
     // data into N chunks, and stream them back.
-    // During server buffering stage, it must send ACK to Envoy as indication how many chunks
+    // During server buffering stage, it must send ``confirmed_chunks_count`` to Envoy as indication how many chunks
     // it has received.
+    //
+    // When bodying mode is set to ``MXN``, the corresponding trailer mode has to be set to ``SEND``.
     MXN = 4;
   }
 
