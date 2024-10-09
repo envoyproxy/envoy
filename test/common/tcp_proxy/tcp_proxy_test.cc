@@ -137,9 +137,9 @@ public:
 
       if (receive_before_connect) {
         filter_callbacks_.connection().streamInfo().filterState()->setData(
-          TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::Connection);
+            TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
+            StreamInfo::FilterState::StateType::ReadOnly,
+            StreamInfo::FilterState::LifeSpan::Connection);
       }
 
       filter_ = std::make_unique<Filter>(config_,
@@ -156,8 +156,9 @@ public:
     }
 
     if (connections > 0) {
-      auto expected_status_on_new_connection = receive_before_connect ? Network::FilterStatus::Continue
-                                                                     : Network::FilterStatus::StopIteration;
+      auto expected_status_on_new_connection = receive_before_connect
+                                                   ? Network::FilterStatus::Continue
+                                                   : Network::FilterStatus::StopIteration;
       EXPECT_EQ(expected_status_on_new_connection, filter_->onNewConnection());
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
       EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
@@ -457,6 +458,38 @@ TEST_P(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
 
   raiseEventUpstreamConnected(0);
 
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_callbacks_->onUpstreamData(response, false);
+
+  EXPECT_CALL(*upstream_connections_.at(0), readDisable(true));
+  filter_callbacks_.connection_.runHighWatermarkCallbacks();
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  filter_callbacks_.connection_.runLowWatermarkCallbacks();
+}
+
+TEST_P(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
+  setup(1, false, true);
+  std::string early_data("early data");
+  Buffer::OwnedImpl early_data_buffer(early_data);
+
+  // Check that the early data is buffered and flushed to upstream when connection is established.
+  // Also check that downstream connection is read disabled.
+  EXPECT_CALL(*upstream_connections_.at(0), write(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  filter_->onData(early_data_buffer, false);
+
+  // Now when upstream connection is established, early buffer will be sent.
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(early_data), false));
+  raiseEventUpstreamConnected(0);
+
   // Any further communications between client and server can resume normally.
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
@@ -468,7 +501,7 @@ TEST_P(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
 }
 
 TEST_P(TcpProxyTest, ReceiveBeforeConnectNoEarlyData) {
-  setup(1, false, true);
+  setup(1, /*set_redirect_records*/ false, /*receive_before_connect*/ true);
   raiseEventUpstreamConnected(0, false);
 
   // Any data sent after upstream connection is established is flushed directly to upstream,
@@ -1386,7 +1419,7 @@ TEST_P(TcpProxyTest, UpstreamSocketOptionsReturnedEmpty) {
 }
 
 TEST_P(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {
-  setup(1, true);
+  setup(1, /*set_redirect_records*/ true, /*receive_before_connect*/ false);
   EXPECT_TRUE(filter_->upstreamSocketOptions());
   auto iterator = std::find_if(
       filter_->upstreamSocketOptions()->begin(), filter_->upstreamSocketOptions()->end(),
