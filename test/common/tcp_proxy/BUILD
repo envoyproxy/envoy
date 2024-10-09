@@ -29,6 +29,7 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/upstreams/http/generic:config",
+        "//source/common/stream_info:bool_accessor_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
