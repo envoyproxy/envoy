@@ -47,7 +47,6 @@ public:
                      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
                      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
   void clear();
-  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
   // the total number of chunks in the queue.

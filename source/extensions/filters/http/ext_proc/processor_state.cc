@@ -290,7 +290,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
       if (common_response.has_body_mutation() && common_response.body_mutation().has_mxn_resp()) {
         ENVOY_LOG(debug,
-                  "MxN body response is received and body mode is {} ", body_mode_);
+                  "MxN body response is received and body_mode_== ProcessingMode::MXN?  {} ", (body_mode_ == ProcessingMode::MXN));
         // mxn_resp will only be supported if the ext_proc filter has body_mode set to MXN.
         if (body_mode_ != ProcessingMode::MXN) {
           return absl::FailedPreconditionError("spurious message");
