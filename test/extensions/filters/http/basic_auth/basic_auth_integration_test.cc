@@ -25,6 +25,7 @@ typed_config:
     inline_string: |-
       user1:{SHA}tESsBmE/yNY3lb6a0L6vVQEZNqw=
       user2:{SHA}EJ9LPFDXsN9ynSmbxvjp75Bmlx8=
+      user3:$2y$05$br5Mb9Dvx3tjWSd9imKvfOBTP9EycYIRTzpDkrMMuZS7y8G1P7p8O
   forward_username_header: x-username
 )EOF";
 
@@ -89,7 +90,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// Request with valid credential
+// Request with valid credential with SHA1 hash
 TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -107,6 +108,31 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
   const auto username_entry = upstream_request_->headers().get(Http::LowerCaseString("x-username"));
   EXPECT_FALSE(username_entry.empty());
   EXPECT_EQ(username_entry[0]->value().getStringView(), "user1");
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Request with valid credential with bcrypt hash
+TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
+  initializeFilter();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Basic dXNlcjM6dGVzdDM="}, // user3, test3
+  });
+
+  waitForNextUpstreamRequest();
+
+  const auto username_entry = upstream_request_->headers().get(Http::LowerCaseString("x-username"));
+  EXPECT_FALSE(username_entry.empty());
+  EXPECT_EQ(username_entry[0]->value().getStringView(), "user3");
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -167,7 +193,7 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, NoneExistedUser) {
       {":path", "/"},
       {":scheme", "http"},
       {":authority", "host"},
-      {"Authorization", "Basic dXNlcjM6dGVzdDI="}, // user3, test2
+      {"Authorization", "Basic dXNlcjQ6dGVzdDI="}, // user4, test2
   });
 
   ASSERT_TRUE(response->waitForEndStream());

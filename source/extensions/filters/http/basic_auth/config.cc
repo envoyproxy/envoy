@@ -43,14 +43,21 @@ UserMap readHtpasswd(const std::string& htpasswd) {
       throw EnvoyException("basic auth: duplicate users");
     }
 
-    if (!absl::StartsWith(hash, "{SHA}")) {
-      throw EnvoyException("basic auth: unsupported htpasswd format: please use {SHA}");
+    if (absl::StartsWith(hash, "{SHA}")) {
+      // The base64 encoded SHA1 hash is 28 bytes long and prefix is 5
+      if (hash.length() != 5+28) {
+        throw EnvoyException("basic auth: invalid htpasswd format, invalid SHA hash length");
+      }
     }
 
-    hash = hash.substr(5);
-    // The base64 encoded SHA1 hash is 28 bytes long
-    if (hash.length() != 28) {
-      throw EnvoyException("basic auth: invalid htpasswd format, invalid SHA hash length");
+    else if (absl::StartsWith(hash, "$2b$") || absl::StartsWith(hash, "$2y$") || absl::StartsWith(hash, "$2x$") || absl::StartsWith(hash, "$2a$")) {
+      if (hash.length() != 60) {
+        throw EnvoyException("basic auth: invalid htpasswd format, invalid bcrypt hash length");
+      }
+    }
+
+    else {
+      throw EnvoyException("basic auth: unsupported htpasswd format: invalid hash type");
     }
 
     users.insert({name, {name, hash}});

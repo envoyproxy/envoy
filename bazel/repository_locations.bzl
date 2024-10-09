@@ -163,6 +163,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2022-06-13",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
+    com_github_bcrypt = dict(
+        project_name = "bcrypt",
+        project_desc = " C++ wrapper around bcrypt password hashing",
+        project_url = "https://github.com/hilch/Bcrypt.cpp",
+        version = "V2.0_NODEBCRYPT",
+        sha256 = "150abb95058a459e58f2bf995fd85af1d616374cc920d1ebb84666a8b2b3c50c",
+        urls = ["https://github.com/hilch/Bcrypt.cpp/archive/refs/tags/{version}.tar.gz"],
+        use_category = ["controlplane", "dataplane_core"],
+        release_date = "2021-12-24",
+        cpe = "N/A",
+    ),
     aspect_bazel_lib = dict(
         project_name = "Aspect Bazel helpers",
         project_desc = "Base Starlark libraries and basic Bazel rules which are useful for constructing rulesets and BUILD files",
