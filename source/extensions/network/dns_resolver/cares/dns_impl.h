@@ -77,7 +77,7 @@ private:
       cancel_reason_ = reason;
     }
     void addTrace(uint8_t) override {}
-    OptRef<std::vector<Trace>> getTraces() override { return {}; }
+    OptRef<const std::vector<Trace>> getTraces() override { return {}; }
     absl::optional<std::vector<std::string>>
     getTraces(absl::AnyInvocable<std::string(const Trace&)>) override {
       return {};
