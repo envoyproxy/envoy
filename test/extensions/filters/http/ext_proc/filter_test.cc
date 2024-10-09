@@ -4055,7 +4055,9 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
     processResponseBody(
         [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
           auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
+          mxn_resp->set_confirmed_chunks_count(1);
           mxn_resp->set_body(body.body());
+          mxn_resp->set_end_of_stream(false);
           want_response_body.add(body.body());
         },
         false);
@@ -4116,7 +4118,7 @@ TEST_F(HttpFilterTest, SendMReqChunksReceiveNRespChunksNormal) {
         mxn_resp->set_body(" HH ");
         want_response_body.add(" HH ");
       },
-      false);
+      true);
 
   // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());

@@ -393,7 +393,7 @@ message MxnBodyResponse {
 
 // Body mutation
 message BodyMutation {
-  // Sending this response for none MxN body mode, i.e, STREAMED, BUFFERED
+  // Sending this response for none MXN body mode, i.e, STREAMED, BUFFERED
   // or BUFFERED_PARTIAL body mode.
   oneof mutation {
     // The entire body to replace
@@ -402,7 +402,7 @@ message BodyMutation {
     // Clear the corresponding body chunk
     bool clear_body = 2;
   }
-  // Sending this body mutation for the MxN body mode.
+  // Sending this body mutation for the MXN body mode.
   // Only one of ``mxn_resp`` or above ``mutation`` can be set.
   MxnBodyResponse mxn_resp = 3;
 }
