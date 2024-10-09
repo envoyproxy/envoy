@@ -93,12 +93,9 @@ Cluster::~Cluster() {
     auto cluster_name = it->first;
     ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
     cluster_map_.erase(it++);
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update")) {
-      cm_.removeCluster(cluster_name, true);
-    } else {
-      cm_.removeCluster(cluster_name);
-    }
+    cm_.removeCluster(cluster_name,
+                      Runtime::runtimeFeatureEnabled(
+                          "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"));
   }
 }
 
@@ -136,12 +133,9 @@ void Cluster::checkIdleSubCluster() {
         auto cluster_name = it->first;
         ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
         cluster_map_.erase(it++);
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update")) {
-          cm_.removeCluster(cluster_name, true);
-        } else {
-          cm_.removeCluster(cluster_name);
-        }
+        cm_.removeCluster(cluster_name,
+                          Runtime::runtimeFeatureEnabled(
+                              "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"));
       } else {
         ++it;
       }
