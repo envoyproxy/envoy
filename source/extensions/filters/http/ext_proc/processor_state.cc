@@ -110,8 +110,10 @@ absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_
 
 ProcessorState::CallbackState
 ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_response) const {
-  if (bodyMode() == ProcessingMode::STREAMED &&
-      filter_.config().sendBodyWithoutWaitingForHeaderResponse() && !chunk_queue_.empty() &&
+  if (((bodyMode() == ProcessingMode::STREAMED &&
+        filter_.config().sendBodyWithoutWaitingForHeaderResponse()) ||
+       bodyMode() == ProcessingMode::MXN)
+       && !chunk_queue_.empty() &&
       (common_response.status() != CommonResponse::CONTINUE_AND_REPLACE)) {
     return ProcessorState::CallbackState::StreamedBodyCallback;
   }

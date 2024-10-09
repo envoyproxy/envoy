@@ -572,8 +572,9 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   }
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    if (state.bodyMode() == ProcessingMode::STREAMED &&
-        config_->sendBodyWithoutWaitingForHeaderResponse()) {
+    if ((state.bodyMode() == ProcessingMode::STREAMED &&
+         config_->sendBodyWithoutWaitingForHeaderResponse()) ||
+        state.bodyMode() == ProcessingMode::MXN) {
       ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
                        "is STREAMED and send_body_without_waiting_for_header_response is enabled");
     } else {
