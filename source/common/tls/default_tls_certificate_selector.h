@@ -8,14 +8,10 @@
 #include "source/common/tls/server_context_impl.h"
 #include "source/common/tls/stats.h"
 
-#include "absl/container/inlined_vector.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
-using CurveNIDSupportedVector = absl::InlinedVector<int, 3>;
 
 // Defined in server_context_impl.h
 class ServerContextImpl;
@@ -35,7 +31,8 @@ public:
   // Finds the best matching context. The returned context will have the same lifetime as
   // ``ServerContextImpl``.
   std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-  findTlsContext(absl::string_view sni, const CurveNIDSupportedVector& client_ecdsa_capabilities,
+  findTlsContext(absl::string_view sni,
+                 const Ssl::CurveNIDSupportedVector& client_ecdsa_capabilities,
                  bool client_ocsp_capable, bool* cert_matched_sni) override;
 
 private:

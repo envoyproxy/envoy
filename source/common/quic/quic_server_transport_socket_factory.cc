@@ -14,8 +14,6 @@
 namespace Envoy {
 namespace Quic {
 
-using CurveNIDSupportedVector = absl::InlinedVector<int, 3>;
-
 absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context,
@@ -176,7 +174,7 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   auto ctx =
       std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
   auto [tls_context, ocsp_staple_action] = ctx->findTlsContext(
-      sni, CurveNIDSupportedVector{NID_X9_62_prime256v1} /* TODO: ecdsa_capable */,
+      sni, Ssl::CurveNIDSupportedVector{NID_X9_62_prime256v1} /* TODO: ecdsa_capable */,
       false /* TODO: ocsp_capable */, cert_matched_sni);
 
   // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ``ssl_ctx``.

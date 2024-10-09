@@ -59,7 +59,6 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-#include "absl/container/inlined_vector.h"
 #include "absl/strings/str_replace.h"
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -79,8 +78,6 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
-using CurveNIDSupportedVector = absl::InlinedVector<int, 3>;
 
 class TestTlsCertificateSelector : public virtual Ssl::TlsCertificateSelector {
 public:

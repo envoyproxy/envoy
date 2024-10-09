@@ -42,18 +42,24 @@
 namespace Envoy {
 namespace {
 
-bool cbsContainsU16(CBS& cbs, uint16_t n) {
+Ssl::CurveNIDSupportedVector getClientCurveNIDSupported(CBS& cbs) {
+  Ssl::CurveNIDSupportedVector cnsv{};
   while (CBS_len(&cbs) > 0) {
     uint16_t v;
     if (!CBS_get_u16(&cbs, &v)) {
-      return false;
+      return cnsv;
     }
-    if (v == n) {
-      return true;
+    if (v == SSL_SIGN_ECDSA_SECP256R1_SHA256 || v == SSL_CURVE_SECP256R1) {
+      cnsv.push_back(NID_X9_62_prime256v1);
+    }
+    if (v == SSL_SIGN_ECDSA_SECP384R1_SHA384 || v == SSL_CURVE_SECP384R1) {
+      cnsv.push_back(NID_secp384r1);
+    }
+    if (v == SSL_SIGN_ECDSA_SECP521R1_SHA512 || v == SSL_CURVE_SECP521R1) {
+      cnsv.push_back(NID_secp521r1);
     }
   }
-
-  return false;
+  return cnsv;
 }
 
 } // namespace
@@ -381,7 +387,6 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 // the vector inside that optional is a list of `ssl.h` constants representing ECDSA group NIDs.
 CurveNIDSupportedVector
 ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const {
-  CurveNIDSupportedVector client_capabilities;
   CBS client_hello;
   CBS_init(&client_hello, ssl_client_hello.client_hello, ssl_client_hello.client_hello_len);
 
@@ -406,22 +411,9 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
             CBS_len(&signature_algorithms_ext) != 0) {
           return CurveNIDSupportedVector{};
         }
-        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256)) {
-          client_capabilities.push_back(NID_X9_62_prime256v1);
-        }
-        CBS_init(&signature_algorithms_ext, signature_algorithms_data, signature_algorithms_len);
-        CBS_get_u16_length_prefixed(&signature_algorithms_ext, &signature_algorithms);
-        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP384R1_SHA384)) {
-          client_capabilities.push_back(NID_secp384r1);
-        }
-        CBS_init(&signature_algorithms_ext, signature_algorithms_data, signature_algorithms_len);
-        CBS_get_u16_length_prefixed(&signature_algorithms_ext, &signature_algorithms);
-        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP521R1_SHA512)) {
-          client_capabilities.push_back(NID_secp521r1);
-        }
-        if (client_capabilities.size() != 0) {
-          return client_capabilities;
-        }
+        CurveNIDSupportedVector client_capabilities =
+            getClientCurveNIDSupported(signature_algorithms);
+        return client_capabilities;
       }
 
       return CurveNIDSupportedVector{};
@@ -440,20 +432,9 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
   CBS curvelist;
   CBS_init(&curvelist, curvelist_data, curvelist_len);
 
-  // We support P-256, P-384 and P-521 ECDSA curves today.
-  if (cbsContainsU16(curvelist, SSL_CURVE_SECP256R1)) {
-    client_capabilities.push_back(NID_X9_62_prime256v1);
-  }
-  CBS_init(&curvelist, curvelist_data, curvelist_len);
-  if (cbsContainsU16(curvelist, SSL_CURVE_SECP384R1)) {
-    client_capabilities.push_back(NID_secp384r1);
-  }
-  CBS_init(&curvelist, curvelist_data, curvelist_len);
-  if (cbsContainsU16(curvelist, SSL_CURVE_SECP521R1)) {
-    client_capabilities.push_back(NID_secp521r1);
-  }
+  CurveNIDSupportedVector client_capabilities = getClientCurveNIDSupported(curvelist);
   // if we haven't got any curves in common with the client, return empty CurveNIDSupportedVector.
-  if (client_capabilities.size() == 0) {
+  if (client_capabilities.empty()) {
     return CurveNIDSupportedVector{};
   }
 

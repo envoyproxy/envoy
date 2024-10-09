@@ -27,6 +27,9 @@ struct TlsContext;
 
 class ServerContextConfig;
 
+using CurveNID = int;
+using CurveNIDSupportedVector = absl::InlinedVector<int, 3>;
+
 class HandshakeCallbacks {
 public:
   virtual ~HandshakeCallbacks() = default;
