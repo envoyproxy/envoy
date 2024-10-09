@@ -283,7 +283,6 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 
   if (receive_before_connect && receive_before_connect->value()) {
     ENVOY_CONN_LOG(debug, "receive_before_connect is enabled", read_callbacks_->connection());
-    std::cout<<"Filter::initialize: receive_before_connect enabled"<<std::endl;
     receive_before_connect_ = true;
   } else {
     // Need to disable reads so that we don't write to an upstream that might fail
@@ -780,10 +779,11 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   } else if (receive_before_connect_) {
     // Buffer data received before upstream connection exists
-    std::cout<<"data received before upstream connection exists"<<std::endl;
-    ENVOY_CONN_LOG(debug, "buffering {} bytes as upstream connection is not established yet", read_callbacks_->connection(), data.length());
+    ENVOY_CONN_LOG(debug, "buffering {} bytes as upstream connection is not established yet",
+                   read_callbacks_->connection(), data.length());
     early_data_buffer_.move(data);
     read_callbacks_->connection().readDisable(true);
+    config_->stats().early_data_received_count_total_.inc();
     if (!early_data_end_stream_) {
       early_data_end_stream_ = end_stream;
     }
@@ -924,8 +924,8 @@ void Filter::onUpstreamConnection() {
   // If we have received any data before upstream connection is established, send it to
   // the upstream connection.
   else if (early_data_buffer_.length() > 0) {
-    std::cout<<"Filter::onUpstreamConnection: Flushing early data buffer"<<std::endl;
-    ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent() Flushing early data buffer to upstream", read_callbacks_->connection());
+    ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent() Flushing early data buffer to upstream",
+                   read_callbacks_->connection());
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
     upstream_->encodeData(early_data_buffer_, early_data_end_stream_);
     ASSERT(0 == early_data_buffer_.length());
