@@ -579,11 +579,10 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     } else {
       ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
       // We don't know what to do with the body until the response comes back.
-      // We must buffer it in case we need it when that happens.
-      // Raise a watermark to prevent a buffer overflow until the response comes back.
-      // When end_stream is true, we need to StopIterationAndWatermark as well to stop the
-      // ActiveStream from returning error when the last chunk added to stream buffer exceeds the
-      // buffer limit.
+      // We must buffer it in case we need it when that happens. Watermark will be raised when the
+      // buffered data reaches the buffer's watermark limit. When end_stream is true, we need to
+      // StopIterationAndWatermark as well to stop the ActiveStream from returning error when the
+      // last chunk added to stream buffer exceeds the buffer limit.
       state.setPaused(true);
       return FilterDataStatus::StopIterationAndWatermark;
     }

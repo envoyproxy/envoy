@@ -72,12 +72,27 @@ bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
 }
 } // namespace
 
+absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>> ListenSocketFactoryImpl::create(
+    ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr address,
+    Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+    const std::string& listener_name, uint32_t tcp_backlog_size,
+    ListenerComponentFactory::BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t num_sockets) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<ListenSocketFactoryImpl>(new ListenSocketFactoryImpl(
+      factory, address, socket_type, options, listener_name, tcp_backlog_size, bind_type,
+      creation_options, num_sockets, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr address,
     Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
     const std::string& listener_name, uint32_t tcp_backlog_size,
     ListenerComponentFactory::BindType bind_type,
-    const Network::SocketCreationOptions& creation_options, uint32_t num_sockets)
+    const Network::SocketCreationOptions& creation_options, uint32_t num_sockets,
+    absl::Status& creation_status)
     : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
       listener_name_(listener_name), tcp_backlog_size_(tcp_backlog_size), bind_type_(bind_type),
       socket_creation_options_(creation_options) {
@@ -100,8 +115,9 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     }
   }
 
-  sockets_.push_back(THROW_OR_RETURN_VALUE(
-      createListenSocketAndApplyOptions(factory, socket_type, 0), Network::SocketSharedPtr));
+  auto socket_or_error = createListenSocketAndApplyOptions(factory, socket_type, 0);
+  SET_AND_RETURN_IF_NOT_OK(socket_or_error.status(), creation_status);
+  sockets_.push_back(*socket_or_error);
 
   if (sockets_[0] != nullptr && local_address_->ip() && local_address_->ip()->port() == 0) {
     local_address_ = sockets_[0]->connectionInfoProvider().localAddress();
@@ -114,8 +130,9 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     if (bind_type_ != ListenerComponentFactory::BindType::ReusePort && sockets_[0] != nullptr) {
       sockets_.push_back(sockets_[0]->duplicate());
     } else {
-      sockets_.push_back(THROW_OR_RETURN_VALUE(
-          createListenSocketAndApplyOptions(factory, socket_type, i), Network::SocketSharedPtr));
+      auto socket_or_error = createListenSocketAndApplyOptions(factory, socket_type, i);
+      SET_AND_RETURN_IF_NOT_OK(socket_or_error.status(), creation_status);
+      sockets_.push_back(*socket_or_error);
     }
   }
   ASSERT(sockets_.size() == num_sockets);
@@ -165,12 +182,7 @@ absl::StatusOr<Network::SocketSharedPtr> ListenSocketFactoryImpl::createListenSo
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
       ENVOY_LOG(warn, "{}", message);
-#ifdef ENVOY_DISABLE_EXCEPTIONS
-      PANIC(message);
-#else
-      throw Network::SocketOptionException(message);
-#endif
-
+      return absl::InvalidArgumentError(message);
     } else {
       ENVOY_LOG(debug, "{}", message);
     }
@@ -236,8 +248,11 @@ std::string listenerStatsScope(const envoy::config::listener::v3::Listener& conf
     return absl::StrCat("envoy_internal_", config.name());
   }
   auto address_or_error = Network::Address::resolveProtoAddress(config.address());
-  THROW_IF_NOT_OK_REF(address_or_error.status());
-  return address_or_error.value()->asString();
+  if (address_or_error.status().ok()) {
+    return address_or_error.value()->asString();
+  }
+  // Listener creation will fail shortly when the address is used.
+  return absl::StrCat("invalid_address_listener");
 }
 } // namespace
 
@@ -254,10 +269,22 @@ Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 Init::Manager& ListenerFactoryContextBaseImpl::initManager() { return server_.initManager(); }
 
+absl::StatusOr<std::unique_ptr<ListenerImpl>>
+ListenerImpl::create(const envoy::config::listener::v3::Listener& config,
+                     const std::string& version_info, ListenerManagerImpl& parent,
+                     const std::string& name, bool added_via_api, bool workers_started,
+                     uint64_t hash) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<ListenerImpl>(new ListenerImpl(
+      config, version_info, parent, name, added_via_api, workers_started, hash, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash)
+                           uint64_t hash, absl::Status& creation_status)
     : parent_(parent),
       socket_type_(config.has_internal_listener()
                        ? Network::Socket::Type::Stream
@@ -324,25 +351,28 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     // All the addresses should be same socket type, so get the first address's socket type is
     // enough.
     auto address_or_error = Network::Address::resolveProtoAddress(config.address());
-    THROW_IF_NOT_OK_REF(address_or_error.status());
+    SET_AND_RETURN_IF_NOT_OK(address_or_error.status(), creation_status);
     auto address = std::move(address_or_error.value());
-    THROW_IF_NOT_OK(checkIpv4CompatAddress(address, config.address()));
+    SET_AND_RETURN_IF_NOT_OK(checkIpv4CompatAddress(address, config.address()), creation_status);
     addresses_.emplace_back(address);
     address_opts_list.emplace_back(std::ref(config.socket_options()));
 
     for (auto i = 0; i < config.additional_addresses_size(); i++) {
       if (socket_type_ !=
           Network::Utility::protobufAddressSocketType(config.additional_addresses(i).address())) {
-        throwEnvoyExceptionOrPanic(
+        creation_status = absl::InvalidArgumentError(
             fmt::format("listener {}: has different socket type. The listener only "
                         "support same socket type for all the addresses.",
                         name_));
+        return;
       }
       auto addresses_or_error =
           Network::Address::resolveProtoAddress(config.additional_addresses(i).address());
-      THROW_IF_NOT_OK_REF(addresses_or_error.status());
+      SET_AND_RETURN_IF_NOT_OK(addresses_or_error.status(), creation_status);
       auto additional_address = std::move(addresses_or_error.value());
-      THROW_IF_NOT_OK(checkIpv4CompatAddress(address, config.additional_addresses(i).address()));
+      SET_AND_RETURN_IF_NOT_OK(
+          checkIpv4CompatAddress(address, config.additional_addresses(i).address()),
+          creation_status);
       addresses_.emplace_back(additional_address);
       if (config.additional_addresses(i).has_socket_options()) {
         address_opts_list.emplace_back(
@@ -367,20 +397,21 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       addresses_, listener_factory_context_->parentFactoryContext(), initManager()),
 
   buildAccessLog(config);
-  THROW_IF_NOT_OK(validateConfig());
+  SET_AND_RETURN_IF_NOT_OK(validateConfig(), creation_status);
 
   // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
   // listener factory can provide additional options.
-  THROW_IF_NOT_OK(buildUdpListenerFactory(config, parent_.server_.options().concurrency()));
+  SET_AND_RETURN_IF_NOT_OK(buildUdpListenerFactory(config, parent_.server_.options().concurrency()),
+                           creation_status);
   buildListenSocketOptions(config, address_opts_list);
-  THROW_IF_NOT_OK(createListenerFilterFactories(config));
-  THROW_IF_NOT_OK(validateFilterChains(config));
-  THROW_IF_NOT_OK(buildFilterChains(config));
+  SET_AND_RETURN_IF_NOT_OK(createListenerFilterFactories(config), creation_status);
+  SET_AND_RETURN_IF_NOT_OK(validateFilterChains(config), creation_status);
+  SET_AND_RETURN_IF_NOT_OK(buildFilterChains(config), creation_status);
   if (socket_type_ != Network::Socket::Type::Datagram) {
     buildSocketOptions(config);
     buildOriginalDstListenerFilter(config);
     buildProxyProtocolListenerFilter(config);
-    THROW_IF_NOT_OK(buildInternalListener(config));
+    SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config), creation_status);
   }
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
@@ -395,7 +426,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash)
+                           uint64_t hash, absl::Status& creation_status)
     : parent_(parent), addresses_(origin.addresses_), socket_type_(origin.socket_type_),
       bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
       hand_off_restored_destination_connections_(
@@ -443,11 +474,11 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
           POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
   buildAccessLog(config);
-  THROW_IF_NOT_OK(validateConfig());
-  THROW_IF_NOT_OK(createListenerFilterFactories(config));
-  THROW_IF_NOT_OK(validateFilterChains(config));
-  THROW_IF_NOT_OK(buildFilterChains(config));
-  THROW_IF_NOT_OK(buildInternalListener(config));
+  SET_AND_RETURN_IF_NOT_OK(validateConfig(), creation_status);
+  SET_AND_RETURN_IF_NOT_OK(createListenerFilterFactories(config), creation_status);
+  SET_AND_RETURN_IF_NOT_OK(validateFilterChains(config), creation_status);
+  SET_AND_RETURN_IF_NOT_OK(buildFilterChains(config), creation_status);
+  SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config), creation_status);
   if (socket_type_ == Network::Socket::Type::Stream) {
     // Apply the options below only for TCP.
     buildSocketOptions(config);
@@ -676,6 +707,13 @@ void ListenerImpl::buildListenSocketOptions(
         // Needed to receive gso_size option
         addListenSocketOptions(listen_socket_options_list_[i],
                                Network::SocketOptionFactory::buildUdpGroOptions());
+      }
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+        addListenSocketOptions(
+            listen_socket_options_list_[i],
+            Network::SocketOptionFactory::buildDoNotFragmentOptions(
+                /*mapped_v6*/ addresses_[i]->ip()->version() == Network::Address::IpVersion::v6 &&
+                !addresses_[i]->ip()->ipv6()->v6only()));
       }
 
       // Additional factory specific options.
@@ -1013,14 +1051,18 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   return false;
 }
 
-ListenerImplPtr
+absl::StatusOr<ListenerImplPtr>
 ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                                          bool workers_started, uint64_t hash) {
+
+  absl::Status creation_status = absl::OkStatus();
   // Use WrapUnique since the constructor is private.
-  return absl::WrapUnique(new ListenerImpl(*this, config, version_info_, parent_, name_,
-                                           added_via_api_,
-                                           /* new new workers started state */ workers_started,
-                                           /* use new hash */ hash));
+  auto ret = absl::WrapUnique(new ListenerImpl(*this, config, version_info_, parent_, name_,
+                                               added_via_api_,
+                                               /* new new workers started state */ workers_started,
+                                               /* use new hash */ hash, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
