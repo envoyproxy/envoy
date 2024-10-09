@@ -55,8 +55,12 @@ public:
    */
   virtual void addTrace(uint8_t trace) PURE;
 
-  /** Return a copy of the DNS query traces. */
-  virtual absl::optional<std::vector<Trace>> getTraces() PURE;
+  /** Return the DNS query traces. */
+  virtual OptRef<std::vector<Trace>> getTraces() PURE;
+
+  /** Return the DNS query traces transformed using the specified `func`. */
+  virtual absl::optional<std::vector<std::string>>
+  getTraces(absl::AnyInvocable<std::string(const Trace&)> func) PURE;
 };
 
 /**
