@@ -462,6 +462,7 @@ new_features:
     load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
 - area: ip-tagging
   change: |
-    Adds support for specifying an alternate header for appending IP tags via ip-tagging filter instead of using the default header ``x-envoy-ip-tags``.
+    Adds support for specifying an alternate header for appending IP tags via ip-tagging filter instead
+    of using the default header ``x-envoy-ip-tags``.
 
 deprecated:
