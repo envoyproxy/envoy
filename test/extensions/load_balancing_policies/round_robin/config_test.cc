@@ -2,6 +2,7 @@
 
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -40,7 +41,9 @@ TEST(RoundRobinConfigTest, ValidateFail) {
   auto thread_local_lb_factory = thread_aware_lb->factory();
   EXPECT_NE(nullptr, thread_local_lb_factory);
 
-  auto thread_local_lb = thread_local_lb_factory->create({thread_local_priority_set, nullptr});
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  auto thread_local_lb =
+      thread_local_lb_factory->create({thread_local_priority_set, nullptr, dispatcher_});
   EXPECT_NE(nullptr, thread_local_lb);
 }
 

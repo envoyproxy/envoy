@@ -582,7 +582,7 @@ private:
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
-      HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+      HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
       absl::optional<HttpPoolData> httpConnPool(HostConstSharedPtr host, ResourcePriority priority,
                                                 absl::optional<Http::Protocol> downstream_protocol,
                                                 LoadBalancerContext* context) override;

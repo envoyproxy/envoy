@@ -4,13 +4,17 @@
 
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "test/test_common/test_random_generator.h"
 #include "test/test_common/test_time_system.h"
 #include "test/test_common/thread_factory_for_test.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/flags/declare.h"
+#include "absl/flags/flag.h"
 
+ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_async_host_selection);
 namespace Envoy {
 namespace Event {
 
@@ -132,6 +136,9 @@ public:
 // during the test.
 class TestUsingSimulatedTime {
 public:
+  TestUsingSimulatedTime() {
+    absl::SetFlag(&FLAGS_envoy_reloadable_features_async_host_selection, false);
+  }
   SimulatedTimeSystem& simTime() { return sim_time_; }
 
 private:

@@ -24,8 +24,8 @@ private:
   public:
     LbImpl(const Upstream::HostSharedPtr& host) : host_(host) {}
 
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override {
-      return host_;
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext*) override {
+      return {host_};
     }
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;

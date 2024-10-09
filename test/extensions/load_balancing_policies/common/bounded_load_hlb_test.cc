@@ -14,9 +14,9 @@ namespace {
 class TestHashingLoadBalancer : public ThreadAwareLoadBalancerBase::HashingLoadBalancer {
 public:
   explicit TestHashingLoadBalancer(NormalizedHostWeightVector ring) : ring_(std::move(ring)) {}
-  HostConstSharedPtr chooseHost(uint64_t hash, uint32_t /* attempt */) const override {
+  HostSelectionResponse chooseHost(uint64_t hash, uint32_t /* attempt */) const override {
     if (ring_.empty()) {
-      return nullptr;
+      return {nullptr};
     }
     return ring_.at(hash).first;
   }
@@ -137,7 +137,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHosts) {
   hlb_ = std::make_shared<TestHashingLoadBalancer>(normalized_host_weights);
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
                                                              nullptr);
-  EXPECT_EQ(lb_->chooseHost(1, 1), nullptr);
+  EXPECT_EQ(lb_->chooseHost(1, 1).host, nullptr);
 };
 
 // Works correctly for the case when no host is ever overloaded.
@@ -156,7 +156,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHostEverOverloaded) {
                                                              host_overload_factor_predicate_);
 
   for (uint32_t i = 0; i < 5; i++) {
-    HostConstSharedPtr host = lb_->chooseHost(i, 1);
+    HostConstSharedPtr host = lb_->chooseHost(i, 1).host;
     EXPECT_NE(host, nullptr);
     EXPECT_EQ(host->address()->asString(), fmt::format("127.0.0.1{}:90", i));
   }
@@ -173,7 +173,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, ActualHostOverloaded) {
   // To use actual host overload factor.
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
                                                              nullptr);
-  HostConstSharedPtr host = lb_->chooseHost(2, 1);
+  HostConstSharedPtr host = lb_->chooseHost(2, 1).host;
   EXPECT_NE(host, nullptr);
   EXPECT_EQ(host->address()->asString(), "127.0.0.12:90");
 
@@ -182,7 +182,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, ActualHostOverloaded) {
   host->stats().rq_active_.add(2);
 
   // The host is overloaded, so the next host in the sequence is picked up.
-  host = lb_->chooseHost(2, 1);
+  host = lb_->chooseHost(2, 1).host;
   EXPECT_NE(host, nullptr);
   EXPECT_EQ(host->address()->asString(), "127.0.0.11:90");
 };
@@ -208,7 +208,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, OneHostOverloaded) {
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
                                                              host_overload_factor_predicate_);
 
-  HostConstSharedPtr host = lb_->chooseHost(2, 1);
+  HostConstSharedPtr host = lb_->chooseHost(2, 1).host;
   EXPECT_NE(host, nullptr);
   EXPECT_EQ(host->address()->asString(), "127.0.0.11:90");
 };
@@ -236,7 +236,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHostOverloaded) {
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
                                                              host_overload_factor_predicate_);
 
-  HostConstSharedPtr host = lb_->chooseHost(2, 1);
+  HostConstSharedPtr host = lb_->chooseHost(2, 1).host;
   EXPECT_NE(host, nullptr);
   EXPECT_EQ(host->address()->asString(), "127.0.0.14:90");
 };
@@ -263,9 +263,9 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, MultipleHashSameHostOverloaded) {
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
                                                              host_overload_factor_predicate_);
 
-  HostConstSharedPtr host1 = lb_->chooseHost(6, 1);
+  HostConstSharedPtr host1 = lb_->chooseHost(6, 1).host;
   EXPECT_NE(host1, nullptr);
-  HostConstSharedPtr host2 = lb_->chooseHost(7, 1);
+  HostConstSharedPtr host2 = lb_->chooseHost(7, 1).host;
   EXPECT_NE(host2, nullptr);
 
   EXPECT_NE(host1->address()->asString(), host2->address()->asString());
@@ -293,7 +293,7 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, AllHostsOverloaded) {
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
                                                              host_overload_factor_predicate_);
 
-  HostConstSharedPtr host = lb_->chooseHost(0, 1);
+  HostConstSharedPtr host = lb_->chooseHost(0, 1).host;
   EXPECT_NE(host, nullptr);
   EXPECT_EQ(host->address()->asString(), "127.0.0.11:90");
 };

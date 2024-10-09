@@ -22,6 +22,7 @@ envoy_cc_test_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//test/config/integration/certs:hashes",
+        "//test/integration:async_round_robin_lb",
         "//test/integration:server_stats_interface",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",

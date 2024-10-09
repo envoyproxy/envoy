@@ -126,10 +126,11 @@ Upstream::HostConstSharedPtr chooseRandomHost(const Upstream::HostSetImpl& host_
 }
 } // namespace
 
-Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
+Upstream::HostSelectionResponse
+RedisClusterLoadBalancerFactory::RedisClusterLoadBalancer::chooseHost(
     Envoy::Upstream::LoadBalancerContext* context) {
   if (!slot_array_) {
-    return nullptr;
+    return {nullptr};
   }
   absl::optional<uint64_t> hash;
   if (context) {
@@ -137,7 +138,7 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
   }
 
   if (!hash) {
-    return nullptr;
+    return {nullptr};
   }
 
   RedisShardSharedPtr shard;
@@ -145,7 +146,7 @@ Upstream::HostConstSharedPtr RedisClusterLoadBalancerFactory::RedisClusterLoadBa
     if (hash.value() < shard_vector_->size()) {
       shard = shard_vector_->at(hash.value());
     } else {
-      return nullptr;
+      return {nullptr};
     }
   } else {
     shard = shard_vector_->at(

@@ -22,6 +22,7 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
                                    public HttpIntegrationTest {
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    absl::SetFlag(&FLAGS_envoy_reloadable_features_async_host_selection, false);
     upstream_tls_ = true;
     filename_ = TestEnvironment::temporaryPath("dns_cache.txt");
     ::unlink(filename_.c_str());

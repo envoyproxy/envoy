@@ -36,13 +36,13 @@ class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::ups
 public:
   SubsetLoadBalancer(const SubsetLoadBalancerConfig& lb_config,
                      const Upstream::ClusterInfo& cluster_info, const PrioritySet& priority_set,
-                     const PrioritySet* local_priority_set, ClusterLbStats& stats,
-                     Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
-                     TimeSource& time_source);
+                     const PrioritySet* local_priority_set, Event::Dispatcher& dispatcher,
+                     ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+                     Random::RandomGenerator& random, TimeSource& time_source);
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
   // TODO(alyssawilk) implement for non-metadata match.
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
   // Pool selection not implemented.
@@ -133,6 +133,7 @@ private:
   private:
     const PrioritySet& original_priority_set_;
     const PrioritySet* original_local_priority_set_{};
+    Event::Dispatcher& dispatcher_;
     const bool locality_weight_aware_;
     const bool scale_locality_weight_;
     bool empty_ = true;
@@ -199,6 +200,7 @@ public:
     absl::optional<OverrideHost> overrideHostToSelect() const override {
       return wrapped_->overrideHostToSelect();
     }
+    void onAsyncHostSelection(Upstream::HostConstSharedPtr&&) override {}
 
   private:
     LoadBalancerContext* wrapped_;
@@ -220,7 +222,7 @@ private:
   class LbSubset {
   public:
     virtual ~LbSubset() = default;
-    virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) const PURE;
+    virtual HostSelectionResponse chooseHost(LoadBalancerContext* context) const PURE;
     virtual void pushHost(uint32_t priority, HostSharedPtr host) PURE;
     virtual void finalize(uint32_t priority, uint64_t seed) PURE;
     virtual bool active() const PURE;
@@ -234,7 +236,7 @@ private:
         : subset_(subset_lb, locality_weight_aware, scale_locality_weight) {}
 
     // Subset
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) const override {
+    HostSelectionResponse chooseHost(LoadBalancerContext* context) const override {
       return subset_.lb_->chooseHost(context);
     }
     void pushHost(uint32_t priority, HostSharedPtr host) override {
@@ -280,7 +282,7 @@ private:
 
   class SingleHostLbSubset : public LbSubset {
     // Subset
-    HostConstSharedPtr chooseHost(LoadBalancerContext*) const override { return subset_; }
+    HostSelectionResponse chooseHost(LoadBalancerContext*) const override { return subset_; }
     // This is called at most once for every update for single host subset.
     void pushHost(uint32_t priority, HostSharedPtr host) override {
       new_hosts_[priority] = std::move(host);
@@ -382,6 +384,7 @@ private:
 
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;
+  Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr original_priority_set_callback_handle_;
 
   LbSubsetEntryPtr subset_any_;

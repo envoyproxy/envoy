@@ -33,7 +33,7 @@ public:
   MOCK_METHOD(absl::optional<HttpPoolData>, httpConnPool,
               (HostConstSharedPtr host, ResourcePriority priority,
                absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context));
-  MOCK_METHOD(HostConstSharedPtr, chooseHost, (LoadBalancerContext * context));
+  MOCK_METHOD(HostSelectionResponse, chooseHost, (LoadBalancerContext * context));
   MOCK_METHOD(absl::optional<TcpPoolData>, tcpConnPool,
               (HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context));
   MOCK_METHOD(absl::optional<TcpPoolData>, tcpConnPool,

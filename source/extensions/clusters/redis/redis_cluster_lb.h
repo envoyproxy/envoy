@@ -219,7 +219,7 @@ private:
           random_(random) {}
 
     // Upstream::LoadBalancerBase
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext*) override;
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
     }

@@ -40,7 +40,9 @@ public:
   EdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())),
         codec_client_type_(envoy::type::v3::HTTP1),
-        deferred_cluster_creation_(std::get<1>(GetParam())) {}
+        deferred_cluster_creation_(std::get<1>(GetParam())) {
+    absl::SetFlag(&FLAGS_envoy_reloadable_features_async_host_selection, false);
+  }
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.

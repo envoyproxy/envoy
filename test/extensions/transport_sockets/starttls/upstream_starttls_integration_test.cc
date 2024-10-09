@@ -128,7 +128,7 @@ private:
 
 Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
   auto c = cluster_manager_.getThreadLocalCluster("cluster_0");
-  auto h = c->loadBalancer().chooseHost(nullptr);
+  auto h = c->loadBalancer().chooseHost(nullptr).host;
   upstream_connection_ =
       h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
   upstream_connection_->addConnectionCallbacks(*upstream_connection_cb_);

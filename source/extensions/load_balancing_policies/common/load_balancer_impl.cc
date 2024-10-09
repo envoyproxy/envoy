@@ -585,7 +585,7 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
+HostSelectionResponse ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr host;
 
   const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;

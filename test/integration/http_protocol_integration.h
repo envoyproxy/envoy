@@ -32,7 +32,6 @@ absl::string_view http2ImplementationToString(Http2Impl impl);
 // TEST_P(MyTest, TestInstance) {
 // ....
 // }
-// TODO(#20996) consider switching to SimulatedTimeSystem instead of using real time.
 class HttpProtocolIntegrationTest : public testing::TestWithParam<HttpProtocolTestParams>,
                                     public HttpIntegrationTest {
 public:
@@ -84,6 +83,9 @@ public:
   void SetUp() override {
     setDownstreamProtocol(GetParam().downstream_protocol);
     setUpstreamProtocol(GetParam().upstream_protocol);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.async_host_selection")) {
+      config_helper_.setAsyncLb();
+    }
   }
 
   void setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
@@ -147,6 +149,9 @@ public:
     setDownstreamProtocol(std::get<0>(GetParam()).downstream_protocol);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
     testing_downstream_filter_ = std::get<1>(GetParam());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.async_host_selection")) {
+      config_helper_.setAsyncLb();
+    }
   }
 
   bool testing_downstream_filter_;
