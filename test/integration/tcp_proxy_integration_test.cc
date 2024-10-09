@@ -1304,27 +1304,18 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool) override {
     if (!metadata_set_) {
       // To allow testing a write that returns `StopIteration`, only proceed
-      // when more than 1 word is received.
+      // when more than 1 byte is received.
+      if (data.length() < 2) {
+        ASSERT(data.length() == 1);
 
-      // locate the first space in data
-      char space = ' ';
-      ssize_t index = data.search(&space, sizeof(space), 0);
-      if (index < 0) {
-        // When returning StopIteration the received data remains in the buffer
-        // so that we can get to it later when enough data has been received.
+        // Echo data back to test can verify it was received.
+        Buffer::OwnedImpl copy(data);
+        read_callbacks_->connection().write(copy, false);
         return Network::FilterStatus::StopIteration;
       }
 
-      void* p = data.linearize(index);
-      std::string first_word(static_cast<char*>(p), index);
-
-      // Echo first word back so tests can verify it was received
-      Buffer::OwnedImpl copy(first_word);
-      read_callbacks_->connection().write(copy, false);
-
-      // Use the first word as dynamic metadata value
       ProtobufWkt::Value val;
-      val.set_string_value(first_word);
+      val.set_string_value(data.toString());
 
       ProtobufWkt::Struct& map =
           (*read_callbacks_->connection()
@@ -1333,25 +1324,24 @@ public:
                 .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB];
       (*map.mutable_fields())[key_] = val;
 
+      // Put this back in the state that TcpProxy expects.
+      read_callbacks_->connection().readDisable(true);
+
       metadata_set_ = true;
     }
     return Network::FilterStatus::Continue;
   }
 
   Network::FilterStatus onNewConnection() override {
+    // TcpProxy disables read; must re-enable so we can read headers.
+    read_callbacks_->connection().readDisable(false);
+
     // Stop until we read the value and can set the metadata for TcpProxy.
-    // TcpProxy proceeds with upstream connection once onData() returns FilterStatus::Continue.
     return Network::FilterStatus::StopIteration;
   }
 
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
     read_callbacks_ = &callbacks;
-
-    // Tell TcpProxy to not disable read so that we can read headers
-    read_callbacks_->connection().streamInfo().filterState()->setData(
-        TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-        StreamInfo::FilterState::StateType::ReadOnly,
-        StreamInfo::FilterState::LifeSpan::Connection);
   }
 
   const std::string key_;
@@ -1409,25 +1399,14 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataMatch) {
   initialize();
 
   expectEndpointToMatchRoute([](IntegrationTcpClient& tcp_client) -> std::string {
-    // Break the write into multiple chunks; validate that the first word is received before sending
-    // the rest. This validates that a downstream network filter can use this functionality, even if it
-    // can't make a decision after the first `onData()`.
-    EXPECT_TRUE(tcp_client.write("pri", false));
-    // Writing additional data in multiple chunks to show that buffering of early data in tcp_buffer
-    // works properly
-    EXPECT_TRUE(tcp_client.write("mary is ", false));
-    EXPECT_TRUE(tcp_client.write("selected ", false));
-    EXPECT_TRUE(tcp_client.write("before ", false));
-    // check that the 1st word is returned
-    tcp_client.waitForData("primary");
+    // Break the write into two; validate that the first is received before sending the second. This
+    // validates that a downstream network filter can use this functionality, even if it can't make
+    // a decision after the first `onData()`.
+    EXPECT_TRUE(tcp_client.write("p", false));
+    tcp_client.waitForData("p");
     tcp_client.clearData();
-    // some more data, most likely the upstream connection has already been established as we waited
-    // for the return data above.
-    EXPECT_TRUE(tcp_client.write("upstream connection ", false));
-    EXPECT_TRUE(tcp_client.write("exists", false));
-
-    // All data expected at the destination
-    return "primary is selected before upstream connection exists";
+    EXPECT_TRUE(tcp_client.write("rimary", false));
+    return "primary";
   });
 }
 
@@ -1444,7 +1423,7 @@ TEST_P(TcpProxyDynamicMetadataMatchIntegrationTest, DynamicMetadataNonMatch) {
 
   initialize();
 
-  expectEndpointNotToMatchRoute("does not match role primary");
+  expectEndpointNotToMatchRoute("does_not_match_role_primary");
 }
 
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxySslIntegrationTest,
@@ -1738,5 +1717,150 @@ TEST_P(MysqlIntegrationTest, PreconnectWithTls) {
 INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, MysqlIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+class PauseIterationFilter : public Network::ReadFilter {
+public:
+  explicit PauseIterationFilter() {}
+
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    if (!should_continue_) {
+      should_continue_ = true;
+      // Stop Iteration when first time data is received.
+      return Network::FilterStatus::StopIteration;
+    }
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() override {
+    // Stop Iteration as more data is needed before filter chain can be continued.
+    return Network::FilterStatus::StopIteration;
+  }
+
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+
+    // Pass ReceiveBeforeConnect state to TCP_PROXY so that it does not read disable
+    // the connection.
+    read_callbacks_->connection().streamInfo().filterState()->setData(
+        TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
+        StreamInfo::FilterState::StateType::ReadOnly,
+        StreamInfo::FilterState::LifeSpan::Connection);
+  }
+
+  bool should_continue_{false};
+  Network::ReadFilterCallbacks* read_callbacks_{};
+};
+
+class PauseIterationFilterFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    return [](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<PauseIterationFilter>());
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "test.pause_iteration"); }
+};
+
+class TcpProxyReceiveBeforeConnectIntegrationTest : public TcpProxyIntegrationTest {
+public:
+  TcpProxyReceiveBeforeConnectIntegrationTest() : TcpProxyIntegrationTest() {
+    config_helper_.addNetworkFilter(R"EOF(
+      name: test.pause_iteration
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF");
+  }
+
+  PauseIterationFilterFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> register_factory_{
+      factory_};
+};
+
+INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyReceiveBeforeConnectIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, ReceiveBeforeConnectEarlyData) {
+  initialize();
+  FakeRawConnectionPtr fake_upstream_connection;
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // First time data is sent, the PauseFilter stops the iteration.
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ASSERT_TRUE(tcp_client->write("world"));
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // Once the connection is established, the early data will be flushed to the upstream.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("helloworld")));
+  ASSERT_TRUE(fake_upstream_connection->write("response"));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+}
+
+TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark) {
+  const uint32_t upstream_buffer_limit = 512;
+  const uint32_t downstream_buffer_limit = 1024;
+  const uint32_t data_size = 16 * downstream_buffer_limit;
+  config_helper_.setBufferLimits(upstream_buffer_limit, downstream_buffer_limit);
+  std::string data;
+  for (uint32_t i = 0; i < data_size / 4; i++)
+    data += "abcd";
+
+  initialize();
+  FakeRawConnectionPtr fake_upstream_connection;
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // First time data is sent, the PauseFilter stops the iteration.
+  ASSERT_TRUE(tcp_client->write(data.substr(0, upstream_buffer_limit + 1)));
+  ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send the remaining data
+  ASSERT_TRUE(tcp_client->write(data.substr(upstream_buffer_limit + 1)));
+  test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // Once the connection is established, the early data will be flushed to the upstream.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch(data.c_str())));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data_size));
+  ASSERT_TRUE(fake_upstream_connection->write("response"));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+  tcp_client->waitForHalfClose();
+  tcp_client->close();
+
+  uint32_t upstream_pauses =
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
+          ->value();
+  uint32_t upstream_resumes =
+      test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
+          ->value();
+
+  uint32_t downstream_pauses =
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_paused_reading_total")
+          ->value();
+  uint32_t downstream_resumes =
+      test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_resumed_reading_total")
+          ->value();
+
+  EXPECT_EQ(upstream_pauses, upstream_resumes);
+  EXPECT_EQ(upstream_resumes, 0);
+
+  // Since we are receiving early data, downstream connection will already be read
+  // disabled so downstream pause metric is not emitted when upstream buffer hits high
+  // watermark. When the upstream buffer watermark goes down, downstream will be read
+  // enabled and downstream resume metric will be emitted.
+  EXPECT_EQ(downstream_pauses, 0);
+  EXPECT_EQ(downstream_resumes, 1);
+}
 
 } // namespace Envoy

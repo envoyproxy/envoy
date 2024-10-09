@@ -301,17 +301,22 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   ASSERT(getStreamInfo().getDownstreamBytesMeter() == nullptr);
   ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
 
-  // Need to disable reads so that we don't write to an upstream that might fail
-  // in onData(). This will get re-enabled when the upstream connection is
-  // established.
-  auto receive_before_connect =
+  StreamInfo::BoolAccessor* receive_before_connect =
       read_callbacks_->connection()
           .streamInfo()
           .filterState()
           ->getDataReadOnly<StreamInfo::BoolAccessor>(ReceiveBeforeConnectKey);
-  if (receive_before_connect && receive_before_connect->value()) {
+
+  // If receive_before_connect is set, we will not read disable the downstream connection
+  // as a filter before TCP_PROXY has set this state so that it can process data before
+  // the upstream connection is established.
+  if (receive_before_connect != nullptr && receive_before_connect->value()) {
+    ENVOY_CONN_LOG(debug, "receive_before_connect is enabled", read_callbacks_->connection());
     receive_before_connect_ = true;
   } else {
+    // Need to disable reads so that we don't write to an upstream that might fail
+    // in onData(). This will get re-enabled when the upstream connection is
+    // established.
     read_callbacks_->connection().readDisable(true);
   }
 
@@ -558,7 +563,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
     return Network::FilterStatus::StopIteration;
   }
-  // Allow OnData() to receive data before connect if so configured
+  // If receive before connect is set, allow the FilterChain iteration to
+  // continue so that the other filters in the filter chain can process the data.
   return receive_before_connect_ ? Network::FilterStatus::Continue
                                  : Network::FilterStatus::StopIteration;
 }
@@ -811,8 +817,16 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     upstream_->encodeData(data, end_stream);
     resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   } else if (receive_before_connect_) {
-    // Buffer data received before upstream connection exists
+    ENVOY_CONN_LOG(debug, "Early data received. Length: {}", read_callbacks_->connection(),
+                   data.length());
+    // Buffer data received before upstream connection exists.
+    // We read disable the downstream connection when we see the first data chunk to protect the early data buffer from overflow.
+    // Preceding filters in the filter chain should read whatever data they need before allowing the filter chain
+    // to proceed as after this step, the downstream connection will be read disabled until the upstream
+    // connection has been established and the early data buffer has been flushed.
     early_data_buffer_.move(data);
+    read_callbacks_->connection().readDisable(true);
+    config_->stats().early_data_received_count_total_.inc();
     if (!early_data_end_stream_) {
       early_data_end_stream_ = end_stream;
     }
@@ -831,7 +845,7 @@ Network::FilterStatus Filter::onNewConnection() {
     connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
   }
 
-  if (config_->accessLogFlushInterval().has_value()) {
+  if (config_->n().has_value()) {
     access_log_flush_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onAccessLogFlushInterval(); });
     resetAccessLogFlushTimer();
@@ -967,14 +981,24 @@ void Filter::onConnectMaxAttempts() {
 
 void Filter::onUpstreamConnection() {
   connecting_ = false;
-  // Re-enable downstream reads now that the upstream connection is established
-  // so we have a place to send downstream data to.
-  if (!receive_before_connect_) {
-    read_callbacks_->connection().readDisable(false);
-  } else if (early_data_buffer_.length() > 0) {
+
+  // If we have received any data before upstream connection is established, send it to
+  // the upstream connection.
+  if (early_data_buffer_.length() > 0) {
+    // Early data should only happen when receive_before_connect is enabled.
+    ASSERT(receive_before_connect_ == true);
+
+    ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent() Flushing early data buffer to upstream",
+                   read_callbacks_->connection());
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
     upstream_->encodeData(early_data_buffer_, early_data_end_stream_);
     ASSERT(0 == early_data_buffer_.length());
+
+    // Re-enable downstream reads now that the early data buffer is flushed.
+    read_callbacks_->connection().readDisable(false);
+  } else if (!receive_before_connect_) {
+    // Re-enable downstream reads now that the upstream connection is established
+    read_callbacks_->connection().readDisable(false);
   }
 
   read_callbacks_->upstreamHost()->outlierDetector().putResult(
