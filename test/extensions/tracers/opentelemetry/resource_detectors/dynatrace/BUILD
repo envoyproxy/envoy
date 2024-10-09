@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.dynatrace"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:config",
@@ -31,6 +32,7 @@ envoy_extension_cc_test(
         "dynatrace_resource_detector_test.cc",
     ],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.dynatrace"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:config",
         "//source/extensions/tracers/opentelemetry/resource_detectors/dynatrace:dynatrace_resource_detector_lib",
@@ -46,6 +48,7 @@ envoy_extension_cc_test(
         "dynatrace_resource_detector_integration_test.cc",
     ],
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.dynatrace"],
+    rbe_pool = "2core",
     deps = [
         "//source/exe:main_common_lib",
         "//source/extensions/tracers/opentelemetry:config",

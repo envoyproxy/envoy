@@ -656,9 +656,9 @@ void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool en
       direct_stream->wants_write_notification_ = false;
       // A new callback must be scheduled each time to capture any changes to the
       // DirectStream's callbacks from call to call.
-      scheduled_callback_ = dispatcher_.createSchedulableCallback(
+      direct_stream->scheduled_callback_ = dispatcher_.createSchedulableCallback(
           [direct_stream] { direct_stream->callbacks_->onSendWindowAvailable(); });
-      scheduled_callback_->scheduleCallbackNextIteration();
+      direct_stream->scheduled_callback_->scheduleCallbackNextIteration();
     } else {
       // Otherwise, make sure the stack will send a notification when the
       // buffers are drained.
@@ -699,7 +699,6 @@ void Client::cancelStream(envoy_stream_t stream) {
   // whether it was closed or not.
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::AllowForAllStreams);
-  scheduled_callback_ = nullptr;
   if (direct_stream) {
     // Attempt to latch the latest stream info. This will be a no-op if the stream
     // is already complete.
@@ -759,6 +758,7 @@ void Client::removeStream(envoy_stream_t stream_handle) {
           "[S{}] removeStream is a private method that is only called with stream ids that exist",
           stream_handle));
 
+  direct_stream->scheduled_callback_ = nullptr;
   // The DirectStream should live through synchronous code that already has a reference to it.
   // Hence why it is scheduled for deferred deletion. If this was all that was needed then it
   // would be sufficient to return a shared_ptr in getStream. However, deferred deletion is still

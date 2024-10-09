@@ -185,7 +185,7 @@ RateLimitQuotaFilter::sendImmediateReport(const size_t bucket_id,
 
   // Start the streaming on the first request.
   // It will be a no-op if the stream is already active.
-  auto status = client_.rate_limit_client->startStream(callbacks_->streamInfo());
+  auto status = client_.rate_limit_client->startStream(&callbacks_->streamInfo());
   if (!status.ok()) {
     ENVOY_LOG(error, "Failed to start the gRPC stream: ", status.message());
     // TODO(tyxia) Check `NoAssignmentBehavior` behavior instead of fail-open here.

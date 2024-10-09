@@ -130,7 +130,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
         std::chrono::milliseconds final_refresh_rate = parent_.dns_refresh_rate_ms_;
 
-        if (status == Network::DnsResolver::ResolutionStatus::Success) {
+        if (status == Network::DnsResolver::ResolutionStatus::Completed) {
           parent_.info_->configUpdateStats().update_success_.inc();
 
           HostVector new_hosts;

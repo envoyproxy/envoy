@@ -13,7 +13,6 @@ envoy_cc_library(
     name = "decompressor_lib",
     srcs = ["brotli_decompressor_impl.cc"],
     hdrs = ["brotli_decompressor_impl.h"],
-    external_deps = ["brotlidec"],
     deps = [
         "//envoy/compression/decompressor:decompressor_interface",
         "//envoy/stats:stats_interface",
@@ -21,6 +20,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/extensions/compression/brotli/common:brotli_base_lib",
+        "@org_brotli//:brotlidec",
     ],
 )
 

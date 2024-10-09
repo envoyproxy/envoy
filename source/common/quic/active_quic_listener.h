@@ -41,7 +41,8 @@ public:
                      EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
                      QuicConnectionIdGeneratorPtr&& cid_generator,
                      QuicConnectionIdWorkerSelector worker_selector,
-                     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory);
+                     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
+                     bool reject_new_connections = false);
 
   ~ActiveQuicListener() override;
 
@@ -159,6 +160,7 @@ private:
   QuicConnectionIdWorkerSelector worker_selector_;
   bool kernel_worker_routing_{};
   Server::Configuration::ServerFactoryContext& context_;
+  bool reject_new_connections_{};
 
   static bool disable_kernel_bpf_packet_routing_for_test_;
 };

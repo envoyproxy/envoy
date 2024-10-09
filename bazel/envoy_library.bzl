@@ -24,23 +24,23 @@ def tcmalloc_external_deps(repository):
         repository + "//bazel:disable_tcmalloc": [],
         repository + "//bazel:disable_tcmalloc_on_linux_x86_64": [],
         repository + "//bazel:disable_tcmalloc_on_linux_aarch64": [],
-        repository + "//bazel:debug_tcmalloc": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:gperftools_tcmalloc": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": [envoy_external_dep_path("gperftools")],
-        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": [envoy_external_dep_path("gperftools")],
+        repository + "//bazel:debug_tcmalloc": [repository + "//bazel/foreign_cc:gperftools"],
+        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": [repository + "//bazel/foreign_cc:gperftools"],
+        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": [repository + "//bazel/foreign_cc:gperftools"],
+        repository + "//bazel:gperftools_tcmalloc": [repository + "//bazel/foreign_cc:gperftools"],
+        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": [repository + "//bazel/foreign_cc:gperftools"],
+        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": [repository + "//bazel/foreign_cc:gperftools"],
         repository + "//bazel:linux_x86_64": [
-            envoy_external_dep_path("tcmalloc"),
-            envoy_external_dep_path("tcmalloc_profile_marshaler"),
-            envoy_external_dep_path("tcmalloc_malloc_extension"),
+            "@com_github_google_tcmalloc//tcmalloc",
+            "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
+            "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
         ],
         repository + "//bazel:linux_aarch64": [
-            envoy_external_dep_path("tcmalloc"),
-            envoy_external_dep_path("tcmalloc_profile_marshaler"),
-            envoy_external_dep_path("tcmalloc_malloc_extension"),
+            "@com_github_google_tcmalloc//tcmalloc",
+            "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
+            "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
         ],
-        "//conditions:default": [envoy_external_dep_path("gperftools")],
+        "//conditions:default": [repository + "//bazel/foreign_cc:gperftools"],
     })
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
@@ -98,6 +98,8 @@ def envoy_cc_library(
         hdrs = [],
         copts = [],
         visibility = None,
+        rbe_pool = None,
+        exec_properties = {},
         external_deps = [],
         tcmalloc_dep = None,
         repository = "",
@@ -112,6 +114,10 @@ def envoy_cc_library(
         linkopts = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+    exec_properties = exec_properties | select({
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
 
     # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
@@ -132,6 +138,7 @@ def envoy_cc_library(
         textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] +
                envoy_pch_deps(repository, "//source/common/common:common_pch"),
+        exec_properties = exec_properties,
         alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,

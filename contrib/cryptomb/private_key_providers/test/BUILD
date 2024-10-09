@@ -50,6 +50,7 @@ envoy_cc_test(
     data = [
         "//contrib/cryptomb/private_key_providers/test/test_data:certs",
     ],
+    rbe_pool = "2core",
     deps = [
         ":test_fake_factory",
         "//source/common/common:random_generator_lib",
@@ -87,13 +88,11 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "speed_test",
     srcs = ["speed_test.cc"],
-    external_deps = [
-        "benchmark",
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//contrib/cryptomb/private_key_providers/source:ipp_crypto_wrapper_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )

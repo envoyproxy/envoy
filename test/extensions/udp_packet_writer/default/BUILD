@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/udp_packet_writer/default:config",
         "//test/test_common:utility_lib",

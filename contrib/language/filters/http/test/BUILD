@@ -11,6 +11,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "language_config_test",
     srcs = ["language_config_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//contrib/language/filters/http/source:config_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -22,6 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "language_integration_test",
     srcs = ["language_integration_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//contrib/language/filters/http/source:config_lib",
         "//test/integration:http_protocol_integration_lib",

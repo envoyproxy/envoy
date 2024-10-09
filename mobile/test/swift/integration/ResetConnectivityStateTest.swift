@@ -30,7 +30,7 @@ final class ResetConnectivityStateTest: XCTestCase {
 
     let client = engine.streamClient()
 
-    let port = String(EnvoyTestServer.getEnvoyPort())
+    let port = String(EnvoyTestServer.getHttpPort())
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
                                                authority: "localhost:" + port, path: "/simple.txt")
       .build()
@@ -98,6 +98,6 @@ final class ResetConnectivityStateTest: XCTestCase {
     XCTAssertTrue(resultEndStream2)
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

@@ -2147,6 +2147,9 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
 }
 
 TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "true");
+
   beginSession();
   FakeRawConnectionPtr fake_upstream_connection;
 
@@ -2170,6 +2173,115 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
                    std::string(settings_max_connections_frame))));
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, UpstreamGoAway) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "true");
+
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  const Http2Frame rst_stream =
+      Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
+  const Http2Frame go_away_frame =
+      Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(rst_stream), std::string(go_away_frame))));
+  ASSERT_TRUE(fake_upstream_connection->close());
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, UpstreamGoAwayLegacy) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "false");
+
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  const Http2Frame rst_stream =
+      Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
+  const Http2Frame go_away_frame =
+      Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(rst_stream), std::string(go_away_frame))));
+  ASSERT_TRUE(fake_upstream_connection->close());
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+// Test that sending an invalid frame results in `upstream_cx_protocol_error`.
+TEST_P(Http2FrameIntegrationTest, UpstreamProtocolError) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "true");
+
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  ASSERT_TRUE(fake_upstream_connection->write("abcdefg this is not a valid h2 frame"));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+// Test that sending an invalid frame results in `upstream_cx_protocol_error`.
+TEST_P(Http2FrameIntegrationTest, UpstreamProtocolErrorLegacy) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "false");
+
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  ASSERT_TRUE(fake_upstream_connection->write("abcdefg this is not a valid h2 frame"));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
 
   // Cleanup.
   tcp_client_->close();

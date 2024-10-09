@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.stat_sinks.graphite_statsd"],
+    rbe_pool = "2core",
     deps = [
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",

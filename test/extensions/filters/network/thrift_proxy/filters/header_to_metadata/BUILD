@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.thrift.header_to_metadata"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters/header_to_metadata:config",
         "//source/extensions/filters/network/thrift_proxy/filters/header_to_metadata:header_to_metadata_filter_lib",
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
     name = "header_to_metadata_filter_test",
     srcs = ["header_to_metadata_filter_test.cc"],
     extension_names = ["envoy.filters.thrift.header_to_metadata"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/network/thrift_proxy/filters/header_to_metadata:header_to_metadata_filter_lib",
         "//test/extensions/filters/network/thrift_proxy:mocks",

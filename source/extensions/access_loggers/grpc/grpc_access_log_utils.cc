@@ -275,14 +275,7 @@ void Utility::extractCommonAccessLogProperties(
   }
 
   if (stream_info.upstreamInfo().has_value()) {
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdangling-reference"
-#endif
     const auto& upstream_info = stream_info.upstreamInfo().value().get();
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
     if (upstream_info.upstreamHost() != nullptr) {
       Network::Utility::addressToProtobufAddress(
           *upstream_info.upstreamHost()->address(),

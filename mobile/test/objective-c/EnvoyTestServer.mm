@@ -3,31 +3,39 @@
 
 @implementation EnvoyTestServer
 
-+ (NSInteger)getEnvoyPort {
-  return get_server_port();
++ (NSInteger)getHttpPort {
+  return get_http_server_port();
+}
+
++ (NSInteger)getProxyPort {
+  return get_proxy_server_port();
 }
 
 + (void)startHttp1PlaintextServer {
-  start_server(Envoy::TestServerType::HTTP1_WITHOUT_TLS);
+  start_http_server(Envoy::TestServerType::HTTP1_WITHOUT_TLS);
 }
 
 + (void)startHttpProxyServer {
-  start_server(Envoy::TestServerType::HTTP_PROXY);
+  start_proxy_server(Envoy::TestServerType::HTTP_PROXY);
 }
 
 + (void)startHttpsProxyServer {
-  start_server(Envoy::TestServerType::HTTPS_PROXY);
+  start_proxy_server(Envoy::TestServerType::HTTPS_PROXY);
 }
 
-+ (void)shutdownTestServer {
-  shutdown_server();
++ (void)shutdownTestHttpServer {
+  shutdown_http_server();
+}
+
++ (void)shutdownTestProxyServer {
+  shutdown_proxy_server();
 }
 
 + (void)setHeadersAndData:(NSString *)header_key
              header_value:(NSString *)header_value
             response_body:(NSString *)response_body {
-  set_headers_and_data([header_key UTF8String], [header_value UTF8String],
-                       [response_body UTF8String]);
+  set_http_headers_and_data([header_key UTF8String], [header_value UTF8String],
+                            [response_body UTF8String]);
 }
 
 @end

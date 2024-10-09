@@ -66,6 +66,33 @@ envoy_entry_point(
     init_data = [":__init__.py"],
 )
 
+sh_binary(
+    name = "generate_release_hash",
+    srcs = ["generate_release_hash.sh"],
+    visibility = ["//visibility:public"],
+)
+
+# This sets a default hash based on currently visible tagged versions.
+# Its very questionably hermetic, making assumptions about git, the repo remotes and so on.
+# The general idea here is to make this cache blow any time there are release changes.
+# You can use the above sh_binary to generate a custom/correct hash to override below.
+genrule(
+    name = "default_release_hash",
+    outs = ["default_release_hash.txt"],
+    cmd = """
+    $(location @envoy//bazel:generate_release_hash.sh) %s > $@
+    """ % PATH,
+    stamp = True,
+    tags = ["no-remote-exec"],
+    tools = ["@envoy//bazel:generate_release_hash.sh"],
+)
+
+label_flag(
+    name = "release-hash",
+    build_setting_default = ":default_release_hash",
+    visibility = ["//visibility:public"],
+)
+
 genrule(
     name = "project",
     outs = ["project.json"],
@@ -74,6 +101,7 @@ genrule(
     """,
     tools = [
         ":get_project_json",
+        ":release-hash",
         "@envoy//:VERSION.txt",
         "@envoy//changelogs",
     ],

@@ -34,11 +34,6 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
   ExtensionRegistry::registerFactories();
 
   Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker_);
-  // Envoy Mobile always requires dfp_mixed_scheme for the TLS and cleartext DFP clusters.
-  // While dfp_mixed_scheme defaults to true, some environments force it to false (e.g. within
-  // Google), so we force it back to true in Envoy Mobile.
-  // TODO(abeyad): Remove once this is no longer needed.
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,

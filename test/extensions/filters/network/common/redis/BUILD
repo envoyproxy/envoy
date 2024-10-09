@@ -34,6 +34,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":redis_mocks",
         "//source/common/buffer:buffer_lib",
@@ -46,6 +47,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "client_impl_test",
     srcs = ["client_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":redis_mocks",
         ":test_utils_lib",
@@ -65,6 +67,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "fault_test",
     srcs = ["fault_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":redis_mocks",
         "//source/common/common:assert_lib",

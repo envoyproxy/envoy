@@ -73,6 +73,13 @@ public:
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
+  absl::Status
+  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                  Grpc::RawAsyncClientPtr&& failover_async_client,
+                  CustomConfigValidatorsPtr&& custom_config_validators, Stats::Scope& scope,
+                  BackOffStrategyPtr&& backoff_strategy,
+                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+
   void handleDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message);
 
@@ -100,11 +107,13 @@ public:
 
 private:
   // Helper function to create the grpc_stream_ object.
-  // TODO(adisuissa): this should be removed when envoy.restart_features.xds_failover_support
-  // is deprecated.
   std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
                                       envoy::service::discovery::v3::DiscoveryResponse>>
-  createGrpcStreamObject(GrpcMuxContext& grpc_mux_context);
+  createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
+                         Grpc::RawAsyncClientPtr&& failover_async_client,
+                         const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
+                         BackOffStrategyPtr&& backoff_strategy,
+                         const RateLimitSettings& rate_limit_settings);
 
   void drainRequests();
   void setRetryTimer();
@@ -272,6 +281,7 @@ private:
                                  ApiState& api_state, const std::string& type_url,
                                  const std::string& version_info, bool call_delegate);
 
+  Event::Dispatcher& dispatcher_;
   // Multiplexes the stream to the primary and failover sources.
   // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
   // convert from unique_ptr<GrpcStreamInterface> to GrpcMuxFailover directly.
@@ -301,7 +311,6 @@ private:
   // URL.
   std::unique_ptr<std::queue<std::string>> request_queue_;
 
-  Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
 
   bool started_{false};

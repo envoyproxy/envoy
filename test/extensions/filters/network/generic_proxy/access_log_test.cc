@@ -63,112 +63,114 @@ TEST(AccessLogFormatterTest, AccessLogFormatterTest) {
   {
     // Test for %METHOD%.
     FormatterContext context;
-    Envoy::Formatter::FormatterBaseImpl<FormatterContext> formatter("%METHOD%");
+    auto formatter = *Envoy::Formatter::FormatterBaseImpl<FormatterContext>::create("%METHOD%");
     StreamInfo::MockStreamInfo stream_info;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-");
 
     FakeStreamCodecFactory::FakeRequest request;
     request.method_ = "FAKE_METHOD";
     context.request_ = &request;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "FAKE_METHOD");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "FAKE_METHOD");
   }
 
   {
     // Test for %HOST%.
     FormatterContext context;
-    Envoy::Formatter::FormatterBaseImpl<FormatterContext> formatter("%HOST%");
+    auto formatter = *Envoy::Formatter::FormatterBaseImpl<FormatterContext>::create("%HOST%");
     StreamInfo::MockStreamInfo stream_info;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-");
 
     FakeStreamCodecFactory::FakeRequest request;
     request.host_ = "FAKE_HOST";
     context.request_ = &request;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "FAKE_HOST");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "FAKE_HOST");
   }
 
   {
     // Test for %PATH%.
     FormatterContext context;
-    Envoy::Formatter::FormatterBaseImpl<FormatterContext> formatter("%PATH%");
+    auto formatter = *Envoy::Formatter::FormatterBaseImpl<FormatterContext>::create("%PATH%");
     StreamInfo::MockStreamInfo stream_info;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-");
 
     FakeStreamCodecFactory::FakeRequest request;
     request.path_ = "FAKE_PATH";
     context.request_ = &request;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "FAKE_PATH");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "FAKE_PATH");
   }
 
   {
     // Test for %PROTOCOL%.
     FormatterContext context;
-    Envoy::Formatter::FormatterBaseImpl<FormatterContext> formatter("%PROTOCOL%");
+    auto formatter = *Envoy::Formatter::FormatterBaseImpl<FormatterContext>::create("%PROTOCOL%");
     StreamInfo::MockStreamInfo stream_info;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-");
 
     FakeStreamCodecFactory::FakeRequest request;
     request.protocol_ = "FAKE_PROTOCOL";
     context.request_ = &request;
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "FAKE_PROTOCOL");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "FAKE_PROTOCOL");
   }
 
   {
     // Test for %REQUEST_PROPERTY%.
     FormatterContext context;
-    Envoy::Formatter::FormatterBaseImpl<FormatterContext> formatter("%REQUEST_PROPERTY(FAKE_KEY)%");
+    auto formatter = *Envoy::Formatter::FormatterBaseImpl<FormatterContext>::create(
+        "%REQUEST_PROPERTY(FAKE_KEY)%");
     StreamInfo::MockStreamInfo stream_info;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-");
 
     FakeStreamCodecFactory::FakeRequest request;
 
     context.request_ = &request;
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-");
 
     request.data_["FAKE_KEY"] = "FAKE_VALUE";
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "FAKE_VALUE");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "FAKE_VALUE");
   }
 
   {
     // Test for %RESPONSE_PROPERTY%.
     FormatterContext context;
-    Envoy::Formatter::FormatterBaseImpl<FormatterContext> formatter(
+    auto formatter = *Envoy::Formatter::FormatterBaseImpl<FormatterContext>::create(
         "%RESPONSE_PROPERTY(FAKE_KEY)%");
     StreamInfo::MockStreamInfo stream_info;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-");
 
     FakeStreamCodecFactory::FakeResponse response;
 
     context.response_ = &response;
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-");
 
     response.data_["FAKE_KEY"] = "FAKE_VALUE";
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "FAKE_VALUE");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "FAKE_VALUE");
   }
 
   {
     // Test for %GENERIC_RESPONSE_CODE%.
     FormatterContext context;
-    Envoy::Formatter::FormatterBaseImpl<FormatterContext> formatter("%GENERIC_RESPONSE_CODE%");
+    auto formatter =
+        *Envoy::Formatter::FormatterBaseImpl<FormatterContext>::create("%GENERIC_RESPONSE_CODE%");
     StreamInfo::MockStreamInfo stream_info;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-");
 
     FakeStreamCodecFactory::FakeResponse response;
     response.status_ = {-1234, false};
     context.response_ = &response;
 
-    EXPECT_EQ(formatter.formatWithContext(context, stream_info), "-1234");
+    EXPECT_EQ(formatter->formatWithContext(context, stream_info), "-1234");
   }
 }
 

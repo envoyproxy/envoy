@@ -481,8 +481,8 @@ public class AndroidEngineExplicitFlowTest {
           mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
           RequestScenario requestScenario =
               new RequestScenario()
-                  .setHttpMethod(RequestMethod.GET)
-                  .setUrl(mockWebServer.url("get/flowers").toString())
+                  .setHttpMethod(RequestMethod.POST)
+                  .setUrl(mockWebServer.url("post/flowers").toString())
                   .addBody("This is my body part 1")
                   .addBody("This is my body part 2")
                   .setResponseBufferSize(20); // Larger than the response body size

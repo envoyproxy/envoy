@@ -30,8 +30,8 @@ public:
 };
 
 #define SET_AND_RETURN_IF_NOT_OK(check_status, set_status)                                         \
-  if (!check_status.ok()) {                                                                        \
-    set_status = check_status;                                                                     \
+  if (const absl::Status temp_status = check_status; !temp_status.ok()) {                          \
+    set_status = temp_status;                                                                      \
     return;                                                                                        \
   }
 

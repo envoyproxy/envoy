@@ -24,9 +24,7 @@ envoy_cc_library(
     name = "extractor_impl",
     srcs = ["extractor_impl.cc"],
     hdrs = ["extractor_impl.h"],
-    external_deps = [
-        "grpc_transcoding",
-    ],
+    external_deps = ["grpc_transcoding"],
     deps = [
         "extractor",
         "//source/common/common:minimal_logger_lib",
@@ -52,9 +50,7 @@ envoy_cc_library(
     name = "filter",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    external_deps = [
-        "grpc_transcoding",
-    ],
+    external_deps = ["grpc_transcoding"],
     deps = [
         "extractor_impl",
         "filter_config",

@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/clusters/aggregate:cluster",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -38,6 +39,7 @@ envoy_extension_cc_test(
     name = "cluster_update_test",
     srcs = ["cluster_update_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/router:context_lib",
         "//source/common/upstream:cluster_factory_lib",
@@ -65,6 +67,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

@@ -13,8 +13,8 @@ envoy_cc_test(
     srcs = [
         "sqlutils_test.cc",
     ],
-    external_deps = ["sqlparser"],
     deps = [
         "//contrib/common/sqlutils/source:sqlutils_lib",
+        "@com_github_envoyproxy_sqlparser//:sqlparser",
     ],
 )

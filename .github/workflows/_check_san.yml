@@ -1,0 +1,55 @@
+name: Check/san
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      gcp-key:
+        required: true
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-asan
+  cancel-in-progress: true
+
+
+jobs:
+  san:
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.target }}
+    with:
+      # bazel-extra: '--config=remote-envoy-engflow'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
+      request: ${{ inputs.request }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+      rbe: ${{ matrix.rbe }}
+      target: ${{ matrix.target }}
+      timeout-minutes: 180
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: asan
+          rbe: true
+        - target: msan
+          rbe: true
+        - target: tsan
+          rbe: true

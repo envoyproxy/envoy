@@ -13,6 +13,7 @@ envoy_cc_fuzz_test(
     name = "original_dst_fuzz_test",
     srcs = ["original_dst_fuzz_test.cc"],
     corpus = "original_dst_corpus",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/listener/original_dst:original_dst_lib",
         "//test/extensions/filters/listener/common/fuzz:listener_filter_fuzzer_lib",
@@ -25,6 +26,7 @@ envoy_cc_test(
     srcs = [
         "original_dst_integration_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
@@ -43,6 +45,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "original_dst_test",
     srcs = ["original_dst_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
         "//source/common/network:listener_filter_buffer_lib",

@@ -12,9 +12,7 @@ envoy_cc_extension(
     name = "health_checker_lib",
     srcs = ["health_checker_impl.cc"],
     hdrs = ["health_checker_impl.h"],
-    external_deps = [
-        "grpc_health_proto",
-    ],
+    external_deps = ["grpc_health_proto"],
     extra_visibility = [
         # previously considered core code.
         "//test:__subpackages__",

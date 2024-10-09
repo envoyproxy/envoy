@@ -133,9 +133,7 @@ envoy_cc_library(
     name = "google_grpc_utils_lib",
     srcs = ["google_grpc_utils.cc"],
     hdrs = ["google_grpc_utils.h"],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         ":google_grpc_creds_lib",
         "//envoy/api:api_interface",
@@ -166,9 +164,7 @@ envoy_cc_library(
     name = "google_async_client_lib",
     srcs = ["google_async_client_impl.cc"],
     hdrs = ["google_async_client_impl.h"],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         ":context_lib",
         ":google_grpc_context_lib",

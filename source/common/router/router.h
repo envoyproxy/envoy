@@ -424,7 +424,7 @@ public:
     return callbacks_->upstreamOverrideHost();
   }
 
-  void setOrcaLoadReportCallbacks(OrcaLoadReportCallbacks& callbacks) override {
+  void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) override {
     orca_load_report_callbacks_ = callbacks;
   }
 
@@ -610,7 +610,7 @@ private:
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
-  OptRef<OrcaLoadReportCallbacks> orca_load_report_callbacks_;
+  std::weak_ptr<OrcaLoadReportCallbacks> orca_load_report_callbacks_;
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
   bool downstream_response_started_ : 1;

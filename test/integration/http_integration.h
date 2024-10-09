@@ -158,10 +158,12 @@ protected:
 
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
-  virtual IntegrationCodecClientPtr
-  makeRawHttpConnection(Network::ClientConnectionPtr&& conn,
-                        absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-                        bool wait_till_connected = true);
+  virtual IntegrationCodecClientPtr makeRawHttpConnection(
+      Network::ClientConnectionPtr&& conn,
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
+          absl::nullopt,
+      bool wait_till_connected = true);
   // Makes a downstream network connection object based on client codec version.
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override;
@@ -271,13 +273,13 @@ protected:
   void testRouterUpstreamResponseBeforeRequestComplete(uint32_t status_code = 0);
 
   void testTwoRequests(bool force_network_backup = false);
-  void testLargeHeaders(Http::TestRequestHeaderMapImpl request_headers,
-                        Http::TestRequestTrailerMapImpl request_trailers, uint32_t size,
-                        uint32_t max_size);
   void testLargeRequestUrl(uint32_t url_size, uint32_t max_headers_size);
   void testLargeRequestHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
                                uint32_t max_count = 100,
                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  void testLargeResponseHeaders(uint32_t size, uint32_t count, uint32_t max_size = 60,
+                                uint32_t max_count = 100,
+                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void testLargeRequestTrailers(uint32_t size, uint32_t max_size = 60);
   void testManyRequestHeaders(std::chrono::milliseconds time = TestUtility::DefaultTimeout);
 

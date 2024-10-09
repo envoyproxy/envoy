@@ -64,6 +64,7 @@ jobs:
     with:
       command: ./bazelw
       container-command:
+      docker-ipv6: false
       # Return to using:
       #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.

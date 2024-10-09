@@ -85,7 +85,6 @@ envoy_quiche_platform_impl_cc_library(
     tags = ["nofips"],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/common/common:stl_helpers",
         "//source/common/common:utility_lib",
     ],
 )

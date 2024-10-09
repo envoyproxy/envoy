@@ -1,0 +1,82 @@
+name: Precheck/publish
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      gcp-key:
+        required: true
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-publish
+  cancel-in-progress: true
+
+
+jobs:
+  publish:
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.name || matrix.target }}
+    with:
+      bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
+      concurrency-suffix: -${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
+      gcs-only: "true"
+      rbe: ${{ matrix.rbe }}
+      request: ${{ inputs.request }}
+      runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
+      timeout-minutes: ${{ matrix.timeout-minutes || 120 }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+      steps-post: ${{ matrix.steps-post }}
+      target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.target-suffix }}
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: release.test_only
+          name: Release (x64)
+          target-suffix: x64
+          arch: x64
+          rbe: true
+        - target: release.test_only
+          name: Release (arm64)
+          target-suffix: arm64
+          arch: arm64
+          bazel-extra: >-
+            --config=common-envoy-engflow
+            --config=cache-envoy-engflow
+            --config=bes-envoy-engflow
+          rbe: false
+          runs-on: envoy-arm64-large
+          timeout-minutes: 180
+        - target: docs
+          name: Docs
+          bazel-extra: >-
+            --config=remote-envoy-engflow
+            --config=docs-ci
+          rbe: true
+          steps-post: |
+            - run: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
+              shell: bash
+              env:
+                GCS_ARTIFACT_BUCKET: ${{ inputs.trusted && 'envoy-postsubmit' || 'envoy-pr' }}
+                GCS_REDIRECT_PATH: ${{ fromJSON(inputs.request).request.pr || fromJSON(inputs.request).request.target-branch }}

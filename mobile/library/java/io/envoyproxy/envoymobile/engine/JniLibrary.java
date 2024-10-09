@@ -307,10 +307,11 @@ public class JniLibrary {
       boolean forceV6, boolean useGro, String http3ConnectionOptions,
       String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
       boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enablePortMigration, boolean enableSocketTagging, boolean enableInterfaceBinding,
-      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
-      long maxConnectionsPerHost, long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds,
-      String appVersion, String appId, boolean trustChainVerification, byte[][] filterChain,
+      int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
+      boolean enableInterfaceBinding, long h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost,
+      long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
+      boolean trustChainVerification, byte[][] filterChain,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
       byte[][] cares_fallback_resolvers);
 

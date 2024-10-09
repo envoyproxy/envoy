@@ -2544,7 +2544,8 @@ class Http1ClientConnectionImplTest : public Http1CodecTestBase {
 public:
   void initialize() {
     codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_,
+        connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_kb_,
+        max_response_headers_count_,
         /* passing_through_proxy=*/false);
   }
 
@@ -2564,6 +2565,7 @@ public:
 protected:
   Stats::TestUtil::TestStore store_;
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
+  uint32_t max_response_headers_kb_{Http::Http1::MAX_RESPONSE_HEADERS_KB};
 };
 
 void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(
@@ -2571,8 +2573,9 @@ void Http1ClientConnectionImplTest::testClientAllowChunkedContentLength(
 // Response validation is not implemented in UHV yet
 #ifndef ENVOY_ENABLE_UHV
   codec_settings_.allow_chunked_length_ = allow_chunked_length;
-  codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+  codec_ = std::make_unique<Http1::ClientConnectionImpl>(connection_, http1CodecStats(), callbacks_,
+                                                         codec_settings_, max_response_headers_kb_,
+                                                         max_response_headers_count_);
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
@@ -3706,6 +3709,28 @@ TEST_P(Http1ClientConnectionImplTest, LargeResponseHeadersAccepted) {
   std::string long_header = "big: " + std::string(79 * 1024, 'q') + "\r\n";
   buffer = Buffer::OwnedImpl(long_header);
   status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
+// Tests that the size of response headers for HTTP/1 can be configured higher than the default of
+// 80kB.
+TEST_P(Http1ClientConnectionImplTest, LargeResponseHeadersAcceptedConfigurable) {
+  constexpr uint32_t size_limit_kb = 85;
+  max_response_headers_kb_ = size_limit_kb;
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+  std::string long_header = "big: " + std::string((size_limit_kb - 1) * 1024, 'q') + "\r\n";
+  buffer = Buffer::OwnedImpl(long_header);
+  status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 // Regression test for CVE-2019-18801. Large method headers should not trigger
@@ -3792,6 +3817,7 @@ TEST_P(Http1ClientConnectionImplTest, ManyResponseHeadersAccepted) {
   // Response already contains one header.
   buffer = Buffer::OwnedImpl(createHeaderOrTrailerFragment(150) + "\r\n");
   status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
 }
 
 TEST_P(Http1ClientConnectionImplTest, TestResponseSplit0) {
@@ -3821,8 +3847,9 @@ TEST_P(Http1ClientConnectionImplTest, TestResponseSplitAllowChunkedLength100) {
 TEST_P(Http1ClientConnectionImplTest, VerifyResponseHeaderTrailerMapMaxLimits) {
   codec_settings_.allow_chunked_length_ = true;
   codec_settings_.enable_trailers_ = true;
-  codec_ = std::make_unique<Http1::ClientConnectionImpl>(
-      connection_, http1CodecStats(), callbacks_, codec_settings_, max_response_headers_count_);
+  codec_ = std::make_unique<Http1::ClientConnectionImpl>(connection_, http1CodecStats(), callbacks_,
+                                                         codec_settings_, max_response_headers_kb_,
+                                                         max_response_headers_count_);
 
   NiceMock<MockResponseDecoder> response_decoder;
   Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);

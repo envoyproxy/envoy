@@ -29,9 +29,7 @@ envoy_cc_library(
     name = "starttls_socket_lib",
     srcs = ["starttls_socket.cc"],
     hdrs = ["starttls_socket.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",

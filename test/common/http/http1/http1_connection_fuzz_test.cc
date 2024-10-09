@@ -45,7 +45,7 @@ public:
     client_ = std::make_unique<Http1::ClientConnectionImpl>(
         mock_client_connection_,
         Http1::CodecStats::atomicGet(http1_stats_, *stats_store_.rootScope()),
-        mock_client_callbacks_, client_settings_, Http::DEFAULT_MAX_HEADERS_COUNT);
+        mock_client_callbacks_, client_settings_, absl::nullopt, Http::DEFAULT_MAX_HEADERS_COUNT);
     Status status = client_->dispatch(payload);
   }
 

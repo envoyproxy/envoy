@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "redis_test",
     srcs = ["redis_test.cc"],
     extension_names = ["envoy.health_checkers.redis"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/api:api_lib",
         "//source/extensions/health_checkers/redis",
@@ -39,6 +40,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.health_checkers.redis"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/upstream:health_checker_lib",
         "//source/extensions/health_checkers/redis:config",

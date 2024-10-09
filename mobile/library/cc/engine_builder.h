@@ -62,7 +62,8 @@ public:
   EngineBuilder& setHttp3ClientConnectionOptions(std::string options);
   EngineBuilder& addQuicHint(std::string host, int port);
   EngineBuilder& addQuicCanonicalSuffix(std::string suffix);
-  EngineBuilder& enablePortMigration(bool enable_port_migration);
+  // 0 means port migration is disabled.
+  EngineBuilder& setNumTimeoutsToTriggerPortMigration(int num_timeouts);
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
   // Sets whether to use GRO for upstream UDP sockets (QUIC/HTTP3).
@@ -103,6 +104,9 @@ public:
   // The value must be an integer between -20 (highest priority) and 19 (lowest priority). Values
   // outside of this range will be ignored.
   EngineBuilder& setNetworkThreadPriority(int thread_priority);
+
+  // Sets the QUIC connection idle timeout in seconds.
+  EngineBuilder& setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds);
 
 #if defined(__APPLE__)
   // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
@@ -176,7 +180,7 @@ private:
   std::string http3_client_connection_options_ = "";
   std::vector<std::pair<std::string, int>> quic_hints_;
   std::vector<std::string> quic_suffixes_;
-  bool enable_port_migration_ = false;
+  int num_timeouts_to_trigger_port_migration_ = 0;
   bool always_use_v6_ = false;
 #if defined(__APPLE__)
   // TODO(abeyad): once stable, consider setting the default to true.
@@ -201,6 +205,8 @@ private:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_session_pool.cc;l=790-793;drc=7f04a8e033c23dede6beae129cd212e6d4473d72
   // https://source.chromium.org/chromium/chromium/src/+/main:net/third_party/quiche/src/quiche/quic/core/quic_constants.h;l=43-47;drc=34ad7f3844f882baf3d31a6bc6e300acaa0e3fc8
   int32_t udp_socket_send_buffer_size_ = 1452 * 20;
+
+  int quic_connection_idle_timeout_seconds_ = 30;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

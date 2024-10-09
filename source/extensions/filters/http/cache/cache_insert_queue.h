@@ -12,7 +12,7 @@ namespace Cache {
 
 using OverHighWatermarkCallback = std::function<void()>;
 using UnderLowWatermarkCallback = std::function<void()>;
-using AbortInsertCallback = std::function<void()>;
+using AbortInsertCallback = absl::AnyInvocable<void()>;
 class CacheInsertFragment;
 
 // This queue acts as an intermediary between CacheFilter and the cache

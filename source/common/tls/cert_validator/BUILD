@@ -23,9 +23,7 @@ envoy_cc_library(
         "san_matcher.h",
         "utility.h",
     ],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/config:typed_config_interface",

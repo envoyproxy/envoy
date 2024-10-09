@@ -115,7 +115,7 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
                             random_generator, state, client_fn, codec_fn, protocol, {}, nullptr),
       quic_info_(dynamic_cast<Quic::PersistentQuicInfoImpl&>(quic_info)),
       server_id_(sni(transport_socket_options, host),
-                 static_cast<uint16_t>(host_->address()->ip()->port()), false),
+                 static_cast<uint16_t>(host_->address()->ip()->port())),
       connect_callback_(connect_callback), attempt_happy_eyeballs_(attempt_happy_eyeballs),
       network_observer_registry_(network_observer_registry) {}
 

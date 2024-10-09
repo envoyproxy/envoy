@@ -15,7 +15,6 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -66,16 +65,6 @@ namespace {
 class MockInternalListenerManager : public InternalListenerManager {
 public:
   MOCK_METHOD(InternalListenerOptRef, findByAddress, (const Address::InstanceConstSharedPtr&), ());
-};
-
-class NoopConnectionExecutionContext : public ExecutionContext {
-public:
-  NoopConnectionExecutionContext() = default;
-  ~NoopConnectionExecutionContext() override = default;
-
-protected:
-  void activate() override {}
-  void deactivate() override {}
 };
 
 TEST(RawBufferSocket, TestBasics) {
@@ -346,27 +335,6 @@ TEST_P(ConnectionImplTest, SetSslConnection) {
   EXPECT_EQ(ssl_info, client_connection_->ssl());
   EXPECT_EQ(ssl_info, client_connection_->connectionInfoProvider().sslConnection());
   disconnect(false);
-}
-
-TEST_P(ConnectionImplTest, SetGetExecutionContextFilterState) {
-  setUpBasicConnection();
-  connect();
-
-  EXPECT_EQ(getConnectionExecutionContext(*client_connection_), nullptr);
-
-  const StreamInfo::FilterStateSharedPtr& filter_state =
-      client_connection_->streamInfo().filterState();
-  auto connection_execution_context = std::make_unique<NoopConnectionExecutionContext>();
-  const NoopConnectionExecutionContext* context_pointer =
-      connection_execution_context.get(); // Not owned.
-  auto filter_state_object = std::make_shared<ConnectionExecutionContextFilterState>(
-      std::move(connection_execution_context));
-  filter_state->setData(kConnectionExecutionContextFilterStateName, filter_state_object,
-                        StreamInfo::FilterState::StateType::ReadOnly,
-                        StreamInfo::FilterState::LifeSpan::Connection);
-
-  EXPECT_EQ(getConnectionExecutionContext(*client_connection_), context_pointer);
-  disconnect(true);
 }
 
 TEST_P(ConnectionImplTest, GetCongestionWindow) {

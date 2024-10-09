@@ -11,7 +11,7 @@ namespace Envoy {
 
 namespace {
 
-std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool typed) {
+std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter() {
   ProtobufWkt::Struct JsonLogFormat;
   const std::string format_yaml = R"EOF(
     remote_address: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
@@ -26,7 +26,7 @@ std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter(bool type
     user-agent: '%REQ(USER-AGENT)%'
   )EOF";
   TestUtility::loadFromYaml(format_yaml, JsonLogFormat);
-  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, typed, false, false);
+  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, false);
 }
 
 std::unique_ptr<Envoy::Formatter::StructFormatter> makeStructFormatter(bool typed) {
@@ -68,7 +68,7 @@ static void BM_AccessLogFormatterSetup(benchmark::State& state) {
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
-        std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
+        *Envoy::Formatter::FormatterImpl::create(LogFormat, false);
   }
 }
 BENCHMARK(BM_AccessLogFormatterSetup);
@@ -85,7 +85,7 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
       "s%RESPONSE_CODE% %BYTES_SENT% %DURATION% %REQ(REFERER)% \"%REQ(USER-AGENT)%\" - - -\n";
 
   std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
-      std::make_unique<Envoy::Formatter::FormatterImpl>(LogFormat, false);
+      *Envoy::Formatter::FormatterImpl::create(LogFormat, false);
 
   size_t output_bytes = 0;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
@@ -131,7 +131,7 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   testing::NiceMock<MockTimeSystem> time_system;
 
   std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
-  std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
+  std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter = makeJsonFormatter();
 
   size_t output_bytes = 0;
   for (auto _ : state) { // NOLINT: Silences warning about dead store
@@ -140,22 +140,6 @@ static void BM_JsonAccessLogFormatter(benchmark::State& state) {
   benchmark::DoNotOptimize(output_bytes);
 }
 BENCHMARK(BM_JsonAccessLogFormatter);
-
-// NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
-  testing::NiceMock<MockTimeSystem> time_system;
-
-  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
-  std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> typed_json_formatter =
-      makeJsonFormatter(true);
-
-  size_t output_bytes = 0;
-  for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes += typed_json_formatter->formatWithContext({}, *stream_info).length();
-  }
-  benchmark::DoNotOptimize(output_bytes);
-}
-BENCHMARK(BM_TypedJsonAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_FormatterCommandParsing(benchmark::State& state) {

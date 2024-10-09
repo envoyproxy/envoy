@@ -308,17 +308,28 @@ public:
   public:
     virtual ~HostLbPolicyData() = default;
   };
-  using HostLbPolicyDataPtr = std::shared_ptr<HostLbPolicyData>;
+  using HostLbPolicyDataPtr = std::unique_ptr<HostLbPolicyData>;
 
-  /* Takes ownership of lb_policy_data and attaches it to the host.
-   * Must be called before the host is used across threads.
+  /**
+   * Set load balancing policy related data to the host.
+   * NOTE: this method should only be called at main thread before the host is used
+   * across worker threads.
    */
   virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
 
-  /*
-   * @return a reference to the LbPolicyData attached to the host.
+  /**
+   * Get the load balancing policy related data of the host.
+   * @return the optional reference to the load balancing policy related data of the host.
    */
-  virtual const HostLbPolicyDataPtr& lbPolicyData() const PURE;
+  virtual OptRef<HostLbPolicyData> lbPolicyData() const PURE;
+
+  /**
+   * Get the typed load balancing policy related data of the host.
+   * @return the optional reference to the typed load balancing policy related data of the host.
+   */
+  template <class HostLbPolicyDataType> OptRef<HostLbPolicyDataType> typedLbPolicyData() const {
+    return makeOptRefFromPtr(dynamic_cast<HostLbPolicyDataType*>(lbPolicyData().ptr()));
+  }
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -1069,6 +1080,11 @@ public:
   virtual uint32_t maxResponseHeadersCount() const PURE;
 
   /**
+   * @return uint32_t the maximum total size of response headers in KB.
+   */
+  virtual absl::optional<uint16_t> maxResponseHeadersKb() const PURE;
+
+  /**
    * @return the human readable name of the cluster.
    */
   virtual const std::string& name() const PURE;
@@ -1316,9 +1332,19 @@ public:
   virtual UnitFloat dropOverload() const PURE;
 
   /**
+   * @return the cluster drop_category_ configuration.
+   */
+  virtual const std::string& dropCategory() const PURE;
+
+  /**
    * Set up the drop_overload value for the cluster.
    */
   virtual void setDropOverload(UnitFloat drop_overload) PURE;
+
+  /**
+   * Set up the drop_category value for the thread local cluster.
+   */
+  virtual void setDropCategory(absl::string_view drop_category) PURE;
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;

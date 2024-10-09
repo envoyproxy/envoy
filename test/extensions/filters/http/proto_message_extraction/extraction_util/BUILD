@@ -15,6 +15,7 @@ envoy_cc_test(
         "//test/proto:extraction.proto",
         "//test/proto:extraction_proto_descriptor",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/proto_message_extraction/extraction_util",
         "//test/proto:extraction_proto_cc_proto",
@@ -23,7 +24,6 @@ envoy_cc_test(
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest",
         "@com_google_protobuf//:protobuf",
         "@com_google_protoconverter//:all",
         "@com_google_protofieldextraction//:all_libs",

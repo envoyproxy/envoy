@@ -68,4 +68,19 @@ TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
   TestEnvironment::removePath(path);
 }
 
+TEST(OsSyscallsTest, SupportsIpTransparent) {
+  bool supported = Api::OsSysCallsSingleton::get().supportsIpTransparent(
+      TestEnvironment::getIpVersionsForTest()[0]);
+  EXPECT_FALSE(supported);
+}
+
+TEST(OsSyscallsTest, SupportsMptcp) {
+  bool supported = Api::OsSysCallsSingleton::get().supportsMptcp();
+  EXPECT_TRUE(supported);
+}
+
+TEST(OsSyscallsTest, IoCtlInvalidFd) {
+  EXPECT_NE(0, Api::OsSysCallsSingleton::get().ioctl(0, 0, nullptr, 0, nullptr, 0, nullptr).errno_);
+}
+
 } // namespace Envoy

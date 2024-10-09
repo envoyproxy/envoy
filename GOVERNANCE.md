@@ -1,34 +1,22 @@
 # Process for becoming a maintainer
 
-## Your organization is not yet a maintainer
+Becoming a maintainer generally means that you are going to be spending substantial time on
+Envoy for the foreseeable future. You should have domain expertise and be extremely proficient in C++.
 
-* Express interest to the senior maintainers that your organization is interested in becoming a
-  maintainer. Becoming a maintainer generally means that you are going to be spending substantial
-  time (>25%) on Envoy for the foreseeable future. You should have domain expertise and be extremely
-  proficient in C++. Ultimately your goal is to become a senior maintainer that will represent your
-  organization.
+* Express interest to the
+  [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-announce)
+  that you are interested in becoming a maintainer and, if your company does not have pre-existing maintainers,
+  that your organization is interested in and willing to sponsoring a maintainer.
 * We will expect you to start contributing increasingly complicated PRs, under the guidance
-  of the existing senior maintainers.
-* We may ask you to do some PRs from our backlog.
+  of the existing maintainers.
+* We may ask you to fix some issues from our backlog.
 * As you gain experience with the code base and our standards, we will ask you to do code reviews
   for incoming PRs (i.e., all maintainers are expected to shoulder a proportional share of
   community reviews).
-* After a period of approximately 2-3 months of working together and making sure we see eye to eye,
-  the existing senior maintainers will confer and decide whether to grant maintainer status or not.
-  We make no guarantees on the length of time this will take, but 2-3 months is the approximate
-  goal.
-
-## Your organization is currently a maintainer
-
-* First decide whether your organization really needs more people with maintainer access. Valid
-  reasons are "blast radius", a large organization that is working on multiple unrelated projects,
-  etc.
-* Contact a senior maintainer for your organization and express interest.
-* Start doing PRs and code reviews under the guidance of your senior maintainer.
-* After a period of 1-2 months the existing senior maintainers will discuss granting "standard"
-  maintainer access.
-* "Standard" maintainer access can be upgraded to "senior" maintainer access after another 1-2
-  months of work and another conference of the existing senior committers.
+* After a period of approximately 2-3 months of contributions demonstrating understanding of (at least parts of)
+  the Envoy code base, reach back out to the maintainers list asking for feedback.  At this point, you will either
+  be granted maintainer status, or be given actionable feedback on any remaining gaps between the contributions
+  demonstrated and those expected of maintainers, at which point you can close those gaps and reach back out.
 
 ## Maintainer responsibilities
 

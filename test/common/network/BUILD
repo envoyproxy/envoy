@@ -36,6 +36,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "address_impl_test",
     srcs = ["address_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -50,11 +51,10 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "address_impl_speed_test",
     srcs = ["address_impl_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
@@ -66,6 +66,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "cidr_range_test",
     srcs = ["cidr_range_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:cidr_range_lib",
@@ -75,12 +76,12 @@ envoy_cc_test(
 envoy_cc_test(
     name = "connection_impl_test",
     srcs = ["connection_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
-        "//source/common/network:common_connection_filter_states_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:utility_lib",
@@ -105,6 +106,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "happy_eyeballs_connection_provider_test",
     srcs = ["happy_eyeballs_connection_provider_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:happy_eyeballs_connection_impl_lib",
         "//test/test_common:utility_lib",
@@ -114,6 +116,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "multi_connection_base_impl_test",
     srcs = ["multi_connection_base_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:multi_connection_base_impl_lib",
         "//source/common/network:socket_option_lib",
@@ -125,6 +128,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_manager_impl_test",
     srcs = ["filter_manager_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -151,6 +155,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "lc_trie_test",
     srcs = ["lc_trie_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
@@ -163,6 +168,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listen_socket_impl_test",
     srcs = ["listen_socket_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:listen_socket_lib",
@@ -179,6 +185,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_filter_buffer_impl_test",
     srcs = ["listener_filter_buffer_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:listener_filter_buffer_lib",
         "//test/mocks/event:event_mocks",
@@ -189,6 +196,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_impl_test",
     srcs = ["listener_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
@@ -210,6 +218,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "raw_buffer_socket_test",
     srcs = ["raw_buffer_socket_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/network:transport_socket_options_lib",
@@ -240,6 +249,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "udp_listener_impl_test",
     srcs = ["udp_listener_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":udp_listener_impl_test_base_lib",
         "//source/common/event:dispatcher_lib",
@@ -264,6 +274,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "udp_listener_impl_batch_writer_test",
     srcs = ["udp_listener_impl_batch_writer_test.cc"],
+    rbe_pool = "2core",
     # Skipping as quiche quic_gso_batch_writer.h does not exist on Windows
     tags = [
         "nofips",
@@ -293,6 +304,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "resolver_test",
     srcs = ["resolver_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
@@ -322,6 +334,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "socket_option_impl_test",
     srcs = ["socket_option_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":socket_option_test",
         "//test/test_common:environment_lib",
@@ -332,6 +345,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "socket_option_factory_test",
     srcs = ["socket_option_factory_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_option_factory_lib",
@@ -348,6 +362,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "addr_family_aware_socket_option_impl_test",
     srcs = ["addr_family_aware_socket_option_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":socket_option_test",
         "//source/common/network:addr_family_aware_socket_option_lib",
@@ -359,6 +374,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -371,9 +387,10 @@ envoy_cc_test(
 )
 
 envoy_cc_fuzz_test(
-    name = "udp_fuzz",
+    name = "udp_fuzz_test",
     srcs = ["udp_fuzz.cc"],
     corpus = "udp_corpus",
+    rbe_pool = "2core",
     deps = [
         "udp_listener_impl_test_base_lib",
         "//source/common/event:dispatcher_lib",
@@ -398,6 +415,7 @@ envoy_cc_fuzz_test(
     name = "utility_fuzz_test",
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -408,12 +426,11 @@ envoy_cc_fuzz_test(
 envoy_cc_benchmark_binary(
     name = "lc_trie_speed_test",
     srcs = ["lc_trie_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 
@@ -425,6 +442,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "io_socket_handle_impl_test",
     srcs = ["io_socket_handle_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
@@ -440,6 +458,7 @@ envoy_cc_test(
         "//bazel:linux": ["io_uring_socket_handle_impl_test.cc"],
         "//conditions:default": [],
     }),
+    rbe_pool = "2core",
     deps = [
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
@@ -454,6 +473,7 @@ envoy_cc_test(
         "//bazel:linux": ["io_uring_socket_handle_impl_integration_test.cc"],
         "//conditions:default": [],
     }),
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:default_socket_interface_lib",
         "//source/common/thread_local:thread_local_lib",
@@ -468,6 +488,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "win32_socket_handle_impl_test",
     srcs = ["win32_socket_handle_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:utility_lib",
@@ -481,6 +502,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "io_socket_handle_impl_integration_test",
     srcs = ["io_socket_handle_impl_integration_test.cc"],
+    rbe_pool = "2core",
     tags = ["requires-network"],
     deps = [
         "//source/common/common:utility_lib",
@@ -492,6 +514,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "transport_socket_options_impl_test",
     srcs = ["transport_socket_options_impl_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:transport_socket_options_lib",
@@ -502,6 +525,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "win32_redirect_records_option_test",
     srcs = ["win32_redirect_records_option_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":socket_option_test",
         "//source/common/network:address_lib",
@@ -512,6 +536,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_matcher_test",
     srcs = ["filter_matcher_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:filter_matcher_lib",
@@ -528,6 +553,7 @@ envoy_cc_fuzz_test(
     name = "listener_filter_buffer_fuzz_test",
     srcs = ["listener_filter_buffer_fuzz_test.cc"],
     corpus = "listener_filter_buffer_corpus",
+    rbe_pool = "2core",
     deps = [
         ":listener_filter_buffer_fuzz_proto_cc_proto",
         "//source/common/network:listener_filter_buffer_lib",

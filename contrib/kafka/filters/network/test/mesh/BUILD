@@ -4,10 +4,6 @@ load(
     "envoy_cc_test_library",
     "envoy_contrib_package",
 )
-load(
-    "//bazel:envoy_internal.bzl",
-    "envoy_external_dep_path",
-)
 
 licenses(["notice"])  # Apache 2
 
@@ -16,6 +12,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_unit_test",
     srcs = ["config_unit_test.cc"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:config_lib",
@@ -27,6 +24,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/kafka/filters/network/source/mesh:filter_lib",
@@ -104,7 +102,7 @@ envoy_cc_test_library(
     hdrs = ["kafka_mocks.h"],
     tags = ["skip_on_windows"],
     deps = [
-        envoy_external_dep_path("librdkafka"),
+        "//bazel/foreign_cc:librdkafka",
         "//contrib/kafka/filters/network/source/mesh:librdkafka_utils_lib",
     ],
 )

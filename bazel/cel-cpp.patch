@@ -1,3 +1,15 @@
+diff --git a/base/attribute.h b/base/attribute.h
+index 9462c180..d6dcce83 100644
+--- a/base/attribute.h
++++ b/base/attribute.h
+@@ -23,6 +23,7 @@
+ #include <vector>
+ 
+ #include "absl/status/statusor.h"
++#include "absl/strings/str_cat.h"
+ #include "absl/strings/string_view.h"
+ #include "absl/types/optional.h"
+ #include "absl/types/span.h"
 diff --git a/base/memory.h b/base/memory.h
 index 3552e19..0fbe618 100644
 --- a/base/memory.h

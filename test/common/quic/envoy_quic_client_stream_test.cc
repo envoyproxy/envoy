@@ -210,6 +210,8 @@ TEST_F(EnvoyQuicClientStreamTest, GetRequestAndHeaderOnlyResponse) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, /*end_stream=*/true);
   EXPECT_TRUE(result.ok());
 
+  quic_stream_->setFlushTimeout(std::chrono::milliseconds(100)); // No-op
+
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
       .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& headers, bool) {
         EXPECT_EQ("200", headers->getStatusValue());

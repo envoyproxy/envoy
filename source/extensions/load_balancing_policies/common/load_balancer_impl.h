@@ -492,6 +492,10 @@ protected:
 
   virtual void refresh(uint32_t priority);
 
+  // Return `true` if refresh() should always use EDF scheduler, even if host
+  // weights are all equal. Default to `false`.
+  virtual bool alwaysUseEdfScheduler() const;
+
   bool isSlowStartEnabled() const;
   bool noHostsAreInSlowStart() const;
 

@@ -13,9 +13,7 @@ envoy_cc_extension(
     name = "http_subscription_lib",
     srcs = ["http_subscription_impl.cc"],
     hdrs = ["http_subscription_impl.h"],
-    external_deps = [
-        "http_api_protos",
-    ],
+    external_deps = ["http_api_protos"],
     extra_visibility = [
         # previously considered core code.
         "//test:__subpackages__",

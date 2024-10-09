@@ -97,8 +97,8 @@ envoy_cc_extension(
     deps = [
         ":wasm_hdr",
         ":wasm_runtime_factory_interface",
+        "//bazel/foreign_cc:zlib",
         "//envoy/server:lifecycle_notifier_interface",
-        "//external:zlib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:safe_memcpy_lib",

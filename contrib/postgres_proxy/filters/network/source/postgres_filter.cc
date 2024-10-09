@@ -211,7 +211,7 @@ bool PostgresFilter::onSSLRequest() {
   buf.add("S");
   // Add callback to be notified when the reply message has been
   // transmitted.
-  read_callbacks_->connection().addBytesSentCallback([=](uint64_t bytes) -> bool {
+  read_callbacks_->connection().addBytesSentCallback([=, this](uint64_t bytes) -> bool {
     // Wait until 'S' has been transmitted.
     if (bytes >= 1) {
       if (!read_callbacks_->connection().startSecureTransport()) {

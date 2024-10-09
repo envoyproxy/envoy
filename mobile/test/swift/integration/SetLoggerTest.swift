@@ -25,7 +25,7 @@ final class LoggerTests: XCTestCase {
       description: "Run received log event via event tracker")
 
     EnvoyTestServer.startHttp1PlaintextServer()
-    let port = String(EnvoyTestServer.getEnvoyPort())
+    let port = String(EnvoyTestServer.getHttpPort())
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
@@ -64,6 +64,6 @@ final class LoggerTests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [logEventExpectation], timeout: 10), .completed)
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

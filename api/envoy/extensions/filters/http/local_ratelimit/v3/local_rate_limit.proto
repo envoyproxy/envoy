@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.local_ratelimit.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 import "envoy/type/v3/http_status.proto";
 import "envoy/type/v3/token_bucket.proto";
@@ -22,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Local Rate limit :ref:`configuration overview <config_http_filters_local_rate_limit>`.
 // [#extension: envoy.filters.http.local_ratelimit]
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message LocalRateLimit {
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
@@ -147,4 +148,23 @@ message LocalRateLimit {
   // of the default ``UNAVAILABLE`` gRPC code for a rate limited gRPC call. The
   // HTTP code will be 200 for a gRPC response.
   bool rate_limited_as_resource_exhausted = 15;
+
+  // Rate limit configuration that is used to generate a list of descriptor entries based on
+  // the request context. The generated entries will be used to find one or multiple matched rate
+  // limit rule from the ``descriptors``.
+  // If this is set, then
+  // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+  // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+  // will be ignored.
+  //
+  // .. note::
+  //   Not all configuration fields of
+  //   :ref:`rate limit config <envoy_v3_api_msg_config.route.v3.RateLimit>` is supported at here.
+  //   Following fields are not supported:
+  //
+  //   1. :ref:`rate limit stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>`.
+  //   2. :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>`.
+  //   3. :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>`.
+  //   4. :ref:`override limit <envoy_v3_api_field_config.route.v3.RateLimit.limit>`.
+  repeated config.route.v3.RateLimit rate_limits = 17;
 }

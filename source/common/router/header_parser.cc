@@ -45,7 +45,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
   final_header_value = HeaderParser::translatePerRequestState(final_header_value);
 
   // Let the substitution formatter parse the final_header_value.
-  return std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true);
+  return Envoy::Formatter::FormatterImpl::create(final_header_value, true);
 }
 
 } // namespace

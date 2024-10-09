@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/event/dispatcher.h"
+
 #include "source/extensions/common/async_files/async_file_handle.h"
 
 #include "absl/status/statusor.h"
@@ -23,7 +25,7 @@ public:
 
 protected:
   // Queue up an action with the AsyncFileManager.
-  CancelFunction enqueue(std::shared_ptr<AsyncFileAction> action);
+  CancelFunction enqueue(Event::Dispatcher* dispatcher, std::unique_ptr<AsyncFileAction> action);
 
   explicit AsyncFileContextBase(AsyncFileManager& manager);
 

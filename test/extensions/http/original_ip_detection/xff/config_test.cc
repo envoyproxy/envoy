@@ -29,7 +29,7 @@ TEST(CustomHeaderFactoryTest, Basic) {
   TestUtility::loadFromYaml(yaml, typed_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_NE(factory->createExtension(typed_config.typed_config(), context), nullptr);
+  EXPECT_NE(*factory->createExtension(typed_config.typed_config(), context), nullptr);
 }
 
 } // namespace Xff

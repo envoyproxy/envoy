@@ -53,6 +53,7 @@ jobs:
         path: mobile-docs
         fetch-depth: 0
         branch: master
+      docker-ipv6: false
       source: |
         echo "ENVOY_DOCKER_SOURCE_DIR=/source/mobile" >> $GITHUB_ENV
         # Path relative to ./mobile directory

@@ -1,0 +1,51 @@
+name: Precheck/format
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-format
+  cancel-in-progress: true
+
+
+jobs:
+  format:
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.name || matrix.target }}
+    with:
+      bazel-extra: '--config=remote-envoy-engflow'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
+      request: ${{ inputs.request }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+      rbe: true
+      target: ${{ matrix.target }}
+      trusted: ${{ inputs.trusted }}
+      upload-name: ${{ matrix.upload-name }}
+      upload-path: ${{ matrix.upload-path }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: format
+          upload-name: fix_format.diff
+          upload-path: /home/runner/work/_temp/fix_format.diff
+        - target: format-api
+          upload-name: fix_proto_format.diff
+          upload-path: /home/runner/work/_temp/fix_proto_format.diff

@@ -63,9 +63,7 @@ envoy_cc_library(
     name = "ssl_socket_base",
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
@@ -98,9 +96,7 @@ envoy_cc_library(
     name = "client_ssl_socket_lib",
     srcs = ["client_ssl_socket.cc"],
     hdrs = ["client_ssl_socket.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         ":ssl_socket_base",
         "@com_google_absl//absl/container:node_hash_set",
@@ -114,9 +110,7 @@ envoy_cc_library(
     name = "server_ssl_socket_lib",
     srcs = ["server_ssl_socket.cc"],
     hdrs = ["server_ssl_socket.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         ":ssl_socket_base",
         "@com_google_absl//absl/container:node_hash_set",
@@ -138,9 +132,7 @@ envoy_cc_library(
     name = "context_config_lib",
     srcs = ["context_config_impl.cc"],
     hdrs = ["context_config_impl.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
@@ -185,9 +177,7 @@ envoy_cc_library(
         "context_impl.h",
         "context_manager_impl.h",
     ],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
@@ -243,9 +233,7 @@ envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats.cc"],
     hdrs = ["stats.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
@@ -258,9 +246,7 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",

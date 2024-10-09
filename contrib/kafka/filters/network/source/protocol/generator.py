@@ -153,9 +153,8 @@ class StatefulProcessor:
                     amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
                     message_spec = json.loads(amended)
                     api_key = message_spec['apiKey']
-                    # (adam.kotwasinski) Higher API keys in the future versions of Kafka need
-                    # some more changes to parse.
-                    if api_key < 68 or api_key == 69:
+                    # (adam.kotwasinski) Telemetry is not supported for now.
+                    if api_key not in [71, 72]:
                         message = self.parse_top_level_element(message_spec)
                         messages.append(message)
             except Exception as e:
@@ -224,8 +223,9 @@ class StatefulProcessor:
                 fields.append(child)
 
         # Some structures share the same name, use request/response as prefix.
-        if cpp_name in ['EntityData', 'EntryData', 'PartitionData', 'PartitionSnapshot',
-                        'SnapshotId', 'TopicData', 'TopicPartitions', 'TopicSnapshot']:
+        if cpp_name in ['Cursor', 'DirectoryData', 'EntityData', 'EntryData', 'PartitionData',
+                        'PartitionSnapshot', 'SnapshotId', 'TopicData', 'TopicPartitions',
+                        'TopicSnapshot']:
             cpp_name = self.type.capitalize() + type_name
 
         # Some of the types repeat multiple times (e.g. AlterableConfig).
@@ -370,9 +370,9 @@ class FieldList:
 
 class FieldSpec:
     """
-  Represents a field present in a structure (request, or child structure thereof).
-  Contains name, type, and versions when it is used (nullable or not).
-  """
+    Represents a field present in a structure (request, or child structure thereof).
+    Contains name, type, and versions when it is used (nullable or not).
+    """
 
     def __init__(self, name, type, version_usage, version_usage_as_nullable):
         import re
@@ -387,10 +387,10 @@ class FieldSpec:
 
     def is_nullable_in_version(self, version):
         """
-    Whether the field is nullable in given version.
-    Fields can be non-nullable in earlier versions.
-    See https://github.com/apache/kafka/tree/2.2.0-rc0/clients/src/main/resources/common/message#nullable-fields
-    """
+        Whether the field is nullable in given version.
+        Fields can be non-nullable in earlier versions.
+        See https://github.com/apache/kafka/tree/3.8.0/clients/src/main/resources/common/message#nullable-fields
+        """
         return version in self.version_usage_as_nullable
 
     def used_in_version(self, version):
@@ -428,12 +428,20 @@ class FieldSpec:
 
     def deserializer_name_in_version(self, version, compact):
         if self.is_nullable_in_version(version):
-            return 'Nullable%s' % self.type.deserializer_name_in_version(version, compact)
+            underlying_deserializer = self.type.deserializer_name_in_version(version, compact)
+            # Handles KAFKA-14425 - structs (complex types) can now be nullable.
+            if isinstance(self.type, Complex):
+                return 'NullableStructDeserializer<%s>' % underlying_deserializer
+            else:
+                return 'Nullable%s' % underlying_deserializer
         else:
             return self.type.deserializer_name_in_version(version, compact)
 
     def is_printable(self):
         return self.type.is_printable()
+
+    def __str__(self):
+        return '%s(%s)' % (self.name, self.type)
 
 
 class TypeSpecification:
@@ -471,10 +479,10 @@ class TypeSpecification:
 
 class Array(TypeSpecification):
     """
-  Represents array complex type.
-  To use instance of this type, it is necessary to declare structures required by self.underlying
-  (e.g. to use Array<Foo>, we need to have `struct Foo {...}`).
-  """
+    Represents array complex type.
+    To use instance of this type, it is necessary to declare structures required by self.underlying
+    (e.g. to use Array<Foo>, we need to have `struct Foo {...}`).
+    """
 
     def __init__(self, underlying):
         self.underlying = underlying
@@ -504,6 +512,9 @@ class Array(TypeSpecification):
 
     def is_printable(self):
         return self.underlying.is_printable()
+
+    def __str__(self):
+        return self.name
 
 
 class Primitive(TypeSpecification):
@@ -643,6 +654,9 @@ class Primitive(TypeSpecification):
     def is_printable(self):
         return self.name not in ['Bytes']
 
+    def __str__(self):
+        return self.name
+
 
 class FieldSerializationSpec():
 
@@ -679,9 +693,9 @@ class Complex(TypeSpecification):
 
     def compute_declaration_chain(self):
         """
-    Computes all dependencies, what means all non-primitive types used by this type.
-    They need to be declared before this struct is declared.
-    """
+        Computes all dependencies, what means all non-primitive types used by this type.
+        They need to be declared before this struct is declared.
+        """
         result = []
         for field in self.fields:
             field_dependencies = field.type.compute_declaration_chain()
@@ -700,10 +714,10 @@ class Complex(TypeSpecification):
 
     def compute_constructors(self):
         """
-    Field lists for different versions may not differ (as Kafka can bump version without any
-    changes). But constructors need to be unique, so we need to remove duplicates if the signatures
-    match.
-    """
+        Field lists for different versions may not differ (as Kafka can bump version without any
+        changes). But constructors need to be unique, so we need to remove duplicates
+        if the signatures match.
+        """
         signature_to_constructor = {}
         for field_list in self.compute_field_lists():
             signature = field_list.constructor_signature()
@@ -724,8 +738,8 @@ class Complex(TypeSpecification):
 
     def compute_field_lists(self):
         """
-    Return field lists representing each of structure versions.
-    """
+        Return field lists representing each of structure versions.
+        """
         field_lists = []
         for version in self.versions:
             field_list = FieldList(version, version in self.flexible_versions, self.fields)
@@ -771,6 +785,9 @@ class Complex(TypeSpecification):
 
     def is_printable(self):
         return True
+
+    def __str__(self):
+        return self.name
 
 
 class RenderingHelper:

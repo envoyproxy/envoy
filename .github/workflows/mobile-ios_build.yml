@@ -41,6 +41,7 @@ jobs:
       args: ${{ matrix.args }}
       command: ./bazelw
       container-command:
+      docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       runs-on: macos-12-large
       source: |
@@ -80,6 +81,7 @@ jobs:
         ${{ matrix.app }}
       command: ./bazelw
       container-command:
+      docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       runs-on: macos-12-large
       source: |
@@ -125,6 +127,7 @@ jobs:
         ${{ matrix.app }}
       command: ./bazelw
       container-command:
+      docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       runs-on: macos-12-large
       source: |

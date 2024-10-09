@@ -18,9 +18,7 @@ envoy_cc_library(
     hdrs = [
         "grpc_tsi.h",
     ],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     visibility = ["//visibility:private"],
     deps = [
         "//source/common/common:c_smart_ptr_lib",
@@ -115,9 +113,7 @@ envoy_cc_library(
     name = "alts_channel_pool",
     srcs = ["alts_channel_pool.cc"],
     hdrs = ["alts_channel_pool.h"],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         "@com_google_absl//absl/random",
     ],
@@ -132,9 +128,7 @@ envoy_cc_library(
     name = "alts_proxy",
     srcs = ["alts_proxy.cc"],
     hdrs = ["alts_proxy.h"],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         ":handshaker_cc_grpc",
         "@com_google_absl//absl/memory",
@@ -147,9 +141,7 @@ envoy_cc_library(
     name = "alts_tsi_handshaker",
     srcs = ["alts_tsi_handshaker.cc"],
     hdrs = ["alts_tsi_handshaker.h"],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         ":alts_proxy",
         ":handshaker_cc_grpc",

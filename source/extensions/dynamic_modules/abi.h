@@ -14,11 +14,7 @@
 // same version of the ABI.
 
 #ifdef __cplusplus
-#include <cstddef>
-
 extern "C" {
-#else
-#include <stddef.h>
 #endif
 
 // -----------------------------------------------------------------------------

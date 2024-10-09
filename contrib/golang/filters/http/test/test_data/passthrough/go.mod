@@ -1,6 +1,6 @@
 module example.com/passthrough
 
-go 1.23
+go 1.22
 
 require github.com/envoyproxy/envoy v1.24.0
 

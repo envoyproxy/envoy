@@ -15,17 +15,6 @@ namespace Extensions {
 namespace Common {
 namespace AsyncFiles {
 
-namespace {
-// ThreadNextAction is per worker thread; if enqueue is called from a callback
-// the action goes directly into ThreadNextAction, otherwise it goes into the
-// queue and is eventually pulled out into ThreadNextAction by a worker thread.
-thread_local std::shared_ptr<AsyncFileAction> ThreadNextAction;
-
-// ThreadIsWorker is set to true for worker threads, and will be false
-// for all other threads.
-thread_local bool ThreadIsWorker = false;
-} // namespace
-
 AsyncFileManagerThreadPool::AsyncFileManagerThreadPool(
     const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
     Api::OsSysCalls& posix)
@@ -50,6 +39,7 @@ AsyncFileManagerThreadPool::~AsyncFileManagerThreadPool() ABSL_LOCKS_EXCLUDED(qu
     absl::MutexLock lock(&queue_mutex_);
     terminate_ = true;
   }
+  // This destructor will be blocked by this loop until all queued file actions are complete.
   while (!thread_pool_.empty()) {
     thread_pool_.back().join();
     thread_pool_.pop_back();
@@ -60,46 +50,123 @@ std::string AsyncFileManagerThreadPool::describe() const {
   return absl::StrCat("thread_pool_size = ", thread_pool_.size());
 }
 
-std::function<void()> AsyncFileManagerThreadPool::enqueue(std::shared_ptr<AsyncFileAction> action) {
-  auto cancel_func = [action]() { action->cancel(); };
-  // If an action is being enqueued from within a callback, we don't have to actually queue it,
-  // we can just set it as the thread's next action - this acts to chain the actions without
-  // yielding to another file.
-  if (ThreadIsWorker) {
-    ASSERT(!ThreadNextAction); // only do one file action per callback.
-    ThreadNextAction = std::move(action);
-    return cancel_func;
-  }
+void AsyncFileManagerThreadPool::waitForIdle() {
+  const auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(queue_mutex_) {
+    return active_workers_ == 0 && queue_.empty() && cleanup_queue_.empty();
+  };
   absl::MutexLock lock(&queue_mutex_);
-  queue_.push(std::move(action));
+  queue_mutex_.Await(absl::Condition(&condition));
+}
+
+absl::AnyInvocable<void()>
+AsyncFileManagerThreadPool::enqueue(Event::Dispatcher* dispatcher,
+                                    std::unique_ptr<AsyncFileAction> action) {
+  QueuedAction entry{std::move(action), dispatcher};
+  auto cancel_func = [dispatcher, state = entry.state_]() {
+    ASSERT(dispatcher == nullptr || dispatcher->isThreadSafe());
+    state->store(QueuedAction::State::Cancelled);
+  };
+  absl::MutexLock lock(&queue_mutex_);
+  queue_.push(std::move(entry));
   return cancel_func;
 }
 
-void AsyncFileManagerThreadPool::worker() {
-  ThreadIsWorker = true;
-  while (true) {
-    const auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(queue_mutex_) {
-      return !queue_.empty() || terminate_;
-    };
-    {
-      absl::MutexLock lock(&queue_mutex_);
-      queue_mutex_.Await(absl::Condition(&condition));
-      if (terminate_) {
-        return;
-      }
-      ThreadNextAction = std::move(queue_.front());
-      queue_.pop();
-    }
-    resolveActions();
-  }
+void AsyncFileManagerThreadPool::postCancelledActionForCleanup(
+    std::unique_ptr<AsyncFileAction> action) {
+  absl::MutexLock lock(&queue_mutex_);
+  cleanup_queue_.push(std::move(action));
 }
 
-void AsyncFileManagerThreadPool::resolveActions() {
-  while (ThreadNextAction) {
-    // Move the action out of ThreadNextAction so that its callback can enqueue
-    // a different ThreadNextAction without self-destructing.
-    std::shared_ptr<AsyncFileAction> action = std::move(ThreadNextAction);
-    action->execute();
+void AsyncFileManagerThreadPool::executeAction(QueuedAction&& queued_action) {
+  using State = QueuedAction::State;
+  State expected = State::Queued;
+  std::shared_ptr<std::atomic<State>> state = std::move(queued_action.state_);
+  std::unique_ptr<AsyncFileAction> action = std::move(queued_action.action_);
+  if (!state->compare_exchange_strong(expected, State::Executing)) {
+    ASSERT(expected == State::Cancelled);
+    if (action->executesEvenIfCancelled()) {
+      action->execute();
+    }
+    return;
+  }
+  action->execute();
+  expected = State::Executing;
+  if (!state->compare_exchange_strong(expected, State::InCallback)) {
+    ASSERT(expected == State::Cancelled);
+    action->onCancelledBeforeCallback();
+    return;
+  }
+  if (queued_action.dispatcher_ == nullptr) {
+    // No need to bother arranging the callback, because a dispatcher was not provided.
+    return;
+  }
+  // If it is necessary to explicitly undo an action on cancel then the lambda will need a
+  // pointer to this manager that is guaranteed to outlive the lambda, in order to be able
+  // to perform that cancel operation on a thread belonging to the file manager.
+  // So capture a shared_ptr if necessary, but, to avoid unnecessary shared_ptr wrangling,
+  // leave it empty if the action doesn't have an associated cancel operation.
+  std::shared_ptr<AsyncFileManagerThreadPool> manager;
+  if (action->hasActionIfCancelledBeforeCallback()) {
+    manager = shared_from_this();
+  }
+  queued_action.dispatcher_->post([manager = std::move(manager), action = std::move(action),
+                                   state = std::move(state)]() mutable {
+    // This callback runs on the caller's thread.
+    State expected = State::InCallback;
+    if (state->compare_exchange_strong(expected, State::Done)) {
+      // Action was not cancelled; run the captured callback on the caller's thread.
+      action->onComplete();
+      return;
+    }
+    ASSERT(expected == State::Cancelled);
+    if (manager == nullptr) {
+      // Action had a "do nothing" cancellation so we don't need to post a cleanup action.
+      return;
+    }
+    // If an action with side-effects was cancelled after being posted, its
+    // side-effects need to be undone as the caller can no longer receive the
+    // returned context. That undo action will need to be done on one of the
+    // file manager's threads, as it is file related, so post it to the thread pool.
+    manager->postCancelledActionForCleanup(std::move(action));
+  });
+}
+
+void AsyncFileManagerThreadPool::worker() {
+  const auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(queue_mutex_) {
+    return !queue_.empty() || !cleanup_queue_.empty() || terminate_;
+  };
+  {
+    absl::MutexLock lock(&queue_mutex_);
+    active_workers_++;
+  }
+  while (true) {
+    QueuedAction action;
+    std::unique_ptr<AsyncFileAction> cleanup_action;
+    {
+      absl::MutexLock lock(&queue_mutex_);
+      active_workers_--;
+      queue_mutex_.Await(absl::Condition(&condition));
+      if (terminate_ && queue_.empty() && cleanup_queue_.empty()) {
+        return;
+      }
+      active_workers_++;
+      if (!queue_.empty()) {
+        action = std::move(queue_.front());
+        queue_.pop();
+      }
+      if (!cleanup_queue_.empty()) {
+        cleanup_action = std::move(cleanup_queue_.front());
+        cleanup_queue_.pop();
+      }
+    }
+    if (action.action_ != nullptr) {
+      executeAction(std::move(action));
+      action.action_ = nullptr;
+    }
+    if (cleanup_action != nullptr) {
+      std::move(cleanup_action)->onCancelledBeforeCallback();
+      cleanup_action = nullptr;
+    }
   }
 }
 
@@ -108,15 +175,17 @@ namespace {
 class ActionWithFileResult : public AsyncFileActionWithResult<absl::StatusOr<AsyncFileHandle>> {
 public:
   ActionWithFileResult(AsyncFileManagerThreadPool& manager,
-                       std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete)
-      : AsyncFileActionWithResult(on_complete), manager_(manager) {}
+                       absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete)
+      : AsyncFileActionWithResult(std::move(on_complete)), manager_(manager) {}
 
 protected:
-  void onCancelledBeforeCallback(absl::StatusOr<AsyncFileHandle> result) override {
-    if (result.ok()) {
-      result.value()->close([](absl::Status) {}).IgnoreError();
+  void onCancelledBeforeCallback() override {
+    if (result_.value().ok()) {
+      result_.value().value()->close(nullptr, [](absl::Status) {}).IgnoreError();
     }
   }
+  bool hasActionIfCancelledBeforeCallback() const override { return true; }
+
   AsyncFileManagerThreadPool& manager_;
   Api::OsSysCalls& posix() { return manager_.posix(); }
 };
@@ -124,8 +193,8 @@ protected:
 class ActionCreateAnonymousFile : public ActionWithFileResult {
 public:
   ActionCreateAnonymousFile(AsyncFileManagerThreadPool& manager, absl::string_view path,
-                            std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete)
-      : ActionWithFileResult(manager, on_complete), path_(path) {}
+                            absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete)
+      : ActionWithFileResult(manager, std::move(on_complete)), path_(path) {}
 
   absl::StatusOr<AsyncFileHandle> executeImpl() override {
     Api::SysCallIntResult open_result;
@@ -187,8 +256,8 @@ class ActionOpenExistingFile : public ActionWithFileResult {
 public:
   ActionOpenExistingFile(AsyncFileManagerThreadPool& manager, absl::string_view filename,
                          AsyncFileManager::Mode mode,
-                         std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete)
-      : ActionWithFileResult(manager, on_complete), filename_(filename), mode_(mode) {}
+                         absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete)
+      : ActionWithFileResult(manager, std::move(on_complete)), filename_(filename), mode_(mode) {}
 
   absl::StatusOr<AsyncFileHandle> executeImpl() override {
     auto open_result = posix().open(filename_.c_str(), openFlags());
@@ -217,8 +286,8 @@ private:
 class ActionStat : public AsyncFileActionWithResult<absl::StatusOr<struct stat>> {
 public:
   ActionStat(Api::OsSysCalls& posix, absl::string_view filename,
-             std::function<void(absl::StatusOr<struct stat>)> on_complete)
-      : AsyncFileActionWithResult(on_complete), posix_(posix), filename_(filename) {}
+             absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete)
+      : AsyncFileActionWithResult(std::move(on_complete)), posix_(posix), filename_(filename) {}
 
   absl::StatusOr<struct stat> executeImpl() override {
     struct stat ret;
@@ -237,8 +306,8 @@ private:
 class ActionUnlink : public AsyncFileActionWithResult<absl::Status> {
 public:
   ActionUnlink(Api::OsSysCalls& posix, absl::string_view filename,
-               std::function<void(absl::Status)> on_complete)
-      : AsyncFileActionWithResult(on_complete), posix_(posix), filename_(filename) {}
+               absl::AnyInvocable<void(absl::Status)> on_complete)
+      : AsyncFileActionWithResult(std::move(on_complete)), posix_(posix), filename_(filename) {}
 
   absl::Status executeImpl() override {
     Api::SysCallIntResult unlink_result = posix_.unlink(filename_.c_str());
@@ -256,25 +325,31 @@ private:
 } // namespace
 
 CancelFunction AsyncFileManagerThreadPool::createAnonymousFile(
-    absl::string_view path, std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
-  return enqueue(std::make_shared<ActionCreateAnonymousFile>(*this, path, on_complete));
+    Event::Dispatcher* dispatcher, absl::string_view path,
+    absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
+  return enqueue(dispatcher,
+                 std::make_unique<ActionCreateAnonymousFile>(*this, path, std::move(on_complete)));
 }
 
 CancelFunction AsyncFileManagerThreadPool::openExistingFile(
-    absl::string_view filename, Mode mode,
-    std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
-  return enqueue(std::make_shared<ActionOpenExistingFile>(*this, filename, mode, on_complete));
+    Event::Dispatcher* dispatcher, absl::string_view filename, Mode mode,
+    absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
+  return enqueue(dispatcher, std::make_unique<ActionOpenExistingFile>(*this, filename, mode,
+                                                                      std::move(on_complete)));
+}
+
+CancelFunction AsyncFileManagerThreadPool::stat(
+    Event::Dispatcher* dispatcher, absl::string_view filename,
+    absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete) {
+  return enqueue(dispatcher,
+                 std::make_unique<ActionStat>(posix(), filename, std::move(on_complete)));
 }
 
 CancelFunction
-AsyncFileManagerThreadPool::stat(absl::string_view filename,
-                                 std::function<void(absl::StatusOr<struct stat>)> on_complete) {
-  return enqueue(std::make_shared<ActionStat>(posix(), filename, on_complete));
-}
-
-CancelFunction AsyncFileManagerThreadPool::unlink(absl::string_view filename,
-                                                  std::function<void(absl::Status)> on_complete) {
-  return enqueue(std::make_shared<ActionUnlink>(posix(), filename, on_complete));
+AsyncFileManagerThreadPool::unlink(Event::Dispatcher* dispatcher, absl::string_view filename,
+                                   absl::AnyInvocable<void(absl::Status)> on_complete) {
+  return enqueue(dispatcher,
+                 std::make_unique<ActionUnlink>(posix(), filename, std::move(on_complete)));
 }
 
 } // namespace AsyncFiles

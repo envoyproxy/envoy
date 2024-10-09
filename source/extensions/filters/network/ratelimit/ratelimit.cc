@@ -30,7 +30,8 @@ Config::Config(const envoy::extensions::filters::network::ratelimit::v3::RateLim
     for (const auto& entry : descriptor.entries()) {
       new_descriptor.entries_.push_back({entry.key(), entry.value()});
       substitution_formatters_.push_back(
-          std::make_unique<Formatter::FormatterImpl>(entry.value(), false));
+          THROW_OR_RETURN_VALUE(Formatter::FormatterImpl::create(entry.value(), false),
+                                std::unique_ptr<Formatter::FormatterImpl>));
     }
     original_descriptors_.push_back(new_descriptor);
   }

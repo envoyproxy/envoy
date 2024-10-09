@@ -123,18 +123,10 @@ public:
     message->set_value(raw_string_ + " By TYPED");
     return message;
   }
-
-private:
-  std::string raw_string_;
-  friend class TestSerializedStringReflection;
-};
-
-class TestSerializedStringReflection : public StreamInfo::FilterState::ObjectReflection {
-public:
-  TestSerializedStringReflection(const TestSerializedStringFilterState* data) : data_(data) {}
+  bool hasFieldSupport() const override { return true; }
   FieldType getField(absl::string_view field_name) const override {
     if (field_name == "test_field") {
-      return data_->raw_string_;
+      return raw_string_;
     } else if (field_name == "test_num") {
       return 137;
     }
@@ -142,24 +134,8 @@ public:
   }
 
 private:
-  const TestSerializedStringFilterState* data_;
+  std::string raw_string_;
 };
-
-class TestSerializedStringFilterStateFactory : public StreamInfo::FilterState::ObjectFactory {
-public:
-  std::string name() const override { return "test_key"; }
-  std::unique_ptr<StreamInfo::FilterState::Object>
-  createFromBytes(absl::string_view) const override {
-    return nullptr;
-  }
-  std::unique_ptr<StreamInfo::FilterState::ObjectReflection>
-  reflect(const StreamInfo::FilterState::Object* data) const override {
-    return std::make_unique<TestSerializedStringReflection>(
-        dynamic_cast<const TestSerializedStringFilterState*>(data));
-  }
-};
-
-REGISTER_FACTORY(TestSerializedStringFilterStateFactory, StreamInfo::FilterState::ObjectFactory);
 
 // Test tests multiple versions of variadic template method parseSubcommand
 // extracting tokens.
@@ -973,20 +949,69 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
-    std::string requested_server_name = "stub_server";
-    stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
-    EXPECT_EQ("stub_server", upstream_format.formatWithContext({}, stream_info));
-    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::stringValue("stub_server")));
-  }
-
-  {
-    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name;
     stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
+    std::string requested_server_name = "stub-server";
+    stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+    EXPECT_EQ("stub-server", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("stub-server")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
+    std::string requested_server_name = "stub_server\n";
+    stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+    EXPECT_EQ("invalid:stub_server_", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("invalid:stub_server_")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
+    std::string requested_server_name = "\e[0;34m\n$(echo -e $blue)end<script>alert()</script>";
+    stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+    EXPECT_EQ("invalid:__0_34m___echo_-e__blue_end_script_alert____script_",
+              upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue(
+                    "invalid:__0_34m___echo_-e__blue_end_script_alert____script_")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
+    std::string invalid_utf8_string("prefix");
+    invalid_utf8_string.append(1, char(0xc3));
+    invalid_utf8_string.append(1, char(0xc7));
+    invalid_utf8_string.append("valid_middle");
+    invalid_utf8_string.append(1, char(0xc4));
+    invalid_utf8_string.append("valid_suffix");
+    stream_info.downstream_connection_info_provider_->setRequestedServerName(invalid_utf8_string);
+    EXPECT_EQ("invalid:prefix__valid_middle_valid_suffix",
+              upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("invalid:prefix__valid_middle_valid_suffix")));
+  }
+
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({
+        {"envoy.reloadable_features.sanitize_sni_in_access_log", "false"},
+    });
+
+    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
+    std::string requested_server_name = "stub_server\n";
+    stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+    EXPECT_EQ("stub_server\n", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("stub_server\n")));
   }
 
   {
@@ -4392,7 +4417,72 @@ TEST(SubstitutionFormatterTest, StructFormatterTypedTest) {
 
 TEST(SubstitutionFormatterTest, JsonFormatterTest) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
+  Http::TestRequestHeaderMapImpl request_header{{"key_1", "value_1"},
+                                                {"key_2", R"(value_with_quotes_"_)"}};
+  Http::TestResponseHeaderMapImpl response_header;
+  Http::TestResponseTrailerMapImpl response_trailer;
+  std::string body;
+
+  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
+                                         body);
+
+  envoy::config::core::v3::Metadata metadata;
+  populateMetadataTestData(metadata);
+  absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+  EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
+
+  ProtobufWkt::Struct key_mapping;
+  TestUtility::loadFromYaml(R"EOF(
+    raw_bool_value: true
+    raw_nummber_value: 6
+    nested_list:
+      - 14
+      - "3.14"
+      - false
+      - "ok"
+      - '%REQ(key_1)%'
+      - '%REQ(error)%'
+    request_duration: '%REQUEST_DURATION%'
+    nested_level:
+      plain_string: plain_string_value
+      protocol: '%PROTOCOL%'
+    request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
+  )EOF",
+                            key_mapping);
+
+  const std::string expected = R"EOF({
+    "raw_bool_value": true,
+    "raw_nummber_value": 6,
+    "nested_list": [
+      14,
+      "3.14",
+      false,
+      "ok",
+      "value_1",
+      null
+    ],
+    "request_duration": 5,
+    "nested_level": {
+      "plain_string": "plain_string_value",
+      "protocol": "HTTP/1.1"
+    },
+    "request_key": "value_1_@!!!_\"_value_with_quotes_\"_"
+  })EOF";
+
+  JsonFormatterImpl formatter(key_mapping, false);
+  const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
+  std::cout << out_json << std::endl;
+  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+}
+
+TEST(SubstitutionFormatterTest, LegacyJsonFormatterTest) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{"key_1", "value_1"},
+                                                {"key_2", R"(value_with_quotes_"_)"}};
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
   std::string body;
@@ -4415,20 +4505,23 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
     nested_level:
       plain_string: plain_string_value
       protocol: '%PROTOCOL%'
+    request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false, false);
 
   const std::string expected = R"EOF({
     "request_duration": "5",
     "nested_level": {
       "plain_string": "plain_string_value",
       "protocol": "HTTP/1.1"
-    }
+    },
+    "request_key": "value_1_@!!!_\"_value_with_quotes_\"_"
   })EOF";
 
-  const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
-  EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
+  LegacyJsonFormatterImpl legacy_formatter(key_mapping, false, false, false);
+  const std::string legacy_out_json =
+      legacy_formatter.formatWithContext(formatter_context, stream_info);
+  EXPECT_TRUE(TestUtility::jsonStringEqual(legacy_out_json, expected));
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
@@ -4461,17 +4554,28 @@ TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
       protocol: '%PROTOCOL%'
   )EOF",
                             key_mapping);
-  JsonFormatterImpl formatter(key_mapping, false, false, true);
 
   const std::string expected =
       "{\"afield\":\"vala\",\"bfield\":\"valb\",\"nested_level\":"
       "{\"cfield\":\"valc\",\"plain_string\":\"plain_string_value\",\"protocol\":\"HTTP/1.1\"},"
-      "\"request_duration\":\"5\"}\n";
+      "\"request_duration\":5}\n";
 
+  // The formatter will always order the properties alphabetically.
+  JsonFormatterImpl formatter(key_mapping, false);
   const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
-
   // Check string equality to verify the order.
   EXPECT_EQ(out_json, expected);
+
+  const std::string legacy_expected =
+      "{\"afield\":\"vala\",\"bfield\":\"valb\",\"nested_level\":"
+      "{\"cfield\":\"valc\",\"plain_string\":\"plain_string_value\",\"protocol\":\"HTTP/1.1\"},"
+      "\"request_duration\":5.0}\n";
+
+  // The legacy formatter needs a flag to tell it to order the properties.
+  LegacyJsonFormatterImpl legacy_formatter(key_mapping, true, false, true);
+  const std::string legacy_out_json =
+      legacy_formatter.formatWithContext(formatter_context, stream_info);
+  EXPECT_EQ(legacy_out_json, legacy_expected);
 }
 
 TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
@@ -4488,21 +4592,21 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "{{%PROTOCOL%}}   %RESP(not_exist)%++%RESP(test)% "
                                "%REQ(FIRST?SECOND)% %RESP(FIRST?SECOND)%"
                                "\t@%TRAILER(THIRD)%@\t%TRAILER(TEST?TEST-2)%[]";
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
     EXPECT_EQ("{{HTTP/1.1}}   -++test GET PUT\t@POST@\ttest-2[]",
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     const std::string format = "{}*JUST PLAIN string]";
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
-    EXPECT_EQ(format, formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_EQ(format, formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4510,9 +4614,9 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "%REQ(first):3%|%REQ(first):1%|%RESP(first?second):2%|%REQ(first):"
                                "10%|%TRAILER(second?third):3%";
 
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
-    EXPECT_EQ("GET|G|PU|GET|POS", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_EQ("GET|G|PU|GET|POS", formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4523,10 +4627,10 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
     const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
                                "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     EXPECT_EQ("test_value|{\"inner_key\":\"inner_value\"}|inner_value",
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4542,10 +4646,10 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
                                        StreamInfo::FilterState::LifeSpan::FilterChain);
     const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     EXPECT_EQ("\"test_value\"|-|\"test_va|-",
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4557,11 +4661,11 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     time_t expected_time_in_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
                           expected_time_in_epoch),
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4577,11 +4681,11 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
                           expected_time_in_epoch),
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4597,11 +4701,11 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
     EXPECT_CALL(*connection_info, expirationPeerCertificate()).WillRepeatedly(Return(time));
     stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
                           expected_time_in_epoch),
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4613,10 +4717,10 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     const time_t test_epoch = 0;
     const SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     EXPECT_EQ("1970/01/01|0|bad_format|1970-01-01T00:00:00.000Z|000000000.0.00.000",
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4626,9 +4730,9 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
         "%START_TIME(%s.%3f)%|%START_TIME(%s.%4f)%|%START_TIME(%s.%5f)%|%START_TIME(%s.%6f)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_time));
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
     EXPECT_EQ("1522796769.123|1522796769.1234|1522796769.12345|1522796769.123456",
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4637,10 +4741,10 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
         "%START_TIME(segment1:%s.%3f|segment2:%s.%4f|seg3:%s.%6f|%s-%3f-asdf-%9f|.%7f:segm5:%Y)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_time));
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
     EXPECT_EQ("segment1:1522796769.123|segment2:1522796769.1234|seg3:1522796769.123456|1522796769-"
               "123-asdf-123456000|.1234560:segm5:2018",
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4650,9 +4754,9 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "%START_TIME(%%%%|%%%%%f|%s%%%%%3f|%1f%%%%%s)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
     EXPECT_EQ("%%|%%123456000|1522796769%%123|1%%1522796769",
-              formatter.formatWithContext(formatter_context, stream_info));
+              formatter->formatWithContext(formatter_context, stream_info));
   }
 
   // The %E formatting option in Absl::FormatTime() behaves differently for non Linux platforms.
@@ -4666,8 +4770,8 @@ TEST(SubstitutionFormatterTest, CompositeFormatterSuccess) {
     const std::string format = "%START_TIME(%E4n)%";
     const SystemTime start_time(std::chrono::microseconds(1522796769123456));
     EXPECT_CALL(stream_info, startTime()).WillOnce(Return(start_time));
-    FormatterImpl formatter(format, false);
-    EXPECT_EQ("%E4n", formatter.formatWithContext(formatter_context, stream_info));
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
+    EXPECT_EQ("%E4n", formatter->formatWithContext(formatter_context, stream_info));
   }
 #endif
 }
@@ -4686,22 +4790,22 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
     const std::string format = "%PROTOCOL%|%RESP(not_exist)%|"
                                "%REQ(FIRST?SECOND)%|%RESP(FIRST?SECOND)%|"
                                "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(absl::nullopt));
 
-    EXPECT_EQ("-|-|-|-|-|-", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_EQ("-|-|-|-|-|-", formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
     const std::string format = "%PROTOCOL%|%RESP(not_exist)%|"
                                "%REQ(FIRST?SECOND)%%RESP(FIRST?SECOND)%|"
                                "%TRAILER(THIRD)%|%TRAILER(TEST?TEST-2)%";
-    FormatterImpl formatter(format, true);
+    FormatterPtr formatter = *FormatterImpl::create(format, true);
 
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(absl::nullopt));
 
-    EXPECT_EQ("||||", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_EQ("||||", formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4710,9 +4814,9 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
     EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
     const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
                                "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
-    EXPECT_EQ("-|-|-", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_EQ("-|-|-", formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
@@ -4721,27 +4825,27 @@ TEST(SubstitutionFormatterTest, CompositeFormatterEmpty) {
     EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
     const std::string format = "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:"
                                "test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%";
-    FormatterImpl formatter(format, true);
+    FormatterPtr formatter = *FormatterImpl::create(format, true);
 
-    EXPECT_EQ("||", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_EQ("||", formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
     EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
     const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
-    FormatterImpl formatter(format, false);
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
 
-    EXPECT_EQ("-|-|-|-", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_EQ("-|-|-|-", formatter->formatWithContext(formatter_context, stream_info));
   }
 
   {
     EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
     const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
-    FormatterImpl formatter(format, true);
+    FormatterPtr formatter = *FormatterImpl::create(format, true);
 
-    EXPECT_EQ("|||", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_EQ("|||", formatter->formatWithContext(formatter_context, stream_info));
   }
 }
 
@@ -4791,7 +4895,10 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "%START_TIME(%4On%)%"};
 
   for (const std::string& test_case : test_cases) {
-    EXPECT_THROW(parser.parse(test_case), EnvoyException) << test_case;
+    EXPECT_THROW(THROW_OR_RETURN_VALUE(parser.parse(test_case),
+                                       std::vector<FormatterProviderBasePtr<HttpFormatterContext>>),
+                 EnvoyException)
+        << test_case;
   }
 }
 
@@ -4802,14 +4909,14 @@ TEST(SubstitutionFormatterTest, ParserSuccesses) {
                                          "%DOWNSTREAM_PEER_FINGERPRINT_256%"};
 
   for (const std::string& test_case : test_cases) {
-    EXPECT_NO_THROW(parser.parse(test_case));
+    EXPECT_TRUE(parser.parse(test_case).status().ok());
   }
 }
 
 TEST(SubstitutionFormatterTest, EmptyFormatParse) {
   StreamInfo::MockStreamInfo stream_info;
 
-  auto providers = SubstitutionFormatParser::parse("");
+  auto providers = *SubstitutionFormatParser::parse("");
 
   EXPECT_EQ(providers.size(), 1);
   EXPECT_EQ("", providers[0]->formatWithContext({}, stream_info));
@@ -4818,7 +4925,7 @@ TEST(SubstitutionFormatterTest, EmptyFormatParse) {
 TEST(SubstitutionFormatterTest, EscapingFormatParse) {
   StreamInfo::MockStreamInfo stream_info;
 
-  auto providers = SubstitutionFormatParser::parse("%%");
+  auto providers = *SubstitutionFormatParser::parse("%%");
 
   ASSERT_EQ(providers.size(), 1);
   EXPECT_EQ("%", providers[0]->formatWithContext({}, stream_info));
@@ -4830,7 +4937,7 @@ TEST(SubstitutionFormatterTest, FormatterExtension) {
   std::vector<CommandParserPtr> commands;
   commands.push_back(std::make_unique<TestCommandParser>());
 
-  auto providers = SubstitutionFormatParser::parse("foo %COMMAND_EXTENSION(x)%", commands);
+  auto providers = *SubstitutionFormatParser::parse("foo %COMMAND_EXTENSION(x)%", commands);
 
   EXPECT_EQ(providers.size(), 2);
   EXPECT_EQ("TestFormatter", providers[1]->formatWithContext({}, stream_info));
@@ -4848,7 +4955,7 @@ TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  auto providers = SubstitutionFormatParser::parse("%HOSTNAME%%PROTOCOL%");
+  auto providers = *SubstitutionFormatParser::parse("%HOSTNAME%%PROTOCOL%");
 
   ASSERT_EQ(providers.size(), 2);
   EXPECT_EQ("myhostname", providers[0]->formatWithContext({}, stream_info));
@@ -4857,14 +4964,14 @@ TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
 
 TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
   {
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%ENVIRONMENT()%"), EnvoyException,
-                              "ENVIRONMENT requires parameters");
+    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatParser::parse("%ENVIRONMENT()%").IgnoreError(),
+                              EnvoyException, "ENVIRONMENT requires parameters");
   }
 
   {
     StreamInfo::MockStreamInfo stream_info;
 
-    auto providers = SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV)%");
+    auto providers = *SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV)%");
 
     ASSERT_EQ(providers.size(), 1);
 
@@ -4877,7 +4984,7 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
     TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
     Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
 
-    auto providers = SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV)%");
+    auto providers = *SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV)%");
 
     ASSERT_EQ(providers.size(), 1);
 
@@ -4890,7 +4997,7 @@ TEST(SubstitutionFormatterTest, EnvironmentFormatterTest) {
     TestEnvironment::setEnvVar("ENVOY_TEST_ENV", "test", 1);
     Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ENVOY_TEST_ENV"); });
 
-    auto providers = SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV):2%");
+    auto providers = *SubstitutionFormatParser::parse("%ENVIRONMENT(ENVOY_TEST_ENV):2%");
 
     ASSERT_EQ(providers.size(), 1);
 
@@ -4958,7 +5065,7 @@ TEST(SubstitutionFormatterTest, UniqueIdFormatterTest) {
   StreamInfo::MockStreamInfo stream_info;
 
   // Simulate initial parsing of configuration
-  auto providers1 = SubstitutionFormatParser::parse("%UNIQUE_ID%");
+  auto providers1 = *SubstitutionFormatParser::parse("%UNIQUE_ID%");
   ASSERT_EQ(providers1.size(), 1);
 
   // Generate first unique ID with the initial configuration
@@ -4973,7 +5080,7 @@ TEST(SubstitutionFormatterTest, UniqueIdFormatterTest) {
   EXPECT_NE(id1, id2);
 
   // Simulate configuration reload
-  auto providers2 = SubstitutionFormatParser::parse("%UNIQUE_ID%");
+  auto providers2 = *SubstitutionFormatParser::parse("%UNIQUE_ID%");
   ASSERT_EQ(providers2.size(), 1);
 
   // Generate another unique ID after the simulated reload

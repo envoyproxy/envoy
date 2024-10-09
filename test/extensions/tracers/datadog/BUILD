@@ -31,9 +31,7 @@ envoy_extension_cc_test(
         "-DDD_USE_ABSEIL_FOR_ENVOY",
     ],
     extension_names = ["envoy.tracers.datadog"],
-    external_deps = [
-        "dd_trace_cpp",
-    ],
+    rbe_pool = "2core",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -56,6 +54,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:utility_lib",
+        "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

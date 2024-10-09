@@ -68,6 +68,7 @@ private:
   friend class DnsResolverImplPeer;
   class PendingResolution : public ActiveDnsQuery {
   public:
+    // Network::ActiveDnsQuery
     void cancel(CancelReason reason) override {
       // c-ares only supports channel-wide cancellation, so we just allow the
       // network events to continue but don't invoke the callback on completion.
@@ -75,6 +76,9 @@ private:
       cancelled_ = true;
       cancel_reason_ = reason;
     }
+    void addTrace(uint8_t) override {}
+    OptRef<const std::vector<Trace>> getTraces() override { return {}; }
+
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.
     bool owned_ = false;
@@ -110,10 +114,9 @@ private:
     };
 
     // Note: pending_response_ is constructed with ResolutionStatus::Failure by default and
-    // __only__ changed to ResolutionStatus::Success if there is an `ARES_SUCCESS` or `ARES_ENODATA`
-    // or `ARES_ENOTFOUND`reply.
-    // In the dual_resolution case __any__ ARES_SUCCESS reply will result in a
-    // ResolutionStatus::Success callback.
+    // __only__ changed to ResolutionStatus::Completed if there is an `ARES_SUCCESS`
+    // or `ARES_ENODATA` or `ARES_ENOTFOUND`reply. In the dual_resolution case __any__ ARES_SUCCESS
+    // reply will result in a ResolutionStatus::Completed callback.
     PendingResponse pending_response_{ResolutionStatus::Failure, {}};
   };
 

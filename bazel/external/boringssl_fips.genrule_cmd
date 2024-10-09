@@ -44,7 +44,7 @@ fi
 
 curl -sLO https://github.com/llvm/llvm-project/releases/download/llvmorg-"$VERSION"/clang+llvm-"$VERSION"-"$PLATFORM".tar.xz
 echo "$SHA256" clang+llvm-"$VERSION"-"$PLATFORM".tar.xz | sha256sum --check
-tar xf clang+llvm-"$VERSION"-"$PLATFORM".tar.xz
+tar xf clang+llvm-"$VERSION"-"$PLATFORM".tar.xz --no-same-owner
 
 printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > ${HOME}/toolchain
 export PATH="$PWD/clang+llvm-$VERSION-$PLATFORM/bin:$PATH"
@@ -66,7 +66,7 @@ fi
 
 curl -sLO https://dl.google.com/go/go"$VERSION"."$PLATFORM".tar.gz \
   && echo "$SHA256" go"$VERSION"."$PLATFORM".tar.gz | sha256sum --check
-tar xf go"$VERSION"."$PLATFORM".tar.gz
+tar xf go"$VERSION"."$PLATFORM".tar.gz --no-same-owner
 
 export GOPATH="$PWD/gopath"
 export GOROOT="$PWD/go"
@@ -82,7 +82,7 @@ VERSION=1.10.2
 SHA256=ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed
 curl -sLO https://github.com/ninja-build/ninja/archive/refs/tags/v"$VERSION".tar.gz \
   && echo "$SHA256" v"$VERSION".tar.gz | sha256sum --check
-tar -xvf v"$VERSION".tar.gz
+tar -xvf v"$VERSION".tar.gz --no-same-owner
 cd ninja-"$VERSION"
 python3 ./configure.py --bootstrap
 
@@ -106,7 +106,7 @@ fi
 
 curl -sLO https://github.com/Kitware/CMake/releases/download/v"$VERSION"/cmake-"$VERSION"-"$PLATFORM".tar.gz \
   && echo "$SHA256" cmake-"$VERSION"-"$PLATFORM".tar.gz | sha256sum --check
-tar xf cmake-"$VERSION"-"$PLATFORM".tar.gz
+tar xf cmake-"$VERSION"-"$PLATFORM".tar.gz --no-same-owner
 
 export PATH="$PWD/cmake-$VERSION-$PLATFORM/bin:$PATH"
 

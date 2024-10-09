@@ -16,9 +16,7 @@ envoy_cc_extension(
     hdrs = [
         "spiffe_validator.h",
     ],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//envoy/ssl:context_config_interface",
         "//envoy/ssl:ssl_socket_extended_info_interface",

@@ -127,7 +127,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
     if (drop_overload_count > 0) {
       auto* dropped_request = cluster_stats->add_dropped_requests();
-      dropped_request->set_category("drop_overload");
+      dropped_request->set_category(cluster.dropCategory());
       dropped_request->set_dropped_count(drop_overload_count);
     }
 

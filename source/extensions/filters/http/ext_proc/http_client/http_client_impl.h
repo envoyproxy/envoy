@@ -2,11 +2,12 @@
 
 #include <memory>
 
+#include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/http/async_client.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/filters/http/ext_proc/ext_proc.h"
-#include "source/extensions/filters/http/ext_proc/http_client/client_base.h"
+#include "source/extensions/filters/http/ext_proc/client_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,8 +24,10 @@ public:
 
   ~ExtProcHttpClient() { cancel(); }
 
-  void sendRequest() override {}
-  void cancel() override {}
+  void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream,
+                   const uint64_t stream_id, RequestCallbacks* callbacks,
+                   StreamBase* stream) override;
+  void cancel() override;
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
   // Http::AsyncClient::Callbacks implemented by this class.
@@ -39,6 +42,8 @@ private:
   void onError();
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   Server::Configuration::ServerFactoryContext& context_;
+  Http::AsyncClient::Request* active_request_{};
+  RequestCallbacks* callbacks_{};
 };
 
 } // namespace ExternalProcessing

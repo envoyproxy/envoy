@@ -1008,11 +1008,12 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
   for (const auto& f : listener_mutators) {
     auto new_listener = listener;
     f(new_listener);
-    EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(new_listener, "version", *manager_, "foo", true,
-                                               false, /*hash=*/static_cast<uint64_t>(0)),
-                              EnvoyException,
-                              "error adding listener named 'foo': has "
-                              "unsupported tcp listener feature");
+    EXPECT_EQ(ListenerImpl::create(new_listener, "version", *manager_, "foo", true, false,
+                                   /*hash=*/static_cast<uint64_t>(0))
+                  .status()
+                  .message(),
+              "error adding listener named 'foo': has "
+              "unsupported tcp listener feature");
   }
   {
     auto new_listener = listener;
@@ -7809,6 +7810,24 @@ TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentFilterChainsAreEquival
   EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
 }
 
+TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, InvalidAddress) {
+  // Worker is not started yet.
+  envoy::config::listener::v3::Listener listener_proto;
+  Protobuf::TextFormat::ParseFromString(R"EOF(
+    name: "foo"
+    address: {
+      socket_address: {
+        address: "127.0.0.1.0"
+        port_value: 1234
+      }
+    }
+    filter_chains: {}
+  )EOF",
+                                        &listener_proto);
+  EXPECT_EQ(manager_->addOrUpdateListener(listener_proto, "", true).status().message(),
+            "malformed IP address: 127.0.0.1.0");
+}
+
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWorkerNotStarted) {
   // Worker is not started yet.
   auto listener_proto = createDefaultListener();
@@ -8034,15 +8053,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
   extend_balance_config->mutable_typed_config()->set_type_url(
       "type.googleapis.com/google.protobuf.test");
 
-  auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                                    /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
   EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
-  EXPECT_THROW_WITH_MESSAGE(
-      listener_impl.addSocketFactory(std::move(socket_factory)), EnvoyException,
-      "Didn't find a registered implementation for type: 'google.protobuf.test'");
+  EXPECT_EQ(listener_impl->addSocketFactory(std::move(socket_factory)).message(),
+            "Didn't find a registered implementation for type: 'google.protobuf.test'");
 #endif
 }
 
@@ -8052,14 +8070,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
   auto listener = createIPv4Listener("TCPListener");
   listener.mutable_connection_balance_config();
 
-  auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                                    /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
   EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
-  EXPECT_THROW_WITH_MESSAGE(listener_impl.addSocketFactory(std::move(socket_factory)),
-                            EnvoyException, "No valid balance type for connection balance");
+  EXPECT_EQ(listener_impl->addSocketFactory(std::move(socket_factory)).message(),
+            "No valid balance type for connection balance");
 #endif
 }
 

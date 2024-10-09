@@ -23,7 +23,9 @@ createStreamAccessLogInstance(const Protobuf::Message& config, AccessLog::Filter
         Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
   } else if (fal_config.access_log_format_case() ==
              T::AccessLogFormatCase::ACCESS_LOG_FORMAT_NOT_SET) {
-    formatter = Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter();
+    formatter = THROW_OR_RETURN_VALUE(
+        Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        Formatter::FormatterPtr);
   }
   Filesystem::FilePathAndType file_info{destination_type, ""};
   return std::make_shared<AccessLoggers::File::FileAccessLog>(

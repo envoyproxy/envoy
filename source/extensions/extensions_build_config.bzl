@@ -496,6 +496,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.ring_hash":         "//source/extensions/load_balancing_policies/ring_hash:config",
     "envoy.load_balancing_policies.subset":            "//source/extensions/load_balancing_policies/subset:config",
     "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
+    "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
 
     #
     # HTTP Early Header Mutation

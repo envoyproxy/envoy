@@ -309,7 +309,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
     float value = cluster.dropOverload().value() * 1000000;
     if (value > 0) {
       auto* drop_overload = policy.add_drop_overloads();
-      drop_overload->set_category("drop_overload");
+      drop_overload->set_category(cluster.dropCategory());
       auto* percent = drop_overload->mutable_drop_percentage();
       percent->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
       percent->set_numerator(uint32_t(value));

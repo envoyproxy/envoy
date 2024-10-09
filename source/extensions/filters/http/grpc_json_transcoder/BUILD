@@ -43,9 +43,7 @@ envoy_cc_library(
     name = "http_body_utils_lib",
     srcs = ["http_body_utils.cc"],
     hdrs = ["http_body_utils.h"],
-    external_deps = [
-        "api_httpbody_protos",
-    ],
+    external_deps = ["api_httpbody_protos"],
     deps = [
         "//source/common/grpc:codec_lib",
         "//source/common/protobuf",

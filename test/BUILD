@@ -56,10 +56,6 @@ envoy_cc_test_library(
 envoy_pch_library(
     name = "test_pch",
     testonly = True,
-    external_deps = [
-        "googletest",
-        "spdlog",
-    ],
     includes = [
         "envoy/config/bootstrap/v3/bootstrap.pb.h",
         "envoy/config/cluster/v3/cluster.pb.h",
@@ -93,6 +89,8 @@ envoy_pch_library(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stats:stats_mocks",
+        "@com_github_gabime_spdlog//:spdlog",
+        "@com_google_googletest//:gtest",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

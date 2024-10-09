@@ -14,6 +14,7 @@ envoy_cc_test(
         "//bazel:linux_x86_64": ["config_test.cc"],
         "//conditions:default": [],
     }),
+    rbe_pool = "2core",
     deps = [
         "//contrib/dlb/source:connection_balancer",
         "//source/common/protobuf:utility_lib",

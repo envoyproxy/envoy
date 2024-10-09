@@ -14,6 +14,7 @@ envoy_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/grpc_credentials/file_based_metadata:config",
         "//test/common/grpc:grpc_client_integration_test_harness_lib",
