@@ -4353,14 +4353,13 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequestAndTimeout) {
                                  timeSystem().advanceTimeWaitImpl(400ms);
                                  return false;
                                });
-  processRequestBodyMessage(*grpc_upstreams_[0], false,
-                            [this](const HttpBody& body, BodyResponse&) {
-                              // Advance 400 ms. Default timeout is 200ms
-                              timeSystem().advanceTimeWaitImpl(400ms);
-                              return false;
-                            });
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse&) {
+    // Advance 400 ms. Default timeout is 200ms
+    timeSystem().advanceTimeWaitImpl(400ms);
+    return false;
+  });
   processRequestTrailersMessage(*grpc_upstreams_[0], false,
-                                [this](const HttpTrailers& trailers, TrailersResponse&) {
+                                [this](const HttpTrailers&, TrailersResponse&) {
                                   // Advance 400 ms. Default timeout is 200ms
                                   timeSystem().advanceTimeWaitImpl(400ms);
                                   return false;
