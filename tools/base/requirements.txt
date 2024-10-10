@@ -25,9 +25,9 @@ aio-api-bazel==0.0.2 \
     --hash=sha256:56e36463d236e477b7e282f2d870185a0b978b50e2c3803c1ebf8b8ac4b18f5b \
     --hash=sha256:d3f563b7698e874437d80538a89dd4d79bc37de2e850c846330ae456e3f21dcc
     # via -r requirements.in
-aio-api-github==0.2.6 \
-    --hash=sha256:71ca0e572a48eab09f3e54267b374fb3d53e246b83f6f23fe1f29f5560acdaed \
-    --hash=sha256:be12d6bf612ce2abc85c695ce74547220636f96fe80d4e64cd2de8670db69c32
+aio-api-github==0.2.7 \
+    --hash=sha256:14eeb3f59fbac472d6f2c1a9cd9542ace5f43dbca6808c456e999486173e74d0 \
+    --hash=sha256:c71e3569ac77365dbeb7b3b798c49ea305f83a4a8ebc67c38f189ab6b6b5d13c
     # via
     #   -r requirements.in
     #   envoy-base-utils
