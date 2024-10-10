@@ -63,6 +63,34 @@ absl::Span<const std::string> ConnectionInfoImplBase::ipSansLocalCertificate() c
   return cached_ip_san_local_certificate_;
 }
 
+absl::Span<const std::string> ConnectionInfoImplBase::emailSansLocalCertificate() const {
+  if (!cached_email_san_local_certificate_.empty()) {
+    return cached_email_san_local_certificate_;
+  }
+
+  X509* cert = SSL_get_certificate(ssl());
+  if (!cert) {
+    ASSERT(cached_email_san_local_certificate_.empty());
+    return cached_email_san_local_certificate_;
+  }
+  cached_email_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_EMAIL);
+  return cached_email_san_local_certificate_;
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::othernameSansLocalCertificate() const {
+  if (!cached_othername_san_local_certificate_.empty()) {
+    return cached_othername_san_local_certificate_;
+  }
+
+  X509* cert = SSL_get_certificate(ssl());
+  if (!cert) {
+    ASSERT(cached_othername_san_local_certificate_.empty());
+    return cached_othername_san_local_certificate_;
+  }
+  cached_othername_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_OTHERNAME);
+  return cached_othername_san_local_certificate_;
+}
+
 const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
   if (!cached_sha_256_peer_certificate_digest_.empty()) {
     return cached_sha_256_peer_certificate_digest_;
@@ -237,6 +265,34 @@ absl::Span<const std::string> ConnectionInfoImplBase::ipSansPeerCertificate() co
   }
   cached_ip_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_IPADD, true);
   return cached_ip_san_peer_certificate_;
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::emailSansPeerCertificate() const {
+  if (!cached_email_san_peer_certificate_.empty()) {
+    return cached_email_san_peer_certificate_;
+  }
+
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  if (!cert) {
+    ASSERT(cached_email_san_peer_certificate_.empty());
+    return cached_email_san_peer_certificate_;
+  }
+  cached_email_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_EMAIL);
+  return cached_email_san_peer_certificate_;
+}
+
+absl::Span<const std::string> ConnectionInfoImplBase::othernameSansPeerCertificate() const {
+  if (!cached_othername_san_peer_certificate_.empty()) {
+    return cached_othername_san_peer_certificate_;
+  }
+
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  if (!cert) {
+    ASSERT(cached_othername_san_peer_certificate_.empty());
+    return cached_othername_san_peer_certificate_;
+  }
+  cached_othername_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_OTHERNAME);
+  return cached_othername_san_peer_certificate_;
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::oidsPeerCertificate() const {
