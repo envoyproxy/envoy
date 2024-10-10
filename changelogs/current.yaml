@@ -298,6 +298,13 @@ new_features:
 - area: jwt_authn
   change: |
     Added missing implementation to jwt_authn matchers to allow glob pattern matching.
+- area: spiffe
+  change: |
+    Added :ref:`trust_bundles <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>`
+    to the SPIFFE certificate validator configuration. This field allows specifying a SPIFFE trust bundle map as a
+    local JSON file through a data source.
+  This is an alternative to :ref:`trust_domains <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_domains>`.
+    The trust_bundle_map is mutually exclusive with trust_domains.
 - area: tls
   change: |
     Added :ref:`prefer_client_ciphers
