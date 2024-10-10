@@ -92,6 +92,9 @@ void initializeUpstreamTlsContextConfig(
   for (const std::string& algorithm : options.sigalgs_) {
     common_context->mutable_tls_params()->add_signature_algorithms(algorithm);
   }
+  for (const std::string& curve : options.curves_) {
+    common_context->mutable_tls_params()->add_ecdh_curves(curve);
+  }
   if (!options.sni_.empty()) {
     tls_context.set_sni(options.sni_);
   }

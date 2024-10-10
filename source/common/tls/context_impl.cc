@@ -218,23 +218,24 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
       bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
       const int pkey_id = EVP_PKEY_id(public_key.get());
-      ctx.is_ecdsa_ = pkey_id == EVP_PKEY_EC;
       switch (pkey_id) {
       case EVP_PKEY_EC: {
-        // We only support P-256 ECDSA today.
+        // We only support P-256, P-384 or P-521 ECDSA today.
         const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
         // Since we checked the key type above, this should be valid.
         ASSERT(ecdsa_public_key != nullptr);
         const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
+        const int ec_group_curve_name = EC_GROUP_get_curve_name(ecdsa_group);
         if (ecdsa_group == nullptr ||
-            EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
+            (ec_group_curve_name != NID_X9_62_prime256v1 && ec_group_curve_name != NID_secp384r1 &&
+             ec_group_curve_name != NID_secp521r1)) {
           creation_status = absl::InvalidArgumentError(
-              fmt::format("Failed to load certificate chain from {}, only P-256 "
-                          "ECDSA certificates are supported",
+              fmt::format("Failed to load certificate chain from {}, only P-256, "
+                          "P-384 or P-521 ECDSA certificates are supported",
                           ctx.cert_chain_file_path_));
           return;
         }
-        ctx.is_ecdsa_ = true;
+        ctx.ec_group_curve_name_ = ec_group_curve_name;
       } break;
       case EVP_PKEY_RSA: {
         // We require RSA certificates with 2048-bit or larger keys.
