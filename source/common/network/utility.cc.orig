@@ -515,27 +515,16 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
                                                const Address::Instance& peer_address) {
   Api::IoCallUint64Result send_result(
       /*rc=*/0, /*err=*/Api::IoError::none());
-
-  const bool is_connected = handle.wasConnected();
   do {
-    if (is_connected) {
-      // The socket is already connected, so the local and peer addresses should not be specified.
-      // Instead, a writev is called.
-      send_result = handle.writev(slices, num_slices);
-    } else {
-      // For non-connected sockets(), calling sendmsg with the peer address specified ensures the
-      // connection happens first.
-      send_result = handle.sendmsg(slices, num_slices, 0, local_ip, peer_address);
-    }
+    send_result = handle.sendmsg(slices, num_slices, 0, local_ip, peer_address);
   } while (!send_result.ok() &&
            // Send again if interrupted.
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
-    ENVOY_LOG_MISC(trace, "{} bytes {}", is_connected ? "writev" : "sendmsg",
-                   send_result.return_value_);
+    ENVOY_LOG_MISC(trace, "sendmsg bytes {}", send_result.return_value_);
   } else {
-    ENVOY_LOG_MISC(debug, "{} failed with error code {}: {}", is_connected ? "writev" : "sendmsg",
+    ENVOY_LOG_MISC(debug, "sendmsg failed with error code {}: {}",
                    static_cast<int>(send_result.err_->getErrorCode()),
                    send_result.err_->getErrorDetails());
   }
@@ -829,42 +818,6 @@ ResolvedUdpSocketConfig::ResolvedUdpSocketConfig(
     ENVOY_LOG_MISC(
         warn, "GRO requested but not supported by the OS. Check OS config or disable prefer_gro.");
   }
-}
-
-bool Utility::isTransparent(Socket& sock) {
-#ifdef SOL_IP
-
-  if (sock.addressType() != Address::Type::Ip) {
-    return false;
-  }
-
-  auto ipVersion = sock.ipVersion();
-  if (!ipVersion.has_value()) {
-    return false;
-  }
-
-  int value;
-  socklen_t value_len = sizeof(value);
-  int status;
-  int call;
-
-  if (*ipVersion == Address::IpVersion::v4) {
-    call = IP_TRANSPARENT;
-  } else {
-    call = IPV6_TRANSPARENT;
-  }
-
-  status = sock.getSocketOption(SOL_IP, call, &value, &value_len).return_value_;
-
-  if (status != 0 || value == 0) {
-    return false;
-  }
-
-  return true;
-#else
-  UNREFERENCED_PARAMETER(sock);
-  return false;
-#endif
 }
 
 } // namespace Network
