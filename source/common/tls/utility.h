@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/ssl/context.h"
+#include "envoy/ssl/parsed_x509_name.h"
 
 #include "source/common/common/utility.h"
 
@@ -87,6 +88,13 @@ std::string getIssuerFromCertificate(X509& cert);
  * @return std::string the subject field for the certificate.
  */
 std::string getSubjectFromCertificate(X509& cert);
+
+/**
+ * Parse the well-known attribute values of subject from certificate.
+ * @param cert the certificate
+ * @return Envoy::Ssl::ParsedX509NameConstSharedPtr the struct contains the parsed values.
+ */
+Envoy::Ssl::ParsedX509NamePtr parseSubjectFromCertificate(X509& cert);
 
 /**
  * Retrieves the extension OIDs from certificate.

@@ -241,6 +241,16 @@ public:
 
   const std::string& expectedPeerSubject() const { return expected_peer_subject_; }
 
+  TestUtilOptions&
+  setExpectedParsedPeerSubject(Ssl::ParsedX509NamePtr&& expected_parsed_peer_subject) {
+    expected_parsed_peer_subject_ = std::move(expected_parsed_peer_subject);
+    return *this;
+  }
+
+  const Ssl::ParsedX509NamePtr& expectedParsedPeerSubject() const {
+    return expected_parsed_peer_subject_;
+  }
+
   TestUtilOptions& setExpectedLocalSubject(const std::string& expected_local_subject) {
     expected_local_subject_ = expected_local_subject;
     return *this;
@@ -372,6 +382,7 @@ private:
   std::vector<std::string> expected_serial_numbers_;
   std::string expected_peer_issuer_;
   std::string expected_peer_subject_;
+  Ssl::ParsedX509NamePtr expected_parsed_peer_subject_;
   std::string expected_local_subject_;
   std::vector<std::string> expected_peer_oids_;
   std::vector<std::string> expected_local_oids_;
@@ -562,6 +573,12 @@ void testUtil(const TestUtilOptions& options) {
                   server_connection->ssl()->subjectPeerCertificate());
         EXPECT_EQ(options.expectedPeerSubject(),
                   server_connection->ssl()->subjectPeerCertificate());
+      }
+      if (options.expectedParsedPeerSubject()) {
+        const auto& subject = server_connection->ssl()->parsedSubjectPeerCertificate();
+        EXPECT_EQ(options.expectedParsedPeerSubject()->commonName_, subject->commonName_);
+        EXPECT_EQ(options.expectedParsedPeerSubject()->organizationName_,
+                  subject->organizationName_);
       }
       if (!options.expectedLocalSubject().empty()) {
         EXPECT_EQ(options.expectedLocalSubject(),
@@ -2074,11 +2091,15 @@ TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  auto expected_parsed_peer_subject = std::make_unique<Ssl::ParsedX509Name>();
+  expected_parsed_peer_subject->commonName_ = "Test Server";
+  expected_parsed_peer_subject->organizationName_.push_back("Lyft");
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerIssuer(
                    "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedPeerSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
+               .setExpectedParsedPeerSubject(std::move(expected_parsed_peer_subject))
                .setExpectedLocalSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
 }
@@ -2163,11 +2184,15 @@ TEST_P(SslSocketTest, GetPeerCert) {
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
   std::string expected_peer_cert = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"));
+  auto expected_parsed_peer_subject = std::make_unique<Ssl::ParsedX509Name>();
+  expected_parsed_peer_subject->commonName_ = "Test Server";
+  expected_parsed_peer_subject->organizationName_.push_back("Lyft");
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerIssuer(
                    "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedPeerSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
+               .setExpectedParsedPeerSubject(std::move(expected_parsed_peer_subject))
                .setExpectedLocalSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedPeerCert(expected_peer_cert));
@@ -2200,11 +2225,15 @@ TEST_P(SslSocketTest, GetPeerCertAcceptUntrusted) {
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
   std::string expected_peer_cert = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"));
+  auto expected_parsed_peer_subject = std::make_unique<Ssl::ParsedX509Name>();
+  expected_parsed_peer_subject->commonName_ = "Test Server";
+  expected_parsed_peer_subject->organizationName_.push_back("Lyft");
   testUtil(test_options.setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL)
                .setExpectedPeerIssuer(
                    "CN=Test CA,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedPeerSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
+               .setExpectedParsedPeerSubject(std::move(expected_parsed_peer_subject))
                .setExpectedLocalSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedPeerCert(expected_peer_cert));

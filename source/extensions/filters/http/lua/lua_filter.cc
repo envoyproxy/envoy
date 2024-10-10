@@ -195,6 +195,7 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
   lua_state_.registerType<Filters::Common::Lua::ConnectionWrapper>();
   lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
+  lua_state_.registerType<Filters::Common::Lua::ParsedX509NameWrapper>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamInfoWrapper>();
