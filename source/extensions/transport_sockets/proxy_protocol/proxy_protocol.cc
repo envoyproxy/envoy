@@ -22,7 +22,7 @@ namespace TransportSockets {
 namespace ProxyProtocol {
 
 UpstreamProxyProtocolStats generateUpstreamProxyProtocolStats(Stats::Scope& stats_scope,
-                                                              const std::string& prefix) {
+                                                              absl::string_view prefix) {
   return {ALL_PROXY_PROTOCOL_TRANSPORT_SOCKET_STATS(POOL_COUNTER_PREFIX(stats_scope, prefix))};
 }
 
@@ -143,8 +143,7 @@ UpstreamProxyProtocolSocketFactory::UpstreamProxyProtocolSocketFactory(
     Network::UpstreamTransportSocketFactoryPtr transport_socket_factory, ProxyProtocolConfig config,
     Stats::Scope& scope)
     : PassthroughFactory(std::move(transport_socket_factory)), config_(config),
-      stats_prefix_("upstream.proxyprotocol."),
-      stats_(generateUpstreamProxyProtocolStats(scope, stats_prefix_)) {}
+      stats_(generateUpstreamProxyProtocolStats(scope, "upstream.proxyprotocol.")) {}
 
 Network::TransportSocketPtr UpstreamProxyProtocolSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options,

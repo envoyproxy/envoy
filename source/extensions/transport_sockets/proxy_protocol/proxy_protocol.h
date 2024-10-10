@@ -69,7 +69,6 @@ public:
 
 private:
   ProxyProtocolConfig config_;
-  const std::string stats_prefix_;
   UpstreamProxyProtocolStats stats_;
 };
 
