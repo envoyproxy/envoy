@@ -220,6 +220,31 @@ TEST_P(WasmFilterIntegrationTest, BodyBufferedManipulation) {
           "upstream_body.0");
 }
 
+TEST_P(WasmFilterIntegrationTest, BodyBufferedMultipleChunksManipulation) {
+  setupWasmFilter("", "body");
+  HttpIntegrationTest::initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                 {":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":authority", "host"},
+                                                 {"x-test-operation", "SetEndOfBodies"}};
+
+  Http::TestRequestHeaderMapImpl expected_request_headers{{":path", "/"}};
+
+  Http::TestResponseHeaderMapImpl upstream_response_headers{{":status", "200"},
+                                                            {"x-test-operation", "SetEndOfBodies"}};
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
+
+  auto request_body = std::vector<std::string>{{"request_"}, {"very_"}, {"long_"}, {"body"}};
+  auto upstream_response_body =
+      std::vector<std::string>{{"upstream_"}, {"very_"}, {"long_"}, {"body"}};
+  runTest(request_headers, request_body, expected_request_headers, "request_very_long_body.0",
+          upstream_response_headers, upstream_response_body, expected_response_headers,
+          "upstream_very_long_body.0");
+}
+
 } // namespace
 } // namespace Wasm
 } // namespace Extensions
