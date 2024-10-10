@@ -18,7 +18,7 @@ public:
   std::string name() const override { return "envoy.filters.connection_pools.http.http"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+  createGenericConnPool(Upstream::HostConstSharedPtr host,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         Upstream::ResourcePriority priority,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
