@@ -49,7 +49,7 @@ private:
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
   ProxyProtocolConfig_Version version_{ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V1};
-  UpstreamProxyProtocolStats stats_;
+  UpstreamProxyProtocolStats& stats_;
   const bool pass_all_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
 };
@@ -69,7 +69,8 @@ public:
 
 private:
   ProxyProtocolConfig config_;
-  Stats::Scope& scope_;
+  const std::string stats_prefix_;
+  UpstreamProxyProtocolStats stats_;
 };
 
 } // namespace ProxyProtocol
