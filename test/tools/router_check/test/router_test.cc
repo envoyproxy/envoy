@@ -18,9 +18,12 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessTest) {
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.golden.proto.json"));
-  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+
+  Envoy::Options options;
+  RouterCheckTool checktool =
+      RouterCheckTool::create(options.setConfigPath(config_filename_).setTestPath(tests_filename_));
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
-      checktool.compareEntries(tests_filename_);
+      checktool.compareEntries();
   EXPECT_EQ(test_results.size(), 33);
   for (const auto& test_result : test_results) {
     EXPECT_TRUE(test_result.test_passed());
@@ -33,10 +36,14 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessShowOnlyFailuresTest) {
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.golden.proto.json"));
-  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
-  checktool.setOnlyShowFailures();
+
+  Envoy::Options options;
+  RouterCheckTool checktool = RouterCheckTool::create(options.setConfigPath(config_filename_)
+                                                          .setOnlyShowFailures(true)
+                                                          .setTestPath(tests_filename_));
+
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
-      checktool.compareEntries(tests_filename_);
+      checktool.compareEntries();
   EXPECT_EQ(test_results.size(), 0);
 }
 
@@ -45,10 +52,13 @@ TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutesFailures.golden.proto.json"));
-  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
-  checktool.setOnlyShowFailures();
+
+  Envoy::Options options;
+  RouterCheckTool checktool = RouterCheckTool::create(options.setConfigPath(config_filename_)
+                                                          .setTestPath(tests_filename_)
+                                                          .setOnlyShowFailures(true));
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
-      checktool.compareEntries(tests_filename_);
+      checktool.compareEntries();
   EXPECT_EQ(test_results.size(), 1);
   const envoy::RouterCheckToolSchema::ValidationItemResult& test_result = test_results[0];
   std::string expected_result_str = R"pb(

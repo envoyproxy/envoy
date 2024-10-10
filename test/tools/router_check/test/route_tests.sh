@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -ex
 
 # Router_check_tool binary path
 PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool
@@ -14,6 +14,13 @@ TESTS=("ContentType" "ClusterHeader" "DirectResponse" "HeaderMatchedRouting" "Re
 for t in "${TESTS[@]}"
 do
   "${PATH_BIN}" "-c" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details"
+done
+
+# Testing bootstrap config
+TESTS=("ClusterHeaderBootstrap")
+for t in "${TESTS[@]}"
+do
+  "${PATH_BIN}" "--bootstrap-config" "${PATH_CONFIG}/${t}.yaml" "-t" "${PATH_CONFIG}/${t}.golden.proto.json" "--details" "-l" "main"
 done
 
 # Testing coverage flag passes

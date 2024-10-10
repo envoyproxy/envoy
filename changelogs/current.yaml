@@ -285,6 +285,12 @@ removed_config_or_runtime:
     Removed ``envoy.reloadable_features.use_http3_header_normalisation`` runtime flag and legacy code paths.
 
 new_features:
+- area: router check tool
+  change: |
+    Added support for reading route configuration from a bootstrap file.
+- area: router check tool
+  change: |
+    Load runtime flags when using bootstrap configuration.
 - area: dns
   change: |
     for the :ref:`strict DNS <arch_overview_service_discovery_types_strict_dns>` and :ref:`logical DNS
