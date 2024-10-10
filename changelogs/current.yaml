@@ -216,6 +216,10 @@ bug_fixes:
 - area: tracing
   change: |
     Fixed a bug where the OpenTelemetry tracer exports the OTLP request even when no spans are present.
+- area: dynamic_forward_proxy
+  change: |
+    Fixed a bug where DFP sub-cluster gets removed due to CDS update and doesn't gets recreated. This behavior can be reverted by
+    setting the runtime guard ``envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
