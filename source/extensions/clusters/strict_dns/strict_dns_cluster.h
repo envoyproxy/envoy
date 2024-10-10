@@ -2,6 +2,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.validate.h"
 
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -18,11 +20,13 @@ public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
   static absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
-  create(const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-         Network::DnsResolverSharedPtr dns_resolver);
+  create(const envoy::config::cluster::v3::Cluster& cluster,
+         const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+         ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
 
 protected:
   StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                       const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
                        ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
                        absl::Status& creation_status);
 
@@ -68,10 +72,10 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Network::DnsResolverSharedPtr dns_resolver_;
   std::list<ResolveTargetPtr> resolve_targets_;
-  std::chrono::milliseconds dns_refresh_rate_ms_;
-  std::chrono::milliseconds dns_jitter_ms_;
+  const std::chrono::milliseconds dns_refresh_rate_ms_;
+  const std::chrono::milliseconds dns_jitter_ms_;
   BackOffStrategyPtr failure_backoff_strategy_;
-  bool respect_dns_ttl_;
+  const bool respect_dns_ttl_;
   Network::DnsLookupFamily dns_lookup_family_;
   uint32_t overprovisioning_factor_;
   bool weighted_priority_health_;
@@ -80,15 +84,20 @@ private:
 /**
  * Factory for StrictDnsClusterImpl
  */
-class StrictDnsClusterFactory : public ClusterFactoryImplBase {
+
+class StrictDnsClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
+                                    envoy::extensions::clusters::dns::v3::DnsCluster> {
 public:
-  StrictDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
+  StrictDnsClusterFactory() : ConfigurableClusterFactoryBase("envoy.cluster.strict_dns") {}
 
 private:
-  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context) override;
+  absl::StatusOr<
+      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
+  createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
+                          const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
+                          Upstream::ClusterFactoryContext& context) override;
 };
+
 
 DECLARE_FACTORY(StrictDnsClusterFactory);
 

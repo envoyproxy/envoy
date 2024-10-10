@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package envoy.extensions.common.dynamic_forward_proxy.v3;
 
+import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/common/key_value/v3/config.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/resolver.proto";
-import "envoy/extensions/clusters/dns/v3/cluster.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -53,7 +53,7 @@ message DnsCacheConfig {
   // likely build a "happy eyeballs" connection pool which would race the primary / fall back
   // address and return the one that wins. This same method could potentially also be used for
   // QUIC to TCP fall back.]
-  clusters.dns.v3.DnsConfig.DnsLookupFamily dns_lookup_family = 2
+  config.cluster.v3.Cluster.DnsLookupFamily dns_lookup_family = 2
       [(validate.rules).enum = {defined_only: true}];
 
   // The DNS refresh rate for unresolved DNS hosts. If not specified defaults to 60s.
@@ -97,7 +97,7 @@ message DnsCacheConfig {
   // If the DNS failure refresh rate is specified,
   // this is used as the cache's DNS refresh rate when DNS requests are failing. If this setting is
   // not specified, the failure refresh rate defaults to the dns_refresh_rate.
-  clusters.dns.v3.DnsConfig.RefreshRate dns_failure_refresh_rate = 6;
+  config.cluster.v3.Cluster.RefreshRate dns_failure_refresh_rate = 6;
 
   // The config of circuit breakers for resolver. It provides a configurable threshold.
   // Envoy will use dns cache circuit breakers with default settings even if this value is not set.

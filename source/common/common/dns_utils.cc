@@ -13,18 +13,18 @@ getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster
 }
 
 Network::DnsLookupFamily getDnsLookupFamilyFromEnum(
-    envoy::extensions::clusters::dns::v3::DnsConfig::DnsLookupFamily family) {
+    envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
   switch (family) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::extensions::clusters::dns::v3::DnsConfig::V6_ONLY:
+  case envoy::config::cluster::v3::Cluster::V6_ONLY:
     return Network::DnsLookupFamily::V6Only;
-  case envoy::extensions::clusters::dns::v3::DnsConfig::V4_ONLY:
+  case envoy::config::cluster::v3::Cluster::V4_ONLY:
     return Network::DnsLookupFamily::V4Only;
-  case envoy::extensions::clusters::dns::v3::DnsConfig::AUTO:
+  case envoy::config::cluster::v3::Cluster::AUTO:
     return Network::DnsLookupFamily::Auto;
-  case envoy::extensions::clusters::dns::v3::DnsConfig::V4_PREFERRED:
+  case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
     return Network::DnsLookupFamily::V4Preferred;
-  case envoy::extensions::clusters::dns::v3::DnsConfig::ALL:
+  case envoy::config::cluster::v3::Cluster::ALL:
     return Network::DnsLookupFamily::All;
   }
   IS_ENVOY_BUG("unexpected dns lookup family enum");

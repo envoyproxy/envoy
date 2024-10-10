@@ -18,3 +18,15 @@ envoy_cc_library(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "backcompat_dns_lib",
+    srcs = ["backcompat_dns.cc"],
+    hdrs = ["backcompat_dns.h"],
+    deps = [
+        "//source/common/upstream:cluster_factory_includes",
+        "//source/common/upstream:upstream_includes",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)

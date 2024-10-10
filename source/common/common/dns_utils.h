@@ -12,7 +12,7 @@ namespace DnsUtils {
 Network::DnsLookupFamily
 getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster);
 Network::DnsLookupFamily
-getDnsLookupFamilyFromEnum(envoy::extensions::clusters::dns::v3::DnsConfig::DnsLookupFamily family);
+getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family);
 
 // Generates a list of InstanceConstSharedPtr from the DNS responses provided.
 std::vector<Network::Address::InstanceConstSharedPtr>

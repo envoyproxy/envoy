@@ -8,6 +8,9 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.validate.h"
+
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/empty_string.h"
@@ -38,11 +41,18 @@ class LogicalDnsCluster : public ClusterImplBase {
 public:
   ~LogicalDnsCluster() override;
 
+  absl::StatusOr<std::unique_ptr<LogicalDnsCluster>>
+  static create(const envoy::config::cluster::v3::Cluster& cluster,
+        const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+        ClusterFactoryContext& context,
+        Network::DnsResolverSharedPtr dns_resolver);
+
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 protected:
   LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                    const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
                     ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
                     absl::Status& creation_status);
 
@@ -85,15 +95,18 @@ private:
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
 };
 
-class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
+class LogicalDnsClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
+                                     envoy::extensions::clusters::dns::v3::DnsCluster> {
 public:
-  LogicalDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.logical_dns") {}
+  LogicalDnsClusterFactory() : ConfigurableClusterFactoryBase("envoy.cluster.logical_dns") {}
+
 
 private:
   friend class LogicalDnsClusterTest;
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context) override;
+  createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
+                          const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
+                          Upstream::ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(LogicalDnsClusterFactory);
