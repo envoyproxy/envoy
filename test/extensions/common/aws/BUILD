@@ -40,6 +40,36 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "sigv4_signer_corpus_test",
+    srcs = ["sigv4_signer_corpus_test.cc"],
+    data = ["signer_corpuses/v4"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:message_lib",
+        "//source/extensions/common/aws:sigv4_signer_impl_lib",
+        "//test/extensions/common/aws:aws_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "sigv4a_signer_corpus_test",
+    srcs = ["sigv4a_signer_corpus_test.cc"],
+    data = ["signer_corpuses/v4a"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:message_lib",
+        "//source/extensions/common/aws:sigv4a_signer_impl_lib",
+        "//test/extensions/common/aws:aws_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "sigv4a_signer_impl_test",
     srcs = ["sigv4a_signer_impl_test.cc"],
     rbe_pool = "2core",

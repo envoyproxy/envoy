@@ -95,7 +95,7 @@ public:
 
     std::string short_date = "20180102";
     std::string credential_scope = fmt::format("{}/service/aws4_request", short_date);
-    std::string long_date = "20180102T030400Z";
+    std::string long_date = "20180102T030405Z";
     std::string string_to_sign =
         fmt::format(SigV4ASignatureConstants::SigV4AStringToSignFormat,
                     SigV4ASignatureConstants::SigV4AAlgorithm, long_date, credential_scope,
@@ -234,7 +234,7 @@ TEST_F(SigV4ASignerImplTest, SignDateHeader) {
   EXPECT_TRUE(status.ok());
   EXPECT_FALSE(message_->headers().get(SigV4ASignatureHeaders::get().ContentSha256).empty());
   EXPECT_EQ(
-      "20180102T030400Z",
+      "20180102T030405Z",
       message_->headers().get(SigV4ASignatureHeaders::get().Date)[0]->value().getStringView());
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
@@ -370,7 +370,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerify) {
 
 host:www.example.com
 x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-x-amz-date:20180102T030400Z
+x-amz-date:20180102T030405Z
 x-amz-region-set:ap-southeast-2
 
 host;x-amz-content-sha256;x-amz-date;x-amz-region-set
@@ -391,7 +391,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyMultiRegion) {
 
 host:www.example.com
 x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-x-amz-date:20180102T030400Z
+x-amz-date:20180102T030405Z
 x-amz-region-set:ap-southeast-2,us-east-1
 
 host;x-amz-content-sha256;x-amz-date;x-amz-region-set
@@ -412,7 +412,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyUnsignedPayload) {
 
 host:www.example.com
 x-amz-content-sha256:UNSIGNED-PAYLOAD
-x-amz-date:20180102T030400Z
+x-amz-date:20180102T030405Z
 x-amz-region-set:ap-southeast-2
 
 host;x-amz-content-sha256;x-amz-date;x-amz-region-set
@@ -433,7 +433,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyEmptyPayloadMultiRegion) {
 
 host:www.example.com
 x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-x-amz-date:20180102T030400Z
+x-amz-date:20180102T030405Z
 x-amz-region-set:ap-southeast-2,us-east-*
 
 host;x-amz-content-sha256;x-amz-date;x-amz-region-set
@@ -451,7 +451,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyEmptyPayloadMultiRegionQuery) {
 
   std::string canonical_request = R"EOF(GET
 /
-X-Amz-Algorithm=AWS4-ECDSA-P256-SHA256&X-Amz-Credential=akid%2F20180102%2Fservice%2Faws4_request&X-Amz-Date=20180102T030400Z&X-Amz-Expires=5&X-Amz-Region-Set=ap-southeast-2%2Cus-east-%2A&X-Amz-SignedHeaders=host%3Bx-amz-content-sha256
+X-Amz-Algorithm=AWS4-ECDSA-P256-SHA256&X-Amz-Credential=akid%2F20180102%2Fservice%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=5&X-Amz-Region-Set=ap-southeast-2%2Cus-east-%2A&X-Amz-SignedHeaders=host%3Bx-amz-content-sha256
 host:www.example.com
 x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
@@ -470,7 +470,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyUnsignedPayloadQuery) {
 
   std::string canonical_request = R"EOF(GET
 /
-X-Amz-Algorithm=AWS4-ECDSA-P256-SHA256&X-Amz-Credential=akid%2F20180102%2Fservice%2Faws4_request&X-Amz-Date=20180102T030400Z&X-Amz-Expires=5&X-Amz-Region-Set=ap-southeast-2%2Cus-east-%2A&X-Amz-SignedHeaders=host%3Bx-amz-content-sha256
+X-Amz-Algorithm=AWS4-ECDSA-P256-SHA256&X-Amz-Credential=akid%2F20180102%2Fservice%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=5&X-Amz-Region-Set=ap-southeast-2%2Cus-east-%2A&X-Amz-SignedHeaders=host%3Bx-amz-content-sha256
 host:www.example.com
 x-amz-content-sha256:UNSIGNED-PAYLOAD
 
@@ -489,7 +489,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyEmptyPayloadMultiRegionQueryStringExis
 
   std::string canonical_request = R"EOF(GET
 /
-X-Amz-Algorithm=AWS4-ECDSA-P256-SHA256&X-Amz-Credential=akid%2F20180102%2Fservice%2Faws4_request&X-Amz-Date=20180102T030400Z&X-Amz-Expires=5&X-Amz-Region-Set=ap-southeast-2%2Cus-east-%2A&X-Amz-SignedHeaders=host%3Bx-amz-content-sha256&anotherquery=2&query1=aaaaaa
+X-Amz-Algorithm=AWS4-ECDSA-P256-SHA256&X-Amz-Credential=akid%2F20180102%2Fservice%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=5&X-Amz-Region-Set=ap-southeast-2%2Cus-east-%2A&X-Amz-SignedHeaders=host%3Bx-amz-content-sha256&anotherquery=2&query1=aaaaaa
 host:www.example.com
 x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
@@ -508,7 +508,7 @@ TEST_F(SigV4ASignerImplTest, SignAndVerifyUnsignedPayloadQueryCustomExpiration) 
 
   std::string canonical_request = R"EOF(GET
 /
-X-Amz-Algorithm=AWS4-ECDSA-P256-SHA256&X-Amz-Credential=akid%2F20180102%2Fservice%2Faws4_request&X-Amz-Date=20180102T030400Z&X-Amz-Expires=200&X-Amz-Region-Set=ap-southeast-2%2Cus-east-%2A&X-Amz-SignedHeaders=host%3Bx-amz-content-sha256&anotherquery=2&query1=aaaaaa
+X-Amz-Algorithm=AWS4-ECDSA-P256-SHA256&X-Amz-Credential=akid%2F20180102%2Fservice%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=200&X-Amz-Region-Set=ap-southeast-2%2Cus-east-%2A&X-Amz-SignedHeaders=host%3Bx-amz-content-sha256&anotherquery=2&query1=aaaaaa
 host:www.example.com
 x-amz-content-sha256:UNSIGNED-PAYLOAD
 
