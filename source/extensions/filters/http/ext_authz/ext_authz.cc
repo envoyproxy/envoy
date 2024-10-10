@@ -180,15 +180,22 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   // Now that we'll definitely be making the request, add filter state stats if configured to do so.
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
-  if ((config_->emitFilterStateStats() || config_->filterMetadata().has_value()) &&
-      !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
-    filter_state->setData(decoder_callbacks_->filterConfigName(),
-                          std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
-                          Envoy::StreamInfo::FilterState::StateType::Mutable,
-                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  if ((config_->emitFilterStateStats() || config_->filterMetadata().has_value())) {
+    if (!filter_state->hasDataWithName(decoder_callbacks_->filterConfigName())) {
+      filter_state->setData(decoder_callbacks_->filterConfigName(),
+                            std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
+                            Envoy::StreamInfo::FilterState::StateType::Mutable,
+                            Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
-    logging_info_ =
-        filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
+      logging_info_ =
+          filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
+    } else {
+      stats_.filter_state_name_collision_.inc();
+      ENVOY_STREAM_LOG(debug,
+                       "Filter state stats / filter metadata are enabled, but filter state already "
+                       "contained data at key '{}'.",
+                       *decoder_callbacks_, decoder_callbacks_->filterConfigName());
+    }
   }
 
   absl::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
@@ -401,7 +408,7 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 }
 
 void Filter::updateLoggingInfo() {
-  if (!config_->emitFilterStateStats()) {
+  if (!config_->emitFilterStateStats() || logging_info_ == nullptr) {
     return;
   }
 
