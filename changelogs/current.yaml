@@ -105,6 +105,9 @@ minor_behavior_changes:
     Connect the QUIC UDP client connection sockets before use and sockets will only bind if
     the local address is specified. This behavior change can be reverted by setting the
     ``envoy_reloadable_features_quic_connect_client_udp_sockets`` runtime flag to ``false``.
+- area: http_11_proxy
+  change: |
+    Make the inner ``transport_socket`` field optional in the proto configuration.
 - area: conn_handler
   change: |
     Enhanced listener filter chain execution to include the case that listener filter has maxReadBytes() of 0,
@@ -112,10 +115,20 @@ minor_behavior_changes:
 - area: tracers
   change: |
     Set status code based on GRPC status code for OpenTelemetry tracers (previously unset).
+- area: xds-failover
+  change: |
+    Add the ability to stick with either the primary or the failover xDS sources once Envoy connects to one of them.
+    This was added behind a runtime guard, to ensure that the move to the primary source can be properly validated, and
+    will be removed in the future. To allow sticksiyness the runtime flag
+    ``envoy.reloadable_features.xds_failover_to_primary_enabled`` must be explicitly set to ``false``.
 - area: http2
   change: |
     Changes the default value of ``envoy.reloadable_features.http2_use_oghttp2`` to ``false``. This changes the codec used for HTTP/2
     requests and responses to address to address stability concerns. This behavior can be reverted by setting the feature to ``true``.
+- area: udp
+  change: |
+    Set Don't Fragment (DF) flag bit on IP packet header on UDP listener sockets and QUIC upstream connection sockets. This behavior
+    can be reverted by setting ``envoy.reloadable_features.udp_set_do_not_fragment`` to false.
 - area: access_log
   change: |
     Sanitize SNI for potential log injection. The invalid character will be replaced by ``_`` with an ``invalid:`` marker. If runtime
@@ -306,7 +319,8 @@ new_features:
 - area: http
   change: |
     Added configuration setting for the :ref:`maximum size of response headers
-    <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_response_headers_kb>` in responses.
+    <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_response_headers_kb>` in responses. The default can
+    be overridden with runtime key ``envoy.reloadable_features.max_response_headers_size_kb``.
 - area: http_11_proxy
   change: |
     Added the option to configure the transport socket via locality or endpoint metadata.
@@ -394,6 +408,9 @@ new_features:
     to configure the number of retries. If this field is not provided, the ``getaddrinfo`` resolver will retry indefinitely until it
     succeeds or the DNS query times out. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.getaddrinfo_num_retries`` to false.
+- area: getaddrinfo
+  change: |
+    Added ``envoy.enable_dfp_dns_trace`` runtime flag to enable DNS query trace in the DNS resolution details.
 - area: geoip
   change: |
     Added ``envoy.reloadable_features.mmdb_files_reload_enabled`` runtime flag that enables reload of mmdb files by default.
@@ -431,6 +448,14 @@ new_features:
   change: |
       Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
       connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
+- area: local_ratelimit
+  change: |
+    Add the :ref:`rate_limits
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limits>`
+    field to generate rate limit descriptors. If this field is set, the
+    :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+    :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+    will be ignored.
 - area: basic_auth
   change: |
     Added support to provide an override

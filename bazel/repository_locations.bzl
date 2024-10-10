@@ -153,7 +153,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         #
         # !!! NOTE !!!
         # Anytime the FIPS BoringSSL version is upgraded, `bazel/external/boringssl_fips.genrule_cmd` must be updated to use the toolchain
-        # specified in the associated accredidation certificate, which can be found linked from
+        # specified in the associated accreditation certificate, which can be found linked from
         # https://boringssl.googlesource.com/boringssl/+/refs/heads/master/crypto/fipsmodule/FIPS.md, for example
         # https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735.
         version = "fips-20220613",
@@ -181,12 +181,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Abseil",
         project_desc = "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase",
         project_url = "https://abseil.io/",
-        version = "20230802.1",
-        sha256 = "987ce98f02eefbaf930d6e38ab16aa05737234d7afbab2d5c4ea7adbe50c28ed",
+        version = "20240722.0",
+        sha256 = "f50e5ac311a81382da7fa75b97310e4b9006474f9560ac46f54a9967f07d4ae3",
         strip_prefix = "abseil-cpp-{version}",
         urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2023-09-18",
+        release_date = "2024-08-01",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/abseil/abseil-cpp/blob/{version}/LICENSE",
@@ -1208,12 +1208,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "42b2e66c721f442bb439b40a1e037897360cf1b2",
-        sha256 = "f72f78d7fa57154ad302d559fee6b72e0695d51391684891ec991b2b5d90491f",
+        version = "de8f411c1b387499c220ffd6702c43dd7ccaca00",
+        sha256 = "03a2855a70a3f22e0b723cc63f4d6b1817e894f35c2a441981c7f8152196713e",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-09-17",
+        release_date = "2024-10-07",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1222,9 +1222,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Chrome URL parsing library",
         project_desc = "Chrome URL parsing library",
         project_url = "https://quiche.googlesource.com/googleurl",
-        # Static snapshot of https://quiche.googlesource.com/googleurl/+archive/dd4080fec0b443296c0ed0036e1e776df8813aa7.tar.gz
         version = "dd4080fec0b443296c0ed0036e1e776df8813aa7",
-        sha256 = "59f14d4fb373083b9dc8d389f16bbb817b5f936d1d436aa67e16eb6936028a51",
+        sha256 = "fc694942e8a7491dcc1dde1bddf48a31370a1f46fef862bc17acf07c34dc6325",
+        # Static snapshot of https://quiche.googlesource.com/googleurl/+archive/dd4080fec0b443296c0ed0036e1e776df8813aa7.tar.gz
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
         extensions = [],

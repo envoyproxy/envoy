@@ -499,7 +499,7 @@ void EncodingProcessorState::requestWatermark() {
 
 void EncodingProcessorState::clearWatermark() {
   if (watermark_requested_) {
-    ENVOY_LOG(debug, "Watermark lowered on decoding");
+    ENVOY_LOG(debug, "Watermark lowered on encoding");
     watermark_requested_ = false;
     encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
   }

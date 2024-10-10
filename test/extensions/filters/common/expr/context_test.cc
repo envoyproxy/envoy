@@ -777,6 +777,8 @@ TEST(Context, FilterStateAttributes) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   ProtobufWkt::Arena arena;
   FilterStateWrapper wrapper(arena, filter_state);
+  auto status_or = wrapper.ListKeys(&arena);
+  EXPECT_EQ(status_or.status().message(), "ListKeys() is not implemented");
 
   const std::string key = "filter_state_key";
   const std::string serialized = "filter_state_value";
@@ -938,6 +940,21 @@ TEST(Context, XDSAttributes) {
     const auto value = wrapper[CelValue::CreateStringView(Node)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
+  }
+}
+
+TEST(Context, EmptyXdsWrapper) {
+  Protobuf::Arena arena;
+  XDSWrapper wrapper(arena, nullptr, nullptr);
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(Node)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ClusterName)];
+    EXPECT_FALSE(value.has_value());
   }
 }
 
