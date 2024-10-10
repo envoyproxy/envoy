@@ -4334,6 +4334,25 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
 }
 
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequestNoSidestreamResponse) {
+  proto_config_.set_observability_mode(true);
+  uint32_t deferred_close_timeout_ms = 1000;
+  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
+
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBodyAndTrailer("Hello");
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
+}
+
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
   proto_config_.set_observability_mode(true);
 
