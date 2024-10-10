@@ -1013,3 +1013,36 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "add_encode_metadata_filter_lib",
+    srcs = [
+        "add_encode_metadata_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/event:timer_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "encoder_recreate_stream_filter_lib",
+    srcs = [
+        "encoder_recreate_stream_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/event:timer_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
