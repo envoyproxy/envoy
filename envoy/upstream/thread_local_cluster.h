@@ -96,6 +96,16 @@ public:
    */
   virtual LoadBalancer& loadBalancer() PURE;
 
+  /* Choose a host for the next request. If this returns a host, this should immediately be
+   * followed by a call to httpConnPool or tcpConnPool or load balancing may not work as
+   * expected.
+   *
+   * @param context the optional load balancer context.
+   * @return host the next host selected by the load balancer or null if no host
+   * is available.
+   */
+  virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
+
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that
    * callers do not need to worry about per thread synchronization. The load balancing policy that
@@ -109,7 +119,8 @@ public:
    * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
   virtual absl::optional<HttpPoolData>
-  httpConnPool(ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+  httpConnPool(HostConstSharedPtr host, ResourcePriority priority,
+               absl::optional<Http::Protocol> downstream_protocol,
                LoadBalancerContext* context) PURE;
 
   /**
@@ -122,6 +133,11 @@ public:
    *        valid until newConnection is called on the pool (if it is to be called).
    * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
+  virtual absl::optional<TcpPoolData> tcpConnPool(HostConstSharedPtr host,
+                                                  ResourcePriority priority,
+                                                  LoadBalancerContext* context) PURE;
+
+  /* a legacy API which synchronously chooses a host and creates a conn pool*/
   virtual absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
                                                   LoadBalancerContext* context) PURE;
 
