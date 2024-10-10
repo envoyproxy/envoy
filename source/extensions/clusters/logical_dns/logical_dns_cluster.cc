@@ -1,5 +1,4 @@
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
-#include "source/extensions/clusters/common/backcompat_dns.h"
 
 #include <chrono>
 #include <list>
@@ -21,6 +20,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/clusters/common/backcompat_dns.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -216,10 +216,8 @@ LogicalDnsClusterFactory::createClusterWithConfig(
   THROW_IF_NOT_OK(dns_resolver_or_error.status());
 
   auto cluster_or_error = LogicalDnsCluster::create(cluster, proto_config, context,
-                                                       std::move(dns_resolver_or_error.value()));
-  return std::make_pair(std::shared_ptr<LogicalDnsCluster>(std::move(*cluster_or_error)),
-                        nullptr);
-
+                                                    std::move(dns_resolver_or_error.value()));
+  return std::make_pair(std::shared_ptr<LogicalDnsCluster>(std::move(*cluster_or_error)), nullptr);
 }
 
 /**

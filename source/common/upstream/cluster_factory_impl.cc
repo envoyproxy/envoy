@@ -65,26 +65,15 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   return factory->create(cluster, context);
 }
 
-absl::StatusOr<Network::DnsResolverSharedPtr> ClusterFactoryImplBase::selectDnsResolver(
-    const envoy::config::cluster::v3::Cluster& cluster,
-    ClusterFactoryContext& context) {
+absl::StatusOr<Network::DnsResolverSharedPtr>
+ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
+                                          ClusterFactoryContext& context) {
   // We make this a shared pointer to deal with the distinct ownership
   // scenarios that can exist: in one case, we pass in the "default"
   // DNS resolver that is owned by the Server::Instance. In the case
   // where 'dns_resolvers' is specified, we have per-cluster DNS
   // resolvers that are created here but ownership resides with
   // StrictDnsClusterImpl/LogicalDnsCluster.
-  // if ((cluster.has_dns_config() && cluster.dns_config().has_typed_dns_resolver_config() &&
-  //     !(cluster.dns_config().typed_dns_resolver_config().typed_config().type_url().empty()))) {
-  //  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  //  Network::DnsResolverFactory& dns_resolver_factory =
-  //      Network::createDnsResolverFactoryFromProto(cluster.dns_config(),
-  //      typed_dns_resolver_config);
-  //  auto& server_context = context.serverFactoryContext();
-  //  return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
-  //                                                server_context.api(),
-  //                                                typed_dns_resolver_config);
-  //}
 
   if ((cluster.has_typed_dns_resolver_config() &&
        !(cluster.typed_dns_resolver_config().typed_config().type_url().empty())) ||

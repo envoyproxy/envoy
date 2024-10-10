@@ -1,5 +1,4 @@
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
-#include "source/extensions/clusters/common/backcompat_dns.h"
 
 #include <chrono>
 
@@ -8,6 +7,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
+
+#include "source/extensions/clusters/common/backcompat_dns.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -24,9 +25,8 @@ StrictDnsClusterImpl::create(const envoy::config::cluster::v3::Cluster& cluster,
   merged_dns_cluster.MergeFrom(dns_cluster);
   mergeClusterAndProtoConfig(cluster, merged_dns_cluster);
 
-
-  auto ret = std::unique_ptr<StrictDnsClusterImpl>(
-      new StrictDnsClusterImpl(cluster, merged_dns_cluster, context, dns_resolver, creation_status));
+  auto ret = std::unique_ptr<StrictDnsClusterImpl>(new StrictDnsClusterImpl(
+      cluster, merged_dns_cluster, context, dns_resolver, creation_status));
 
   RETURN_IF_NOT_OK(creation_status);
   return ret;

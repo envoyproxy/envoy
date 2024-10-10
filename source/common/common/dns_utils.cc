@@ -12,8 +12,8 @@ getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster
   return getDnsLookupFamilyFromEnum(cluster.dns_lookup_family());
 }
 
-Network::DnsLookupFamily getDnsLookupFamilyFromEnum(
-    envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
+Network::DnsLookupFamily
+getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
   switch (family) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::cluster::v3::Cluster::V6_ONLY:

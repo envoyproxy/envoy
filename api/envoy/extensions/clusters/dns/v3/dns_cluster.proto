@@ -28,35 +28,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 7]
 message DnsCluster {
-  // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
-  // addresses in the IPv4 family. If V6_ONLY is selected, the DNS resolver will
-  // only perform a lookup for addresses in the IPv6 family. If AUTO is
-  // specified, the DNS resolver will first perform a lookup for addresses in
-  // the IPv6 family and fallback to a lookup for addresses in the IPv4 family.
-  // This is semantically equivalent to a non-existent V6_PREFERRED option.
-  // AUTO is a legacy name that is more opaque than
-  // necessary and will be deprecated in favor of V6_PREFERRED in a future major version of the API.
-  // If V4_PREFERRED is specified, the DNS resolver will first perform a lookup for addresses in the
-  // IPv4 family and fallback to a lookup for addresses in the IPv6 family. i.e., the callback
-  // target will only get v6 addresses if there were NO v4 addresses to return.
-  // If ALL is specified, the DNS resolver will perform a lookup for both IPv4 and IPv6 families,
-  // and return all resolved addresses. When this is used, Happy Eyeballs will be enabled for
-  // upstream connections. Refer to :ref:`Happy Eyeballs Support <arch_overview_happy_eyeballs>`
-  // for more information.
-  // For cluster types other than
-  // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
-  // :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
-  // this setting is
-  // ignored.
-  // [#next-major-version: deprecate AUTO in favor of a V6_PREFERRED option.]
-//  enum DnsLookupFamily {
-//    UNSPECIFIED = 0;
-//    AUTO = 1;
-//    V4_ONLY = 2;
-//    V6_ONLY = 3;
-//    V4_PREFERRED = 4;
-//    ALL = 5;
-//  }
 
   message RefreshRate {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
@@ -77,35 +48,21 @@ message DnsCluster {
   // This value is the cluster’s DNS refresh rate. The value configured must be at least 1ms.
   // If this setting is not specified, the
   // value defaults to 5000ms.
-  google.protobuf.Duration dns_refresh_rate = 1 [(validate.rules).duration = {gt {nanos: 1000000}}];
+  google.protobuf.Duration dns_refresh_rate = 3 [(validate.rules).duration = {gt {nanos: 1000000}}];
 
   // this is the cluster’s DNS refresh rate when requests are failing. If this setting is
   // not specified, the failure refresh rate defaults to the DNS refresh rate.
-  RefreshRate dns_failure_refresh_rate = 2;
+  RefreshRate dns_failure_refresh_rate = 4;
 
   // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
   // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
   // resolution.
-  google.protobuf.BoolValue respect_dns_ttl = 3;
+  google.protobuf.BoolValue respect_dns_ttl = 5;
 
   // The DNS IP address resolution policy. If this setting is not specified, the
   // value defaults to
   // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.dns.v3.DnsConfig.DnsLookupFamily.AUTO>`.
   // DnsLookupFamily dns_lookup_family = 4 [(validate.rules).enum = {defined_only: true}];
-
-  // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
-  // or any other DNS resolver types and the related parameters.
-  // For example, an object of
-  // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
-  // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
-  // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
-  // configuration.
-  // During the transition period when both ``dns_resolution_config`` and ``typed_dns_resolver_config`` exists,
-  // when ``typed_dns_resolver_config`` is in place, Envoy will use it and ignore ``dns_resolution_config``.
-  // When ``typed_dns_resolver_config`` is missing, the default behavior is in place.
-  // [#extension-category: envoy.network.dns_resolver]
-  // Fixme docs
-  // config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 5;
 
   // DNS jitter causes the cluster to refresh DNS entries later by a random amount of time to avoid a
   // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount.

@@ -98,7 +98,6 @@ private:
                           Upstream::ClusterFactoryContext& context) override;
 };
 
-
 DECLARE_FACTORY(StrictDnsClusterFactory);
 
 } // namespace Upstream
