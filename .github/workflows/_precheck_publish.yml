@@ -5,6 +5,9 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      gcp-key:
+        required: true
     inputs:
       request:
         type: string
@@ -20,6 +23,8 @@ concurrency:
 
 jobs:
   publish:
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
     permissions:
       contents: read
       packages: read
@@ -30,6 +35,7 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
+      gcs-only: "true"
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
@@ -38,6 +44,7 @@ jobs:
         ERROR
         error:
         Error:
+      steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
       target-suffix: ${{ matrix.target-suffix }}
       trusted: ${{ inputs.trusted }}
@@ -67,3 +74,9 @@ jobs:
             --config=remote-envoy-engflow
             --config=docs-ci
           rbe: true
+          steps-post: |
+            - run: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
+              shell: bash
+              env:
+                GCS_ARTIFACT_BUCKET: ${{ inputs.trusted && 'envoy-postsubmit' || 'envoy-pr' }}
+                GCS_REDIRECT_PATH: ${{ fromJSON(inputs.request).request.pr || fromJSON(inputs.request).request.target-branch }}

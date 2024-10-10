@@ -676,8 +676,8 @@ TEST_P(EnvoyQuicClientSessionTest, WriteBlockedAndUnblock) {
   EnvoyQuicClientConnectionPeer::onFileEvent(*quic_connection_, Event::FileReadyType::Write,
                                              *quic_connection_->connectionSocket());
   EXPECT_FALSE(quic_connection_->writer()->IsWriteBlocked());
-  EXPECT_CALL(stream_callbacks,
-              onResetStream(Http::StreamResetReason::LocalReset, "QUIC_STREAM_REQUEST_REJECTED"));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset,
+                                              "QUIC_STREAM_REQUEST_REJECTED|FROM_SELF"));
   EXPECT_CALL(*quic_connection_, SendControlFrame(_));
   stream.resetStream(Http::StreamResetReason::LocalReset);
 }

@@ -100,8 +100,18 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
       switch (action.bucket_action_case()) {
       case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
           kQuotaAssignmentAction: {
-        quota_buckets_[bucket_id]->cached_action = action;
+        absl::optional<BucketAction> cached_action = quota_buckets_[bucket_id]->cached_action;
         quota_buckets_[bucket_id]->current_assignment_time = time_source_.monotonicTime();
+
+        if (cached_action.has_value() &&
+            Protobuf::util::MessageDifferencer::Equals(*cached_action, action)) {
+          ENVOY_LOG(debug,
+                    "Cached action matches the incoming response so only TTL is updated for bucket "
+                    "id: {}",
+                    bucket_id);
+          break;
+        }
+        quota_buckets_[bucket_id]->cached_action = action;
         if (quota_buckets_[bucket_id]->cached_action->has_quota_assignment_action()) {
           auto rate_limit_strategy = quota_buckets_[bucket_id]
                                          ->cached_action->quota_assignment_action()

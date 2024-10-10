@@ -4975,10 +4975,10 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
 
-  std::string error_message =
-      upstreamProtocol() == Http::CodecType::HTTP3
-          ? "upstream_reset_before_response_started{protocol_error|QUIC_BAD_APPLICATION_PAYLOAD}"
-          : "upstream_reset_before_response_started{protocol_error}";
+  std::string error_message = upstreamProtocol() == Http::CodecType::HTTP3
+                                  ? "upstream_reset_before_response_started{protocol_error|QUIC_"
+                                    "BAD_APPLICATION_PAYLOAD|FROM_SELF}"
+                                  : "upstream_reset_before_response_started{protocol_error}";
 
   EXPECT_EQ(waitForAccessLog(access_log_name_), error_message);
   // Upstream connection should stay up
