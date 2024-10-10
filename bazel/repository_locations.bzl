@@ -453,7 +453,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = ["envoy.tls.key_providers.cryptomb"],
         cpe = "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*",
         license = "Apache-2.0",
-        license_url = "https://github.com/intel/ipp-crypto/blob/ippcp_{version}/LICENSE",
+        license_url = "https://github.com/intel/cryptography-primitives/blob/ippcp_{version}/LICENSE",
     ),
     com_github_intel_qatlib = dict(
         project_name = "qatlib",
