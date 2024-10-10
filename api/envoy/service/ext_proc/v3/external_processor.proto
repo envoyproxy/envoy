@@ -391,7 +391,8 @@ message BodyMutation {
     bool clear_body = 2;
   }
 
+  // [#not-implemented-hide:]
   // Sending this body mutation for the MXN body mode.
   // Only one of ``mxn_resp`` or above ``mutation`` can be set.
-  MxnBodyResponse mxn_resp = 3 [(xds.annotations.v3.field_status).work_in_progress = true];
+  MxnBodyResponse mxn_resp = 3;
 }

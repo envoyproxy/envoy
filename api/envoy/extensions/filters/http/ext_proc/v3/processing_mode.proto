@@ -69,6 +69,7 @@ message ProcessingMode {
     // up to the buffer limit will be sent.
     BUFFERED_PARTIAL = 3;
 
+    // [#not-implemented-hide:]
     // Envoy streams the body to the server in pieces as they arrive. The data is not
     // stored in the internal queue. Only bytes tracking is stored there.
     // Server may buffer the M chunks of data, processing them then split the processed
@@ -77,7 +78,7 @@ message ProcessingMode {
     // it has received.
     //
     // When bodying mode is set to ``MXN``, the corresponding trailer mode has to be set to ``SEND``.
-    MXN = 4 [(xds.annotations.v3.field_status).work_in_progress = true];
+    MXN = 4;
   }
 
   // How to handle the request header. Default is "SEND".

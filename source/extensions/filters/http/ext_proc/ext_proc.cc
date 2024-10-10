@@ -839,9 +839,13 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   state.setTrailers(&trailers);
 
   if (state.callbackState() != ProcessorState::CallbackState::Idle) {
-    ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
-    state.setPaused(true);
-    return FilterTrailersStatus::StopIteration;
+    if (state.bodyMode() == ProcessingMode::MXN) {
+      ENVOY_LOG(trace, "Body mode is MXN, sending trailers even Envoy is waiting for header or body response");
+    } else {
+      ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
+      state.setPaused(true);
+      return FilterTrailersStatus::StopIteration;
+    }
   }
 
   if (!body_delivered &&
@@ -980,8 +984,13 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *trailers_req->mutable_trailers());
-  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             ProcessorState::CallbackState::TrailersCallback);
+  if (state.callbackState() == ProcessorState::CallbackState::Idle) {
+    state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                               ProcessorState::CallbackState::TrailersCallback);
+  } else {
+    state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                               state.callbackState());
+  }
   ENVOY_LOG(debug, "Sending trailers message");
   sendRequest(std::move(req), false);
   stats_.stream_msgs_sent_.inc();

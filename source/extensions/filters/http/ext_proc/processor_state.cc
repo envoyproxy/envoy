@@ -467,6 +467,8 @@ bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response
 
   if (end_of_stream) {
     onFinishProcessorCall(Grpc::Status::Ok);
+  } else if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
+    onFinishProcessorCall(Grpc::Status::Ok, CallbackState::TrailersCallback);
   } else {
     onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
   }
