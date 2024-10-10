@@ -1055,6 +1055,7 @@ parsedSubjectPeerCertificate()
 
 Returns :repo:`connection <envoy/ssl/parsed_x509_name.h>` parsed from subject field of the peer
 certificate. Returns nil if there is no peer certificate.
+
 Returns a :ref:`parsed name object <config_http_filters_lua_parsed_name>`.
 
 uriSanPeerCertificate()
