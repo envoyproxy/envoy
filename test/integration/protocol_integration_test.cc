@@ -1849,17 +1849,9 @@ TEST_P(DownstreamProtocolIntegrationTest, HeadersWithUnderscoresCauseRequestReje
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("400", response->headers().getStatusValue());
-  } else {
-    ASSERT_TRUE(response->waitForReset());
-    codec_client_->close();
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
   }
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
 }
 
@@ -1890,17 +1882,11 @@ TEST_P(DownstreamProtocolIntegrationTest, TrailerWithUnderscoresCauseRequestReje
 
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
-    ASSERT_TRUE(response->complete());
-    EXPECT_EQ("400", response->headers().getStatusValue());
-  } else {
-    ASSERT_TRUE(response->waitForReset());
-    codec_client_->close();
-    ASSERT_TRUE(response->reset());
-    EXPECT_EQ((downstream_protocol_ == Http::CodecType::HTTP3
-                   ? Http::StreamResetReason::ProtocolError
-                   : Http::StreamResetReason::RemoteReset),
-              response->resetReason());
   }
+  // response->decodeHeaders(Http::ResponseHeaderMapPtr(new
+  // Http::TestResponseHeaderMapImpl{{":status", "400"}}), true);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("unexpected_underscore"));
 }
 
