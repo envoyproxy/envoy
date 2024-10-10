@@ -38,7 +38,7 @@ void addFileDescriptorsRecursively(const Protobuf::FileDescriptor& descriptor,
 
 void addBookstoreProtoDescriptor(Protobuf::Message* message) {
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder& config =
-      *Envoy::Protobuf::DynamicCastToGenerated<
+      *Envoy::Protobuf::DynamicCastMessage<
           envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder>(message);
   config.clear_services();
   config.add_services("bookstore.Bookstore");
@@ -82,8 +82,7 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
 
 void cleanTapConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::tap::v3::Tap& config =
-      *Envoy::Protobuf::DynamicCastToGenerated<envoy::extensions::filters::http::tap::v3::Tap>(
-          message);
+      *Envoy::Protobuf::DynamicCastMessage<envoy::extensions::filters::http::tap::v3::Tap>(message);
   if (config.common_config().config_type_case() ==
       envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kStaticConfig) {
     auto const& output_config = config.common_config().static_config().output_config();
@@ -111,7 +110,7 @@ void cleanTapConfig(Protobuf::Message* message) {
 
 void cleanFileSystemBufferConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig& config =
-      *Envoy::Protobuf::DynamicCastToGenerated<
+      *Envoy::Protobuf::DynamicCastMessage<
           envoy::extensions::filters::http::file_system_buffer::v3::FileSystemBufferFilterConfig>(
           message);
   if (config.manager_config().thread_pool().thread_count() > kMaxAsyncFileManagerThreadCount) {
