@@ -80,7 +80,7 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
   ENVOY_LOG(trace, "Performing DNS resolution via Apple APIs");
   auto pending_resolution = std::make_unique<PendingResolution>(*this, callback, dispatcher_,
                                                                 dns_name, dns_lookup_family);
-
+  pending_resolution->addTrace(AppleDnsTrace::Starting);
   DNSServiceErrorType error =
       pending_resolution->dnsServiceGetAddrInfo(include_unroutable_families_);
   if (error != kDNSServiceErr_NoError) {
@@ -176,6 +176,20 @@ void AppleDnsResolverImpl::PendingResolution::cancel(Network::ActiveDnsQuery::Ca
   delete this;
 }
 
+void AppleDnsResolverImpl::PendingResolution::addTrace() {
+  traces_.push_back(Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
+}
+
+std::string getTraces() {
+  std::vector<std::string> string_traces;
+  string_traces.reserve(traces_.size());
+  std::transform(traces_.begin(), traces_.end(), std::back_inserter(string_traces),
+                 [](const Trace& trace) {
+                   return absl::StrCat(trace.trace_, "=", trace.time_.time_since_epoch().count());
+                 });
+  return absl::StrJoin(string_traces, ",");
+}
+
 void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
   ENVOY_LOG(debug, "DNS resolver file event ({})", events);
   RELEASE_ASSERT(events & Event::FileReadyType::Read,
@@ -189,6 +203,7 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
     // Therefore, finish resolving with an error.
     pending_response_.status_ = ResolutionStatus::Failure;
     pending_response_.details_ = absl::StrCat(error);
+    addTrace(AppleDnsTrace::Failed);
     finishResolve();
   }
 }
@@ -347,6 +362,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     pending_response_.v4_responses_.clear();
     pending_response_.v6_responses_.clear();
 
+    addTrace(AppleDnsTrace::Failed);
     finishResolve();
     // Note: Nothing can follow this call to flushPendingQueries due to deletion of this
     // object upon resolution.
@@ -378,6 +394,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   if (!(flags & kDNSServiceFlagsMoreComing) && isAddressFamilyProcessed(kDNSServiceProtocol_IPv4) &&
       isAddressFamilyProcessed(kDNSServiceProtocol_IPv6)) {
     ENVOY_LOG(debug, "DNS Resolver flushing queries pending callback");
+    addTrace(AppleDnsTrace::Success);
     finishResolve();
     // Note: Nothing can follow this call to finishResolve due to deletion of this
     // object upon resolution.

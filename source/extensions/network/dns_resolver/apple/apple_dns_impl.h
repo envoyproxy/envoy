@@ -24,6 +24,13 @@
 namespace Envoy {
 namespace Network {
 
+// Trace information for Apple DNS.
+enum class AppleDnsTrace : uint8_t {
+  Starting = 1,
+  Success = 2,
+  Failed = 3,
+};
+
 // This abstraction allows for finer control in tests by using a mocked API. Production code simply
 // forwards the function calls to Apple's API.
 class DnsService {
@@ -100,8 +107,8 @@ private:
 
     // Network::ActiveDnsQuery
     void cancel(Network::ActiveDnsQuery::CancelReason reason) override;
-    void addTrace(uint8_t) override {}
-    std::string getTraces() override { return {}; }
+    void addTrace(uint8_t) override;
+    std::string getTraces() override;
 
     static DnsResponse buildDnsResponse(const struct sockaddr* address, uint32_t ttl);
 
@@ -161,6 +168,7 @@ private:
     // be accumulated before firing callback_.
     PendingResponse pending_response_;
     DnsLookupFamily dns_lookup_family_;
+    std::vector<Trace> traces_;
   };
 
   Event::Dispatcher& dispatcher_;
