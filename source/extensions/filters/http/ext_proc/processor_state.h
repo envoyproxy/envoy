@@ -6,6 +6,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -39,11 +40,18 @@ public:
   ChunkQueue& operator=(const ChunkQueue&) = delete;
   uint32_t bytesEnqueued() const { return bytes_enqueued_; }
   bool empty() const { return queue_.empty(); }
-  void push(Buffer::Instance& data, bool end_stream);
+  void push(Buffer::Instance& data, bool end_stream,
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
+                envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
+  QueuedChunkPtr
+  pop(Buffer::OwnedImpl& out_data,
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
+          envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
   void clear();
-  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
+  // the total number of chunks in the queue.
+  uint32_t size() { return queue_.size(); }
 
 private:
   std::deque<QueuedChunkPtr> queue_;
@@ -170,9 +178,7 @@ public:
   // Move the contents of "data" into a QueuedChunk object on the streaming queue.
   void enqueueStreamingChunk(Buffer::Instance& data, bool end_stream);
   // If the queue has chunks, return the head of the queue.
-  QueuedChunkPtr dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
-    return chunk_queue_.pop(out_data);
-  }
+  QueuedChunkPtr dequeueStreamingChunk(Buffer::OwnedImpl& out_data);
   // Consolidate all the chunks on the queue into a single one and return a reference.
   const QueuedChunk& consolidateStreamedChunks() { return chunk_queue_.consolidate(); }
   bool queueOverHighLimit() const { return chunk_queue_.bytesEnqueued() > bufferLimit(); }
@@ -182,11 +188,13 @@ public:
     // 1) STREAMED BodySendMode
     // 2) BUFFERED_PARTIAL BodySendMode
     // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
+    // 4) MXN BodySendMode
     // In these modes, ext_proc filter can not guarantee to set the content length correctly if
     // body is mutated by external processor later.
     // In http1 codec, removing content length will enable chunked encoding whenever feasible.
     return (
         body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED ||
+        body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::MXN ||
         body_mode_ ==
             envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED_PARTIAL ||
         (body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED &&
@@ -273,6 +281,9 @@ protected:
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
+  bool handleSingleChunkInBodyResponse(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  bool handleMxnBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);

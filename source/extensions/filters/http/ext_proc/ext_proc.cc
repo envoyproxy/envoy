@@ -572,8 +572,9 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   }
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    if (state.bodyMode() == ProcessingMode::STREAMED &&
-        config_->sendBodyWithoutWaitingForHeaderResponse()) {
+    if ((state.bodyMode() == ProcessingMode::STREAMED &&
+         config_->sendBodyWithoutWaitingForHeaderResponse()) ||
+        state.bodyMode() == ProcessingMode::MXN) {
       ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
                        "is STREAMED and send_body_without_waiting_for_header_response is enabled");
     } else {
@@ -617,7 +618,8 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     state.setPaused(true);
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
-  case ProcessingMode::STREAMED: {
+  case ProcessingMode::STREAMED:
+  case ProcessingMode::MXN: {
     // STREAMED body mode works as follows:
     //
     // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it
@@ -757,7 +759,7 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
   // For the body processing mode in observability mode, only STREAMED body processing mode is
   // supported and any other body processing modes will be ignored. NONE mode(i.e., skip body
   // processing) will still work as expected.
-  if (state.bodyMode() == ProcessingMode::STREAMED) {
+  if (state.bodyMode() == ProcessingMode::STREAMED || state.bodyMode() == ProcessingMode::MXN) {
     // Try to open the stream if the connection has not been established.
     switch (openStream()) {
     case StreamOpenState::Error:
@@ -835,9 +837,13 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   state.setTrailers(&trailers);
 
   if (state.callbackState() != ProcessorState::CallbackState::Idle) {
-    ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
-    state.setPaused(true);
-    return FilterTrailersStatus::StopIteration;
+    if (state.bodyMode() == ProcessingMode::MXN) {
+      ENVOY_LOG(trace, "Body mode is MXN, sending trailers even Envoy is waiting for header or body response");
+    } else {
+      ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
+      state.setPaused(true);
+      return FilterTrailersStatus::StopIteration;
+    }
   }
 
   if (!body_delivered &&
@@ -976,13 +982,16 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *trailers_req->mutable_trailers());
-
   if (observability_mode) {
     ENVOY_LOG(debug, "Sending trailers message in observability mode");
   } else {
-    state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                               config_->messageTimeout(),
-                               ProcessorState::CallbackState::TrailersCallback);
+    if (state.callbackState() == ProcessorState::CallbackState::Idle) {
+      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                                 ProcessorState::CallbackState::TrailersCallback);
+    } else {
+      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+                                 state.callbackState());
+    }
     ENVOY_LOG(debug, "Sending trailers message");
   }
 
