@@ -2392,14 +2392,14 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillOnce(ReturnRef(peer_cert_subject));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_subject)));
 
-  auto parsed_subject = std::make_shared<Ssl::ParsedX509Name>();
+  auto parsed_subject = std::make_unique<Ssl::ParsedX509Name>();
   parsed_subject->commonName_ = "Test CN";
   parsed_subject->organizationName_.push_back("Test O1");
   parsed_subject->organizationName_.push_back("Test O2");
   // need this conversion to avoid compiler error in ReturnRef
-  Ssl::ParsedX509NameConstSharedPtr const_parsed_subject = parsed_subject;
+  Ssl::ParsedX509NameOptConstRef const_parsed_subject(*parsed_subject);
   EXPECT_CALL(*connection_info, parsedSubjectPeerCertificate())
-      .WillRepeatedly(ReturnRef(const_parsed_subject));
+      .WillRepeatedly(Return(const_parsed_subject));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Test CN")));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Test O1,Test O2")));
 

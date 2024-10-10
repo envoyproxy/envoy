@@ -92,7 +92,7 @@ std::string getSubjectFromCertificate(X509& cert);
  * @param cert the certificate
  * @return Envoy::Ssl::ParsedX509NameConstSharedPtr the struct contains the parsed values.
  */
-Envoy::Ssl::ParsedX509NameConstSharedPtr parseSubjectFromCertificate(X509& cert);
+Envoy::Ssl::ParsedX509NamePtr parseSubjectFromCertificate(X509& cert);
 
 /**
  * Retrieves the extension OIDs from certificate.

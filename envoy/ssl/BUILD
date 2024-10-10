@@ -16,6 +16,7 @@ envoy_cc_library(
     ],
     deps = [
         ":ssl_socket_state",
+        "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
         "@com_google_absl//absl/types:optional",
     ],

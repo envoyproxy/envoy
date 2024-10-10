@@ -140,10 +140,9 @@ std::string getRFC2253NameFromCertificate(X509& cert, CertName desired_name) {
  * Parse well-known attribute values from a X509 distinguished name in certificate
  * @param cert the certificate.
  * @param desired_name the desired name (Issuer or Subject) to parse from the certificate.
- * @return Envoy::Ssl::ParsedX509NameConstSharedPtr returns the struct contains the parsed values.
+ * @return Envoy::Ssl::ParsedX509NamePtr returns the struct contains the parsed values.
  */
-Envoy::Ssl::ParsedX509NameConstSharedPtr parseX509NameFromCertificate(X509& cert,
-                                                                      CertName desired_name) {
+Envoy::Ssl::ParsedX509NamePtr parseX509NameFromCertificate(X509& cert, CertName desired_name) {
   X509_NAME* name = nullptr;
   switch (desired_name) {
   case CertName::Issuer:
@@ -154,7 +153,7 @@ Envoy::Ssl::ParsedX509NameConstSharedPtr parseX509NameFromCertificate(X509& cert
     break;
   }
 
-  auto parsed = std::make_shared<Envoy::Ssl::ParsedX509Name>();
+  auto parsed = std::make_unique<Envoy::Ssl::ParsedX509Name>();
   int cnt = X509_NAME_entry_count(name);
   for (int i = 0; i < cnt; i++) {
     const X509_NAME_ENTRY* ent;
@@ -415,7 +414,7 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return getRFC2253NameFromCertificate(cert, CertName::Subject);
 }
 
-Envoy::Ssl::ParsedX509NameConstSharedPtr Utility::parseSubjectFromCertificate(X509& cert) {
+Envoy::Ssl::ParsedX509NamePtr Utility::parseSubjectFromCertificate(X509& cert) {
   return parseX509NameFromCertificate(cert, CertName::Subject);
 }
 
