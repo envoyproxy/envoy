@@ -19,6 +19,7 @@ Common messages
   ../extensions/network/socket_interface/v3/default_socket_interface.proto
   ../extensions/matching/common_inputs/environment_variable/v3/input.proto
   ../config/core/v3/extension.proto
+  ../extensions/common/aws/v3/credential_provider.proto
   ../extensions/common/matching/v3/extension_matcher.proto
   ../extensions/filters/common/dependency/v3/dependency.proto
   ../extensions/regex_engines/v3/google_re2.proto
