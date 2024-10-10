@@ -1391,7 +1391,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.wasm.runtime.wamr",
             "envoy.wasm.runtime.wasmtime",
         ],
-        release_date = "2024-10-01",
+        release_date = "2024-10-07",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/proxy-wasm/proxy-wasm-cpp-sdk/blob/{version}/LICENSE",
