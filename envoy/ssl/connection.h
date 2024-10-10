@@ -99,7 +99,7 @@ public:
   /**
    * @return the well-known attribute values parsed from subject field of the peer certificate.
    **/
-  virtual const ParsedX509NameConstSharedPtr& parsedSubjectPeerCertificate() const PURE;
+  virtual ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const PURE;
 
   /**
    * @return absl::Span<const std::string> the URIs in the SAN field of the peer certificate.

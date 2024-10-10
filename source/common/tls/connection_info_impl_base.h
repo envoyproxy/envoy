@@ -29,7 +29,7 @@ public:
   absl::Span<const std::string> serialNumbersPeerCertificates() const override;
   const std::string& issuerPeerCertificate() const override;
   const std::string& subjectPeerCertificate() const override;
-  const Ssl::ParsedX509NameConstSharedPtr& parsedSubjectPeerCertificate() const override;
+  Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
   absl::Span<const std::string> uriSanPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
@@ -61,7 +61,7 @@ protected:
   mutable std::vector<std::string> cached_serial_numbers_peer_certificates_;
   mutable std::string cached_issuer_peer_certificate_;
   mutable std::string cached_subject_peer_certificate_;
-  mutable Ssl::ParsedX509NameConstSharedPtr cached_parsed_subject_peer_certificate_;
+  mutable Ssl::ParsedX509NamePtr cached_parsed_subject_peer_certificate_;
   mutable std::string cached_subject_local_certificate_;
   mutable std::vector<std::string> cached_uri_san_peer_certificate_;
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
