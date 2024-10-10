@@ -124,11 +124,12 @@ void MessageUtil::loadFromJson(absl::string_view json, Protobuf::Message& messag
   }
   if (has_unknown_field) {
     // If the parsing failure is caused by the unknown fields.
-    THROW_IF_NOT_OK(validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                                      load_status.ToString()));
+    THROW_IF_NOT_OK(validation_visitor.onUnknownField(
+        fmt::format("type {} reason {}", message.GetTypeName(), load_status.ToString())));
   } else {
     // If the error has nothing to do with unknown field.
-    throw EnvoyException("Unable to parse JSON as proto (" + load_status.ToString() + "): " + json);
+    throw EnvoyException(
+        fmt::format("Unable to parse JSON as proto ({}): {}", load_status.ToString(), json));
   }
 }
 
