@@ -2,7 +2,10 @@ load("@rules_rust//rust:defs.bzl", "rust_shared_library")
 
 licenses(["notice"])  # Apache 2
 
-package(default_visibility = ["//test/extensions/dynamic_modules:__pkg__"])
+package(default_visibility = [
+    "//test/extensions/dynamic_modules:__pkg__",
+    "//test/extensions/dynamic_modules/http:__pkg__",
+])
 
 rust_shared_library(
     name = "no_op",

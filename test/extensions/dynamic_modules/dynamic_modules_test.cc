@@ -1,10 +1,6 @@
-#include <memory>
-
-#include "envoy/common/exception.h"
-
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
-#include "test/test_common/environment.h"
+#include "test/extensions/dynamic_modules/util.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -13,28 +9,11 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
-// This loads a shared object file from the test_data directory.
-std::string testSharedObjectPath(std::string name, std::string language) {
-  return TestEnvironment::substitute(
-             "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/") +
-         language + "/lib" + name + ".so";
-}
-
 TEST(DynamicModuleTestGeneral, InvalidPath) {
   absl::StatusOr<DynamicModuleSharedPtr> result = newDynamicModule("invalid_name", false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
 }
-
-/**
- * Class to test the identical behavior of the dynamic module in different languages.
- */
-class DynamicModuleTestLanguages : public ::testing::TestWithParam<std::string> {
-public:
-  static std::string languageParamToTestName(const ::testing::TestParamInfo<std::string>& info) {
-    return info.param;
-  };
-};
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),
                          DynamicModuleTestLanguages::languageParamToTestName);
