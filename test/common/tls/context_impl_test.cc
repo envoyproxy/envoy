@@ -1421,8 +1421,9 @@ TEST_F(ClientContextConfigImplTest, P384EcdsaCert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate that P384 ECDSA certs are loaded from `pkcs12`.
@@ -1450,8 +1451,9 @@ TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Multiple TLS certificates are not yet supported.

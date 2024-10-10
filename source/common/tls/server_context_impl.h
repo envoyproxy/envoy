@@ -12,6 +12,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
+#include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 #include "envoy/stats/scope.h"
@@ -26,7 +27,6 @@
 #include "source/common/tls/ocsp/ocsp.h"
 #include "source/common/tls/stats.h"
 
-#include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
@@ -39,8 +39,6 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
-using CurveNIDSupportedVector = absl::InlinedVector<int, 3>;
 
 class ServerContextImpl : public ContextImpl,
                           public Envoy::Ssl::ServerContext,
@@ -64,11 +62,10 @@ public:
   // Finds the best matching context. The returned context will have the same lifetime as
   // this ``ServerContextImpl``.
   std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-  findTlsContext(absl::string_view sni, const CurveNIDSupportedVector& client_ecdsa_capable,
+  findTlsContext(absl::string_view sni, const Ssl::CurveNIDVector& client_ecdsa_capable,
                  bool client_ocsp_capable, bool* cert_matched_sni);
 
-  CurveNIDSupportedVector
-  getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const;
+  Ssl::CurveNIDVector getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const;
   bool isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const;
 
 private:

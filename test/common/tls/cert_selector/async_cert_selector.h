@@ -30,7 +30,7 @@ public:
 
   // It's only for quic.
   std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-  findTlsContext(absl::string_view, const CurveNIDSupportedVector&, bool, bool*) override {
+  findTlsContext(absl::string_view, const Ssl::CurveNIDVector&, bool, bool*) override {
     PANIC("unreachable");
   };
 

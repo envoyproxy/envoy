@@ -108,7 +108,7 @@ public:
   };
 
   std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-  findTlsContext(absl::string_view, const absl::InlinedVector<int, 3>&, bool, bool*) override {
+  findTlsContext(absl::string_view, const Ssl::CurveNIDVector&, bool, bool*) override {
     PANIC("unreachable");
   };
 

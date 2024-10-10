@@ -42,13 +42,16 @@
 namespace Envoy {
 namespace {
 
-Ssl::CurveNIDSupportedVector getClientCurveNIDSupported(CBS& cbs) {
-  Ssl::CurveNIDSupportedVector cnsv{};
+Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs) {
+  Ssl::CurveNIDVector cnsv{};
   while (CBS_len(&cbs) > 0) {
     uint16_t v;
     if (!CBS_get_u16(&cbs, &v)) {
-      return cnsv;
+      break;
     }
+    // Check for values that refer to the `sigalgs` used in TLSv1.3 negotiation (left)
+    // or their equivalent curve expressed in TLSv1.2 `LSEXT_TYPE_supported_groups`
+    // present in ClientHello (right).
     if (v == SSL_SIGN_ECDSA_SECP256R1_SHA256 || v == SSL_CURVE_SECP256R1) {
       cnsv.push_back(NID_X9_62_prime256v1);
     }
@@ -382,10 +385,9 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
   }
 }
 
-// We want to return a list of client capabilities for ECDSA now that we support curves other
-// than P-256. An empty optional is used to represent a client that is unable to handle ECDSA
-// the vector inside that optional is a list of `ssl.h` constants representing ECDSA group NIDs.
-CurveNIDSupportedVector
+// Returns a list of client capabilities for ECDSA curves as NIDs. An empty vector indicates
+// a client that is unable to handle ECDSA.
+Ssl::CurveNIDVector
 ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client_hello) const {
   CBS client_hello;
   CBS_init(&client_hello, ssl_client_hello.client_hello, ssl_client_hello.client_hello_len);
@@ -409,14 +411,12 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
         CBS_init(&signature_algorithms_ext, signature_algorithms_data, signature_algorithms_len);
         if (!CBS_get_u16_length_prefixed(&signature_algorithms_ext, &signature_algorithms) ||
             CBS_len(&signature_algorithms_ext) != 0) {
-          return CurveNIDSupportedVector{};
+          return Ssl::CurveNIDVector{};
         }
-        CurveNIDSupportedVector client_capabilities =
-            getClientCurveNIDSupported(signature_algorithms);
-        return client_capabilities;
+        return getClientCurveNIDSupported(signature_algorithms);
       }
 
-      return CurveNIDSupportedVector{};
+      return Ssl::CurveNIDVector{};
     }
   }
 
@@ -426,16 +426,16 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
   size_t curvelist_len;
   if (!SSL_early_callback_ctx_extension_get(&ssl_client_hello, TLSEXT_TYPE_supported_groups,
                                             &curvelist_data, &curvelist_len)) {
-    return CurveNIDSupportedVector{};
+    return Ssl::CurveNIDVector{};
   }
 
   CBS curvelist;
   CBS_init(&curvelist, curvelist_data, curvelist_len);
 
-  CurveNIDSupportedVector client_capabilities = getClientCurveNIDSupported(curvelist);
-  // if we haven't got any curves in common with the client, return empty CurveNIDSupportedVector.
+  Ssl::CurveNIDVector client_capabilities = getClientCurveNIDSupported(curvelist);
+  // if we haven't got any curves in common with the client, return empty CurveNIDVector.
   if (client_capabilities.empty()) {
-    return CurveNIDSupportedVector{};
+    return Ssl::CurveNIDVector{};
   }
 
   // The client must have offered an ECDSA ciphersuite that we like.
@@ -445,7 +445,7 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
   while (CBS_len(&cipher_suites) > 0) {
     uint16_t cipher_id;
     if (!CBS_get_u16(&cipher_suites, &cipher_id)) {
-      return CurveNIDSupportedVector{};
+      return Ssl::CurveNIDVector{};
     }
     // All tls_context_ share the same set of enabled ciphers, so we can just look at the base
     // context.
@@ -454,7 +454,7 @@ ServerContextImpl::getClientEcdsaCapabilities(const SSL_CLIENT_HELLO& ssl_client
     }
   }
 
-  return CurveNIDSupportedVector{};
+  return Ssl::CurveNIDVector{};
 }
 
 bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_hello) const {
@@ -470,7 +470,7 @@ bool ServerContextImpl::isClientOcspCapable(const SSL_CLIENT_HELLO& ssl_client_h
 
 std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
 ServerContextImpl::findTlsContext(absl::string_view sni,
-                                  const CurveNIDSupportedVector& client_ecdsa_capabilities,
+                                  const Ssl::CurveNIDVector& client_ecdsa_capabilities,
                                   bool client_ocsp_capable, bool* cert_matched_sni) {
   return tls_certificate_selector_->findTlsContext(sni, client_ecdsa_capabilities,
                                                    client_ocsp_capable, cert_matched_sni);

@@ -2,8 +2,6 @@
 
 #include "source/common/tls/utility.h"
 
-#include "openssl/evp.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -91,7 +89,7 @@ DefaultTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_clie
                                                 Ssl::CertificateSelectionCallbackPtr) {
   absl::string_view sni =
       absl::NullSafeStringView(SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
-  const CurveNIDSupportedVector client_ecdsa_capabilities =
+  const Ssl::CurveNIDVector client_ecdsa_capabilities =
       server_ctx_.getClientEcdsaCapabilities(ssl_client_hello);
   const bool client_ocsp_capable = server_ctx_.isClientOcspCapable(ssl_client_hello);
 
@@ -165,9 +163,9 @@ Ssl::OcspStapleAction DefaultTlsCertificateSelector::ocspStapleAction(const Ssl:
 }
 
 std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-DefaultTlsCertificateSelector::findTlsContext(
-    absl::string_view sni, const CurveNIDSupportedVector& client_ecdsa_capabilities,
-    bool client_ocsp_capable, bool* cert_matched_sni) {
+DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni,
+                                              const Ssl::CurveNIDVector& client_ecdsa_capabilities,
+                                              bool client_ocsp_capable, bool* cert_matched_sni) {
   bool unused = false;
   if (cert_matched_sni == nullptr) {
     // Avoid need for nullptr checks when this is set.
@@ -181,7 +179,7 @@ DefaultTlsCertificateSelector::findTlsContext(
   Ssl::OcspStapleAction ocsp_staple_action;
 
   // If the capabilities list vector is not empty, then the client is ECDSA-capable.
-  bool client_ecdsa_capable = !client_ecdsa_capabilities.empty();
+  const bool client_ecdsa_capable = !client_ecdsa_capabilities.empty();
 
   auto selected = [&](const Ssl::TlsContext& ctx) -> bool {
     auto action = ocspStapleAction(ctx, client_ocsp_capable);

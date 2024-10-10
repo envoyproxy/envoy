@@ -31,8 +31,7 @@ public:
   // Finds the best matching context. The returned context will have the same lifetime as
   // ``ServerContextImpl``.
   std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-  findTlsContext(absl::string_view sni,
-                 const Ssl::CurveNIDSupportedVector& client_ecdsa_capabilities,
+  findTlsContext(absl::string_view sni, const Ssl::CurveNIDVector& client_ecdsa_capabilities,
                  bool client_ocsp_capable, bool* cert_matched_sni) override;
 
 private:
