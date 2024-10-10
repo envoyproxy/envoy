@@ -33,7 +33,7 @@ class UpstreamProxyProtocolSocket : public TransportSockets::PassthroughSocket,
 public:
   UpstreamProxyProtocolSocket(Network::TransportSocketPtr&& transport_socket,
                               Network::TransportSocketOptionsConstSharedPtr options,
-                              ProxyProtocolConfig config, Stats::Scope& scope);
+                              ProxyProtocolConfig config, UpstreamProxyProtocolStats& stats);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
