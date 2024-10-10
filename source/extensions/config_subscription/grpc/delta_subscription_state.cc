@@ -218,12 +218,14 @@ void DeltaSubscriptionState::handleGoodResponse(
     }
   }
 
-  watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
+  absl::Span<const envoy::service::discovery::v3::Resource* const> non_heartbeat_resources_span =
+      absl::MakeConstSpan(non_heartbeat_resources.data(), non_heartbeat_resources.size());
+  watch_map_.onConfigUpdate(non_heartbeat_resources_span, message.removed_resources(),
                             message.system_version_info());
 
   // Processing point when resources are successfully ingested.
   if (xds_config_tracker_.has_value()) {
-    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources,
+    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources_span,
                                           message.removed_resources());
   }
 
