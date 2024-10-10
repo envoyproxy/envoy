@@ -1006,6 +1006,16 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       // Assert twice to ensure a cached value is returned and still valid.
       EXPECT_EQ(options.expectedClientCertIpSans(),
                 server_connection->ssl()->ipSansPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertEmailSans(),
+                server_connection->ssl()->emailSansPeerCertificate());
+      // Assert twice to ensure a cached value is returned and still valid.
+      EXPECT_EQ(options.expectedClientCertEmailSans(),
+                server_connection->ssl()->emailSansPeerCertificate());
+      EXPECT_EQ(options.expectedClientCertOthernameSans(),
+                server_connection->ssl()->othernameSansPeerCertificate());
+      // Assert twice to ensure a cached value is returned and still valid.
+      EXPECT_EQ(options.expectedClientCertOthernameSans(),
+                server_connection->ssl()->othernameSansPeerCertificate());
       const SslHandshakerImpl* ssl_socket =
           dynamic_cast<const SslHandshakerImpl*>(client_connection->ssl().get());
       SSL* client_ssl_socket = ssl_socket->ssl();
