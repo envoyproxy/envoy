@@ -451,12 +451,11 @@ TEST_F(TcpProxyTest, OutlierDetection) {
   raiseEventUpstreamConnected(2);
 }
 
-TEST_P(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
+TEST_F(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
   setup(1);
 
   raiseEventUpstreamConnected(0);
 
-  // Any further communications between client and server can resume normally.
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
   filter_->onData(buffer, false);
@@ -464,10 +463,18 @@ TEST_P(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
+
+  EXPECT_CALL(*upstream_connections_.at(0), readDisable(true));
+  filter_callbacks_.connection_.runHighWatermarkCallbacks();
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  filter_callbacks_.connection_.runLowWatermarkCallbacks();
 }
 
-TEST_P(TcpProxyTest, ReceiveBeforeConnectNoEarlyData) {
-  setup(1, false, true);
+TEST_F(TcpProxyTest, ReceiveBeforeConnectNoEarlyData) {
+  setup(1, /*set_redirect_records*/ false, /*receive_before_connect*/ true);
   raiseEventUpstreamConnected(0, false);
 
   // Any data sent after upstream connection is established is flushed directly to upstream,
@@ -1240,8 +1247,8 @@ TEST_F(TcpProxyTest, UpstreamSocketOptionsReturnedEmpty) {
   EXPECT_EQ(options, nullptr);
 }
 
-TEST_P(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {
-  setup(1, true);
+TEST_F(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {
+  setup(1, /*set_redirect_records*/ true, /*receive_before_connect*/ false);
   EXPECT_TRUE(filter_->upstreamSocketOptions());
   auto iterator = std::find_if(
       filter_->upstreamSocketOptions()->begin(), filter_->upstreamSocketOptions()->end(),
