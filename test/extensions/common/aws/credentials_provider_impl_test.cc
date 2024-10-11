@@ -1956,9 +1956,9 @@ public:
                          MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    std::string toke_file_path;
+    std::string token_file_path;
     if (token_.empty()) {
-      toke_file_path = TestEnvironment::writeStringToFileForTest("web_token_file", "web_token");
+      token_file_path = TestEnvironment::writeStringToFileForTest("web_token_file", "web_token");
     }
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
         *api_, context_,
@@ -1969,7 +1969,7 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        toke_file_path, token_, "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn",
+        token_file_path, token_, "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn",
         "role-session-name", refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 
@@ -1989,9 +1989,9 @@ public:
   setupProviderWithLibcurl(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
                                MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                            std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
-    std::string toke_file_path;
+    std::string token_file_path;
     if (token_.empty()) {
-      toke_file_path = TestEnvironment::writeStringToFileForTest("web_token_file", "web_token");
+      token_file_path = TestEnvironment::writeStringToFileForTest("web_token_file", "web_token");
     }
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
@@ -2003,7 +2003,7 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        toke_file_path, token_, "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn",
+        token_file_path, token_, "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn",
         "role-session-name", refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 

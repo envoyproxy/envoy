@@ -321,6 +321,8 @@ private:
 class WebIdentityCredentialsProvider : public MetadataCredentialsProviderBase,
                                        public MetadataFetcher::MetadataReceiver {
 public:
+  // token and token_file_path are mutually exclusive. If token is not empty, token_file_path is
+  // not used, and vice versa.
   WebIdentityCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
                                  const CurlMetadataFetcher& fetch_metadata_using_curl,
                                  CreateMetadataFetcherCb create_metadata_fetcher_cb,
