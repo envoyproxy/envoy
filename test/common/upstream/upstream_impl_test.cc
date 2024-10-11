@@ -25,6 +25,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/extensions/clusters/common/backcompat_dns.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
@@ -97,16 +98,22 @@ absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
 makeStrictDnsClusterFromDnsResolver(const envoy::config::cluster::v3::Cluster& cluster_config,
                                     ClusterFactoryContext& factory_context,
                                     std::shared_ptr<Network::DnsResolver> dns_resolver) {
-  ProtobufTypes::MessagePtr dns_cluster =
-      std::make_unique<envoy::extensions::clusters::dns::v3::DnsCluster>();
-  Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                         factory_context.messageValidationVisitor(), *dns_cluster);
-  cluster_config.cluster_type().typed_config(), factory_context.messageValidationVisitor();
-  return StrictDnsClusterImpl::create(
-      cluster_config,
-      MessageUtil::downcastAndValidate<const envoy::extensions::clusters::dns::v3::DnsCluster&>(
-          *dns_cluster, factory_context.messageValidationVisitor()),
-      factory_context, dns_resolver);
+  envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
+
+  if (cluster_config.has_cluster_type()) {
+    ProtobufTypes::MessagePtr dns_cluster_msg =
+        std::make_unique<envoy::extensions::clusters::dns::v3::DnsCluster>();
+    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
+                                           factory_context.messageValidationVisitor(),
+                                           *dns_cluster_msg);
+    dns_cluster =
+        MessageUtil::downcastAndValidate<const envoy::extensions::clusters::dns::v3::DnsCluster&>(
+            *dns_cluster_msg, factory_context.messageValidationVisitor());
+
+  } else {
+    createDnsClusterFromLegacyFields(cluster_config, dns_cluster);
+  }
+  return StrictDnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver);
 }
 
 std::list<std::string> hostListToAddresses(const HostVector& hosts) {
@@ -1241,7 +1248,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
               cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
-TEST_P(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
+TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   ResolverData resolver3(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver1(*dns_resolver_, server_context_.dispatcher_);

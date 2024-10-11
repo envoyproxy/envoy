@@ -6,27 +6,33 @@
 namespace Envoy {
 namespace Upstream {
 
-void mergeClusterAndProtoConfig(
+void createDnsClusterFromLegacyFields(
     const envoy::config::cluster::v3::Cluster& cluster,
-    envoy::extensions::clusters::dns::v3::DnsCluster& new_proto_config) {
+    envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster) {
 
-  if (cluster.has_dns_refresh_rate() && !new_proto_config.has_dns_refresh_rate()) {
-    new_proto_config.mutable_dns_refresh_rate()->CopyFrom(cluster.dns_refresh_rate());
+  // We have to add all these guards because otherwise dns_cluster.mutable_FIELD will initialize the
+  // field and dns_cluster.has_FIELD will return true
+  if (cluster.has_dns_refresh_rate()) {
+    dns_cluster.mutable_dns_refresh_rate()->CopyFrom(cluster.dns_refresh_rate());
   }
 
-  if (cluster.has_dns_failure_refresh_rate() && !new_proto_config.has_dns_failure_refresh_rate()) {
-    auto* new_refresh_rate = new_proto_config.mutable_dns_failure_refresh_rate();
+  // FIXME: tests this
+  if (cluster.has_dns_failure_refresh_rate()) {
+    auto* new_refresh_rate = dns_cluster.mutable_dns_failure_refresh_rate();
     const auto& old_refresh_rate = cluster.dns_failure_refresh_rate();
-    new_refresh_rate->mutable_max_interval()->CopyFrom(old_refresh_rate.max_interval());
-    new_refresh_rate->mutable_base_interval()->CopyFrom(old_refresh_rate.base_interval());
+
+    if (old_refresh_rate.has_max_interval()) {
+      new_refresh_rate->mutable_max_interval()->CopyFrom(old_refresh_rate.max_interval());
+    }
+    if (old_refresh_rate.has_base_interval()) {
+      new_refresh_rate->mutable_base_interval()->CopyFrom(old_refresh_rate.base_interval());
+    }
   }
 
-  if (!new_proto_config.has_respect_dns_ttl()) {
-    new_proto_config.mutable_respect_dns_ttl()->set_value(cluster.respect_dns_ttl());
-  }
+  dns_cluster.set_respect_dns_ttl(cluster.respect_dns_ttl());
 
-  if (cluster.has_dns_jitter() && !new_proto_config.has_dns_jitter()) {
-    new_proto_config.mutable_dns_jitter()->CopyFrom(cluster.dns_jitter());
+  if (cluster.has_dns_jitter()) {
+    dns_cluster.mutable_dns_jitter()->CopyFrom(cluster.dns_jitter());
   }
 }
 

@@ -6,8 +6,9 @@
 namespace Envoy {
 namespace Upstream {
 
-void mergeClusterAndProtoConfig(const envoy::config::cluster::v3::Cluster& cluster,
-                                envoy::extensions::clusters::dns::v3::DnsCluster& new_proto_config);
+void createDnsClusterFromLegacyFields(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    envoy::extensions::clusters::dns::v3::DnsCluster& new_proto_config);
 
 }
 } // namespace Envoy
