@@ -127,6 +127,28 @@ credential_provider:
   cb(filter_callbacks);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_invalid) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+credential_provider: {}
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  EXPECT_TRUE(proto_config.has_credential_provider());
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  // The config is invalid because the credential provider is empty.
+  absl::StatusOr<Http::FilterFactoryCb> cb =
+      factory.createFilterFactoryFromProto(proto_config, "", context);
+  EXPECT_FALSE(cb.ok());
+  EXPECT_EQ(cb.status().code(), absl::StatusCode::kInvalidArgument);
+}
+
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigExplicitSigningAlgorithm) {
   const std::string yaml = R"EOF(
 service_name: s3
