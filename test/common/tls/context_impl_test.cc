@@ -1460,7 +1460,7 @@ TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
   auto cleanup = cleanUpHelper(*context_or);
 }
 
-// Validate that a Brainpool key will cause an error.
+// Validate that a P-224 key will cause an error.
 TEST_F(ClientContextConfigImplTest, BrainpoolCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(

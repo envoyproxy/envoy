@@ -4,7 +4,7 @@
 
 namespace Envoy {
 TEST(ServerContextImplTest, OneByteCBSParameterReturnsEmptyCurveNIDVector) {
-  // A one-byte CBS will result in `CBS_get_u16(&cbs, &v)` returning false
+  // A one-byte CBS will result in `CBS_get_u16` returning false
   // giving us coverage for the break in `getClientCurveNIDSupported`.
   const uint8_t* data = reinterpret_cast<const uint8_t*>("a");
   CBS cbs;
