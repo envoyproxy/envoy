@@ -362,27 +362,34 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
-// [#not-implemented-hide:]
+// The body response message corresponding to MXN body mode.
 message MxnBodyResponse {
-  // Envoy sends the body out as it is.
+  // Envoy sends this body mutation out as it is.
   bytes body = 1;
 
-  // Set ``end_of_stream`` to true of this is the last chunk of body.
-  // Envoy will continue filter chain operation if this flag is enabled.
+  // Set this flag to true for the last body response if a ``ProcessingRequest`` is received with
+  // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.HttpBody.end_of_stream>` is true.
   bool end_of_stream = 2;
 
   // The ext_proc server sends this number to notify Envoy how many body chunks are received.
-  // After receives this, Envoy will clear those chunks in it's queue. So more date chunks can come into Envoy.
-  // The ext_proc server may send a ``confirmed_chunks_count``  message with or without the ``body``.
-  // In the situation the ext_proc server needs to buffer large amount of data before sending back body response,
-  // it can send standalone ``confirmed_chunks_count``  message as confirmation .
+  // The server may wait for receiving multiple chunks before sening an aggregated number, like 20, back to Envoy.
+  //
+  // After receives this, Envoy will
+  // * Stop the waiting timer in its state machine to avoid timeout events.
+  // * Consume that amount of chunks in it's queue to avoid flow control being triggered.
+  //   This also enables more data chunks be able to get into Envoy.
+  //
+  // The server may also send a MxnBodyResponse message with both ``body`` and ``confirmed_chunks_count`` field set.
+  // This is a more efficient thus recommended way for sending confirmation.
+  //
+  // In the situation when the ext_proc server needs to buffer large amount of data before sending back body response,
+  // it may choose to send standalone ``confirmed_chunks_count``  message back to Envoy for the reasons listed above.
   uint32 confirmed_chunks_count = 3;
 }
 
 // Body mutation
 message BodyMutation {
-  // Sending this response for none MXN body mode, i.e, STREAMED, BUFFERED
-  // or BUFFERED_PARTIAL body mode.
+  // Sending this response for any body mode except MXN.
   oneof mutation {
     // The entire body to replace
     bytes body = 1;
@@ -392,7 +399,7 @@ message BodyMutation {
   }
 
   // [#not-implemented-hide:]
-  // Sending this body mutation for the MXN body mode.
+  // Sending this response for MXN body mode.
   // Only one of ``mxn_resp`` or above ``mutation`` can be set.
   MxnBodyResponse mxn_resp = 3;
 }

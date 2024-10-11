@@ -41,6 +41,7 @@ message ProcessingMode {
   // 1) STREAMED BodySendMode: header processing completes before body mutation comes back.
   // 2) BUFFERED_PARTIAL BodySendMode: body is buffered and could be injected in different phases.
   // 3) BUFFERED BodySendMode + SKIP HeaderSendMode: header processing (e.g., update content-length) is skipped.
+  // 4) MXN BodySendMode: header processing completes before body mutation comes back.
   //
   // In Envoy's http1 codec implementation, removing content length will enable chunked transfer
   // encoding whenever feasible. The recipient (either client or server) must be able
@@ -70,14 +71,28 @@ message ProcessingMode {
     BUFFERED_PARTIAL = 3;
 
     // [#not-implemented-hide:]
-    // Envoy streams the body to the server in pieces as they arrive. The data is not
-    // stored in the internal queue. Only bytes tracking is stored there.
-    // Server may buffer the M chunks of data, processing them then split the processed
-    // data into N chunks, and stream them back.
-    // During server buffering stage, it must send ``confirmed_chunks_count`` to Envoy as indication how many chunks
-    // it has received.
+    // Envoy streams the body to the server in pieces as they arrive. The data is not stored in
+    // the internal queue. Only data size is stored there for tracking and flow control purpose.
     //
-    // When bodying mode is set to ``MXN``, the corresponding trailer mode has to be set to ``SEND``.
+    // Server may choose to buffer any number, i.e M, chunks of data before processing them.
+    // After finish buffereing, server processes the buffered data. Then it splits the processed
+    // data into any number, i.e N, chunks, and stream them back to Envoy one by one.
+    // The server may continuously do above until the complete body is processed.
+    //
+    // Server may also choose to buffer the entire message, including the headers(if header mode is
+    // ``SEND``), the entire body, and the trailers(if present), before sending back any response.
+    // The server response has to maintain the headers-body-trailers ordering.
+    //
+    // In this body mode:
+    // * The corresponding trailer mode has to be set to ``SEND``.
+    // * Envoy will send body and trailers(if present) as they arrive.
+    //   Sending the trailers(if present) is to inform the server complete body arrives.
+    //   In case of no trailers, then
+    //   :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.HttpBody.end_of_stream>`
+    //   serves for that purpose.
+    // * Server needs to send
+    //   :ref:`MxnBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.MxnBodyResponse>`
+    //   to Envoy in the body response.
     MXN = 4;
   }
 
