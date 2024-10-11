@@ -127,6 +127,8 @@ envoy_cc_library(
     deps = [
         ":pure_lib",
         ":scope_tracker_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/common:macros",
     ],
 )
 

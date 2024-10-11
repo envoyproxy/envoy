@@ -2,10 +2,13 @@
 
 #include <memory>
 
+#include "envoy/common/backoff_strategy.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/custom_config_validators.h"
 #include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/subscription.h"
+#include "envoy/grpc/async_client.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/cleanup.h"
@@ -112,6 +115,16 @@ public:
    * @return EdsResourcesCacheOptRef optional eds resources cache for the gRPC-mux.
    */
   virtual EdsResourcesCacheOptRef edsResourcesCache() PURE;
+
+  /**
+   * Updates the current gRPC-Mux object to use a new gRPC client, and config.
+   */
+  virtual absl::Status
+  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                  Grpc::RawAsyncClientPtr&& failover_async_client,
+                  CustomConfigValidatorsPtr&& custom_config_validators, Stats::Scope& scope,
+                  BackOffStrategyPtr&& backoff_strategy,
+                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

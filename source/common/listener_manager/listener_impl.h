@@ -63,14 +63,12 @@ class ListenerManagerImpl;
 class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
                                 protected Logger::Loggable<Logger::Id::config> {
 public:
-  ListenSocketFactoryImpl(ListenerComponentFactory& factory,
-                          Network::Address::InstanceConstSharedPtr address,
-                          Network::Socket::Type socket_type,
-                          const Network::Socket::OptionsSharedPtr& options,
-                          const std::string& listener_name, uint32_t tcp_backlog_size,
-                          ListenerComponentFactory::BindType bind_type,
-                          const Network::SocketCreationOptions& creation_options,
-                          uint32_t num_sockets);
+  static absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>>
+  create(ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr address,
+         Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+         const std::string& listener_name, uint32_t tcp_backlog_size,
+         ListenerComponentFactory::BindType bind_type,
+         const Network::SocketCreationOptions& creation_options, uint32_t num_sockets);
 
   // Network::ListenSocketFactory
   Network::Socket::Type socketType() const override { return socket_type_; }
@@ -89,6 +87,15 @@ public:
   absl::Status doFinalPreWorkerInit() override;
 
 private:
+  ListenSocketFactoryImpl(ListenerComponentFactory& factory,
+                          Network::Address::InstanceConstSharedPtr address,
+                          Network::Socket::Type socket_type,
+                          const Network::Socket::OptionsSharedPtr& options,
+                          const std::string& listener_name, uint32_t tcp_backlog_size,
+                          ListenerComponentFactory::BindType bind_type,
+                          const Network::SocketCreationOptions& creation_options,
+                          uint32_t num_sockets, absl::Status& creation_status);
+
   ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone);
 
   absl::StatusOr<Network::SocketSharedPtr>
@@ -205,9 +212,10 @@ public:
    * @param hash supplies the hash to use for duplicate checking.
    * @param concurrency is the number of listeners instances to be created.
    */
-  ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
-               ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash);
+  static absl::StatusOr<std::unique_ptr<ListenerImpl>>
+  create(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
+         ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
+         bool workers_started, uint64_t hash);
   ~ListenerImpl() override;
 
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
@@ -216,7 +224,7 @@ public:
    * Execute in place filter chain update. The filter chain update is less expensive than full
    * listener update because connections may not need to be drained.
    */
-  std::unique_ptr<ListenerImpl>
+  absl::StatusOr<std::unique_ptr<ListenerImpl>>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                              bool workers_started, uint64_t hash);
   /**
@@ -344,6 +352,9 @@ public:
   SystemTime last_updated_;
 
 private:
+  ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
+               ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
+               bool workers_started, uint64_t hash, absl::Status& creation_status);
   struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
     UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
         : config_(config) {}
@@ -384,7 +395,8 @@ private:
    */
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
-               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               absl::Status& creation_status);
   // Helpers for constructor.
   void buildAccessLog(const envoy::config::listener::v3::Listener& config);
   absl::Status buildInternalListener(const envoy::config::listener::v3::Listener& config);

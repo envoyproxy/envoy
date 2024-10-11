@@ -603,6 +603,8 @@ envoy_cc_test(
     deps = [
         "//envoy/common:execution_context",
         "//source/common/api:api_lib",
+        "//source/common/http:conn_manager_lib",
+        "//source/common/http:filter_manager_lib",
         "//test/mocks:common_lib",
         "//test/mocks/stream_info:stream_info_mocks",
     ],
