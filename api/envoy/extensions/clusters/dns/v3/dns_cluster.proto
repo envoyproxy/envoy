@@ -17,14 +17,15 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: DNS cluster configuration]
 
 // Configuration for strict and logical DNS clusters.
-// FIXME [#extension: envoy.clusters.dns]
+// [#extension: envoy.clusters.strict_dns]
+// [#extension: envoy.clusters.dns]
 
 // [#next-free-field: 7]
 message DnsCluster {
   message RefreshRate {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
-    // :ref:`max_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsConfig.RefreshRate.max_interval>`.
+    // :ref:`max_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.RefreshRate.max_interval>`.
     google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
       required: true
       gt {nanos: 1000000}
@@ -32,8 +33,8 @@ message DnsCluster {
 
     // Specifies the maximum interval between refreshes. This parameter is optional, but must be
     // greater than or equal to the
-    // :ref:`base_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsConfig.RefreshRate.max_interval>`  if set. The default
-    // is 10 times the :ref:`base_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsConfig.RefreshRate.max_interval>`.
+    // :ref:`base_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.RefreshRate.base_interval>`  if set. The default
+    // is 10 times the :ref:`base_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.RefreshRate.base_interval>`.
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
@@ -42,7 +43,7 @@ message DnsCluster {
   // value defaults to 5000ms.
   google.protobuf.Duration dns_refresh_rate = 3 [(validate.rules).duration = {gt {nanos: 1000000}}];
 
-  // this is the cluster’s DNS refresh rate when requests are failing. If this setting is
+  // This is the cluster’s DNS refresh rate when requests are failing. If this setting is
   // not specified, the failure refresh rate defaults to the DNS refresh rate.
   RefreshRate dns_failure_refresh_rate = 4;
 
@@ -50,11 +51,6 @@ message DnsCluster {
   // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
   // resolution.
   bool respect_dns_ttl = 5;
-
-  // The DNS IP address resolution policy. If this setting is not specified, the
-  // value defaults to
-  // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.dns.v3.DnsConfig.DnsLookupFamily.AUTO>`.
-  // DnsLookupFamily dns_lookup_family = 4 [(validate.rules).enum = {defined_only: true}];
 
   // DNS jitter causes the cluster to refresh DNS entries later by a random amount of time to avoid a
   // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount.
