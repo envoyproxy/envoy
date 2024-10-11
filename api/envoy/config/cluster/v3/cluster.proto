@@ -1015,6 +1015,8 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
+  // This field is deprecated in favor of ``dns_resolution_config``
+  // which aggregates all of the DNS resolver configuration in a single message.
   repeated core.v3.Address dns_resolvers = 18
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -1041,7 +1043,6 @@ message Cluster {
   // when ``typed_dns_resolver_config`` is in place, Envoy will use it and ignore ``dns_resolution_config``.
   // When ``typed_dns_resolver_config`` is missing, the default behavior is in place.
   // [#extension-category: envoy.network.dns_resolver]
-  // FIXME do we also want to move this one?
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
 
   // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
