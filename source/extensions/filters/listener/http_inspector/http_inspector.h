@@ -122,7 +122,7 @@ private:
   absl::string_view protocol_;
 
   std::unique_ptr<Http::Http1::Parser> parser_;
-  std::unique_ptr<NoOpParserCallbacks> no_op_callbacks_;
+  NoOpParserCallbacks no_op_callbacks_;
   ssize_t nread_ = 0;
 };
 
