@@ -1043,7 +1043,7 @@ Return the subject field of the peer certificate in RFC 2253 format. Returns ``"
 peer certificate, or no subject.
 
 parsedSubjectPeerCertificate()
-^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
@@ -1205,7 +1205,7 @@ Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS con
 .. _config_http_filters_lua_parsed_name:
 
 Parsed name object API
----------------------
+----------------------
 
 commonName()
 ^^^^^^^^^^^^
