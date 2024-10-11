@@ -40,7 +40,6 @@
 #include "openssl/rand.h"
 
 namespace Envoy {
-namespace {
 
 Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs) {
   Ssl::CurveNIDVector cnsv{};
@@ -64,8 +63,6 @@ Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs) {
   }
   return cnsv;
 }
-
-} // namespace
 
 namespace Extensions {
 namespace TransportSockets {

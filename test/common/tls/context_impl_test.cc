@@ -1460,6 +1460,27 @@ TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
   auto cleanup = cleanUpHelper(*context_or);
 }
 
+// Validate that a Brainpool key will cause an error.
+TEST_F(ClientContextConfigImplTest, BrainpoolCert) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_secp224r1_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_secp224r1_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+                  .status()
+                  .message(),
+              testing::ContainsRegex(
+                  "Failed to load certificate chain from .*selfsigned_secp224r1_cert.pem, "
+                  "only P-256, P-384 or P-521 ECDSA certificates are supported"));
+}
+
 // Multiple TLS certificates are not yet supported.
 // TODO(PiotrSikora): Support multiple TLS certificates.
 TEST_F(ClientContextConfigImplTest, MultipleTlsCertificates) {

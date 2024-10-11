@@ -36,6 +36,9 @@
 #endif
 
 namespace Envoy {
+
+Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs);
+
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
