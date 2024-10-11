@@ -112,9 +112,8 @@ ProcessorState::CallbackState
 ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_response) const {
   if (((bodyMode() == ProcessingMode::STREAMED &&
         filter_.config().sendBodyWithoutWaitingForHeaderResponse()) ||
-       bodyMode() == ProcessingMode::MXN)
-       && !chunk_queue_.empty() &&
-      (common_response.status() != CommonResponse::CONTINUE_AND_REPLACE)) {
+       bodyMode() == ProcessingMode::MXN) &&
+      !chunk_queue_.empty() && (common_response.status() != CommonResponse::CONTINUE_AND_REPLACE)) {
     return ProcessorState::CallbackState::StreamedBodyCallback;
   }
   return ProcessorState::CallbackState::Idle;

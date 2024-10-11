@@ -838,7 +838,9 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 
   if (state.callbackState() != ProcessorState::CallbackState::Idle) {
     if (state.bodyMode() == ProcessingMode::MXN) {
-      ENVOY_LOG(trace, "Body mode is MXN, sending trailers even Envoy is waiting for header or body response");
+      ENVOY_LOG(
+          trace,
+          "Body mode is MXN, sending trailers even Envoy is waiting for header or body response");
     } else {
       ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
       state.setPaused(true);
@@ -986,11 +988,12 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
     ENVOY_LOG(debug, "Sending trailers message in observability mode");
   } else {
     if (state.callbackState() == ProcessorState::CallbackState::Idle) {
-      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
+      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
+                                 config_->messageTimeout(),
                                  ProcessorState::CallbackState::TrailersCallback);
     } else {
-      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                                 state.callbackState());
+      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
+                                 config_->messageTimeout(), state.callbackState());
     }
     ENVOY_LOG(debug, "Sending trailers message");
   }

@@ -75,7 +75,7 @@ message ProcessingMode {
     // the internal queue. Only data size is stored there for tracking and flow control purpose.
     //
     // Server may choose to buffer any number, i.e M, chunks of data before processing them.
-    // After finish buffereing, server processes the buffered data. Then it splits the processed
+    // After finish buffering, server processes the buffered data. Then it splits the processed
     // data into any number, i.e N, chunks, and stream them back to Envoy one by one.
     // The server may continuously do above until the complete body is processed.
     //
