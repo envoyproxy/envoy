@@ -473,6 +473,31 @@ TEST_F(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
   filter_callbacks_.connection_.runLowWatermarkCallbacks();
 }
 
+TEST_F(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
+  setup(1, false, true);
+  std::string early_data("early data");
+  Buffer::OwnedImpl early_data_buffer(early_data);
+
+  // Check that the early data is buffered and flushed to upstream when connection is established.
+  // Also check that downstream connection is read disabled.
+  EXPECT_CALL(*upstream_connections_.at(0), write(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true)).Times(1);
+  filter_->onData(early_data_buffer, false);
+
+  // Now when upstream connection is established, early buffer will be sent.
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(early_data), false)).Times(1);
+  raiseEventUpstreamConnected(0);
+
+  // Any further communications between client and server can resume normally.
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_callbacks_->onUpstreamData(response, false);
+}
+
 TEST_F(TcpProxyTest, ReceiveBeforeConnectNoEarlyData) {
   setup(1, /*set_redirect_records*/ false, /*receive_before_connect*/ true);
   raiseEventUpstreamConnected(0, false);

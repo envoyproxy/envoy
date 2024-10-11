@@ -555,6 +555,9 @@ protected:
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
+  bool receive_before_connect_{false};
+  bool early_data_end_stream_{false};
+  Buffer::OwnedImpl early_data_buffer_{};
 };
 
 // This class deals with an upstream connection that needs to finish flushing, when the downstream

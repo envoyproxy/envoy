@@ -1750,7 +1750,7 @@ public:
 
 class PauseIterationFilterFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
-  absl::StatusOr<Network::FilterFactoryCb>
+  Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
