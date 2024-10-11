@@ -2659,10 +2659,11 @@ TEST(CreateCredentialsProviderFromConfig, InlineCredential) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider base;
   base.mutable_inline_credential()->CopyFrom(inline_credential);
 
-  CredentialsProviderSharedPtr provider =
+  absl::StatusOr<CredentialsProviderSharedPtr> provider =
       createCredentialsProviderFromConfig(context, "test-region", base);
-  EXPECT_NE(nullptr, provider);
-  const Credentials creds = provider->getCredentials();
+  EXPECT_TRUE(provider.ok());
+  EXPECT_NE(nullptr, provider.value());
+  const Credentials creds = provider.value()->getCredentials();
   EXPECT_EQ("TestAccessKey", creds.accessKeyId().value());
   EXPECT_EQ("TestSecret", creds.secretAccessKey().value());
   EXPECT_EQ("TestSessionToken", creds.sessionToken().value());
@@ -2678,11 +2679,13 @@ TEST(CreateCredentialsProviderFromConfig, AssumeRoleWithWebIdentity) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider base;
   base.mutable_assume_role_with_web_identity()->CopyFrom(assume_role_provider);
 
-  CredentialsProviderSharedPtr provider =
+  absl::StatusOr<CredentialsProviderSharedPtr> provider =
       createCredentialsProviderFromConfig(context, "test-region", base);
-  EXPECT_NE(nullptr, provider);
+  EXPECT_TRUE(provider.ok());
+  EXPECT_NE(nullptr, provider.value());
 
-  const auto* web_identity_provider = dynamic_cast<WebIdentityCredentialsProvider*>(provider.get());
+  const auto* web_identity_provider =
+      dynamic_cast<WebIdentityCredentialsProvider*>(provider.value().get());
   EXPECT_NE(nullptr, web_identity_provider);
 
   const std::string& token = web_identity_provider->tokenForTesting();
@@ -2694,7 +2697,9 @@ TEST(CreateCredentialsProviderFromConfig, AssumeRoleWithWebIdentity) {
 TEST(CreateCredentialsProviderFromConfig, InvalidEnum) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::extensions::common::aws::v3::AwsCredentialProvider base;
-  EXPECT_DEATH(createCredentialsProviderFromConfig(context, "foo", base), ".*panic: unset oneof.*");
+  absl::StatusOr<CredentialsProviderSharedPtr> result =
+      createCredentialsProviderFromConfig(context, "foo", base);
+  EXPECT_FALSE(result.ok());
 }
 
 } // namespace Aws

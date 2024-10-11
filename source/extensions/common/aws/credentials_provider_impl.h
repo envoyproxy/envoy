@@ -495,7 +495,7 @@ private:
  * Create an AWS credentials provider from the proto configuration instead of using the default
  * credentials provider chain.
  */
-CredentialsProviderSharedPtr createCredentialsProviderFromConfig(
+absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& config);
 

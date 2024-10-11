@@ -1015,7 +1015,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
   }
 }
 
-CredentialsProviderSharedPtr createCredentialsProviderFromConfig(
+absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& config) {
 
@@ -1046,7 +1046,7 @@ CredentialsProviderSharedPtr createCredentialsProviderFromConfig(
     break;
   }
   case envoy::extensions::common::aws::v3::AwsCredentialProvider::ProviderCase::PROVIDER_NOT_SET:
-    PANIC_DUE_TO_PROTO_UNSET;
+    return absl::InvalidArgumentError("No AWS credential provider specified");
   }
   return provider;
 }
