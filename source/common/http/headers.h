@@ -150,6 +150,9 @@ public:
   const LowerCaseString ContentType{"content-type"};
   const LowerCaseString Cookie{"cookie"};
   const LowerCaseString Date{"date"};
+  // This is different from `early-data` which is sent on the wire. This custom header
+  // is designed be force requests to allow early data in Envoy.
+  const LowerCaseString EnvoyAllowEarlyData{absl::StrCat(prefix(), "-allow-early-data")};
   const LowerCaseString EnvoyAttemptCount{absl::StrCat(prefix(), "-attempt-count")};
   const LowerCaseString EnvoyCluster{absl::StrCat(prefix(), "-cluster")};
   const LowerCaseString EnvoyDegraded{absl::StrCat(prefix(), "-degraded")};

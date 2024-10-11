@@ -602,6 +602,7 @@ void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, boo
     // https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on
     headers->addCopy(Headers::get().EnvoyRetryOn,
                      Headers::get().EnvoyRetryOnValues.Http3PostConnectFailure);
+    headers->addCopy(Headers::get.EnvoyAllowEarlyData, "true")
   }
   ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
             *headers);
