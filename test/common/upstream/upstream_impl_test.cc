@@ -25,7 +25,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/extensions/clusters/common/backcompat_dns.h"
+#include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"

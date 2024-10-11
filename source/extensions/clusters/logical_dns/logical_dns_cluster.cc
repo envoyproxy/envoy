@@ -20,7 +20,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/clusters/common/backcompat_dns.h"
+#include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 
 namespace Envoy {
 namespace Upstream {

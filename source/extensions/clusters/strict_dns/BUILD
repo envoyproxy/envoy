@@ -17,7 +17,7 @@ envoy_cc_extension(
     deps = [
         "//source/common/upstream:cluster_factory_includes",
         "//source/common/upstream:upstream_includes",
-        "//source/extensions/clusters/common:backcompat_dns_lib",
+        "//source/extensions/clusters/common:dns_cluster_backcompat_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dns/v3:pkg_cc_proto",

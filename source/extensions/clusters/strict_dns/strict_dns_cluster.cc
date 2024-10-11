@@ -8,7 +8,7 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
 
-#include "source/extensions/clusters/common/backcompat_dns.h"
+#include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 
 namespace Envoy {
 namespace Upstream {

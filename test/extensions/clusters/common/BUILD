@@ -9,6 +9,18 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
+    name = "dns_cluster_backcompat_test",
+    srcs = ["dns_cluster_backcompat_test.cc"],
+    rbe_pool = "2core",
+    deps = [
+        "//source/extensions/clusters/common:dns_cluster_backcompat_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/dns/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "logical_host_test",
     srcs = ["logical_host_test.cc"],
     rbe_pool = "2core",

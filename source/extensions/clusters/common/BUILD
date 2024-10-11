@@ -20,9 +20,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "backcompat_dns_lib",
-    srcs = ["backcompat_dns.cc"],
-    hdrs = ["backcompat_dns.h"],
+    name = "dns_cluster_backcompat_lib",
+    srcs = ["dns_cluster_backcompat.cc"],
+    hdrs = ["dns_cluster_backcompat.h"],
     deps = [
         "//source/common/upstream:cluster_factory_includes",
         "//source/common/upstream:upstream_includes",

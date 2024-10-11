@@ -12,7 +12,7 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/extensions/clusters/common/backcompat_dns.h"
+#include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -399,6 +399,51 @@ TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
   type: LOGICAL_DNS
   dns_refresh_rate: 4s
   respect_dns_ttl: true
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                     address: foo.bar.com
+                     port_value: 443
+  )EOF";
+
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV3Yaml(yaml);
+
+  // TTL is recorded when the DNS response is successful and not empty
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(5000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(5)));
+
+  // If the response is successful but empty, the cluster uses the cluster configured refresh rate.
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
+
+  // On failure, the cluster uses the cluster configured refresh rate.
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "",
+                TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
+}
+
+TEST_F(LogicalDnsParamTest, UseNewConfig) {
+  const std::string yaml = R"EOF(
+  name: name
+  cluster_type:
+    name: envoy.cluster.logical_dns
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      respect_dns_ttl: true
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
