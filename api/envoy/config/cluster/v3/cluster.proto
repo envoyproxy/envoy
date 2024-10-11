@@ -999,11 +999,7 @@ message Cluster {
   // The DNS IP address resolution policy. If this setting is not specified, the
   // value defaults to
   // :ref:`AUTO<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.AUTO>`.
-  DnsLookupFamily dns_lookup_family = 17 [
-    deprecated = true,
-    (validate.rules).enum = {defined_only: true},
-    (envoy.annotations.deprecated_at_minor_version) = "3.0"
-  ];
+  DnsLookupFamily dns_lookup_family = 17;
 
   // If DNS resolvers are specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
