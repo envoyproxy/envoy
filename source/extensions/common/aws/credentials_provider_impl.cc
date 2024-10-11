@@ -1018,11 +1018,13 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
 absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& config) {
-
-  CredentialsProviderSharedPtr provider;
-  switch (config.provider_case()) {
-  case envoy::extensions::common::aws::v3::AwsCredentialProvider::ProviderCase::
-      kAssumeRoleWithWebIdentity: {
+  // The precedence order is: inline_credential > assume_role_with_web_identity.
+  if (config.has_inline_credential()) {
+    const auto& inline_credential = config.inline_credential();
+    return std::make_shared<InlineCredentialProvider>(inline_credential.access_key_id(),
+                                                      inline_credential.secret_access_key(),
+                                                      inline_credential.session_token());
+  } else if (config.has_assume_role_with_web_identity()) {
     const auto& web_identity = config.assume_role_with_web_identity();
     const std::string& role_arn = web_identity.role_arn();
     const std::string& token = web_identity.web_identity_token();
@@ -1032,23 +1034,13 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     // This "two seconds" is a bit arbitrary, but matches the other places in the codebase.
     const auto initialization_timer = std::chrono::seconds(2);
-    provider = std::make_shared<WebIdentityCredentialsProvider>(
+    return std::make_shared<WebIdentityCredentialsProvider>(
         context.api(), context, Extensions::Common::Aws::Utility::fetchMetadata,
         MetadataFetcher::create, "", token, sts_endpoint, role_arn, role_session_name,
         refresh_state, initialization_timer, cluster_name);
-    break;
-  }
-  case envoy::extensions::common::aws::v3::AwsCredentialProvider::ProviderCase::kInlineCredential: {
-    const auto& inline_credential = config.inline_credential();
-    provider = std::make_shared<InlineCredentialProvider>(inline_credential.access_key_id(),
-                                                          inline_credential.secret_access_key(),
-                                                          inline_credential.session_token());
-    break;
-  }
-  case envoy::extensions::common::aws::v3::AwsCredentialProvider::ProviderCase::PROVIDER_NOT_SET:
+  } else {
     return absl::InvalidArgumentError("No AWS credential provider specified");
   }
-  return provider;
 }
 
 } // namespace Aws
