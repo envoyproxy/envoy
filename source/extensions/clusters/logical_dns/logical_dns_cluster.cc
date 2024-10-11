@@ -223,12 +223,12 @@ LogicalDnsClusterFactory::createClusterWithConfig(
   absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> cluster_or_error;
   if (cluster.has_cluster_type()) {
     cluster_or_error = LogicalDnsCluster::create(cluster, proto_config, context,
-                                                    std::move(*dns_resolver_or_error));
+                                                 std::move(*dns_resolver_or_error));
   } else {
     envoy::extensions::clusters::dns::v3::DnsCluster proto_config_legacy{};
     createDnsClusterFromLegacyFields(cluster, proto_config_legacy);
     cluster_or_error = LogicalDnsCluster::create(cluster, proto_config_legacy, context,
-                                                    std::move(*dns_resolver_or_error));
+                                                 std::move(*dns_resolver_or_error));
   }
 
   RETURN_IF_NOT_OK(cluster_or_error.status());
