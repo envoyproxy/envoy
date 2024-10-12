@@ -32,6 +32,10 @@ public:
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
         const Http::AsyncClient::StreamOptions& options,
         Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) override;
+  void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& request, bool end_stream,
+                   const uint64_t stream_id, RequestCallbacks* callbacks,
+                   StreamBase* stream) override;
+  void cancel() override {}
 
 private:
   Grpc::AsyncClientManager& client_manager_;

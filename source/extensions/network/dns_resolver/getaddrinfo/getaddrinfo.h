@@ -12,6 +12,19 @@ namespace Network {
 
 DECLARE_FACTORY(GetAddrInfoDnsResolverFactory);
 
+// Trace information for getaddrinfo.
+enum class GetAddrInfoTrace : uint8_t {
+  NotStarted = 0,
+  Starting = 1,
+  Success = 2,
+  Failed = 3,
+  NoResult = 4,
+  Retrying = 5,
+  DoneRetrying = 6,
+  Cancelled = 7,
+  Callback = 8,
+};
+
 // This resolver uses getaddrinfo() on a dedicated resolution thread. Thus, it is only suitable
 // currently for relatively low rate resolutions. In the future a thread pool could be added if
 // desired.
@@ -34,28 +47,48 @@ public:
 protected:
   class PendingQuery : public ActiveDnsQuery {
   public:
-    PendingQuery(const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback,
-                 absl::Mutex& mutex)
-        : mutex_(mutex), dns_name_(dns_name), dns_lookup_family_(dns_lookup_family),
-          callback_(callback) {}
+    PendingQuery(const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback)
+        : dns_name_(dns_name), dns_lookup_family_(dns_lookup_family), callback_(callback) {}
 
     void cancel(CancelReason) override {
       ENVOY_LOG(debug, "cancelling query [{}]", dns_name_);
-      absl::MutexLock guard(&mutex_);
+      absl::MutexLock lock(&mutex_);
       cancelled_ = true;
     }
 
-    absl::Mutex& mutex_;
+    void addTrace(uint8_t trace) override {
+      absl::MutexLock lock(&mutex_);
+      traces_.push_back(
+          Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
+    }
+
+    std::string getTraces() override {
+      absl::MutexLock lock(&mutex_);
+      std::vector<std::string> string_traces;
+      string_traces.reserve(traces_.size());
+      std::transform(traces_.begin(), traces_.end(), std::back_inserter(string_traces),
+                     [](const Trace& trace) {
+                       return absl::StrCat(trace.trace_, "=",
+                                           trace.time_.time_since_epoch().count());
+                     });
+      return absl::StrJoin(string_traces, ",");
+    }
+
+    bool isCancelled() {
+      absl::MutexLock lock(&mutex_);
+      return cancelled_;
+    }
+
+    absl::Mutex mutex_;
     const std::string dns_name_;
     const DnsLookupFamily dns_lookup_family_;
     ResolveCb callback_;
     bool cancelled_{false};
+    std::vector<Trace> traces_;
   };
-  // Must be a shared_ptr for passing around via post.
-  using PendingQuerySharedPtr = std::shared_ptr<PendingQuery>;
 
   struct PendingQueryInfo {
-    PendingQuerySharedPtr pending_query_;
+    std::unique_ptr<PendingQuery> pending_query_;
     // Empty means it will retry indefinitely until it succeeds.
     absl::optional<uint32_t> num_retries_;
   };

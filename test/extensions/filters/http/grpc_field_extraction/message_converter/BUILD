@@ -12,8 +12,6 @@ envoy_package()
 envoy_cc_test_library(
     name = "message_converter_test_lib",
     hdrs = ["message_converter_test_lib.h"],
-    external_deps = [
-    ],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",
@@ -26,6 +24,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "message_converter_utility_test",
     srcs = ["message_converter_utility_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":message_converter_test_lib",
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_utility_lib",
@@ -39,6 +38,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "message_converter_test",
     srcs = ["message_converter_test.cc"],
+    rbe_pool = "2core",
     deps = [
         ":message_converter_test_lib",
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_lib",
@@ -53,6 +53,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stream_message_test",
     srcs = ["stream_message_test.cc"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:stream_message_lib",
     ],

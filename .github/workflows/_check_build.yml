@@ -1,0 +1,55 @@
+name: Check/build
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      gcp-key:
+        required: true
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-build
+  cancel-in-progress: true
+
+
+jobs:
+  build:
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.name ||matrix.target }}
+    with:
+      # bazel-extra: '--config=remote-envoy-engflow'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+      rbe: true
+      request: ${{ inputs.request }}
+      target: ${{ matrix.target }}
+      timeout-minutes: 180
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: api
+          name: API
+        - target: compile_time_options
+          name: Compile time options
+        - target: gcc
+          name: GCC

@@ -43,6 +43,8 @@ public:
 
   // Network::ActiveDnsQuery
   MOCK_METHOD(void, cancel, (CancelReason reason));
+  MOCK_METHOD(void, addTrace, (uint8_t));
+  MOCK_METHOD(std::string, getTraces, ());
 };
 
 class MockFilterManager : public FilterManager {
@@ -411,7 +413,6 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
-  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
 
   IoHandlePtr io_handle_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
