@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions/wasm/v3/wasm.pb.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/lifecycle_notifier.h"
@@ -142,6 +143,7 @@ public:
                          std::static_pointer_cast<PluginBase>(plugin)),
         plugin_(plugin), wasm_handle_(wasm_handle) {}
 
+  Wasm* wasmOfHandle() { return wasm_handle_ != nullptr ? wasm_handle_->wasm().get() : nullptr; }
   WasmHandleSharedPtr& wasmHandle() { return wasm_handle_; }
   uint32_t rootContextId() { return wasm_handle_->wasm()->getRootContext(plugin_, false)->id(); }
 
@@ -154,11 +156,10 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle_(handle){};
-  PluginHandleSharedPtr& handle() { return handle_; }
-
-private:
-  PluginHandleSharedPtr handle_;
+  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle(std::move(handle)) {}
+  Wasm* wasmOfHandle() { return handle != nullptr ? handle->wasmOfHandle() : nullptr; }
+  void updateHandle(PluginHandleSharedPtr new_handle) { handle = std::move(new_handle); }
+  PluginHandleSharedPtr handle;
 };
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
@@ -182,6 +183,67 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
 void clearCodeCacheForTesting();
 void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);
 WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
+
+class PluginConfig : Logger::Loggable<Logger::Id::wasm> {
+public:
+  PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
+               Server::Configuration::ServerFactoryContext& server, Stats::Scope& scope,
+               Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
+               const envoy::config::core::v3::Metadata* metadata);
+
+  std::shared_ptr<Context> createContext() {
+    if (!tls_slot_->currentThreadRegistered()) {
+      return nullptr;
+    }
+    auto plugin_holder = tls_slot_->get();
+    if (!plugin_holder.has_value()) {
+      return nullptr;
+    }
+
+    if (plugin_holder->handle == nullptr) {
+      return nullptr;
+    }
+
+    Wasm* wasm = plugin_holder->wasmOfHandle();
+
+    if (!wasm || wasm->isFailed()) {
+      if (plugin_->fail_open_) {
+        return nullptr; // Fail open skips adding this filter to callbacks.
+      } else {
+        return std::make_shared<Context>(
+            nullptr, 0,
+            plugin_holder->handle); // Fail closed is handled by an empty Context.
+      }
+    }
+    return std::make_shared<Context>(wasm, plugin_holder->handle->rootContextId(),
+                                     plugin_holder->handle);
+  }
+
+  Wasm* wasmOfHandle() {
+    if (!tls_slot_->currentThreadRegistered()) {
+      return nullptr;
+    }
+    auto plugin_holder = tls_slot_->get();
+    if (!plugin_holder.has_value()) {
+      return nullptr;
+    }
+
+    if (plugin_holder->handle == nullptr) {
+      return nullptr;
+    }
+
+    return plugin_holder->handle->wasmOfHandle();
+  }
+  const PluginSharedPtr& plugin() { return plugin_; }
+
+private:
+  PluginSharedPtr plugin_;
+  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
+  RemoteAsyncDataProviderPtr remote_data_provider_;
+};
+
+using PluginConfigPtr = std::unique_ptr<PluginConfig>;
+using PluginConfigSharedPtr = std::shared_ptr<PluginConfig>;
 
 } // namespace Wasm
 } // namespace Common

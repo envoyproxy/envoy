@@ -485,6 +485,33 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
       getPluginHandleFactory()));
 }
 
+PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
+                           Server::Configuration::ServerFactoryContext& server, Stats::Scope& scope,
+                           Init::Manager& init_manager,
+                           envoy::config::core::v3::TrafficDirection direction,
+                           const envoy::config::core::v3::Metadata* metadata) {
+  tls_slot_ = ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
+      server.threadLocal());
+
+  plugin_ = std::make_shared<Common::Wasm::Plugin>(config, direction, server.localInfo(), metadata);
+
+  auto callback = [this](const Common::Wasm::WasmHandleSharedPtr& base_wasm) {
+    // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
+    tls_slot_->set([base_wasm, plugin = this->plugin_](Event::Dispatcher& dispatcher) {
+      return std::make_shared<PluginHandleSharedPtrThreadLocal>(
+          getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
+    });
+  };
+
+  if (!Common::Wasm::createWasm(plugin_, scope.createScope(""), server.clusterManager(),
+                                init_manager, server.mainThreadDispatcher(), server.api(),
+                                server.lifecycleNotifier(), remote_data_provider_,
+                                std::move(callback))) {
+    throw Common::Wasm::WasmException(
+        fmt::format("Unable to create Wasm plugin {}", plugin_->name_));
+  }
+}
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions
