@@ -42,7 +42,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "sigv4_signer_corpus_test",
     srcs = ["sigv4_signer_corpus_test.cc"],
-    data = ["signer_corpuses/v4"],
+    data = ["@com_github_awslabs_aws_c_auth//:sigv4_tests"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -57,7 +57,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "sigv4a_signer_corpus_test",
     srcs = ["sigv4a_signer_corpus_test.cc"],
-    data = ["signer_corpuses/v4a"],
+    data = ["@com_github_awslabs_aws_c_auth//:sigv4a_tests"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",

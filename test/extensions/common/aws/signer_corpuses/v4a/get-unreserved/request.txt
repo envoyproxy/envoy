@@ -1,2 +1,0 @@
-GET /-._~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz HTTP/1.1
-Host:example.amazonaws.com
