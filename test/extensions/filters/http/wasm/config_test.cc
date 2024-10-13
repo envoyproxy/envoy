@@ -268,7 +268,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   TestUtility::loadFromYaml(invalid_yaml, proto_config);
   WasmFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
   const std::string valid_yaml =
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
@@ -337,7 +337,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineBadCode) {
   TestUtility::loadFromYaml(yaml, proto_config);
   WasmFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
@@ -430,7 +430,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
           }));
 
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher_, ready());
   initializeContextInitManager(init_watcher_);
@@ -506,10 +506,10 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 
   // Case 1: fail and fetch in the background, got 503, cache failure.
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
   // Fail a second time because we are in-progress.
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
   async_callbacks->onSuccess(
       request, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
@@ -524,7 +524,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 
   setupContextInitManager(init_manager2);
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher2, ready());
   init_manager2.initialize(init_watcher2);
@@ -552,7 +552,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   setupContextInitManager(init_manager3);
 
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher3, ready());
   init_manager3.initialize(init_watcher3);
@@ -609,7 +609,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   setupContextInitManager(init_manager5);
 
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config2, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher_, ready());
   initializeContextInitManager(init_watcher_);

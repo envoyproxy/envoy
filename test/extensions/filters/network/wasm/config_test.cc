@@ -336,7 +336,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   WasmFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProto(proto_config, context_).IgnoreError(),
-      Envoy::Extensions::Common::Wasm::WasmException, "Unable to create Wasm network filter ");
+      Envoy::Extensions::Common::Wasm::WasmException, "Unable to create Wasm plugin ");
   const std::string valid_yaml =
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:

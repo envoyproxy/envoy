@@ -192,10 +192,10 @@ public:
                const envoy::config::core::v3::Metadata* metadata);
 
   std::shared_ptr<Context> createContext() {
-    if (!tls_slot_->currentThreadRegistered()) {
+    if (!tls_slot_was_set_ || !tls_slot_.currentThreadRegistered()) {
       return nullptr;
     }
-    auto plugin_holder = tls_slot_->get();
+    auto plugin_holder = tls_slot_.get();
     if (!plugin_holder.has_value()) {
       return nullptr;
     }
@@ -220,10 +220,10 @@ public:
   }
 
   Wasm* wasmOfHandle() {
-    if (!tls_slot_->currentThreadRegistered()) {
+    if (!tls_slot_was_set_ || !tls_slot_.currentThreadRegistered()) {
       return nullptr;
     }
-    auto plugin_holder = tls_slot_->get();
+    auto plugin_holder = tls_slot_.get();
     if (!plugin_holder.has_value()) {
       return nullptr;
     }
@@ -238,7 +238,8 @@ public:
 
 private:
   PluginSharedPtr plugin_;
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
+  ThreadLocal::TypedSlot<PluginHandleSharedPtrThreadLocal> tls_slot_;
+  bool tls_slot_was_set_{};
   RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
