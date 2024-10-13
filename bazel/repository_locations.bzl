@@ -213,7 +213,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "7f97aacef6bd1649734383c2bf022250671f353b7fa60d195e6865d7f4594b43",
         strip_prefix = "aws-c-auth-{version}",
         urls = ["https://github.com/awslabs/aws-c-auth/archive/refs/tags/v{version}.tar.gz"],
-        use_category = ["dataplane_ext"],
+        use_category = ["test_only"],
         extensions = [
             "envoy.filters.http.aws_request_signing",
         ],
