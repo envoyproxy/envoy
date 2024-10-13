@@ -486,31 +486,106 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
 }
 
 PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
-                           Server::Configuration::ServerFactoryContext& server, Stats::Scope& scope,
-                           Init::Manager& init_manager,
+                           Server::Configuration::ServerFactoryContext& context,
+                           Stats::Scope& scope, Init::Manager& init_manager,
                            envoy::config::core::v3::TrafficDirection direction,
-                           const envoy::config::core::v3::Metadata* metadata)
-    : tls_slot_(server.threadLocal()) {
+                           const envoy::config::core::v3::Metadata* metadata, bool singleton)
+    : is_singleton_handle_(singleton) {
 
-  plugin_ = std::make_shared<Common::Wasm::Plugin>(config, direction, server.localInfo(), metadata);
+  plugin_ = std::make_shared<Plugin>(config, direction, context.localInfo(), metadata);
 
-  auto callback = [this](const Common::Wasm::WasmHandleSharedPtr& base_wasm) {
-    tls_slot_was_set_ = true;
+  auto callback = [this, &context](WasmHandleSharedPtr base_wasm) {
+    plugin_handle_initialized_ = true;
 
+    if (base_wasm == nullptr) {
+      ENVOY_LOG(critical, "Plugin {} failed to load", plugin_->name_);
+    }
+
+    if (is_singleton_handle_) {
+      singleton_handle_ =
+          getOrCreateThreadLocalPlugin(base_wasm, plugin_, context.mainThreadDispatcher());
+      return;
+    }
+    thread_local_handle_ =
+        ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
+            context.threadLocal());
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    tls_slot_.set([base_wasm, plugin = this->plugin_](Event::Dispatcher& dispatcher) {
+    thread_local_handle_->set([base_wasm, plugin = this->plugin_](Event::Dispatcher& dispatcher) {
       return std::make_shared<PluginHandleSharedPtrThreadLocal>(
           getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
     });
   };
 
-  if (!Common::Wasm::createWasm(plugin_, scope.createScope(""), server.clusterManager(),
-                                init_manager, server.mainThreadDispatcher(), server.api(),
-                                server.lifecycleNotifier(), remote_data_provider_,
+  if (!Common::Wasm::createWasm(plugin_, scope.createScope(""), context.clusterManager(),
+                                init_manager, context.mainThreadDispatcher(), context.api(),
+                                context.lifecycleNotifier(), remote_data_provider_,
                                 std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm plugin {}", plugin_->name_));
   }
+}
+
+std::shared_ptr<Context> PluginConfig::createContext() {
+  if (!plugin_handle_initialized_) {
+    return nullptr;
+  }
+
+  if (is_singleton_handle_) {
+    // Use critical log because this error should not happen in production.
+    ENVOY_LOG(critical, "CreateContext() only works for thread local plugins.");
+    return nullptr;
+  }
+
+  if (!thread_local_handle_->currentThreadRegistered()) {
+    return nullptr;
+  }
+  auto plugin_holder = thread_local_handle_->get();
+  if (!plugin_holder.has_value()) {
+    return nullptr;
+  }
+
+  if (plugin_holder->handle == nullptr) {
+    return nullptr;
+  }
+
+  Wasm* wasm = plugin_holder->handle->wasmOfHandle();
+
+  if (!wasm || wasm->isFailed()) {
+    if (plugin_->fail_open_) {
+      return nullptr; // Fail open skips adding this filter to callbacks.
+    } else {
+      return std::make_shared<Context>(
+          nullptr, 0,
+          plugin_holder->handle); // Fail closed is handled by an empty Context.
+    }
+  }
+  return std::make_shared<Context>(wasm, plugin_holder->handle->rootContextId(),
+                                   plugin_holder->handle);
+}
+
+Wasm* PluginConfig::wasmOfHandle() {
+  if (!plugin_handle_initialized_) {
+    return nullptr;
+  }
+
+  if (singleton_handle_ != nullptr) {
+    return singleton_handle_->wasmOfHandle();
+  }
+
+  ASSERT(thread_local_handle_ != nullptr);
+  if (!thread_local_handle_->currentThreadRegistered()) {
+    return nullptr;
+  }
+  auto plugin_holder = thread_local_handle_->get();
+  if (!plugin_holder.has_value()) {
+    return nullptr;
+  }
+
+  if (plugin_holder->handle == nullptr) {
+    return nullptr;
+  }
+
+  return plugin_holder->handle->wasmOfHandle();
 }
 
 } // namespace Wasm

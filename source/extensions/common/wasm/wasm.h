@@ -187,60 +187,26 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
 class PluginConfig : Logger::Loggable<Logger::Id::wasm> {
 public:
   PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
-               Server::Configuration::ServerFactoryContext& server, Stats::Scope& scope,
+               Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
                Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
-               const envoy::config::core::v3::Metadata* metadata);
+               const envoy::config::core::v3::Metadata* metadata, bool singleton);
 
-  std::shared_ptr<Context> createContext() {
-    if (!tls_slot_was_set_ || !tls_slot_.currentThreadRegistered()) {
-      return nullptr;
-    }
-    auto plugin_holder = tls_slot_.get();
-    if (!plugin_holder.has_value()) {
-      return nullptr;
-    }
-
-    if (plugin_holder->handle == nullptr) {
-      return nullptr;
-    }
-
-    Wasm* wasm = plugin_holder->wasmOfHandle();
-
-    if (!wasm || wasm->isFailed()) {
-      if (plugin_->fail_open_) {
-        return nullptr; // Fail open skips adding this filter to callbacks.
-      } else {
-        return std::make_shared<Context>(
-            nullptr, 0,
-            plugin_holder->handle); // Fail closed is handled by an empty Context.
-      }
-    }
-    return std::make_shared<Context>(wasm, plugin_holder->handle->rootContextId(),
-                                     plugin_holder->handle);
-  }
-
-  Wasm* wasmOfHandle() {
-    if (!tls_slot_was_set_ || !tls_slot_.currentThreadRegistered()) {
-      return nullptr;
-    }
-    auto plugin_holder = tls_slot_.get();
-    if (!plugin_holder.has_value()) {
-      return nullptr;
-    }
-
-    if (plugin_holder->handle == nullptr) {
-      return nullptr;
-    }
-
-    return plugin_holder->handle->wasmOfHandle();
-  }
+  std::shared_ptr<Context> createContext();
+  Wasm* wasmOfHandle();
   const PluginSharedPtr& plugin() { return plugin_; }
 
 private:
   PluginSharedPtr plugin_;
-  ThreadLocal::TypedSlot<PluginHandleSharedPtrThreadLocal> tls_slot_;
-  bool tls_slot_was_set_{};
   RemoteAsyncDataProviderPtr remote_data_provider_;
+  const bool is_singleton_handle_{};
+
+  bool plugin_handle_initialized_{};
+  // Plugin handle that works for all threads. Only one of thread_local_handle_ or
+  // singleton_handle_ will be set.
+  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> thread_local_handle_;
+  // Plugin handle that works for the main. Only one of thread_local_handle_ or
+  // singleton_handle_ will be set.
+  PluginHandleSharedPtr singleton_handle_;
 };
 
 using PluginConfigPtr = std::unique_ptr<PluginConfig>;

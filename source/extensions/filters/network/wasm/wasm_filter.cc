@@ -9,7 +9,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::network::wasm::v3::
                            Server::Configuration::FactoryContext& context)
     : Extensions::Common::Wasm::PluginConfig(
           config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
-          context.listenerInfo().direction(), &context.listenerInfo().metadata()) {}
+          context.listenerInfo().direction(), &context.listenerInfo().metadata(), false) {}
 
 } // namespace Wasm
 } // namespace NetworkFilters
