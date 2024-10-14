@@ -976,9 +976,16 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *trailers_req->mutable_trailers());
-  state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
-                             ProcessorState::CallbackState::TrailersCallback);
-  ENVOY_LOG(debug, "Sending trailers message");
+
+  if (observability_mode) {
+    ENVOY_LOG(debug, "Sending trailers message in observability mode");
+  } else {
+    state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
+                               config_->messageTimeout(),
+                               ProcessorState::CallbackState::TrailersCallback);
+    ENVOY_LOG(debug, "Sending trailers message");
+  }
+
   sendRequest(std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
