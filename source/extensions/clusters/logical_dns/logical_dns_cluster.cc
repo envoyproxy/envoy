@@ -72,16 +72,8 @@ LogicalDnsCluster::create(const envoy::config::cluster::v3::Cluster& cluster,
   absl::Status creation_status = absl::OkStatus();
   std::unique_ptr<LogicalDnsCluster> ret;
 
-  // dns_cluster should be cluster.cluster_type.typed_config cast to the right type.
-  if (cluster.has_cluster_type()) {
-    ret = std::unique_ptr<LogicalDnsCluster>(new LogicalDnsCluster(
-        cluster, dns_cluster, context, std::move(dns_resolver), creation_status));
-  } else {
-    envoy::extensions::clusters::dns::v3::DnsCluster legacy_dns_cluster{};
-    createDnsClusterFromLegacyFields(cluster, legacy_dns_cluster);
-    ret = std::unique_ptr<LogicalDnsCluster>(new LogicalDnsCluster(
-        cluster, legacy_dns_cluster, context, std::move(dns_resolver), creation_status));
-  }
+  ret = std::unique_ptr<LogicalDnsCluster>(new LogicalDnsCluster(
+      cluster, dns_cluster, context, std::move(dns_resolver), creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -101,10 +93,9 @@ LogicalDnsCluster::LogicalDnsCluster(
           [this]() -> void { startResolve(); })),
       local_info_(context.serverFactoryContext().localInfo()),
       load_assignment_(convertPriority(cluster.load_assignment())) {
-  failure_backoff_strategy_ =
-      Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
-          cluster, dns_refresh_rate_ms_.count(),
-          context.serverFactoryContext().api().randomGenerator());
+  failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
+      dns_cluster, dns_refresh_rate_ms_.count(),
+      context.serverFactoryContext().api().randomGenerator());
 
   const envoy::config::core::v3::SocketAddress& socket_address =
       lbEndpoint().endpoint().address().socket_address();

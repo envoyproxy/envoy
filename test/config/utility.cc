@@ -1021,7 +1021,8 @@ void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_po
       eds_hosts = true;
     } else if (cluster->type() == envoy::config::cluster::v3::Cluster::ORIGINAL_DST) {
       original_dst_cluster = true;
-    } else if (cluster->has_cluster_type()) {
+    } else if (cluster->has_cluster_type() &&
+               !cluster->cluster_type().name().starts_with("envoy.cluster.")) {
       custom_cluster = true;
     } else {
       // Assign ports to statically defined load_assignment hosts.

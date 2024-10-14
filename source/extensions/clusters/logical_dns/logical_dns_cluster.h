@@ -40,13 +40,13 @@ class LogicalDnsCluster : public ClusterImplBase {
 public:
   ~LogicalDnsCluster() override;
 
-  absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> static create(
-      const envoy::config::cluster::v3::Cluster& cluster,
-      const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
-      ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
-
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
+  static absl::StatusOr<std::unique_ptr<LogicalDnsCluster>>
+  create(const envoy::config::cluster::v3::Cluster& cluster,
+         const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+         ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
 
 protected:
   LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,

@@ -1,4 +1,5 @@
 #include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
+
 #include "source/common/config/utility.h"
 
 #include "test/integration/http_integration.h"
