@@ -54,8 +54,7 @@ public:
         config, R"EOF(
                 code:
                   local:
-                    filename: "/Users/jolle/repos/envoy-jmo/test_cpp_append2.wasm"
-                    #filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+                    filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
         )EOF"));
     config_helper_.prependFilter(yaml, downstream);
   }
