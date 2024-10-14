@@ -73,7 +73,7 @@ and availability perspective, as described above.
 For issues requiring control plane and data plane coordination, such as a configuration option which
 results in a Query of Death, risk is assessed by Envoy Security Team. If the configuration option is
 long-standing, turning it off presents a risk (e.g turning off overload manager) and leaving it on
-results in risk, the Security Team would usually opt to fix the issue under embarg. If a feature is new
+results in risk, the Security Team would usually opt to fix the issue under embargo. If a feature is new
 and a config change always results in a data plane crash, it might be classified as something the
 trusted control plane should disallow, and be fixed in the clear. For more nuanced issues, such as long
 standing configuration where only one variant is problematic, the Security Team will try to assess if
