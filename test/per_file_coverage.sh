@@ -37,7 +37,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/mongo_proxy:96.1"
 "source/extensions/filters/network/sni_cluster:88.9"
-"source/extensions/http/cache/simple_http_cache:96.5"
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"
 "source/extensions/stat_sinks/graphite_statsd:82.8" # Death tests don't report LCOV
