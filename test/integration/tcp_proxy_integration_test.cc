@@ -1754,8 +1754,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(
-          std::make_shared<PauseIterationFilter>());
+      filter_manager.addReadFilter(std::make_shared<PauseIterationFilter>());
     };
   }
 
@@ -1767,8 +1766,8 @@ public:
 };
 
 class TcpProxyReceiveBeforeConnectIntegrationTest : public TcpProxyIntegrationTest {
-  public:
-TcpProxyReceiveBeforeConnectIntegrationTest() : TcpProxyIntegrationTest() {
+public:
+  TcpProxyReceiveBeforeConnectIntegrationTest() : TcpProxyIntegrationTest() {
     config_helper_.addNetworkFilter(R"EOF(
       name: test.pause_iteration
       typed_config:
@@ -1822,7 +1821,7 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
   test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   // Once the connection is established, the early data will be flushed to the upstream.
-  ASSERT_TRUE(fake_upstream_connection->waitForData(1024*16));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(1024 * 16));
   ASSERT_TRUE(fake_upstream_connection->write("response"));
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -1835,7 +1834,6 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
   uint32_t upstream_resumes =
       test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
           ->value();
-
 
   uint32_t downstream_pauses =
       test_server_->counter("tcp.tcpproxy_stats.downstream_flow_control_paused_reading_total")

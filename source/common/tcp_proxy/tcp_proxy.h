@@ -52,7 +52,7 @@ constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_b
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
-  COUNTER(early_data_received_count_total)                                                            \
+  COUNTER(early_data_received_count_total)                                                         \
   COUNTER(idle_timeout)                                                                            \
   COUNTER(max_downstream_connection_duration)                                                      \
   COUNTER(upstream_flush_total)                                                                    \

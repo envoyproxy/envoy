@@ -136,9 +136,9 @@ public:
 
       if (receive_before_connect) {
         filter_callbacks_.connection().streamInfo().filterState()->setData(
-          TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::Connection);
+            TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
+            StreamInfo::FilterState::StateType::ReadOnly,
+            StreamInfo::FilterState::LifeSpan::Connection);
       }
 
       filter_ = std::make_unique<Filter>(config_,
@@ -155,8 +155,9 @@ public:
     }
 
     if (connections > 0) {
-      auto expected_status_on_new_connection = receive_before_connect ? Network::FilterStatus::Continue
-                                                                     : Network::FilterStatus::StopIteration;
+      auto expected_status_on_new_connection = receive_before_connect
+                                                   ? Network::FilterStatus::Continue
+                                                   : Network::FilterStatus::StopIteration;
       EXPECT_EQ(expected_status_on_new_connection, filter_->onNewConnection());
       EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
       EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
@@ -481,11 +482,11 @@ TEST_F(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
   // Check that the early data is buffered and flushed to upstream when connection is established.
   // Also check that downstream connection is read disabled.
   EXPECT_CALL(*upstream_connections_.at(0), write(_, _)).Times(0);
-  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true)).Times(1);
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   filter_->onData(early_data_buffer, false);
 
   // Now when upstream connection is established, early buffer will be sent.
-  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(early_data), false)).Times(1);
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(early_data), false));
   raiseEventUpstreamConnected(0);
 
   // Any further communications between client and server can resume normally.
