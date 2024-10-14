@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.clusters.dns.v3;
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
