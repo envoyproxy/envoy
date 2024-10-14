@@ -778,9 +778,9 @@ humanfriendly==10.0 \
     --hash=sha256:1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477 \
     --hash=sha256:6b0b831ce8f15f7300721aa49829fc4e83921a9a301cc7f606be6686a2288ddc
     # via coloredlogs
-icalendar==6.0.0 \
-    --hash=sha256:567e718551d800362db04ca09777295336e1803f6fc6bc0a7a5e258917fa8ed0 \
-    --hash=sha256:7ddf60d343f3c1f716de9b62f6e80ffd95d03cab62464894a0539feab7b5c76e
+icalendar==6.0.1 \
+    --hash=sha256:1ff44825d7b41c3f77eac9e09cc67a770dd3c2377430c23b0eb7d91603088892 \
+    --hash=sha256:9bf3d69203bd0366a9a29a8b0e220574580b86d7918afcb628fc6920287922f3
     # via -r requirements.in
 idna==3.10 \
     --hash=sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9 \
