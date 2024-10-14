@@ -17,7 +17,7 @@ public:
               (LookupContextPtr && lookup_context, Http::StreamEncoderFilterCallbacks& callbacks));
   MOCK_METHOD(void, updateHeaders,
               (const LookupContext& lookup_context, const Http::ResponseHeaderMap& response_headers,
-               const ResponseMetadata& metadata, std::function<void(bool)> on_complete));
+               const ResponseMetadata& metadata, absl::AnyInvocable<void(bool)> on_complete));
   MOCK_METHOD(CacheInfo, cacheInfo, (), (const));
 };
 

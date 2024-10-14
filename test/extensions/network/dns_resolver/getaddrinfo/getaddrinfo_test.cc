@@ -2,6 +2,7 @@
 
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/utility.h"
+#include "source/extensions/network//dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
@@ -9,6 +10,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::ElementsAre;
 using testing::NiceMock;
 using testing::Return;
 
@@ -93,7 +95,7 @@ public:
                              std::list<DnsResponse>&& response) {
     // Since we use AF_UNSPEC, depending on the CI environment we might get either 1 or 2
     // addresses.
-    EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+    EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
     EXPECT_TRUE(response.size() == 1 || response.size() == 2);
     EXPECT_TRUE("127.0.0.1:0" == response.front().addrInfo().address_->asString() ||
                 "[::1]:0" == response.front().addrInfo().address_->asString());
@@ -104,18 +106,34 @@ public:
   DnsResolverSharedPtr resolver_;
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config_;
+  ActiveDnsQuery* active_dns_query_;
 };
+
+MATCHER_P(HasTrace, expected_trace, "") {
+  std::vector<std::string> v = absl::StrSplit(arg, '=');
+  uint8_t trace = std::stoi(v.at(0));
+  return trace == static_cast<uint8_t>(expected_trace);
+}
 
 TEST_F(GetAddrInfoDnsImplTest, LocalhostResolve) {
   // See https://github.com/envoyproxy/envoy/issues/28504.
   DISABLE_UNDER_WINDOWS;
 
-  resolver_->resolve("localhost", DnsLookupFamily::All,
-                     [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                            std::list<DnsResponse>&& response) {
-                       verifyRealGaiResponse(status, std::move(response));
-                       dispatcher_->exit();
-                     });
+  initialize();
+
+  active_dns_query_ =
+      resolver_->resolve("localhost", DnsLookupFamily::All,
+                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                std::list<DnsResponse>&& response) {
+                           verifyRealGaiResponse(status, std::move(response));
+                           std::vector<std::string> traces =
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
+                           EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
+                                                           HasTrace(GetAddrInfoTrace::Starting),
+                                                           HasTrace(GetAddrInfoTrace::Success),
+                                                           HasTrace(GetAddrInfoTrace::Callback)));
+                           dispatcher_->exit();
+                         });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
@@ -124,75 +142,110 @@ TEST_F(GetAddrInfoDnsImplTest, Cancel) {
   // See https://github.com/envoyproxy/envoy/issues/28504.
   DISABLE_UNDER_WINDOWS;
 
+  initialize();
+
   auto query = resolver_->resolve(
       "localhost", DnsLookupFamily::All,
       [](DnsResolver::ResolutionStatus, absl::string_view, std::list<DnsResponse>&&) { FAIL(); });
 
   query->cancel(ActiveDnsQuery::CancelReason::QueryAbandoned);
 
-  resolver_->resolve("localhost", DnsLookupFamily::All,
-                     [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                            std::list<DnsResponse>&& response) {
-                       verifyRealGaiResponse(status, std::move(response));
-                       dispatcher_->exit();
-                     });
+  active_dns_query_ =
+      resolver_->resolve("localhost", DnsLookupFamily::All,
+                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                std::list<DnsResponse>&& response) {
+                           verifyRealGaiResponse(status, std::move(response));
+                           std::vector<std::string> traces =
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
+                           EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
+                                                           HasTrace(GetAddrInfoTrace::Starting),
+                                                           HasTrace(GetAddrInfoTrace::Success),
+                                                           HasTrace(GetAddrInfoTrace::Callback)));
+                           dispatcher_->exit();
+                         });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
 TEST_F(GetAddrInfoDnsImplTest, Failure) {
+  initialize();
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 
   EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
       .WillOnce(Return(Api::SysCallIntResult{EAI_FAIL, 0}));
-  resolver_->resolve("localhost", DnsLookupFamily::All,
-                     [this](DnsResolver::ResolutionStatus status, absl::string_view details,
-                            std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
-                       EXPECT_EQ("Non-recoverable failure in name resolution", details);
-                       EXPECT_TRUE(response.empty());
-
-                       dispatcher_->exit();
-                     });
+  active_dns_query_ =
+      resolver_->resolve("localhost", DnsLookupFamily::All,
+                         [this](DnsResolver::ResolutionStatus status, absl::string_view details,
+                                std::list<DnsResponse>&& response) {
+                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
+                           EXPECT_EQ("Non-recoverable failure in name resolution", details);
+                           EXPECT_TRUE(response.empty());
+                           std::vector<std::string> traces =
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
+                           EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
+                                                           HasTrace(GetAddrInfoTrace::Starting),
+                                                           HasTrace(GetAddrInfoTrace::Failed),
+                                                           HasTrace(GetAddrInfoTrace::Callback)));
+                           dispatcher_->exit();
+                         });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
 TEST_F(GetAddrInfoDnsImplTest, NoData) {
+  initialize();
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 
   EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
       .WillOnce(Return(Api::SysCallIntResult{EAI_NODATA, 0}));
-  resolver_->resolve("localhost", DnsLookupFamily::All,
-                     [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                            std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
-                       EXPECT_TRUE(response.empty());
-
-                       dispatcher_->exit();
-                     });
+  active_dns_query_ =
+      resolver_->resolve("localhost", DnsLookupFamily::All,
+                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                std::list<DnsResponse>&& response) {
+                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
+                           EXPECT_TRUE(response.empty());
+                           std::vector<std::string> traces =
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
+                           EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
+                                                           HasTrace(GetAddrInfoTrace::Starting),
+                                                           HasTrace(GetAddrInfoTrace::NoResult),
+                                                           HasTrace(GetAddrInfoTrace::Callback)));
+                           dispatcher_->exit();
+                         });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
 TEST_F(GetAddrInfoDnsImplTest, NoName) {
+  initialize();
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 
   EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
       .WillOnce(Return(Api::SysCallIntResult{EAI_NONAME, 0}));
-  resolver_->resolve("localhost", DnsLookupFamily::All,
-                     [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                            std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
-                       EXPECT_TRUE(response.empty());
-
-                       dispatcher_->exit();
-                     });
+  active_dns_query_ =
+      resolver_->resolve("localhost", DnsLookupFamily::All,
+                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                std::list<DnsResponse>&& response) {
+                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
+                           EXPECT_TRUE(response.empty());
+                           std::vector<std::string> traces =
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
+                           EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
+                                                           HasTrace(GetAddrInfoTrace::Starting),
+                                                           HasTrace(GetAddrInfoTrace::NoResult),
+                                                           HasTrace(GetAddrInfoTrace::Callback)));
+                           dispatcher_->exit();
+                         });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
 TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccess) {
+  initialize();
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 
   // 2 calls - one EAGAIN, one success.
@@ -200,14 +253,22 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainIndefinitelyAndSuccess) {
       .Times(2)
       .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
       .WillOnce(Return(Api::SysCallIntResult{0, 0}));
-  resolver_->resolve("localhost", DnsLookupFamily::All,
-                     [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                            std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
-                       EXPECT_TRUE(response.empty());
-
-                       dispatcher_->exit();
-                     });
+  active_dns_query_ =
+      resolver_->resolve("localhost", DnsLookupFamily::All,
+                         [this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                std::list<DnsResponse>&& response) {
+                           EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
+                           EXPECT_TRUE(response.empty());
+                           std::vector<std::string> traces =
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
+                           EXPECT_THAT(traces, ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
+                                                           HasTrace(GetAddrInfoTrace::Starting),
+                                                           HasTrace(GetAddrInfoTrace::Retrying),
+                                                           HasTrace(GetAddrInfoTrace::Starting),
+                                                           HasTrace(GetAddrInfoTrace::Success),
+                                                           HasTrace(GetAddrInfoTrace::Callback)));
+                           dispatcher_->exit();
+                         });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
@@ -232,6 +293,8 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainThenCancel) {
 }
 
 TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccess) {
+  initialize();
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 
   config_.mutable_num_retries()->set_value(3);
@@ -244,19 +307,30 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndSuccess) {
       .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
       .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
       .WillOnce(Return(Api::SysCallIntResult{0, 0}));
-  resolver_->resolve("localhost", DnsLookupFamily::All,
-                     [this](DnsResolver::ResolutionStatus status, absl::string_view,
-                            std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
-                       EXPECT_TRUE(response.empty());
-
-                       dispatcher_->exit();
-                     });
+  active_dns_query_ = resolver_->resolve(
+      "localhost", DnsLookupFamily::All,
+      [this](DnsResolver::ResolutionStatus status, absl::string_view,
+             std::list<DnsResponse>&& response) {
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
+        EXPECT_TRUE(response.empty());
+        std::vector<std::string> traces = absl::StrSplit(active_dns_query_->getTraces(), ',');
+        EXPECT_THAT(
+            traces,
+            ElementsAre(HasTrace(GetAddrInfoTrace::NotStarted),
+                        HasTrace(GetAddrInfoTrace::Starting), HasTrace(GetAddrInfoTrace::Retrying),
+                        HasTrace(GetAddrInfoTrace::Starting), HasTrace(GetAddrInfoTrace::Retrying),
+                        HasTrace(GetAddrInfoTrace::Starting), HasTrace(GetAddrInfoTrace::Retrying),
+                        HasTrace(GetAddrInfoTrace::Starting), HasTrace(GetAddrInfoTrace::Success),
+                        HasTrace(GetAddrInfoTrace::Callback)));
+        dispatcher_->exit();
+      });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
 
 TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailure) {
+  initialize();
+
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls_);
 
   config_.mutable_num_retries()->set_value(3);
@@ -269,15 +343,24 @@ TEST_F(GetAddrInfoDnsImplTest, TryAgainWithNumRetriesAndFailure) {
       .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
       .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}))
       .WillOnce(Return(Api::SysCallIntResult{EAI_AGAIN, 0}));
-  resolver_->resolve("localhost", DnsLookupFamily::All,
-                     [this](DnsResolver::ResolutionStatus status, absl::string_view details,
-                            std::list<DnsResponse>&& response) {
-                       EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
-                       EXPECT_FALSE(details.empty());
-                       EXPECT_TRUE(response.empty());
-
-                       dispatcher_->exit();
-                     });
+  active_dns_query_ = resolver_->resolve(
+      "localhost", DnsLookupFamily::All,
+      [this](DnsResolver::ResolutionStatus status, absl::string_view details,
+             std::list<DnsResponse>&& response) {
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Failure);
+        EXPECT_FALSE(details.empty());
+        EXPECT_TRUE(response.empty());
+        std::vector<std::string> traces = absl::StrSplit(active_dns_query_->getTraces(), ',');
+        EXPECT_THAT(
+            traces,
+            ElementsAre(
+                HasTrace(GetAddrInfoTrace::NotStarted), HasTrace(GetAddrInfoTrace::Starting),
+                HasTrace(GetAddrInfoTrace::Retrying), HasTrace(GetAddrInfoTrace::Starting),
+                HasTrace(GetAddrInfoTrace::Retrying), HasTrace(GetAddrInfoTrace::Starting),
+                HasTrace(GetAddrInfoTrace::Retrying), HasTrace(GetAddrInfoTrace::Starting),
+                HasTrace(GetAddrInfoTrace::DoneRetrying), HasTrace(GetAddrInfoTrace::Callback)));
+        dispatcher_->exit();
+      });
 
   dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
 }
@@ -293,7 +376,7 @@ TEST_F(GetAddrInfoDnsImplTest, All) {
       "localhost", DnsLookupFamily::All,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(2, response.size());
         EXPECT_EQ("[[::1]:0, 127.0.0.1:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -317,7 +400,7 @@ TEST_F(GetAddrInfoDnsImplTest, V4Only) {
       "localhost", DnsLookupFamily::V4Only,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[127.0.0.1:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -341,7 +424,7 @@ TEST_F(GetAddrInfoDnsImplTest, V6Only) {
       "localhost", DnsLookupFamily::V6Only,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -365,7 +448,7 @@ TEST_F(GetAddrInfoDnsImplTest, V4Preferred) {
       "localhost", DnsLookupFamily::V4Preferred,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[127.0.0.1:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -389,7 +472,7 @@ TEST_F(GetAddrInfoDnsImplTest, V4PreferredNoV4) {
       "localhost", DnsLookupFamily::V4Preferred,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -413,7 +496,7 @@ TEST_F(GetAddrInfoDnsImplTest, Auto) {
       "localhost", DnsLookupFamily::Auto,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[[::1]:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
@@ -437,7 +520,7 @@ TEST_F(GetAddrInfoDnsImplTest, AutoNoV6) {
       "localhost", DnsLookupFamily::Auto,
       [this](DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<DnsResponse>&& response) {
-        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Success);
+        EXPECT_EQ(status, DnsResolver::ResolutionStatus::Completed);
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("[127.0.0.1:0]",
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {

@@ -48,6 +48,7 @@ jobs:
         //:ios_xcframework
       command: ./bazelw
       container-command:
+      docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       runs-on: macos-12
       source: |

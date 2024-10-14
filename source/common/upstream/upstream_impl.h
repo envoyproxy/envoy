@@ -421,7 +421,9 @@ public:
   void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
     lb_policy_data_ = std::move(lb_policy_data);
   }
-  const HostLbPolicyDataPtr& lbPolicyData() const override { return lb_policy_data_; }
+  OptRef<HostLbPolicyData> lbPolicyData() const override {
+    return makeOptRefFromPtr(lb_policy_data_.get());
+  }
 
 protected:
   static CreateConnectionData
@@ -810,12 +812,13 @@ public:
   using HttpProtocolOptionsConfigImpl =
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
   using TcpProtocolOptionsConfigImpl = Envoy::Extensions::Upstreams::Tcp::ProtocolOptionsConfigImpl;
-  ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
-                  const envoy::config::cluster::v3::Cluster& config,
-                  const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
-                  Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
-                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
-                  Server::Configuration::TransportSocketFactoryContext&);
+  static absl::StatusOr<std::unique_ptr<ClusterInfoImpl>>
+  create(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
+         const envoy::config::cluster::v3::Cluster& config,
+         const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
+         Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
+         Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
+         Server::Configuration::TransportSocketFactoryContext&);
 
   static DeferredCreationCompatibleClusterTrafficStats
   generateStats(Stats::ScopeSharedPtr scope, const ClusterTrafficStatNames& cluster_stat_names,
@@ -913,6 +916,9 @@ public:
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
+  absl::optional<uint16_t> maxResponseHeadersKb() const override {
+    return max_response_headers_kb_;
+  }
   const std::string& name() const override { return name_; }
   const std::string& observabilityName() const override {
     if (observability_name_ != nullptr) {
@@ -1033,6 +1039,14 @@ public:
   }
 
 protected:
+  ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
+                  const envoy::config::cluster::v3::Cluster& config,
+                  const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
+                  Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
+                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
+                  Server::Configuration::TransportSocketFactoryContext& context,
+                  absl::Status& creation_status);
+
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
   // budget message is specified, defaults will be filled in if either params are unspecified.
   static std::pair<absl::optional<double>, absl::optional<uint32_t>>
@@ -1126,6 +1140,7 @@ private:
   // overhead via alignment
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint32_t max_response_headers_count_;
+  const absl::optional<uint16_t> max_response_headers_kb_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
   const bool drain_connections_on_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
@@ -1200,7 +1215,9 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
   UnitFloat dropOverload() const override { return drop_overload_; }
+  const std::string& dropCategory() const override { return drop_category_; }
   void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
+  void setDropCategory(absl::string_view drop_category) override { drop_category_ = drop_category; }
 
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
@@ -1271,6 +1288,7 @@ private:
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
   UnitFloat drop_overload_{0};
+  std::string drop_category_;
   static constexpr int kDropOverloadSize = 1;
 };
 

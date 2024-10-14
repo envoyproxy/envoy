@@ -14,7 +14,7 @@ public:
   // on_complete is called when the cache completes the operation.
   virtual void
   send(InsertContext& context,
-       std::function<void(bool cache_success, bool end_stream, size_t sz)> on_complete) PURE;
+       absl::AnyInvocable<void(bool cache_success, bool end_stream, size_t sz)> on_complete) PURE;
 
   virtual ~CacheInsertFragment() = default;
 };
@@ -27,14 +27,14 @@ public:
   CacheInsertFragmentBody(const Buffer::Instance& buffer, bool end_stream)
       : buffer_(buffer), end_stream_(end_stream) {}
 
-  void
-  send(InsertContext& context,
-       std::function<void(bool cache_success, bool end_stream, size_t sz)> on_complete) override {
+  void send(InsertContext& context,
+            absl::AnyInvocable<void(bool cache_success, bool end_stream, size_t sz)> on_complete)
+      override {
     size_t sz = buffer_.length();
     context.insertBody(
         std::move(buffer_),
-        [on_complete, end_stream = end_stream_, sz](bool cache_success) {
-          on_complete(cache_success, end_stream, sz);
+        [cb = std::move(on_complete), end_stream = end_stream_, sz](bool cache_success) mutable {
+          std::move(cb)(cache_success, end_stream, sz);
         },
         end_stream_);
   }
@@ -52,14 +52,15 @@ public:
     Http::ResponseTrailerMapImpl::copyFrom(*trailers_, trailers);
   }
 
-  void
-  send(InsertContext& context,
-       std::function<void(bool cache_success, bool end_stream, size_t sz)> on_complete) override {
+  void send(InsertContext& context,
+            absl::AnyInvocable<void(bool cache_success, bool end_stream, size_t sz)> on_complete)
+      override {
     // While zero isn't technically true for the size of trailers, it doesn't
     // matter at this point because watermarks after the stream is complete
     // aren't useful.
-    context.insertTrailers(
-        *trailers_, [on_complete](bool cache_success) { on_complete(cache_success, true, 0); });
+    context.insertTrailers(*trailers_, [cb = std::move(on_complete)](bool cache_success) mutable {
+      std::move(cb)(cache_success, true, 0);
+    });
   }
 
 private:
@@ -72,7 +73,7 @@ CacheInsertQueue::CacheInsertQueue(std::shared_ptr<HttpCache> cache,
     : dispatcher_(encoder_callbacks.dispatcher()), insert_context_(std::move(insert_context)),
       low_watermark_bytes_(encoder_callbacks.encoderBufferLimit() / 2),
       high_watermark_bytes_(encoder_callbacks.encoderBufferLimit()),
-      encoder_callbacks_(encoder_callbacks), abort_callback_(abort), cache_(cache) {}
+      encoder_callbacks_(encoder_callbacks), abort_callback_(std::move(abort)), cache_(cache) {}
 
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                      const ResponseMetadata& metadata, bool end_stream) {
@@ -123,59 +124,54 @@ void CacheInsertQueue::insertTrailers(const Http::ResponseTrailerMap& trailers) 
 }
 
 void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, size_t sz) {
-  // If the cache implementation is asynchronous, this may be called from whatever
-  // thread that cache implementation runs on. Therefore, we post it to the
-  // dispatcher to be certain any callbacks and updates are called on the filter's
-  // thread (and therefore we don't have to mutex-guard anything).
-  dispatcher_.post([this, cache_success, end_stream, sz]() {
-    fragment_in_flight_ = false;
-    if (aborting_) {
-      // Parent filter was destroyed, so we can quit this operation.
-      fragments_.clear();
-      self_ownership_.reset();
-      return;
+  ASSERT(dispatcher_.isThreadSafe());
+  fragment_in_flight_ = false;
+  if (aborting_) {
+    // Parent filter was destroyed, so we can quit this operation.
+    fragments_.clear();
+    self_ownership_.reset();
+    return;
+  }
+  ASSERT(queue_size_bytes_ >= sz, "queue can't be emptied by more than its size");
+  queue_size_bytes_ -= sz;
+  if (watermarked_ && queue_size_bytes_ <= low_watermark_bytes_) {
+    if (encoder_callbacks_.has_value()) {
+      encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
     }
-    ASSERT(queue_size_bytes_ >= sz, "queue can't be emptied by more than its size");
-    queue_size_bytes_ -= sz;
-    if (watermarked_ && queue_size_bytes_ <= low_watermark_bytes_) {
+    watermarked_ = false;
+  }
+  if (!cache_success) {
+    // canceled by cache; unwatermark if necessary, inform the filter if
+    // it's still around, and delete the queue.
+    if (watermarked_) {
       if (encoder_callbacks_.has_value()) {
         encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
       }
       watermarked_ = false;
     }
-    if (!cache_success) {
-      // canceled by cache; unwatermark if necessary, inform the filter if
-      // it's still around, and delete the queue.
-      if (watermarked_) {
-        if (encoder_callbacks_.has_value()) {
-          encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
-        }
-        watermarked_ = false;
-      }
-      fragments_.clear();
-      // Clearing self-ownership might provoke the destructor, so take a copy of the
-      // abort callback to avoid reading from 'this' after it may be deleted.
-      auto abort_callback = abort_callback_;
-      self_ownership_.reset();
-      abort_callback();
-      return;
-    }
-    if (end_stream) {
-      ASSERT(fragments_.empty(), "ending a stream with the queue not empty is a bug");
-      ASSERT(!watermarked_, "being over the high watermark when the queue is empty makes no sense");
-      self_ownership_.reset();
-      return;
-    }
-    if (!fragments_.empty()) {
-      // If there's more in the queue, push the next fragment to the cache.
-      auto fragment = std::move(fragments_.front());
-      fragments_.pop_front();
-      fragment_in_flight_ = true;
-      fragment->send(*insert_context_, [this](bool cache_success, bool end_stream, size_t sz) {
-        onFragmentComplete(cache_success, end_stream, sz);
-      });
-    }
-  });
+    fragments_.clear();
+    // Clearing self-ownership might provoke the destructor, so take a copy of the
+    // abort callback to avoid reading from 'this' after it may be deleted.
+    auto abort_callback = std::move(abort_callback_);
+    self_ownership_.reset();
+    std::move(abort_callback)();
+    return;
+  }
+  if (end_stream) {
+    ASSERT(fragments_.empty(), "ending a stream with the queue not empty is a bug");
+    ASSERT(!watermarked_, "being over the high watermark when the queue is empty makes no sense");
+    self_ownership_.reset();
+    return;
+  }
+  if (!fragments_.empty()) {
+    // If there's more in the queue, push the next fragment to the cache.
+    auto fragment = std::move(fragments_.front());
+    fragments_.pop_front();
+    fragment_in_flight_ = true;
+    fragment->send(*insert_context_, [this](bool cache_success, bool end_stream, size_t sz) {
+      onFragmentComplete(cache_success, end_stream, sz);
+    });
+  }
 }
 
 void CacheInsertQueue::setSelfOwned(std::unique_ptr<CacheInsertQueue> self) {

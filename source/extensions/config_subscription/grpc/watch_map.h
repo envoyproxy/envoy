@@ -73,7 +73,7 @@ struct Watch {
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMap(const bool use_namespace_matching, const std::string& type_url,
-           CustomConfigValidators& config_validators, EdsResourcesCacheOptRef eds_resources_cache)
+           CustomConfigValidators* config_validators, EdsResourcesCacheOptRef eds_resources_cache)
       : use_namespace_matching_(use_namespace_matching), type_url_(type_url),
         config_validators_(config_validators), eds_resources_cache_(eds_resources_cache) {
     // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
@@ -105,14 +105,18 @@ public:
   void onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
                       const std::string& version_info) override;
 
-  void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) override;
+  void
+  onConfigUpdate(absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
   WatchMap(const WatchMap&) = delete;
   WatchMap& operator=(const WatchMap&) = delete;
+
+  void setConfigValidators(CustomConfigValidators* config_validators) {
+    config_validators_ = config_validators;
+  }
 
 private:
   void removeDeferredWatches();
@@ -147,7 +151,7 @@ private:
 
   const bool use_namespace_matching_;
   const std::string type_url_;
-  CustomConfigValidators& config_validators_;
+  CustomConfigValidators* config_validators_;
   EdsResourcesCacheOptRef eds_resources_cache_;
 };
 

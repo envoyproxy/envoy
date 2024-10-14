@@ -29,11 +29,7 @@ envoy_cc_library(
     name = "starttls_socket_lib",
     srcs = ["starttls_socket.cc"],
     hdrs = ["starttls_socket.h"],
-    external_deps = [
-        "abseil_optional",
-        "abseil_synchronization",
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
@@ -44,6 +40,8 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_annotations",
         "//source/common/network:transport_socket_options_lib",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/extensions/transport_sockets/starttls/v3:pkg_cc_proto",
     ],
 )

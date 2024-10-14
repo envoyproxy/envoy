@@ -121,6 +121,8 @@ public:
   probeAndMigrateToServerPreferredAddress(const quic::QuicSocketAddress& server_preferred_address);
 
 private:
+  friend class EnvoyQuicClientConnectionPeer;
+
   // Receives notifications from the Quiche layer on path validation results.
   class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
   public:

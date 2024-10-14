@@ -61,8 +61,10 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
   envoy::config::core::v3::SubstitutionFormatString proxy_substitution_format_config;
   proxy_substitution_format_config.mutable_text_format_source()->set_inline_string(
       config.proxy_host());
-  proxy_host_formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-      proxy_substitution_format_config, context);
+  proxy_host_formatter_ =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+                                proxy_substitution_format_config, context),
+                            Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
 
   if (config.has_proxy_port()) {
     uint32_t port = config.proxy_port().value();
@@ -76,8 +78,10 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
   envoy::config::core::v3::SubstitutionFormatString target_substitution_format_config;
   target_substitution_format_config.mutable_text_format_source()->set_inline_string(
       config.target_host());
-  target_host_formatter_ = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-      target_substitution_format_config, context);
+  target_host_formatter_ =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+                                target_substitution_format_config, context),
+                            Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
 }
 
 UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(

@@ -11,9 +11,6 @@ envoy_package()
 envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
-    external_deps = [
-        "abseil_node_hash_map",
-    ],
     deps = [
         ":health_checker_interface",
         ":load_balancer_interface",
@@ -35,6 +32,7 @@ envoy_cc_library(
         "//envoy/singleton:manager_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/thread_local:thread_local_interface",
+        "@com_google_absl//absl/container:node_hash_map",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -102,9 +100,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "outlier_detection_interface",
     hdrs = ["outlier_detection.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/common:time_interface",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
 )
@@ -147,7 +145,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_interface",
     hdrs = ["upstream.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":health_check_host_monitor_interface",
         ":locality_lib",
@@ -164,6 +161,7 @@ envoy_cc_library(
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",
         "//envoy/upstream:types_interface",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

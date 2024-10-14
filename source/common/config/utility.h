@@ -237,7 +237,7 @@ public:
    * Get a Factory from the registry with a particular name or return nullptr.
    * @param name string identifier for the particular implementation.
    */
-  template <class Factory> static Factory* getFactoryByName(const std::string& name) {
+  template <class Factory> static Factory* getFactoryByName(absl::string_view name) {
     if (name.empty()) {
       return nullptr;
     }
@@ -424,19 +424,7 @@ public:
                                               const std::string& filter_type,
                                               const std::string& filter_chain_type,
                                               bool is_terminal_filter,
-                                              bool last_filter_in_current_config) {
-    if (is_terminal_filter && !last_filter_in_current_config) {
-      return absl::InvalidArgumentError(
-          fmt::format("Error: terminal filter named {} of type {} must be the "
-                      "last filter in a {} filter chain.",
-                      name, filter_type, filter_chain_type));
-    } else if (!is_terminal_filter && last_filter_in_current_config) {
-      return absl::InvalidArgumentError(fmt::format(
-          "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
-          name, filter_type, filter_chain_type));
-    }
-    return absl::OkStatus();
-  }
+                                              bool last_filter_in_current_config);
 
   /**
    * Prepares the DNS failure refresh backoff strategy given the cluster configuration.
