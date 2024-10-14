@@ -30,7 +30,6 @@ constexpr absl::string_view QUERY_SEPERATOR = "&";
 constexpr absl::string_view QUERY_SPLITTER = "?";
 constexpr absl::string_view RESERVED_CHARS = "-._~";
 constexpr absl::string_view URI_ENCODE = "%{:02X}";
-constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
 
 constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
 constexpr char AWS_PROFILE[] = "AWS_PROFILE";
@@ -133,7 +132,7 @@ Utility::createCanonicalRequest(absl::string_view method, absl::string_view path
   if (query_part == path_part) {
     absl::StrAppend(&canonical_request, "\n");
   } else {
-    absl::StrAppend(&canonical_request, Utility::canonicalizeQueryString(query_part), "\n");
+    absl::StrAppend(&canonical_request, canonicalizeQueryString(query_part), "\n");
   }
 
   // Add headers
@@ -148,7 +147,7 @@ Utility::createCanonicalRequest(absl::string_view method, absl::string_view path
   absl::StrAppend(&canonical_request, "\n");
 
   // Add the list of signed headers
-  absl::StrAppend(&canonical_request, Utility::joinCanonicalHeaderNames(canonical_headers), "\n");
+  absl::StrAppend(&canonical_request, joinCanonicalHeaderNames(canonical_headers), "\n");
 
   // Add the content hash
   absl::StrAppend(&canonical_request, content_hash);
@@ -177,7 +176,7 @@ std::string Utility::normalizePath(absl::string_view original_path) {
       continue;
     } else if (path_segment == "..") {
       if (path_list.empty()) {
-        path_list.emplace_back("/");
+        path_list.emplace_back(PATH_SPLITTER);
       } else {
         path_list.pop_back();
       }
@@ -209,7 +208,7 @@ std::string Utility::uriEncodePath(absl::string_view original_path) {
 
   for (unsigned char c : path) {
     // Do not encode slashes or unreserved chars from RFC 3986
-    if ((isReservedChar(c)) || c == '/') {
+    if ((isReservedChar(c)) || c == PATH_SPLITTER[0]) {
       encoded.push_back(c);
     } else {
       absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
@@ -247,8 +246,8 @@ std::string Utility::canonicalizeQueryString(absl::string_view query_string) {
       query = std::make_pair(query.first, query.second);
     } else {
       query = std::make_pair(
-          Utility::encodeQueryParam(Envoy::Http::Utility::PercentEncoding::decode(query.first)),
-          Utility::encodeQueryParam(Envoy::Http::Utility::PercentEncoding::decode(query.second)));
+          encodeQueryComponent(Envoy::Http::Utility::PercentEncoding::decode(query.first)),
+          encodeQueryComponent(Envoy::Http::Utility::PercentEncoding::decode(query.second)));
     }
   }
 
@@ -260,7 +259,7 @@ std::string Utility::canonicalizeQueryString(absl::string_view query_string) {
 
 // To avoid modifying the path, we handle spaces as if they have already been encoded to a plus, and
 // avoid additional equals signs in the query parameters
-std::string Utility::encodeQueryParam(absl::string_view decoded) {
+std::string Utility::encodeQueryComponent(absl::string_view decoded) {
   std::string encoded;
   for (unsigned char c : decoded) {
     if (isReservedChar(c)) {
@@ -269,9 +268,6 @@ std::string Utility::encodeQueryParam(absl::string_view decoded) {
     } else if (c == '+') {
       // Encode '+' as space
       absl::StrAppend(&encoded, "%20");
-    } else if (c == QUERY_PARAM_SEPERATOR[0]) {
-      // Double encode '='
-      absl::StrAppend(&encoded, fmt::format(URI_DOUBLE_ENCODE, c));
     } else {
       absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
     }
@@ -505,12 +501,12 @@ std::string Utility::getCredentialFilePath() {
   // environment variable does
   // not exist
 
-  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
+  const auto home = getEnvironmentVariableOrDefault("HOME", "");
   const auto default_credentials_file_path =
       absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
 
-  return Utility::getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE,
-                                                  default_credentials_file_path);
+  return getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE,
+                                         default_credentials_file_path);
 }
 
 std::string Utility::getConfigFilePath() {
@@ -522,15 +518,15 @@ std::string Utility::getConfigFilePath() {
   const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
   const auto default_credentials_file_path = absl::StrCat(home, DEFAULT_AWS_CONFIG_FILE);
 
-  return Utility::getEnvironmentVariableOrDefault(AWS_CONFIG_FILE, default_credentials_file_path);
+  return getEnvironmentVariableOrDefault(AWS_CONFIG_FILE, default_credentials_file_path);
 }
 
 std::string Utility::getCredentialProfileName() {
-  return Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+  return getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
 }
 
 std::string Utility::getConfigProfileName() {
-  auto profile_name = Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+  auto profile_name = getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
   if (profile_name == DEFAULT_AWS_PROFILE) {
     return profile_name;
   } else {

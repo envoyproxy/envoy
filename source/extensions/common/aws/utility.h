@@ -73,7 +73,7 @@ public:
    * @param decoded the decoded string.
    * @return the URI encoded string.
    */
-  static std::string encodeQueryParam(absl::string_view decoded);
+  static std::string encodeQueryComponent(absl::string_view decoded);
 
   /**
    * Get the semicolon-delimited string of canonical header names.

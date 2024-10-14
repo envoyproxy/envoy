@@ -332,22 +332,22 @@ TEST(UtilityTest, CanonicalizeQueryStringWithPlus) {
   EXPECT_EQ("a=1%202", canonical_query);
 }
 
-TEST(UtilityTest, CanonicalizeQueryStringDoubleEncodeEquals) {
-  const absl::string_view query = "a=!.!=!";
+TEST(UtilityTest, CanonicalizeQueryStringWithTilde) {
+  const absl::string_view query = "a=1%7E~2";
   const auto canonical_query = Utility::canonicalizeQueryString(query);
-  EXPECT_EQ("a=%21.%21%253D%21", canonical_query);
+  EXPECT_EQ("a=1~~2", canonical_query);
 }
 
 TEST(UtilityTest, EncodeQuerySegment) {
   const absl::string_view query = "^!@/-_~.";
-  const auto encoded_query = Utility::encodeQueryParam(query);
+  const auto encoded_query = Utility::encodeQueryComponent(query);
   EXPECT_EQ("%5E%21%40%2F-_~.", encoded_query);
 }
 
 TEST(UtilityTest, EncodeQuerySegmentReserved) {
   const absl::string_view query = "?=&";
-  const auto encoded_query = Utility::encodeQueryParam(query);
-  EXPECT_EQ("%3F%253D%26", encoded_query);
+  const auto encoded_query = Utility::encodeQueryComponent(query);
+  EXPECT_EQ("%3F%3D%26", encoded_query);
 }
 
 TEST(UtilityTest, CanonicalizationFuzzTest) {
@@ -362,7 +362,7 @@ TEST(UtilityTest, CanonicalizationFuzzTest) {
         fuzz.push_back(k);
         Utility::uriEncodePath(fuzz);
         Utility::normalizePath(fuzz);
-        Utility::encodeQueryParam(fuzz);
+        Utility::encodeQueryComponent(fuzz);
         Utility::canonicalizeQueryString(fuzz);
         fuzz.pop_back();
       }

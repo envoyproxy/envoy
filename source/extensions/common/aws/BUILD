@@ -133,6 +133,8 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = [
+        "credentials_provider.h",
+        "signer.h",
         "signer_base_impl.h",
         "utility.h",
     ],
