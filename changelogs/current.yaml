@@ -359,7 +359,7 @@ new_features:
 - area: access log
   change: |
     Added support for :ref:`%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_1% <config_access_log_format_response_flags>`,
-    `%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256%``, and ``%DOWNSTREAM_PEER_CHAIN_SERIALS%``, as access log formatters.
+    ``%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256%``, and ``%DOWNSTREAM_PEER_CHAIN_SERIALS%``, as access log formatters.
 - area: matching
   change: |
     Added dynamic metadata matcher support :ref:`Dynamic metadata input <extension_envoy.matching.inputs.dynamic_metadata>`
