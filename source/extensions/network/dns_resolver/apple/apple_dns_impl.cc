@@ -188,7 +188,7 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
     // events indicates that the sd_ref state is broken.
     // Therefore, finish resolving with an error.
     pending_response_.status_ = ResolutionStatus::Failure;
-    pending_response_.details_ = absl::StrCat(error);
+    pending_response_.details_ = absl::StrCat("apple_dns_error_", error);
     finishResolve();
   }
 }
