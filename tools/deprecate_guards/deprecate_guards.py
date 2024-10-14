@@ -196,8 +196,7 @@ if __name__ == '__main__':
     access_token = os.getenv('GITHUB_TOKEN')
     if not access_token:
         print(
-            'Missing GITHUB_TOKEN: see instructions in tools/deprecate_guards/deprecate_guards.py'
-        )
+            'Missing GITHUB_TOKEN: see instructions in tools/deprecate_guards/deprecate_guards.py')
         sys.exit(1)
 
     create_issues(access_token, runtime_and_pr)
