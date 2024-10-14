@@ -205,6 +205,23 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "MIT",
         license_url = "https://github.com/aignas/rules_shellcheck/blob/v{version}/LICENSE",
     ),
+    com_github_awslabs_aws_c_auth = dict(
+        project_name = "aws-c-auth",
+        project_desc = "C99 library implementation of AWS client-side authentication: standard credentials providers and signing",
+        project_url = "https://github.com/awslabs/aws-c-auth",
+        version = "0.7.31",
+        sha256 = "7f97aacef6bd1649734383c2bf022250671f353b7fa60d195e6865d7f4594b43",
+        strip_prefix = "aws-c-auth-{version}",
+        urls = ["https://github.com/awslabs/aws-c-auth/archive/refs/tags/v{version}.tar.gz"],
+        use_category = ["test_only"],
+        extensions = [
+            "envoy.filters.http.aws_request_signing",
+        ],
+        release_date = "2024-09-16",
+        cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/awslabs/aws-c-auth/blob/v{version}/LICENSE",
+    ),
     com_github_axboe_liburing = dict(
         project_name = "liburing",
         project_desc = "C helpers to set up and tear down io_uring instances",
