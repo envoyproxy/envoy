@@ -34,6 +34,7 @@ jobs:
       # bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
+      diskspace-hack: ${{ matrix.diskspace-hack || false }}
       error-match: |
         ERROR
         error:
@@ -41,6 +42,12 @@ jobs:
         lower than limit
       rbe: true
       request: ${{ inputs.request }}
+      steps-post: |
+        - run: ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ matrix.target }}-upload'
+          shell: bash
+          env:
+            GCS_ARTIFACT_BUCKET: ${{ inputs.trusted && 'envoy-postsubmit' || 'envoy-pr' }}
+            GCS_REDIRECT_PATH: ${{ fromJSON(inputs.request).request.pr || fromJSON(inputs.request).request.target-branch }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
       trusted: ${{ inputs.trusted }}
@@ -50,5 +57,6 @@ jobs:
         include:
         - target: coverage
           name: Coverage
+          diskspace-hack: true
         - target: fuzz_coverage
           name: Fuzz coverage

@@ -4334,6 +4334,43 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
 }
 
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequestAndTimeout) {
+  proto_config_.set_observability_mode(true);
+  uint32_t deferred_close_timeout_ms = 2000;
+  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
+
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBodyAndTrailer("Hello");
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Advance 400 ms. Default timeout is 200ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse&) {
+    // Advance 400 ms. Default timeout is 200ms
+    timeSystem().advanceTimeWaitImpl(400ms);
+    return false;
+  });
+  processRequestTrailersMessage(*grpc_upstreams_[0], false,
+                                [this](const HttpTrailers&, TrailersResponse&) {
+                                  // Advance 400 ms. Default timeout is 200ms
+                                  timeSystem().advanceTimeWaitImpl(400ms);
+                                  return false;
+                                });
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms - 1200));
+}
+
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
   proto_config_.set_observability_mode(true);
 
