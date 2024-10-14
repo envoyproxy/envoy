@@ -34,16 +34,14 @@ std::vector<std::string> directoryListing() {
 
 class SigV4ASignerCorpusTest : public ::testing::TestWithParam<std::string> {
 public:
-  SigV4ASignerCorpusTest()
-      : credentials_provider_(new NiceMock<MockCredentialsProvider>()),
-        message_(new Http::RequestMessageImpl()) {}
+  SigV4ASignerCorpusTest() = default;
 
-  void addMethod(const std::string& method) { message_->headers().setMethod(method); }
+  void addMethod(const std::string& method) { message_.headers().setMethod(method); }
 
-  void addPath(const std::string& path) { message_->headers().setPath(path); }
+  void addPath(const std::string& path) { message_.headers().setPath(path); }
 
   void addHeader(const std::string& key, const std::string& value) {
-    message_->headers().addCopy(Http::LowerCaseString(key), value);
+    message_.headers().addCopy(Http::LowerCaseString(key), value);
   }
 
   std::string readStringFile(std::string path) {
@@ -126,7 +124,7 @@ public:
     short_date_ = short_date_formatter_.now(time_system_);
   }
   std::string getHeaderSignature() {
-    auto authheader = message_->headers()
+    auto authheader = message_.headers()
                           .get(Envoy::Http::LowerCaseString("Authorization"))[0]
                           ->value()
                           .getStringView();
@@ -137,7 +135,7 @@ public:
 
   std::string getQuerySignature() {
     auto query =
-        Http::Utility::QueryParamsMulti::parseQueryString(message_->headers().getPathValue());
+        Http::Utility::QueryParamsMulti::parseQueryString(message_.headers().getPathValue());
     auto val = query.getFirstValue("X-Amz-Signature");
     if (val.has_value()) {
       return val.value();
@@ -148,14 +146,14 @@ public:
 
   void addBodySigningIfRequired() {
     // Set body signing true if we have content-length
-    sign_body_ = !message_->headers().get(Envoy::Http::LowerCaseString("content-length")).empty();
+    sign_body_ = !message_.headers().get(Envoy::Http::LowerCaseString("content-length")).empty();
 
     if (sign_body_) {
-      message_->body().add(body_);
+      message_.body().add(body_);
       auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
-      content_hash_ = Hex::encode(hashing_util.getSha256Digest(message_->body()));
+      content_hash_ = Hex::encode(hashing_util.getSha256Digest(message_.body()));
       if (!query_string_) {
-        message_->headers().setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash_);
+        message_.headers().setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash_);
       }
     }
   }
@@ -177,7 +175,7 @@ public:
   }
 
   NiceMock<MockCredentialsProvider>* credentials_provider_;
-  Http::RequestMessagePtr message_;
+  Http::RequestMessageImpl message_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Json::ObjectSharedPtr json_context_;
   bool normalize_, omit_session_token_, sign_body_, query_string_;
@@ -257,11 +255,7 @@ std::vector<std::string> denylist = {"get-header-value-multiline", "get-vanilla-
                                      "get-vanilla-query-order-value"};
 
 TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusHeaderSigning) {
-
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
-
   rundir_ = GetParam();
-
   query_string_ = false;
 
   // Do not perform denylist tests
@@ -277,23 +271,25 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusHeaderSigning) {
   setDate();
   addBodySigningIfRequired();
 
+  auto* credentials_provider_ = new NiceMock<MockCredentialsProvider>();
+
   SigV4ASignerImpl headersigner_(
       service_, region_, CredentialsProviderSharedPtr{credentials_provider_}, context_,
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false, expiration_);
 
   auto signer_friend = SigV4ASignerImplFriend(&headersigner_);
 
-  signer_friend.addRequiredHeaders(message_->headers(), long_date_,
+  signer_friend.addRequiredHeaders(message_.headers(), long_date_,
                                    absl::optional<std::string>(token_), region_);
 
-  const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_->headers(), {});
+  const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_.headers(), {});
 
   if (content_hash_.empty()) {
     content_hash_ = SignatureConstants::HashedEmptyString;
   }
 
   const auto calculated_canonical_request = Utility::createCanonicalRequest(
-      method_, message_->headers().Path()->value().getStringView(), calculated_canonical_headers,
+      method_, message_.headers().Path()->value().getStringView(), calculated_canonical_headers,
       content_hash_, normalize_, true);
 
   auto source_canonical_request_ = readStringFile("header-canonical-request.txt");
@@ -320,11 +316,7 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusHeaderSigning) {
 }
 
 TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
-
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
-
   rundir_ = GetParam();
-
   query_string_ = true;
 
   // Do not perform denylist tests
@@ -340,7 +332,8 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
   setDate();
   addBodySigningIfRequired();
 
-  const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_->headers(), {});
+  const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_.headers(), {});
+  auto* credentials_provider_ = new NiceMock<MockCredentialsProvider>();
 
   SigV4ASignerImpl querysigner_(
       service_, region_, CredentialsProviderSharedPtr{credentials_provider_}, context_,
@@ -352,7 +345,7 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
       signer_friend.createCredentialScope(short_date_, region_);
 
   auto query_params =
-      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message_->headers().getPathValue());
+      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message_.headers().getPathValue());
 
   signer_friend.addRegionQueryParam(query_params, region_);
 
@@ -361,14 +354,14 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
       long_date_, token_.empty() ? absl::optional<std::string>(absl::nullopt) : token_,
       calculated_canonical_headers, expiration_);
 
-  message_->headers().setPath(query_params.replaceQueryString(message_->headers().Path()->value()));
+  message_.headers().setPath(query_params.replaceQueryString(message_.headers().Path()->value()));
 
   if (content_hash_.empty()) {
     content_hash_ = SignatureConstants::HashedEmptyString;
   }
 
   const auto calculated_canonical_request = Utility::createCanonicalRequest(
-      method_, message_->headers().Path()->value().getStringView(), calculated_canonical_headers,
+      method_, message_.headers().Path()->value().getStringView(), calculated_canonical_headers,
       content_hash_, normalize_, true);
 
   const auto source_canonical_request_ = readStringFile("query-canonical-request.txt");

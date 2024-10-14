@@ -1,4 +1,3 @@
-#include "source/extensions/common/aws/utility.h"
 
 #include <cstdint>
 #include <limits>
@@ -11,6 +10,8 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
+#include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
@@ -242,7 +243,7 @@ std::string Utility::canonicalizeQueryString(absl::string_view query_string) {
   // Encode query params name and value separately
   for (auto& query : query_list) {
     // The token has already been url encoded, so don't do it again
-    if (query.first == "X-Amz-Security-Token") {
+    if (query.first == SignatureQueryParameterValues::AmzSecurityToken) {
       query = std::make_pair(query.first, query.second);
     } else {
       query = std::make_pair(

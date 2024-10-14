@@ -217,7 +217,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.filters.http.aws_request_signing",
         ],
-        release_date = "2024-09-17",
+        release_date = "2024-09-16",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/awslabs/aws-c-auth/blob/v{version}/LICENSE",
