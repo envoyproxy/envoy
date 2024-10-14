@@ -181,19 +181,22 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
   if ((config_->emitFilterStateStats() || config_->filterMetadata().has_value())) {
-    if (!filter_state->hasDataWithName(decoder_callbacks_->filterConfigName())) {
+    if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
       filter_state->setData(decoder_callbacks_->filterConfigName(),
                             std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
                             Envoy::StreamInfo::FilterState::StateType::Mutable,
                             Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
+      // This may return nullptr (if there's a value at this name whose type doesn't match or isn't
+      // mutable, for example), so we must check logging_info_ is not nullptr later.
       logging_info_ =
           filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
-    } else {
+    }
+    if (logging_info_ == nullptr) {
       stats_.filter_state_name_collision_.inc();
       ENVOY_STREAM_LOG(debug,
-                       "Filter state stats / filter metadata are enabled, but filter state already "
-                       "contained data at key '{}'.",
+                       "Could not find logging info at {}! (Did another filter already put data "
+                       "at this name?)",
                        *decoder_callbacks_, decoder_callbacks_->filterConfigName());
     }
   }
@@ -408,7 +411,11 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 }
 
 void Filter::updateLoggingInfo() {
-  if (!config_->emitFilterStateStats() || logging_info_ == nullptr) {
+  if (!config_->emitFilterStateStats()) {
+    return;
+  }
+
+  if (logging_info_ == nullptr) {
     return;
   }
 

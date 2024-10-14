@@ -264,6 +264,13 @@ public:
 
     prepareCheck();
 
+    auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+    absl::optional<ExtAuthzLoggingInfo> preexisting_data_copy =
+        filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName)
+            ? absl::make_optional(
+                  *filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName))
+            : absl::nullopt;
+
     // ext_authz makes a single call to the external auth service once it sees the end of stream.
     EXPECT_CALL(*client_, check(_, _, _, _))
         .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -274,43 +281,28 @@ public:
           request_callbacks_ = &callbacks;
         }));
 
-    auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
-
-    // Check if there's already filter state present. If so, this was added by a test and it will
-    // affect the filter's behavior. Copy the object so we can later verify it wasn't overridden.
-    absl::optional<ExtAuthzLoggingInfo> preexisting_data =
-        filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName)
-            ? absl::make_optional<ExtAuthzLoggingInfo>(
-                  *filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName))
-            : absl::nullopt;
-
     EXPECT_CALL(*client_, streamInfo()).WillRepeatedly(Return(stream_info_.get()));
-
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter_->decodeHeaders(request_headers_, true));
 
     request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-    // Will exist if stats or filter metadata is emitted or if there was a preexisting logging
-    // info.
-    const bool expect_data =
-        std::get<1>(GetParam()) || std::get<2>(GetParam()) || preexisting_data.has_value();
-    ASSERT_EQ(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName), expect_data);
+    // Will exist if stats or filter metadata is emitted or if there was preexisting logging info.
+    bool expect_logging_info =
+        (std::get<1>(GetParam()) || std::get<2>(GetParam()) || preexisting_data_copy);
 
-    if (!expect_data) {
+    ASSERT_EQ(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName), expect_logging_info);
+
+    if (!expect_logging_info) {
       return;
     }
 
     auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-    if (preexisting_data.has_value()) {
-      // Filter state should not have been changed at all.
-      expectEq(*actual, *preexisting_data);
-
-      if (std::get<1>(GetParam()) || std::get<2>(GetParam())) {
-        EXPECT_EQ(1U, config_->stats().filter_state_name_collision_.value());
-      } else {
-        EXPECT_EQ(0U, config_->stats().filter_state_name_collision_.value());
-      }
+    ASSERT_NE(actual, nullptr);
+    if (preexisting_data_copy) {
+      expectEq(*actual, *preexisting_data_copy);
+      EXPECT_EQ((std::get<1>(GetParam()) || std::get<2>(GetParam())) ? 1U : 0U,
+                config_->stats().filter_state_name_collision_.value());
       return;
     }
 
@@ -4037,16 +4029,34 @@ TEST_P(EmitFilterStateTest, NullUpstreamHost) {
   test(response);
 }
 
-TEST_P(EmitFilterStateTest, PreexistingFilterState) {
+// hasData<ExtAuthzLoggingInfo>() will return false, setData() will succeed because this is
+// mutable, thus getMutableData<ExtAuthzLoggingInfo> will not be nullptr and the naming collision
+// is silently ignored.
+TEST_P(EmitFilterStateTest, PreexistingFilterStateDifferentTypeMutable) {
+  class TestObject : public Envoy::StreamInfo::FilterState::Object {};
   decoder_filter_callbacks_.stream_info_.filter_state_->setData(
-      FilterConfigName, std::make_shared<ExtAuthzLoggingInfo>(std::nullopt),
-      Envoy::StreamInfo::FilterState::StateType::ReadOnly,
+      FilterConfigName,
+      // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
+      // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
+      std::make_shared<TestObject>(), Envoy::StreamInfo::FilterState::StateType::Mutable,
       Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
-  expected_output_.clearUpstreamHost();
-  expected_output_.clearClusterInfo();
-  expected_output_.clearBytesSent();
-  expected_output_.clearBytesReceived();
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  test(response);
+}
+
+// hasData<ExtAuthzLoggingInfo>() will return true so the filter will not try to override the data.
+TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
+  class TestObject : public Envoy::StreamInfo::FilterState::Object {};
+  decoder_filter_callbacks_.stream_info_.filter_state_->setData(
+      FilterConfigName,
+      // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
+      // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
+      std::make_shared<ExtAuthzLoggingInfo>(absl::nullopt),
+      Envoy::StreamInfo::FilterState::StateType::Mutable,
+      Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
