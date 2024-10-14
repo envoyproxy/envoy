@@ -157,8 +157,6 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
   PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle(std::move(handle)) {}
-  Wasm* wasmOfHandle() { return handle != nullptr ? handle->wasmOfHandle() : nullptr; }
-  void updateHandle(PluginHandleSharedPtr new_handle) { handle = std::move(new_handle); }
   PluginHandleSharedPtr handle;
 };
 
