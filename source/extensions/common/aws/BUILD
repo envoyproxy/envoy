@@ -132,7 +132,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
+    hdrs = [
+        "signer_base_impl.h",
+        "utility.h",
+    ],
     copts = envoy_select_boringssl(
         [
             "-DENVOY_SSL_FIPS",
