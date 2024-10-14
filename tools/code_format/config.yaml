@@ -58,7 +58,6 @@ paths:
   - test/extensions/filters/http/wasm/test_data
   - test/extensions/filters/network/wasm/test_data
   - test/extensions/stats_sinks/wasm/test_data
-  - test/extensions/common/aws/signer_corpuses/
 
   build_fixer:
     exclude:
