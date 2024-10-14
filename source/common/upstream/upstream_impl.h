@@ -159,14 +159,6 @@ private:
 class HostDescriptionImplBase : virtual public HostDescription,
                                 protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  HostDescriptionImplBase(
-      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-      Network::Address::InstanceConstSharedPtr dest_address,
-      MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-      const envoy::config::core::v3::Locality& locality,
-      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source);
-
   Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
     absl::ReaderMutexLock lock(&metadata_mutex_);
     return socket_factory_;
@@ -250,6 +242,14 @@ public:
   }
 
 protected:
+  HostDescriptionImplBase(
+      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+      Network::Address::InstanceConstSharedPtr dest_address,
+      MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
+      const envoy::config::core::v3::Locality& locality,
+      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+      uint32_t priority, TimeSource& time_source, absl::Status& creation_status);
+
   /**
    * @return nullptr if address_list is empty, otherwise a shared_ptr copy of address_list.
    */
@@ -288,13 +288,13 @@ private:
  */
 class HostDescriptionImpl : public HostDescriptionImplBase {
 public:
-  HostDescriptionImpl(
-      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-      Network::Address::InstanceConstSharedPtr dest_address,
-      MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-      const envoy::config::core::v3::Locality& locality,
-      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
+  static absl::StatusOr<std::unique_ptr<HostDescriptionImpl>>
+  create(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+         Network::Address::InstanceConstSharedPtr dest_address,
+         MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
+         const envoy::config::core::v3::Locality& locality,
+         const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+         uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
 
   // HostDescription
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
@@ -302,6 +302,15 @@ public:
     return health_check_address_;
   }
   SharedConstAddressVector addressListOrNull() const override { return address_list_or_null_; }
+
+protected:
+  HostDescriptionImpl(
+      absl::Status& creation_status, ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+      Network::Address::InstanceConstSharedPtr dest_address,
+      MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
+      const envoy::config::core::v3::Locality& locality,
+      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+      uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
 
 private:
   // No locks are required in this implementation: all address-related member
@@ -470,16 +479,27 @@ private:
 
 class HostImpl : public HostImplBase, public HostDescriptionImpl {
 public:
-  HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-           Network::Address::InstanceConstSharedPtr address,
+  static absl::StatusOr<std::unique_ptr<HostImpl>>
+  create(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+         Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr endpoint_metadata,
+         MetadataConstSharedPtr locality_metadata, uint32_t initial_weight,
+         const envoy::config::core::v3::Locality& locality,
+         const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+         uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
+         TimeSource& time_source, const AddressVector& address_list = {});
+
+protected:
+  HostImpl(absl::Status& creation_status, ClusterInfoConstSharedPtr cluster,
+           const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
            MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
            uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
            TimeSource& time_source, const AddressVector& address_list = {})
       : HostImplBase(initial_weight, health_check_config, health_status),
-        HostDescriptionImpl(cluster, hostname, address, endpoint_metadata, locality_metadata,
-                            locality, health_check_config, priority, time_source, address_list) {}
+        HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
+                            locality_metadata, locality, health_check_config, priority, time_source,
+                            address_list) {}
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
