@@ -273,11 +273,12 @@ private:
     switch (matcher.matcher_tree().tree_type_case()) {
     case MatcherType::MatcherTree::kExactMatchMap: {
       return createMapMatcher<ExactMapMatcher>(matcher.matcher_tree().exact_match_map(), data_input,
-                                               on_no_match);
+                                               on_no_match, &ExactMapMatcher<DataType>::create);
     }
     case MatcherType::MatcherTree::kPrefixMatchMap: {
       return createMapMatcher<PrefixMapMatcher>(matcher.matcher_tree().prefix_match_map(),
-                                                data_input, on_no_match);
+                                                data_input, on_no_match,
+                                                &PrefixMapMatcher<DataType>::create);
     }
     case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
       PANIC("unexpected matcher type");
@@ -294,10 +295,14 @@ private:
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
+  using MapCreationFunction = std::function<absl::StatusOr<std::unique_ptr<MapMatcher<DataType>>>(
+      DataInputPtr<DataType>&& data_input, absl::optional<OnMatch<DataType>> on_no_match)>;
+
   template <template <class> class MapMatcherType, class MapType>
   MatchTreeFactoryCb<DataType>
   createMapMatcher(const MapType& map, DataInputFactoryCb<DataType> data_input,
-                   absl::optional<OnMatchFactoryCb<DataType>>& on_no_match) {
+                   absl::optional<OnMatchFactoryCb<DataType>>& on_no_match,
+                   MapCreationFunction creation_function) {
     std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
     match_children.reserve(map.map().size());
 
@@ -306,9 +311,11 @@ private:
           std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
     }
 
-    return [match_children, data_input, on_no_match]() {
-      auto multimap_matcher = std::make_unique<MapMatcherType<DataType>>(
+    return [match_children, data_input, on_no_match, creation_function]() {
+      auto matcher_or_error = creation_function(
           data_input(), on_no_match ? absl::make_optional((*on_no_match)()) : absl::nullopt);
+      THROW_IF_NOT_OK(matcher_or_error.status());
+      auto multimap_matcher = std::move(*matcher_or_error);
       for (const auto& children : match_children) {
         multimap_matcher->addChild(children.first, children.second());
       }
