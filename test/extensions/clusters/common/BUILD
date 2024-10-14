@@ -43,5 +43,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "@envoy_api//envoy/extensions/clusters/dns/v3:pkg_cc_proto",
     ],
 )
