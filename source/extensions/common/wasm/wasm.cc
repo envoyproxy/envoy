@@ -568,8 +568,8 @@ Wasm* PluginConfig::wasmOfHandle() {
     return nullptr;
   }
 
-  if (singleton_handle_ != nullptr) {
-    return singleton_handle_->wasmOfHandle();
+  if (is_singleton_handle_) {
+    return singleton_handle_ != nullptr ? singleton_handle_->wasmOfHandle() : nullptr;
   }
 
   ASSERT(thread_local_handle_ != nullptr);
