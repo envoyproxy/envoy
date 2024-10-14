@@ -59,11 +59,11 @@ std::vector<std::tuple<std::string, std::string, bool, Http::CodecType>>
 wasmDualFilterWithCodecsTestMatrix(bool include_nullvm, bool cpp_only,
                                    std::vector<Http::CodecType> codecs_type) {
   std::vector<std::tuple<std::string, std::string, bool, Http::CodecType>> values;
-  for (const auto& codec_type : codecs_type) {
-    for (const auto& p :
+  for (const Http::CodecType codec_type : codecs_type) {
+    for (const auto& [runtime, language] :
          Envoy::Extensions::Common::Wasm::wasmTestMatrix(include_nullvm, cpp_only)) {
-      values.push_back(std::make_tuple(std::get<0>(p), std::get<1>(p), true, codec_type));
-      values.push_back(std::make_tuple(std::get<0>(p), std::get<1>(p), false, codec_type));
+      values.push_back(std::make_tuple(runtime, language, true, codec_type));
+      values.push_back(std::make_tuple(runtime, language, false, codec_type));
     }
   }
   return values;
@@ -76,8 +76,8 @@ wasmTestParamsToString(const ::testing::TestParamInfo<std::tuple<std::string, st
 
 std::string wasmDualFilterTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<std::string, std::string, bool>>& p) {
-  return (std::get<2>(p.param) ? "downstream_" : "upstream_") + std::get<0>(p.param) + "_" +
-         std::get<1>(p.param);
+  auto [runtime, language, direction] = p.param;
+  return fmt::format("{}_{}_{}", direction ? "downstream" : "upstream", runtime, language);
 }
 
 static std::string codecToString(const Http::CodecType& e) {
