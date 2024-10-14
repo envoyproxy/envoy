@@ -81,6 +81,7 @@ bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
   }
 }
 
+// Send buffered data in STREAMED or MXN body mode.
 void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
   // Process the data being buffered in streaming mode.
   // Move the current buffer into the queue for remote processing and clear the buffered data.
@@ -345,12 +346,14 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     headers_ = nullptr;
 
     // Send trailers if they are available and no data pending for processing.
-    if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
+    if (send_trailers_ && trailers_available_ && chunk_queue_.empty() &&
+        (body_mode_ != ProcessingMode::MXN)) {
       filter_.sendTrailers(*this, *trailers_);
       return absl::OkStatus();
     }
 
-    if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
+    if (should_continue ||
+        (trailers_available_ && chunk_queue_.empty() && (body_mode_ != ProcessingMode::MXN))) {
       continueIfNecessary();
     }
     return absl::OkStatus();

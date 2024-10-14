@@ -77,7 +77,7 @@ message ProcessingMode {
     // Server may choose to buffer any number, i.e M, chunks of data before processing them.
     // After finish buffering, server processes the buffered data. Then it splits the processed
     // data into any number, i.e N, chunks, and stream them back to Envoy one by one.
-    // The server may continuously do above until the complete body is processed.
+    // The server may continuously do so until the complete body is processed.
     //
     // Server may also choose to buffer the entire message, including the headers(if header mode is
     // ``SEND``), the entire body, and the trailers(if present), before sending back any response.
@@ -86,7 +86,7 @@ message ProcessingMode {
     // In this body mode:
     // * The corresponding trailer mode has to be set to ``SEND``.
     // * Envoy will send body and trailers(if present) as they arrive.
-    //   Sending the trailers(if present) is to inform the server complete body arrives.
+    //   Sending the trailers(if present) is to inform the server the complete body arrives.
     //   In case of no trailers, then
     //   :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.HttpBody.end_of_stream>`
     //   serves for that purpose.

@@ -575,8 +575,9 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     if ((state.bodyMode() == ProcessingMode::STREAMED &&
          config_->sendBodyWithoutWaitingForHeaderResponse()) ||
         state.bodyMode() == ProcessingMode::MXN) {
-      ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
-                       "is STREAMED and send_body_without_waiting_for_header_response is enabled");
+      ENVOY_LOG(trace,
+                "Sending body data even header processing is still in progress as body mode "
+                "is MXN or STREAMED and send_body_without_waiting_for_header_response is enabled");
     } else {
       ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
       // We don't know what to do with the body until the response comes back.
@@ -620,7 +621,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     break;
   case ProcessingMode::STREAMED:
   case ProcessingMode::MXN: {
-    // STREAMED body mode works as follows:
+    // STREAMED or MXN body mode works as follows:
     //
     // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it
     // dispatches via gRPC message to the external processor, and then keeps in a queue. It
@@ -759,7 +760,7 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
   // For the body processing mode in observability mode, only STREAMED body processing mode is
   // supported and any other body processing modes will be ignored. NONE mode(i.e., skip body
   // processing) will still work as expected.
-  if (state.bodyMode() == ProcessingMode::STREAMED || state.bodyMode() == ProcessingMode::MXN) {
+  if (state.bodyMode() == ProcessingMode::STREAMED) {
     // Try to open the stream if the connection has not been established.
     switch (openStream()) {
     case StreamOpenState::Error:
