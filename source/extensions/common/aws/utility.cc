@@ -1,3 +1,4 @@
+#include "source/extensions/common/aws/utility.h"
 
 #include <cstdint>
 #include <limits>
@@ -11,7 +12,6 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/aws/signer_base_impl.h"
-#include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"

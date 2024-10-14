@@ -1,3 +1,4 @@
+#include "source/extensions/common/aws/signer_base_impl.h"
 
 #include <openssl/ssl.h>
 
@@ -13,7 +14,6 @@
 #include "source/common/crypto/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/common/aws/signer_base_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_join.h"
