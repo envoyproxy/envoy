@@ -3,6 +3,9 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
 TEST(ServerContextImplTest, OneByteCBSParameterReturnsEmptyCurveNIDVector) {
   // A one-byte CBS will result in `CBS_get_u16` returning false
   // giving us coverage for the break in `getClientCurveNIDSupported`.
@@ -12,4 +15,7 @@ TEST(ServerContextImplTest, OneByteCBSParameterReturnsEmptyCurveNIDVector) {
   Ssl::CurveNIDVector nullCbs = getClientCurveNIDSupported(cbs);
   EXPECT_EQ(0, nullCbs.size());
 }
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 } // namespace Envoy

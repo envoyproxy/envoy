@@ -41,6 +41,10 @@
 
 namespace Envoy {
 
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+
 Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs) {
   Ssl::CurveNIDVector cnsv{};
   while (CBS_len(&cbs) > 0) {
@@ -49,7 +53,7 @@ Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs) {
       break;
     }
     // Check for values that refer to the `sigalgs` used in TLSv1.3 negotiation (left)
-    // or their equivalent curve expressed in TLSv1.2 `LSEXT_TYPE_supported_groups`
+    // or their equivalent curve expressed in TLSv1.2 `TLSEXT_TYPE_supported_groups`
     // present in ClientHello (right).
     if (v == SSL_SIGN_ECDSA_SECP256R1_SHA256 || v == SSL_CURVE_SECP256R1) {
       cnsv.push_back(NID_X9_62_prime256v1);
@@ -63,10 +67,6 @@ Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs) {
   }
   return cnsv;
 }
-
-namespace Extensions {
-namespace TransportSockets {
-namespace Tls {
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,
                                           const unsigned char* in, unsigned int inlen) {

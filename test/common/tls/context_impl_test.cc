@@ -1461,7 +1461,7 @@ TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
 }
 
 // Validate that a P-224 key will cause an error.
-TEST_F(ClientContextConfigImplTest, BrainpoolCert) {
+TEST_F(ClientContextConfigImplTest, UnsupportedCurveEcdsaCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:

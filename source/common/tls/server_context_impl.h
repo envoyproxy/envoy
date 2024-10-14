@@ -37,11 +37,11 @@
 
 namespace Envoy {
 
-Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs);
-
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+Ssl::CurveNIDVector getClientCurveNIDSupported(CBS& cbs);
 
 class ServerContextImpl : public ContextImpl,
                           public Envoy::Ssl::ServerContext,
