@@ -122,7 +122,7 @@ FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
     logBody(type);
     if (end_of_stream) {
       getBufferStatus(type, &size, &flags);
-      setBuffer(type, size, 0, ".0");
+      setBuffer(type, size, 0, ".end");
       return FilterDataStatus::Continue;
     }
     return FilterDataStatus::StopIterationAndBuffer;

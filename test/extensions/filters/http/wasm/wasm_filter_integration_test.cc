@@ -12,15 +12,14 @@ namespace {
 
 class WasmFilterIntegrationTest
     : public HttpIntegrationTest,
-      public testing::TestWithParam<
-          std::tuple<std::tuple<std::string, std::string, bool>, Http::CodecType>> {
+      public testing::TestWithParam<std::tuple<std::string, std::string, bool, Http::CodecType>> {
 public:
   WasmFilterIntegrationTest()
-      : HttpIntegrationTest(std::get<1>(GetParam()), Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(std::get<3>(GetParam()), Network::Address::IpVersion::v4) {}
 
   void SetUp() override {
-    setUpstreamProtocol(std::get<1>(GetParam()));
-    if (std::get<1>(GetParam()) == Http::CodecType::HTTP2) {
+    setUpstreamProtocol(std::get<3>(GetParam()));
+    if (std::get<3>(GetParam()) == Http::CodecType::HTTP2) {
       config_helper_.setClientCodec(envoy::extensions::filters::network::http_connection_manager::
                                         v3::HttpConnectionManager::HTTP2);
     } else {
@@ -35,7 +34,7 @@ public:
   void TearDown() override { fake_upstream_connection_.reset(); }
 
   void setupWasmFilter(const std::string& config, const std::string& root_id = "") {
-    bool downstream = std::get<2>(std::get<0>(GetParam()));
+    bool downstream = std::get<2>(GetParam());
     const std::string yaml = TestEnvironment::substitute(absl::StrCat(
         R"EOF(
           name: envoy.filters.http.wasm
@@ -48,14 +47,15 @@ public:
               vm_config:
                 vm_id: "vm_id"
                 runtime: envoy.wasm.runtime.)EOF",
-        std::get<0>(std::get<0>(GetParam())), R"EOF(
+        std::get<0>(GetParam()), R"EOF(
                 configuration:
                   "@type": type.googleapis.com/google.protobuf.StringValue
                   value: )EOF",
         config, R"EOF(
                 code:
                   local:
-                    filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+                    filename: "/Users/jolle/repos/envoy-jmo/test_cpp_append2.wasm"
+                    #filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
         )EOF"));
     config_helper_.prependFilter(yaml, downstream);
   }
@@ -129,21 +129,11 @@ public:
     ASSERT_TRUE(fake_upstream_connection_->close());
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
-
-  static std::string
-  testParamsToString(const ::testing::TestParamInfo<
-                     std::tuple<std::tuple<std::string, std::string, bool>, Http::CodecType>>& p) {
-    return fmt::format("{}_{}_{}_{}", std::get<2>(std::get<0>(p.param)) ? "downstream" : "upstream",
-                       std::get<0>(std::get<0>(p.param)), std::get<1>(std::get<0>(p.param)),
-                       std::get<1>(p.param) == Http::CodecType::HTTP2 ? "Http2" : "Http");
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFilterIntegrationTest,
-                         testing::Combine(Common::Wasm::dual_filter_sandbox_runtime_and_cpp_values,
-                                          testing::Values(Http::CodecType::HTTP1,
-                                                          Http::CodecType::HTTP2)),
-                         WasmFilterIntegrationTest::testParamsToString);
+                         Common::Wasm::dual_filter_with_codecs_sandbox_runtime_and_cpp_values,
+                         Common::Wasm::wasmDualFilterWithCodecsTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmFilterIntegrationTest);
 
 TEST_P(WasmFilterIntegrationTest, HeadersManipulation) {
@@ -215,9 +205,9 @@ TEST_P(WasmFilterIntegrationTest, BodyBufferedManipulation) {
 
   auto request_body = std::vector<std::string>{{"request_"}, {"body"}};
   auto upstream_response_body = std::vector<std::string>{{"upstream_"}, {"body"}};
-  runTest(request_headers, request_body, expected_request_headers, "request_body.0",
+  runTest(request_headers, request_body, expected_request_headers, "request_body.end",
           upstream_response_headers, upstream_response_body, expected_response_headers,
-          "upstream_body.0");
+          "upstream_body.end");
 }
 
 TEST_P(WasmFilterIntegrationTest, BodyBufferedMultipleChunksManipulation) {
@@ -240,9 +230,9 @@ TEST_P(WasmFilterIntegrationTest, BodyBufferedMultipleChunksManipulation) {
   auto request_body = std::vector<std::string>{{"request_"}, {"very_"}, {"long_"}, {"body"}};
   auto upstream_response_body =
       std::vector<std::string>{{"upstream_"}, {"very_"}, {"long_"}, {"body"}};
-  runTest(request_headers, request_body, expected_request_headers, "request_very_long_body.0",
+  runTest(request_headers, request_body, expected_request_headers, "request_very_long_body.end",
           upstream_response_headers, upstream_response_body, expected_response_headers,
-          "upstream_very_long_body.0");
+          "upstream_very_long_body.end");
 }
 
 } // namespace
