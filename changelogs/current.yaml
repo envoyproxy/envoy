@@ -22,8 +22,8 @@ behavior_changes:
     Added HTTP/1-safe option for :ref:`max_connection_duration
     <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` in
     HttpConnectionManager. When enabled, ``max_connection_duration`` will only drain downstream
-    HTTP/1 connections by adding the "Connection: close" response header; it will never cause the
-    HttpConnectionManager to close the connection itself.  Defaults to off (allows "unsafe" connection closing)
+    HTTP/1 connections by adding the ``Connection: close`` response header; it will never cause the
+    ``HttpConnectionManager`` to close the connection itself.  Defaults to off (allows "unsafe" connection closing)
     but is configurable via :ref:`http1_safe_max_connection_duration
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.http1_safe_max_connection_duration>`.
 - area: eds
@@ -37,7 +37,7 @@ behavior_changes:
     the runtime flag ``envoy.restart_features.use_eds_cache_for_ads`` to ``false``.
 - area: stats scoped_rds
   change: |
-    Added new tag extraction so that scoped rds stats have their scope_route_config_name and stat prefix extracted.
+    Added new tag extraction so that scoped rds stats have their ``scope_route_config_name`` and stat prefix extracted.
 - area: http
   change: |
     The default configuration of Envoy will continue to trust internal addresses while in the future it will not trust them by default.
@@ -71,17 +71,17 @@ minor_behavior_changes:
     <envoy_v3_api_field_config.cluster.v3.Cluster.connection_pool_per_downstream_connection>` flag in tcp connection pool.
 - area: http3
   change: |
-    The ACCEPT_UNTRUSTED option now works more consistently for HTTP/3 requests. This change is
+    The ``ACCEPT_UNTRUSTED`` option now works more consistently for HTTP/3 requests. This change is
     guarded by ``envoy.reloadable_features.extend_h3_accept_untrusted``.
 - area: http3
   change: |
-    HTTP/3 alt-svc headers will now be respected from IP-address-based hostnames. This change is
+    HTTP/3 ``alt-svc`` headers will now be respected from IP-address-based hostnames. This change is
     guarded by runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips``.
 - area: lua
   change: |
-    When Lua scripts execute httpCall, backpressure is now exercised when receiving body from downstream
+    When Lua scripts execute ``httpCall``, backpressure is now exercised when receiving body from downstream
     client. This behavior can be reverted
-    by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
+    by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to ``false``.
 - area: ext_proc
   change: |
     Added support for :ref:`send_body_without_waiting_for_header_response
@@ -89,17 +89,17 @@ minor_behavior_changes:
 - area: http
   change: |
     Modified the authority header value validator to allow the same characters as oghttp2
-    plus the "@" character. This is compliant with nghttp2, and supports the HTTP/1 use-cases
-    that allow user-info@ as part of the authority. This behavior can be reverted by setting
-    the runtime guard ``envoy.reloadable_features.internal_authority_header_validator`` to false.
+    plus the ``@`` character. This is compliant with nghttp2, and supports the HTTP/1 use-cases
+    that allow ``user-info@`` as part of the authority. This behavior can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.internal_authority_header_validator`` to ``false``.
 - area: sni
   change: |
     When computing SNI and SAN value for the auto-sni and auto-san verification feature,
     route host manipulations are now taken into account. This behavior can be reverted
-    by setting the runtime guard ``envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san`` to false.
+    by setting the runtime guard ``envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san`` to ``false``.
 - area: aws
   change: |
-    Aws request signing common code now uses the http async client by default, moving curl to the
+    AWS request signing common code now uses the HTTP async client by default, moving curl to the
     deprecation path. This behavior change can be
     reverted by setting the ``envoy_reloadable_features_use_http_client_to_fetch_aws_credentials``
     runtime flag to ``false``.
@@ -113,11 +113,11 @@ minor_behavior_changes:
     Made the inner ``transport_socket`` field optional in the proto configuration.
 - area: conn_handler
   change: |
-    Enhanced listener filter chain execution to handle the case that listener filter has maxReadBytes() of 0,
-    but may return StopIteration in onAccept to wait for asynchronous callback.
+    Enhanced listener filter chain execution to handle the case that listener filter has ``maxReadBytes()`` of 0,
+    but may return ``StopIteration`` in ``onAccept`` to wait for asynchronous callback.
 - area: tracers
   change: |
-    Set status code based on GRPC status code for OpenTelemetry tracers (previously unset).
+    Set status code based on gRPC status code for OpenTelemetry tracers (previously unset).
 - area: xds-failover
   change: |
     Add the ability to stick with either the primary or the failover xDS sources once Envoy connects to one of them.
@@ -128,9 +128,9 @@ minor_behavior_changes:
     requests and responses to address to address stability concerns. This behavior can be reverted by setting the feature to ``true``.
 - area: udp
   change: |
-    Envoy now sets the Don't Fragment (DF) flag bit on IP packet header on UDP listener sockets and
+    Envoy now sets the Don't Fragment (``DF``) flag bit on IP packet header on UDP listener sockets and
     QUIC upstream connection sockets. This behavior
-    can be reverted by setting ``envoy.reloadable_features.udp_set_do_not_fragment`` to false.
+    can be reverted by setting ``envoy.reloadable_features.udp_set_do_not_fragment`` to ``false``.
 - area: access_log
   change: |
     Sanitize SNI for potential log injection. The invalid character will be replaced by ``_`` with an ``invalid:`` marker.
@@ -145,13 +145,13 @@ bug_fixes:
 - area: dispatcher
   change: |
     Update approximate now after polling instead of before polling. This is only used by QUIC.
-    The behavior can be reverted by setting ``envoy.restart_features.fix_dispatcher_approximate_now`` to false.
+    The behavior can be reverted by setting ``envoy.restart_features.fix_dispatcher_approximate_now`` to ``false``.
 - area: dns
   change: |
-    The DNS filter no longer returns FORMERR if a message has an ID of 0.
+    The DNS filter no longer returns ``FORMERR`` if a message has an ``ID`` of 0.
 - area: quic
   change: |
-    Fixes access log formatter %CONNECTION_ID% for QUIC connections.
+    Fixes access log formatter ``%CONNECTION_ID%`` for QUIC connections.
 - area: c-ares
   change: |
     Applying a C-ares patch to fix DNS resoultion by the Google gRPC library.
@@ -160,18 +160,19 @@ bug_fixes:
     Fixed a bug where the websocket upgrade filter would not take into account per-filter configs.
 - area: ext_proc
   change: |
-    Add runtime guard for timeout error code 504 Gateway Timeout that is returned to downstream. If runtime flag
-    ``envoy.reloadable_features.ext_proc_timeout_error`` is set to false, old error code 500 Internal Server Error will be returned.
+    Add runtime guard for timeout error code ``504 Gateway Timeout`` that is returned to downstream. If runtime flag
+    ``envoy.reloadable_features.ext_proc_timeout_error`` is set to ``false``, old error code ``500 Internal Server Error``
+    will be returned.
 - area: rbac
   change: |
     RBAC will now allow stat prefixes configured in per-route config to override the base config's
     stat prefix.
 - area: http2
   change: |
-    Fixed bug where an upstream that sent a GOAWAY and gracefully closed a connection would result in an increment of
+    Fixed bug where an upstream that sent a ``GOAWAY`` and gracefully closed a connection would result in an increment of
     the cluster stat ``upstream_cx_protocol_error`` and setting the ``UpstreamProtocolError`` response flag. This behavior
     can be reverted by setting the runtime guard ``envoy.reloadable_features.http2_no_protocol_error_upon_clean_close``
-    to false.
+    to ``false``.
 - area: http3
   change: |
     Fixed a bug where an empty trailers block could be sent. This would occur if a filter removed
@@ -183,7 +184,7 @@ bug_fixes:
     Fixed a bug where an incomplete request (missing body or trailers) may be proxied to the upstream when the limit on
     the number of requests per I/O cycle is configured and an HTTP decoder filter that pauses filter chain is present. This behavior
     can be reverted by setting the runtime guard ``envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream``
-    to false.
+    to ``false``.
 - area: upstream
   change: |
     Fixed a bug using hard coded drop category when reporting drop_overload stats to the load report service.
@@ -196,9 +197,9 @@ bug_fixes:
     This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.proxy_ssl_port`` to ``false``.
 - area: runtime
   change: |
-    Fixed an inconsistency in how boolean values are loaded in RTDS, where they were previously converted to "1"/"0"
-    instead of "true"/"false". The correct string representation ("true"/"false") will now be used. This change can be
-    reverted by setting the runtime guard ``envoy.reloadable_features.boolean_to_string_fix`` to false.
+    Fixed an inconsistency in how boolean values are loaded in RTDS, where they were previously converted to ``1``/``0``
+    instead of ``true``/``false``. The correct string representation (``true``/``false``) will now be used. This change can be
+    reverted by setting the runtime guard ``envoy.reloadable_features.boolean_to_string_fix`` to ``false``.
 - area: jwt
   change: |
     Fixed a bug where using ``clear_route_cache`` with remote JWKs works
@@ -206,10 +207,10 @@ bug_fixes:
     any route.
 - area: http_async_client
   change: |
-    Fixed the local reply and destroy order crashes when using the http async client for websocket handshake.
+    Fixed the local reply and destroy order crashes when using the HTTP async client for websocket handshake.
 - area: http3
   change: |
-    Fixed a bug in the CONNECT-UDP forwarding mode where Envoy reset the upstream stream when it
+    Fixed a bug in the ``CONNECT-UDP`` forwarding mode where Envoy reset the upstream stream when it
     received HTTP/3 datagrams before receiving the SETTINGS frame from the upstream peer. Envoy now
     drops the datagrams in this case instead of resetting the stream.
 - area: oauth
@@ -226,7 +227,7 @@ bug_fixes:
 - area: dynamic_forward_proxy
   change: |
     Fixed a bug where DFP sub-cluster gets removed due to CDS update and doesn't gets recreated. This behavior can be reverted by
-    setting the runtime guard ``envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update`` to false.
+    setting the runtime guard ``envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -446,8 +447,8 @@ new_features:
     external authentication for redis proxy.
 - area: udp_access_logs
   change: |
-    Added support for %BYTES_RECEIVED%, %BYTES_SENT%, %UPSTREAM_HEADER_BYTES_SENT%, %UPSTREAM_HEADER_BYTES_RECEIVED%,
-    %UPSTREAM_WIRE_BYTES_SENT%, %UPSTREAM_WIRE_BYTES_RECEIVED% access log substitution strings for UDP tunneling flows.
+    Added support for ``%BYTES_RECEIVED%``, ``%BYTES_SENT%``, ``%UPSTREAM_HEADER_BYTES_SENT%``, ``%UPSTREAM_HEADER_BYTES_RECEIVED%``,
+    ``%UPSTREAM_WIRE_BYTES_SENT%``, ``%UPSTREAM_WIRE_BYTES_RECEIVED%`` access log substitution strings for UDP tunneling flows.
 - area: original_ip_detection extension
   change: |
     The :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
@@ -465,8 +466,8 @@ new_features:
     Add the :ref:`rate_limits
     <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.rate_limits>`
     field to generate rate limit descriptors. If this field is set, the
-    :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
-    :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+    :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+    :ref:`RouteAction.rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
     will be ignored.
 - area: basic_auth
   change: |
