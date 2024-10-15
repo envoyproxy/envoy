@@ -1515,6 +1515,7 @@ public:
     if (context_ != nullptr) {
       context_->setDecoderFilterCallbacks(decoder_callbacks_);
       context_->setEncoderFilterCallbacks(encoder_callbacks_);
+      context_->onCreate();
     }
   }
 
@@ -1595,21 +1596,14 @@ vm_config:
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_backoff_.value(), 0);
 
     EXPECT_CALL(decoder_callbacks_,
-                sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _, _, _));
-    request_body.add("skip_panic");
-    EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark,
-              context_->decodeData(request_body, true));
-
-    // Create third context.
-    createContext();
-
-    EXPECT_CALL(decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                                testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
                                testing::Eq("wasm_fail_stream")));
-    request_body.drain(request_body.length());
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
+
+    // The wasm should be in runtime error state.
+    EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
     // The wasm failed again and the wasmOfHandle() will try to reload again but will backoff.
     // The previous wasm will be returned.
