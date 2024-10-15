@@ -75,7 +75,6 @@ private:
   FilterState filter_state_;
   std::shared_ptr<HttpCache> cache_;
   Http::AsyncClient::Stream* stream_ = nullptr;
-  std::unique_ptr<UpstreamRequest> self_ownership_;
   std::unique_ptr<CacheInsertQueue> insert_queue_;
 };
 

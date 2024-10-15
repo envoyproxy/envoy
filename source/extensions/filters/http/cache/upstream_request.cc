@@ -117,11 +117,8 @@ UpstreamRequest* UpstreamRequest::create(CacheFilter* filter, LookupContextPtr l
                                          std::shared_ptr<HttpCache> cache,
                                          Http::AsyncClient& async_client,
                                          const Http::AsyncClient::StreamOptions& options) {
-  auto upstream_request = std::make_unique<UpstreamRequest>(
-      filter, std::move(lookup), std::move(lookup_result), std::move(cache), async_client, options);
-  UpstreamRequest* ret = upstream_request.get();
-  ret->self_ownership_ = std::move(upstream_request);
-  return ret;
+  return new UpstreamRequest(filter, std::move(lookup), std::move(lookup_result), std::move(cache),
+                             async_client, options);
 }
 
 UpstreamRequest::UpstreamRequest(CacheFilter* filter, LookupContextPtr lookup,
@@ -179,7 +176,7 @@ UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void UpstreamRequest::onReset() { self_ownership_ = nullptr; }
+void UpstreamRequest::onReset() { delete this; }
 void UpstreamRequest::onComplete() {
   if (filter_) {
     ENVOY_STREAM_LOG(debug, "UpstreamRequest complete", *filter_->decoder_callbacks_);
@@ -188,7 +185,7 @@ void UpstreamRequest::onComplete() {
   } else {
     ENVOY_LOG(debug, "UpstreamRequest complete after stream finished");
   }
-  self_ownership_ = nullptr;
+  delete this;
 }
 void UpstreamRequest::disconnectFilter() {
   filter_ = nullptr;
