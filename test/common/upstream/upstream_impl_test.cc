@@ -5594,6 +5594,69 @@ TEST_F(ClusterInfoImplTest, Http2AutoWithNonAlpnMatcherAndValidationOff) {
   EXPECT_NO_THROW(makeCluster(yaml + auto_http2));
 }
 
+TEST_F(ClusterInfoImplTest, MaxResponseHeadersDefault) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_FALSE(cluster->info()->maxResponseHeadersKb().has_value());
+  EXPECT_EQ(100, cluster->info()->maxResponseHeadersCount());
+}
+
+// Test that the runtime override for the defaults is used when specified.
+TEST_F(ClusterInfoImplTest, MaxResponseHeadersRuntimeOverride) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("envoy.reloadable_features.max_response_headers_size_kb", _))
+      .WillRepeatedly(Return(123));
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("envoy.reloadable_features.max_response_headers_count", _))
+      .WillRepeatedly(Return(456));
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(absl::make_optional(uint16_t(123)), cluster->info()->maxResponseHeadersKb());
+  EXPECT_EQ(456, cluster->info()->maxResponseHeadersCount());
+}
+
+// Test that the runtime override is ignored if there is a configured value.
+TEST_F(ClusterInfoImplTest, MaxResponseHeadersRuntimeOverrideIgnored) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          max_response_headers_kb: 1
+          max_headers_count: 2
+        explicit_http_config:
+          http2_protocol_options: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getDouble("envoy.reloadable_features.max_response_headers_size_kb", _))
+      .WillRepeatedly(Return(123));
+  EXPECT_CALL(runtime_.snapshot_,
+              getDouble("envoy.reloadable_features.max_response_headers_count", _))
+      .WillRepeatedly(Return(456));
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(absl::make_optional(uint16_t(1)), cluster->info()->maxResponseHeadersKb());
+  EXPECT_EQ(2, cluster->info()->maxResponseHeadersCount());
+}
+
 TEST_F(ClusterInfoImplTest, UpstreamFilterTypedAndDynamicConfigThrows) {
   const std::string yaml = R"EOF(
     name: name
