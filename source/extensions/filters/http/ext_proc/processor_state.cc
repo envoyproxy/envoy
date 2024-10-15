@@ -111,6 +111,7 @@ absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_
 
 ProcessorState::CallbackState
 ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_response) const {
+  // TBD what about there is no body but trailers
   if (((bodyMode() == ProcessingMode::STREAMED &&
         filter_.config().sendBodyWithoutWaitingForHeaderResponse()) ||
        bodyMode() == ProcessingMode::MXN) &&
@@ -229,9 +230,11 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         return absl::OkStatus();
       }
       if (send_trailers_ && trailers_available_) {
-        // Trailers came in while we were waiting for this response, and the server
-        // is not interested in the body, so send them now.
-        filter_.sendTrailers(*this, *trailers_);
+        if (body_mode_ != ProcessingMode::MXN) {
+          // Trailers came in while we were waiting for this response, and the server
+          // is not interested in the body, so send them now.
+          filter_.sendTrailers(*this, *trailers_);
+        }
         clearWatermark();
         return absl::OkStatus();
       }
@@ -291,15 +294,16 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
       if (common_response.has_body_mutation() && common_response.body_mutation().has_mxn_resp()) {
-        ENVOY_LOG(debug, "MxN body response is received and body_mode_== ProcessingMode::MXN?  {} ",
-                  (body_mode_ == ProcessingMode::MXN));
+        ENVOY_LOG(debug, "MxN body response is received and body_mode_: {} ",
+                  ProcessingMode::BodySendMode_Name(body_mode_));
         // mxn_resp will only be supported if the ext_proc filter has body_mode set to MXN.
-        if (body_mode_ != ProcessingMode::MXN) {
+        if (body_mode_ != ProcessingMode::MXN ||
+            common_response.body_mutation().mxn_resp().chunks_received() > chunk_queue_.size()) {
           return absl::FailedPreconditionError("spurious message");
         }
         should_continue = handleMxnBodyResponse(common_response);
       } else {
-        should_continue = handleSingleChunkInBodyResponse(common_response);
+        should_continue = handleStreamedBodyResponse(common_response);
       }
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
@@ -413,7 +417,7 @@ void ProcessorState::continueIfNecessary() {
   }
 }
 
-bool ProcessorState::handleSingleChunkInBodyResponse(const CommonResponse& common_response) {
+bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_response) {
   Buffer::OwnedImpl chunk_data;
   auto chunk = dequeueStreamingChunk(chunk_data);
   ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
@@ -440,12 +444,12 @@ bool ProcessorState::handleSingleChunkInBodyResponse(const CommonResponse& commo
 }
 
 bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response) {
-  // If confirmed_chunks_count is encoded, clear the chunks from the queue, and clear the watermark.
-  const uint32_t confirmed_chunks_count =
-      common_response.body_mutation().mxn_resp().confirmed_chunks_count();
-  if (confirmed_chunks_count > 0 && confirmed_chunks_count <= chunk_queue_.size()) {
-    ENVOY_LOG(trace, "MxN: Clearing {} chunks of HTTP body", confirmed_chunks_count);
-    for (uint32_t i = 0; i < confirmed_chunks_count; i++) {
+  const auto& mxn_resp = common_response.body_mutation().mxn_resp();
+  // If chunks_received field is encoded, clear the chunks from the queue, and clear the watermark.
+  const uint32_t chunks_received = mxn_resp.chunks_received();
+  if (chunks_received > 0) {
+    ENVOY_LOG(trace, "MxN: Clearing {} chunks of HTTP body from the queue", chunks_received);
+    for (uint32_t i = 0; i < chunks_received; i++) {
       Buffer::OwnedImpl chunk_data;
       (void)dequeueStreamingChunk(chunk_data);
       chunk_data.drain(chunk_data.length());
@@ -456,9 +460,20 @@ bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response
   }
 
   // If body mutation is encoded, send the body out.
-  const auto& mxn_resp = common_response.body_mutation().mxn_resp();
   const auto& body = mxn_resp.body();
-  bool end_of_stream = mxn_resp.end_of_stream();
+  const bool end_of_body = mxn_resp.end_of_body();
+  bool end_of_stream;
+  if (!end_of_body) {
+    end_of_stream = false;
+  } else {
+    if (trailers_available_) {
+      end_of_stream = false;
+    } else {
+      // If trailers are not available, and server sends end_of_body = true, then this
+      // means there is no trailer, and the end_of_stream is received when processing body.
+      end_of_stream = true;
+    }
+  }
   if (body.size() > 0) {
     Buffer::OwnedImpl buffer;
     buffer.add(body);
@@ -469,13 +484,13 @@ bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response
 
   if (end_of_stream) {
     onFinishProcessorCall(Grpc::Status::Ok);
-  } else if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
+  } else if (end_of_body) {
     onFinishProcessorCall(Grpc::Status::Ok, CallbackState::TrailersCallback);
   } else {
-    onFinishProcessorCall(Grpc::Status::Ok, callback_state_);
+    onFinishProcessorCall(Grpc::Status::Ok, CallbackState::StreamedBodyCallback);
   }
 
-  bool should_continue = end_of_stream;
+  const bool should_continue = end_of_stream;
   return should_continue;
 }
 

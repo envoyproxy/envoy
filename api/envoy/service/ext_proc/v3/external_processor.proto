@@ -367,12 +367,11 @@ message MxnBodyResponse {
   // Envoy sends this body mutation out as it is.
   bytes body = 1;
 
-  // Set this flag to true for the last body response if a ``ProcessingRequest`` is received with
-  // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.HttpBody.end_of_stream>` is true.
-  bool end_of_stream = 2;
+  // Set this flag to true for the last body response.
+  bool end_of_body = 2;
 
   // The ext_proc server sends this number to notify Envoy how many body chunks are received.
-  // The server may send a response message with ``confirmed_chunks_count`` set to 1 for each body chunk it receives.
+  // The server may send a response message with ``chunks_received`` set to 1 for each body chunk it receives.
   // It may also choose to wait for receiving multiple body chunks, then send an aggregated number back to Envoy for confirmation.
   //
   // After receives this, Envoy will
@@ -381,14 +380,14 @@ message MxnBodyResponse {
   // * Consume that amount of chunks in it's queue to avoid flow control being triggered. This also enables more data chunks
   //   be able to get into Envoy.
   //
-  // In the situation when the ext_proc server needs to buffer large amount of data before sending back body response, to avoid
-  // Envoy timeouts or flow control events being triggered, it should send standalone ``BodyMutation`` response messages with
-  // ``confirmed_chunks_count`` field set back to Envoy.
+  // In the situation when the ext_proc server needs to buffer large amount of data before sending back body responses, to avoid
+  // Envoy timeouts or flow control events being triggered, it should send standalone ``MxnBodyResponse`` messages with
+  // ``chunks_received`` field set back to Envoy.
   //
   // In the case the ext_proc server does not need to buffer large amount of data, and buffering time is short,  the server
-  // may choose to send a ``MxnBodyResponse`` message with both ``body`` and ``confirmed_chunks_count`` field set.
+  // may choose to send a ``MxnBodyResponse`` message with both ``body`` and ``chunks_received`` field set.
   // This can save some gRPC calls thus is a more efficient and recommended way for sending confirmation in such situation.
-  uint32 confirmed_chunks_count = 3;
+  uint32 chunks_received = 3;
 }
 
 // Body mutation
