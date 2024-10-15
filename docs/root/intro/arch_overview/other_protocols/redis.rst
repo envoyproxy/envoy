@@ -205,7 +205,9 @@ For details on each command's usage see the official
   RPUSHX, List
   PUBLISH, Pubsub
   EVAL, Scripting
+  EVAL_RO, Scripting
   EVALSHA, Scripting
+  EVALSHA_RO, Scripting
   SADD, Set
   SCARD, Set
   SISMEMBER, Set

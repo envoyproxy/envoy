@@ -561,6 +561,31 @@ TEST_F(RedisLoadBalancerContextImplTest, EnforceHashTag) {
   EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::Primary, context2.readPolicy());
 }
 
+TEST_F(RedisLoadBalancerContextImplTest, ReadOnlyCommand) {
+  std::vector<NetworkFilters::Common::Redis::RespValue> eval_ro_foo(4);
+  eval_ro_foo[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  eval_ro_foo[0].asString() = "eval_ro";
+  eval_ro_foo[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  eval_ro_foo[1].asString() = "return {KEYS[1]}";
+  eval_ro_foo[2].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  eval_ro_foo[2].asString() = "foo";
+  eval_ro_foo[3].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  eval_ro_foo[3].asString() = "0";
+
+  NetworkFilters::Common::Redis::RespValue eval_ro_request;
+  eval_ro_request.type(NetworkFilters::Common::Redis::RespType::Array);
+  eval_ro_request.asArray().swap(eval_ro_foo);
+
+  RedisLoadBalancerContextImpl context1(
+      "foo", true, true, eval_ro_request,
+      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
+
+  EXPECT_EQ(absl::optional<uint64_t>(44950), context1.computeHashKey());
+  EXPECT_EQ(true, context1.isReadCommand());
+  EXPECT_EQ(NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica,
+            context1.readPolicy());
+}
+
 } // namespace Redis
 } // namespace Clusters
 } // namespace Extensions
