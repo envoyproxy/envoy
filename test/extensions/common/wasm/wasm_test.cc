@@ -1,5 +1,6 @@
 #include "envoy/server/lifecycle_notifier.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
@@ -1504,7 +1505,7 @@ public:
   void setUp(const std::string& plugin_config_yaml, bool singleton) {
     envoy::extensions::wasm::v3::PluginConfig plugin_config;
     TestUtility::loadFromYaml(plugin_config_yaml, plugin_config);
-    plugin_config_ = std::make_unique<PluginConfig>(
+    plugin_config_ = std::make_shared<PluginConfig>(
         plugin_config, server_, server_.scope(), server_.initManager(),
         envoy::config::core::v3::TrafficDirection::UNSPECIFIED, nullptr /* metadata */, singleton);
   }
@@ -1517,8 +1518,8 @@ public:
     }
   }
 
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_;
-  PluginConfigPtr plugin_config_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_;
+  PluginConfigSharedPtr plugin_config_;
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
@@ -1538,20 +1539,25 @@ TEST_P(PluginConfigTest, WasmReload) {
 
   const std::string runtime_name = runtime;
 
-  auto test_func = [this, runtime_name](bool singleton) {
+  const std::string code =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+          "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+
+  auto test_func = [this, runtime_name, code](bool singleton) {
     const std::string plugin_config_yaml = fmt::format(
         R"EOF(
 name: "test_wasm_reload"
 root_id: "panic after sending local reply"
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "some configuration"
   code:
     local:
-      filename: "{}"
+      inline_bytes: "{}"
 )EOF",
-        runtime_name,
-        TestEnvironment::substitute(absl::StrCat(
-            "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+        runtime_name, Base64::encode(code.data(), code.size()));
 
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
@@ -1641,20 +1647,25 @@ TEST_P(PluginConfigTest, WasmReloadIsNotEnabledByDefaultIfFlagIsSetToFalse) {
 
   const std::string runtime_name = runtime;
 
-  auto test_func = [this, runtime_name](bool singleton) {
+  const std::string code =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+          "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+
+  auto test_func = [this, runtime_name, code](bool singleton) {
     const std::string plugin_config_yaml = fmt::format(
         R"EOF(
 name: "test_wasm_reload"
 root_id: "panic after sending local reply"
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "some configuration"
   code:
     local:
-      filename: "{}"
+      inline_bytes: "{}"
 )EOF",
-        runtime_name,
-        TestEnvironment::substitute(absl::StrCat(
-            "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+        runtime_name, Base64::encode(code.data(), code.size()));
 
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;

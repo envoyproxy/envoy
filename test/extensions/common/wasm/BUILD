@@ -44,6 +44,7 @@ envoy_cc_test(
     rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/event:dispatcher_lib",

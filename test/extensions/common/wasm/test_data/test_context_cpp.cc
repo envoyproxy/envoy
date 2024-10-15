@@ -111,11 +111,11 @@ FilterDataStatus PanicReplyContext::onRequestBody(size_t size, bool) {
   }
 
   sendLocalResponse(200, "not send", "body", {});
-  if (!skip_panic) {
-    int* badptr = nullptr;
-    *badptr = 0; // NOLINT(clang-analyzer-core.NullDereference)
+  if (skip_panic) {
+    return FilterDataStatus::StopIterationAndBuffer;
   }
-  return FilterDataStatus::StopIterationAndWatermark;
+
+  throw std::runtime_error("panic");
 }
 
 class InvalidGrpcStatusReplyContext : public Context {
