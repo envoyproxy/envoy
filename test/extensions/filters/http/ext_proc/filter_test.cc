@@ -2855,8 +2855,7 @@ TEST_F(HttpFilterTest, RequestBodyModeMXNTrailerModeSKIP) {
                 Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
             factory_context_);
       },
-      EnvoyException,
-      "If request_body_mode is MXN, then request_trailer_mode has to be SEND");
+      EnvoyException, "If request_body_mode is MXN, then request_trailer_mode has to be SEND");
 }
 
 TEST_F(HttpFilterTest, ResponseBodyModeMXNTrailerModeSKIP) {
@@ -2879,8 +2878,7 @@ TEST_F(HttpFilterTest, ResponseBodyModeMXNTrailerModeSKIP) {
                 Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
             factory_context_);
       },
-      EnvoyException,
-      "If response_body_mode is MXN, then response_trailer_mode has to be SEND");
+      EnvoyException, "If response_body_mode is MXN, then response_trailer_mode has to be SEND");
 }
 
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate

@@ -87,11 +87,11 @@ void verifyProcessingModeConfig(const ExternalProcessor& config) {
 
   if ((processing_mode.request_body_mode() == ProcessingMode::MXN) &&
       (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
-      throw EnvoyException("If request_body_mode is MXN, then request_trailer_mode has to be SEND");
+    throw EnvoyException("If request_body_mode is MXN, then request_trailer_mode has to be SEND");
   }
   if ((processing_mode.response_body_mode() == ProcessingMode::MXN) &&
       (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
-      throw EnvoyException("If response_body_mode is MXN, then response_trailer_mode has to be SEND");
+    throw EnvoyException("If response_body_mode is MXN, then response_trailer_mode has to be SEND");
   }
 }
 

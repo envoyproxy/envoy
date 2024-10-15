@@ -281,8 +281,8 @@ protected:
 
 private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
-  bool handleStreamedBodyResponse(
-      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  bool
+  handleStreamedBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   bool handleMxnBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status

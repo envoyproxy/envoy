@@ -111,13 +111,25 @@ absl::Status ProcessorState::processHeaderMutation(const CommonResponse& common_
 
 ProcessorState::CallbackState
 ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_response) const {
-  // TBD what about there is no body but trailers
-  if (((bodyMode() == ProcessingMode::STREAMED &&
-        filter_.config().sendBodyWithoutWaitingForHeaderResponse()) ||
-       bodyMode() == ProcessingMode::MXN) &&
-      !chunk_queue_.empty() && (common_response.status() != CommonResponse::CONTINUE_AND_REPLACE)) {
+  if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
+    return ProcessorState::CallbackState::Idle;
+  }
+
+  if ((bodyMode() == ProcessingMode::STREAMED &&
+       filter_.config().sendBodyWithoutWaitingForHeaderResponse()) &&
+      !chunk_queue_.empty()) {
     return ProcessorState::CallbackState::StreamedBodyCallback;
   }
+
+  if (bodyMode() == ProcessingMode::MXN) {
+    if (!chunk_queue_.empty()) {
+      return ProcessorState::CallbackState::StreamedBodyCallback;
+    }
+    if (trailers_available_) {
+      return ProcessorState::CallbackState::TrailersCallback;
+    }
+  }
+
   return ProcessorState::CallbackState::Idle;
 }
 
@@ -350,9 +362,10 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     headers_ = nullptr;
 
     // Send trailers if they are available and no data pending for processing.
-    if (send_trailers_ && trailers_available_ && chunk_queue_.empty() &&
-        (body_mode_ != ProcessingMode::MXN)) {
-      filter_.sendTrailers(*this, *trailers_);
+    if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
+      if (body_mode_ != ProcessingMode::MXN) {
+        filter_.sendTrailers(*this, *trailers_);
+      }
       return absl::OkStatus();
     }
 
