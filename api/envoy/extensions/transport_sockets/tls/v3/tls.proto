@@ -42,6 +42,17 @@ message UpstreamTlsContext {
   // SNI string to use when creating TLS backend connections.
   string sni = 2 [(validate.rules).string = {max_bytes: 255}];
 
+  // If true, replaces the SNI for the connection with the hostname of the upstream host, if
+  // the hostname is known due to either a DNS cluster type or the
+  // :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` is set on
+  // the host.
+  bool auto_host_sni = 6;
+
+  // If true, replace any Subject Alternative Name validations with a validation for a DNS SAN matching
+  // the SNI value sent. Note that the validation will be against the actual requested SNI, regardless of how it
+  // is configured.
+  bool auto_sni_san_validation = 7;
+
   // If true, server-initiated TLS renegotiation will be allowed.
   //
   // .. attention::

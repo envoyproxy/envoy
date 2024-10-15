@@ -111,6 +111,13 @@ public:
     }
   }
 
+  // Helper to create an exact matcher in contexts where there is no factory context available.
+  // This is a static member instead of constructor so that it can be named for clarity of what it
+  // produces.
+  static StringMatcherImpl createExactMatcher(absl::string_view match) {
+    return StringMatcherImpl(match);
+  }
+
   // StringMatcher
   bool match(const absl::string_view value) const override {
     switch (matcher_.match_pattern_case()) {
@@ -165,6 +172,13 @@ public:
   }
 
 private:
+  StringMatcherImpl(absl::string_view exact_match)
+      : matcher_([&]() -> StringMatcherType {
+          StringMatcherType cfg;
+          cfg.set_exact(exact_match);
+          return cfg;
+        }()) {}
+
   const StringMatcherType matcher_;
   Regex::CompiledMatcherPtr regex_;
   std::string lowercase_contains_match_;

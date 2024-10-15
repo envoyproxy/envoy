@@ -425,7 +425,7 @@ public:
       bool use_alpn = false, bool http3 = false,
       absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
           alternate_protocol_cache_config = {},
-      std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&)>
           configure_tls_context = nullptr);
 
   // Skip validation that ensures that all upstream ports are referenced by the
