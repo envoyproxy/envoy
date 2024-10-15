@@ -1196,6 +1196,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
 absl::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context) {
+  if (!host) {
+    return absl::nullopt;
+  }
   // Select a host and create a connection pool for it if it does not already exist.
   auto pool = tcpConnPoolImpl(host, priority, context);
   if (pool == nullptr) {
