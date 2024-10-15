@@ -4,9 +4,12 @@
 #include <chrono>
 
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/extensions/wasm/v3/wasm.pb.h"
 
+#include "source/common/common/backoff_strategy.h"
 #include "source/common/common/logger.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/common/wasm/stats_handler.h"
@@ -484,6 +487,189 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
       getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
       getPluginHandleFactory()));
 }
+
+Wasm* PluginConfig::mayReloadHandleIfNeeded(PluginHandleSharedPtrThreadLocal& handle_wrapper) {
+  // Null handle is special case and won't be reloaded for backward compatibility.
+  if (handle_wrapper.handle == nullptr) {
+    return nullptr;
+  }
+
+  Wasm* wasm = handle_wrapper.handle->wasmOfHandle();
+
+  // Only runtime failure will be handled by reloading logic. If the wasm is not failed or
+  // failed with other errors, return it directly.
+  if (wasm == nullptr || wasm->fail_state() != proxy_wasm::FailState::RuntimeError ||
+      base_wasm_ == nullptr) {
+    return wasm;
+  }
+
+  // If the handle is not allowed to reload, return it directly.
+  if (failure_policy_ != FailurePolicy::FAIL_RELOAD) {
+    return wasm;
+  }
+
+  ASSERT(reload_backoff_ != nullptr);
+  uint64_t reload_interval = reload_backoff_->nextBackOffMs();
+
+  Event::Dispatcher& dispatcher = wasm->dispatcher();
+
+  MonotonicTime now = dispatcher.timeSource().monotonicTime();
+  if (std::chrono::duration_cast<std::chrono::milliseconds>(now - handle_wrapper.last_load)
+          .count() < static_cast<int64_t>(reload_interval)) {
+    stats_handler_->onEvent(WasmEvent::VmReloadBackoff);
+    return wasm;
+  }
+
+  stats_handler_->onEvent(WasmEvent::VmReload);
+
+  // Reload the handle and update it if the new handle is not failed. The timestamp will be
+  // updated anyway.
+  handle_wrapper.last_load = now;
+  PluginHandleSharedPtr new_load = getOrCreateThreadLocalPlugin(base_wasm_, plugin_, dispatcher);
+  if (new_load != nullptr) {
+    Wasm* new_wasm = new_load->wasmOfHandle();
+    if (new_wasm == nullptr || new_wasm->isFailed()) {
+      stats_handler_->onEvent(WasmEvent::VmReloadFailure);
+    } else {
+      stats_handler_->onEvent(WasmEvent::VmReloadSuccess);
+      handle_wrapper.handle = new_load;
+    }
+  }
+
+  ASSERT(handle_wrapper.handle != nullptr);
+  return handle_wrapper.handle->wasmOfHandle();
+}
+
+std::pair<OptRef<PluginHandleSharedPtrThreadLocal>, Wasm*> PluginConfig::getWasmAndPluginHandle() {
+  if (!plugin_handle_initialized_) {
+    return {OptRef<PluginHandleSharedPtrThreadLocal>{}, nullptr};
+  }
+
+  if (is_singleton_handle_) {
+    return {singleton_handle_, mayReloadHandleIfNeeded(singleton_handle_)};
+  }
+
+  ASSERT(thread_local_handle_ != nullptr);
+  if (!thread_local_handle_->currentThreadRegistered()) {
+    return {OptRef<PluginHandleSharedPtrThreadLocal>{}, nullptr};
+  }
+  auto plugin_holder = thread_local_handle_->get();
+  if (!plugin_holder.has_value()) {
+    return {OptRef<PluginHandleSharedPtrThreadLocal>{}, nullptr};
+  }
+
+  return {plugin_holder, mayReloadHandleIfNeeded(*plugin_holder)};
+}
+
+PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
+                           Server::Configuration::ServerFactoryContext& context,
+                           Stats::Scope& scope, Init::Manager& init_manager,
+                           envoy::config::core::v3::TrafficDirection direction,
+                           const envoy::config::core::v3::Metadata* metadata, bool singleton)
+    : is_singleton_handle_(singleton) {
+
+  if (config.fail_open()) {
+    // If the legacy fail_open is set to true explicitly.
+
+    // Only one of fail_open or failure_policy can be set explicitly.
+    if (config.failure_policy() != FailurePolicy::UNSPECIFIED) {
+      throw EnvoyException("only one of fail_open or failure_policy can be set");
+    }
+
+    // We treat fail_open as FAIL_OPEN.
+    failure_policy_ = FailurePolicy::FAIL_OPEN;
+  } else {
+    // If the legacy fail_open is not set, we need to determine the failure policy.
+    switch (config.failure_policy()) {
+    case FailurePolicy::UNSPECIFIED: {
+      const bool reload_by_default = Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.wasm_failure_reload_by_default");
+      failure_policy_ = reload_by_default ? FailurePolicy::FAIL_RELOAD : FailurePolicy::FAIL_CLOSED;
+      break;
+    }
+    case FailurePolicy::FAIL_RELOAD:
+    case FailurePolicy::FAIL_CLOSED:
+    case FailurePolicy::FAIL_OPEN:
+      // If the failure policy is FAIL_RELOAD, FAIL_CLOSED, or FAIL_OPEN, we treat it as the
+      // failure policy.
+      failure_policy_ = config.failure_policy();
+      break;
+    default:
+      throw EnvoyException("unknown failure policy");
+    }
+  }
+  ASSERT(failure_policy_ == FailurePolicy::FAIL_CLOSED ||
+         failure_policy_ == FailurePolicy::FAIL_OPEN ||
+         failure_policy_ == FailurePolicy::FAIL_RELOAD);
+
+  if (failure_policy_ == FailurePolicy::FAIL_RELOAD) {
+    const uint64_t base =
+        PROTOBUF_GET_MS_OR_DEFAULT(config.reload_config().backoff(), base_interval, 1000);
+    reload_backoff_ =
+        std::make_unique<JitteredLowerBoundBackOffStrategy>(base, context.api().randomGenerator());
+  }
+
+  stats_handler_ = std::make_shared<StatsHandler>(scope, absl::StrCat("wasm.", config.name(), "."));
+
+  plugin_ = std::make_shared<Plugin>(config, direction, context.localInfo(), metadata);
+
+  auto callback = [this, &context](WasmHandleSharedPtr base_wasm) {
+    plugin_handle_initialized_ = true;
+    base_wasm_ = base_wasm;
+
+    if (base_wasm == nullptr) {
+      ENVOY_LOG(critical, "Plugin {} failed to load", plugin_->name_);
+    }
+
+    if (is_singleton_handle_) {
+      singleton_handle_.handle =
+          getOrCreateThreadLocalPlugin(base_wasm, plugin_, context.mainThreadDispatcher());
+      singleton_handle_.last_load = context.mainThreadDispatcher().timeSource().monotonicTime();
+      return;
+    }
+
+    thread_local_handle_ =
+        ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
+            context.threadLocal());
+    // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
+    thread_local_handle_->set([base_wasm, plugin = this->plugin_](Event::Dispatcher& dispatcher) {
+      return std::make_shared<PluginHandleSharedPtrThreadLocal>(
+          getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher),
+          dispatcher.timeSource().monotonicTime());
+    });
+  };
+
+  if (!Common::Wasm::createWasm(plugin_, scope.createScope(""), context.clusterManager(),
+                                init_manager, context.mainThreadDispatcher(), context.api(),
+                                context.lifecycleNotifier(), remote_data_provider_,
+                                std::move(callback))) {
+    throw Common::Wasm::WasmException(
+        fmt::format("Unable to create Wasm plugin {}", plugin_->name_));
+  }
+}
+
+std::shared_ptr<Context> PluginConfig::createContext() {
+  auto [plugin_holder, wasm] = getWasmAndPluginHandle();
+  if (!plugin_holder.has_value() || plugin_holder->handle == nullptr) {
+    return nullptr;
+  }
+
+  // FAIL_RELOAD is handled by the getWasmAndPluginHandle() call. If the latest
+  // wasm is still failed, return nullptr or an sense less Context.
+  if (!wasm || wasm->isFailed()) {
+    if (failure_policy_ == FailurePolicy::FAIL_OPEN) {
+      // Fail open skips adding this filter to callbacks.
+      return nullptr;
+    } else {
+      // Fail closed is handled by an empty Context.
+      return std::make_shared<Context>(nullptr, 0, plugin_holder->handle);
+    }
+  }
+  return std::make_shared<Context>(wasm, plugin_holder->handle->rootContextId(),
+                                   plugin_holder->handle);
+}
+
+Wasm* PluginConfig::wasmOfHandle() { return getWasmAndPluginHandle().second; }
 
 } // namespace Wasm
 } // namespace Common

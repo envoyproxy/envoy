@@ -58,6 +58,12 @@ behavior_changes:
   change: |
     Removed runtime feature flag ``envoy.restart_features.enable_execution_context``. The execution context feature
     can instead be enabled by setting compile option ``--define=execution_context=enabled``.
+- area: wasm
+  change: |
+    The failed wasm vm with runtime errors will be reloaded by default. This behavior can be reverted by setting the runtime
+    flag ``envoy.reloadable_features.wasm_failure_reload_by_default`` to false or by setting the
+    :ref:`reload_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.reload_policy>`
+    to ``FAIL_OPEN`` or ``FAIL_CLOSED`` explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -497,5 +503,10 @@ new_features:
     Added a new WIP implementation of :ref:`client_side_weighted_round_robin
     <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
     load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
+- area: wasm
+  change: |
+    Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
+    :ref:`reload_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.reload_policy>` for more details.
+    The ``FAIL_RELOAD`` reload policy will be used by default.
 
 deprecated:
