@@ -235,6 +235,8 @@ TagNameValues::TagNameValues() {
   // Leaving: proxy_proto.(found|disallowed|error)
   addRe2(PROXY_PROTOCOL_VERSION,
          R"(^proxy_proto\.((?:<TAG_VALUE>\.)?versions\.v(<PROXY_PROTOCOL_VERSION>)\.)\w+$)");
+
+  addTokenized(ADS_CLUSTER_PREFIX, "grpc.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
