@@ -27,19 +27,19 @@ protected:
 };
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidHttpConnPool) {
-  EXPECT_TRUE(factory_.createGenericConnPool(thread_local_cluster_,
+  EXPECT_TRUE(factory_.createGenericConnPool(nullptr, thread_local_cluster_,
                                              Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
                                              priority_, Envoy::Http::Protocol::Http2, nullptr));
 }
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidTcpConnPool) {
-  EXPECT_TRUE(factory_.createGenericConnPool(thread_local_cluster_,
+  EXPECT_TRUE(factory_.createGenericConnPool(nullptr, thread_local_cluster_,
                                              Router::GenericConnPoolFactory::UpstreamProtocol::TCP,
                                              priority_, Envoy::Http::Protocol::Http2, nullptr));
 }
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidUdpConnPool) {
-  EXPECT_TRUE(factory_.createGenericConnPool(thread_local_cluster_,
+  EXPECT_TRUE(factory_.createGenericConnPool(thread_local_cluster_.lb_.host_, thread_local_cluster_,
                                              Router::GenericConnPoolFactory::UpstreamProtocol::UDP,
                                              priority_, Envoy::Http::Protocol::Http2, nullptr));
 }
@@ -47,8 +47,9 @@ TEST_F(GenericGenericConnPoolFactoryTest, CreateValidUdpConnPool) {
 TEST_F(GenericGenericConnPoolFactoryTest, InvalidConnPool) {
   // Passes an invalid UpstreamProtocol and check a nullptr is returned.
   EXPECT_FALSE(factory_.createGenericConnPool(
-      thread_local_cluster_, static_cast<Router::GenericConnPoolFactory::UpstreamProtocol>(0xff),
-      priority_, Envoy::Http::Protocol::Http2, nullptr));
+      nullptr, thread_local_cluster_,
+      static_cast<Router::GenericConnPoolFactory::UpstreamProtocol>(0xff), priority_,
+      Envoy::Http::Protocol::Http2, nullptr));
 }
 
 } // namespace Generic

@@ -11,10 +11,12 @@ namespace Http {
 using UpstreamProtocol = Envoy::Router::GenericConnPoolFactory::UpstreamProtocol;
 
 Router::GenericConnPoolPtr HttpGenericConnPoolFactory::createGenericConnPool(
-    Upstream::HostConstSharedPtr host, UpstreamProtocol, Upstream::ResourcePriority priority,
+    Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+    UpstreamProtocol, Upstream::ResourcePriority priority,
     absl::optional<Envoy::Http::Protocol> downstream_protocol,
     Upstream::LoadBalancerContext* ctx) const {
-  auto ret = std::make_unique<HttpConnPool>(host, priority, downstream_protocol, ctx);
+  auto ret = std::make_unique<HttpConnPool>(host, thread_local_cluster, priority,
+                                            downstream_protocol, ctx);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 
