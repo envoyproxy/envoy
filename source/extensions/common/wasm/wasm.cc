@@ -492,6 +492,8 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
                            const envoy::config::core::v3::Metadata* metadata, bool singleton)
     : is_singleton_handle_(singleton) {
 
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
   plugin_ = std::make_shared<Plugin>(config, direction, context.localInfo(), metadata);
 
   auto callback = [this, &context](WasmHandleSharedPtr base_wasm) {
@@ -520,6 +522,7 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
                                 init_manager, context.mainThreadDispatcher(), context.api(),
                                 context.lifecycleNotifier(), remote_data_provider_,
                                 std::move(callback))) {
+    // TODO(wbpcode): use absl::Status to return error rather than throw.
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm plugin {}", plugin_->name_));
   }
