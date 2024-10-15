@@ -489,6 +489,11 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
 }
 
 Wasm* PluginConfig::mayReloadHandleIfNeeded(PluginHandleSharedPtrThreadLocal& handle_wrapper) {
+  // base_wasm_ is null means the plugin is not loaded successfully. Return anyway.
+  if (base_wasm_ == nullptr) {
+    return nullptr;
+  }
+
   // Null handle is special case and won't be reloaded for backward compatibility.
   if (handle_wrapper.handle == nullptr) {
     return nullptr;
@@ -498,8 +503,7 @@ Wasm* PluginConfig::mayReloadHandleIfNeeded(PluginHandleSharedPtrThreadLocal& ha
 
   // Only runtime failure will be handled by reloading logic. If the wasm is not failed or
   // failed with other errors, return it directly.
-  if (wasm == nullptr || wasm->fail_state() != proxy_wasm::FailState::RuntimeError ||
-      base_wasm_ == nullptr) {
+  if (wasm == nullptr || wasm->fail_state() != proxy_wasm::FailState::RuntimeError) {
     return wasm;
   }
 
@@ -540,7 +544,7 @@ Wasm* PluginConfig::mayReloadHandleIfNeeded(PluginHandleSharedPtrThreadLocal& ha
   return handle_wrapper.handle->wasmOfHandle();
 }
 
-std::pair<OptRef<PluginHandleSharedPtrThreadLocal>, Wasm*> PluginConfig::getWasmAndPluginHandle() {
+std::pair<OptRef<PluginHandleSharedPtrThreadLocal>, Wasm*> PluginConfig::getPluginHandleAndWasm() {
   if (!plugin_handle_initialized_) {
     return {OptRef<PluginHandleSharedPtrThreadLocal>{}, nullptr};
   }
@@ -649,12 +653,12 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
 }
 
 std::shared_ptr<Context> PluginConfig::createContext() {
-  auto [plugin_holder, wasm] = getWasmAndPluginHandle();
+  auto [plugin_holder, wasm] = getPluginHandleAndWasm();
   if (!plugin_holder.has_value() || plugin_holder->handle == nullptr) {
     return nullptr;
   }
 
-  // FAIL_RELOAD is handled by the getWasmAndPluginHandle() call. If the latest
+  // FAIL_RELOAD is handled by the getPluginHandleAndWasm() call. If the latest
   // wasm is still failed, return nullptr or an sense less Context.
   if (!wasm || wasm->isFailed()) {
     if (failure_policy_ == FailurePolicy::FAIL_OPEN) {
@@ -669,7 +673,7 @@ std::shared_ptr<Context> PluginConfig::createContext() {
                                    plugin_holder->handle);
 }
 
-Wasm* PluginConfig::wasmOfHandle() { return getWasmAndPluginHandle().second; }
+Wasm* PluginConfig::wasmOfHandle() { return getPluginHandleAndWasm().second; }
 
 } // namespace Wasm
 } // namespace Common

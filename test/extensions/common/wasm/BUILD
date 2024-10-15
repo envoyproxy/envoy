@@ -59,6 +59,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:wasm_lib",
         "@com_google_absl//absl/types:optional",
     ],

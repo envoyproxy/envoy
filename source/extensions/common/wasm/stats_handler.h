@@ -121,6 +121,7 @@ class StatsHandler {
 public:
   StatsHandler(Stats::Scope& parent_scope, const std::string& prefix);
   void onEvent(WasmEvent event) const;
+  WasmStats& wasmStats() const { return wasm_stats_; }
 
 private:
   Stats::ScopeSharedPtr scope_;

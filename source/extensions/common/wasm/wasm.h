@@ -197,13 +197,14 @@ public:
   std::shared_ptr<Context> createContext();
   Wasm* wasmOfHandle();
   const PluginSharedPtr& plugin() { return plugin_; }
+  WasmStats& wasmStats() { return stats_handler_->wasmStats(); }
 
 private:
   /**
    * Get the latest wasm and plugin handle wrapper. The plugin handle may be reloaded if
    * the wasm is failed and the policy allows it.
    */
-  std::pair<OptRef<PluginHandleSharedPtrThreadLocal>, Wasm*> getWasmAndPluginHandle();
+  std::pair<OptRef<PluginHandleSharedPtrThreadLocal>, Wasm*> getPluginHandleAndWasm();
 
   /**
    * May reload the handle if the wasm if failed. The input handle will be updated if the

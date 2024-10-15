@@ -103,11 +103,19 @@ private:
   EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
 };
 
-FilterDataStatus PanicReplyContext::onRequestBody(size_t, bool) {
+FilterDataStatus PanicReplyContext::onRequestBody(size_t size, bool) {
+  const auto body = getBufferBytes(WasmBufferType::HttpRequestBody, 0, size);
+  bool skip_panic = false;
+  if (body != nullptr) {
+    skip_panic = body->view() == "skip_panic";
+  }
+
   sendLocalResponse(200, "not send", "body", {});
-  int* badptr = nullptr;
-  *badptr = 0; // NOLINT(clang-analyzer-core.NullDereference)
-  return FilterDataStatus::Continue;
+  if (!skip_panic) {
+    int* badptr = nullptr;
+    *badptr = 0; // NOLINT(clang-analyzer-core.NullDereference)
+  }
+  return FilterDataStatus::StopIterationAndWatermark;
 }
 
 class InvalidGrpcStatusReplyContext : public Context {
@@ -120,7 +128,8 @@ private:
 };
 
 FilterDataStatus InvalidGrpcStatusReplyContext::onRequestBody(size_t size, bool) {
-  sendLocalResponse(200, "ok", "body", {}, size == 0 ? GrpcStatus::InvalidCode : GrpcStatus::PermissionDenied);
+  sendLocalResponse(200, "ok", "body", {},
+                    size == 0 ? GrpcStatus::InvalidCode : GrpcStatus::PermissionDenied);
   return FilterDataStatus::Continue;
 }
 
@@ -131,9 +140,8 @@ static RegisterContextFactory register_PanicReplyContext(CONTEXT_FACTORY(PanicRe
                                                          ROOT_FACTORY(EnvoyRootContext),
                                                          "panic after sending local reply");
 
-static RegisterContextFactory register_InvalidGrpcStatusReplyContext(CONTEXT_FACTORY(InvalidGrpcStatusReplyContext),
-                                                         ROOT_FACTORY(EnvoyRootContext),
-                                                         "send local reply grpc");
-
+static RegisterContextFactory
+    register_InvalidGrpcStatusReplyContext(CONTEXT_FACTORY(InvalidGrpcStatusReplyContext),
+                                           ROOT_FACTORY(EnvoyRootContext), "send local reply grpc");
 
 END_WASM_PLUGIN
