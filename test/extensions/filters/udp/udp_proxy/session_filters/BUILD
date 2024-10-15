@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     name = "pass_through_filter_test",
     srcs = ["pass_through_filter_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/udp/udp_proxy/session_filters:pass_through_filter_lib",
         "//test/extensions/filters/udp/udp_proxy:mocks",
@@ -36,7 +37,6 @@ envoy_cc_test_library(
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters:factory_base_lib",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
         "//test/test_common:utility_lib",
     ],
     alwayslink = 1,
@@ -55,7 +55,6 @@ envoy_cc_test_library(
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/udp/udp_proxy/session_filters:factory_base_lib",
-        "//source/extensions/filters/udp/udp_proxy/session_filters:filter_interface",
         "//test/test_common:utility_lib",
     ],
     alwayslink = 1,

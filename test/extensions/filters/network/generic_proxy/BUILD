@@ -27,6 +27,7 @@ envoy_cc_test(
     srcs = [
         "route_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
@@ -45,9 +46,11 @@ envoy_cc_test(
     srcs = [
         "proxy_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/network/generic_proxy:proxy_lib",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",
@@ -63,6 +66,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
@@ -87,6 +91,7 @@ envoy_cc_test(
     srcs = [
         "integration_test.cc",
     ],
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],
@@ -119,6 +124,7 @@ envoy_cc_test(
     srcs = [
         "match_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//source/extensions/filters/network/generic_proxy:match_lib",
@@ -131,6 +137,7 @@ envoy_cc_test(
     srcs = [
         "access_log_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//source/extensions/filters/network/generic_proxy:access_log_lib",
@@ -143,6 +150,7 @@ envoy_cc_test(
     srcs = [
         "stream_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/network/generic_proxy/interface:stream_interface",
     ],
@@ -153,6 +161,7 @@ envoy_cc_test(
     srcs = [
         "tracing_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":fake_codec_lib",
         "//source/extensions/filters/network/generic_proxy:tracing_lib",
@@ -164,6 +173,7 @@ envoy_cc_test(
     srcs = [
         "stats_test.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/network/generic_proxy:stats_lib",
         "//test/mocks/server:factory_context_mocks",

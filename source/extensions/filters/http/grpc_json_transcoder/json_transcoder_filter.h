@@ -25,23 +25,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
-/**
- * VariableBinding specifies a value for a single field in the request message.
- * When transcoding HTTP/REST/JSON to gRPC/proto the request message is
- * constructed using the HTTP body and the variable bindings (specified through
- * request url).
- * See https://github.com/googleapis/googleapis/blob/master/google/api/http.proto
- * for details of variable binding.
- */
-struct VariableBinding {
-  // The location of the field in the protobuf message, where the value
-  // needs to be inserted, e.g. "shelf.theme" would mean the "theme" field
-  // of the nested "shelf" message of the request protobuf message.
-  std::vector<std::string> field_path;
-  // The value to be inserted.
-  std::string value;
-};
-
 struct MethodInfo {
   const Protobuf::MethodDescriptor* descriptor_ = nullptr;
   std::vector<const ProtobufWkt::Field*> request_body_field_path;

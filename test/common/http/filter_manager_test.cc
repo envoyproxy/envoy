@@ -168,7 +168,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createDecoderFilterFactoryCb(filter);
-        manager.applyFilterFactoryCb({"configName1", "filterName1"}, factory);
+        manager.applyFilterFactoryCb({"configName1"}, factory);
         return true;
       }));
 
@@ -222,10 +222,10 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
-        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1"}, decoder_factory);
 
         auto stream_factory = createStreamFilterFactoryCb(encoder_filter);
-        manager.applyFilterFactoryCb({"configName2", "filterName2"}, stream_factory);
+        manager.applyFilterFactoryCb({"configName2"}, stream_factory);
         return true;
       }));
 
@@ -272,11 +272,11 @@ TEST_F(FilterManagerTest, OnLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
-        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1"}, decoder_factory);
         auto stream_factory = createStreamFilterFactoryCb(stream_filter);
-        manager.applyFilterFactoryCb({"configName2", "filterName2"}, stream_factory);
+        manager.applyFilterFactoryCb({"configName2"}, stream_factory);
         auto encoder_factory = createEncoderFilterFactoryCb(encoder_filter);
-        manager.applyFilterFactoryCb({"configName3", "filterName3"}, encoder_factory);
+        manager.applyFilterFactoryCb({"configName3"}, encoder_factory);
         return true;
       }));
 
@@ -335,11 +335,11 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
-        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1"}, decoder_factory);
         auto stream_factory = createStreamFilterFactoryCb(stream_filter);
-        manager.applyFilterFactoryCb({"configName2", "filterName2"}, stream_factory);
+        manager.applyFilterFactoryCb({"configName2"}, stream_factory);
         auto encoder_factory = createEncoderFilterFactoryCb(encoder_filter);
-        manager.applyFilterFactoryCb({"configName3", "filterName3"}, encoder_factory);
+        manager.applyFilterFactoryCb({"configName3"}, encoder_factory);
         return true;
       }));
 
@@ -437,7 +437,7 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
-        manager.applyFilterFactoryCb({"custom-name", "filter-name"}, decoder_factory);
+        manager.applyFilterFactoryCb({"custom-name"}, decoder_factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -461,24 +461,18 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
   EXPECT_EQ(nullptr, decoder_filter->callbacks_->mostSpecificPerFilterConfig());
 
   // Get a valid config by the custom filter name.
-  EXPECT_CALL(*route, traversePerFilterConfig(testing::Eq("custom-name"), _))
-      .WillOnce(Invoke([&](const std::string&,
-                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-        cb(*route_config);
+  EXPECT_CALL(*route, perFilterConfigs(testing::Eq("custom-name")))
+      .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        return {route_config.get()};
       }));
-  decoder_filter->callbacks_->traversePerFilterConfig(
-      [&](const Router::RouteSpecificFilterConfig& config) {
-        EXPECT_EQ(route_config.get(), &config);
-      });
+  auto route_config_result = decoder_filter->callbacks_->perFilterConfigs();
+  EXPECT_EQ(route_config.get(), route_config_result[0]);
 
   // Get nothing by the custom filter name.
-  EXPECT_CALL(*route, traversePerFilterConfig(testing::Eq("custom-name"), _))
-      .WillOnce(Invoke([&](const std::string&,
-                           std::function<void(const Router::RouteSpecificFilterConfig&)>) {}));
-  decoder_filter->callbacks_->traversePerFilterConfig(
-      [&](const Router::RouteSpecificFilterConfig& config) {
-        EXPECT_EQ(route_config.get(), &config);
-      });
+  EXPECT_CALL(*route, perFilterConfigs(testing::Eq("custom-name")))
+      .WillOnce(Invoke([](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; }));
+  route_config_result = decoder_filter->callbacks_->perFilterConfigs();
+  EXPECT_TRUE(route_config_result.empty());
 
   filter_manager_->destroyFilters();
 };
@@ -491,7 +485,7 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigForNullRoute) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
-        manager.applyFilterFactoryCb({"custom-name", "filter-name"}, decoder_factory);
+        manager.applyFilterFactoryCb({"custom-name"}, decoder_factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -507,8 +501,7 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigForNullRoute) {
   decoder_filter->callbacks_->mostSpecificPerFilterConfig();
 
   EXPECT_CALL(downstream_callbacks, route(_)).WillOnce(Return(nullptr));
-  decoder_filter->callbacks_->traversePerFilterConfig(
-      [](const Router::RouteSpecificFilterConfig&) {});
+  decoder_filter->callbacks_->perFilterConfigs();
 
   filter_manager_->destroyFilters();
 }
@@ -523,9 +516,9 @@ TEST_F(FilterManagerTest, MetadataContinueAll) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1"}, decoder_factory);
         decoder_factory = createStreamFilterFactoryCb(filter_2);
-        manager.applyFilterFactoryCb({"configName2", "filterName2"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName2"}, decoder_factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -595,9 +588,9 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"configName1", "filterName1"}, factory);
+        manager.applyFilterFactoryCb({"configName1"}, factory);
         factory = createStreamFilterFactoryCb(filter_2);
-        manager.applyFilterFactoryCb({"configName2", "filterName2"}, factory);
+        manager.applyFilterFactoryCb({"configName2"}, factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -642,9 +635,9 @@ TEST_F(FilterManagerTest, MetadataContinueAllFollowedByHeadersLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto decoder_factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"configName1", "filterName1"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName1"}, decoder_factory);
         decoder_factory = createStreamFilterFactoryCb(filter_2);
-        manager.applyFilterFactoryCb({"configName2", "filterName2"}, decoder_factory);
+        manager.applyFilterFactoryCb({"configName2"}, decoder_factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -682,9 +675,9 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"configName1", "filterName1"}, factory);
+        manager.applyFilterFactoryCb({"configName1"}, factory);
         factory = createStreamFilterFactoryCb(filter_2);
-        manager.applyFilterFactoryCb({"configName2", "filterName2"}, factory);
+        manager.applyFilterFactoryCb({"configName2"}, factory);
         return true;
       }));
   filter_manager_->createFilterChain();
@@ -721,7 +714,7 @@ TEST_F(FilterManagerTest, IdleTimerResets) {
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
         auto factory = createStreamFilterFactoryCb(filter_1);
-        manager.applyFilterFactoryCb({"configName1", "filterName1"}, factory);
+        manager.applyFilterFactoryCb({"configName1"}, factory);
         return true;
       }));
   filter_manager_->createFilterChain();

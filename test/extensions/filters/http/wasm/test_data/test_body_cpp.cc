@@ -118,6 +118,15 @@ FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
     }
     return FilterDataStatus::StopIterationAndBuffer;
 
+  } else if (body_op_ == "SetEndOfBodies") {
+    logBody(type);
+    if (end_of_stream) {
+      getBufferStatus(type, &size, &flags);
+      setBuffer(type, size, 0, ".end");
+      return FilterDataStatus::Continue;
+    }
+    return FilterDataStatus::StopIterationAndBuffer;
+
   } else {
     // This is a test and the test was configured incorrectly.
     logError("Invalid body test op " + body_op_);

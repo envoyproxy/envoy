@@ -20,9 +20,6 @@ enum class HistogramBucketsMode { Unset, Summary, Cumulative, Disjoint, Detailed
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 
-bool filterParam(Http::Utility::QueryParamsMulti params, Buffer::Instance& response,
-                 std::shared_ptr<std::regex>& regex);
-
 absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params,
                                    HistogramBucketsMode& histogram_buckets_mode);
 

@@ -1,3 +1,4 @@
+#include "ext_authz.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include <chrono>
@@ -89,6 +90,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
       filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
                                                     : absl::nullopt),
+      emit_filter_state_stats_(config.emit_filter_state_stats()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -175,11 +177,39 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
-  auto&& maybe_merged_per_route_config =
-      Http::Utility::getMergedPerFilterConfig<FilterConfigPerRoute>(
-          decoder_callbacks_, [](FilterConfigPerRoute& cfg_base, const FilterConfigPerRoute& cfg) {
-            cfg_base.merge(cfg);
-          });
+  // Now that we'll definitely be making the request, add filter state stats if configured to do so.
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      decoder_callbacks_->streamInfo().filterState();
+  if ((config_->emitFilterStateStats() || config_->filterMetadata().has_value())) {
+    if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+      filter_state->setData(decoder_callbacks_->filterConfigName(),
+                            std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
+                            Envoy::StreamInfo::FilterState::StateType::Mutable,
+                            Envoy::StreamInfo::FilterState::LifeSpan::Request);
+
+      // This may return nullptr (if there's a value at this name whose type doesn't match or isn't
+      // mutable, for example), so we must check logging_info_ is not nullptr later.
+      logging_info_ =
+          filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
+    }
+    if (logging_info_ == nullptr) {
+      stats_.filter_state_name_collision_.inc();
+      ENVOY_STREAM_LOG(debug,
+                       "Could not find logging info at {}! (Did another filter already put data "
+                       "at this name?)",
+                       *decoder_callbacks_, decoder_callbacks_->filterConfigName());
+    }
+  }
+
+  absl::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
+  for (const FilterConfigPerRoute& cfg :
+       Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
+    if (maybe_merged_per_route_config.has_value()) {
+      maybe_merged_per_route_config.value().merge(cfg);
+    } else {
+      maybe_merged_per_route_config = cfg;
+    }
+  }
 
   Protobuf::Map<std::string, std::string> context_extensions;
   if (maybe_merged_per_route_config) {
@@ -378,14 +408,40 @@ Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
-  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
-      decoder_callbacks_->streamInfo().filterState();
-  if (config_->filterMetadata().has_value() &&
-      !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
-    filter_state->setData(decoder_callbacks_->filterConfigName(),
-                          std::make_shared<ExtAuthzLoggingInfo>(*config_->filterMetadata()),
-                          Envoy::StreamInfo::FilterState::StateType::ReadOnly,
-                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+}
+
+void Filter::updateLoggingInfo() {
+  if (!config_->emitFilterStateStats()) {
+    return;
+  }
+
+  if (logging_info_ == nullptr) {
+    return;
+  }
+
+  // Latency is the only stat available if we aren't using envoy grpc.
+  if (start_time_.has_value()) {
+    logging_info_->setLatency(std::chrono::duration_cast<std::chrono::microseconds>(
+        decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
+  }
+
+  auto const* stream_info = client_->streamInfo();
+  if (stream_info == nullptr) {
+    return;
+  }
+
+  const auto& bytes_meter = stream_info->getUpstreamBytesMeter();
+  if (bytes_meter != nullptr) {
+    logging_info_->setBytesSent(bytes_meter->wireBytesSent());
+    logging_info_->setBytesReceived(bytes_meter->wireBytesReceived());
+  }
+  if (stream_info->upstreamInfo().has_value()) {
+    logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+  }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      stream_info->upstreamClusterInfo();
+  if (cluster_info) {
+    logging_info_->setClusterInfo(std::move(*cluster_info));
   }
 }
 
@@ -415,6 +471,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
+
+  updateLoggingInfo();
 
   if (!response->dynamic_metadata.fields().empty()) {
     if (!config_->enableDynamicMetadataIngestion()) {

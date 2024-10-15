@@ -11,6 +11,13 @@ final class CancelGRPCStreamTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testCancelGRPCStream() {
     let filterName = "cancel_validation_filter"
 
@@ -63,7 +70,7 @@ final class CancelGRPCStreamTests: XCTestCase {
 
     let requestHeaders = GRPCRequestHeadersBuilder(
         scheme: "http",
-        authority: "localhost:" + String(EnvoyTestServer.getEnvoyPort()),
+        authority: "localhost:" + String(EnvoyTestServer.getHttpPort()),
         path: "/")
       .build()
 
@@ -80,6 +87,6 @@ final class CancelGRPCStreamTests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

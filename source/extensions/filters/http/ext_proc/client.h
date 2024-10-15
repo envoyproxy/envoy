@@ -10,13 +10,14 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/http/sidestream_watermark.h"
+#include "source/extensions/filters/http/ext_proc/client_base.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-class ExternalProcessorStream {
+class ExternalProcessorStream : public StreamBase {
 public:
   virtual ~ExternalProcessorStream() = default;
   virtual void send(envoy::service::ext_proc::v3::ProcessingRequest&& request,
@@ -24,12 +25,13 @@ public:
   // Idempotent close. Return true if it actually closed.
   virtual bool close() PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
   virtual void notifyFilterDestroy() PURE;
 };
 
 using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
 
-class ExternalProcessorCallbacks {
+class ExternalProcessorCallbacks : public RequestCallbacks {
 public:
   virtual ~ExternalProcessorCallbacks() = default;
   virtual void onReceiveMessage(
@@ -39,7 +41,7 @@ public:
   virtual void logGrpcStreamInfo() PURE;
 };
 
-class ExternalProcessorClient {
+class ExternalProcessorClient : public ClientBase {
 public:
   virtual ~ExternalProcessorClient() = default;
   virtual ExternalProcessorStreamPtr

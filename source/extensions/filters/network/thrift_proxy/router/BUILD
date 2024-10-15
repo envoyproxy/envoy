@@ -25,7 +25,6 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/rds:rds_interface",
         "//envoy/router:router_interface",
@@ -37,6 +36,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_options_config_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 

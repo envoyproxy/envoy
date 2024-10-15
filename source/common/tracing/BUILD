@@ -41,6 +41,7 @@ envoy_cc_library(
         ":trace_context_lib",
         ":tracer_lib",
         "//envoy/tracing:tracer_interface",
+        "//source/common/formatter:substitution_format_utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",

@@ -76,7 +76,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
   // TODO(boteng): introduce additional validation for the authority and path headers
   // based on the default UHV when it is available.
   auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.http_health_check().receive());
-  THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
+  THROW_IF_NOT_OK_REF(bytes_or_error.status());
   receive_bytes_ = bytes_or_error.value();
   if (config.http_health_check().has_service_name_matcher()) {
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher(),

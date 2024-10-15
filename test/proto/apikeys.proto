@@ -2,11 +2,10 @@ syntax = "proto3";
 
 package apikeys;
 
-import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
 service ApiKeys {
-
   // Creates a new API key.
   rpc CreateApiKey(CreateApiKeyRequest) returns (ApiKey) {
   }
@@ -17,7 +16,6 @@ service ApiKeys {
 
 // Message for an API key.
 message ApiKey {
-
   string name = 1;
 
   string display_name = 2;
@@ -94,6 +92,8 @@ message RepeatedSupportedTypes {
   repeated float float = 12;
 
   repeated double double = 13;
+
+  map<string, string> map = 14;
 }
 
 message UnsupportedTypes {

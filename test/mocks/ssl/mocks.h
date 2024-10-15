@@ -46,8 +46,11 @@ public:
   MOCK_METHOD(bool, peerCertificateValidated, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, sha256PeerCertificateDigest, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, sha256PeerCertificateChainDigests, (), (const));
   MOCK_METHOD(const std::string&, sha1PeerCertificateDigest, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, sha1PeerCertificateChainDigests, (), (const));
   MOCK_METHOD(const std::string&, serialNumberPeerCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, serialNumbersPeerCertificates, (), (const));
   MOCK_METHOD(const std::string&, issuerPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, subjectPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanPeerCertificate, (), (const));
@@ -58,6 +61,8 @@ public:
   MOCK_METHOD(absl::Span<const std::string>, dnsSansLocalCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, ipSansPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, ipSansLocalCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, oidsPeerCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, oidsLocalCertificate, (), (const));
   MOCK_METHOD(absl::optional<SystemTime>, validFromPeerCertificate, (), (const));
   MOCK_METHOD(absl::optional<SystemTime>, expirationPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, sessionId, (), (const));

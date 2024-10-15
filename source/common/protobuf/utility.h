@@ -23,6 +23,12 @@
 #define PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, field_name, default_value)                        \
   ((message).has_##field_name() ? (message).field_name().value() : (default_value))
 
+// Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
+// absl::nullopt.
+#define PROTOBUF_GET_OPTIONAL_WRAPPED(message, field_name)                                         \
+  ((message).has_##field_name() ? absl::make_optional((message).field_name().value())              \
+                                : absl::nullopt)
+
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
 // a EnvoyException.
 
@@ -249,7 +255,7 @@ public:
   static std::size_t hash(const Protobuf::Message& message);
 
 #ifdef ENVOY_ENABLE_YAML
-  static void loadFromJson(const std::string& json, Protobuf::Message& message,
+  static void loadFromJson(absl::string_view json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   /**
    * Return ok only when strict conversion(don't ignore unknown field) succeeds.
@@ -258,9 +264,9 @@ public:
    * Return error status for relaxed conversion and set has_unknown_field to false if relaxed
    * conversion(ignore unknown field) fails.
    */
-  static absl::Status loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
+  static absl::Status loadFromJsonNoThrow(absl::string_view json, Protobuf::Message& message,
                                           bool& has_unknown_fileld);
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
+  static void loadFromJson(absl::string_view json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
 #endif
@@ -772,10 +778,7 @@ public:
 
 } // namespace Envoy
 
-namespace std {
-// Inject an implementation of std::hash for Envoy::HashedValue into the std namespace.
-template <> struct hash<Envoy::HashedValue> {
+// Specialize std::hash on Envoy::HashedValue.
+template <> struct std::hash<Envoy::HashedValue> {
   std::size_t operator()(Envoy::HashedValue const& v) const { return v.hash(); }
 };
-
-} // namespace std

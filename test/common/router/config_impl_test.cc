@@ -6305,19 +6305,58 @@ virtual_hosts:
   {
     Http::TestRequestHeaderMapImpl headers = genHeaders("www3.lyft.com", "/foo", "GET");
     EXPECT_CALL(runtime.snapshot_, featureEnabled("www3", 100, _)).WillRepeatedly(Return(true));
+    // new total weight will be 140
     EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster1", 30))
         .WillRepeatedly(Return(10));
-
-    // We return an invalid value here, one that is greater than 100
-    // Expect any random value > 10 to always land in cluster2.
     EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster2", 30))
         .WillRepeatedly(Return(120));
     EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster3", 40))
         .WillRepeatedly(Return(10));
 
-    EXPECT_EQ("cluster1", config.route(headers, 1005)->routeEntry()->clusterName());
+    // 1005 % total_weight == 25
+    EXPECT_EQ("cluster2", config.route(headers, 1005)->routeEntry()->clusterName());
     EXPECT_EQ("cluster2", config.route(headers, 82)->routeEntry()->clusterName());
     EXPECT_EQ("cluster2", config.route(headers, 92)->routeEntry()->clusterName());
+  }
+
+  // Weighted Cluster with runtime values under total weight
+  // Makes sure new total weight is taken into account
+  // if total_weight is not recomputed, it will raise "unexpected" error
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www3.lyft.com", "/foo", "GET");
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("www3", 100, _)).WillRepeatedly(Return(true));
+    // new total weight will be 6
+    EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster1", 30))
+        .WillRepeatedly(Return(1));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster2", 30))
+        .WillRepeatedly(Return(2));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster3", 40))
+        .WillRepeatedly(Return(3));
+
+    // 1005 % total_weight == 3
+    EXPECT_EQ("cluster3", config.route(headers, 1005)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster3", config.route(headers, 82)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", config.route(headers, 92)->routeEntry()->clusterName());
+  }
+
+  // Total weight is set to zero
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www3.lyft.com", "/foo", "GET");
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("www3", 100, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster1", 30))
+        .WillRepeatedly(Return(0));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster2", 30))
+        .WillRepeatedly(Return(0));
+    EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster3", 40))
+        .WillRepeatedly(Return(0));
+
+#if defined(NDEBUG)
+    // sum of weight returns nullptr
+    EXPECT_EQ(nullptr, config.route(headers, 42));
+#else
+    // in debug mode, it aborts
+    EXPECT_DEATH(config.route(headers, 42), "Sum of weight cannot be zero");
+#endif
   }
 
   // Weighted Cluster with runtime values, total weight = 10000
@@ -10605,11 +10644,11 @@ public:
     check(dynamic_cast<const DerivedFilterConfig*>(
               route->mostSpecificPerFilterConfig(route_config_name)),
           expected_most_specific_config, "most specific config");
-    route->traversePerFilterConfig(
-        route_config_name, [&](const Router::RouteSpecificFilterConfig& cfg) {
-          auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
-          traveled_cfg.push_back(typed_cfg->config_.seconds());
-        });
+    for (const auto* cfg : route->perFilterConfigs(route_config_name)) {
+      auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(cfg);
+      traveled_cfg.push_back(typed_cfg->config_.seconds());
+    }
+
     ASSERT_EQ(expected_traveled_config, traveled_cfg);
   }
 
@@ -10627,11 +10666,10 @@ public:
     absl::InlinedVector<uint32_t, 3> traveled_cfg;
 
     EXPECT_EQ(nullptr, route->mostSpecificPerFilterConfig(route_config_name));
-    route->traversePerFilterConfig(
-        route_config_name, [&](const Router::RouteSpecificFilterConfig& cfg) {
-          auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(&cfg);
-          traveled_cfg.push_back(typed_cfg->config_.seconds());
-        });
+    for (const auto* cfg : route->perFilterConfigs(route_config_name)) {
+      auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(cfg);
+      traveled_cfg.push_back(typed_cfg->config_.seconds());
+    }
     EXPECT_EQ(0, traveled_cfg.size());
   }
 

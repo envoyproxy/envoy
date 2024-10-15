@@ -38,7 +38,7 @@ paths:
   excluded:
   - .
   - bazel/external/http_parser/
-  - bazel/toolchains/configs/
+  - bazel/rbe/toolchains/configs/
   - bazel-
   - build
   - contrib/contrib_build_config.bzl
@@ -61,6 +61,8 @@ paths:
 
   build_fixer:
     exclude:
+    - BUILD
+    - tools/BUILD
     - bazel/BUILD
     - bazel/external/
     - bazel/toolchains/
@@ -89,7 +91,6 @@ paths:
     - envoy/common/exception.h
     - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
-    - source/common/matcher/map_matcher.h
     - source/common/matcher/matcher.h
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
@@ -98,8 +99,6 @@ paths:
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/router/route_config_update_receiver_impl.cc
-    - source/common/listener_manager/listener_impl.cc
-    - source/common/listener_manager/listener_manager_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/network/listen_socket_impl.cc
@@ -109,7 +108,6 @@ paths:
     - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
-    - source/common/formatter/substitution_format_string.h
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
@@ -160,36 +158,85 @@ paths:
     # Extensions can exempt entire directories but new extensions
     # points should ideally use StatusOr
     - source/extensions/access_loggers
-    - source/extensions/bootstrap
-    - source/extensions/clusters
+    - source/extensions/bootstrap/wasm/config.cc
+    - source/extensions/clusters/eds/
+    - source/extensions/clusters/logical_dns
+    - source/extensions/clusters/original_dst
+    - source/extensions/clusters/redis
+    - source/extensions/clusters/static
+    - source/extensions/clusters/strict_dns
     - source/extensions/common
-    - source/extensions/config
+    - source/extensions/config/validators/minimum_clusters/minimum_clusters_validator.cc
     - source/extensions/config_subscription
-    - source/extensions/compression/zstd/common
-    - source/extensions/early_data
-    - source/extensions/filters
+    - source/extensions/compression/zstd/common/dictionary_manager.h
+    - source/extensions/filters/http/adaptive_concurrency/controller
+    - source/extensions/filters/http/admission_control
+    - source/extensions/filters/http/aws_lambda
+    - source/extensions/filters/http/aws_request_signing
+    - source/extensions/filters/http/bandwidth_limit
+    - source/extensions/filters/http/basic_auth
+    - source/extensions/filters/http/cache
+    - source/extensions/filters/http/cdn_loop
+    - source/extensions/filters/http/common
+    - source/extensions/filters/http/composite
+    - source/extensions/filters/http/ext_authz
+    - source/extensions/filters/http/ext_proc
+    - source/extensions/filters/http/file_system_buffer
+    - source/extensions/filters/http/gcp_authn
+    - source/extensions/filters/http/grpc_field_extraction
+    - source/extensions/filters/http/grpc_json_transcoder
+    - source/extensions/filters/http/grpc_stats
+    - source/extensions/filters/http/header_mutation
+    - source/extensions/filters/http/header_to_metadata
+    - source/extensions/filters/http/health_check
+    - source/extensions/filters/http/ip_tagging
+    - source/extensions/filters/http/json_to_metadata
+    - source/extensions/filters/http/jwt_authn
+    - source/extensions/filters/http/local_ratelimit
+    - source/extensions/filters/http/oauth2
+    - source/extensions/filters/http/file_system_buffer
+    - source/extensions/filters/http/header_to_metadata
+    - source/extensions/filters/http/on_demand
+    - source/extensions/filters/http/json_to_metadata
+    - source/extensions/filters/http/json_to_metadata
+    - source/extensions/filters/http/thrift_to_metadata
+    - source/extensions/filters/http/lua
+    - source/extensions/filters/http/proto_message_extraction
+    - source/extensions/filters/http/rate_limit_quota
+    - source/extensions/filters/http/ratelimit
+    - source/extensions/filters/http/oauth2
+    - source/extensions/filters/http/wasm
+    - source/extensions/filters/network
+    - source/extensions/filters/common
+    - source/extensions/filters/udp
+    - source/extensions/filters/listener
     - source/extensions/formatter
-    - source/extensions/geoip_providers
+    - source/extensions/geoip_providers/maxmind/geoip_provider.cc
     - source/extensions/grpc_credentials
-    - source/extensions/health_check
+    - source/extensions/health_check/event_sinks/file/file_sink_impl.h
     - source/extensions/health_checkers
-    - source/extensions/http
-    - source/extensions/io_socket
+    - source/extensions/http/cache/file_system_http_cache/config.cc
+    - source/extensions/http/custom_response
+    - source/extensions/http/early_header_mutation
+    - source/extensions/http/injected_credentials
+    - source/extensions/http/stateful_session
+    - source/extensions/io_socket/user_space
     - source/extensions/key_value
-    - source/extensions/listener_managers
-    - source/extensions/load_balancing_policies
+    - source/extensions/load_balancing_policies/maglev
+    - source/extensions/load_balancing_policies/ring_hash
+    - source/extensions/load_balancing_policies/subset
     - source/extensions/matching
-    - source/extensions/network
-    - source/extensions/path
+    - source/extensions/network/dns_resolver/cares/
     - source/extensions/quic/server_preferred_address
     - source/extensions/rate_limit_descriptors
     - source/extensions/resource_monitors
-    - source/extensions/retry
-    - source/extensions/router
+    - source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.cc
     - source/extensions/stat_sinks
-    - source/extensions/string_matcher
+    - source/extensions/string_matcher/lua/match.cc
     - source/extensions/tracers
-    - source/extensions/transport_sockets
+    - source/extensions/transport_sockets/internal_upstream
+    - source/extensions/transport_sockets/tls/cert_validator
+    - source/extensions/transport_sockets/tcp_stats/config.cc
 
   # Only one C++ file should instantiate grpc_init
   grpc_init:
@@ -202,6 +249,7 @@ paths:
     - source/common/protobuf/utility.cc
     - source/common/protobuf/protobuf.h
     - source/common/protobuf/yaml_utility.cc
+    - source/extensions/filters/http/proto_message_extraction/extraction_util/extraction_util.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
 
   namespace_check:
@@ -223,6 +271,7 @@ paths:
     - ci/prebuilt
     - source/common/protobuf
     - source/extensions/filters/http/grpc_field_extraction
+    - source/extensions/filters/http/proto_message_extraction/extraction_util
     - test/extensions/bootstrap/wasm/test_data
 
   # Files that are allowed to use try without main thread assertion.

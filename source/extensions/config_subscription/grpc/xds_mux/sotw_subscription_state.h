@@ -35,7 +35,7 @@ public:
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const override;
 
-  void markStreamFresh() override;
+  void markStreamFresh(bool) override;
 
   void ttlExpiryCallback(const std::vector<std::string>& expired) override;
 

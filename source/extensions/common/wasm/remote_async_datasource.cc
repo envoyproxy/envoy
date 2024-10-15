@@ -32,7 +32,7 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
 
   auto strategy_or_error = Config::Utility::prepareJitteredExponentialBackOffStrategy(
       source, random, RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds);
-  THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
+  THROW_IF_NOT_OK_REF(strategy_or_error.status());
   backoff_strategy_ = std::move(strategy_or_error.value());
 
   retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });

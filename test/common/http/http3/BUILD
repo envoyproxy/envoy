@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = envoy_select_enable_http3(["conn_pool_test.cc"]),
+    rbe_pool = "2core",
     tags = ["nofips"],
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
@@ -20,6 +21,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
+        "//test/common/quic:test_utils_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",

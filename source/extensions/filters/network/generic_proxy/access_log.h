@@ -20,8 +20,10 @@ using Formatter = Formatter::FormatterBase<FormatterContext>;
 using FormatterProvider = Envoy::Formatter::FormatterProviderBase<FormatterContext>;
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;
 using CommandParser = Envoy::Formatter::CommandParserBase<FormatterContext>;
+using CommandParserPtr = Envoy::Formatter::CommandParserBasePtr<FormatterContext>;
 using CommandParserFactory = Envoy::Formatter::CommandParserFactoryBase<FormatterContext>;
-using BuiltInCommandParsers = Envoy::Formatter::BuiltInCommandParsersBase<FormatterContext>;
+using BuiltInCommandParserFactory =
+    Envoy::Formatter::BuiltInCommandParserFactoryBase<FormatterContext>;
 
 // Access log for generic proxy.
 using AccessLogFilter = AccessLog::FilterBase<FormatterContext>;

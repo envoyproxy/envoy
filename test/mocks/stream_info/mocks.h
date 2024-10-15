@@ -172,6 +172,9 @@ public:
   MOCK_METHOD(void, setShouldSchemeMatchUpstream, (bool));
   MOCK_METHOD(bool, shouldDrainConnectionUponCompletion, (), (const));
   MOCK_METHOD(void, setShouldDrainConnectionUponCompletion, (bool));
+  MOCK_METHOD(void, setParentStreamInfo, (const StreamInfo&), ());
+  MOCK_METHOD(void, clearParentStreamInfo, ());
+  MOCK_METHOD(OptRef<const StreamInfo>, parentStreamInfo, (), (const));
 
   Envoy::Event::SimulatedTimeSystem ts_;
   SystemTime start_time_;

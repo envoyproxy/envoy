@@ -57,7 +57,7 @@ envoy_cmake(
     postfix_script = """
         mkdir -p $INSTALLDIR/lib/external $INSTALLDIR/include/external \
         && find . -name "*.a" | xargs -I{} cp -a {} $INSTALLDIR/lib/ \
-        && find . -name "*.h" | xargs -I{} cp -a {} $INSTALLDIR/include
+        && find . -name "*.h" ! -name config.h | xargs -I{} cp -a {} $INSTALLDIR/include
     """,
     tags = [
         "cpu:16",
@@ -80,10 +80,8 @@ genrule(
         "external/vppcom.h",
     ],
     cmd = """
-        EXTERNAL_DIR=$$(dirname $(location external/libsvm.a)) \
-        && mkdir -p $$EXTERNAL_DIR \
-        && find . -name "*.a" | xargs -I{} cp -a {} $$EXTERNAL_DIR \
-        && find . -name "vppcom.h" | xargs -I{} cp -a {} $$EXTERNAL_DIR
+        find . -name "*.a" | grep -v copy_build | xargs -I{} cp -a {} $(RULEDIR)/external \
+        && find . -name "vppcom.h" | grep -v copy_build | xargs -I{} cp -a {} $(RULEDIR)/external
     """,
     tools = [":build"],
 )

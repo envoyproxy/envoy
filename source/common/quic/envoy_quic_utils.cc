@@ -14,6 +14,20 @@
 namespace Envoy {
 namespace Quic {
 
+namespace {
+
+Network::Address::InstanceConstSharedPtr
+getLoopbackAddress(Network::Address::InstanceConstSharedPtr peer_address) {
+  if (peer_address->ip()->version() == Network::Address::IpVersion::v6) {
+    return std::make_shared<Network::Address::Ipv6Instance>(
+        "::1", 0, &peer_address->socketInterface(), peer_address->ip()->ipv6()->v6only());
+  }
+  return std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1",
+                                                          &peer_address->socketInterface());
+}
+
+} // namespace
+
 // TODO(danzh): this is called on each write. Consider to return an address instance on the stack if
 // the heap allocation is too expensive.
 Network::Address::InstanceConstSharedPtr
@@ -56,8 +70,8 @@ quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address
   return quic::QuicSocketAddress(ss);
 }
 
-spdy::Http2HeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers) {
-  spdy::Http2HeaderBlock header_block;
+quiche::HttpHeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers) {
+  quiche::HttpHeaderBlock header_block;
   headers.iterate([&header_block](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     // The key-value pairs are copied.
     header_block.AppendValueOrAddHeader(header.key().getStringView(),
@@ -90,6 +104,10 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
   case Http::StreamResetReason::RemoteRefusedStreamReset:
   case Http::StreamResetReason::RemoteReset:
     IS_ENVOY_BUG("Remote reset shouldn't be initiated by self.");
+    break;
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
+    IS_ENVOY_BUG("H/1 premature response reset is not applicable to H/3.");
+    break;
   }
 
   ENVOY_LOG_MISC(error, absl::StrCat("Unknown reset reason: ", reason));
@@ -168,16 +186,23 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
                        const bool prefer_gro) {
-  if (local_addr == nullptr) {
-    local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
-  }
+  ASSERT(peer_addr != nullptr);
+  const bool should_connect =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_connect_client_udp_sockets");
   size_t max_addresses_cache_size =
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read")
           ? 4u
           : 0u;
+
+  if (local_addr == nullptr && !should_connect) {
+    local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
+  }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram, local_addr, peer_addr,
+      Network::Socket::Type::Datagram,
+      // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
+      // create the IoHandle, without having to make the more expensive `getifaddrs` call.
+      local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
       Network::SocketCreationOptions{false, max_addresses_cache_size});
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
@@ -192,6 +217,25 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int v6_only = 0;
+    if (connection_socket->ipVersion().has_value() &&
+        connection_socket->ipVersion().value() == Network::Address::IpVersion::v6) {
+      socklen_t v6_only_len = sizeof(v6_only);
+      Api::SysCallIntResult result =
+          connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &v6_only, &v6_only_len);
+      if (result.return_value_ != 0) {
+        ENVOY_LOG_MISC(
+            error, "Failed to get IPV6_V6ONLY socket option, getsockopt() returned {}, errno {}",
+            result.return_value_, result.errno_);
+        connection_socket->close();
+        return connection_socket;
+      }
+    }
+    connection_socket->addOptions(Network::SocketOptionFactory::buildDoNotFragmentOptions(
+        /*mapped_v6*/ connection_socket->ipVersion().value() == Network::Address::IpVersion::v6 &&
+        v6_only == 0));
+  }
   if (options != nullptr) {
     connection_socket->addOptions(options);
   }
@@ -201,8 +245,20 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
     ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
     return connection_socket;
   }
-  connection_socket->bind(local_addr);
-  ASSERT(local_addr->ip());
+
+  if (local_addr != nullptr) {
+    connection_socket->bind(local_addr);
+    ASSERT(local_addr->ip());
+  }
+  if (should_connect) {
+    if (auto result = connection_socket->connect(peer_addr); result.return_value_ == -1) {
+      connection_socket->close();
+      ENVOY_LOG_MISC(error, "Fail to connect socket: ({}) {}", result.errno_,
+                     errorDetails(result.errno_));
+      return connection_socket;
+    }
+  }
+
   local_addr = connection_socket->connectionInfoProvider().localAddress();
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {

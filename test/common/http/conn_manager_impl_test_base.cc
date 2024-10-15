@@ -53,6 +53,9 @@ public:
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return parent_.maxConnectionDuration();
   }
+  bool http1SafeMaxConnectionDuration() const override {
+    return parent_.http1SafeMaxConnectionDuration();
+  }
   uint32_t maxRequestHeadersKb() const override { return parent_.maxRequestHeadersKb(); }
   uint32_t maxRequestHeadersCount() const override { return parent_.maxRequestHeadersCount(); }
   std::chrono::milliseconds streamIdleTimeout() const override {
@@ -149,7 +152,7 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
       access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
-          Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
+          *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
                                       POOL_GAUGE(*fake_stats_.rootScope()),
@@ -169,7 +172,7 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
   // method only.
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
 
-  ip_detection_extensions_.push_back(getXFFExtension(0));
+  ip_detection_extensions_.push_back(getXFFExtension(0, false));
 }
 
 HttpConnectionManagerImplMixin::~HttpConnectionManagerImplMixin() {
@@ -183,14 +186,14 @@ HttpConnectionManagerImplMixin::requestHeaderCustomTag(const std::string& header
   return std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag);
 }
 
-void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_name, bool tracing,
-                                           bool use_srds) {
-  use_srds_ = use_srds;
-  if (ssl) {
+void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
+  use_srds_ = opts.use_srds_;
+  http1_safe_max_connection_duration_ = opts.http1_safe_max_connection_duration_;
+  if (opts.ssl_) {
     ssl_connection_ = std::make_shared<Ssl::MockConnectionInfo>();
   }
 
-  server_name_ = server_name;
+  server_name_ = opts.server_name_;
   ON_CALL(filter_callbacks_.connection_, ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(Const(filter_callbacks_.connection_), ssl()).WillByDefault(Return(ssl_connection_));
   ON_CALL(filter_callbacks_.connection_.dispatcher_, createScaledTypedTimer_)
@@ -214,7 +217,7 @@ void HttpConnectionManagerImplMixin::setup(bool ssl, const std::string& server_n
 
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
-  if (tracing) {
+  if (opts.tracing_) {
     envoy::type::v3::FractionalPercent percent1;
     percent1.set_numerator(100);
     envoy::type::v3::FractionalPercent percent2;
@@ -257,14 +260,16 @@ void HttpConnectionManagerImplMixin::setupFilterChain(int num_decoder_filters,
           for (int i = 0; i < num_decoder_filters; i++) {
             auto factory = createDecoderFilterFactoryCb(
                 StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
-            manager.applyFilterFactoryCb({}, factory);
+            std::string name = absl::StrCat(req * num_decoder_filters + i);
+            manager.applyFilterFactoryCb({name}, factory);
             applied_filters = true;
           }
 
           for (int i = 0; i < num_encoder_filters; i++) {
             auto factory = createEncoderFilterFactoryCb(
                 StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
-            manager.applyFilterFactoryCb({}, factory);
+            std::string name = absl::StrCat(req * num_decoder_filters + i);
+            manager.applyFilterFactoryCb({name}, factory);
             applied_filters = true;
           }
           return applied_filters;
@@ -389,21 +394,15 @@ void HttpConnectionManagerImplMixin::expectOnDestroy(bool deferred) {
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onStreamComplete());
   }
-  {
-    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
-      EXPECT_CALL(*filter, onStreamComplete());
-    };
-    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  for (auto filter : encoder_filters_) {
+    EXPECT_CALL(*filter, onStreamComplete());
   }
 
   for (auto filter : decoder_filters_) {
     EXPECT_CALL(*filter, onDestroy());
   }
-  {
-    auto setup_filter_expect = [](MockStreamEncoderFilter* filter) {
-      EXPECT_CALL(*filter, onDestroy());
-    };
-    std::for_each(encoder_filters_.rbegin(), encoder_filters_.rend(), setup_filter_expect);
+  for (auto filter : encoder_filters_) {
+    EXPECT_CALL(*filter, onDestroy());
   }
 
   if (deferred) {
@@ -421,7 +420,7 @@ void HttpConnectionManagerImplMixin::doRemoteClose(bool deferred) {
 
 void HttpConnectionManagerImplMixin::testPathNormalization(
     const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
-  setup(false, "");
+  setup();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);

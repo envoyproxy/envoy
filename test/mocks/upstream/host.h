@@ -93,6 +93,7 @@ public:
   MOCK_METHOD(void, canary, (bool new_canary));
   MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
   MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
+  MOCK_METHOD(const MetadataConstSharedPtr, localityMetadata, (), (const));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
   MOCK_METHOD(bool, canCreateConnection, (Upstream::ResourcePriority), (const));
   MOCK_METHOD(Outlier::DetectorHostMonitor&, outlierDetector, (), (const));
@@ -169,6 +170,7 @@ public:
   MOCK_METHOD(bool, canary, (), (const));
   MOCK_METHOD(void, canary, (bool new_canary));
   MOCK_METHOD(MetadataConstSharedPtr, metadata, (), (const));
+  MOCK_METHOD(const MetadataConstSharedPtr, localityMetadata, (), (const));
   MOCK_METHOD(void, metadata, (MetadataConstSharedPtr));
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
   MOCK_METHOD(bool, canCreateConnection, (Upstream::ResourcePriority), (const));
@@ -212,7 +214,7 @@ public:
   MOCK_METHOD(bool, warmed, (), (const));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
   MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
-  MOCK_METHOD(const HostLbPolicyDataPtr&, lbPolicyData, (), (const));
+  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
 
   bool disable_active_health_check_ = false;
 };
@@ -238,6 +240,7 @@ public:
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
+  HostLbPolicyDataPtr lb_policy_data_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };

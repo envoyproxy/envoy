@@ -35,9 +35,9 @@ enum class CertVerifyStatus : int {
 
 bool jvmCertIsIssuedByKnownRoot(JniHelper& jni_helper, jobject result) {
   jclass jcls_AndroidCertVerifyResult =
-      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
+      jni_helper.findClassFromCache("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
   jmethodID jmid_isIssuedByKnownRoot =
-      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
+      jni_helper.getMethodIdFromCache(jcls_AndroidCertVerifyResult, "isIssuedByKnownRoot", "()Z");
   ASSERT(jmid_isIssuedByKnownRoot);
   bool is_issued_by_known_root = jni_helper.callBooleanMethod(result, jmid_isIssuedByKnownRoot);
   return is_issued_by_known_root;
@@ -45,9 +45,9 @@ bool jvmCertIsIssuedByKnownRoot(JniHelper& jni_helper, jobject result) {
 
 CertVerifyStatus jvmCertGetStatus(JniHelper& jni_helper, jobject j_result) {
   jclass jcls_AndroidCertVerifyResult =
-      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
+      jni_helper.findClassFromCache("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
   jmethodID jmid_getStatus =
-      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "getStatus", "()I");
+      jni_helper.getMethodIdFromCache(jcls_AndroidCertVerifyResult, "getStatus", "()I");
   ASSERT(jmid_getStatus);
   CertVerifyStatus result =
       static_cast<CertVerifyStatus>(jni_helper.callIntMethod(j_result, jmid_getStatus));
@@ -57,9 +57,9 @@ CertVerifyStatus jvmCertGetStatus(JniHelper& jni_helper, jobject j_result) {
 LocalRefUniquePtr<jobjectArray> jvmCertGetCertificateChainEncoded(JniHelper& jni_helper,
                                                                   jobject result) {
   jclass jcls_AndroidCertVerifyResult =
-      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
-  jmethodID jmid_getCertificateChainEncoded =
-      jni_helper.getMethodId(jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
+      jni_helper.findClassFromCache("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult");
+  jmethodID jmid_getCertificateChainEncoded = jni_helper.getMethodIdFromCache(
+      jcls_AndroidCertVerifyResult, "getCertificateChainEncoded", "()[[B");
   LocalRefUniquePtr<jobjectArray> certificate_chain =
       jni_helper.callObjectMethod<jobjectArray>(result, jmid_getCertificateChainEncoded);
   return certificate_chain;
@@ -108,8 +108,8 @@ LocalRefUniquePtr<jobject> callJvmVerifyX509CertChain(JniHelper& jni_helper,
                                                       std::string auth_type,
                                                       absl::string_view hostname) {
   jclass jcls_AndroidNetworkLibrary =
-      jni_helper.findClass("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
-  jmethodID jmid_verifyServerCertificates = jni_helper.getStaticMethodId(
+      jni_helper.findClassFromCache("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
+  jmethodID jmid_verifyServerCertificates = jni_helper.getStaticMethodIdFromCache(
       jcls_AndroidNetworkLibrary, "verifyServerCertificates",
       "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;");
   LocalRefUniquePtr<jobjectArray> chain_byte_array =

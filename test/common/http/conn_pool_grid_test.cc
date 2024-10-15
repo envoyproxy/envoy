@@ -4,6 +4,7 @@
 
 #include "source/common/http/conn_pool_grid.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
+#include "source/common/upstream/transport_socket_match_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -50,6 +51,8 @@ public:
   static ConnectionPool::Instance* forceGetOrCreateHttp2Pool(ConnectivityGrid& grid) {
     return grid.getOrCreateHttp2Pool();
   }
+
+  std::string getOriginHostname() { return origin_.hostname_; }
 
   ConnectionPool::InstancePtr createHttp3Pool(bool alternate) override {
     if (!alternate) {
@@ -177,15 +180,15 @@ public:
         std::make_unique<PersistentQuicInfo>();
 #endif
     host_ = std::make_shared<Upstream::HostImpl>(
-        cluster_, "hostname", *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"), nullptr,
-        nullptr, 1, envoy::config::core::v3::Locality(),
+        cluster_, host_impl_hostname_, *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
+        nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
         envoy::config::core::v3::UNKNOWN, simTime(), address_list_);
 
     grid_ = std::make_unique<ConnectivityGridForTest>(
         dispatcher_, random_, host_, Upstream::ResourcePriority::Default, socket_options_,
         transport_socket_options_, state_, simTime(), alternate_protocols_, options_,
-        quic_stat_names_, *store_.rootScope(), *quic_connection_persistent_info_);
+        quic_stat_names_, *store_.rootScope(), *quic_connection_persistent_info_, registry_);
     grid_->cancel_ = &cancel_;
     grid_->info_ = &info_;
     grid_->encoder_ = &encoder_;
@@ -213,7 +216,7 @@ public:
 
   HttpServerPropertiesCacheImpl::Origin origin_{"https", "hostname", 9000};
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   ConnectivityGrid::ConnectivityOptions options_;
   Upstream::ClusterConnectivityState state_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
@@ -231,16 +234,46 @@ public:
 
   StreamInfo::MockStreamInfo info_;
   NiceMock<MockRequestEncoder> encoder_;
-
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+
+  Quic::EnvoyQuicNetworkObserverRegistry registry_;
   std::unique_ptr<ConnectivityGridForTest> grid_;
+  std::string host_impl_hostname_ = "hostname";
 };
+
+TEST_F(ConnectivityGridTest, HostnameFromTransportSocketFactory) {
+  Network::MockTransportSocketFactory factory;
+  Upstream::MockTransportSocketMatcher* transport_socket_matcher =
+      dynamic_cast<Upstream::MockTransportSocketMatcher*>(
+          cluster_->transport_socket_matcher_.get());
+  EXPECT_CALL(*transport_socket_matcher, resolve(_, _))
+      .WillOnce(Return(Upstream::TransportSocketMatcher::MatchData(
+          factory, transport_socket_matcher->stats_, "test")));
+  EXPECT_CALL(factory, defaultServerNameIndication)
+      .WillRepeatedly(Return("transport_socket_hostname"));
+  host_impl_hostname_ = "custom_hostname";
+  transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>();
+  initialize();
+  // Without "hostname" in the TransportSocketOptionsImpl, this fails over to
+  // the host name in HostNameImpl
+  EXPECT_EQ("transport_socket_hostname", grid_->getOriginHostname());
+}
+
+TEST_F(ConnectivityGridTest, NoServerNameOverride) {
+  host_impl_hostname_ = "custom_hostname";
+  transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>();
+  initialize();
+  // Without "hostname" in the TransportSocketOptionsImpl, this fails over to
+  // the host name in HostNameImpl
+  EXPECT_EQ(host_impl_hostname_, grid_->getOriginHostname());
+}
 
 // Test the first pool successfully connecting.
 TEST_F(ConnectivityGridTest, Success) {
   initialize();
+  EXPECT_EQ("hostname", grid_->getOriginHostname());
   addHttp3AlternateProtocol();
   EXPECT_EQ(grid_->http3Pool(), nullptr);
   EXPECT_NE(grid_->newStream(decoder_, callbacks_,
@@ -1334,7 +1367,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_);
+      *quic_connection_persistent_info_, {});
   EXPECT_EQ("connection grid", grid.protocolDescription());
   EXPECT_FALSE(grid.hasActiveConnections());
 
@@ -1374,31 +1407,15 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
       dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_);
+      *quic_connection_persistent_info_, {});
 
   // Create the HTTP/3 pool.
   auto pool = ConnectivityGridForTest::forceGetOrCreateHttp3Pool(grid);
   ASSERT_TRUE(pool != nullptr);
   EXPECT_EQ("HTTP/3", pool->protocolDescription());
 
-  const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
-  Api::InterfaceAddressVector interfaces{};
-  if (supports_getifaddrs) {
-    ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
-  }
-
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(supports_getifaddrs));
-  if (supports_getifaddrs) {
-    EXPECT_CALL(os_sys_calls, getifaddrs(_))
-        .WillOnce(
-            Invoke([&](Api::InterfaceAddressVector& interface_vector) -> Api::SysCallIntResult {
-              interface_vector.insert(interface_vector.begin(), interfaces.begin(),
-                                      interfaces.end());
-              return {0, 0};
-            }));
-  }
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
 #if defined(__APPLE__) || defined(WIN32)
   EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
@@ -1407,7 +1424,16 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _))
       .Times(testing::AtLeast(0u))
       .WillRepeatedly(Return(0));
-  EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
+  EXPECT_CALL(os_sys_calls, connect(_, _, _)).WillOnce(Return(Api::SysCallIntResult{1, 0}));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+        sockaddr_in* addr_in = reinterpret_cast<sockaddr_in*>(addr);
+        addr_in->sin_family = AF_INET;
+        addr_in->sin_port = 0;
+        inet_pton(AF_INET, "127.0.0.1", &addr_in->sin_addr.s_addr);
+        *addrlen = sizeof(sockaddr_in);
+        return Api::SysCallIntResult{0, 0};
+      }));
   EXPECT_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillRepeatedly(Return(0));
   auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
 
@@ -1416,7 +1442,8 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
                                                          /*can_use_http3_=*/true});
   EXPECT_NE(nullptr, cancel);
 
-  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
+  // When there is only 1 slice, the IoHandle's writev method will call the `send` system call.
+  EXPECT_CALL(os_sys_calls, send(_, _, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 101}));
   EXPECT_CALL(callbacks_.pool_failure_, ready());
   async_connect_callback->invokeCallback();
 }

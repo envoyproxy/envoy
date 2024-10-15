@@ -202,7 +202,7 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   if (wasm()->isFailed() || !wasm()->on_resolve_dns_) {
     return;
   }
-  if (status != Network::DnsResolver::ResolutionStatus::Success) {
+  if (status != Network::DnsResolver::ResolutionStatus::Completed) {
     buffer_.set("");
     wasm()->on_resolve_dns_(this, id_, token, 0);
     return;
@@ -1723,6 +1723,9 @@ Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool
   if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
+  if (buffering_request_body_) {
+    decoder_callbacks_->addDecodedData(data, false);
+  }
   request_body_buffer_ = &data;
   end_of_stream_ = end_stream;
   const auto buffer = getBuffer(WasmBufferType::HttpRequestBody);
@@ -1793,6 +1796,9 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
   if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
+  if (buffering_response_body_) {
+    encoder_callbacks_->addEncodedData(data, false);
+  }
   response_body_buffer_ = &data;
   end_of_stream_ = end_stream;
   const auto buffer = getBuffer(WasmBufferType::HttpResponseBody);
@@ -1801,7 +1807,7 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
   buffering_response_body_ = false;
   switch (result) {
   case Http::FilterDataStatus::Continue:
-    request_body_buffer_ = nullptr;
+    response_body_buffer_ = nullptr;
     break;
   case Http::FilterDataStatus::StopIterationAndBuffer:
     buffering_response_body_ = true;

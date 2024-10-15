@@ -7,23 +7,21 @@ permissions:
   contents: read
 
 on:
-  # This runs untrusted code, do not expose secrets in the verify job
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: "Git SHA ref to checkout"
-      sha:
-        description: "Git SHA of commit HEAD (ie last commit of PR)"
-      head_ref:
-        description: "Ref for grouping PRs"
+  workflow_run:
+    workflows:
+    # Workaround issue with PRs not triggering tertiary workflows
+    - Request
+    # - Envoy/Prechecks
+    types:
+    - completed
 
 concurrency:
-  group: >-
-    ${{ github.actor != 'trigger-release-envoy[bot]'
-        && github.event.inputs.head_ref
-        || github.run_id
-    }}-${{ github.event.workflow.id }}
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG }}
+
 
 jobs:
   load:
@@ -38,17 +36,39 @@ jobs:
       packages: read
       pull-requests: read
     if: >-
-      ${{
-          (github.repository == 'envoyproxy/envoy'
-           || vars.ENVOY_CI)
-          && (!contains(github.actor, '[bot]')
-              || github.actor == 'trigger-workflow-envoy[bot]'
-              || github.actor == 'trigger-release-envoy[bot]')
-      }}
+      ${{ github.event.workflow_run.conclusion == 'success'
+       && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI) }}
     uses: ./.github/workflows/_load.yml
     with:
       check-name: publish
-      head-sha: ${{ inputs.sha }}
+      # head-sha: ${{ github.sha }}
+
+  build:
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      dockerhub-username: >-
+        ${{ fromJSON(needs.load.outputs.trusted)
+            && secrets.DOCKERHUB_USERNAME
+            || '' }}
+      dockerhub-password: >-
+        ${{ fromJSON(needs.load.outputs.trusted)
+            && secrets.DOCKERHUB_PASSWORD
+            || '' }}
+      gpg-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.ENVOY_GPG_MAINTAINER_KEY || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
+      gpg-key-password: >-
+        ${{ fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
+    if: ${{ fromJSON(needs.load.outputs.request).run.publish || fromJSON(needs.load.outputs.request).run.verify }}
+    needs:
+    - load
+    uses: ./.github/workflows/_publish_build.yml
+    name: Build
+    with:
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
 
   publish:
     secrets:
@@ -62,7 +82,8 @@ jobs:
     if: ${{ fromJSON(needs.load.outputs.request).run.publish }}
     needs:
     - load
-    uses: ./.github/workflows/_stage_publish.yml
+    - build
+    uses: ./.github/workflows/_publish_publish.yml
     name: Publish
     with:
       request: ${{ needs.load.outputs.request }}
@@ -75,7 +96,8 @@ jobs:
     if: ${{ fromJSON(needs.load.outputs.request).run.verify }}
     needs:
     - load
-    uses: ./.github/workflows/_stage_verify.yml
+    - build
+    uses: ./.github/workflows/_publish_verify.yml
     name: Verify
     with:
       request: ${{ needs.load.outputs.request }}
@@ -95,6 +117,7 @@ jobs:
               || fromJSON(needs.load.outputs.request).run.verify) }}
     needs:
     - load
+    - build
     - publish
     - verify
     uses: ./.github/workflows/_finish.yml

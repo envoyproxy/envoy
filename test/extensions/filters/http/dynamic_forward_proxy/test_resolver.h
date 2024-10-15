@@ -27,7 +27,7 @@ public:
       if (blocked_resolutions_.empty()) {
         continue;
       }
-      auto run = blocked_resolutions_.front();
+      auto run = std::move(blocked_resolutions_.front());
       blocked_resolutions_.pop_front();
       run(dns_override);
       return;
@@ -36,21 +36,25 @@ public:
 
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override {
-    auto new_query = new PendingQuery(dns_name, dns_lookup_family, callback, mutex_);
-
+    std::unique_ptr<PendingQuery> new_query =
+        std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback);
+    PendingQuery* raw_new_query = new_query.get();
     absl::MutexLock guard(&resolution_mutex_);
-    blocked_resolutions_.push_back([&, new_query](absl::optional<std::string> dns_override) {
-      absl::MutexLock guard(&mutex_);
-      if (dns_override.has_value()) {
-        *const_cast<std::string*>(&new_query->dns_name_) = dns_override.value();
-      }
-      pending_queries_.emplace_back(std::unique_ptr<PendingQuery>{new_query});
-    });
-    return new_query;
+    blocked_resolutions_.push_back(
+        [&, query = std::move(new_query)](absl::optional<std::string> dns_override) mutable {
+          absl::MutexLock guard(&mutex_);
+          if (dns_override.has_value()) {
+            *const_cast<std::string*>(&query->dns_name_) = dns_override.value();
+          }
+          // Add a dummy trace for test coverage.
+          query->addTrace(100);
+          pending_queries_.push_back(PendingQueryInfo{std::move(query), absl::nullopt});
+        });
+    return raw_new_query;
   }
 
   static absl::Mutex resolution_mutex_;
-  static std::list<std::function<void(absl::optional<std::string> dns_override)>>
+  static std::list<absl::AnyInvocable<void(absl::optional<std::string> dns_override)>>
       blocked_resolutions_ ABSL_GUARDED_BY(resolution_mutex_);
 };
 
@@ -65,8 +69,11 @@ public:
 
   absl::StatusOr<DnsResolverSharedPtr>
   createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
-    return std::make_shared<TestResolver>(dispatcher, api);
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_getaddrinfo_config)
+      const override {
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config;
+    RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_getaddrinfo_config.typed_config(), config));
+    return std::make_shared<TestResolver>(config, dispatcher, api);
   }
 };
 
@@ -74,8 +81,11 @@ class OverrideAddrInfoDnsResolverFactory : public Network::GetAddrInfoDnsResolve
 public:
   absl::StatusOr<Network::DnsResolverSharedPtr>
   createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
-                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
-    return std::make_shared<Network::TestResolver>(dispatcher, api);
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_getaddrinfo_config)
+      const override {
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config;
+    RETURN_IF_NOT_OK(Envoy::MessageUtil::unpackTo(typed_getaddrinfo_config.typed_config(), config));
+    return std::make_shared<Network::TestResolver>(config, dispatcher, api);
   }
 };
 

@@ -121,7 +121,7 @@ deadline of 3 weeks.
 * Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. This tool will create a commit with the
   necessary changes to continue development.
 * Create a pull request with that commit.
-* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
+* Run the deprecate_guards.py script (`bazel run //tools/deprecate_guards:deprecate_guards`)
 * If you haven't done this before, request posting permission from admins for all the groups in the next bullet.
 * Craft a witty/uplifting email and send it to all the email aliases:
 envoy-announce@googlegroups.com
@@ -138,6 +138,6 @@ Security releases are published on a 3-monthly cycle, around the mid point betwe
 | Quarter |  Expected  |   Actual   | Difference |
 |:-------:|:----------:|:----------:|:----------:|
 | 2024 Q2 | 2024/06/04 | 2024/06/04 |   0 days   |
-| 2024 Q3 | 2024/09/03 |
+| 2024 Q3 | 2024/09/03 | 2024/09/19 |  16 days   |
 
 NOTE: Zero-day vulnerabilities, and upstream vulnerabilities disclosed to us under embargo, may necessitate an emergency release with little or no warning.
