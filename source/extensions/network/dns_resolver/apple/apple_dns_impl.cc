@@ -379,7 +379,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
       isAddressFamilyProcessed(kDNSServiceProtocol_IPv6)) {
     ENVOY_LOG(debug, "DNS Resolver flushing queries pending callback");
     pending_response_.status_ = ResolutionStatus::Completed;
-    pending_response_.details_ = "apple_dns_success";
+    pending_response_.details_ = absl::StrCat("apple_dns_complete_", error_code);
     finishResolve();
     // Note: Nothing can follow this call to finishResolve due to deletion of this
     // object upon resolution.
