@@ -1536,7 +1536,9 @@ TEST_P(PluginConfigTest, WasmReload) {
     return;
   }
 
-  auto test_func = [this, runtime](bool singleton) {
+  const std::string runtime_name = runtime;
+
+  auto test_func = [this, runtime_name](bool singleton) {
     const std::string plugin_config_yaml = fmt::format(
         R"EOF(
 name: "test_wasm_reload"
@@ -1547,7 +1549,7 @@ vm_config:
     local:
       filename: "{}"
 )EOF",
-        runtime,
+        runtime_name,
         TestEnvironment::substitute(absl::StrCat(
             "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
 
@@ -1637,7 +1639,9 @@ TEST_P(PluginConfigTest, WasmReloadIsNotEnabledByDefaultIfFlagIsSetToFalse) {
     return;
   }
 
-  auto test_func = [this, runtime](bool singleton) {
+  const std::string runtime_name = runtime;
+
+  auto test_func = [this, runtime_name](bool singleton) {
     const std::string plugin_config_yaml = fmt::format(
         R"EOF(
 name: "test_wasm_reload"
@@ -1648,7 +1652,7 @@ vm_config:
     local:
       filename: "{}"
 )EOF",
-        runtime,
+        runtime_name,
         TestEnvironment::substitute(absl::StrCat(
             "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
 

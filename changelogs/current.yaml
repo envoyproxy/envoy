@@ -62,7 +62,7 @@ behavior_changes:
   change: |
     The failed wasm vm with runtime errors will be reloaded by default. This behavior can be reverted by setting the runtime
     flag ``envoy.reloadable_features.wasm_failure_reload_by_default`` to false or by setting the
-    :ref:`reload_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.reload_policy>`
+    :ref:`failure_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.failure_policy>`
     to ``FAIL_OPEN`` or ``FAIL_CLOSED`` explicitly.
 
 minor_behavior_changes:
@@ -506,7 +506,7 @@ new_features:
 - area: wasm
   change: |
     Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
-    :ref:`reload_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.reload_policy>` for more details.
+    :ref:`failure_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.failure_policy>` for more details.
     The ``FAIL_RELOAD`` reload policy will be used by default.
 
 deprecated:
