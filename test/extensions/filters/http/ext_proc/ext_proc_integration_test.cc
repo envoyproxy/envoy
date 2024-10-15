@@ -737,6 +737,8 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
   // Turn on debug to troubleshoot possible flaky test.
+  // TODO(cainelli): Remove this and the debug logs in the tracer test filter after a test failure
+  // occurs.
   LogLevelSetter save_levels(spdlog::level::trace);
   ENVOY_LOG(trace, "GetAndCloseStreamWithTracing Initializing config");
   initializeConfig();
