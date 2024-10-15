@@ -55,6 +55,20 @@ wasmDualFilterTestMatrix(bool include_nullvm, bool cpp_only) {
   return values;
 }
 
+std::vector<std::tuple<std::string, std::string, bool, Http::CodecType>>
+wasmDualFilterWithCodecsTestMatrix(bool include_nullvm, bool cpp_only,
+                                   std::vector<Http::CodecType> codecs_type) {
+  std::vector<std::tuple<std::string, std::string, bool, Http::CodecType>> values;
+  for (const Http::CodecType codec_type : codecs_type) {
+    for (const auto& [runtime, language] :
+         Envoy::Extensions::Common::Wasm::wasmTestMatrix(include_nullvm, cpp_only)) {
+      values.push_back(std::make_tuple(runtime, language, true, codec_type));
+      values.push_back(std::make_tuple(runtime, language, false, codec_type));
+    }
+  }
+  return values;
+}
+
 std::string
 wasmTestParamsToString(const ::testing::TestParamInfo<std::tuple<std::string, std::string>>& p) {
   return std::get<0>(p.param) + "_" + std::get<1>(p.param);
@@ -62,8 +76,30 @@ wasmTestParamsToString(const ::testing::TestParamInfo<std::tuple<std::string, st
 
 std::string wasmDualFilterTestParamsToString(
     const ::testing::TestParamInfo<std::tuple<std::string, std::string, bool>>& p) {
-  return (std::get<2>(p.param) ? "downstream_" : "upstream_") + std::get<0>(p.param) + "_" +
-         std::get<1>(p.param);
+  auto [runtime, language, direction] = p.param;
+  return fmt::format("{}_{}_{}", direction ? "downstream" : "upstream", runtime, language);
+}
+
+static std::string codecToString(const Http::CodecType& e) {
+  switch (e) {
+  case Http::CodecType::HTTP1:
+    return "http1";
+  case Http::CodecType::HTTP2:
+    return "http2";
+  case Http::CodecType::HTTP3:
+    return "http3";
+  default:
+    break;
+  }
+  return "Unknown";
+}
+
+std::string wasmDualFilterWithCodecsTestParamsToString(
+    const ::testing::TestParamInfo<std::tuple<std::string, std::string, bool, Http::CodecType>>&
+        p) {
+  auto [runtime, language, direction, codec_type] = p.param;
+  return fmt::format("{}_{}_{}_{}", direction ? "downstream" : "upstream", runtime, language,
+                     codecToString(codec_type));
 }
 
 } // namespace Wasm

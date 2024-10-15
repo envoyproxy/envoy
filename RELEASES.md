@@ -121,7 +121,7 @@ deadline of 3 weeks.
 * Switch the repo back to "dev" mode by running `bazel run @envoy_repo//:dev`. This tool will create a commit with the
   necessary changes to continue development.
 * Create a pull request with that commit.
-* Run the deprecate_versions.py script (`bazel run //tools/deprecate_version:deprecate_version`)
+* Run the deprecate_guards.py script (`bazel run //tools/deprecate_guards:deprecate_guards`)
 * If you haven't done this before, request posting permission from admins for all the groups in the next bullet.
 * Craft a witty/uplifting email and send it to all the email aliases:
 envoy-announce@googlegroups.com

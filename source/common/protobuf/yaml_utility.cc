@@ -115,7 +115,7 @@ void jsonConvertInternal(const Protobuf::Message& source,
 
 } // namespace
 
-void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
+void MessageUtil::loadFromJson(absl::string_view json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
   bool has_unknown_field;
   auto load_status = loadFromJsonNoThrow(json, message, has_unknown_field);
@@ -124,15 +124,16 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   }
   if (has_unknown_field) {
     // If the parsing failure is caused by the unknown fields.
-    THROW_IF_NOT_OK(validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                                      load_status.ToString()));
+    THROW_IF_NOT_OK(validation_visitor.onUnknownField(
+        fmt::format("type {} reason {}", message.GetTypeName(), load_status.ToString())));
   } else {
     // If the error has nothing to do with unknown field.
-    throw EnvoyException("Unable to parse JSON as proto (" + load_status.ToString() + "): " + json);
+    throw EnvoyException(
+        fmt::format("Unable to parse JSON as proto ({}): {}", load_status.ToString(), json));
   }
 }
 
-absl::Status MessageUtil::loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
+absl::Status MessageUtil::loadFromJsonNoThrow(absl::string_view json, Protobuf::Message& message,
                                               bool& has_unknown_fileld) {
   has_unknown_fileld = false;
   Protobuf::util::JsonParseOptions options;
@@ -163,7 +164,7 @@ absl::Status MessageUtil::loadFromJsonNoThrow(const std::string& json, Protobuf:
   return relaxed_status;
 }
 
-void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
+void MessageUtil::loadFromJson(absl::string_view json, ProtobufWkt::Struct& message) {
   // No need to validate if converting to a Struct, since there are no unknown
   // fields possible.
   loadFromJson(json, message, ProtobufMessage::getNullValidationVisitor());

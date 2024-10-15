@@ -365,8 +365,10 @@ trailers()
 
   local trailers = handle:trailers()
 
-Returns the stream's trailers. May return nil if there are no trailers. The trailers may be
-modified before they are sent to the next filter.
+Returns the stream's trailers. Before calling this method, the caller should call ``body()`` or
+``bodyChunks()`` to consume the body, otherwise the trailers will not be available.
+May return nil if there are no trailers. The trailers may be modified before they are sent
+to the next filter.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 

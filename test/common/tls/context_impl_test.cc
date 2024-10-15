@@ -1298,8 +1298,9 @@ TEST_F(ClientContextConfigImplTest, RSA2048Cert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate that 1024-bit RSA certificates are rejected.
@@ -1370,8 +1371,9 @@ TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   ContextManagerImpl manager(server_factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate that 4096-bit RSA certificates load successfully.
@@ -1387,8 +1389,9 @@ TEST_F(ClientContextConfigImplTest, RSA4096Cert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate that P256 ECDSA certs load.
@@ -1404,8 +1407,9 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  auto context = *manager_.createSslClientContext(*store.rootScope(), *client_context_config);
-  auto cleanup = cleanUpHelper(context);
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
 // Validate that non-P256 ECDSA certs are rejected.

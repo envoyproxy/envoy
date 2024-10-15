@@ -98,6 +98,7 @@ envoy_cc_test_library(
     hdrs = ["wasm_runtime.h"],
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/http:codec_interface",
         "//source/extensions/wasm_runtime/null:config",
         "//source/extensions/wasm_runtime/v8:config",
         "//source/extensions/wasm_runtime/wamr:config",

@@ -99,12 +99,6 @@ LookupContextPtr HttpCacheImplementationTest::lookup(absl::string_view request_p
   return context;
 }
 
-absl::Status HttpCacheImplementationTest::insert(LookupContextPtr lookup,
-                                                 const Http::TestResponseHeaderMapImpl& headers,
-                                                 const absl::string_view body) {
-  return insert(std::move(lookup), headers, body, absl::nullopt);
-}
-
 absl::Status HttpCacheImplementationTest::insert(
     LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
     const absl::string_view body, const absl::optional<Http::TestResponseTrailerMapImpl> trailers) {
@@ -459,6 +453,7 @@ TEST_P(HttpCacheImplementationTest, VaryResponses) {
       {"date", formatter_.fromTime(time_system_.systemTime())},
       {"cache-control", "public,max-age=3600"},
       {"vary", "accept"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"why", "is"}, {"sky", "blue"}};
 
   // First request.
   request_headers_.setCopy(Http::LowerCaseString("accept"), "image/*");
@@ -466,9 +461,11 @@ TEST_P(HttpCacheImplementationTest, VaryResponses) {
   LookupContextPtr first_lookup_miss = lookup(request_path);
   EXPECT_EQ(lookup_result_.cache_entry_status_, CacheEntryStatus::Unusable);
   const std::string body1("accept is image/*");
-  ASSERT_THAT(insert(std::move(first_lookup_miss), response_headers, body1), IsOk());
+  ASSERT_THAT(insert(std::move(first_lookup_miss), response_headers, body1, response_trailers),
+              IsOk());
   LookupContextPtr first_lookup_hit = lookup(request_path);
-  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(first_lookup_hit.get(), body1));
+  EXPECT_TRUE(
+      expectLookupSuccessWithBodyAndTrailers(first_lookup_hit.get(), body1, response_trailers));
 
   // Second request with a different value for the varied header.
   request_headers_.setCopy(Http::LowerCaseString("accept"), "text/html");
@@ -489,7 +486,8 @@ TEST_P(HttpCacheImplementationTest, VaryResponses) {
   LookupContextPtr first_lookup_hit_again = lookup(request_path);
   // Looks up first version again to be sure it wasn't replaced with the second
   // one.
-  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(first_lookup_hit_again.get(), body1));
+  EXPECT_TRUE(expectLookupSuccessWithBodyAndTrailers(first_lookup_hit_again.get(), body1,
+                                                     response_trailers));
 
   // Create a new allow list to make sure a now disallowed cached vary entry is not served.
   Protobuf::RepeatedPtrField<::envoy::type::matcher::v3::StringMatcher> proto_allow_list;

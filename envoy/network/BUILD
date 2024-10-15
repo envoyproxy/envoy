@@ -86,7 +86,6 @@ envoy_cc_library(
     name = "dns_interface",
     hdrs = ["dns.h"],
     deps = [
-        "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
         "//envoy/network:address_interface",
     ],

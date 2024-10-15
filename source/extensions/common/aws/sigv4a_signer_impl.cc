@@ -59,7 +59,7 @@ void SigV4ASignerImpl::addRegionQueryParam(Envoy::Http::Utility::QueryParamsMult
                                            const absl::string_view override_region) const {
   query_params.add(
       SignatureQueryParameterValues::AmzRegionSet,
-      Utility::encodeQueryParam(override_region.empty() ? getRegion() : override_region));
+      Utility::encodeQueryComponent(override_region.empty() ? getRegion() : override_region));
 }
 
 std::string SigV4ASignerImpl::createSignature(

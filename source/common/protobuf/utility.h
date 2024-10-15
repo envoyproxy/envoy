@@ -255,7 +255,7 @@ public:
   static std::size_t hash(const Protobuf::Message& message);
 
 #ifdef ENVOY_ENABLE_YAML
-  static void loadFromJson(const std::string& json, Protobuf::Message& message,
+  static void loadFromJson(absl::string_view json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   /**
    * Return ok only when strict conversion(don't ignore unknown field) succeeds.
@@ -264,9 +264,9 @@ public:
    * Return error status for relaxed conversion and set has_unknown_field to false if relaxed
    * conversion(ignore unknown field) fails.
    */
-  static absl::Status loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
+  static absl::Status loadFromJsonNoThrow(absl::string_view json, Protobuf::Message& message,
                                           bool& has_unknown_fileld);
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
+  static void loadFromJson(absl::string_view json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
 #endif
