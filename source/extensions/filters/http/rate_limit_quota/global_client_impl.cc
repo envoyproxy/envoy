@@ -63,6 +63,53 @@ GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
       time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()),
       main_dispatcher_(main_dispatcher) {}
 
+void getUsageFromBucket(const CachedBucket& cached_bucket, TimeSource& time_source,
+                        BucketQuotaUsage& usage) {
+  std::shared_ptr<QuotaUsage> cached_usage = cached_bucket.quota_usage;
+  *usage.mutable_bucket_id() = cached_bucket.bucket_id;
+
+  std::atomic<uint64_t>& num_requests_allowed = cached_usage->num_requests_allowed;
+  std::atomic<uint64_t>& num_requests_denied = cached_usage->num_requests_denied;
+
+  // Reset usage atomics to 0 and save current values as request totals.
+  uint64_t allowed = num_requests_allowed.load(std::memory_order_relaxed);
+  while (!num_requests_allowed.compare_exchange_weak(allowed, 0, std::memory_order_relaxed)) {
+  }
+  uint64_t denied = num_requests_denied.load(std::memory_order_relaxed);
+  while (!num_requests_denied.compare_exchange_weak(denied, 0, std::memory_order_relaxed)) {
+  }
+
+  usage.set_num_requests_allowed(allowed);
+  usage.set_num_requests_denied(denied);
+
+  // Get the time elapsed since this bucket last went into a usage report.
+  std::atomic<std::chrono::nanoseconds>& cached_last_report = cached_usage->last_report;
+  std::chrono::nanoseconds now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+      time_source.monotonicTime().time_since_epoch());
+  // `last_report` should always be set in the cached bucket.
+  std::chrono::nanoseconds last_report = cached_last_report.load(std::memory_order_relaxed);
+  // Update the last_report time point.
+  while (!cached_last_report.compare_exchange_weak(last_report, now, std::memory_order_relaxed)) {
+  }
+
+  usage.mutable_time_elapsed()->set_seconds(
+      std::chrono::duration_cast<std::chrono::seconds>(now - last_report).count());
+}
+
+// Read a specific bucket's aggregated usage & build it into a UsageReports
+// message.
+RateLimitQuotaUsageReports
+GlobalRateLimitClientImpl::buildReports(std::shared_ptr<CachedBucket> cached_bucket) {
+  RateLimitQuotaUsageReports report;
+  getUsageFromBucket(*cached_bucket, time_source_, *report.add_bucket_quota_usages());
+
+  // Set the domain name.
+  report.set_domain(domain_name_);
+  ENVOY_LOG(debug, "The bucket-specific usage report that will be sent to RLQS server:\n{}",
+            report.DebugString());
+  return report;
+}
+
 // Read all active buckets' aggregated usage & build them into a UsageReports
 // message.
 RateLimitQuotaUsageReports GlobalRateLimitClientImpl::buildReports() {
@@ -75,34 +122,7 @@ RateLimitQuotaUsageReports GlobalRateLimitClientImpl::buildReports() {
     // bug, and should cause a crash.
     std::shared_ptr<QuotaUsage> cached_usage = cached->quota_usage;
     auto* usage = report.add_bucket_quota_usages();
-    *usage->mutable_bucket_id() = cached->bucket_id;
-
-    std::atomic<uint64_t>& num_requests_allowed = cached_usage->num_requests_allowed;
-    std::atomic<uint64_t>& num_requests_denied = cached_usage->num_requests_denied;
-
-    // Reset usage atomics to 0 and save current values as request totals.
-    uint64_t allowed = num_requests_allowed.load(std::memory_order_relaxed);
-    while (!num_requests_allowed.compare_exchange_weak(allowed, 0, std::memory_order_relaxed)) {
-    }
-    uint64_t denied = num_requests_denied.load(std::memory_order_relaxed);
-    while (!num_requests_denied.compare_exchange_weak(denied, 0, std::memory_order_relaxed)) {
-    }
-
-    usage->set_num_requests_allowed(allowed);
-    usage->set_num_requests_denied(denied);
-
-    // Get the time elapsed since this bucket last went into a usage report.
-    std::atomic<std::chrono::nanoseconds>& cached_last_report = cached_usage->last_report;
-    std::chrono::nanoseconds now = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        time_source_.monotonicTime().time_since_epoch());
-    // `last_report` should always be set in the cached bucket.
-    std::chrono::nanoseconds last_report = cached_last_report.load(std::memory_order_relaxed);
-    // Update the last_report time point.
-    while (!cached_last_report.compare_exchange_weak(last_report, now, std::memory_order_relaxed)) {
-    }
-
-    usage->mutable_time_elapsed()->set_seconds(
-        std::chrono::duration_cast<std::chrono::seconds>(now - last_report).count());
+    getUsageFromBucket(*cached, time_source_, *usage);
   }
 
   // Set the domain name.
@@ -176,6 +196,11 @@ void GlobalRateLimitClientImpl::createBucketImpl(const BucketId& bucket_id, size
       bucket_id,
       std::make_shared<QuotaUsage>(initial_request_allowed, !initial_request_allowed, now), nullptr,
       std::move(fallback_action), fallback_ttl, default_bucket_action, nullptr);
+
+  // Send initial usage report for this new bucket to notify the RLQS server of
+  // the new bucket's activation.
+  RateLimitQuotaUsageReports initial_report = buildReports(buckets_cache_[id]);
+  sendUsageReportImpl(initial_report);
 
   writeBucketsToTLS();
   if (callbacks_)

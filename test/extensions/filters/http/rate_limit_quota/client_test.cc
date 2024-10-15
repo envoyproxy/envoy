@@ -288,6 +288,13 @@ TEST_F(GlobalClientTest, TestInitialCreation) {
   mock_stream_client->expectStreamCreation(1);
   mock_stream_client->expectTimerCreations(reporting_interval_);
 
+  // Expect an immediate usage report for the new bucket.
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
+
   // The global client should handle multiple, duplicate createBucket calls
   // correctly as multiple worker threads may attempt to create the same bucket
   // concurrently.
@@ -339,6 +346,13 @@ TEST_F(GlobalClientTest, TestCreationWithDefaultDeny) {
       ->mutable_rate_limit_strategy()
       ->set_blanket_rule(RateLimitStrategy::DENY_ALL);
 
+  // Expect an immediate usage report for the new bucket.
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<reportData>{{/*allowed=*/0, /*denied=*/1, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
+
   // The global client should handle multiple, duplicate createBucket calls
   // correctly as multiple worker threads may attempt to create the same bucket
   // concurrently.
@@ -379,6 +393,13 @@ TEST_F(GlobalClientTest, BasicUsageReporting) {
   mock_stream_client->expectStreamCreation(1);
   mock_stream_client->expectTimerCreations(reporting_interval_);
 
+  // Expect an immediate usage report for the new bucket.
+  RateLimitQuotaUsageReports initial_report = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(initial_report), false));
+
   cb_ptr_->expectBuckets({sample_id_hash_});
   global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
                                std::chrono::milliseconds::zero(), true);
@@ -414,6 +435,9 @@ TEST_F(GlobalClientTest, TestStreamCreationFailures) {
   mock_stream_client->setStreamStartToFail(3);
   // Stream failure should not stop the usage reporting timer.
   mock_stream_client->expectTimerCreations(reporting_interval_);
+
+  // Don't expect an initial usage report for the created bucket as the RLQS
+  // stream failure will block it.
 
   // Only the first createBucket should result in a stream attempt, as only the
   // reporting timer reattempts stream creation from then on.
@@ -459,6 +483,13 @@ TEST_F(GlobalClientTest, TestStreamFailureMidUse) {
   mock_stream_client->expectStreamCreation(2);
   mock_stream_client->expectTimerCreations(reporting_interval_);
 
+  // Expect an immediate usage report for the new bucket.
+  RateLimitQuotaUsageReports initial_report = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(initial_report), false));
+
   // Initial bucket creation & setting of usage data.
   cb_ptr_->expectBuckets({sample_id_hash_});
   global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
@@ -487,6 +518,8 @@ TEST_F(GlobalClientTest, TestStreamFailureMidUse) {
                                 "Stream cancelled gracefully during RLQS server shutdown.");
 
   // Should still be able to create buckets safely & interact with atomics.
+  // Don't expect the initial bucket creation to trigger an immediate report due
+  // to the downed stream.
   BucketId sample_bucket_id2;
   (*sample_bucket_id2.mutable_bucket())["mock_id_key"] = "mutable_id_value3";
   (*sample_bucket_id2.mutable_bucket())["mock_id_key2"] = "mutable_id_value4";
@@ -507,13 +540,13 @@ TEST_F(GlobalClientTest, TestStreamFailureMidUse) {
   std::shared_ptr<QuotaUsage> quota_usage2 = getQuotaUsage(*buckets_tls_, sample_id_hash2);
   EXPECT_EQ(quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 3);
   EXPECT_EQ(quota_usage->num_requests_denied.load(std::memory_order_relaxed), 4);
-  EXPECT_EQ(quota_usage2->num_requests_allowed.load(std::memory_order_relaxed), 2);
+  EXPECT_EQ(quota_usage2->num_requests_allowed.load(std::memory_order_relaxed), 1);
   EXPECT_EQ(quota_usage2->num_requests_denied.load(std::memory_order_relaxed), 0);
 
   // Expect stream creation & successful sending of a report.
   expected_reports = buildReports(
       std::vector<reportData>{{/*allowed=*/3, /*denied=*/4, /*bucket_id=*/sample_bucket_id_},
-                              {/*allowed=*/2, /*denied=*/0, /*bucket_id=*/sample_bucket_id2}});
+                              {/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id2}});
   EXPECT_CALL(
       mock_stream_client->stream_,
       sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
@@ -542,6 +575,16 @@ TEST_F(GlobalClientTest, TestBasicResponseProcessing) {
   BucketAction default_allow_action3 = default_allow_action;
   *default_allow_action3.mutable_bucket_id() = sample_bucket_id3;
 
+  // Expect initial bucket creations to each trigger immediate bucket-specific
+  // reports.
+  for (const BucketId& bucket_id : {sample_bucket_id_, sample_bucket_id2, sample_bucket_id3}) {
+    RateLimitQuotaUsageReports initial_report = buildReports(
+        std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/bucket_id}});
+    EXPECT_CALL(
+        mock_stream_client->stream_,
+        sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(initial_report), false));
+  }
+
   cb_ptr_->expectBuckets({sample_id_hash_, sample_id_hash2, sample_id_hash3});
   global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
                                std::chrono::milliseconds::zero(), true);
@@ -551,10 +594,14 @@ TEST_F(GlobalClientTest, TestBasicResponseProcessing) {
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
 
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+  setAtomic(2, getQuotaUsage(*buckets_tls_, sample_id_hash2)->num_requests_allowed);
+  setAtomic(3, getQuotaUsage(*buckets_tls_, sample_id_hash3)->num_requests_allowed);
+
   RateLimitQuotaUsageReports expected_reports = buildReports(
       std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_},
-                              {/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id2},
-                              {/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id3}});
+                              {/*allowed=*/2, /*denied=*/0, /*bucket_id=*/sample_bucket_id2},
+                              {/*allowed=*/3, /*denied=*/0, /*bucket_id=*/sample_bucket_id3}});
   EXPECT_CALL(
       mock_stream_client->stream_,
       sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
@@ -621,6 +668,13 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
   // Don't expect any expiration timers to be created when actions are dropped.
   mock_stream_client->expectTimerCreations(reporting_interval_, action_ttl, 2);
 
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false))
+      .Times(2);
+
   cb_ptr_->expectBuckets({sample_id_hash_});
   global_client_->createBucket(
       /*bucket_id=*/sample_bucket_id_,
@@ -631,12 +685,7 @@ TEST_F(GlobalClientTest, TestDuplicateTokenBucket) {
       /*initial_request_allowed=*/true);
   cb_ptr_->waitForExpectedBuckets();
 
-  RateLimitQuotaUsageReports expected_reports = buildReports(
-      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
-  EXPECT_CALL(
-      mock_stream_client->stream_,
-      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
-
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
   mock_stream_client->timer_->invokeCallback();
   waitForNotification(cb_ptr_->report_sent);
 
@@ -706,6 +755,12 @@ TEST_F(GlobalClientTest, TestResponseProcessingForNonExistentBucket) {
   // Expect a single expiration timer as the dropped action will not be cached.
   mock_stream_client->expectTimerCreations(reporting_interval_, action_ttl, 1);
 
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
+
   // sample_bucket_id2 will not be added to the bucket cache via reporting so we
   // expect an assignment from the response to be dropped.
   BucketId sample_bucket_id2;
@@ -717,15 +772,6 @@ TEST_F(GlobalClientTest, TestResponseProcessingForNonExistentBucket) {
   global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
-
-  RateLimitQuotaUsageReports expected_reports = buildReports(
-      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
-  EXPECT_CALL(
-      mock_stream_client->stream_,
-      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
-
-  mock_stream_client->timer_->invokeCallback();
-  waitForNotification(cb_ptr_->report_sent);
 
   EXPECT_OK(tryGetBucket(*buckets_tls_, sample_id_hash_));
   EXPECT_FALSE(tryGetBucket(*buckets_tls_, sample_id_hash2).ok());
@@ -772,12 +818,28 @@ TEST_F(GlobalClientTest, TestResponseEdgeCases) {
   BucketAction default_allow_action2 = default_allow_action;
   *default_allow_action2.mutable_bucket_id() = sample_bucket_id2;
 
+  // Expect initial bucket creations to each trigger immediate bucket-specific
+  // reports.
+  EXPECT_CALL(mock_stream_client->stream_,
+              sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(buildReports(
+                                  std::vector<reportData>{{/*allowed=*/1, /*denied=*/0,
+                                                           /*bucket_id=*/sample_bucket_id_}})),
+                              false));
+  EXPECT_CALL(mock_stream_client->stream_,
+              sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(buildReports(
+                                  std::vector<reportData>{{/*allowed=*/1, /*denied=*/0,
+                                                           /*bucket_id=*/sample_bucket_id2}})),
+                              false));
+
   cb_ptr_->expectBuckets({sample_id_hash_, sample_id_hash2});
   global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
                                std::chrono::milliseconds::zero(), true);
   global_client_->createBucket(sample_bucket_id2, sample_id_hash2, default_allow_action2, nullptr,
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
+
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash2)->num_requests_allowed);
 
   RateLimitQuotaUsageReports expected_reports = buildReports(
       std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_},
@@ -865,6 +927,16 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
   RateLimitStrategy fallback_deny_action;
   fallback_deny_action.set_blanket_rule(RateLimitStrategy::DENY_ALL);
 
+  // Expect initial bucket creations to each trigger immediate bucket-specific
+  // reports.
+  for (const BucketId& bucket_id : {sample_bucket_id_, sample_bucket_id2, sample_bucket_id3}) {
+    RateLimitQuotaUsageReports initial_report = buildReports(
+        std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/bucket_id}});
+    EXPECT_CALL(
+        mock_stream_client->stream_,
+        sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(initial_report), false));
+  }
+
   // Create buckets with static default actions and with or without a fallback
   // action.
   cb_ptr_->expectBuckets({sample_id_hash_, sample_id_hash2, sample_id_hash3});
@@ -875,7 +947,7 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
                                std::chrono::seconds(300), true);
   global_client_->createBucket(sample_bucket_id3, sample_id_hash3, default_deny_action3,
                                std::make_unique<RateLimitStrategy>(fallback_deny_action),
-                               std::chrono::seconds(300), false);
+                               std::chrono::seconds(300), true);
   cb_ptr_->waitForExpectedBuckets();
 
   // Defaults from no_assignment_behavior.
@@ -887,6 +959,9 @@ TEST_F(GlobalClientTest, TestExpirationAndFallback) {
       mock_stream_client->stream_,
       sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
 
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash2)->num_requests_allowed);
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash3)->num_requests_denied);
   mock_stream_client->timer_->invokeCallback();
   waitForNotification(cb_ptr_->report_sent);
 
@@ -1065,6 +1140,14 @@ TEST_F(GlobalClientTest, TestFallbackToDuplicateTokenBucket) {
   RateLimitStrategy fallback_tb_action =
       buildTokenBucketStrategy(max_tokens, 60, std::chrono::seconds(12));
 
+  // Defaults from no_assignment_behavior.
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false))
+      .Times(2);
+
   // Create bucket with static default actions and fallback TokenBucket.
   cb_ptr_->expectBuckets({sample_id_hash_});
   global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action,
@@ -1072,13 +1155,7 @@ TEST_F(GlobalClientTest, TestFallbackToDuplicateTokenBucket) {
                                std::chrono::seconds(300), true);
   cb_ptr_->waitForExpectedBuckets();
 
-  // Defaults from no_assignment_behavior.
-  RateLimitQuotaUsageReports expected_reports = buildReports(
-      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
-  EXPECT_CALL(
-      mock_stream_client->stream_,
-      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
-
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
   mock_stream_client->timer_->invokeCallback();
   waitForNotification(cb_ptr_->report_sent);
 
@@ -1141,17 +1218,19 @@ TEST_F(GlobalClientTest, TestAbandonAction) {
   mock_stream_client->expectStreamCreation(1);
   mock_stream_client->expectTimerCreations(reporting_interval_);
 
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false))
+      .Times(2);
+
   cb_ptr_->expectBuckets({sample_id_hash_});
   global_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
                                std::chrono::milliseconds::zero(), true);
   cb_ptr_->waitForExpectedBuckets();
 
-  RateLimitQuotaUsageReports expected_reports = buildReports(
-      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
-  EXPECT_CALL(
-      mock_stream_client->stream_,
-      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
-
+  setAtomic(1, getQuotaUsage(*buckets_tls_, sample_id_hash_)->num_requests_allowed);
   mock_stream_client->timer_->invokeCallback();
   waitForNotification(cb_ptr_->report_sent);
 
@@ -1208,6 +1287,12 @@ TEST_F(LocalClientTest, TestLocalClient) {
   // bucket.
   mock_stream_client->expectStreamCreation(1);
   mock_stream_client->expectTimerCreations(reporting_interval_);
+
+  RateLimitQuotaUsageReports expected_reports = buildReports(
+      std::vector<reportData>{{/*allowed=*/1, /*denied=*/0, /*bucket_id=*/sample_bucket_id_}});
+  EXPECT_CALL(
+      mock_stream_client->stream_,
+      sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_reports), false));
 
   cb_ptr_->expectBuckets({sample_id_hash_});
   local_client_->createBucket(sample_bucket_id_, sample_id_hash_, default_allow_action, nullptr,
