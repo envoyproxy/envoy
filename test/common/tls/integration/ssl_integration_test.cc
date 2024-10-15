@@ -982,11 +982,6 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP384EcdsaClientAllCurve
   server_rsa_cert_ = true;
   server_ecdsa_cert_ = true;
   server_ecdsa_cert_name_ = "server_ecdsa_p384";
-  // For successful negotiation of a connection with P-384 and P-521 certificates,
-  // the curves have to be explicitly defined on the client and server.
-  server_curves_.push_back("P-256");
-  server_curves_.push_back("P-384");
-  server_curves_.push_back("P-521");
   client_ecdsa_cert_ = true;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ecdsaAllCurvesClientOptions());
@@ -1007,9 +1002,6 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP521EcdsaClientAllCurve
   server_rsa_cert_ = true;
   server_ecdsa_cert_ = true;
   server_ecdsa_cert_name_ = "server_ecdsa_p521";
-  server_curves_.push_back("P-256");
-  server_curves_.push_back("P-384");
-  server_curves_.push_back("P-521");
   client_ecdsa_cert_ = true;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ecdsaAllCurvesClientOptions());
