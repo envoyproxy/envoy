@@ -235,6 +235,9 @@ TagNameValues::TagNameValues() {
   // Leaving: proxy_proto.(found|disallowed|error)
   addRe2(PROXY_PROTOCOL_VERSION,
          R"(^proxy_proto\.((?:<TAG_VALUE>\.)?versions\.v(<PROXY_PROTOCOL_VERSION>)\.)\w+$)");
+
+  // listener.[<address>.]tls_context.(<stat_prefix>.)*
+  addRe2(TLS_CONTEXT_PREFIX, R"(^listener\..*?\.tls_context\.((<TAG_VALUE>)\.))", ".tls_context.");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,

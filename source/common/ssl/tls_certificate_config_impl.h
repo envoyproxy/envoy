@@ -29,6 +29,7 @@ public:
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr privateKeyMethod() const override {
     return private_key_method_;
   }
+  const std::string& statPrefix() const override { return stat_prefix_; }
 
 private:
   TlsCertificateConfigImpl(
@@ -46,6 +47,7 @@ private:
   const std::string password_path_;
   const std::vector<uint8_t> ocsp_staple_;
   const std::string ocsp_staple_path_;
+  const std::string stat_prefix_;
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_{};
 };
 

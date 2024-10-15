@@ -70,6 +70,11 @@ public:
    * Remove an existing ssl context.
    */
   virtual void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) PURE;
+
+  /**
+   * Update the certificate expiry stats related with each ssl context.
+   */
+  virtual void updateTlsCertificateExpiryStats() PURE;
 };
 
 using ContextManagerPtr = std::unique_ptr<ContextManager>;
