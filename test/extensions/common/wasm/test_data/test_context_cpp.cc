@@ -112,10 +112,17 @@ FilterDataStatus PanicReplyContext::onRequestBody(size_t size, bool) {
 
   sendLocalResponse(200, "not send", "body", {});
   if (skip_panic) {
+    // std::cout is used to avoid the log mock for this example context.
+    std::cout << "skip panic" << std::endl;
     return FilterDataStatus::StopIterationAndBuffer;
+  } else {
+    // std::cout is used to avoid the log mock for this example context.
+    std::cout << "panic wasm" << std::endl;
   }
 
-  throw std::runtime_error("panic");
+  int* badptr = nullptr;
+  *badptr = 0; // NOLINT(clang-analyzer-core.NullDereference)
+  return FilterDataStatus::Continue;
 }
 
 class InvalidGrpcStatusReplyContext : public Context {
