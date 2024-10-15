@@ -106,18 +106,21 @@ private:
 FilterDataStatus PanicReplyContext::onRequestBody(size_t size, bool) {
   const auto body = getBufferBytes(WasmBufferType::HttpRequestBody, 0, size);
   bool skip_panic = false;
+  std::string response_body;
   if (body != nullptr) {
     skip_panic = body->view() == "skip_panic";
+    response_body = "skip_panic";
+  } else {
+    response_body = "wasm_panic";
   }
 
-  sendLocalResponse(200, "not send", "body", {});
-  if (skip_panic) {
-    return FilterDataStatus::StopIterationAndBuffer;
+  sendLocalResponse(200, "not send", response_body, {});
+  if (!skip_panic) {
+    int* badptr = nullptr;
+    *badptr = 0; // NOLINT(clang-analyzer-core.NullDereference)
   }
 
-  int* badptr = nullptr;
-  *badptr = 0; // NOLINT(clang-analyzer-core.NullDereference)
-  return FilterDataStatus::Continue;
+  return FilterDataStatus::StopIterationAndBuffer;
 }
 
 class InvalidGrpcStatusReplyContext : public Context {
