@@ -27,6 +27,7 @@
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
@@ -1022,7 +1023,7 @@ void ConfigHelper::setPorts(const std::vector<uint32_t>& ports, bool override_po
     } else if (cluster->type() == envoy::config::cluster::v3::Cluster::ORIGINAL_DST) {
       original_dst_cluster = true;
     } else if (cluster->has_cluster_type() &&
-               !cluster->cluster_type().name().starts_with("envoy.cluster.")) {
+               !absl::StartsWith(cluster->cluster_type().name(), "envoy.cluster.")) {
       custom_cluster = true;
     } else {
       // Assign ports to statically defined load_assignment hosts.
