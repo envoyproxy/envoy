@@ -1,7 +1,6 @@
-date: Pending
+date: October 15, 2024
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: tracing
   change: |
     Removed support for (long deprecated) opentracing.  See `issue 27401
@@ -60,7 +59,6 @@ behavior_changes:
     can instead be enabled by setting compile option ``--define=execution_context=enabled``.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: command line options
   change: |
     :option:`--enable-fine-grain-logging` and :option:`--component-log-level` were incompatible in that one
@@ -138,7 +136,6 @@ minor_behavior_changes:
     runtime guard ``envoy.reloadable_features.sanitize_sni_in_access_log`` to ``false``.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: upstream
   change: |
     Use previously calculated healthcheck when endpoints move priority levels repeatedly.
@@ -229,7 +226,6 @@ bug_fixes:
     setting the runtime guard ``envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update`` to false.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: upstream
   change: |
     Removed runtime flag ``envoy.reloadable_features.avoid_zombie_streams`` and legacy code paths.
@@ -458,8 +454,8 @@ new_features:
     <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>` in overload manager.
 - area: lua
   change: |
-      Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
-      connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
+    Added two new methods ``oidsPeerCertificate()`` and ``oidsLocalCertificate()`` to SSL
+    connection object API :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_info>`.
 - area: local_ratelimit
   change: |
     Add the :ref:`rate_limits
@@ -497,5 +493,3 @@ new_features:
     Added a new WIP implementation of :ref:`client_side_weighted_round_robin
     <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
     load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
-
-deprecated:
