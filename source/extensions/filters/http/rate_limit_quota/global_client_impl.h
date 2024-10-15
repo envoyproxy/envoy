@@ -92,8 +92,10 @@ public:
 
 private:
   // Build usage reports (i.e., the request sent to RLQS server) from the
-  // buckets in quota bucket cache.
+  // buckets in quota bucket cache. If specified, the usage reports will only
+  // include the given bucket.
   RateLimitQuotaUsageReports buildReports();
+  RateLimitQuotaUsageReports buildReports(std::shared_ptr<CachedBucket> cached_bucket);
 
   // Helpers to write to TLS.
   // Copy source-of-truth BucketsCache & pointer-swap/write to TLS.
