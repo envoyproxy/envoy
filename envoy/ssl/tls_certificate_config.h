@@ -72,6 +72,11 @@ public:
    * ocsp response was inlined.
    */
   virtual const std::string& ocspStaplePath() const PURE;
+
+  /**
+   * @return a stat prefix for the certificate.
+   */
+  virtual const std::string& statPrefix() const PURE;
 };
 
 using TlsCertificateConfigPtr = std::unique_ptr<TlsCertificateConfig>;

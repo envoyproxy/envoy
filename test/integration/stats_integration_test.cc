@@ -192,6 +192,7 @@ TEST_P(StatsIntegrationTest, WithExpiringCert) {
         TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    tls_certificate->set_stat_prefix("cert0");
   });
 
   initialize();
@@ -199,6 +200,13 @@ TEST_P(StatsIntegrationTest, WithExpiringCert) {
   int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
   EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(),
             days_until_expiry);
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    test_server_->waitForGaugeGe("listener.127.0.0.1_0.tls_context.cert0.days_until_cert_expiring",
+                                 days_until_expiry);
+  } else {
+    test_server_->waitForGaugeGe("listener.[__1]_0.tls_context.cert0.days_until_cert_expiring",
+                                 days_until_expiry);
+  }
 }
 
 TEST_P(StatsIntegrationTest, WithExpiredCert) {

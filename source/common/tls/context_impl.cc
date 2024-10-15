@@ -301,6 +301,11 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         }
       }
 
+      if (!tls_certificate.statPrefix().empty()) {
+        tls_context_stats_helpers_.emplace_back(
+            Ssl::TlsContextStatsHelper(factory_context_, scope, tls_certificate.statPrefix(),
+                                       std::reference_wrapper<const Ssl::TlsContext>(ctx)));
+      }
       if (additional_init != nullptr) {
         absl::Status init_status = additional_init(ctx, tls_certificate);
         SET_AND_RETURN_IF_NOT_OK(creation_status, init_status);
@@ -651,6 +656,12 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
   return cert_details;
 }
 
+void ContextImpl::updateTlsCertificateExpiryStats() {
+  for (auto& stats_helper : tls_context_stats_helpers_) {
+    stats_helper.updateStats();
+  }
+}
+
 bool ContextImpl::parseAndSetAlpn(const std::vector<std::string>& alpn, SSL& ssl,
                                   absl::Status& parse_status) {
   std::vector<uint8_t> parsed_alpn = parseAlpnProtocols(absl::StrJoin(alpn, ","), parse_status);
@@ -832,6 +843,16 @@ absl::Status TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
   UNREFERENCED_PARAMETER(key_path);
 #endif
   return absl::OkStatus();
+}
+
+void TlsContextStatsHelper::updateStats() {
+  if (tls_context_.get().cert_chain_ == nullptr) {
+    return;
+  }
+  const absl::optional<uint32_t> days =
+      Extensions::TransportSockets::Tls::Utility::getDaysUntilExpiration(
+          tls_context_.get().cert_chain_.get(), factory_context_.timeSource());
+  stats_->days_until_cert_expiring_.set(days.value_or(0));
 }
 
 } // namespace Ssl

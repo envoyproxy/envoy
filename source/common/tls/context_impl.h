@@ -38,6 +38,18 @@ namespace Envoy {
 
 namespace Ssl {
 
+#define ALL_TLS_CONTEXT_STATS(COUNTER, GAUGE) GAUGE(days_until_cert_expiring, Accumulate)
+
+struct TlsContextStats {
+  ALL_TLS_CONTEXT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+
+  static TlsContextStats generateStats(Stats::Scope& scope, const std::string& prefix) {
+    const auto final_prefix = fmt::format("tls_context.{}", prefix);
+    return TlsContextStats{ALL_TLS_CONTEXT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
+                                                 POOL_GAUGE_PREFIX(scope, final_prefix))};
+  }
+};
+
 struct TlsContext {
   // Each certificate specified for the context has its own SSL_CTX. `SSL_CTXs`
   // are identical with the exception of certificate material, and can be
@@ -68,6 +80,24 @@ struct TlsContext {
                           const std::string& password);
   absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
+
+using TlsContextConstRef = std::reference_wrapper<const TlsContext>;
+
+struct TlsContextStatsHelper {
+  TlsContextStatsHelper(Server::Configuration::CommonFactoryContext& factory_context,
+                        Stats::Scope& scope, const std::string& prefix,
+                        TlsContextConstRef tls_context)
+      : factory_context_(factory_context),
+        stats_(std::make_unique<TlsContextStats>(TlsContextStats::generateStats(scope, prefix))),
+        tls_context_(tls_context) {}
+  void updateStats();
+
+private:
+  Server::Configuration::CommonFactoryContext& factory_context_;
+  std::unique_ptr<TlsContextStats> stats_;
+  TlsContextConstRef tls_context_;
+};
+
 } // namespace Ssl
 
 namespace Extensions {
@@ -100,6 +130,7 @@ public:
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
+  void updateTlsCertificateExpiryStats() override;
 
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
@@ -147,6 +178,7 @@ protected:
   // potentially switch to a different CertificateContext based on certificate
   // selection.
   std::vector<Ssl::TlsContext> tls_contexts_;
+  std::vector<Ssl::TlsContextStatsHelper> tls_context_stats_helpers_;
   CertValidatorPtr cert_validator_;
   Stats::Scope& scope_;
   SslStats stats_;

@@ -42,6 +42,11 @@ public:
    * expire, or `absl::nullopt` if no OCSP responses exist.
    */
   virtual absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const PURE;
+
+  /**
+   * @return Update the certificate expiry stats related with each ssl context.
+   */
+  virtual void updateTlsCertificateExpiryStats() PURE;
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 
