@@ -15,3 +15,6 @@ removed_config_or_runtime:
 new_features:
 
 deprecated:
+- area: router
+  change: |
+    deprecate runtime guard ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
