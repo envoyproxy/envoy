@@ -309,10 +309,13 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         ENVOY_LOG(debug, "MxN body response is received and body_mode_: {} ",
                   ProcessingMode::BodySendMode_Name(body_mode_));
         // mxn_resp will only be supported if the ext_proc filter has body_mode set to MXN.
-        const uint32_t chunks_received = common_response.body_mutation().mxn_resp().chunks_received();
+        const uint32_t chunks_received =
+            common_response.body_mutation().mxn_resp().chunks_received();
         if (body_mode_ != ProcessingMode::MXN || chunks_received > chunk_queue_.size()) {
-          ENVOY_LOG(debug, "Incorrect: chunks_received {} > queue size {}", chunks_received, chunk_queue_.size());
-          return absl::FailedPreconditionError("spurious message: body_mode_ not MXN, or chunks_received is too big");
+          ENVOY_LOG(debug, "Incorrect: chunks_received {} > queue size {}", chunks_received,
+                    chunk_queue_.size());
+          return absl::FailedPreconditionError(
+              "spurious message: body_mode_ not MXN, or chunks_received is too big");
         }
         should_continue = handleMxnBodyResponse(common_response);
       } else {
