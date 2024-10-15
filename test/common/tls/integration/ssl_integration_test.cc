@@ -750,10 +750,8 @@ public:
   ClientSslTransportOptions ecdsaAllCurvesClientOptions() {
     auto options = ClientSslTransportOptions().setClientEcdsaCert(true);
     if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
-      return options
-          .setSigningAlgorithms({"ecdsa_secp256r1_sha256", "ecdsa_secp384r1_sha384",
-                                 "ecdsa_secp521r1_sha512", "rsa_pss_rsae_sha256"})
-          .setCurves({"P-256", "P-384", "P-521"});
+      return options.setSigningAlgorithms({"ecdsa_secp256r1_sha256", "ecdsa_secp384r1_sha384",
+                                           "ecdsa_secp521r1_sha512", "rsa_pss_rsae_sha256"});
     } else {
       return options
           .setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256", "ECDHE-ECDSA-AES128-GCM-SHA256"})
