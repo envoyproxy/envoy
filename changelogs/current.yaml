@@ -219,6 +219,10 @@ bug_fixes:
 - area: tracing
   change: |
     Fixed a bug where the OpenTelemetry tracer exports the OTLP request even when no spans are present.
+- area: wasm
+  change: |
+    Fixed a bug where a body received in chunks is not correctly dumped, resulting in
+    an incomplete dump and loss of the last chunk. This issue is manifested in HTTP/2.
 - area: dynamic_forward_proxy
   change: |
     Fixed a bug where DFP sub-cluster gets removed due to CDS update and doesn't gets recreated. This behavior can be reverted by
