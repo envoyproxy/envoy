@@ -924,10 +924,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // this stack for whether `data` is the same buffer as already buffered data.
     callbacks_->addDecodedData(data, true);
   } else {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request")) {
-      upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
-    } else {
       if (!upstream_requests_.empty()) {
         upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
       } else {
