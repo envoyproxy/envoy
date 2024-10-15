@@ -22,8 +22,8 @@ public:
   std::string dumpStats();
   StreamClientSharedPtr streamClient();
   void onDefaultNetworkChanged(NetworkType network);
-  void Engine::OnDefaultNetworkUnavailable();
-  void Engine::OnDefaultNetworkAvailable();
+  void OnDefaultNetworkUnavailable();
+  void OnDefaultNetworkAvailable();
 
   envoy_status_t terminate();
   Envoy::InternalEngine* engine() { return engine_; }
