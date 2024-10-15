@@ -31,5 +31,9 @@ void Engine::onDefaultNetworkChanged(NetworkType network) {
   engine_->onDefaultNetworkChanged(network);
 }
 
+void Engine::OnDefaultNetworkUnavailable() { engine_->OnDefaultNetworkUnavailable(); }
+
+void Engine::OnDefaultNetworkAvailable() { engine_->OnDefaultNetworkAvailable(); }
+
 } // namespace Platform
 } // namespace Envoy
