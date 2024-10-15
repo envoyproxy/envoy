@@ -841,10 +841,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       use_gro_if_available_);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
-  // TODO(abeyad): This runtime flag is set because https://github.com/envoyproxy/envoy/pull/32370
-  // needed to be merged with the default off due to unresolved test issues. Once those are fixed,
-  // and the default for `allow_client_socket_creation_failure` is true, we can remove this.
-  (*restart_features.mutable_fields())["allow_client_socket_creation_failure"].set_bool_value(true);
   for (auto& guard_and_value : restart_runtime_guards_) {
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);

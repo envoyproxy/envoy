@@ -11,6 +11,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: upstream
+  change: |
+    Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
 
 new_features:
 
