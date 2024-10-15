@@ -161,12 +161,10 @@ Envoy::Ssl::ParsedX509NamePtr parseX509NameFromCertificate(X509& cert, CertName 
 
     const ASN1_OBJECT* fn = X509_NAME_ENTRY_get_object(ent);
     int fn_nid = OBJ_obj2nid(fn);
-    // ignore unknown attribute
     if (fn_nid != NID_commonName && fn_nid != NID_organizationName) {
       continue;
     }
 
-    // put the value into utf8 string
     const ASN1_STRING* val = X509_NAME_ENTRY_get_data(ent);
     unsigned char* text = nullptr;
     int len = ASN1_STRING_to_UTF8(&text, val);
@@ -183,7 +181,6 @@ Envoy::Ssl::ParsedX509NamePtr parseX509NameFromCertificate(X509& cert, CertName 
         break;
       }
     }
-    // make sure free the memory allocated by openssl
     OPENSSL_free(text);
   }
   return parsed;
