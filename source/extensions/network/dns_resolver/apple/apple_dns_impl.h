@@ -29,6 +29,7 @@ enum class AppleDnsTrace : uint8_t {
   Starting = 1,
   Success = 2,
   Failed = 3,
+  NoResult = 4,
 };
 
 // This abstraction allows for finer control in tests by using a mocked API. Production code simply

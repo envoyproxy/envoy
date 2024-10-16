@@ -1,0 +1,9 @@
+base {
+  config {
+    stat_prefix: "#"
+    failure_mode_allow_header_add: true
+    emit_filter_state_stats: true
+  }
+  request_data {
+  }
+}
