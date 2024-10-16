@@ -50,7 +50,10 @@ public:
       : api_(Api::createApiForTest(store_, time_system_)),
         libqat_(std::make_shared<FakeLibQatCryptoImpl>()), fsm_(libqat_) {
     ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
+    ON_CALL(factory_context_.server_context_, sslContextManager())
+        .WillByDefault(ReturnRef(context_manager_));
+    ON_CALL(factory_context_.server_context_, messageValidationVisitor())
+        .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
     ON_CALL(context_manager_, privateKeyMethodManager())
         .WillByDefault(ReturnRef(private_key_method_manager_));
     ON_CALL(factory_context_.server_context_, singletonManager()).WillByDefault(ReturnRef(fsm_));
@@ -61,9 +64,10 @@ public:
     Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
         qat_private_key_method_factory(qat_factory);
 
-    return factory_context_.sslContextManager()
+    return factory_context_.server_context_.sslContextManager()
         .privateKeyMethodManager()
-        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_);
+        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml),
+                                        factory_context_.server_context_);
   }
 
   Event::SimulatedTimeSystem time_system_;

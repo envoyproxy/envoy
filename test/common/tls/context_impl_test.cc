@@ -2073,7 +2073,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   const std::string tls_context_yaml = R"EOF(
@@ -2098,7 +2099,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderFallbac
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   const std::string tls_context_yaml = R"EOF(
@@ -2129,7 +2131,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
   ContextManagerImpl manager(server_factory_context_);
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
@@ -2164,7 +2167,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
@@ -2193,7 +2197,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodFallback) {
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))

@@ -179,7 +179,8 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config = Ssl::TlsCertificateConfigImpl::create(*sds_api.secret(), ctx, *api_).value();
+  auto tls_config =
+      Ssl::TlsCertificateConfigImpl::create(*sds_api.secret(), ctx.server_context_).value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config->certificateChain());
@@ -600,7 +601,8 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
       subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config = Ssl::TlsCertificateConfigImpl::create(*sds_api.secret(), ctx, *api_).value();
+  auto tls_config =
+      Ssl::TlsCertificateConfigImpl::create(*sds_api.secret(), ctx.server_context_).value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config->certificateChain());

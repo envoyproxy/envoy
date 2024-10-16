@@ -63,6 +63,7 @@ protected:
         async_client_(new Grpc::MockAsyncClient()),
         api_(Api::createApiForTest(stats_store_, random_)), ssl_context_manager_(server_context_) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(server_context_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     node_.set_id("hds-node");
   }
 
@@ -616,8 +617,7 @@ TEST_F(HdsTest, TestSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-            params.server_context_, params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(),
+            params.server_context_, *scope, params.server_context_.clusterManager(),
             params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.
@@ -1107,8 +1107,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
         Envoy::Stats::ScopeSharedPtr scope =
             params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-            params.server_context_, params.ssl_context_manager_, *scope,
-            params.server_context_.clusterManager(),
+            params.server_context_, *scope, params.server_context_.clusterManager(),
             params.server_context_.messageValidationVisitor());
 
         // Create a mock socket_factory for the scope of this unit test.

@@ -27,6 +27,7 @@
 #include "test/mocks/server/options.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_lifecycle_notifier.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -86,6 +87,7 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
 
@@ -116,6 +118,7 @@ public:
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   testing::NiceMock<MockOptions> options_;
   Regex::GoogleReEngine regex_engine_;
+  testing::NiceMock<Ssl::MockContextManager> ssl_context_manager_;
 };
 
 class MockGenericFactoryContext : public GenericFactoryContext {
@@ -170,6 +173,7 @@ public:
   MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
 };

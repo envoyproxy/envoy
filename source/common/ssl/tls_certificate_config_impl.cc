@@ -47,34 +47,38 @@ static const std::string INLINE_STRING = "<inline>";
 
 absl::StatusOr<std::unique_ptr<TlsCertificateConfigImpl>> TlsCertificateConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api) {
+    Server::Configuration::ServerFactoryContext& factory_context) {
   absl::Status creation_status = absl::OkStatus();
   std::unique_ptr<TlsCertificateConfigImpl> ret(
-      new TlsCertificateConfigImpl(config, factory_context, api, creation_status));
+      new TlsCertificateConfigImpl(config, factory_context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
-    absl::Status& creation_status)
-    : certificate_chain_(maybeSet(Config::DataSource::read(config.certificate_chain(), true, api),
-                                  creation_status)),
+    Server::Configuration::ServerFactoryContext& factory_context, absl::Status& creation_status)
+    : certificate_chain_(maybeSet(
+          Config::DataSource::read(config.certificate_chain(), true, factory_context.api()),
+          creation_status)),
       certificate_chain_path_(
           Config::DataSource::getPath(config.certificate_chain())
               .value_or(certificate_chain_.empty() ? EMPTY_STRING : INLINE_STRING)),
       private_key_(
-          maybeSet(Config::DataSource::read(config.private_key(), true, api), creation_status)),
+          maybeSet(Config::DataSource::read(config.private_key(), true, factory_context.api()),
+                   creation_status)),
       private_key_path_(Config::DataSource::getPath(config.private_key())
                             .value_or(private_key_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      pkcs12_(maybeSet(Config::DataSource::read(config.pkcs12(), true, api), creation_status)),
+      pkcs12_(maybeSet(Config::DataSource::read(config.pkcs12(), true, factory_context.api()),
+                       creation_status)),
       pkcs12_path_(Config::DataSource::getPath(config.pkcs12())
                        .value_or(pkcs12_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      password_(maybeSet(Config::DataSource::read(config.password(), true, api), creation_status)),
+      password_(maybeSet(Config::DataSource::read(config.password(), true, factory_context.api()),
+                         creation_status)),
       password_path_(Config::DataSource::getPath(config.password())
                          .value_or(password_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      ocsp_staple_(maybeReadOcspStaple(config.ocsp_staple(), api, creation_status)),
+      ocsp_staple_(
+          maybeReadOcspStaple(config.ocsp_staple(), factory_context.api(), creation_status)),
       ocsp_staple_path_(Config::DataSource::getPath(config.ocsp_staple())
                             .value_or(ocsp_staple_.empty() ? EMPTY_STRING : INLINE_STRING)),
       private_key_method_(nullptr) {

@@ -83,10 +83,11 @@ tls_certificate:
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config =
-      Ssl::TlsCertificateConfigImpl::create(
-          *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx, *api_)
-          .value();
+  EXPECT_CALL(ctx.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
+  auto tls_config = Ssl::TlsCertificateConfigImpl::create(
+                        *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(),
+                        ctx.server_context_)
+                        .value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config->certificateChain());
@@ -385,7 +386,8 @@ tls_certificate:
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   auto tls_config =
-      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx.server_context_)
+          .value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config->certificateChain());
@@ -484,7 +486,8 @@ tls_certificate:
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   auto tls_config =
-      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx.server_context_)
+          .value();
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config->certificateChain());
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config->privateKey());
   EXPECT_EQ("DUMMY_PASSWORD", tls_config->password());
@@ -1122,8 +1125,9 @@ tls_certificate:
       .WillRepeatedly(Return(nullptr));
   EXPECT_CALL(ssl_context_manager, privateKeyMethodManager())
       .WillRepeatedly(ReturnRef(private_key_method_manager));
-  EXPECT_CALL(ctx, sslContextManager()).WillRepeatedly(ReturnRef(ssl_context_manager));
-  EXPECT_EQ(Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_)
+  EXPECT_CALL(ctx.server_context_, sslContextManager())
+      .WillRepeatedly(ReturnRef(ssl_context_manager));
+  EXPECT_EQ(Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx.server_context_)
                 .status()
                 .message(),
             "Failed to load private key provider: test");

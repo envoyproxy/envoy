@@ -37,7 +37,12 @@ public:
   CryptoMbConfigTest() : api_(Api::createApiForTest(store_, time_system_)) {
     ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
     ON_CALL(factory_context_.server_context_, threadLocal()).WillByDefault(ReturnRef(tls_));
-    ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
+    ON_CALL(factory_context_.server_context_, sslContextManager())
+        .WillByDefault(ReturnRef(context_manager_));
+    ON_CALL(factory_context_.server_context_, messageValidationVisitor())
+        .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+    ON_CALL(factory_context_.server_context_, scope())
+        .WillByDefault(ReturnRef(*store_.rootScope()));
     ON_CALL(context_manager_, privateKeyMethodManager())
         .WillByDefault(ReturnRef(private_key_method_manager_));
   }
@@ -48,9 +53,10 @@ public:
     Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
         cryptomb_private_key_method_factory(cryptomb_factory);
 
-    return factory_context_.sslContextManager()
+    return factory_context_.server_context_.sslContextManager()
         .privateKeyMethodManager()
-        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml), factory_context_);
+        .createPrivateKeyMethodProvider(parsePrivateKeyProviderFromV3Yaml(yaml),
+                                        factory_context_.server_context_);
   }
 
   Event::SimulatedTimeSystem time_system_;

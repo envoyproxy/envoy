@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 // Prevent a dependency loop with the forward declaration.
-class TransportSocketFactoryContext;
+class ServerFactoryContext;
 } // namespace Configuration
 } // namespace Server
 
@@ -88,7 +88,7 @@ public:
    */
   virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProvider(
       const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
-      Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context) PURE;
+      Envoy::Server::Configuration::ServerFactoryContext& factory_context) PURE;
 };
 
 } // namespace Ssl

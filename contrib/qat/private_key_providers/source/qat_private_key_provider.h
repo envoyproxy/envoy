@@ -40,7 +40,7 @@ public:
   QatPrivateKeyMethodProvider(
       const envoy::extensions::private_key_providers::qat::v3alpha::QatPrivateKeyMethodConfig&
           config,
-      Server::Configuration::TransportSocketFactoryContext& private_key_provider_context,
+      Server::Configuration::ServerFactoryContext& private_key_provider_context,
       LibQatCryptoSharedPtr libqat);
   // Ssl::PrivateKeyMethodProvider
   void registerPrivateKeyMethod(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,
