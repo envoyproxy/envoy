@@ -4,7 +4,6 @@
 
 #include <cstdint>
 
-#include <unistd.h>
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
