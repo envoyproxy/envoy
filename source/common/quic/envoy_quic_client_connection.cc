@@ -64,6 +64,12 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
       prefer_gro_(prefer_gro), disallow_mmsg_(Runtime::runtimeFeatureEnabled(
                                    "envoy.reloadable_features.disallow_quic_client_udp_mmsg")) {}
 
+EnvoyQuicClientConnection::~EnvoyQuicClientConnection() {
+  if (poll_timer_) {
+    poll_timer_->disableTimer();
+  }
+}
+
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
@@ -134,6 +140,24 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
     // current socket is still usable.
     CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
                     quic::ConnectionCloseBehavior::SILENT_CLOSE);
+  } else {
+    int poll_time = 0;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_client_3ms_poll")) {
+      poll_time = 3;
+    } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_client_5ms_poll")) {
+      poll_time = 5;
+    }
+    if (poll_time) {
+      if (!poll_timer_) {
+        poll_timer_ = dispatcher_.createTimer([this, poll_time]() {
+          if (connected() && connectionSocket()) {
+            connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+            poll_timer_->enableTimer(std::chrono::milliseconds(poll_time));
+          }
+        });
+      }
+      poll_timer_->enableTimer(std::chrono::milliseconds(poll_time));
+    }
   }
 }
 
