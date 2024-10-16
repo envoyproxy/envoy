@@ -94,7 +94,7 @@ TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
               testing::HasSubstr("ABI version mismatch: got invalid-version-hash, but expected"));
 }
 
-TEST(CreateDynamicModulesByName, SearchPath) {
+TEST(CreateDynamicModulesByName, OK) {
   TestEnvironment::setEnvVar(
       "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
       TestEnvironment::substitute(
@@ -103,6 +103,16 @@ TEST(CreateDynamicModulesByName, SearchPath) {
 
   absl::StatusOr<DynamicModuleSharedPtr> module = newDynamicModuleByName("no_op", false);
   EXPECT_TRUE(module.ok());
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+}
+
+TEST(CreateDynamicModulesByName, EnvVarNotSet) {
+  // Without setting the search path, this should fail.
+  absl::StatusOr<DynamicModuleSharedPtr> module = newDynamicModuleByName("no_op", false);
+  EXPECT_FALSE(module.ok());
+  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(module.status().message(),
+              testing::HasSubstr("ENVOY_DYNAMIC_MODULES_SEARCH_PATH is not set"));
 }
 
 } // namespace DynamicModules
