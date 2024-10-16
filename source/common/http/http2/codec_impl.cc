@@ -2232,7 +2232,10 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
 
 Status ClientConnectionImpl::onBeginHeaders(int32_t stream_id) {
   StreamImpl* stream = getStream(stream_id);
-  return stream->onBeginHeaders();
+  if (stream != nullptr) {
+    return stream->onBeginHeaders();
+  }
+  return codecClientError(absl::StrFormat("stream %d is already gone", stream_id));
 }
 
 int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
