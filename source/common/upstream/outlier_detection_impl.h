@@ -158,9 +158,6 @@ public:
   double successRate(SuccessRateMonitorType type) const override {
     return getSRMonitor(type).getSuccessRate();
   }
-  std::string getFailedExtensionMonitorName() const override { return failed_monitor_name_; }
-  std::string getFailedExtensionMonitorExtraInfo() const override { return failed_extra_info_; }
-  uint32_t getFailedExtensionMonitorEnforce() const override { return failed_monitor_enforce_; }
   void updateCurrentSuccessRateBucket();
   void successRate(SuccessRateMonitorType type, double new_success_rate) {
     getSRMonitor(type).setSuccessRate(new_success_rate);
@@ -216,12 +213,6 @@ private:
 
   // Set of extension monitors.
   ExtMonitorsSet monitors_set_;
-  // The following fields are reported when extension monitor is "tripped" and
-  // reports that a host where the extension monitor was attached should be
-  // ejected.
-  std::string failed_monitor_name_;
-  uint32_t failed_monitor_enforce_;
-  std::string failed_extra_info_;
 };
 
 /**
@@ -409,7 +400,9 @@ public:
   void onConsecutiveGatewayFailure(HostSharedPtr host);
   void onConsecutiveLocalOriginFailure(HostSharedPtr host);
   void notifyMainThreadConsecutiveError(HostSharedPtr host,
-                                        envoy::data::cluster::v3::OutlierEjectionType type);
+                                        envoy::data::cluster::v3::OutlierEjectionType type,
+                                        absl::optional<std::string> monitor_name = absl::nullopt,
+                                        absl::optional<uint32_t> enforce = absl::nullopt);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
   void unejectHost(HostSharedPtr host);
@@ -456,14 +449,18 @@ private:
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
   void checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor, MonotonicTime now);
-  void ejectHost(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type);
+  void ejectHost(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type,
+                 absl::optional<std::string> monitor_name, absl::optional<uint32_t>);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(Cluster& cluster);
   void onConsecutiveErrorWorker(HostSharedPtr host,
-                                envoy::data::cluster::v3::OutlierEjectionType type);
+                                envoy::data::cluster::v3::OutlierEjectionType type,
+                                absl::optional<std::string> monitor_name,
+                                absl::optional<uint32_t> enforce);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
-  bool enforceEjection(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type);
+  bool enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type,
+                       absl::optional<std::string>, absl::optional<uint32_t>);
   void updateEnforcedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
   void updateDetectedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
   void processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);
@@ -530,7 +527,8 @@ public:
 
   // Upstream::Outlier::EventLogger
   void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
-                envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) override;
+                envoy::data::cluster::v3::OutlierEjectionType type, bool enforcedi,
+                absl::optional<std::string> monitor_name) override;
 
   void logUneject(const HostDescriptionConstSharedPtr& host) override;
 

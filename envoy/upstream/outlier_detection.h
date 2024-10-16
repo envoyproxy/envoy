@@ -83,7 +83,7 @@ using ExtResult = absl::variant<HttpCode, LocalOriginEvent>;
 class ExtMonitor {
 public:
   using ExtMonitorCallback =
-      std::function<void(uint32_t, std::string, absl::optional<std::string>)>;
+      std::function<void(uint32_t /* enforce */, std::string /* runtime_key */)>;
   virtual ~ExtMonitor() {}
 
   // Method to report a result to extensions.
@@ -170,23 +170,6 @@ public:
    * and LocalOrigin type returns success rate for local origin errors.
    */
   virtual double successRate(SuccessRateMonitorType type) const PURE;
-
-  /**
-     @return name of failed extension monitor or empty string if failure was not in extensions.
-  */
-  virtual std::string getFailedExtensionMonitorName() const PURE;
-
-  /**
-     @return extra info which extension monitor wants to add to event logger
-             or empty string if failure was not in extensions.
-  */
-  virtual std::string getFailedExtensionMonitorExtraInfo() const PURE;
-
-  /**
-     @return ejection enforcing parameter configured in extension
-              monitor which failed.
-  */
-  virtual uint32_t getFailedExtensionMonitorEnforce() const PURE;
 };
 
 using DetectorHostMonitorPtr = std::unique_ptr<DetectorHostMonitor>;
@@ -244,9 +227,11 @@ public:
    * @param detector supplies the detector that is doing the ejection.
    * @param type supplies the type of the event.
    * @param enforced is true if the ejection took place; false, if only logging took place.
+   * @param monitor_name is optional name of failed extension monitor.
    */
   virtual void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
-                        envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) PURE;
+                        envoy::data::cluster::v3::OutlierEjectionType type, bool enforced,
+                        absl::optional<std::string> monitor_name) PURE;
 
   /**
    * Log an unejection event.

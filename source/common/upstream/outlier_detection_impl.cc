@@ -104,19 +104,14 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   });
 }
 ExtMonitor::ExtMonitorCallback DetectorHostMonitorImpl::getOnFailedExtensioMonitorCallback() {
-  return [this](uint32_t enforce, std::string failed_monitor_name,
-                absl::optional<std::string> extra_info) {
+  return [this](uint32_t enforce, std::string failed_monitor_name) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
       // It's possible for the cluster/detector to go away while we still have a host in use.
       return;
     }
-    failed_monitor_name_ = failed_monitor_name;
-    if (extra_info.has_value()) {
-      failed_extra_info_ = extra_info.value();
-    }
-    failed_monitor_enforce_ = enforce;
-    detector->notifyMainThreadConsecutiveError(host_.lock(), envoy::data::cluster::v3::EXTENSION);
+    detector->notifyMainThreadConsecutiveError(host_.lock(), envoy::data::cluster::v3::EXTENSION,
+                                               failed_monitor_name, enforce);
   };
 }
 
@@ -469,8 +464,9 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
   }
 }
 
-bool DetectorImpl::enforceEjection(HostSharedPtr host,
-                                   envoy::data::cluster::v3::OutlierEjectionType type) {
+bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type,
+                                   absl::optional<std::string> monitor_name,
+                                   absl::optional<uint32_t> enforce) {
   switch (type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
@@ -496,9 +492,7 @@ bool DetectorImpl::enforceEjection(HostSharedPtr host,
                                               config_.enforcingFailurePercentageLocalOrigin());
   case envoy::data::cluster::v3::EXTENSION:
     return runtime_.snapshot().featureEnabled(
-        std::string(EnforcingExtensionRuntime) + "." +
-            host->outlierDetector().getFailedExtensionMonitorName(),
-        host->outlierDetector().getFailedExtensionMonitorEnforce());
+        std::string(EnforcingExtensionRuntime) + "." + monitor_name.value(), enforce.value());
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -564,8 +558,9 @@ void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::Outlier
   }
 }
 
-void DetectorImpl::ejectHost(HostSharedPtr host,
-                             envoy::data::cluster::v3::OutlierEjectionType type) {
+void DetectorImpl::ejectHost(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type,
+                             absl::optional<std::string> monitor_name,
+                             absl::optional<uint32_t> enforce) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(MaxEjectionPercentRuntime, config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * (ejections_active_helper_.value() + 1) / host_monitors_.size();
@@ -581,7 +576,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
       // Deprecated counter, preserving old behaviour until it's removed.
       stats_.ejections_total_.inc();
     }
-    if (enforceEjection(host, type)) {
+    if (enforceEjection(type, monitor_name, enforce)) {
       ejections_active_helper_.inc();
       updateEnforcedEjectionStats(type);
       host_monitors_[host]->eject(time_source_.monotonicTime());
@@ -610,11 +605,11 @@ void DetectorImpl::ejectHost(HostSharedPtr host,
 
       runCallbacks(host);
       if (event_logger_) {
-        event_logger_->logEject(host, *this, type, true);
+        event_logger_->logEject(host, *this, type, true, monitor_name);
       }
     } else {
       if (event_logger_) {
-        event_logger_->logEject(host, *this, type, false);
+        event_logger_->logEject(host, *this, type, false, monitor_name);
       }
     }
   } else {
@@ -629,7 +624,8 @@ DetectionStats DetectorImpl::generateStats(Stats::Scope& scope) {
 }
 
 void DetectorImpl::notifyMainThreadConsecutiveError(
-    HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type) {
+    HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type,
+    absl::optional<std::string> monitor_name, absl::optional<uint32_t> enforce) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
   // NOTE: Unfortunately consecutive errors are complicated from a threading perspective because
   //       we catch consecutive errors on worker threads and then post back to the main thread.
@@ -641,10 +637,10 @@ void DetectorImpl::notifyMainThreadConsecutiveError(
   //          pointer, the detector/cluster must still exist so we can safely fire callbacks.
   //          Otherwise we do nothing since the detector/cluster is already gone.
   std::weak_ptr<DetectorImpl> weak_this = shared_from_this();
-  dispatcher_.post([weak_this, host, type]() -> void {
+  dispatcher_.post([weak_this, host, type, monitor_name, enforce]() -> void {
     std::shared_ptr<DetectorImpl> shared_this = weak_this.lock();
     if (shared_this) {
-      shared_this->onConsecutiveErrorWorker(host, type);
+      shared_this->onConsecutiveErrorWorker(host, type, monitor_name, enforce);
     }
   });
 }
@@ -663,7 +659,9 @@ void DetectorImpl::onConsecutiveLocalOriginFailure(HostSharedPtr host) {
 }
 
 void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
-                                            envoy::data::cluster::v3::OutlierEjectionType type) {
+                                            envoy::data::cluster::v3::OutlierEjectionType type,
+                                            absl::optional<std::string> monitor_name,
+                                            absl::optional<uint32_t> enforce) {
   // Ejections come in cross thread. There is a chance that the host has already been removed from
   // the set. If so, just ignore it.
   if (host_monitors_.count(host) == 0) {
@@ -676,7 +674,7 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
   // We also reset the appropriate counter here to allow the monitor to detect a bout of consecutive
   // error responses even if the monitor is not charged with an interleaved non-error code.
   updateDetectedEjectionStats(type);
-  ejectHost(host, type);
+  ejectHost(host, type, monitor_name, enforce);
 
   // reset counters
   switch (type) {
@@ -810,7 +808,7 @@ void DetectorImpl::processSuccessRateEjections(
                 ->getSRMonitor(monitor_type)
                 .getEjectionType();
         updateDetectedEjectionStats(type);
-        ejectHost(host_success_rate_pair.host_, type);
+        ejectHost(host_success_rate_pair.host_, type, absl::nullopt, absl::nullopt);
       }
     }
   }
@@ -831,7 +829,7 @@ void DetectorImpl::processSuccessRateEjections(
                 ? envoy::data::cluster::v3::FAILURE_PERCENTAGE
                 : envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN;
         updateDetectedEjectionStats(type);
-        ejectHost(host_success_rate_pair.host_, type);
+        ejectHost(host_success_rate_pair.host_, type, absl::nullopt, absl::nullopt);
       }
     }
   }
@@ -880,7 +878,8 @@ void DetectorImpl::runCallbacks(HostSharedPtr host) {
 }
 
 void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
-                               envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) {
+                               envoy::data::cluster::v3::OutlierEjectionType type, bool enforced,
+                               absl::optional<std::string> monitor_name) {
   envoy::data::cluster::v3::OutlierDetectionEvent event;
   event.set_type(type);
 
@@ -912,10 +911,7 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
     event.mutable_eject_failure_percentage_event()->set_host_success_rate(
         host->outlierDetector().successRate(monitor_type));
   } else if (type == envoy::data::cluster::v3::EXTENSION) {
-    event.mutable_eject_extension_event()->set_monitor_name(
-        host->outlierDetector().getFailedExtensionMonitorName());
-    event.mutable_eject_extension_event()->set_extra_info(
-        host->outlierDetector().getFailedExtensionMonitorExtraInfo());
+    event.mutable_eject_extension_event()->set_monitor_name(monitor_name.value());
   } else {
     event.mutable_eject_consecutive_event();
   }
