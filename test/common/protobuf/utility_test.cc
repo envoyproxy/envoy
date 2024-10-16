@@ -194,22 +194,16 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   a4.PackFrom(s2);
   a5.PackFrom(s3);
 
-  TestScopedRuntime runtime_;
-  for (std::string runtime_value : {"true", "false"}) {
-    // TODO(ravenblack): when the runtime flag is removed, keep the expects
-    // but remove the loop around them and the extra output.
-    runtime_.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", runtime_value}});
-    EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2)) << runtime_value;
-    EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3)) << runtime_value;
-    EXPECT_NE(0, MessageUtil::hash(a1)) << runtime_value;
-    // Same keys and values but with the values in a different order should not have
-    // the same hash.
-    EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a4)) << runtime_value;
-    // Different keys with the values in the same order should not have the same hash.
-    EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a5)) << runtime_value;
-    // Struct without 'any' around it should not hash the same as struct inside 'any'.
-    EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1)) << runtime_value;
-  }
+  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
+  EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
+  EXPECT_NE(0, MessageUtil::hash(a1));
+  // Same keys and values but with the values in a different order should not have
+  // the same hash.
+  EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a4));
+  // Different keys with the values in the same order should not have the same hash.
+  EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a5));
+  // Struct without 'any' around it should not hash the same as struct inside 'any'.
+  EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
 }
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
