@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // If there is a fatal error on the VM (e.g. exception, abort()), then the policy will be applied.
 enum FailurePolicy {
-  // No policy is specified. The default policy will be used. The default policy is ``FAIL_RELOAD``.
+  // No policy is specified. The default policy will be used. The default policy is ``FAIL_CLOSED``.
   UNSPECIFIED = 0;
 
   // New plugin instance will be created for the new request if the VM is failed. Note this only

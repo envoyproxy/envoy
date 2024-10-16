@@ -159,11 +159,32 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCode) {
       Extensions::Common::Wasm::WasmException, "Unable to create Wasm plugin test");
 }
 
-TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
+TEST_P(WasmNetworkFilterConfigTest,
+       DEPRECATED_FEATURE_TEST(YamlLoadInlineBadCodeFailOpenNackConfig)) {
   const std::string yaml = absl::StrCat(R"EOF(
   config:
     name: "test"
     fail_open: true
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                        std::get<0>(GetParam()), R"EOF("
+      code:
+        local: { inline_string: "bad code" }
+  )EOF");
+
+  envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  WasmFilterConfig factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProto(proto_config, context_).IgnoreError(),
+      Extensions::Common::Wasm::WasmException, "Unable to create Wasm plugin test");
+}
+
+TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenPolicyNackConfig) {
+  const std::string yaml = absl::StrCat(R"EOF(
+  config:
+    name: "test"
+    failure_policy: FAIL_OPEN
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
                                         std::get<0>(GetParam()), R"EOF("
@@ -202,13 +223,35 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
   EXPECT_TRUE(context->isFailed());
 }
 
-TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
+TEST_P(WasmNetworkFilterConfigTest, DEPRECATED_FEATURE_TEST(FilterConfigFailOpen)) {
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     fail_open: true
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/network/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
+  filter_config.wasm()->fail(proxy_wasm::FailState::RuntimeError, "");
+  EXPECT_EQ(filter_config.createContext(), nullptr);
+}
+
+TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpenPolicy) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    failure_policy: FAIL_OPEN
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("

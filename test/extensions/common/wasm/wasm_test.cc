@@ -1532,7 +1532,7 @@ INSTANTIATE_TEST_SUITE_P(PluginConfigRuntimes, PluginConfigTest,
                          Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
-TEST_P(PluginConfigTest, WasmReload) {
+TEST_P(PluginConfigTest, FailReloadPolicy) {
   auto [runtime, language] = GetParam();
   if (runtime == "null") {
     return;
@@ -1549,6 +1549,7 @@ TEST_P(PluginConfigTest, WasmReload) {
         R"EOF(
 name: "{}_test_wasm_reload"
 root_id: "panic after sending local reply"
+failure_policy: FAIL_RELOAD
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
   configuration:
@@ -1571,8 +1572,6 @@ vm_config:
     createContext();
     EXPECT_NE(nullptr, context_.get());
 
-    // In the case of VM failure, failStream is called, so we need to make sure that we don't send
-    // the local reply twice.
     EXPECT_CALL(decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                                testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
@@ -1580,19 +1579,20 @@ vm_config:
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
 
-    // The wasm should be in runtime error state.
+    // The wasm should be in runtime error state now.
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
-    // Wait 3 seconds.
-    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(3));
+    // Wait 2 seconds to avoid possible backoff.
+    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
 
-    // Create second context and reload the wasm automatically.
+    // Create second context and reload the wasm vm will be reload automatically.
     createContext();
+    EXPECT_NE(nullptr, context_.get());
+    Wasm* context_wasm = context_->wasm();
 
-    Wasm* new_wasm = plugin_config_->wasm();
-    EXPECT_NE(nullptr, new_wasm);
-    EXPECT_NE(initial_wasm, new_wasm);
-    EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::Ok);
+    EXPECT_NE(nullptr, context_wasm);
+    EXPECT_NE(initial_wasm, context_wasm);
+    EXPECT_EQ(context_wasm->fail_state(), proxy_wasm::FailState::Ok);
 
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_success_.value(), 1);
@@ -1606,37 +1606,129 @@ vm_config:
               context_->decodeData(request_body, true));
 
     // The wasm should be in runtime error state again.
-    EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+    EXPECT_EQ(context_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
-    // The wasm failed again and the wasm() will try to reload again but will backoff.
+    // The wasm failed again and the PluginConfig::wasm() will try to reload again but will backoff.
     // The previous wasm will be returned.
-    Wasm* new_wasm_2 = plugin_config_->wasm();
-    EXPECT_NE(nullptr, new_wasm_2);
-    EXPECT_EQ(new_wasm_2, new_wasm);
-    EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+    EXPECT_EQ(plugin_config_->wasm(), context_wasm);
 
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_success_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_backoff_.value(), 1);
 
-    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(3));
+    // Wait 2 seconds.
+    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
 
-    // Now the wasm should be reloaded again.
-    Wasm* new_wasm_3 = plugin_config_->wasm();
-    EXPECT_NE(nullptr, new_wasm_3);
-    EXPECT_NE(new_wasm_3, new_wasm);
-    EXPECT_EQ(new_wasm_3->fail_state(), proxy_wasm::FailState::Ok);
+    // Now the wasm should be reloaded again after the backoff.
+    Wasm* latest_wasm = plugin_config_->wasm();
+    EXPECT_NE(nullptr, latest_wasm);
+    EXPECT_NE(context_wasm, latest_wasm);
+    EXPECT_EQ(latest_wasm->fail_state(), proxy_wasm::FailState::Ok);
+
+    // Mock another failure.
+    latest_wasm->fail(proxy_wasm::FailState::MissingFunction, "mocked failure");
+
+    // Wait 2 seconds.
+    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
+
+    // No reload should happen because the fail state is not reloadable.
+    EXPECT_EQ(plugin_config_->wasm(), latest_wasm);
+
+    // Create a new context.
+    createContext();
+    EXPECT_NE(nullptr, context_.get());
+
+    // Fallback to the FAIL_CLOSED policy.
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                               testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                               testing::Eq("wasm_fail_stream")));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+              context_->decodeData(request_body, true));
   };
 
   test_func(false);
   test_func(true);
 }
 
-TEST_P(PluginConfigTest, WasmReloadIsNotEnabledByDefaultIfFlagIsSetToFalse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.wasm_failure_reload_by_default", "false"}});
+TEST_P(PluginConfigTest, FailClosedPolicy) {
+  auto [runtime, language] = GetParam();
+  if (runtime == "null") {
+    return;
+  }
 
+  const std::string runtime_name = runtime;
+
+  const std::string code =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+          "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+
+  auto test_func = [this, runtime_name, code](bool singleton) {
+    const std::string plugin_config_yaml = fmt::format(
+        R"EOF(
+name: "{}_test_wasm_reload"
+root_id: "panic after sending local reply"
+failure_policy: FAIL_CLOSED
+vm_config:
+  runtime: "envoy.wasm.runtime.{}"
+  configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "some configuration"
+  code:
+    local:
+      inline_bytes: "{}"
+)EOF",
+        singleton, runtime_name, Base64::encode(code.data(), code.size()));
+
+    setUp(plugin_config_yaml, singleton);
+    Envoy::Buffer::OwnedImpl request_body;
+
+    Wasm* initial_wasm = plugin_config_->wasm();
+    EXPECT_NE(nullptr, initial_wasm);
+    EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::Ok);
+
+    // Create first context.
+    createContext();
+    EXPECT_NE(nullptr, context_.get());
+
+    // In the case of VM failure, failStream is called, so we need to make sure that we don't send
+    // the local reply twice.
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                               testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                               testing::Eq("wasm_fail_stream")));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+              context_->decodeData(request_body, true));
+
+    // The wasm should be in runtime error state.
+    EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+
+    // Wait 2 seconds.
+    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
+
+    // Create second context but the wasm is not reloaded.
+    createContext();
+    EXPECT_NE(nullptr, context_.get());
+
+    Wasm* latest_wasm = plugin_config_->wasm();
+    EXPECT_NE(nullptr, latest_wasm);
+    EXPECT_EQ(latest_wasm, initial_wasm);
+    EXPECT_EQ(latest_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+
+    // Request will still fail because the wasm is not reloaded.
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                               testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                               testing::Eq("wasm_fail_stream")));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+              context_->decodeData(request_body, true));
+  };
+
+  test_func(false);
+  test_func(true);
+}
+
+TEST_P(PluginConfigTest, FailUnspecifiedPolicy) {
   auto [runtime, language] = GetParam();
   if (runtime == "null") {
     return;
@@ -1687,16 +1779,17 @@ vm_config:
     // The wasm should be in runtime error state.
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
-    // Wait 3 seconds.
-    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(3));
+    // Wait 2 seconds.
+    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
 
     // Create second context but the wasm is not reloaded.
     createContext();
+    EXPECT_NE(nullptr, context_.get());
 
-    Wasm* new_wasm = plugin_config_->wasm();
-    EXPECT_NE(nullptr, new_wasm);
-    EXPECT_EQ(new_wasm, initial_wasm);
-    EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+    Wasm* latest_wasm = plugin_config_->wasm();
+    EXPECT_NE(nullptr, latest_wasm);
+    EXPECT_EQ(latest_wasm, initial_wasm);
+    EXPECT_EQ(latest_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
     // Request will still fail because the wasm is not reloaded.
     EXPECT_CALL(decoder_callbacks_,
@@ -1705,6 +1798,73 @@ vm_config:
                                testing::Eq("wasm_fail_stream")));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
+  };
+
+  test_func(false);
+  test_func(true);
+}
+
+TEST_P(PluginConfigTest, FailOpenPolicy) {
+  auto [runtime, language] = GetParam();
+  if (runtime == "null") {
+    return;
+  }
+
+  const std::string runtime_name = runtime;
+
+  const std::string code =
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+          "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+
+  auto test_func = [this, runtime_name, code](bool singleton) {
+    const std::string plugin_config_yaml = fmt::format(
+        R"EOF(
+name: "{}_test_wasm_reload"
+root_id: "panic after sending local reply"
+failure_policy: FAIL_OPEN
+vm_config:
+  runtime: "envoy.wasm.runtime.{}"
+  configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "some configuration"
+  code:
+    local:
+      inline_bytes: "{}"
+)EOF",
+        singleton, runtime_name, Base64::encode(code.data(), code.size()));
+
+    setUp(plugin_config_yaml, singleton);
+    Envoy::Buffer::OwnedImpl request_body;
+
+    Wasm* initial_wasm = plugin_config_->wasm();
+    EXPECT_NE(nullptr, initial_wasm);
+    EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::Ok);
+
+    // Create first context.
+    createContext();
+    EXPECT_NE(nullptr, context_.get());
+
+    EXPECT_CALL(decoder_callbacks_,
+                sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
+                               testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
+                               testing::Eq("wasm_fail_stream")));
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
+              context_->decodeData(request_body, true));
+
+    // The wasm should be in runtime error state.
+    EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+
+    // Wait 2 seconds.
+    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));
+
+    // Create second context but the wasm is not reloaded and empty context is returned.
+    createContext();
+    EXPECT_EQ(nullptr, context_.get());
+
+    Wasm* latest_wasm = plugin_config_->wasm();
+    EXPECT_NE(nullptr, latest_wasm);
+    EXPECT_EQ(latest_wasm, initial_wasm);
+    EXPECT_EQ(latest_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
   };
 
   test_func(false);

@@ -549,7 +549,7 @@ Wasm* PluginConfig::mayReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper) 
 }
 
 std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPluginHandleAndWasm() {
-  if (absl::holds_alternative<std::monostate>(plugin_handle_)) {
+  if (absl::holds_alternative<absl::monostate>(plugin_handle_)) {
     return {OptRef<SinglePluginHandle>{}, nullptr};
   }
 
@@ -564,12 +564,12 @@ std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPlug
   if (!thread_local_handle->currentThreadRegistered()) {
     return {OptRef<SinglePluginHandle>{}, nullptr};
   }
-  auto plugin_holder = thread_local_handle->get();
-  if (!plugin_holder.has_value()) {
+  auto plugin_handle_holder = thread_local_handle->get();
+  if (!plugin_handle_holder.has_value()) {
     return {OptRef<SinglePluginHandle>{}, nullptr};
   }
 
-  return {plugin_holder, mayReloadHandleIfNeeded(*plugin_holder)};
+  return {plugin_handle_holder, mayReloadHandleIfNeeded(*plugin_handle_holder)};
 }
 
 PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
@@ -593,9 +593,8 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
     // If the legacy fail_open is not set, we need to determine the failure policy.
     switch (config.failure_policy()) {
     case FailurePolicy::UNSPECIFIED: {
-      const bool reload_by_default = Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.wasm_failure_reload_by_default");
-      failure_policy_ = reload_by_default ? FailurePolicy::FAIL_RELOAD : FailurePolicy::FAIL_CLOSED;
+      // TODO(wbpcode): we may could add a runtime key to set the default failure policy.
+      failure_policy_ = FailurePolicy::FAIL_CLOSED;
       break;
     }
     case FailurePolicy::FAIL_RELOAD:
@@ -659,8 +658,8 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
 }
 
 std::shared_ptr<Context> PluginConfig::createContext() {
-  auto [plugin_holder, wasm] = getPluginHandleAndWasm();
-  if (!plugin_holder.has_value() || plugin_holder->handle == nullptr) {
+  auto [plugin_handle_holder, wasm] = getPluginHandleAndWasm();
+  if (!plugin_handle_holder.has_value() || plugin_handle_holder->handle == nullptr) {
     return nullptr;
   }
 
@@ -672,11 +671,11 @@ std::shared_ptr<Context> PluginConfig::createContext() {
       return nullptr;
     } else {
       // Fail closed is handled by an empty Context.
-      return std::make_shared<Context>(nullptr, 0, plugin_holder->handle);
+      return std::make_shared<Context>(nullptr, 0, plugin_handle_holder->handle);
     }
   }
-  return std::make_shared<Context>(wasm, plugin_holder->handle->rootContextId(),
-                                   plugin_holder->handle);
+  return std::make_shared<Context>(wasm, plugin_handle_holder->handle->rootContextId(),
+                                   plugin_handle_holder->handle);
 }
 
 Wasm* PluginConfig::wasm() { return getPluginHandleAndWasm().second; }

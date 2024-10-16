@@ -2,12 +2,6 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-- area: wasm
-  change: |
-    The failed wasm vm with runtime errors will be reloaded by default. This behavior can be reverted by setting the runtime
-    flag ``envoy.reloadable_features.wasm_failure_reload_by_default`` to false or by setting the
-    :ref:`failure_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.failure_policy>`
-    to ``FAIL_OPEN`` or ``FAIL_CLOSED`` explicitly.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
