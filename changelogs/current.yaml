@@ -24,5 +24,8 @@ new_features:
     Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
     :ref:`failure_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.failure_policy>` for more details.
     The ``FAIL_RELOAD`` reload policy will be used by default.
+- area: tls
+  change: |
+    Added support for P-384 and P-521 curves for TLS server certificates.
 
 deprecated:
