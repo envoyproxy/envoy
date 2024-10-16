@@ -59,9 +59,7 @@ public:
       : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor,
                       always_consume_default_token_bucket) {}
   static const std::string& key();
-  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() const {
-    return rate_limiter_;
-  }
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() { return rate_limiter_; }
 
 private:
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
@@ -193,7 +191,7 @@ private:
                            std::vector<RateLimit::LocalDescriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
-  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
   requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 

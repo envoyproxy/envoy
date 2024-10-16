@@ -159,12 +159,18 @@ AtomicTokenBucket::AtomicTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fi
                                      TimeSource& time_source)
     : token_bucket_(max_tokens, time_source,
                     // Calculate the fill rate in tokens per second.
-                    tokens_per_fill / std::chrono::duration<double>(fill_interval).count()) {}
+                    tokens_per_fill / std::chrono::duration<double>(fill_interval).count()),
+      fill_interval_(fill_interval) {}
 
 bool AtomicTokenBucket::consume(double factor) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
   auto cb = [tokens = 1.0 / factor](double total) { return total < tokens ? 0.0 : tokens; };
   return token_bucket_.consume(cb) != 0.0;
+}
+
+bool AtomicTokenBucket::isIdle() {
+  return token_bucket_.secsSinceLastConsume() >
+         3 * std::chrono::duration<double>(fill_interval_).count();
 }
 
 LocalRateLimiterImpl::LocalRateLimiterImpl(
@@ -176,6 +182,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     : fill_timer_(fill_interval > std::chrono::milliseconds(0)
                       ? dispatcher.createTimer([this] { onFillTimer(); })
                       : nullptr),
+      dynamic_desc_idle_timer_(dispatcher.createTimer([this] { onDynDescIdleTimer(); })),
       time_source_(dispatcher.timeSource()), share_provider_(std::move(shared_provider)),
       always_consume_default_token_bucket_(always_consume_default_token_bucket),
       no_timer_based_rate_limit_token_bucket_(Runtime::runtimeFeatureEnabled(
@@ -195,6 +202,10 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
   if (fill_timer_ && default_token_bucket_->fillInterval().count() > 0 &&
       !no_timer_based_rate_limit_token_bucket_) {
     fill_timer_->enableTimer(default_token_bucket_->fillInterval());
+  }
+
+  if (dynamic_desc_idle_timer_) {
+    dynamic_desc_idle_timer_->enableTimer(std::chrono::milliseconds(5000));
   }
 
   for (const auto& descriptor : descriptors) {
@@ -241,6 +252,24 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
   if (fill_timer_ != nullptr) {
     fill_timer_->disableTimer();
   }
+  if (dynamic_desc_idle_timer_ != nullptr) {
+    dynamic_desc_idle_timer_->disableTimer();
+  }
+}
+
+void LocalRateLimiterImpl::onDynDescIdleTimer() {
+  absl::WriterMutexLock lock(&dyn_desc_lock_);
+  for (auto it = dynamic_descriptors_.begin(), end = dynamic_descriptors_.end(); it != end;) {
+    // `erase()` will invalidate `it`, so advance `it` first.
+    auto copy_it = it++;
+    if (copy_it->second->isIdle()) {
+      dynamic_descriptors_.erase(copy_it);
+      ENVOY_LOG(trace, "cleaned up idle descriptor: {}._ current size: {}",
+                copy_it->first.toString(), dynamic_descriptors_.size());
+    }
+  }
+
+  dynamic_desc_idle_timer_->enableTimer(std::chrono::milliseconds(5000));
 }
 
 void LocalRateLimiterImpl::onFillTimer() {
@@ -257,12 +286,18 @@ void LocalRateLimiterImpl::onFillTimer() {
   for (const auto& descriptor : descriptors_) {
     descriptor.second->onFillTimer(refill_counter_, share_factor);
   }
+  {
+    absl::ReaderMutexLock lock(&dyn_desc_lock_);
+    for (const auto& descriptor : dynamic_descriptors_) {
+      descriptor.second->onFillTimer(refill_counter_, share_factor);
+    }
+  }
 
   fill_timer_->enableTimer(default_token_bucket_->fillInterval());
 }
 
 LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
-    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
 
   // In most cases the request descriptors has only few elements. We use a inlined vector to
   // avoid heap allocation.
@@ -273,6 +308,65 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
     auto iter = descriptors_.find(request_descriptor);
     if (iter != descriptors_.end()) {
       matched_descriptors.push_back(iter->second.get());
+    } else {
+      {
+        absl::ReaderMutexLock lock(&dyn_desc_lock_);
+        // find request descriptor in the existing dynamic descriptors. If it exists, add bucket to
+        // matched_descriptors.
+        auto dynamic_iter = dynamic_descriptors_.find(request_descriptor);
+        if (dynamic_iter != dynamic_descriptors_.end()) {
+          matched_descriptors.push_back(dynamic_iter->second.get());
+          continue;
+        }
+      }
+
+      // If it does not exist, It could be first request for a dynamic descriptor. Verify it matches
+      // any of the user descriptors by key and value as blank. If it does not match, skip to next
+      // entry. check if it matches any of the user descriptors by key and value as blank. If it
+      // does not match, skip to next entry. If it matches, this is the dynamic descriptor case.
+      for (const auto& pair : descriptors_) {
+        auto user_descriptor = pair.first;
+        auto user_bucket = pair.second.get();
+        if (user_descriptor.entries_.size() != request_descriptor.entries_.size()) {
+          continue;
+        }
+        RateLimit::LocalDescriptor new_descriptor;
+        bool wildcard_found = false;
+        new_descriptor.entries_.reserve(user_descriptor.entries_.size());
+        wildcard_found = compareDescriptorEntries(
+            request_descriptor.entries_, user_descriptor.entries_, new_descriptor.entries_);
+
+        if (!wildcard_found) {
+          continue;
+        }
+        RateLimitTokenBucketSharedPtr per_descriptor_token_bucket;
+        if (no_timer_based_rate_limit_token_bucket_) {
+          ENVOY_LOG(trace, "creating atomic token bucket for dynamic descriptor");
+          ENVOY_LOG(trace, "max_tokens: {}, fill_rate: {}, fill_interval: {}",
+                    user_bucket->maxTokens(), user_bucket->fillRate(),
+                    std::chrono::duration<double>(user_bucket->fillInterval()).count());
+          per_descriptor_token_bucket = std::make_shared<AtomicTokenBucket>(
+              user_bucket->maxTokens(),
+              uint32_t(user_bucket->fillRate() *
+                       std::chrono::duration<double>(user_bucket->fillInterval()).count()),
+              /*1000 milliseconds*/ user_bucket->fillInterval(), time_source_);
+        } else {
+          per_descriptor_token_bucket = std::make_shared<TimerTokenBucket>(
+              user_bucket->maxTokens(), uint32_t(user_bucket->fillRate()),
+              std::chrono::milliseconds(1000), user_bucket->multiplier(), *this);
+        }
+
+        {
+          absl::WriterMutexLock lock(&dyn_desc_lock_);
+          auto result = dynamic_descriptors_.emplace(std::move(new_descriptor),
+                                                     std::move(per_descriptor_token_bucket));
+          if (!result.second) {
+            throw EnvoyException(absl::StrCat("duplicate descriptor in the local rate descriptor: ",
+                                              result.first->first.toString()));
+          }
+          matched_descriptors.push_back(result.first->second.get());
+        }
+      }
     }
   }
 
@@ -294,6 +388,10 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
       // If the request is forbidden by a descriptor, return the result and the descriptor
       // token bucket.
       return {false, makeOptRefFromPtr<TokenBucketContext>(descriptor)};
+    } else {
+      ENVOY_LOG(debug,
+                "request allowed by descriptor with fill rate: {}, maxToken: {}, remainingToken {}",
+                descriptor->fillRate(), descriptor->maxTokens(), descriptor->remainingTokens());
     }
   }
 
@@ -314,6 +412,31 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
 
   ASSERT(!matched_descriptors.empty());
   return {true, makeOptRefFromPtr<TokenBucketContext>(matched_descriptors[0])};
+}
+
+bool LocalRateLimiterImpl::compareDescriptorEntries(
+    const std::vector<RateLimit::DescriptorEntry>& request_entries,
+    const std::vector<RateLimit::DescriptorEntry>& user_entries,
+    std::vector<RateLimit::DescriptorEntry>& new_descriptor_entries) {
+  // Check for equality of sizes
+  if (request_entries.size() != user_entries.size()) {
+    return false;
+  }
+
+  bool has_empty_value = false;
+  for (size_t i = 0; i < request_entries.size(); ++i) {
+    // Check if the keys are equal
+    if (request_entries[i].key_ != user_entries[i].key_) {
+      return false;
+    }
+
+    // Check for empty value in user entries
+    if (user_entries[i].value_.empty()) {
+      has_empty_value = true;
+    }
+    new_descriptor_entries.push_back({request_entries[i].key_, request_entries[i].value_});
+  }
+  return has_empty_value;
 }
 
 } // namespace LocalRateLimit

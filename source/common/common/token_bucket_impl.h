@@ -78,6 +78,12 @@ public:
     return consumed;
   }
 
+  double secsSinceLastConsume() {
+    double time_old = time_in_seconds_.load(std::memory_order_relaxed);
+    const double time_now = timeNowInSeconds();
+    return time_now - time_old;
+  }
+
   /**
    * Consumes one tokens from the bucket.
    * @return true if the token is consumed, false otherwise.
