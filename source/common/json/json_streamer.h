@@ -144,7 +144,8 @@ public:
    * @param response The buffer in which to stream output.
    * NOTE: The response must could be used to construct instance of OutputBufferType.
    */
-  template <class T> explicit StreamerBase(T& response) : response_(response) {}
+  template <class T>
+  explicit StreamerBase(T& response) : SerializerBase<OutputBufferType>(response) {}
 
   class Array;
   using ArrayPtr = std::unique_ptr<Array>;
