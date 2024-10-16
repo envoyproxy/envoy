@@ -27,7 +27,7 @@ public:
       }
     }
 
-    if (Common::Wasm::Wasm* wasm = plugin_config_->wasmOfHandle(); wasm != nullptr) {
+    if (Common::Wasm::Wasm* wasm = plugin_config_->wasm(); wasm != nullptr) {
       wasm->log(plugin_config_->plugin(), log_context, stream_info);
     }
   }

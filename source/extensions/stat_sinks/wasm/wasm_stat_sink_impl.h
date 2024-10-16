@@ -21,7 +21,7 @@ public:
       : plugin_config_(std::move(plugin_config)) {}
 
   void flush(Stats::MetricSnapshot& snapshot) override {
-    if (Common::Wasm::Wasm* wasm = plugin_config_->wasmOfHandle(); wasm != nullptr) {
+    if (Common::Wasm::Wasm* wasm = plugin_config_->wasm(); wasm != nullptr) {
       wasm->onStatsUpdate(plugin_config_->plugin(), snapshot);
     }
   }

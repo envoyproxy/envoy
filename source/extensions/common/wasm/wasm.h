@@ -143,7 +143,6 @@ public:
                          std::static_pointer_cast<PluginBase>(plugin)),
         plugin_(plugin), wasm_handle_(wasm_handle) {}
 
-  Wasm* wasmOfHandle() { return wasm_handle_ != nullptr ? wasm_handle_->wasm().get() : nullptr; }
   WasmHandleSharedPtr& wasmHandle() { return wasm_handle_; }
   uint32_t rootContextId() { return wasm_handle_->wasm()->getRootContext(plugin_, false)->id(); }
 
@@ -190,21 +189,18 @@ public:
                const envoy::config::core::v3::Metadata* metadata, bool singleton);
 
   std::shared_ptr<Context> createContext();
-  Wasm* wasmOfHandle();
+  Wasm* wasm();
   const PluginSharedPtr& plugin() { return plugin_; }
 
 private:
+  using SinglePluginHandle = PluginHandleSharedPtr;
+  using ThreadLocalPluginHandle = ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>;
+
   PluginSharedPtr plugin_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
   const bool is_singleton_handle_{};
 
-  bool plugin_handle_initialized_{};
-  // Plugin handle that works for all threads. Only one of thread_local_handle_ or
-  // singleton_handle_ will be set.
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> thread_local_handle_;
-  // Plugin handle that works for the main. Only one of thread_local_handle_ or
-  // singleton_handle_ will be set.
-  PluginHandleSharedPtr singleton_handle_;
+  absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;
 };
 
 using PluginConfigPtr = std::unique_ptr<PluginConfig>;
