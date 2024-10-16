@@ -15,6 +15,10 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    Removed the ``envoy.reloadable_features.http_route_connect_proxy_by_default`` runtime flag and
+    its legacy code path.
 
 new_features:
 - area: tls
