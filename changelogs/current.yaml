@@ -24,6 +24,12 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: proto
+  change: |
+    Removed runtime flag ``envoy.restart_features.use_fast_protobuf_hash`` and legacy code paths.
+- area: dns
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.dns_reresolve_on_eai_again`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
