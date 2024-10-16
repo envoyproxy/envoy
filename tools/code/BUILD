@@ -61,6 +61,8 @@ genrule(
         -l warn \
         -v warn \
         -x mobile/dist/envoy-pom.xml \
+        # shellcheck thinks this is a shell script
+        -x bazel/repo.bzl \
         --codeowners=$(location //:CODEOWNERS) \
         --owners=$(location //:OWNERS.md) \
         --extensions_build_config=$(location :extensions_build_config) \

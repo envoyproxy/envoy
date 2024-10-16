@@ -66,9 +66,27 @@ envoy_entry_point(
     init_data = [":__init__.py"],
 )
 
+genrule(
+    name = "generate_release_hash_bin",
+    outs = ["generate_release_hash.sh"],
+    cmd = """
+    echo "
+#!/usr/bin/env bash
+
+set -e -o pipefail
+
+git ls-remote --tags https://github.com/envoyproxy/envoy \\\\
+    | grep -E 'refs/tags/v[0-9]+\\\\.[0-9]+\\\\.[0-9]+$$' \\\\
+    | sort -u \\\\
+    | sha256sum \\\\
+    | cut -d ' ' -f 1" > $@
+    chmod +x $@
+    """
+)
+
 sh_binary(
     name = "generate_release_hash",
-    srcs = ["@envoy//bazel:generate_release_hash.sh"],
+    srcs = [":generate_release_hash_bin"],
     visibility = ["//visibility:public"],
 )
 
@@ -80,11 +98,11 @@ genrule(
     name = "default_release_hash",
     outs = ["default_release_hash.txt"],
     cmd = """
-    $(location @envoy_repo//:generate_release_hash) > $@
+    $(location :generate_release_hash) > $@
     """,
     stamp = True,
     tags = ["no-remote-exec"],
-    tools = ["@envoy_repo//:generate_release_hash"],
+    tools = [":generate_release_hash"],
 )
 
 label_flag(
