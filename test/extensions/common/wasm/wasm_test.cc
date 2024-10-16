@@ -1547,7 +1547,7 @@ TEST_P(PluginConfigTest, WasmReload) {
   auto test_func = [this, runtime_name, code](bool singleton) {
     const std::string plugin_config_yaml = fmt::format(
         R"EOF(
-name: "test_wasm_reload"
+name: "{}_test_wasm_reload"
 root_id: "panic after sending local reply"
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
@@ -1558,7 +1558,7 @@ vm_config:
     local:
       inline_bytes: "{}"
 )EOF",
-        runtime_name, Base64::encode(code.data(), code.size()));
+        singleton, runtime_name, Base64::encode(code.data(), code.size()));
 
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
@@ -1583,6 +1583,9 @@ vm_config:
     // The wasm should be in runtime error state.
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
+    // Wait 3 seconds.
+    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(3));
+
     // Create second context and reload the wasm automatically.
     createContext();
 
@@ -1602,7 +1605,7 @@ vm_config:
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
 
-    // The wasm should be in runtime error state.
+    // The wasm should be in runtime error state again.
     EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
     // The wasm failed again and the wasmOfHandle() will try to reload again but will backoff.
@@ -1616,7 +1619,7 @@ vm_config:
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_success_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_backoff_.value(), 1);
 
-    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(5));
+    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(3));
 
     // Now the wasm should be reloaded again.
     Wasm* new_wasm_3 = plugin_config_->wasmOfHandle();
@@ -1648,7 +1651,7 @@ TEST_P(PluginConfigTest, WasmReloadIsNotEnabledByDefaultIfFlagIsSetToFalse) {
   auto test_func = [this, runtime_name, code](bool singleton) {
     const std::string plugin_config_yaml = fmt::format(
         R"EOF(
-name: "test_wasm_reload"
+name: "{}_test_wasm_reload"
 root_id: "panic after sending local reply"
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
@@ -1659,7 +1662,7 @@ vm_config:
     local:
       inline_bytes: "{}"
 )EOF",
-        runtime_name, Base64::encode(code.data(), code.size()));
+        singleton, runtime_name, Base64::encode(code.data(), code.size()));
 
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
@@ -1684,6 +1687,9 @@ vm_config:
     // The wasm should be in runtime error state.
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
+    // Wait 3 seconds.
+    server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(3));
+
     // Create second context but the wasm is not reloaded.
     createContext();
 
@@ -1697,7 +1703,6 @@ vm_config:
                 sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
                                testing::Eq(Grpc::Status::WellKnownGrpcStatus::Unavailable),
                                testing::Eq("wasm_fail_stream")));
-    request_body.add("skip_panic");
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
   };
