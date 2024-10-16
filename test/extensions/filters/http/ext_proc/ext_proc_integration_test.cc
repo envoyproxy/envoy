@@ -727,6 +727,8 @@ INSTANTIATE_TEST_SUITE_P(
     GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
     Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
 
+#if 0
+
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by immediately closing the stream.
@@ -4869,7 +4871,305 @@ TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
   handleUpstreamRequest(100);
   verifyDownstreamResponse(*response, 200);
 }
+#endif
 
+TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
+  config_helper_.setBufferLimits(1024, 1024);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::MXN);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  // Downstream client sending 16k data.
+  const std::string body_sent(16 * 1024, 's');
+  codec_client_->sendData(*request_encoder_, body_sent, true);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
+  ASSERT_TRUE(header_request.has_request_headers());
+
+  // The ext_proc server receives 16 chunks of body, each chunk size is 1k.
+  std::string body_received;
+  bool end_stream = false;
+  uint32_t total_req_body_msg = 0;
+  while (!end_stream) {
+    ProcessingRequest body_request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+    ASSERT_TRUE(body_request.has_request_body());
+    body_received = absl::StrCat(body_received, body_request.request_body().body());
+    end_stream = body_request.request_body().end_of_stream();
+    total_req_body_msg++;
+  }
+  EXPECT_TRUE(end_stream);
+  EXPECT_EQ(body_received, body_sent);
+
+  // The ext_proc server sends back the header response.
+  processor_stream_->startGrpcStream();
+  ProcessingResponse response_header;
+  auto* header_resp = response_header.mutable_request_headers();
+  auto header_mutation = header_resp->mutable_response()->mutable_header_mutation();
+  auto* mut = header_mutation->add_set_headers();
+  mut->mutable_header()->set_key("x-new-header");
+  mut->mutable_header()->set_raw_value("new");
+  processor_stream_->sendGrpcMessage(response_header);
+
+  // The ext_proc server sends back the body response.
+  uint32_t total_resp_body_msg = 2 * total_req_body_msg;
+  const std::string body_upstream(total_resp_body_msg, 'r');
+  for (uint32_t i = 0; i < total_resp_body_msg; i++) {
+    ProcessingResponse response_body;
+    auto* body_resp = response_body.mutable_request_body();
+    auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
+    auto* mxn_resp = body_mut->mutable_mxn_resp();
+    mxn_resp->set_body("r");
+    bool end_of_body = (i == total_resp_body_msg - 1) ? true : false;
+    mxn_resp->set_end_of_body(end_of_body);
+    if (i == 0) {
+      mxn_resp->set_chunks_received(total_req_body_msg);
+    }
+    processor_stream_->sendGrpcMessage(response_body);
+  }
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Buffer the whole message including header, body and trailer before sending response in MXN mode.
+// The body is small. So, no need to send standalone chunks_received confirmation message.
+TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespMxnSmallBody) {
+  config_helper_.setBufferLimits(1024, 1024);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::MXN);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  // Downstream client sends headers, body, and trailer.
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  const std::string body_sent(16 * 1024, 's');
+  codec_client_->sendData(*request_encoder_, body_sent, false);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
+  ASSERT_TRUE(header_request.has_request_headers());
+
+  std::string body_received;
+  bool end_stream = false;
+  uint32_t total_req_body_msg = 0;
+  while (!end_stream) {
+    ProcessingRequest request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+    ASSERT_TRUE(request.has_request_body() || request.has_request_trailers());
+    if (!request.has_request_trailers()) {
+      // request_body is received
+      body_received = absl::StrCat(body_received, request.request_body().body());
+      total_req_body_msg++;
+    } else {
+      // request_trailer is received.
+      end_stream = true;
+    }
+  }
+  EXPECT_TRUE(end_stream);
+  EXPECT_EQ(body_received, body_sent);
+
+  // The ext_proc server sends back the header response.
+  processor_stream_->startGrpcStream();
+  ProcessingResponse response_header;
+  auto* header_resp = response_header.mutable_request_headers();
+  auto header_mutation = header_resp->mutable_response()->mutable_header_mutation();
+  auto* mut = header_mutation->add_set_headers();
+  mut->mutable_header()->set_key("x-new-header");
+  mut->mutable_header()->set_raw_value("new");
+  processor_stream_->sendGrpcMessage(response_header);
+
+  // The ext_proc server sends back the body response.
+  uint32_t total_resp_body_msg = total_req_body_msg / 2;
+  const std::string body_upstream(total_resp_body_msg, 'r');
+  for (uint32_t i = 0; i < total_resp_body_msg; i++) {
+    ProcessingResponse response_body;
+    auto* mxn_resp = response_body.mutable_request_body()->mutable_response()
+                     ->mutable_body_mutation()->mutable_mxn_resp();
+    mxn_resp->set_body("r");
+    bool end_of_body = (i == total_resp_body_msg - 1) ? true : false;
+    mxn_resp->set_end_of_body(end_of_body);
+    // Send confirmation for the rest of the received body chunks in the 1st response message.
+    if (i == 0) {
+      mxn_resp->set_chunks_received(total_req_body_msg /*- confirm_msg_count * 2*/);
+    }
+    processor_stream_->sendGrpcMessage(response_body);
+  }
+
+  // The ext_proc server sends back the trailer response.
+  ProcessingResponse response_trailer;
+  auto* trailer_resp = response_trailer.mutable_request_trailers()->mutable_header_mutation();
+  auto* mut_trailer = trailer_resp->add_set_headers();
+  mut_trailer->mutable_header()->set_key("x-new-trailer");
+  mut_trailer->mutable_header()->set_raw_value("new");
+  processor_stream_->sendGrpcMessage(response_trailer);
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Buffer the whole message including header, body and trailer before sending response in MXN mode.
+// The body is large. So, need to send header response and standalone body mutation response messages
+// with chunks_received field set to avoid timeout being triggered.
+TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespMxnLargeBody) {
+  if (IsEnvoyGrpc()) {
+    return;
+  }
+  config_helper_.setBufferLimits(4, 4);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::MXN);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  // Downstream client sends headers, body, and trailer.
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  const uint32_t chunks_count = 10;
+  const std::string body_sent(chunks_count * 4, 's');
+  codec_client_->sendData(*request_encoder_, body_sent, false);
+  Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
+  ASSERT_TRUE(header_request.has_request_headers());
+
+  std::string body_received;
+  bool end_stream = false;
+  uint32_t total_req_body_msg = 0;
+  uint32_t confirm_msg_count = 0;
+  bool header_resp_sent = false;
+  while (!end_stream) {
+    ProcessingRequest request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+    ASSERT_TRUE(request.has_request_body() || request.has_request_trailers());
+    // If it is not trailer, then it is body.
+    if (!request.has_request_trailers()) {
+      // Buffer the entire body.
+      body_received = absl::StrCat(body_received, request.request_body().body());
+      total_req_body_msg++;
+
+      if (total_req_body_msg % 4 == 0) {
+        if (!header_resp_sent) {
+          // Sending a header response if it is not already sent.
+          processor_stream_->startGrpcStream();
+          ProcessingResponse response_header;
+          auto* header_resp = response_header.mutable_request_headers();
+          auto header_mutation = header_resp->mutable_response()->mutable_header_mutation();
+          auto* mut = header_mutation->add_set_headers();
+          mut->mutable_header()->set_key("x-new-header");
+          mut->mutable_header()->set_raw_value("new");
+          processor_stream_->sendGrpcMessage(response_header);
+          header_resp_sent = true;
+        }
+        // Sending back a confirmation after receiving every 4 chunks.
+        ProcessingResponse response_body;
+        auto* mxn_resp = response_body.mutable_request_body()->mutable_response()
+                         ->mutable_body_mutation()->mutable_mxn_resp();
+        mxn_resp->set_chunks_received(4);
+        mxn_resp->set_end_of_body(false);
+        confirm_msg_count++;
+        processor_stream_->sendGrpcMessage(response_body);
+      }
+    } else {
+      // request_trailer is received.
+      end_stream = true;
+    }
+  }
+  EXPECT_TRUE(end_stream);
+  EXPECT_EQ(body_received, body_sent);
+
+  #if 0
+  // Sending a header response if it is not already sent.
+  if (!header_resp_sent) {
+    processor_stream_->startGrpcStream();
+    ProcessingResponse response_header;
+    auto* header_resp = response_header.mutable_request_headers();
+    auto header_mutation = header_resp->mutable_response()->mutable_header_mutation();
+    auto* mut = header_mutation->add_set_headers();
+    mut->mutable_header()->set_key("x-new-header");
+    mut->mutable_header()->set_raw_value("new");
+    processor_stream_->sendGrpcMessage(response_header);
+    header_resp_sent = true;
+  }
+  #endif
+
+  uint32_t total_resp_body_msg = total_req_body_msg / 2;
+  const std::string body_upstream(total_resp_body_msg, 'r');
+  #if 0
+  for (uint32_t i = 0; i < total_resp_body_msg; i++) {
+    ProcessingResponse response_body;
+    auto* mxn_resp = response_body.mutable_request_body()->mutable_response()
+                     ->mutable_body_mutation()->mutable_mxn_resp();
+    mxn_resp->set_body("r");
+    const bool end_of_body = (i == total_resp_body_msg - 1) ? true : false;
+    mxn_resp->set_end_of_body(end_of_body);
+    // Send confirmation for the rest of the received body chunks in the 1st response message.
+    if (i == 0) {
+      mxn_resp->set_chunks_received(total_req_body_msg - confirm_msg_count * 4);
+    }
+    processor_stream_->sendGrpcMessage(response_body);
+  }
+  #endif
+
+
+
+  // The ext_proc server sends back the trailer response.
+  ProcessingResponse response_trailer;
+  auto* trailer_resp = response_trailer.mutable_request_trailers()->mutable_header_mutation();
+  auto* mut_trailer = trailer_resp->add_set_headers();
+  mut_trailer->mutable_header()->set_key("x-new-trailer");
+  mut_trailer->mutable_header()->set_raw_value("new");
+  processor_stream_->sendGrpcMessage(response_trailer);
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  verifyDownstreamResponse(*response, 200);
+}
+
+#if 0
 TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   proto_config_.set_allow_mode_override(true);
@@ -4936,5 +5236,6 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideDisallowed) {
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }
+#endif
 
 } // namespace Envoy

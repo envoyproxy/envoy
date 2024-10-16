@@ -180,7 +180,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         // Fall through if there was never a body in the first place.
         ENVOY_LOG(debug, "The message had no body");
       } else if (complete_body_available_ && body_mode_ != ProcessingMode::NONE) {
-        if (callback_state_ != CallbackState::StreamedBodyCallback) {
+        if (callback_state_ == CallbackState::Idle) {
           // If we get here, then all the body data came in before the header message
           // was complete, and the server wants the body. It doesn't matter whether the
           // processing mode is buffered, streamed, or partially buffered.
