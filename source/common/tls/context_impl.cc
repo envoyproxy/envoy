@@ -379,6 +379,20 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
 #endif
 
+// Run SSL_CTX_set_compliance_policy as the final configuration, given this
+// does this code belong here or more someplace more downstream like ServerContextImpl or
+// ClientContextImpl
+#if BORINGSSL_FIPS
+  ENVOY_LOG(debug, "compliancePolicy {}",
+            static_cast<char>(factory_context_.options().compliancePolicy()));
+
+  if (factory_context_.options().compliancePolicy() == Server::CompliancePolicy::FIPS_202205) {
+    for (auto ctx : ssl_contexts) {
+      SSL_CTX_set_compliance_policy(ctx, ssl_compliance_policy_fips_202205);
+    }
+  }
+#endif
+
   // As late as possible, run the custom SSL_CTX configuration callback on each
   // SSL_CTX, if set.
   if (auto sslctx_cb = config.sslctxCb(); sslctx_cb) {
