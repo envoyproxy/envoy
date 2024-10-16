@@ -1412,8 +1412,8 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
   auto cleanup = cleanUpHelper(*context_or);
 }
 
-// Validate that non-P256 ECDSA certs are rejected.
-TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
+// Validate that P384 ECDSA certs load.
+TEST_F(ClientContextConfigImplTest, P384EcdsaCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:
@@ -1425,16 +1425,13 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
-                  .status()
-                  .message(),
-              testing::ContainsRegex(
-                  "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
-                  "only P-256 ECDSA certificates are supported"));
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
 }
 
-// Validate that non-P256 ECDSA certs are rejected loaded from `pkcs12`.
-TEST_F(ClientContextConfigImplTest, NonP256EcdsaPkcs12) {
+// Validate that P384 ECDSA certs are loaded from `pkcs12`.
+TEST_F(ClientContextConfigImplTest, P384EcdsaPkcs12) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
   pkcs12:
@@ -1444,12 +1441,44 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaPkcs12) {
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
+}
+
+TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_ecdsa_p521_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_ecdsa_p521_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Stats::IsolatedStoreImpl store;
+  auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
+  EXPECT_TRUE(context_or.ok());
+  auto cleanup = cleanUpHelper(*context_or);
+}
+
+// Validate that a P-224 key will cause an error.
+TEST_F(ClientContextConfigImplTest, UnsupportedCurveEcdsaCert) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_secp224r1_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_secp224r1_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Stats::IsolatedStoreImpl store;
   EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
                   .status()
                   .message(),
               testing::ContainsRegex(
-                  "Failed to load certificate chain from .*selfsigned_ecdsa_p384_certkey.p12, "
-                  "only P-256 ECDSA certificates are supported"));
+                  "Failed to load certificate chain from .*selfsigned_secp224r1_cert.pem, "
+                  "only P-256, P-384 or P-521 ECDSA certificates are supported"));
 }
 
 // Multiple TLS certificates are not yet supported.

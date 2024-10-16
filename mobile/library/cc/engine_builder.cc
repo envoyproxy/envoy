@@ -646,6 +646,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   h2_options->mutable_connection_keepalive()->mutable_timeout()->set_seconds(
       h2_connection_keepalive_timeout_seconds_);
   h2_options->mutable_max_concurrent_streams()->set_value(100);
+  h2_options->mutable_initial_stream_window_size()->set_value(initial_stream_window_size_);
+  h2_options->mutable_initial_connection_window_size()->set_value(initial_connection_window_size_);
 
   envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig
       preserve_case_config;
@@ -718,6 +720,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->mutable_http3_protocol_options()
         ->mutable_quic_protocol_options()
         ->set_client_connection_options(http3_client_connection_options_);
+    alpn_options.mutable_auto_config()
+        ->mutable_http3_protocol_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_initial_stream_window_size()
+        ->set_value(initial_stream_window_size_);
+    alpn_options.mutable_auto_config()
+        ->mutable_http3_protocol_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_initial_connection_window_size()
+        ->set_value(initial_connection_window_size_);
     alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
     for (const auto& [host, port] : quic_hints_) {
@@ -841,10 +853,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       use_gro_if_available_);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
-  // TODO(abeyad): This runtime flag is set because https://github.com/envoyproxy/envoy/pull/32370
-  // needed to be merged with the default off due to unresolved test issues. Once those are fixed,
-  // and the default for `allow_client_socket_creation_failure` is true, we can remove this.
-  (*restart_features.mutable_fields())["allow_client_socket_creation_failure"].set_bool_value(true);
   for (auto& guard_and_value : restart_runtime_guards_) {
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
