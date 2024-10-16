@@ -309,10 +309,13 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
     if (iter != descriptors_.end()) {
       matched_descriptors.push_back(iter->second.get());
     } else {
+      // If the request descriptor is not found in the user descriptors, it could be a wildcard case
+      // where value is left blank in the user configured descriptor entry. In this case, we need to
+      // check if it matches any of the dynamic descriptors.
       {
         absl::ReaderMutexLock lock(&dyn_desc_lock_);
-        // find request descriptor in the existing dynamic descriptors. If it exists, add bucket to
-        // matched_descriptors.
+        // find request descriptor in the existing dynamic descriptors. If it exists, add token
+        // bucket to matched_descriptors.
         auto dynamic_iter = dynamic_descriptors_.find(request_descriptor);
         if (dynamic_iter != dynamic_descriptors_.end()) {
           matched_descriptors.push_back(dynamic_iter->second.get());
@@ -320,10 +323,8 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
         }
       }
 
-      // If it does not exist, It could be first request for a dynamic descriptor. Verify it matches
-      // any of the user descriptors by key and value as blank. If it does not match, skip to next
-      // entry. check if it matches any of the user descriptors by key and value as blank. If it
-      // does not match, skip to next entry. If it matches, this is the dynamic descriptor case.
+      // If it does not exist, then it could be the first request for a dynamic descriptor. Verify
+      // it matches any of the user configured descriptors by key where value is left blank
       for (const auto& pair : descriptors_) {
         auto user_descriptor = pair.first;
         auto user_bucket = pair.second.get();
@@ -349,7 +350,7 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
               user_bucket->maxTokens(),
               uint32_t(user_bucket->fillRate() *
                        std::chrono::duration<double>(user_bucket->fillInterval()).count()),
-              /*1000 milliseconds*/ user_bucket->fillInterval(), time_source_);
+              user_bucket->fillInterval(), time_source_);
         } else {
           per_descriptor_token_bucket = std::make_shared<TimerTokenBucket>(
               user_bucket->maxTokens(), uint32_t(user_bucket->fillRate()),
@@ -414,6 +415,8 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
   return {true, makeOptRefFromPtr<TokenBucketContext>(matched_descriptors[0])};
 }
 
+// Compare the request descriptor entries with the user descriptor entries. If all non-empty user
+// descriptor values match the request descriptor values, return true and fill the new descriptor
 bool LocalRateLimiterImpl::compareDescriptorEntries(
     const std::vector<RateLimit::DescriptorEntry>& request_entries,
     const std::vector<RateLimit::DescriptorEntry>& user_entries,
@@ -427,6 +430,11 @@ bool LocalRateLimiterImpl::compareDescriptorEntries(
   for (size_t i = 0; i < request_entries.size(); ++i) {
     // Check if the keys are equal
     if (request_entries[i].key_ != user_entries[i].key_) {
+      return false;
+    }
+
+    // all non-blank user values must match the request values
+    if (!user_entries[i].value_.empty() && user_entries[i].value_ != request_entries[i].value_) {
       return false;
     }
 
