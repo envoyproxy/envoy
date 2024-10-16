@@ -14,6 +14,10 @@ minor_behavior_changes:
     instead of a string.
     This behavior change could be disabled temporarily by setting the runtime
     ``envoy.reloadable_features.logging_with_fast_json_formatter`` to false.
+- area: formatter
+  change: |
+    The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the
+    metadata (``DYNAMIC_METADATA``, ``CLUSTER_METADATA``, etc.) formatter.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
