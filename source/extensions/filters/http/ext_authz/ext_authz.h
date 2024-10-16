@@ -42,7 +42,8 @@ namespace ExtAuthz {
   COUNTER(disabled)                                                                                \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(invalid)                                                                                 \
-  COUNTER(ignored_dynamic_metadata)
+  COUNTER(ignored_dynamic_metadata)                                                                \
+  COUNTER(filter_state_name_collision)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
@@ -402,7 +403,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
-  ExtAuthzLoggingInfo* logging_info_;
+  ExtAuthzLoggingInfo* logging_info_{nullptr};
 
   // This is used to hold the final configs after we merge them with per-route configs.
   bool allow_partial_message_{};

@@ -736,7 +736,14 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
+  // Turn on debug to troubleshoot possible flaky test.
+  // TODO(cainelli): Remove this and the debug logs in the tracer test filter after a test failure
+  // occurs.
+  LogLevelSetter save_levels(spdlog::level::trace);
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing Initializing config");
   initializeConfig();
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing configuring test tracer");
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
     test::integration::filters::ExpectSpan ext_proc_span;
     ext_proc_span.set_operation_name(
@@ -759,19 +766,31 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
     tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
   });
 
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing initializing http integration test");
   HttpIntegrationTest::initialize();
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing sending downstream request");
   auto response = sendDownstreamRequest(absl::nullopt);
 
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing waiting for first message");
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
 
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing starting gRPC stream");
   processor_stream_->startGrpcStream();
   EXPECT_FALSE(processor_stream_->headers().get(LowerCaseString("traceparent")).empty())
       << "expected traceparent header";
 
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing finishing gRPC stream");
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing handling upstream request");
   handleUpstreamRequest();
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing verifying downstream response");
   verifyDownstreamResponse(*response, 200);
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing done");
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithLogging) {
