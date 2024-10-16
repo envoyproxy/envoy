@@ -85,6 +85,15 @@ void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_hea
       response_headers, metadata,
       [this, end_stream](bool cache_success) { onFragmentComplete(cache_success, end_stream, 0); },
       end_stream);
+  // This requirement simplifies the cache implementation; most caches will have to
+  // do asynchronous operations, and so will post anyway. It is an error to call continueDecoding
+  // during decodeHeaders, and calling a callback inline *may* do that, therefore we
+  // require the cache to post. A previous version performed a post here to guarantee
+  // correct behavior, but that meant for async caches it would double-post - it makes
+  // more sense to single-post when it may not be necessary (in the rarer case of a cache
+  // not needing async action) than to double-post in the common async case.
+  // This requirement may become unnecessary after some more iterations result in
+  // continueDecoding no longer being a thing in this filter.
   ASSERT(fragment_in_flight_,
          "insertHeaders must post the callback to dispatcher, not just call it");
 }
