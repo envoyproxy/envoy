@@ -108,6 +108,9 @@ public:
   // Sets the QUIC connection idle timeout in seconds.
   EngineBuilder& setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds);
 
+  // Sets the QUIC connection keepalive initial interval in nanoseconds
+  EngineBuilder& setKeepAliveInitialIntervalMilliseconds(int keepalive_initial_interval_ms);
+
 #if defined(__APPLE__)
   // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
   // use in reading and using the system proxy settings.
@@ -207,6 +210,8 @@ private:
   int32_t udp_socket_send_buffer_size_ = 1452 * 20;
 
   int quic_connection_idle_timeout_seconds_ = 30;
+
+  int keepalive_initial_interval_ms_ = 0;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

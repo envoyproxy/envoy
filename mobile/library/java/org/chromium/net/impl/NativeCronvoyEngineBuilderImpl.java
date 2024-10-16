@@ -69,6 +69,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
+  private final int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
 
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
@@ -234,6 +235,12 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return this;
   }
 
+  public NativeCronvoyEngineBuilderImpl
+  setH3ConnectionKeepaliveInitialIntervalMilliseconds(int interval) {
+    mH3ConnectionKeepaliveInitialIntervalMilliseconds = interval;
+    return this;
+  }
+
   /**
    * Indicates to skip the TLS certificate verification.
    *
@@ -297,6 +304,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
         mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
         keyValueStores, mRuntimeGuards, mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
-        mCaresFallbackResolvers);
+        mCaresFallbackResolvers, mH3ConnectionKeepaliveInitialIntervalMilliseconds);
   }
 }

@@ -274,6 +274,12 @@ EngineBuilder::setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_time
 }
 
 EngineBuilder&
+EngineBuilder::setKeepAliveInitialIntervalMilliseconds(int keepalive_initial_interval_ms) {
+  keepalive_initial_interval_ms_ = keepalive_initial_interval_ms;
+  return *this;
+}
+
+EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
   return *this;
@@ -746,6 +752,12 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->mutable_quic_protocol_options()
         ->mutable_idle_network_timeout()
         ->set_seconds(quic_connection_idle_timeout_seconds_);
+
+    auto* quic_protocol_options = alpn_options.mutable_auto_config()
+                                      ->mutable_http3_protocol_options()
+                                      ->mutable_quic_protocol_options();
+    quic_protocol_options->mutable_connection_keepalive()->mutable_initial_interval()->set_nanos(
+        keepalive_initial_interval_ms_ * 1000 * 1000);
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())

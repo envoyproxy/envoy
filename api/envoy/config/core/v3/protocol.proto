@@ -51,7 +51,7 @@ message QuicKeepAliveSettings {
   // If absent or zero, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`  is also zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
   google.protobuf.Duration initial_interval = 2 [(validate.rules).duration = {
     lte {}
-    gte {seconds: 1}
+    gte {nanos: 1000000}
   }];
 }
 
