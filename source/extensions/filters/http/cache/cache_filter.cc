@@ -66,7 +66,7 @@ void CacheFilter::sendUpstreamRequest(Http::RequestHeaderMap& request_headers) {
   if (route_entry == nullptr) {
     return sendNoRouteResponse();
   }
-  const auto thread_local_cluster =
+  const Upstream::ThreadLocalCluster* thread_local_cluster =
       config_->clusterManager().getThreadLocalCluster(route_entry->clusterName());
   if (thread_local_cluster == nullptr) {
     return sendNoClusterResponse(route_entry->clusterName());
