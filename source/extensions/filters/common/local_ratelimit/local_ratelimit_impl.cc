@@ -353,8 +353,10 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
               user_bucket->fillInterval(), time_source_);
         } else {
           per_descriptor_token_bucket = std::make_shared<TimerTokenBucket>(
-              user_bucket->maxTokens(), uint32_t(user_bucket->fillRate()),
-              std::chrono::milliseconds(1000), user_bucket->multiplier(), *this);
+              user_bucket->maxTokens(),
+              uint32_t(user_bucket->fillRate() *
+                       std::chrono::duration<double>(user_bucket->fillInterval()).count()),
+              user_bucket->fillInterval(), user_bucket->multiplier(), *this);
         }
 
         {
