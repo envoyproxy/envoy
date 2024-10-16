@@ -481,6 +481,7 @@ using JsonFormatterImpl = JsonFormatterImplBase<HttpFormatterContext>;
 template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
 template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
 
+#ifndef ENVOY_DISABLE_EXCEPTIONS
 /**
  * An formatter for structured log formats, which returns a Struct proto that
  * can be converted easily into multiple formats.
@@ -576,7 +577,7 @@ private:
           output->emplace(pair.first, toFormatNumberValue(pair.second.number_value()));
           break;
         default:
-          throwEnvoyExceptionOrPanic(
+          throw EnvoyException(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }
@@ -607,7 +608,7 @@ private:
           break;
 
         default:
-          throwEnvoyExceptionOrPanic(
+          throw EnvoyException(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }
@@ -724,10 +725,11 @@ private:
 
 using StructFormatter = StructFormatterBase<HttpFormatterContext>;
 using StructFormatterPtr = std::unique_ptr<StructFormatter>;
+using LegacyJsonFormatterImpl = LegacyJsonFormatterBaseImpl<HttpFormatterContext>;
+#endif // ENVOY_DISABLE_EXCEPTIONS
 
 // Aliases for backwards compatibility.
 using FormatterImpl = FormatterBaseImpl<HttpFormatterContext>;
-using LegacyJsonFormatterImpl = LegacyJsonFormatterBaseImpl<HttpFormatterContext>;
 
 } // namespace Formatter
 } // namespace Envoy

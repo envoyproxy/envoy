@@ -54,7 +54,10 @@ There are 15 identities:
   using the config *selfsigned_cert.cfg*. *selfsigned_ecdsa_p256_key.pem* is
   its private key.
 - **Self-signed ECDSA P-384**: The self-signed certificate *selfsigned_ecdsa_p384_cert.pem*,
-  using the config *selfsigned_cert.cfg*. *selfsigned_ecdsa_p256_key.pem* is
+  using the config *selfsigned_cert.cfg*. *selfsigned_ecdsa_p384_key.pem* is
+  its private key.
+- **Self-signed ECDSA P-521**: The self-signed certificate *selfsigned_ecdsa_p521_cert.pem*,
+  using the config *selfsigned_cert.cfg*. *selfsigned_ecdsa_p521_key.pem* is
   its private key.
 - **Expired**: A self-signed, expired certificate *expired_cert.pem*,
   using the config *selfsigned_cert.cfg*. *expired_key.pem* is its private
