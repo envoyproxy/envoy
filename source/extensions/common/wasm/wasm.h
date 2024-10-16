@@ -183,6 +183,9 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
 
 class PluginConfig : Logger::Loggable<Logger::Id::wasm> {
 public:
+  // TODO(wbpcode): the code of PluginConfig will be shared cross all Wasm extensions (loggers,
+  // http filters, etc.), we may extend the constructor to takes a static string view to tell
+  // the type of the plugin if needed.
   PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
                Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
                Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
