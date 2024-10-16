@@ -68,6 +68,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_route_connect_proxy_by_default);
 RUNTIME_GUARD(envoy_reloadable_features_internal_authority_header_validator);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_remove_jwt_from_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_validate_uri);
+RUNTIME_GUARD(envoy_reloadable_features_logging_with_fast_json_formatter);
 RUNTIME_GUARD(envoy_reloadable_features_lua_flow_control_while_http_call);
 RUNTIME_GUARD(envoy_reloadable_features_mmdb_files_reload_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
@@ -162,9 +163,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 
-// A flag to enable the usage of the latest JSON formatter for logging.
-// TODO(wbpcode): flip to true after Envoy v1.32.0 is released.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_logging_with_fast_json_formatter);
 // TODO(yanavlasov): Flip to true after prod testing.
 // Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
 // before downstream.
