@@ -69,7 +69,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
-  private final int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
+  private int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
 
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
