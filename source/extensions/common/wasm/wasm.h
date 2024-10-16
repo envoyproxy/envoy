@@ -144,7 +144,6 @@ public:
                          std::static_pointer_cast<PluginBase>(plugin)),
         plugin_(plugin), wasm_handle_(wasm_handle) {}
 
-  Wasm* wasmOfHandle() { return wasm_handle_ != nullptr ? wasm_handle_->wasm().get() : nullptr; }
   WasmHandleSharedPtr& wasmHandle() { return wasm_handle_; }
   uint32_t rootContextId() { return wasm_handle_->wasm()->getRootContext(plugin_, false)->id(); }
 
@@ -189,29 +188,35 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
 
 class PluginConfig : Logger::Loggable<Logger::Id::wasm> {
 public:
+  // TODO(wbpcode): the code of PluginConfig will be shared cross all Wasm extensions (loggers,
+  // http filters, etc.), we may extend the constructor to takes a static string view to tell
+  // the type of the plugin if needed.
   PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
                Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
                Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
                const envoy::config::core::v3::Metadata* metadata, bool singleton);
 
   std::shared_ptr<Context> createContext();
-  Wasm* wasmOfHandle();
+  Wasm* wasm();
   const PluginSharedPtr& plugin() { return plugin_; }
   WasmStats& wasmStats() { return stats_handler_->wasmStats(); }
+
+  using SinglePluginHandle = PluginHandleSharedPtrThreadLocal;
+  using ThreadLocalPluginHandle = ThreadLocal::TypedSlotPtr<SinglePluginHandle>;
 
 private:
   /**
    * Get the latest wasm and plugin handle wrapper. The plugin handle may be reloaded if
    * the wasm is failed and the policy allows it.
    */
-  std::pair<OptRef<PluginHandleSharedPtrThreadLocal>, Wasm*> getPluginHandleAndWasm();
+  std::pair<OptRef<SinglePluginHandle>, Wasm*> getPluginHandleAndWasm();
 
   /**
    * May reload the handle if the wasm if failed. The input handle will be updated if the
    * handle is reloaded.
    * @return the wasm pointer of the latest handle.
    */
-  Wasm* mayReloadHandleIfNeeded(PluginHandleSharedPtrThreadLocal& handle_wrapper);
+  Wasm* mayReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper);
 
   StatsHandlerSharedPtr stats_handler_;
   FailurePolicy failure_policy_;
@@ -221,16 +226,8 @@ private:
   PluginSharedPtr plugin_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
   const bool is_singleton_handle_{};
-
-  bool plugin_handle_initialized_{};
   WasmHandleSharedPtr base_wasm_{};
-
-  // Plugin handle that works for all threads. Only one of thread_local_handle_ or
-  // singleton_handle_ will be set.
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> thread_local_handle_;
-  // Plugin handle that works for the main. Only one of thread_local_handle_ or
-  // singleton_handle_ will be set.
-  PluginHandleSharedPtrThreadLocal singleton_handle_;
+  absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;
 };
 
 using PluginConfigPtr = std::unique_ptr<PluginConfig>;

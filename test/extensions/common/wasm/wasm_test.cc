@@ -1563,7 +1563,7 @@ vm_config:
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
 
-    Wasm* initial_wasm = plugin_config_->wasmOfHandle();
+    Wasm* initial_wasm = plugin_config_->wasm();
     EXPECT_NE(nullptr, initial_wasm);
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::Ok);
 
@@ -1589,7 +1589,7 @@ vm_config:
     // Create second context and reload the wasm automatically.
     createContext();
 
-    Wasm* new_wasm = plugin_config_->wasmOfHandle();
+    Wasm* new_wasm = plugin_config_->wasm();
     EXPECT_NE(nullptr, new_wasm);
     EXPECT_NE(initial_wasm, new_wasm);
     EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::Ok);
@@ -1608,9 +1608,9 @@ vm_config:
     // The wasm should be in runtime error state again.
     EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
 
-    // The wasm failed again and the wasmOfHandle() will try to reload again but will backoff.
+    // The wasm failed again and the wasm() will try to reload again but will backoff.
     // The previous wasm will be returned.
-    Wasm* new_wasm_2 = plugin_config_->wasmOfHandle();
+    Wasm* new_wasm_2 = plugin_config_->wasm();
     EXPECT_NE(nullptr, new_wasm_2);
     EXPECT_EQ(new_wasm_2, new_wasm);
     EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
@@ -1622,7 +1622,7 @@ vm_config:
     server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(3));
 
     // Now the wasm should be reloaded again.
-    Wasm* new_wasm_3 = plugin_config_->wasmOfHandle();
+    Wasm* new_wasm_3 = plugin_config_->wasm();
     EXPECT_NE(nullptr, new_wasm_3);
     EXPECT_NE(new_wasm_3, new_wasm);
     EXPECT_EQ(new_wasm_3->fail_state(), proxy_wasm::FailState::Ok);
@@ -1667,7 +1667,7 @@ vm_config:
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
 
-    Wasm* initial_wasm = plugin_config_->wasmOfHandle();
+    Wasm* initial_wasm = plugin_config_->wasm();
     EXPECT_NE(nullptr, initial_wasm);
     EXPECT_EQ(initial_wasm->fail_state(), proxy_wasm::FailState::Ok);
 
@@ -1693,7 +1693,7 @@ vm_config:
     // Create second context but the wasm is not reloaded.
     createContext();
 
-    Wasm* new_wasm = plugin_config_->wasmOfHandle();
+    Wasm* new_wasm = plugin_config_->wasm();
     EXPECT_NE(nullptr, new_wasm);
     EXPECT_EQ(new_wasm, initial_wasm);
     EXPECT_EQ(new_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);

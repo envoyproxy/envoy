@@ -1,4 +1,5 @@
 #include "source/extensions/common/wasm/wasm.h"
+#include "wasm.h"
 
 #include <algorithm>
 #include <chrono>
@@ -488,7 +489,10 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
       getPluginHandleFactory()));
 }
 
-Wasm* PluginConfig::mayReloadHandleIfNeeded(PluginHandleSharedPtrThreadLocal& handle_wrapper) {
+// Simple helper function to get the Wasm* from a WasmHandle.
+Wasm* wasmHandleWasm(WasmHandleSharedPtr& h) { return h != nullptr ? h->wasm().get() : nullptr; }
+
+Wasm* PluginConfig::mayReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper) {
   // base_wasm_ is null means the plugin is not loaded successfully. Return anyway.
   if (base_wasm_ == nullptr) {
     return nullptr;
@@ -499,7 +503,7 @@ Wasm* PluginConfig::mayReloadHandleIfNeeded(PluginHandleSharedPtrThreadLocal& ha
     return nullptr;
   }
 
-  Wasm* wasm = handle_wrapper.handle->wasmOfHandle();
+  Wasm* wasm = wasmHandleWasm(handle_wrapper.handle->wasmHandle());
 
   // Only runtime failure will be handled by reloading logic. If the wasm is not failed or
   // failed with other errors, return it directly.
@@ -531,7 +535,7 @@ Wasm* PluginConfig::mayReloadHandleIfNeeded(PluginHandleSharedPtrThreadLocal& ha
   handle_wrapper.last_load = now;
   PluginHandleSharedPtr new_load = getOrCreateThreadLocalPlugin(base_wasm_, plugin_, dispatcher);
   if (new_load != nullptr) {
-    Wasm* new_wasm = new_load->wasmOfHandle();
+    Wasm* new_wasm = wasmHandleWasm(new_load->wasmHandle());
     if (new_wasm == nullptr || new_wasm->isFailed()) {
       stats_handler_->onEvent(WasmEvent::VmReloadFailure);
     } else {
@@ -541,25 +545,28 @@ Wasm* PluginConfig::mayReloadHandleIfNeeded(PluginHandleSharedPtrThreadLocal& ha
   }
 
   ASSERT(handle_wrapper.handle != nullptr);
-  return handle_wrapper.handle->wasmOfHandle();
+  return wasmHandleWasm(handle_wrapper.handle->wasmHandle());
 }
 
-std::pair<OptRef<PluginHandleSharedPtrThreadLocal>, Wasm*> PluginConfig::getPluginHandleAndWasm() {
-  if (!plugin_handle_initialized_) {
-    return {OptRef<PluginHandleSharedPtrThreadLocal>{}, nullptr};
+std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPluginHandleAndWasm() {
+  if (absl::holds_alternative<std::monostate>(plugin_handle_)) {
+    return {OptRef<SinglePluginHandle>{}, nullptr};
   }
 
   if (is_singleton_handle_) {
-    return {singleton_handle_, mayReloadHandleIfNeeded(singleton_handle_)};
+    ASSERT(absl::holds_alternative<SinglePluginHandle>(plugin_handle_));
+    OptRef<SinglePluginHandle> singleton_handle = absl::get<SinglePluginHandle>(plugin_handle_);
+    return {singleton_handle, mayReloadHandleIfNeeded(singleton_handle.ref())};
   }
 
-  ASSERT(thread_local_handle_ != nullptr);
-  if (!thread_local_handle_->currentThreadRegistered()) {
-    return {OptRef<PluginHandleSharedPtrThreadLocal>{}, nullptr};
+  ASSERT(absl::holds_alternative<ThreadLocalPluginHandle>(plugin_handle_));
+  auto* thread_local_handle = absl::get<ThreadLocalPluginHandle>(plugin_handle_).get();
+  if (!thread_local_handle->currentThreadRegistered()) {
+    return {OptRef<SinglePluginHandle>{}, nullptr};
   }
-  auto plugin_holder = thread_local_handle_->get();
+  auto plugin_holder = thread_local_handle->get();
   if (!plugin_holder.has_value()) {
-    return {OptRef<PluginHandleSharedPtrThreadLocal>{}, nullptr};
+    return {OptRef<SinglePluginHandle>{}, nullptr};
   }
 
   return {plugin_holder, mayReloadHandleIfNeeded(*plugin_holder)};
@@ -614,11 +621,9 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
   }
 
   stats_handler_ = std::make_shared<StatsHandler>(scope, absl::StrCat("wasm.", config.name(), "."));
-
   plugin_ = std::make_shared<Plugin>(config, direction, context.localInfo(), metadata);
 
   auto callback = [this, &context](WasmHandleSharedPtr base_wasm) {
-    plugin_handle_initialized_ = true;
     base_wasm_ = base_wasm;
 
     if (base_wasm == nullptr) {
@@ -626,27 +631,28 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
     }
 
     if (is_singleton_handle_) {
-      singleton_handle_.handle =
-          getOrCreateThreadLocalPlugin(base_wasm, plugin_, context.mainThreadDispatcher());
-      singleton_handle_.last_load = context.mainThreadDispatcher().timeSource().monotonicTime();
+      plugin_handle_ = SinglePluginHandle(
+          getOrCreateThreadLocalPlugin(base_wasm, plugin_, context.mainThreadDispatcher()),
+          context.mainThreadDispatcher().timeSource().monotonicTime());
       return;
     }
 
-    thread_local_handle_ =
-        ThreadLocal::TypedSlot<Common::Wasm::PluginHandleSharedPtrThreadLocal>::makeUnique(
-            context.threadLocal());
+    auto thread_local_handle =
+        ThreadLocal::TypedSlot<SinglePluginHandle>::makeUnique(context.threadLocal());
     // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    thread_local_handle_->set([base_wasm, plugin = this->plugin_](Event::Dispatcher& dispatcher) {
-      return std::make_shared<PluginHandleSharedPtrThreadLocal>(
+    thread_local_handle->set([base_wasm, plugin = this->plugin_](Event::Dispatcher& dispatcher) {
+      return std::make_shared<SinglePluginHandle>(
           getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher),
           dispatcher.timeSource().monotonicTime());
     });
+    plugin_handle_ = std::move(thread_local_handle);
   };
 
   if (!Common::Wasm::createWasm(plugin_, scope.createScope(""), context.clusterManager(),
                                 init_manager, context.mainThreadDispatcher(), context.api(),
                                 context.lifecycleNotifier(), remote_data_provider_,
                                 std::move(callback))) {
+    // TODO(wbpcode): use absl::Status to return error rather than throw.
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm plugin {}", plugin_->name_));
   }
@@ -673,7 +679,7 @@ std::shared_ptr<Context> PluginConfig::createContext() {
                                    plugin_holder->handle);
 }
 
-Wasm* PluginConfig::wasmOfHandle() { return getPluginHandleAndWasm().second; }
+Wasm* PluginConfig::wasm() { return getPluginHandleAndWasm().second; }
 
 } // namespace Wasm
 } // namespace Common

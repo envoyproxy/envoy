@@ -19,8 +19,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Wasm {
 
-using Extensions::Bootstrap::Wasm::WasmServicePtr;
-
 class WasmFactoryTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFactoryTest() {

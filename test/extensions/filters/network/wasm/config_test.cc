@@ -196,7 +196,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  filter_config.wasmOfHandle()->fail(proxy_wasm::FailState::RuntimeError, "");
+  filter_config.wasm()->fail(proxy_wasm::FailState::RuntimeError, "");
   auto context = filter_config.createContext();
   EXPECT_EQ(context->wasm(), nullptr);
   EXPECT_TRUE(context->isFailed());
@@ -220,7 +220,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  filter_config.wasmOfHandle()->fail(proxy_wasm::FailState::RuntimeError, "");
+  filter_config.wasm()->fail(proxy_wasm::FailState::RuntimeError, "");
   EXPECT_EQ(filter_config.createContext(), nullptr);
 }
 
@@ -243,7 +243,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  auto wasm = filter_config.wasmOfHandle();
+  auto wasm = filter_config.wasm();
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_log"));
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_http_call"));
@@ -272,7 +272,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  auto wasm = filter_config.wasmOfHandle();
+  auto wasm = filter_config.wasm();
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_log"));
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_new_connection"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_http_call"));
