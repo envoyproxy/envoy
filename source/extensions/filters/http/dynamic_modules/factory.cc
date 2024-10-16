@@ -14,13 +14,8 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
       raw_config, context.messageValidationVisitor());
 
   const auto& module_config = proto_config.dynamic_module_config();
-  // TODO(mathetake): add support for other data source.
-  if (!module_config.object_file().has_filename()) {
-    return absl::InvalidArgumentError(
-        "Only filename is supported as a data source of dynamic module object file");
-  }
-  const auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
-      module_config.object_file().filename(), module_config.do_not_close());
+  const auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
+      module_config.name(), module_config.do_not_close());
   if (!dynamic_module.ok()) {
     return absl::InvalidArgumentError("Failed to load dynamic module: " +
                                       std::string(dynamic_module.status().message()));

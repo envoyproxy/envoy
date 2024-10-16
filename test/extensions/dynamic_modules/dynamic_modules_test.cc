@@ -94,6 +94,17 @@ TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
               testing::HasSubstr("ABI version mismatch: got invalid-version-hash, but expected"));
 }
 
+TEST(CreateDynamicModulesByName, SearchPath) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+      1);
+
+  absl::StatusOr<DynamicModuleSharedPtr> module = newDynamicModuleByName("no_op", false);
+  EXPECT_TRUE(module.ok());
+}
+
 } // namespace DynamicModules
 } // namespace Extensions
 } // namespace Envoy

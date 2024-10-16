@@ -2,11 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.dynamic_modules.v3;
 
-import "envoy/config/core/v3/base.proto";
-
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.dynamic_modules.v3";
 option java_outer_classname = "DynamicModulesProto";
@@ -34,10 +33,12 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // same version of the ABI.
 //
 // Currently, the implementation is work in progress and not usable.
-// [#next-free-field: 8]
 message DynamicModuleConfig {
-  // The location of the object file. Currently, only the local path is supported.
-  config.core.v3.DataSource object_file = 7;
+  // The name of the dynamic module. Envoy searches for the shared object with this name in the module search path.
+  // Currently, the search path can only be configured via the environment variable ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``.
+  // The actual search path is ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``. TODO: make the search path configurable via
+  // command line options.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Set true to prevent the module from being unloaded with dlclose.
   // This is useful for modules that have global state that should not be unloaded.
