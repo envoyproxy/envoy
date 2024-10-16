@@ -68,7 +68,7 @@ envoy_entry_point(
 
 sh_binary(
     name = "generate_release_hash",
-    srcs = ["generate_release_hash.sh"],
+    srcs = ["@envoy//bazel:generate_release_hash.sh"],
     visibility = ["//visibility:public"],
 )
 
@@ -80,11 +80,11 @@ genrule(
     name = "default_release_hash",
     outs = ["default_release_hash.txt"],
     cmd = """
-    $(location @envoy//bazel:generate_release_hash.sh) %s > $@
-    """ % PATH,
+    $(location @envoy_repo//:generate_release_hash) > $@
+    """,
     stamp = True,
     tags = ["no-remote-exec"],
-    tools = ["@envoy//bazel:generate_release_hash.sh"],
+    tools = ["@envoy_repo//:generate_release_hash"],
 )
 
 label_flag(

@@ -4770,8 +4770,6 @@ private:
 };
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.allow_client_socket_creation_failure",
-                                    "true");
   AllowForceFail fail_socket_n_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
 

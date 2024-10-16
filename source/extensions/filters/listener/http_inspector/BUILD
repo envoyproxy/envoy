@@ -16,7 +16,6 @@ envoy_cc_library(
     srcs = ["http_inspector.cc"],
     hdrs = ["http_inspector.h"],
     deps = [
-        "//bazel/external/http_parser",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/network:filter_interface",
@@ -25,6 +24,8 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/http/http1:legacy_parser_lib",
+        "//source/common/http/http1:parser_interface",
     ],
 )
 
