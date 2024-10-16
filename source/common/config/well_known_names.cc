@@ -236,6 +236,7 @@ TagNameValues::TagNameValues() {
   addRe2(PROXY_PROTOCOL_VERSION,
          R"(^proxy_proto\.((?:<TAG_VALUE>\.)?versions\.v(<PROXY_PROTOCOL_VERSION>)\.)\w+$)");
 
+  // grpc.(<stat_prefix>).**
   addTokenized(ADS_CLUSTER_PREFIX, "grpc.$.**");
 }
 
