@@ -8,6 +8,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -78,6 +79,9 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.logging_with_fast_json_formatter", "false"}});
+
   const std::vector<std::string> invalid_configs = {
       R"(
   json_format:

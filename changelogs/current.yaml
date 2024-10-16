@@ -5,6 +5,15 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: access_log
+  change: |
+    New implementation of the JSON formatter will be enabled by default.
+    The :ref:`sort_properties <envoy_v3_api_field_config.core.v3.JsonFormatOptions.sort_properties>` field will
+    be ignored in the new implementation because the new implementation always sorts properties. And the new implementation
+    will always keep the value type in the JSON output. For example, the duration field will always be rendered as a number
+    instead of a string.
+    This behavior change could be disabled temporarily by setting the runtime
+    ``envoy.reloadable_features.logging_with_fast_json_formatter`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
