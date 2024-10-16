@@ -444,12 +444,6 @@ private:
     levels_.pop();
   }
 
-#endif
-
-  OutputBufferType response_;
-  std::string sanitize_buffer_;
-
-#ifndef NDEBUG
   // Keeps a stack of Maps or Arrays (subclasses of Level) to facilitate
   // assertions that only the top-level map/array can be written.
   std::stack<Level*> levels_;
