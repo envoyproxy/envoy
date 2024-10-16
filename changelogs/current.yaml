@@ -29,6 +29,12 @@ removed_config_or_runtime:
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
 
 new_features:
+- area: spiffe
+  change: |
+    Added :ref:`trust_bundle_map <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundle_map>` to the SPIFFE certificate validator configuration.
+    This field allows specifying a SPIFFE trust bundle map as a local JSON file through a data source.
+    This is an alternative to the existing :ref:`trust_domains <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_domains>` field.
+    The trust_bundle_map is mutually exclusive with trust_domains.
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
