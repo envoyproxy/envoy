@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include <unistd.h>
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
@@ -109,40 +110,15 @@ std::shared_ptr<SpiffeData> SPIFFEValidator::loadTrustBundles() {
             error = true;
             return false;
           }
-
-          STACK_OF(GENERAL_NAME)* san_names = static_cast<STACK_OF(GENERAL_NAME)*>(
-              X509_get_ext_d2i(x509.get(), NID_subject_alt_name, nullptr, nullptr));
-          if (san_names != nullptr) {
-            for (size_t i = 0; i < sk_GENERAL_NAME_num(san_names); i++) {
-              const GENERAL_NAME* current_name = sk_GENERAL_NAME_value(san_names, i);
-              if (current_name->type == GEN_URI) {
-                const char* uri = reinterpret_cast<const char*>(
-                    ASN1_STRING_get0_data(current_name->d.uniformResourceIdentifier));
-                if (absl::StartsWith(uri, "spiffe://")) {
-                  std::string san_string(uri);
-                  const std::string& san_domain = extractTrustDomain(san_string);
-                  if (domain_name != san_domain) {
-                    ENVOY_LOG(error, "Domain specified in bundle '{}' and in SAN '{}' do not match",
-                              domain_name, san_domain);
-                    error = true;
-                    return false;
-                  }
-
-                  if (X509_STORE_add_cert(spiffeDataPtr->trust_bundle_stores[domain_name].get(),
-                                          x509.get()) != 1) {
-                    ENVOY_LOG(error, "Failed to add x509 object while loading '{}'",
-                              trust_bundle_file_name_);
-                    error = true;
-                    return false;
-                  }
-                  X509_up_ref(x509.get());
-                  spiffeDataPtr->ca_certs.push_back(std::move(x509));
-                  break;
-                }
-              }
-            }
-            sk_GENERAL_NAME_pop_free(san_names, GENERAL_NAME_free);
+          if (X509_STORE_add_cert(spiffeDataPtr->trust_bundle_stores[domain_name].get(),
+                                      x509.get()) != 1) {
+            ENVOY_LOG(error, "Failed to add x509 object while loading '{}'",
+                      trust_bundle_file_name_);
+            error = true;
+            return false;
           }
+          X509_up_ref(x509.get());
+          spiffeDataPtr->ca_certs.push_back(std::move(x509));
         }
       }
     }

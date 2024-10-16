@@ -16,6 +16,66 @@ cleanup() {
     rm ./intermediate_crl_*
 }
 
+
+# $@=<trust domain, CA cert, sequence number> (repeatable for multiple domains and certs per domain)
+generate_spiffe_trust_bundle_mapping() {
+    local trust_domains=()
+
+    # Collecting all trust domain arguments
+    while [[ $# -gt 0 ]]; do
+        trust_domains+=( "$1" "$2" "$3" )
+        shift 3
+    done
+
+    echo "{" > trust_bundles.json
+    echo "  \"trust_domains\": {" >> trust_bundles.json
+
+    local first_domain=true
+    for (( i=0; i<${#trust_domains[@]}; i+=3 )); do
+        local trust_domain="${trust_domains[i]}"
+        local ca_cert_files=(${trust_domains[i+1]//,/ })
+        local sequence_number="${trust_domains[i+2]}"
+
+        if [ "$first_domain" = false ]; then
+            echo "    }," >> trust_bundles.json
+        fi
+        first_domain=false
+
+        echo "    \"$trust_domain\": {" >> trust_bundles.json
+        echo "      \"sequence_number\": $sequence_number," >> trust_bundles.json
+        echo "      \"keys\": [" >> trust_bundles.json
+
+        local first_key=true
+        for ca_cert_file in "${ca_cert_files[@]}"; do
+            local base64_der=$(openssl x509 -in "$ca_cert_file" -outform DER | base64 | tr -d '\n\r')
+            local modulus=$(openssl x509 -in "$ca_cert_file" -noout -modulus | cut -d'=' -f2 | xxd -r -p | base64 | tr -d "=\n" | tr '/+' '_-')
+
+            if [ "$first_key" = false ]; then
+                echo "," >> trust_bundles.json
+            fi
+            first_key=false
+
+            cat <<EOF >> trust_bundles.json
+        {
+          "kty": "RSA",
+          "use": "x509-svid",
+          "x5c": [
+            "$base64_der"
+          ],
+          "n": "$modulus",
+          "e": "AQAB"
+        }
+EOF
+        done
+
+        echo "      ]" >> trust_bundles.json
+    done
+
+    echo "    }" >> trust_bundles.json
+    echo "  }" >> trust_bundles.json
+    echo "}" >> trust_bundles.json
+}
+
 # $1=<CA name> $2=[issuer name]
 generate_ca() {
     local extra_args=()
@@ -397,6 +457,8 @@ generate_x509_cert spiffe_san ca
 
 generate_rsa_key non_spiffe_san
 generate_x509_cert non_spiffe_san ca
+
+generate_spiffe_trust_bundle_mapping "example.com" "ca_cert.pem" 12035488 "lyft.com" "ca_cert.pem" 12035489
 
 cp -f spiffe_san_cert.cfg expired_spiffe_san_cert.cfg
 generate_rsa_key expired_spiffe_san
