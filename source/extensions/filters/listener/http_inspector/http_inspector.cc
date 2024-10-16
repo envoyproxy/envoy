@@ -24,7 +24,7 @@ Config::Config(Stats::Scope& scope)
 const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config), no_op_callbacks_() {
-  // Filter for only Request Message types with NoOp callbacks
+  // Filter for only Request Message types with NoOp Parser callbacks.
   parser_ = std::make_unique<Http::Http1::LegacyHttpParserImpl>(Http::Http1::MessageType::Request,
                                                                 &no_op_callbacks_);
 }
