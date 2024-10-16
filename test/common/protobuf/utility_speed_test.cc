@@ -62,10 +62,7 @@ static void bmHashByDeterministicHash(benchmark::State& state,
   benchmark::DoNotOptimize(hash);
 }
 BENCHMARK_CAPTURE(bmHashByDeterministicHash, map, testProtoWithMaps());
-BENCHMARK_CAPTURE(bmHashByTextFormat, map, testProtoWithMaps());
 BENCHMARK_CAPTURE(bmHashByDeterministicHash, recursion, testProtoWithRecursion());
-BENCHMARK_CAPTURE(bmHashByTextFormat, recursion, testProtoWithRecursion());
 BENCHMARK_CAPTURE(bmHashByDeterministicHash, repeatedFields, testProtoWithRepeatedFields());
-BENCHMARK_CAPTURE(bmHashByTextFormat, repeatedFields, testProtoWithRepeatedFields());
 
 } // namespace Envoy
