@@ -18,7 +18,7 @@ new_features:
     Added support for P-384 and P-521 curves for TLS server certificates.
 - area: ip-tagging
   change: |
-    Adds support for specifying an alternate header for appending IP tags via ip-tagging filter instead
+    Adds support for specifying an alternate header :ref:`ip_tag_header <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>` for appending IP tags via ip-tagging filter instead
     of using the default header ``x-envoy-ip-tags``.
 
 deprecated:

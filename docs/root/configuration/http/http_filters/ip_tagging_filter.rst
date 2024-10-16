@@ -3,8 +3,8 @@
 IP Tagging
 ==========
 
-The HTTP IP Tagging filter sets the header *x-envoy-ip-tags* if the alternate ``ip_tag_header`` is not provided
-with the string tags for the trusted address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+The HTTP IP Tagging filter sets the header *x-envoy-ip-tags* if the alternate :ref: `ip_tag_header <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+is not provided with the string tags for the trusted address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 If there are no tags for an address, the header is not set.
 
 The implementation for IP Tagging provides a scalable way to compare an IP address to a large list of CIDR
