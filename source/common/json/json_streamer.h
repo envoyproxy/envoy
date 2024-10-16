@@ -67,6 +67,63 @@ public:
   std::string& buffer_;
 };
 
+// Helper class to write value to output buffer in JSON style. This class
+// provides a low-level API to operate on the output buffer.
+template <class OutputBufferType> class SerializerBase {
+public:
+  template <class T> explicit SerializerBase(T& output) : output_buffer_(output) {}
+
+  // Methods that be used to add JSON delimiter to output buffer.
+  void addMapBeginDelimiter() { output_buffer_.add(Json::Constants::MapBegin); }
+  void addMapEndDelimiter() { output_buffer_.add(Json::Constants::MapEnd); }
+  void addArrayBeginDelimiter() { output_buffer_.add(Json::Constants::ArrayBegin); }
+  void addArrayEndDelimiter() { output_buffer_.add(Json::Constants::ArrayEnd); }
+  void addElementsDelimiter() { output_buffer_.add(Json::Constants::Comma); }
+  void addKeyValueDelimiter() { output_buffer_.add(Json::Constants::Colon); }
+
+  // Methods that be used to add JSON key or value to output buffer.
+  void addString(absl::string_view value) { addSanitized(R"(")", value, R"(")"); }
+
+  /**
+   * Serializes a number.
+   */
+  void addNumber(double d) {
+    if (std::isnan(d)) {
+      output_buffer_.add(Json::Constants::Null);
+    } else {
+      Buffer::Util::serializeDouble(d, output_buffer_);
+    }
+  }
+  /**
+   * Serializes a integer number.
+   * NOTE: All numbers in JSON is float. When loading output of this serializer, the parser's
+   * implementation decides if the full precision of big integer could be preserved or not.
+   * See discussion here https://stackoverflow.com/questions/13502398/json-integers-limit-on-size
+   * and spec https://www.rfc-editor.org/rfc/rfc7159#section-6 for more details.
+   */
+  void addNumber(uint64_t i) { output_buffer_.add(absl::StrCat(i)); }
+  void addNumber(int64_t i) { output_buffer_.add(absl::StrCat(i)); }
+
+  /**
+   * Serializes a boolean.
+   */
+  void addBool(bool b) { output_buffer_.add(b ? Json::Constants::True : Json::Constants::False); }
+
+  /**
+   * Serializes a null.
+   */
+  void addNull() { output_buffer_.add(Json::Constants::Null); }
+
+  // Low-level methods that be used to provide a low-level control to buffer.
+  void addSanitized(absl::string_view prefix, absl::string_view value, absl::string_view suffix) {
+    output_buffer_.add(prefix, Json::sanitize(sanitize_buffer_, value), suffix);
+  }
+
+protected:
+  std::string sanitize_buffer_;
+  OutputBufferType output_buffer_;
+};
+
 /**
  * Provides an API for streaming JSON output, as an alternative to populating a
  * JSON structure with an image of what you want to serialize, or using a
@@ -79,7 +136,7 @@ public:
  * add(absl::string_view) and
  * add(absl::string_view, absl::string_view, absl::string_view) methods.
  */
-template <class OutputBufferType> class StreamerBase {
+template <class OutputBufferType> class StreamerBase : public SerializerBase<OutputBufferType> {
 public:
   using Value = absl::variant<absl::string_view, double, uint64_t, int64_t, bool, absl::monostate>;
 
@@ -100,15 +157,12 @@ public:
    */
   class Level {
   public:
-    Level(StreamerBase& streamer, absl::string_view opener, absl::string_view closer)
-        : streamer_(streamer), closer_(closer) {
-      streamer_.addWithoutSanitizing(opener);
+    Level(StreamerBase& streamer) : streamer_(streamer) {
 #ifndef NDEBUG
       streamer_.push(this);
 #endif
     }
     virtual ~Level() {
-      streamer_.addWithoutSanitizing(closer_);
 #ifndef NDEBUG
       streamer_.pop(this);
 #endif
@@ -211,7 +265,7 @@ public:
       if (is_first_) {
         is_first_ = false;
       } else {
-        streamer_.addWithoutSanitizing(",");
+        streamer_.addElementsDelimiter();
       }
     }
 
@@ -262,7 +316,6 @@ public:
   protected:
     bool is_first_{true}; // Used to control whether a comma-separator is added for a new entry.
     StreamerBase& streamer_;
-    absl::string_view closer_;
   };
   using LevelPtr = std::unique_ptr<Level>;
 
@@ -275,7 +328,8 @@ public:
     using NameValue = std::pair<const absl::string_view, Value>;
     using Entries = absl::Span<const NameValue>;
 
-    Map(StreamerBase& streamer) : Level(streamer, "{", "}") {}
+    Map(StreamerBase& streamer) : Level(streamer) { this->streamer_.addMapBeginDelimiter(); }
+    ~Map() override { this->streamer_.addMapEndDelimiter(); }
 
     /**
      * Initiates a new map key. This must be followed by rendering a value,
@@ -326,7 +380,9 @@ public:
    */
   class Array : public Level {
   public:
-    Array(StreamerBase& streamer) : Level(streamer, "[", "]") {}
+    Array(StreamerBase& streamer) : Level(streamer) { this->streamer_.addArrayBeginDelimiter(); }
+    ~Array() override { this->streamer_.addArrayEndDelimiter(); }
+
     using Entries = absl::Span<const Value>;
 
     /**
@@ -367,59 +423,7 @@ public:
     return std::make_unique<Array>(*this);
   }
 
-  /**
-   * Takes a raw string, sanitizes it using JSON syntax, surrounds it
-   * with a prefix and suffix, and streams it out.
-   */
-  void addSanitized(absl::string_view prefix, absl::string_view token, absl::string_view suffix) {
-    absl::string_view sanitized = Json::sanitize(sanitize_buffer_, token);
-    response_.add(prefix, sanitized, suffix);
-  }
-
-  /**
-   * Serializes a string to the output stream. The input string value will be sanitized and
-   * surrounded by quotes.
-   * @param str the string to be serialized.
-   */
-  void addString(absl::string_view str) { addSanitized("\"", str, "\""); }
-
-  /**
-   * Serializes a number.
-   */
-  void addNumber(double d) {
-    if (std::isnan(d)) {
-      response_.add(Constants::Null);
-    } else {
-      Buffer::Util::serializeDouble(d, response_);
-    }
-  }
-  /**
-   * Serializes a integer number.
-   * NOTE: All numbers in JSON is float. When loading output of this serializer, the parser's
-   * implementation decides if the full precision of big integer could be preserved or not.
-   * See discussion here https://stackoverflow.com/questions/13502398/json-integers-limit-on-size
-   * and spec https://www.rfc-editor.org/rfc/rfc7159#section-6 for more details.
-   */
-  void addNumber(uint64_t u) { response_.add(absl::StrCat(u)); }
-  void addNumber(int64_t i) { response_.add(absl::StrCat(i)); }
-
-  /**
-   * Serializes a bool to the output stream.
-   */
-  void addBool(bool b) { response_.add(b ? Constants::True : Constants::False); }
-
-  /**
-   * Serializes a null to the output stream.
-   */
-  void addNull() { response_.add(Constants::Null); }
-
 private:
-  /**
-   * Adds a string to the output stream without sanitizing it. This is only used to push
-   * the delimiters to output buffer.
-   */
-  void addWithoutSanitizing(absl::string_view str) { response_.add(str); }
-
 #ifndef NDEBUG
   /**
    * @return the top Level*. This is used for asserts.
