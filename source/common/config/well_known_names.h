@@ -172,7 +172,7 @@ public:
   const std::string PROXY_PROTOCOL_VERSION = "envoy.proxy_protocol_version";
   // Stats prefix for the proxy protocol listener filter.
   const std::string PROXY_PROTOCOL_PREFIX = "envoy.proxy_protocol_prefix";
-
+  // Stats prefix for ADS connections
   const std::string ADS_CLUSTER_PREFIX = "envoy.ads_cluster_prefix";
 
   // Mapping from the names above to their respective regex strings.

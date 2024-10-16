@@ -485,5 +485,9 @@ new_features:
     WIP: Added implementation of :ref:`client_side_weighted_round_robin
     <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
     load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
+- area: stats ads
+  change: |
+    Fixed metric for ADS disconnection counters, extracting the tag from `grpc.ads_cluster.*` counter stats.
+
 
 deprecated:
