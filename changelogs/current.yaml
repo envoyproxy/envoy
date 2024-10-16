@@ -5,6 +5,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: formatter
+  change: |
+    The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the
+    metadata (``DYNAMIC_METADATA``, ``CLUSTER_METADATA``, etc.) formatter.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
