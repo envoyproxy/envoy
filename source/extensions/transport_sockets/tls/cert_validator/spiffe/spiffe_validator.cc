@@ -117,7 +117,6 @@ std::shared_ptr<SpiffeData> SPIFFEValidator::loadTrustBundles() {
             error = true;
             return false;
           }
-          X509_up_ref(x509.get());
           spiffeDataPtr->ca_certs.push_back(std::move(x509));
         }
       }
