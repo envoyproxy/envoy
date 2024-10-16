@@ -218,6 +218,6 @@ new_features:
     load balancing policy that uses ``OrcaLoadReport`` provided by the upstream host to calculate host load balancing weight.
 - area: stats ads
   change: |
-    Fixed metric for ADS disconnection counters, extracting the tag from `grpc.ads_cluster.*` counter stats.
+    Fixed metric for ADS disconnection counters, extracting the tag from ``grpc.ads_cluster.*`` counter stats.
 
 deprecated:
