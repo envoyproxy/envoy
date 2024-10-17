@@ -128,9 +128,6 @@ private:
   friend class RedisClusterFactory;
   friend class RedisClusterTest;
 
-  friend class RedisClusterTest;
-  friend class RedisClsuterFactory;
-
   void startPreInit() override;
 
   void updateAllHosts(const Upstream::HostVector& hosts_added,
