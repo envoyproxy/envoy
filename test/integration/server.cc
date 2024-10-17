@@ -250,7 +250,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     // This is technically thread unsafe (assigning to a shared_ptr accessed
     // across threads), but because we synchronize below through serverReady(), the only
     // consumer on the main test thread in ~IntegrationTestServerImpl will not race.
-    if (server.admin()) {
+    if (server.admin() && !options.adminAddressPath().empty()) {
       admin_address_ = server.admin()->socket().connectionInfoProvider().localAddress();
     }
     server_ = &server;
