@@ -178,6 +178,7 @@ private:
  */
 #define INLINE_REQ_STRING_HEADERS(HEADER_FUNC)                                                     \
   HEADER_FUNC(ClientTraceId)                                                                       \
+  HEADER_FUNC(EnvoyAllowEarlyData)                                                                 \
   HEADER_FUNC(EnvoyDownstreamServiceCluster)                                                       \
   HEADER_FUNC(EnvoyDownstreamServiceNode)                                                          \
   HEADER_FUNC(EnvoyExternalAddress)                                                                \

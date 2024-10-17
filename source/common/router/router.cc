@@ -761,6 +761,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const bool can_send_early_data =
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
 
+  // Consume the envoy-allow-early-data header so it doesn't get onto the wire.
+  downstream_headers_->removeEnvoyAllowEarlyData();
+
   include_timeout_retry_header_in_request_ = route_->virtualHost().includeIsTimeoutRetryHeader();
 
   // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.

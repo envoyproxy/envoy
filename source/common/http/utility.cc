@@ -1458,6 +1458,10 @@ Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolic
 
 bool Utility::isSafeRequest(const Http::RequestHeaderMap& request_headers) {
   absl::string_view method = request_headers.getMethodValue();
+  auto result = request_headers.get(Headers::get().EnvoyAllowEarlyData);
+  if (!result.empty() && result[0]->value() == "true") {
+    return true;
+  }
   return method == Http::Headers::get().MethodValues.Get ||
          method == Http::Headers::get().MethodValues.Head ||
          method == Http::Headers::get().MethodValues.Options ||
