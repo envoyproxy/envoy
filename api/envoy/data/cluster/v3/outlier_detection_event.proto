@@ -63,6 +63,10 @@ enum OutlierEjectionType {
   // Runs over aggregated success rate statistics for local origin failures from every host in
   // cluster and selects hosts for which ratio of failed replies is above configured value.
   FAILURE_PERCENTAGE_LOCAL_ORIGIN = 6;
+
+  // The host has been ejected by outlier detection extension. Additional information about the ejection
+  // is attached to the event via :ref:`OutlierEjectExtension message <envoy_v3_api_msg_data.cluster.v3.OutlierEjectExtension>`.
+  EXTENSION = 7;
 }
 
 // Represents possible action applied to upstream host
@@ -74,7 +78,7 @@ enum Action {
   UNEJECT = 1;
 }
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message OutlierDetectionEvent {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.cluster.v2alpha.OutlierDetectionEvent";
@@ -114,6 +118,8 @@ message OutlierDetectionEvent {
     OutlierEjectConsecutive eject_consecutive_event = 10;
 
     OutlierEjectFailurePercentage eject_failure_percentage_event = 11;
+
+    OutlierEjectExtension eject_extension_event = 12;
   }
 }
 
@@ -143,4 +149,9 @@ message OutlierEjectFailurePercentage {
 
   // Host's success rate at the time of the ejection event on a 0-100 range.
   uint32 host_success_rate = 1 [(validate.rules).uint32 = {lte: 100}];
+}
+
+message OutlierEjectExtension {
+  // Name of extension monitor which caused a host ejection.
+  string monitor_name = 1 [(validate.rules).string = {min_len: 1}];
 }
