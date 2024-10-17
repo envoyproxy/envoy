@@ -313,7 +313,7 @@ public class JniLibrary {
       long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] filterChain,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
-      byte[][] cares_fallback_resolvers);
+      byte[][] cares_fallback_resolvers, long h3ConnectionKeepaliveInitialIntervalMilliseconds);
 
   /**
    * Initializes c-ares.
