@@ -306,7 +306,8 @@ TEST_F(AppleDnsImplTest, DestructPending) {
 TEST_F(AppleDnsImplTest, LocalLookup) {
   EXPECT_NE(nullptr,
             resolveWithExpectations(
-                "localhost", DnsLookupFamily::Auto, DnsResolver::ResolutionStatus::Completed, true,
+                "localhost", DnsLookupFamily::Auto, DnsResolver::ResolutionStatus::Completed,
+                /* expected_results= */ true, /* exit_dispatcher= */ true,
                 {HasTrace(AppleDnsTrace::Starting), HasTrace(AppleDnsTrace::Success)}));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -761,6 +762,7 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockFileEvent>* file_event_;
   Event::FileReadyCb file_ready_cb_;
+  ActiveDnsQuery* active_dns_query_;
 };
 
 TEST_F(AppleDnsImplFakeApiTest, IncludeUnroutableFamiliesConfigFalse) {
