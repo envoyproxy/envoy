@@ -374,6 +374,14 @@ protected:
   Http::HeaderMap* getMap(WasmHeaderMapType type);
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);
 
+  void onHeadersModified(WasmHeaderMapType type) {
+    if (type == WasmHeaderMapType::RequestHeaders) {
+      if (!no_automatic_route_refresh_) {
+        clearRouteCache();
+      }
+    }
+  }
+
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
   PluginHandleSharedPtr plugin_handle_{nullptr};
 
@@ -450,6 +458,9 @@ protected:
   // Filter state prototype declaration.
   absl::flat_hash_map<std::string, Filters::Common::Expr::CelStatePrototypeConstPtr>
       state_prototypes_;
+
+  const bool no_automatic_route_refresh_{
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_no_automatic_route_refresh")};
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 
