@@ -220,11 +220,11 @@ Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_desc
              : used_config_->requestAllowed(request_descriptors);
 }
 
-const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
+Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
   ASSERT(used_config_->rateLimitPerConnection());
 
   auto typed_state =
-      decoder_callbacks_->streamInfo().filterState()->getDataReadOnly<PerConnectionRateLimiter>(
+      decoder_callbacks_->streamInfo().filterState()->getDataMutable<PerConnectionRateLimiter>(
           PerConnectionRateLimiter::key());
 
   if (typed_state == nullptr) {

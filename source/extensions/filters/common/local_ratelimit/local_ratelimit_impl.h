@@ -70,9 +70,11 @@ public:
 class RateLimitTokenBucket : public TokenBucketContext {
 public:
   virtual bool consume(double factor = 1.0) PURE;
+  virtual bool isIdle() PURE;
   virtual void onFillTimer(uint64_t refill_counter, double factor = 1.0) PURE;
   virtual std::chrono::milliseconds fillInterval() const PURE;
   virtual double fillRate() const PURE;
+  virtual uint64_t multiplier() const { return 1; }
 };
 using RateLimitTokenBucketSharedPtr = std::shared_ptr<RateLimitTokenBucket>;
 
@@ -87,9 +89,11 @@ public:
 
   // RateLimitTokenBucket
   bool consume(double factor) override;
+  bool isIdle() override { return false; /* TODO: implement*/ }
   void onFillTimer(uint64_t refill_counter, double factor) override;
   std::chrono::milliseconds fillInterval() const override { return fill_interval_; }
   double fillRate() const override { return fill_rate_; }
+  uint64_t multiplier() const override { return multiplier_; }
   uint32_t maxTokens() const override { return max_tokens_; }
   uint32_t remainingTokens() const override { return tokens_.load(); }
   absl::optional<int64_t> remainingFillInterval() const override;
@@ -109,15 +113,17 @@ public:
   const double fill_rate_{};
 };
 
-class AtomicTokenBucket : public RateLimitTokenBucket {
+class AtomicTokenBucket : public RateLimitTokenBucket,
+                          public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   AtomicTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
                     std::chrono::milliseconds fill_interval, TimeSource& time_source);
 
   // RateLimitTokenBucket
   bool consume(double factor) override;
+  bool isIdle() override;
   void onFillTimer(uint64_t, double) override {}
-  std::chrono::milliseconds fillInterval() const override { return {}; }
+  std::chrono::milliseconds fillInterval() const override { return fill_interval_; }
   double fillRate() const override { return token_bucket_.fillRate(); }
   uint32_t maxTokens() const override { return static_cast<uint32_t>(token_bucket_.maxTokens()); }
   uint32_t remainingTokens() const override {
@@ -127,9 +133,10 @@ public:
 
 private:
   AtomicTokenBucketImpl token_bucket_;
+  const std::chrono::milliseconds fill_interval_;
 };
 
-class LocalRateLimiterImpl {
+class LocalRateLimiterImpl : public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   struct Result {
     bool allowed{};
@@ -145,16 +152,26 @@ public:
       ShareProviderSharedPtr shared_provider = nullptr);
   ~LocalRateLimiterImpl();
 
-  Result requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  Result requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
 private:
   void onFillTimer();
+  bool compareDescriptorEntries(const std::vector<RateLimit::DescriptorEntry>& request_entries,
+                                const std::vector<RateLimit::DescriptorEntry>& user_entries,
+                                std::vector<RateLimit::DescriptorEntry>& new_descriptor_entries);
+  void onDynDescIdleTimer();
 
   RateLimitTokenBucketSharedPtr default_token_bucket_;
 
   const Event::TimerPtr fill_timer_;
+  const Event::TimerPtr dynamic_desc_idle_timer_;
   TimeSource& time_source_;
   RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> descriptors_;
+
+  mutable absl::Mutex dyn_desc_lock_;
+  RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr>
+      dynamic_descriptors_ ABSL_GUARDED_BY(dyn_desc_lock_);
+
   // Refill counter is incremented per each refill timer hit.
   uint64_t refill_counter_{0};
 
