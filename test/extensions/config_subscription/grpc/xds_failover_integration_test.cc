@@ -575,6 +575,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
 
 // Validate that once failover responds, and then disconnects, primary will be attempted.
 TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconnect) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.xds_failover_to_primary_enabled",
+                                    "true");
   // These tests are not executed with GoogleGrpc because they are flaky due to
   // the large timeout values for retries.
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
@@ -692,6 +694,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
 // still doesn't respond, failover will be attempted with the correct
 // initial_resource_versions.
 TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconnect) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.xds_failover_to_primary_enabled",
+                                    "true");
   // These tests are not executed with GoogleGrpc because they are flaky due to
   // the large timeout values for retries.
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
@@ -814,6 +818,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
 // both are not responding.
 TEST_P(XdsFailoverAdsIntegrationTest,
        PrimaryAndFailoverAttemptsAfterFailoverResponseAndDisconnect) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.xds_failover_to_primary_enabled",
+                                    "true");
   // These tests are not executed with GoogleGrpc because they are flaky due to
   // the large timeout values for retries.
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
