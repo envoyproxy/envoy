@@ -189,7 +189,7 @@ void TestServer::start(TestServerType type, int port) {
     test_server_ = IntegrationTestServer::create(
         "", version_, nullptr, nullptr, {}, time_system_, *api_, false, absl::nullopt,
         Server::FieldValidationConfig(), 1, std::chrono::seconds(1), Server::DrainStrategy::Gradual,
-        nullptr, false, false, baseProxyConfig(version_, true, port_));
+        nullptr, false, false, baseProxyConfig(version_, true, port_), false);
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Http proxy is now running");
     return;
@@ -204,7 +204,7 @@ void TestServer::start(TestServerType type, int port) {
     test_server_ = IntegrationTestServer::create(
         "", version_, nullptr, nullptr, {}, time_system_, *api_, false, absl::nullopt,
         Server::FieldValidationConfig(), 1, std::chrono::seconds(1), Server::DrainStrategy::Gradual,
-        nullptr, false, false, baseProxyConfig(version_, false, port_));
+        nullptr, false, false, baseProxyConfig(version_, false, port_), false);
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Https proxy is now running");
     return;
