@@ -125,7 +125,7 @@ index 66819966b..446d75420 100644
  )
  
 diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
-index 37d80e591..2b1be2afc 100644
+index 37d80e591..c17f61a76 100644
 --- a/src/google/protobuf/port_def.inc
 +++ b/src/google/protobuf/port_def.inc
 @@ -856,7 +856,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
@@ -143,7 +143,7 @@ index 37d80e591..2b1be2afc 100644
  
 -#if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
 +#if defined(PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII) && \
-+    update_protobuf_patch_gcc_warning_undef
++  PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
  #define PROTOBUF_DEBUG true
  #else
  #define PROTOBUF_DEBUG false
