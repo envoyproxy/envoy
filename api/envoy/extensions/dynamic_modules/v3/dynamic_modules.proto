@@ -34,8 +34,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // Currently, the implementation is work in progress and not usable.
 message DynamicModuleConfig {
-  // The name of the dynamic module. Envoy searches for the shared object with this name in the module search path.
-  // Currently, the search path can only be configured via the environment variable ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``.
+  // The name of the dynamic module. The client is expected to have some configuration indicating where to search for the module.
+  // In Envoy, the search path can only be configured via the environment variable ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``.
   // The actual search path is ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``. TODO: make the search path configurable via
   // command line options.
   string name = 1 [(validate.rules).string = {min_len: 1}];
