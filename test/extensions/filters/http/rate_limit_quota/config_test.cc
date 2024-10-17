@@ -1,10 +1,14 @@
+#include <memory>
+#include <string>
+
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
-#include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
-#include "envoy/type/v3/percent.pb.h"
+#include "envoy/http/filter_factory.h"
 
 #include "source/extensions/filters/http/rate_limit_quota/config.h"
 
-#include "test/mocks/server/factory_context.h"
+#include "test/extensions/filters/http/rate_limit_quota/client_test_utils.h"
+#include "test/mocks/http/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -46,13 +50,18 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
   )EOF";
   envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig filter_config;
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  RateLimitQuotaFilterFactory factory;
-  std::string stats_prefix = "test";
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix, context);
+
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
+  // Handle the global client's creation by expecting the underlying async grpc
+  // client creation. getOrThrow fails otherwise.
+  auto mock_stream_client = std::make_unique<RateLimitTestClient>();
+  mock_stream_client->expectClientCreation();
+
+  RateLimitQuotaFilterFactory factory;
+  std::string stats_prefix = "test";
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProtoTyped(
+      filter_config, stats_prefix, mock_stream_client->context_);
   cb(filter_callback);
 }
 
