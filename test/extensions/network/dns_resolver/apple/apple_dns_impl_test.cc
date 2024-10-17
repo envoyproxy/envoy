@@ -548,7 +548,7 @@ TEST_F(AppleDnsImplTest, NonExistentDomain) {
 }
 
 TEST_F(AppleDnsImplTest, LocalResolution) {
-  active_dns_query_ =
+  auto pending_resolution =
       resolver_->resolve("0.0.0.0", DnsLookupFamily::Auto,
                          [](DnsResolver::ResolutionStatus status, absl::string_view details,
                             std::list<DnsResponse>&& results) -> void {
@@ -558,7 +558,7 @@ TEST_F(AppleDnsImplTest, LocalResolution) {
                            EXPECT_EQ("0.0.0.0:0", results.front().addrInfo().address_->asString());
                            EXPECT_EQ(std::chrono::seconds(60), results.front().addrInfo().ttl_);
                          });
-  EXPECT_EQ(nullptr, active_dns_query_);
+  EXPECT_EQ(nullptr, pending_resolution);
   // Note that the dispatcher does NOT have to run because resolution is synchronous.
 }
 
@@ -630,20 +630,16 @@ public:
 
     // The returned value is nullptr because the query has already been fulfilled. Verify that the
     // callback ran via notification.
-    active_dns_query_ = resolver_->resolve(
-        hostname, Network::DnsLookupFamily::Auto,
-        [&dns_callback_executed, this](DnsResolver::ResolutionStatus status,
-                                       absl::string_view details,
-                                       std::list<DnsResponse>&& responses) -> void {
-          EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-          EXPECT_THAT(details, StartsWith("apple_dns_error"));
-          std::vector<std::string> traces = absl::StrSplit(active_dns_query_->getTraces(), ',');
-          EXPECT_THAT(traces, ElementsAre(HasTrace(AppleDnsTrace::Starting),
-                                          HasTrace(AppleDnsTrace::Failed)));
-          EXPECT_TRUE(responses.empty());
-          dns_callback_executed.Notify();
-        });
-    EXPECT_EQ(nullptr, active_dns_query_);
+    EXPECT_EQ(nullptr, resolver_->resolve(
+                           hostname, Network::DnsLookupFamily::Auto,
+                           [&dns_callback_executed](DnsResolver::ResolutionStatus status,
+                                                    absl::string_view details,
+                                                    std::list<DnsResponse>&& responses) -> void {
+                             EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+                             EXPECT_THAT(details, StartsWith("apple_dns_error"));
+                             EXPECT_TRUE(responses.empty());
+                             dns_callback_executed.Notify();
+                           }));
     dns_callback_executed.WaitForNotification();
     checkErrorStat(error_code);
   }
@@ -833,17 +829,22 @@ TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
 
-  auto query = resolver_->resolve(
-      hostname, Network::DnsLookupFamily::Auto,
-      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view details,
-                               std::list<DnsResponse>&& response) -> void {
-        EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-        EXPECT_EQ(details, "");
-        EXPECT_EQ(0, response.size());
-        dns_callback_executed.Notify();
-      });
+  active_dns_query_ =
+      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
+                         [&dns_callback_executed, this](DnsResolver::ResolutionStatus status,
+                                                        absl::string_view details,
+                                                        std::list<DnsResponse>&& response) -> void {
+                           EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+                           EXPECT_EQ(details, "");
+                           std::vector<std::string> traces =
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
+                           EXPECT_THAT(traces, ElementsAre(HasTrace(AppleDnsTrace::Starting),
+                                                           HasTrace(AppleDnsTrace::Failed)));
+                           EXPECT_EQ(0, response.size());
+                           dns_callback_executed.Notify();
+                         });
 
-  EXPECT_NE(nullptr, query);
+  EXPECT_NE(nullptr, active_dns_query_);
 
   EXPECT_DEATH(file_ready_cb_(2).IgnoreError(), "invalid FileReadyType event=2");
 }
@@ -870,17 +871,22 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInProcessResult) {
   EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
       .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
 
-  auto query = resolver_->resolve(
-      hostname, Network::DnsLookupFamily::Auto,
-      [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view details,
-                               std::list<DnsResponse>&& response) -> void {
-        EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
-        EXPECT_THAT(details, StartsWith("apple_dns_error"));
-        EXPECT_EQ(0, response.size());
-        dns_callback_executed.Notify();
-      });
+  active_dns_query_ =
+      resolver_->resolve(hostname, Network::DnsLookupFamily::Auto,
+                         [&dns_callback_executed, this](DnsResolver::ResolutionStatus status,
+                                                        absl::string_view details,
+                                                        std::list<DnsResponse>&& response) -> void {
+                           EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
+                           EXPECT_THAT(details, StartsWith("apple_dns_error"));
+                           std::vector<std::string> traces =
+                               absl::StrSplit(active_dns_query_->getTraces(), ',');
+                           EXPECT_THAT(traces, ElementsAre(HasTrace(AppleDnsTrace::Starting),
+                                                           HasTrace(AppleDnsTrace::Failed)));
+                           EXPECT_EQ(0, response.size());
+                           dns_callback_executed.Notify();
+                         });
 
-  EXPECT_NE(nullptr, query);
+  EXPECT_NE(nullptr, active_dns_query_);
 
   // Error in processing will cause the connection to the DNS server to be reset.
   EXPECT_CALL(dns_service_, dnsServiceProcessResult(_)).WillOnce(Return(kDNSServiceErr_Unknown));
