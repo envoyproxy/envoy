@@ -154,7 +154,4 @@ message OutlierEjectFailurePercentage {
 message OutlierEjectExtension {
   // Name of extension monitor which caused a host ejection.
   string monitor_name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Any extra info an extension monitor wants to add when a host is ejected.
-  string extra_info = 2;
 }
