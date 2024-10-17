@@ -646,7 +646,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     Network::Socket::appendOptions(upstream_options_, callbacks_->getUpstreamSocketOptions());
   }
 
-  std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);
+  std::shared_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster);
 
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse();
@@ -823,7 +823,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-std::unique_ptr<GenericConnPool>
+std::shared_ptr<GenericConnPool>
 Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
@@ -852,7 +852,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   }
   return factory->createGenericConnPool(thread_local_cluster, upstream_protocol,
                                         route_entry_->priority(),
-                                        callbacks_->streamInfo().protocol(), this);
+                                        callbacks_->streamInfo().protocol(), this, cluster_->upstreamConfig()->typed_config());
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
@@ -2020,7 +2020,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 
   // Clusters can technically get removed by CDS during a retry. Make sure it still exists.
   const auto cluster = config_->cm_.getThreadLocalCluster(route_entry_->clusterName());
-  std::unique_ptr<GenericConnPool> generic_conn_pool;
+  std::shared_ptr<GenericConnPool> generic_conn_pool;
   if (cluster != nullptr) {
     cluster_ = cluster->info();
     generic_conn_pool = createConnPool(*cluster);
