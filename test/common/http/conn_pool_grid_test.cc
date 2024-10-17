@@ -167,8 +167,6 @@ public:
         quic_stat_names_(store_.symbolTable()) {
     ON_CALL(factory_context_.server_context_, threadLocal())
         .WillByDefault(ReturnRef(thread_local_));
-    ON_CALL(factory_context_.server_context_, threadLocal())
-        .WillByDefault(ReturnRef(thread_local_));
     // Make sure we test happy eyeballs code.
     address_list_ = {*Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
                      *Network::Utility::resolveUrl("tcp://[::]:9000")};
