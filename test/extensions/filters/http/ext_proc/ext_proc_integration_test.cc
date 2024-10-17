@@ -5094,7 +5094,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
       body_received = absl::StrCat(body_received, request.request_body().body());
       total_req_body_msg++;
       // After receiving every 4 body chunks, the server sends back a body response with
-      // chunks_received field set to 4 to notify Envoy how many body chunnks are received.
+      // chunks_received field set to 4 to notify Envoy how many body chunks are received.
       if (total_req_body_msg % body_chunks == 0) {
         if (!header_resp_sent) {
           // Before sending the 1st body response, sends a header response.
