@@ -50,7 +50,8 @@ private:
 using DynamicModuleSharedPtr = std::shared_ptr<DynamicModule>;
 
 /**
- * Creates a new DynamicModule.
+ * Creates a new DynamicModule. This is mainly exposed for testing purposes. Use
+ * newDynamicModuleByName in wiring up dynamic modules.
  * @param object_file_path the path to the object file to load.
  * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
  * will not be destroyed. This is useful when an object has some global state that should not be
@@ -59,6 +60,18 @@ using DynamicModuleSharedPtr = std::shared_ptr<DynamicModule>;
  */
 absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view object_file_path,
                                                         const bool do_not_close);
+
+/**
+ * Creates a new DynamicModule by name under the search path specified by the environment variable
+ * `DYNAMIC_MODULES_SEARCH_PATH`. The file name is assumed to be `lib<module_name>.so`.
+ * This is mostly a wrapper around newDynamicModule.
+ * @param module_name the name of the module to load.
+ * @param do_not_close if true, the dlopen will be called with RTLD_NODELETE, so the loaded object
+ * will not be destroyed. This is useful when an object has some global state that should not be
+ * terminated.
+ */
+absl::StatusOr<DynamicModuleSharedPtr> newDynamicModuleByName(const absl::string_view module_name,
+                                                              const bool do_not_close);
 
 } // namespace DynamicModules
 } // namespace Extensions
