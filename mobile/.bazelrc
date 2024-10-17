@@ -108,7 +108,7 @@ build:mobile-remote-release-clang --config=ci
 build:mobile-remote-release-clang --config=remote
 
 build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
-build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
+# build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
 build:mobile-remote-release-clang-android --linkopt=-fuse-ld=lld
 
 build:mobile-remote-release-clang-android-publish --config=mobile-remote-release-clang
