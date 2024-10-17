@@ -462,7 +462,7 @@ TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
   waitForNextUpstreamRequest();
   EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::DownstreamPeriodic),
-            waitForAccessLog(access_log_name_));
+            waitForAccessLog(access_log_name_, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
