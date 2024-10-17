@@ -23,7 +23,9 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
@@ -89,6 +91,31 @@ protected:
 };
 
 namespace {
+
+// Usually, the factory is in charge of parsing the cluster config and creating the DNS cluster,
+// but we can't use a factory to create because we need to inject out mock DNS resolver.
+absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
+makeStrictDnsClusterFromDnsResolver(const envoy::config::cluster::v3::Cluster& cluster_config,
+                                    ClusterFactoryContext& factory_context,
+                                    std::shared_ptr<Network::DnsResolver> dns_resolver) {
+  envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
+
+  if (cluster_config.has_cluster_type()) {
+    ProtobufTypes::MessagePtr dns_cluster_msg =
+        std::make_unique<envoy::extensions::clusters::dns::v3::DnsCluster>();
+    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
+                                           factory_context.messageValidationVisitor(),
+                                           *dns_cluster_msg);
+    dns_cluster =
+        MessageUtil::downcastAndValidate<const envoy::extensions::clusters::dns::v3::DnsCluster&>(
+            *dns_cluster_msg, factory_context.messageValidationVisitor());
+
+  } else {
+    createDnsClusterFromLegacyFields(cluster_config, dns_cluster);
+  }
+  return StrictDnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver);
+}
+
 std::list<std::string> hostListToAddresses(const HostVector& hosts) {
   std::list<std::string> addresses;
   for (const HostSharedPtr& host : hosts) {
@@ -195,11 +222,12 @@ public:
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
     if (numerator <= 100) {
-      auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+      auto cluster =
+          *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver);
       EXPECT_EQ(drop_ratio, cluster->dropOverload().value());
     } else {
       EXPECT_EQ(
-          StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
+          makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver)
               .status()
               .message(),
           fmt::format("load_balancing_policy.drop_overload_limit runtime key config {} is invalid. "
@@ -244,8 +272,8 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
-
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver);
   cluster->initialize([&]() -> void { initialized.ready(); });
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -273,7 +301,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver);
   EXPECT_EQ(0.000035f, cluster->dropOverload().value());
   EXPECT_EQ("test", cluster->dropCategory());
 }
@@ -300,7 +329,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver);
   EXPECT_EQ(0.1f, cluster->dropOverload().value());
   EXPECT_EQ("foo", cluster->dropCategory());
 }
@@ -328,7 +358,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  EXPECT_EQ(StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
+  EXPECT_EQ(makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver)
                 .status()
                 .message(),
             "Cluster drop_overloads config denominator setting is invalid : 4. Valid range 0~2.");
@@ -358,7 +388,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
   EXPECT_EQ(
-      StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
+      makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver)
           .status()
           .message(),
       "Cluster drop_overloads config is invalid. drop_ratio=2(Numerator 200 / Denominator 100). "
@@ -390,7 +420,7 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  EXPECT_EQ(StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
+  EXPECT_EQ(makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver)
                 .status()
                 .message(),
             "Cluster drop_overloads config has 2 categories. Envoy only support one.");
@@ -437,7 +467,8 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
   EXPECT_CALL(initialized, ready());
   cluster->initialize([&]() -> void { initialized.ready(); });
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -470,7 +501,8 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
@@ -514,7 +546,8 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   ReadyWatcher initialized;
 
@@ -595,7 +628,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43))
       .Times(AnyNumber());
@@ -764,7 +798,8 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
@@ -824,7 +859,8 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
@@ -903,7 +939,8 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
@@ -1017,7 +1054,8 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
   EXPECT_EQ(43U, cluster->info()->resourceManager(ResourcePriority::Default).connections().max());
@@ -1261,7 +1299,8 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
@@ -1380,7 +1419,8 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
       false);
 
   EXPECT_THROW_WITH_MESSAGE(
-      auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_),
+      auto cluster =
+          *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_),
       EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
 }
 
@@ -1412,7 +1452,8 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   cluster->initialize([] {});
 
@@ -1460,7 +1501,8 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
@@ -1517,7 +1559,8 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
 
   cluster->initialize([] {});
 
@@ -1586,7 +1629,8 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
       false);
 
   EXPECT_THROW_WITH_REGEX(
-      auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_),
+      auto cluster =
+          *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_),
       EnvoyException,
       R"(the \{hpack_table_size\} HTTP/2 SETTINGS parameter\(s\) can not be configured through)"
       " both");
@@ -3802,7 +3846,8 @@ TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver);
 
   EXPECT_TRUE(cluster->info()->features() &
               ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE);
@@ -4013,7 +4058,7 @@ public:
         false);
 
     return THROW_OR_RETURN_VALUE(
-        StrictDnsClusterImpl::create(cluster_config_, factory_context, dns_resolver_),
+        makeStrictDnsClusterFromDnsResolver(cluster_config_, factory_context, dns_resolver_),
         std::unique_ptr<StrictDnsClusterImpl>);
   }
 
