@@ -4,7 +4,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/common/protobuf/deterministic_hash_test.pb.h"
-#include "test/test_common/test_runtime.h"
 
 #include "benchmark/benchmark.h"
 
@@ -53,21 +52,8 @@ static std::unique_ptr<Protobuf::Message> testProtoWithRepeatedFields() {
   return msg;
 }
 
-static void bmHashByTextFormat(benchmark::State& state, std::unique_ptr<Protobuf::Message> msg) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "false"}});
-  uint64_t hash = 0;
-  for (auto _ : state) {
-    UNREFERENCED_PARAMETER(_);
-    hash += MessageUtil::hash(*msg);
-  }
-  benchmark::DoNotOptimize(hash);
-}
-
 static void bmHashByDeterministicHash(benchmark::State& state,
                                       std::unique_ptr<Protobuf::Message> msg) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", "true"}});
   uint64_t hash = 0;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
@@ -76,10 +62,7 @@ static void bmHashByDeterministicHash(benchmark::State& state,
   benchmark::DoNotOptimize(hash);
 }
 BENCHMARK_CAPTURE(bmHashByDeterministicHash, map, testProtoWithMaps());
-BENCHMARK_CAPTURE(bmHashByTextFormat, map, testProtoWithMaps());
 BENCHMARK_CAPTURE(bmHashByDeterministicHash, recursion, testProtoWithRecursion());
-BENCHMARK_CAPTURE(bmHashByTextFormat, recursion, testProtoWithRecursion());
 BENCHMARK_CAPTURE(bmHashByDeterministicHash, repeatedFields, testProtoWithRepeatedFields());
-BENCHMARK_CAPTURE(bmHashByTextFormat, repeatedFields, testProtoWithRepeatedFields());
 
 } // namespace Envoy

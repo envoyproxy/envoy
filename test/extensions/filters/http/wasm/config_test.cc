@@ -268,7 +268,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   TestUtility::loadFromYaml(invalid_yaml, proto_config);
   WasmFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
   const std::string valid_yaml =
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
@@ -337,7 +337,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineBadCode) {
   TestUtility::loadFromYaml(yaml, proto_config);
   WasmFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
@@ -430,7 +430,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
           }));
 
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher_, ready());
   initializeContextInitManager(init_watcher_);
@@ -506,10 +506,10 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 
   // Case 1: fail and fetch in the background, got 503, cache failure.
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
   // Fail a second time because we are in-progress.
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
   async_callbacks->onSuccess(
       request, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
@@ -524,7 +524,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 
   setupContextInitManager(init_manager2);
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher2, ready());
   init_manager2.initialize(init_watcher2);
@@ -552,7 +552,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   setupContextInitManager(init_manager3);
 
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher3, ready());
   init_manager3.initialize(init_watcher3);
@@ -609,7 +609,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   setupContextInitManager(init_manager5);
 
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config2, factory).status().IgnoreError(),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher_, ready());
   initializeContextInitManager(init_watcher_);
@@ -967,7 +967,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpen) {
   cb(filter_callback);
 }
 
-TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
+TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmcreateContext) {
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -1008,7 +1008,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   setupContextServerFactoryThreadLocal(threadlocal);
   threadlocal.registered_ = false;
   auto filter_config = getFilterConfig(proto_config);
-  EXPECT_EQ(filter_config->createFilter(), nullptr);
+  EXPECT_EQ(filter_config->createContext(), nullptr);
   EXPECT_CALL(init_watcher_, ready());
   initializeContextInitManager(init_watcher_);
   auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
@@ -1017,7 +1017,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   async_callbacks->onSuccess(request, std::move(response));
   EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   threadlocal.registered_ = true;
-  EXPECT_NE(filter_config->createFilter(), nullptr);
+  EXPECT_NE(filter_config->createContext(), nullptr);
 }
 
 TEST_P(WasmFilterConfigTest, FailedToGetThreadLocalPlugin) {
@@ -1042,11 +1042,12 @@ TEST_P(WasmFilterConfigTest, FailedToGetThreadLocalPlugin) {
   threadlocal.registered_ = true;
   auto filter_config = getFilterConfig(proto_config);
   ASSERT_EQ(threadlocal.current_slot_, 1);
-  ASSERT_NE(filter_config->createFilter(), nullptr);
+  ASSERT_NE(filter_config->createContext(), nullptr);
 
-  // If the thread local plugin handle returns nullptr, `createFilter` should return nullptr
-  threadlocal.data_[0] = std::make_shared<PluginHandleSharedPtrThreadLocal>(nullptr);
-  EXPECT_EQ(filter_config->createFilter(), nullptr);
+  // If the thread local plugin handle returns nullptr, `createContext` should return nullptr
+  threadlocal.data_[0] =
+      std::make_shared<Extensions::Common::Wasm::PluginHandleSharedPtrThreadLocal>(nullptr);
+  EXPECT_EQ(filter_config->createContext(), nullptr);
 }
 
 } // namespace Wasm
