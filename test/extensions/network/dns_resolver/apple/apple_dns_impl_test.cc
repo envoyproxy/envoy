@@ -27,6 +27,8 @@
 
 using testing::_;
 using testing::DoAll;
+using testing::ElementsAre;
+using testing::ElementsAreArray;
 using testing::IsNull;
 using testing::NiceMock;
 using testing::NotNull;
