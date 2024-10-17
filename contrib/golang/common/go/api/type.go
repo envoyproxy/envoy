@@ -450,3 +450,63 @@ var (
 )
 
 // *************** errors end **************//
+
+ // Status codes returned by tcp upstream that can deal with data.
+ type UpstreamDataStatus int
+ 
+ const (
+	 // Continue to deal with further data.
+	 UpstreamDataContinue UpstreamDataStatus = 0
+	 // Finish dealing with data.
+	 UpstreamDataFinish UpstreamDataStatus = 1
+	 // Failure when dealing with data.
+	 UpstreamDataFailure UpstreamDataStatus = 2
+ )
+ 
+ func (s UpstreamDataStatus) String() string {
+	 switch s {
+	 case UpstreamDataContinue:
+		 return "Continue"
+	 case UpstreamDataFinish:
+		 return "Finish"
+	 case UpstreamDataFailure:
+		 return "Failure"
+	 }
+	 return "unknown"
+ }
+ 
+ // Info types called by tcp upstream that can get the corresponding info from c++ side.
+ type TcpUpstreamInfoType int
+ 
+ const (
+	 TcpUpstreamInfoRouterName  TcpUpstreamInfoType = 0
+	 TcpUpstreamInfoClusterName TcpUpstreamInfoType = 1
+ )
+ 
+ func (t TcpUpstreamInfoType) String() string {
+	 switch t {
+	 case TcpUpstreamInfoRouterName:
+		 return "TcpUpstreamInfoRouterName"
+	 case TcpUpstreamInfoClusterName:
+		 return "TcpUpstreamInfoClusterName"
+	 }
+	 return "unknown"
+ }
+ 
+ type EndStreamType int
+ 
+ const (
+	 NotEndStream EndStreamType = 0
+	 EndStream    EndStreamType = 1
+ )
+ 
+ func (t EndStreamType) String() string {
+	 switch t {
+	 case NotEndStream:
+		 return "NotEndStream"
+	 case EndStream:
+		 return "EndStream"
+	 }
+	 return "unknown"
+ }
+ 

@@ -79,10 +79,10 @@ public:
 };
 
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
-                                 std::unique_ptr<GenericConnPool>&& conn_pool,
+                                 std::shared_ptr<GenericConnPool>&& conn_pool,
                                  bool can_send_early_data, bool can_use_http3,
                                  bool enable_half_close)
-    : parent_(parent), conn_pool_(std::move(conn_pool)),
+    : parent_(parent), conn_pool_(conn_pool),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
@@ -583,7 +583,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
   onResetStream(reset_reason, transport_failure_reason);
 }
 
-void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
+void UpstreamRequest::onPoolReady(std::shared_ptr<GenericUpstream>&& upstream,
                                   Upstream::HostDescriptionConstSharedPtr host,
                                   const Network::ConnectionInfoProvider& address_provider,
                                   StreamInfo::StreamInfo& info,
@@ -592,7 +592,7 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   recordConnectionPoolCallbackLatency();
-  upstream_ = std::move(upstream);
+  upstream_ = upstream;
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
