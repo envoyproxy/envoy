@@ -153,6 +153,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change);
 // TODO(botengyao): this will be default true in the next release after this warning release.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
+// Adding runtime flag to use balsa_parser for http_inspector.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
