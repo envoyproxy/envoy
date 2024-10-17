@@ -72,7 +72,7 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
     ENVOY_LOG_EVENT(debug, "apple_dns_immediate_resolution",
                     "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
                     dns_name, address->asString());
-    addTrace(AppleDnsTrace::Success);
+    addTrace(static_cast<uint8_t>(AppleDnsTrace::Success));
     callback(DnsResolver::ResolutionStatus::Completed, "apple_dns_immediate_success",
              {DnsResponse(address, std::chrono::seconds(60))});
     return {nullptr, true};
@@ -81,7 +81,7 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
   ENVOY_LOG(trace, "Performing DNS resolution via Apple APIs");
   auto pending_resolution = std::make_unique<PendingResolution>(*this, callback, dispatcher_,
                                                                 dns_name, dns_lookup_family);
-  pending_resolution->addTrace(AppleDnsTrace::Starting);
+  pending_resolution->addTrace(static_cast<uint8_t>(AppleDnsTrace::Starting));
   DNSServiceErrorType error =
       pending_resolution->dnsServiceGetAddrInfo(include_unroutable_families_);
   if (error != kDNSServiceErr_NoError) {
@@ -204,7 +204,7 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
     // Therefore, finish resolving with an error.
     pending_response_.status_ = ResolutionStatus::Failure;
     pending_response_.details_ = absl::StrCat("apple_dns_error_", error);
-    addTrace(AppleDnsTrace::Failed);
+    addTrace(static_cast<uint8_t>(AppleDnsTrace::Failed));
     finishResolve();
   }
 }
@@ -363,7 +363,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     pending_response_.v4_responses_.clear();
     pending_response_.v6_responses_.clear();
 
-    addTrace(AppleDnsTrace::Failed);
+    addTrace(static_cast<uint8_t>(AppleDnsTrace::Failed));
     finishResolve();
     // Note: Nothing can follow this call to flushPendingQueries due to deletion of this
     // object upon resolution.
@@ -398,9 +398,9 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     pending_response_.status_ = ResolutionStatus::Completed;
     pending_response_.details_ = absl::StrCat("apple_dns_completed_", error_code);
     if (error_code == kDNSServiceErr_NoSuchRecord) {
-      addTrace(AppleDnsTrace::NoResult);
+      addTrace(static_cast<uint8_t>(AppleDnsTrace::NoResult));
     } else {
-      addTrace(AppleDnsTrace::Success);
+      addTrace(static_cast<uint8_t>(AppleDnsTrace::Success));
     }
     finishResolve();
     // Note: Nothing can follow this call to finishResolve due to deletion of this
