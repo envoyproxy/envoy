@@ -66,6 +66,7 @@ public:
    * config file.
    * */
   static RouterCheckTool create(const std::string& router_config_file,
+                                const std::string& validation_config_file,
                                 const bool disable_deprecation_check);
 
   /**

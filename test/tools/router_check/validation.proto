@@ -4,6 +4,7 @@ package envoy.RouterCheckToolSchema;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
@@ -15,6 +16,9 @@ import "validate/validate.proto";
 message Validation {
   // A collection of test cases.
   repeated ValidationItem tests = 1 [(validate.rules).repeated .min_items = 1];
+
+  // The runtime flags to be loaded before running the tests.
+  google.protobuf.Struct runtime = 2;
 }
 
 // Schema for each test case.
