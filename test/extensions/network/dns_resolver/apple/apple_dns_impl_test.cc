@@ -174,7 +174,7 @@ public:
                              if (expected_traces.has_value()) {
                                std::vector<std::string> traces =
                                    absl::StrSplit(active_dns_query_->getTraces(), ',');
-                               EXPECT_EQ(traces, ElementsAreArray(expected_traces));
+                               EXPECT_EQ(traces, ElementsAreArray(*expected_traces));
                              }
                              if (exit_dispatcher) {
                                dispatcher_->exit();
