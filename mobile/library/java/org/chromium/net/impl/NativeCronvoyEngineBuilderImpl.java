@@ -234,8 +234,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return this;
   }
 
-  public NativeCronvoyEngineBuilderImpl setConnectTimeoutSeconds(int connect_timeout) {
-    mConnectTimeoutSeconds = connect_timeout;
+  public NativeCronvoyEngineBuilderImpl setConnectTimeoutSeconds(int connectTimeout) {
+    mConnectTimeoutSeconds = connectTimeout;
     return this;
   }
 
