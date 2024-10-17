@@ -378,6 +378,11 @@ protected:
     if (type == WasmHeaderMapType::RequestHeaders) {
       if (!no_automatic_route_refresh_) {
         clearRouteCache();
+      } else {
+        ENVOY_LOG_FIRST_N(critical, 20,
+                          "Route will no be refreshed automatically when request headers are "
+                          "modified by the wasm plugin. Refresh the route manually by calling the "
+                          "'clear_route_cache' foreign function. ");
       }
     }
   }

@@ -2,6 +2,12 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: wasm
+  change: |
+    The route cache will not be cleared by default if the wasm extension modified the request headers.
+    But it could be done explicitly by call the ``clear_route_cache`` foreign function.
+    This behavior change could be disabled temporarily by setting the runtime flag
+    ``envoy_reloadable_features_wasm_no_automatic_route_refresh`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -32,5 +38,8 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: wasm
+  change: |
+    added ``clear_route_cache`` foreign function to clear the route cache.
 
 deprecated:
