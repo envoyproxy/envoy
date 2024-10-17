@@ -148,15 +148,19 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               continue;
             }
 
-            new_hosts.emplace_back(new HostImpl(
-                parent_.info_, hostname_, address,
-                // TODO(zyfjeff): Created through metadata shared pool
-                std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
-                std::make_shared<const envoy::config::core::v3::Metadata>(
-                    locality_lb_endpoints_.metadata()),
-                lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
-                lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
-                lb_endpoint_.health_status(), parent_.time_source_));
+            new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
+                HostImpl::create(parent_.info_, hostname_, address,
+                                 // TODO(zyfjeff): Created through metadata shared pool
+                                 std::make_shared<const envoy::config::core::v3::Metadata>(
+                                     lb_endpoint_.metadata()),
+                                 std::make_shared<const envoy::config::core::v3::Metadata>(
+                                     locality_lb_endpoints_.metadata()),
+                                 lb_endpoint_.load_balancing_weight().value(),
+                                 locality_lb_endpoints_.locality(),
+                                 lb_endpoint_.endpoint().health_check_config(),
+                                 locality_lb_endpoints_.priority(), lb_endpoint_.health_status(),
+                                 parent_.time_source_),
+                std::unique_ptr<HostImpl>));
             all_new_hosts.emplace(address->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
           }

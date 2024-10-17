@@ -224,7 +224,8 @@ private:
                      absl::string_view details, std::list<Network::DnsResponse>&& response,
                      absl::optional<MonotonicTime> resolution_time = {},
                      bool is_proxy_lookup = false, bool is_timeout = false);
-  void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
+  absl::Status runAddUpdateCallbacks(const std::string& host,
+                                     const DnsHostInfoSharedPtr& host_info);
   void runResolutionCompleteCallbacks(const std::string& host,
                                       const DnsHostInfoSharedPtr& host_info,
                                       Network::DnsResolver::ResolutionStatus status);

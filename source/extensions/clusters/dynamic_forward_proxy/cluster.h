@@ -34,7 +34,7 @@ public:
   void startPreInit() override;
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
-  void onDnsHostAddOrUpdate(
+  absl::Status onDnsHostAddOrUpdate(
       const std::string& host,
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) override;
   void onDnsHostRemove(const std::string& host) override;
@@ -167,7 +167,7 @@ private:
     Cluster& cluster_;
   };
 
-  void
+  absl::Status
   addOrUpdateHost(absl::string_view host,
                   const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
                   std::unique_ptr<Upstream::HostVector>& hosts_added)
