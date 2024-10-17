@@ -124,8 +124,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
   while (true) {
     std::unique_ptr<PendingQuery> next_query;
     absl::optional<uint32_t> num_retries;
-    const bool reresolve =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_reresolve_on_eai_again");
     const bool treat_nodata_noname_as_success =
         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_nodata_noname_is_success");
     {
@@ -142,7 +140,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       next_query = std::move(pending_query_info.pending_query_);
       num_retries = pending_query_info.num_retries_;
       pending_queries_.pop_front();
-      if (reresolve && next_query->isCancelled()) {
+      if (next_query->isCancelled()) {
         continue;
       }
     }
@@ -169,7 +167,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       if (rc.return_value_ == 0) {
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
         response = processResponse(*next_query, addrinfo_wrapper.get());
-      } else if (reresolve && rc.return_value_ == EAI_AGAIN) {
+      } else if (rc.return_value_ == EAI_AGAIN) {
         if (num_retries.has_value()) {
           (*num_retries)--;
         }
