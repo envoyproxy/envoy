@@ -613,6 +613,8 @@ void ChunkQueue::push(Buffer::Instance& data, bool end_stream,
   // Adding the data to the buffer.
   if (body_mode != ProcessingMode::MXN) {
     received_data_.move(data);
+  } else {
+    data.drain(data.length());
   }
 }
 
