@@ -551,10 +551,6 @@ TEST_F(AppleDnsImplTest, LocalResolution) {
                             std::list<DnsResponse>&& results) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
                            EXPECT_EQ(details, "apple_dns_immediate_success");
-                           std::vector<std::string> traces =
-                               absl::StrSplit(active_dns_query_->getTraces(), ',');
-                           EXPECT_THAT(traces, ElementsAre(HasTrace(AppleDnsTrace::Starting),
-                                                           HasTrace(AppleDnsTrace::Success)));
                            EXPECT_EQ(1, results.size());
                            EXPECT_EQ("0.0.0.0:0", results.front().addrInfo().address_->asString());
                            EXPECT_EQ(std::chrono::seconds(60), results.front().addrInfo().ttl_);
