@@ -72,6 +72,7 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
     ENVOY_LOG_EVENT(debug, "apple_dns_immediate_resolution",
                     "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
                     dns_name, address->asString());
+    addTrace(AppleDnsTrace::Success);
     callback(DnsResolver::ResolutionStatus::Completed, "apple_dns_immediate_success",
              {DnsResponse(address, std::chrono::seconds(60))});
     return {nullptr, true};
