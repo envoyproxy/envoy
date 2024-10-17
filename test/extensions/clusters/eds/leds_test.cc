@@ -89,8 +89,7 @@ public:
 
     cluster_scope_ = stats_.createScope("cluster.xds_cluster.");
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        server_context_, ssl_context_manager_, *cluster_scope_, server_context_.cluster_manager_,
-        validation_visitor_);
+        server_context_, *cluster_scope_, server_context_.cluster_manager_, validation_visitor_);
 
     // Setup LEDS subscription.
     EXPECT_CALL(server_context_.cluster_manager_.subscription_factory_,
@@ -151,7 +150,6 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   uint32_t callbacks_called_counter_{0};
   Stats::TestUtil::TestStore stats_;
-  Ssl::MockContextManager ssl_context_manager_;
   Envoy::Stats::ScopeSharedPtr cluster_scope_;
   LedsSubscriptionPtr leds_subscription_;
   NiceMock<Random::MockRandomGenerator> random_;

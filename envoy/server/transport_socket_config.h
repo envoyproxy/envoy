@@ -49,11 +49,6 @@ public:
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
-   * @return Ssl::ContextManager& the SSL context manager.
-   */
-  virtual Ssl::ContextManager& sslContextManager() PURE;
-
-  /**
    * @return Stats::Scope& the transport socket's stats scope.
    */
   virtual Stats::Scope& statsScope() PURE;

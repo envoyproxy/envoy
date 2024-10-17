@@ -1606,8 +1606,8 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   auto stats_scope = generateStatsScope(cluster, server_context.serverScope().store());
   transport_factory_context_ =
       std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
-          server_context, cluster_context.sslContextManager(), *stats_scope,
-          cluster_context.clusterManager(), cluster_context.messageValidationVisitor());
+          server_context, *stats_scope, cluster_context.clusterManager(),
+          cluster_context.messageValidationVisitor());
   transport_factory_context_->setInitManager(init_manager_);
 
   auto socket_factory_or_error = createTransportSocketFactory(cluster, *transport_factory_context_);

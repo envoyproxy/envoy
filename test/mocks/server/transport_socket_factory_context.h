@@ -8,7 +8,6 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
@@ -28,7 +27,6 @@ public:
   MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
-  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   MOCK_METHOD(Stats::Scope&, statsScope, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
 
@@ -36,7 +34,6 @@ public:
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockConfigTracker> config_tracker_;
-  testing::NiceMock<Ssl::MockContextManager> context_manager_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
   testing::NiceMock<Server::MockOptions> options_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;

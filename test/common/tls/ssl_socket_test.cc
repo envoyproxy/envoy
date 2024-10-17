@@ -416,7 +416,7 @@ void testUtil(const TestUtilOptions& options) {
       test_private_key_method_factory(test_factory);
   PrivateKeyMethodManagerImpl private_key_method_manager;
   if (options.expectedPrivateKeyMethod()) {
-    EXPECT_CALL(transport_socket_factory_context, sslContextManager())
+    EXPECT_CALL(transport_socket_factory_context.server_context_, sslContextManager())
         .WillOnce(ReturnRef(context_manager))
         .WillRepeatedly(ReturnRef(context_manager));
     EXPECT_CALL(context_manager, privateKeyMethodManager())

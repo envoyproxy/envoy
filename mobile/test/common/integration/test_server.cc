@@ -135,7 +135,7 @@ TestServer::TestServer()
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope())
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
-  ON_CALL(factory_context_, sslContextManager())
+  ON_CALL(factory_context_.server_context_, sslContextManager())
       .WillByDefault(testing::ReturnRef(context_manager_));
 
   Envoy::ExtensionRegistry::registerFactories();
