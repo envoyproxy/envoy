@@ -177,7 +177,7 @@ void AppleDnsResolverImpl::PendingResolution::cancel(Network::ActiveDnsQuery::Ca
   delete this;
 }
 
-void AppleDnsResolverImpl::PendingResolution::addTrace() {
+void AppleDnsResolverImpl::PendingResolution::addTrace(uint8_t trace) {
   traces_.push_back(Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
 }
 
@@ -185,7 +185,7 @@ std::string getTraces() {
   std::vector<std::string> string_traces;
   string_traces.reserve(traces_.size());
   std::transform(traces_.begin(), traces_.end(), std::back_inserter(string_traces),
-                 [](const Trace& trace) {
+                 [](const ActiveDnsQuery::Trace& trace) {
                    return absl::StrCat(trace.trace_, "=", trace.time_.time_since_epoch().count());
                  });
   return absl::StrJoin(string_traces, ",");
