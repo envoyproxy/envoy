@@ -116,7 +116,7 @@ TEST_F(FileAccessLogTest, DEPRECATED_FEATURE_TEST(LegacyJsonFormat)) {
       R"({
     "text": "plain text",
     "path": "/bar/foo",
-    "code": "200"
+    "code": 200
 })",
       true);
 }

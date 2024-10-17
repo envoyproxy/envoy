@@ -4,6 +4,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
+#include "envoy/ssl/handshaker.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/network/transport_socket_options_impl.h"

@@ -19,8 +19,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Wasm {
 
-using Extensions::Bootstrap::Wasm::WasmServicePtr;
-
 class WasmFactoryTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFactoryTest() {
@@ -101,7 +99,7 @@ TEST_P(WasmFactoryTest, MissingImport) {
       TestEnvironment::substitute(
           "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/missing_cpp.wasm"));
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
+                            "Unable to create Wasm plugin test");
 }
 
 TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
@@ -117,7 +115,7 @@ TEST_P(WasmFactoryTest, UnknownRuntime) {
   config_.mutable_config()->mutable_vm_config()->set_runtime("envoy.wasm.runtime.invalid");
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
+                            "Unable to create Wasm plugin test");
 }
 
 TEST_P(WasmFactoryTest, StartFailed) {
@@ -127,7 +125,7 @@ TEST_P(WasmFactoryTest, StartFailed) {
       plugin_configuration);
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
+                            "Unable to create Wasm plugin test");
 }
 
 TEST_P(WasmFactoryTest, StartFailedOpen) {
@@ -138,7 +136,7 @@ TEST_P(WasmFactoryTest, StartFailedOpen) {
   config_.mutable_config()->set_fail_open(true);
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
+                            "Unable to create Wasm plugin test");
 }
 
 TEST_P(WasmFactoryTest, ConfigureFailed) {
@@ -147,7 +145,7 @@ TEST_P(WasmFactoryTest, ConfigureFailed) {
   config_.mutable_config()->mutable_configuration()->PackFrom(plugin_configuration);
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
+                            "Unable to create Wasm plugin test");
 }
 
 } // namespace Wasm

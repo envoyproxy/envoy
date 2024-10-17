@@ -337,7 +337,7 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionAllSupportsV6Only) {
                          [=](DnsResolver::ResolutionStatus status, absl::string_view details,
                              std::list<DnsResponse>&& results) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-                           EXPECT_EQ(details, "apple_dns_success");
+                           EXPECT_THAT(details, StartsWith("apple_dns_completed"));
                            // On v4 only networks, there will be no results.
                            for (const auto& result : results) {
                              const auto& addrinfo = result.addrInfo();
@@ -368,7 +368,7 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6OnlySupportsV4Only) {
                          [=](DnsResolver::ResolutionStatus status, absl::string_view details,
                              std::list<DnsResponse>&& results) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-                           EXPECT_EQ(details, "apple_dns_success");
+                           EXPECT_THAT(details, StartsWith("apple_dns_completed"));
                            for (const auto& result : results) {
                              const auto& addrinfo = result.addrInfo();
                              EXPECT_THAT(addrinfo.address_->ip()->ipv6(), NotNull());
@@ -386,7 +386,7 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6OnlySupportsV6Only) {
                          [=](DnsResolver::ResolutionStatus status, absl::string_view details,
                              std::list<DnsResponse>&& results) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-                           EXPECT_EQ(details, "apple_dns_success");
+                           EXPECT_THAT(details, StartsWith("apple_dns_completed"));
                            EXPECT_FALSE(results.empty());
                            for (const auto& result : results) {
                              const auto& addrinfo = result.addrInfo();
@@ -411,7 +411,7 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionAutoSupportsV6Only) {
                          [=](DnsResolver::ResolutionStatus status, absl::string_view details,
                              std::list<DnsResponse>&& results) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-                           EXPECT_EQ(details, "apple_dns_success");
+                           EXPECT_THAT(details, StartsWith("apple_dns_completed"));
                            // On v4 only networks, there will be no results.
                            for (const auto& result : results) {
                              const auto& addrinfo = result.addrInfo();
@@ -436,7 +436,7 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4PreferredSupportsV6Only) {
                          [=](DnsResolver::ResolutionStatus status, absl::string_view details,
                              std::list<DnsResponse>&& results) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-                           EXPECT_EQ(details, "apple_dns_success");
+                           EXPECT_THAT(details, StartsWith("apple_dns_completed"));
                            // On v4 only networks, there will be no results.
                            for (const auto& result : results) {
                              const auto& addrinfo = result.addrInfo();
@@ -660,7 +660,7 @@ public:
          expected_address_size](DnsResolver::ResolutionStatus status, absl::string_view details,
                                 std::list<DnsResponse>&& response) -> void {
           EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-          EXPECT_EQ(details, "apple_dns_success");
+          EXPECT_THAT(details, StartsWith("apple_dns_completed"));
           EXPECT_EQ(expected_address_size, response.size());
 
           if (dns_lookup_family == DnsLookupFamily::Auto) {
@@ -918,7 +918,7 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletionUnroutableFamilies) {
                                                   absl::string_view details,
                                                   std::list<DnsResponse>&& response) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-                           EXPECT_EQ(details, "apple_dns_success");
+                           EXPECT_THAT(details, StartsWith("apple_dns_completed"));
                            EXPECT_EQ(1, response.size());
                            EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
                            EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
@@ -958,7 +958,7 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
                                                   absl::string_view details,
                                                   std::list<DnsResponse>&& response) -> void {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-                           EXPECT_EQ(details, "apple_dns_success");
+                           EXPECT_THAT(details, StartsWith("apple_dns_completed"));
                            EXPECT_EQ(1, response.size());
                            EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
                            EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
@@ -1015,7 +1015,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
       [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view details,
                                std::list<DnsResponse>&& response) -> void {
         EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-        EXPECT_EQ(details, "apple_dns_success");
+        EXPECT_THAT(details, StartsWith("apple_dns_completed"));
         EXPECT_EQ(2, response.size());
         dns_callback_executed.Notify();
       });
@@ -1148,7 +1148,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
       [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view details,
                                std::list<DnsResponse>&& response) -> void {
         EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-        EXPECT_EQ(details, "apple_dns_success");
+        EXPECT_THAT(details, StartsWith("apple_dns_completed"));
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
         EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
@@ -1170,7 +1170,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
       [&dns_callback_executed2](DnsResolver::ResolutionStatus status, absl::string_view details,
                                 std::list<DnsResponse>&& response) -> void {
         EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-        EXPECT_EQ(details, "apple_dns_success");
+        EXPECT_THAT(details, StartsWith("apple_dns_completed"));
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("5.6.7.8:0", response.front().addrInfo().address_->asString());
         EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
@@ -1225,7 +1225,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueriesOneFails) {
         // Even though the second query will fail, this one will flush with the
         // state it had.
         EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-        EXPECT_EQ(details, "apple_dns_success");
+        EXPECT_THAT(details, StartsWith("apple_dns_completed"));
         EXPECT_EQ(1, response.size());
         EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
         EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
@@ -1289,7 +1289,7 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
       [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view details,
                                std::list<DnsResponse>&& response) -> void {
         EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-        EXPECT_EQ(details, "apple_dns_success");
+        EXPECT_THAT(details, StartsWith("apple_dns_completed"));
         EXPECT_TRUE(response.empty());
         dns_callback_executed.Notify();
       });
@@ -1367,7 +1367,7 @@ TEST_F(AppleDnsImplFakeApiTest, DeallocateOnDestruction) {
       [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view details,
                                std::list<DnsResponse>&& response) -> void {
         EXPECT_EQ(DnsResolver::ResolutionStatus::Completed, status);
-        EXPECT_EQ(details, "apple_dns_success");
+        EXPECT_THAT(details, StartsWith("apple_dns_completed"));
         EXPECT_EQ(1, response.size());
         dns_callback_executed.Notify();
       });
