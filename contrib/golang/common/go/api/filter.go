@@ -87,131 +87,134 @@ type StreamFilter interface {
 	StreamEncoderFilter
 
 	// log
-	 OnLog()
-	 OnLogDownstreamStart()
-	 OnLogDownstreamPeriodic()
- 
-	 // destroy filter
-	 OnDestroy(DestroyReason)
-	 // TODO add more for stream complete
- }
- 
- func (*PassThroughStreamFilter) OnLog() {
- }
- 
- func (*PassThroughStreamFilter) OnLogDownstreamStart() {
- }
- 
- func (*PassThroughStreamFilter) OnLogDownstreamPeriodic() {
- }
- 
- func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
- }
- 
- type StreamFilterConfigParser interface {
-	 // Parse the proto message to any Go value, and return error to reject the config.
-	 // This is called when Envoy receives the config from the control plane.
-	 // Also, you can define Metrics through the callbacks, and the callbacks will be nil when parsing the route config.
-	 Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
-	 // Merge the two configs(filter level config or route level config) into one.
-	 // May merge multi-level configurations, i.e. filter level, virtualhost level, router level and weighted cluster level,
-	 // into a single one recursively, by invoking this method multiple times.
-	 Merge(parentConfig interface{}, childConfig interface{}) interface{}
- }
- 
- type StreamFilterFactory func(config interface{}, callbacks FilterCallbackHandler) StreamFilter
- 
- // stream info
- // refer https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
- type StreamInfo interface {
-	 GetRouteName() string
-	 FilterChainName() string
-	 // Protocol return the request's protocol.
-	 Protocol() (string, bool)
-	 // ResponseCode return the response code.
-	 ResponseCode() (uint32, bool)
-	 // ResponseCodeDetails return the response code details.
-	 ResponseCodeDetails() (string, bool)
-	 // AttemptCount return the number of times the request was attempted upstream.
-	 AttemptCount() uint32
-	 // Get the dynamic metadata of the request
-	 DynamicMetadata() DynamicMetadata
-	 // DownstreamLocalAddress return the downstream local address.
-	 DownstreamLocalAddress() string
-	 // DownstreamRemoteAddress return the downstream remote address.
-	 DownstreamRemoteAddress() string
-	 // UpstreamLocalAddress return the upstream local address.
-	 UpstreamLocalAddress() (string, bool)
-	 // UpstreamRemoteAddress return the upstream remote address.
-	 UpstreamRemoteAddress() (string, bool)
-	 // UpstreamClusterName return the upstream host cluster.
-	 UpstreamClusterName() (string, bool)
-	 // FilterState return the filter state interface.
-	 FilterState() FilterState
-	 // VirtualClusterName returns the name of the virtual cluster which got matched
-	 VirtualClusterName() (string, bool)
-	 // WorkerID returns the ID of the Envoy worker thread
-	 WorkerID() uint32
-	 // Some fields in stream info can be fetched via GetProperty
-	 // For example, startTime() is equal to GetProperty("request.time")
- }
- 
- type StreamFilterCallbacks interface {
-	 StreamInfo() StreamInfo
- 
-	 // ClearRouteCache clears the route cache for the current request, and filtermanager will re-fetch the route in the next filter.
-	 // Please be careful to invoke it, since filtermanager will raise an 404 route_not_found response when failed to re-fetch a route.
-	 ClearRouteCache()
-	 Log(level LogType, msg string)
-	 LogLevel() LogType
-	 // GetProperty fetch Envoy attribute and return the value as a string.
-	 // The list of attributes can be found in https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.
-	 // If the fetch succeeded, a string will be returned.
-	 // If the value is a timestamp, it is returned as a timestamp string like "2023-07-31T07:21:40.695646+00:00".
-	 // If the fetch failed (including the value is not found), an error will be returned.
-	 //
-	 // The error can be one of:
-	 // * ErrInternalFailure
-	 // * ErrSerializationFailure (Currently, fetching attributes in List/Map type are unsupported)
-	 // * ErrValueNotFound
-	 GetProperty(key string) (string, error)
-	 // TODO add more for filter callbacks
- }
- 
- // FilterProcessCallbacks is the interface for filter to process request/response in decode/encode phase.
- type FilterProcessCallbacks interface {
-	 // Continue or SendLocalReply should be last API invoked, no more code after them.
-	 Continue(StatusType)
-	 SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
-	 // RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
-	 RecoverPanic()
- }
- 
- type DecoderFilterCallbacks interface {
-	 FilterProcessCallbacks
- }
- 
- type EncoderFilterCallbacks interface {
-	 FilterProcessCallbacks
- }
- 
- type FilterCallbackHandler interface {
-	 StreamFilterCallbacks
-	 // DecoderFilterCallbacks could only be used in DecodeXXX phases.
-	 DecoderFilterCallbacks() DecoderFilterCallbacks
-	 // EncoderFilterCallbacks could only be used in EncodeXXX phases.
-	 EncoderFilterCallbacks() EncoderFilterCallbacks
- }
- 
- type DynamicMetadata interface {
-	 Get(filterName string) map[string]interface{}
-	 Set(filterName string, key string, value interface{})
- }
- 
- type DownstreamFilter interface {
-	 // Called when a connection is first established.
-	 OnNewConnection() FilterStatus
-	 // Called when data is read on the connection.
+	OnLog(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap)
+	OnLogDownstreamStart(RequestHeaderMap)
+	OnLogDownstreamPeriodic(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap)
+
+	// destroy filter
+	OnDestroy(DestroyReason)
+	OnStreamComplete()
+}
+
+func (*PassThroughStreamFilter) OnLog(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap) {
+}
+
+func (*PassThroughStreamFilter) OnLogDownstreamStart(RequestHeaderMap) {
+}
+
+func (*PassThroughStreamFilter) OnLogDownstreamPeriodic(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap) {
+}
+
+func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
+}
+
+func (*PassThroughStreamFilter) OnStreamComplete() {
+}
+
+type StreamFilterConfigParser interface {
+	// Parse the proto message to any Go value, and return error to reject the config.
+	// This is called when Envoy receives the config from the control plane.
+	// Also, you can define Metrics through the callbacks, and the callbacks will be nil when parsing the route config.
+	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
+	// Merge the two configs(filter level config or route level config) into one.
+	// May merge multi-level configurations, i.e. filter level, virtualhost level, router level and weighted cluster level,
+	// into a single one recursively, by invoking this method multiple times.
+	Merge(parentConfig interface{}, childConfig interface{}) interface{}
+}
+
+type StreamFilterFactory func(config interface{}, callbacks FilterCallbackHandler) StreamFilter
+
+// stream info
+// refer https://github.com/envoyproxy/envoy/blob/main/envoy/stream_info/stream_info.h
+type StreamInfo interface {
+	GetRouteName() string
+	FilterChainName() string
+	// Protocol return the request's protocol.
+	Protocol() (string, bool)
+	// ResponseCode return the response code.
+	ResponseCode() (uint32, bool)
+	// ResponseCodeDetails return the response code details.
+	ResponseCodeDetails() (string, bool)
+	// AttemptCount return the number of times the request was attempted upstream.
+	AttemptCount() uint32
+	// Get the dynamic metadata of the request
+	DynamicMetadata() DynamicMetadata
+	// DownstreamLocalAddress return the downstream local address.
+	DownstreamLocalAddress() string
+	// DownstreamRemoteAddress return the downstream remote address.
+	DownstreamRemoteAddress() string
+	// UpstreamLocalAddress return the upstream local address.
+	UpstreamLocalAddress() (string, bool)
+	// UpstreamRemoteAddress return the upstream remote address.
+	UpstreamRemoteAddress() (string, bool)
+	// UpstreamClusterName return the upstream host cluster.
+	UpstreamClusterName() (string, bool)
+	// FilterState return the filter state interface.
+	FilterState() FilterState
+	// VirtualClusterName returns the name of the virtual cluster which got matched
+	VirtualClusterName() (string, bool)
+	// WorkerID returns the ID of the Envoy worker thread
+	WorkerID() uint32
+	// Some fields in stream info can be fetched via GetProperty
+	// For example, startTime() is equal to GetProperty("request.time")
+}
+
+type StreamFilterCallbacks interface {
+	StreamInfo() StreamInfo
+
+	// ClearRouteCache clears the route cache for the current request, and filtermanager will re-fetch the route in the next filter.
+	// Please be careful to invoke it, since filtermanager will raise an 404 route_not_found response when failed to re-fetch a route.
+	ClearRouteCache()
+	Log(level LogType, msg string)
+	LogLevel() LogType
+	// GetProperty fetch Envoy attribute and return the value as a string.
+	// The list of attributes can be found in https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes.
+	// If the fetch succeeded, a string will be returned.
+	// If the value is a timestamp, it is returned as a timestamp string like "2023-07-31T07:21:40.695646+00:00".
+	// If the fetch failed (including the value is not found), an error will be returned.
+	//
+	// The error can be one of:
+	// * ErrInternalFailure
+	// * ErrSerializationFailure (Currently, fetching attributes in List/Map type are unsupported)
+	// * ErrValueNotFound
+	GetProperty(key string) (string, error)
+	// TODO add more for filter callbacks
+}
+
+// FilterProcessCallbacks is the interface for filter to process request/response in decode/encode phase.
+type FilterProcessCallbacks interface {
+	// Continue or SendLocalReply should be last API invoked, no more code after them.
+	Continue(StatusType)
+	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
+	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
+	RecoverPanic()
+}
+
+type DecoderFilterCallbacks interface {
+	FilterProcessCallbacks
+}
+
+type EncoderFilterCallbacks interface {
+	FilterProcessCallbacks
+}
+
+type FilterCallbackHandler interface {
+	StreamFilterCallbacks
+	// DecoderFilterCallbacks could only be used in DecodeXXX phases.
+	DecoderFilterCallbacks() DecoderFilterCallbacks
+	// EncoderFilterCallbacks could only be used in EncodeXXX phases.
+	EncoderFilterCallbacks() EncoderFilterCallbacks
+}
+
+type DynamicMetadata interface {
+	Get(filterName string) map[string]interface{}
+	Set(filterName string, key string, value interface{})
+}
+
+type DownstreamFilter interface {
+	// Called when a connection is first established.
+	OnNewConnection() FilterStatus
+	// Called when data is read on the connection.
 	OnData(buffer []byte, endOfStream bool) FilterStatus
 	// Callback for connection events.
 	OnEvent(event ConnectionEvent)
