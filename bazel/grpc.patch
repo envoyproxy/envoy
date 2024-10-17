@@ -1,8 +1,8 @@
 diff --git a/BUILD b/BUILD
-index 06b69411a8..05cd878ae8 100644
+index 5caf32799b..4e05babe22 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -29,7 +29,7 @@ licenses(["reciprocal"])
+@@ -33,7 +33,7 @@ package(
      default_visibility = ["//visibility:public"],
      features = [
          "-parse_headers",
@@ -12,10 +12,10 @@ index 06b69411a8..05cd878ae8 100644
  )
  
 diff --git a/src/core/BUILD b/src/core/BUILD
-index 1bb970e049..81265483e9 100644
+index dee69ed3bd..e82006c31e 100644
 --- a/src/core/BUILD
 +++ b/src/core/BUILD
-@@ -24,7 +24,7 @@ licenses(["reciprocal"])
+@@ -25,7 +25,7 @@ licenses(["reciprocal"])
  package(
      default_visibility = ["//:__subpackages__"],
      features = [
@@ -24,15 +24,25 @@ index 1bb970e049..81265483e9 100644
      ],
  )
  
-diff --git a/src/core/lib/promise/detail/promise_like.h b/src/core/lib/promise/detail/promise_like.h
---- a/src/core/lib/promise/detail/promise_like.h	2024-04-18 19:47:19.524155042 +0000
-+++ b/src/core/lib/promise/detail/promise_like.h	2024-04-18 23:40:29.050761807 +0000
-@@ -71,7 +71,7 @@
+diff --git a/third_party/BUILD b/third_party/BUILD
+index 77cb52d0fc..5f69f71978 100644
+--- a/third_party/BUILD
++++ b/third_party/BUILD
+@@ -30,7 +30,7 @@ alias(
  
- template <typename F>
- class PromiseLike<F, absl::enable_if_t<!std::is_void<
--                         typename std::result_of<F()>::type>::value>> {
-+                         typename std::invoke_result<F>::type>::value>> {
-  private:
-   GPR_NO_UNIQUE_ADDRESS F f_;
+ alias(
+     name = "madler_zlib",
+-    actual = "@zlib//:zlib",
++    actual = "@envoy//bazel/foreign_cc:zlib",
+     tags = ["manual"],
+ )
+ 
+@@ -61,7 +61,7 @@ alias(
+ 
+ alias(
+     name = "cares",
+-    actual = "@com_github_cares_cares//:ares",
++    actual = "@envoy//bazel/foreign_cc:ares",
+     tags = ["manual"],
+ )
  
