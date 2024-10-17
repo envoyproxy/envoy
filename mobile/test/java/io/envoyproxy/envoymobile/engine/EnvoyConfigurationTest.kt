@@ -202,7 +202,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains(".xyz.com");
     assertThat(resolvedTemplate).contains("connection_options: \"5RTO\"");
     assertThat(resolvedTemplate).contains("client_connection_options: \"MPQC\"");
-    assertThat(resolvedTemplate).contains("connection_keepalive { initial_interval { }")
+    assertThat(resolvedTemplate).doesNotContain("connection_keepalive { initial_interval {")
 
 
     // Per Host Limits
