@@ -308,7 +308,7 @@ TEST_F(AppleDnsImplTest, LocalLookup) {
             resolveWithExpectations(
                 "localhost", DnsLookupFamily::Auto, DnsResolver::ResolutionStatus::Completed,
                 /* expected_results= */ true, /* exit_dispatcher= */ true,
-                {HasTrace(AppleDnsTrace::Starting), HasTrace(AppleDnsTrace::Success)}));
+                {{HasTrace(AppleDnsTrace::Starting), HasTrace(AppleDnsTrace::Success)}}));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -632,8 +632,9 @@ public:
     // callback ran via notification.
     active_dns_query_ = resolver_->resolve(
         hostname, Network::DnsLookupFamily::Auto,
-        [&dns_callback_executed](DnsResolver::ResolutionStatus status, absl::string_view details,
-                                 std::list<DnsResponse>&& responses) -> void {
+        [&dns_callback_executed, this](DnsResolver::ResolutionStatus status,
+                                       absl::string_view details,
+                                       std::list<DnsResponse>&& responses) -> void {
           EXPECT_EQ(DnsResolver::ResolutionStatus::Failure, status);
           EXPECT_THAT(details, StartsWith("apple_dns_error"));
           std::vector<std::string> traces = absl::StrSplit(active_dns_query_->getTraces(), ',');
