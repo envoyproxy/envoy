@@ -5,6 +5,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "eval/public/cel_value.h"
 #include "gmock/gmock.h"
@@ -248,6 +249,11 @@ TEST_F(ContextTest, FindValueTest) {
 }
 
 TEST_F(ContextTest, ClearRouteCacheCalledInDownstreamConfiguration) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.wasm_no_automatic_route_refresh", "false"}});
+
+  TestContext test_ctx;
 
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
   EXPECT_CALL(downstream_callbacks, clearRouteCache()).Times(5).WillRepeatedly(testing::Return());
@@ -256,34 +262,39 @@ TEST_F(ContextTest, ClearRouteCacheCalledInDownstreamConfiguration) {
   EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
       .WillRepeatedly(testing::Return(
           makeOptRef(dynamic_cast<Http::DownstreamStreamFilterCallbacks&>(downstream_callbacks))));
-  ctx_.setDecoderFilterCallbacksPtr(&decoder_callbacks);
+  test_ctx.setDecoderFilterCallbacksPtr(&decoder_callbacks);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/123"}};
-  ctx_.setRequestHeaders(&request_headers);
+  test_ctx.setRequestHeaders(&request_headers);
 
-  ctx_.clearRouteCache();
-  ctx_.addHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value");
-  ctx_.setHeaderMapPairs(WasmHeaderMapType::RequestHeaders, Pairs{{"key2", "value2"}});
-  ctx_.replaceHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value2");
-  ctx_.removeHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key");
+  test_ctx.clearRouteCache();
+  test_ctx.addHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value");
+  test_ctx.setHeaderMapPairs(WasmHeaderMapType::RequestHeaders, Pairs{{"key2", "value2"}});
+  test_ctx.replaceHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value2");
+  test_ctx.removeHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key");
 }
 
 TEST_F(ContextTest, ClearRouteCacheDoesNothingInUpstreamConfiguration) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.wasm_no_automatic_route_refresh", "false"}});
+
+  TestContext test_ctx;
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
       .WillRepeatedly(testing::Return(absl::nullopt));
-  ctx_.setDecoderFilterCallbacksPtr(&decoder_callbacks);
+  test_ctx.setDecoderFilterCallbacksPtr(&decoder_callbacks);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/123"}};
-  ctx_.setRequestHeaders(&request_headers);
+  test_ctx.setRequestHeaders(&request_headers);
 
   // Calling methods should be safe.
-  ctx_.clearRouteCache();
-  ctx_.addHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value");
-  ctx_.setHeaderMapPairs(WasmHeaderMapType::RequestHeaders, Pairs{{"key2", "value2"}});
-  ctx_.replaceHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value2");
-  ctx_.removeHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key");
+  test_ctx.clearRouteCache();
+  test_ctx.addHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value");
+  test_ctx.setHeaderMapPairs(WasmHeaderMapType::RequestHeaders, Pairs{{"key2", "value2"}});
+  test_ctx.replaceHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key", "value2");
+  test_ctx.removeHeaderMapValue(WasmHeaderMapType::RequestHeaders, "key");
 }
 
 } // namespace Wasm
