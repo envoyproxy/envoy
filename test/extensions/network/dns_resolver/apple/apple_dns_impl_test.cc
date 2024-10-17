@@ -108,7 +108,7 @@ public:
       const std::string& address, const DnsLookupFamily lookup_family,
       const DnsResolver::ResolutionStatus expected_status, const bool expected_results,
       const bool exit_dispatcher = true,
-      const absl::optional<absl::vector<HasTraceMatcherP<AppleDnsTrace>>>& expected_traces =
+      const absl::optional<std::vector<HasTraceMatcherP<AppleDnsTrace>>>& expected_traces =
           absl::nullopt) {
     active_dns_query_ =
         resolver_->resolve(address, lookup_family,
@@ -545,7 +545,7 @@ TEST_F(AppleDnsImplTest, NonExistentDomain) {
 }
 
 TEST_F(AppleDnsImplTest, LocalResolution) {
-  active_dns_query_ = pending_resolution =
+  active_dns_query_ =
       resolver_->resolve("0.0.0.0", DnsLookupFamily::Auto,
                          [](DnsResolver::ResolutionStatus status, absl::string_view details,
                             std::list<DnsResponse>&& results) -> void {
@@ -555,7 +555,7 @@ TEST_F(AppleDnsImplTest, LocalResolution) {
                            EXPECT_EQ("0.0.0.0:0", results.front().addrInfo().address_->asString());
                            EXPECT_EQ(std::chrono::seconds(60), results.front().addrInfo().ttl_);
                          });
-  EXPECT_EQ(nullptr, pending_resolution);
+  EXPECT_EQ(nullptr, active_dns_query_);
   // Note that the dispatcher does NOT have to run because resolution is synchronous.
 }
 
