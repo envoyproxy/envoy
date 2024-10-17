@@ -2855,9 +2855,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
 
     DynamicMetadataFormatter formatter("com.test", {"nan_val"}, absl::optional<size_t>());
     absl::optional<std::string> value = formatter.format(stream_info);
-    EXPECT_EQ("google.protobuf.Value cannot encode double values for nan, because it would be "
-              "parsed as a string",
-              value.value());
+    EXPECT_EQ("null", value.value());
   }
 
   {
@@ -2869,9 +2867,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
 
     DynamicMetadataFormatter formatter("com.test", {"inf_val"}, absl::optional<size_t>());
     absl::optional<std::string> value = formatter.format(stream_info);
-    EXPECT_EQ("google.protobuf.Value cannot encode double values for infinity, because it would be "
-              "parsed as a string",
-              value.value());
+    EXPECT_EQ("inf", value.value());
   }
 }
 
@@ -4631,7 +4627,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
 
   JsonFormatterImpl formatter(key_mapping, false);
   const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
-  std::cout << out_json << std::endl;
   EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
 }
 

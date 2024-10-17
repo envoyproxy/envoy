@@ -4,8 +4,8 @@ load("@rules_python//python:defs.bzl", "py_binary")
 licenses(["notice"])  # Apache 2
 
 py_binary(
-    name = "deprecate_version",
-    srcs = ["deprecate_version.py"],
+    name = "deprecate_guards",
+    srcs = ["deprecate_guards.py"],
     deps = [
         "@envoy_repo",
         requirement("gitpython"),

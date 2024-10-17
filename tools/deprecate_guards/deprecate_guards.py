@@ -1,6 +1,6 @@
 # Bazel usage
 #
-# bazel run //tools/deprecate_version:deprecate_version
+# bazel run //tools/deprecate_guards:deprecate_guards
 #
 # A GitHub access token must be set in GITHUB_TOKEN. To create one, go to
 # Settings -> Developer settings -> Personal access tokens in GitHub and create
@@ -196,8 +196,7 @@ if __name__ == '__main__':
     access_token = os.getenv('GITHUB_TOKEN')
     if not access_token:
         print(
-            'Missing GITHUB_TOKEN: see instructions in tools/deprecate_version/deprecate_version.py'
-        )
+            'Missing GITHUB_TOKEN: see instructions in tools/deprecate_guards/deprecate_guards.py')
         sys.exit(1)
 
     create_issues(access_token, runtime_and_pr)

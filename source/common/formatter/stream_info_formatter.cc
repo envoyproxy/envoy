@@ -3,6 +3,7 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
@@ -61,20 +62,11 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
   }
 
   std::string str;
+  str.reserve(256);
   if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
     str = value.string_value();
   } else {
-#ifdef ENVOY_ENABLE_YAML
-    absl::StatusOr<std::string> json_or_error =
-        MessageUtil::getJsonStringFromMessage(value, false, true);
-    if (json_or_error.ok()) {
-      str = json_or_error.value();
-    } else {
-      str = json_or_error.status().message();
-    }
-#else
-    IS_ENVOY_BUG("Json support compiled out");
-#endif
+    Json::Utility::appendValueToString(value, str);
   }
   SubstitutionFormatUtils::truncate(str, max_length_);
   return str;

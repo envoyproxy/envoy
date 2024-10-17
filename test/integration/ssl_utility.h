@@ -38,6 +38,11 @@ struct ClientSslTransportOptions {
     return *this;
   }
 
+  ClientSslTransportOptions& setCurves(const std::vector<std::string>& curves) {
+    curves_ = curves;
+    return *this;
+  }
+
   ClientSslTransportOptions& setSni(absl::string_view sni) {
     sni_ = std::string(sni);
     return *this;
@@ -70,6 +75,7 @@ struct ClientSslTransportOptions {
   std::vector<std::string> cipher_suites_{};
   std::string san_;
   std::vector<std::string> sigalgs_;
+  std::vector<std::string> curves_;
   std::string sni_;
   envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version_{
       envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLS_AUTO};
