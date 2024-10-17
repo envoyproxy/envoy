@@ -1561,6 +1561,8 @@ vm_config:
 )EOF",
         singleton, runtime_name, Base64::encode(code.data(), code.size()));
 
+    proxy_wasm::clearWasmCachesForTesting(); // clear the cache to make sure we get a new one wasm.
+
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
 
@@ -1680,6 +1682,8 @@ vm_config:
 )EOF",
         singleton, runtime_name, Base64::encode(code.data(), code.size()));
 
+    proxy_wasm::clearWasmCachesForTesting(); // clear the cache to make sure we get a new one wasm.
+
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
 
@@ -1755,6 +1759,8 @@ vm_config:
       inline_bytes: "{}"
 )EOF",
         singleton, runtime_name, Base64::encode(code.data(), code.size()));
+
+    proxy_wasm::clearWasmCachesForTesting(); // clear the cache to make sure we get a new one wasm.
 
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
@@ -1832,6 +1838,8 @@ vm_config:
       inline_bytes: "{}"
 )EOF",
         singleton, runtime_name, Base64::encode(code.data(), code.size()));
+
+    proxy_wasm::clearWasmCachesForTesting(); // clear the cache to make sure we get a new one wasm.
 
     setUp(plugin_config_yaml, singleton);
     Envoy::Buffer::OwnedImpl request_body;
