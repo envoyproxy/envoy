@@ -87,7 +87,7 @@ envoy_cc_test(
     name = "cluster_manager_impl_test",
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     deps = [
         ":test_cluster_manager",
         "//source/common/router:context_lib",

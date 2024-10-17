@@ -1539,7 +1539,7 @@ envoy_cc_test(
     name = "load_stats_integration_test",
     size = "large",
     srcs = ["load_stats_integration_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     deps = [
         ":http_integration_lib",
         "//test/config:utility_lib",
@@ -2546,7 +2546,7 @@ envoy_cc_test(
         "//conditions:default": ["quic_http_integration_test.cc"],
     }),
     data = ["//test/config/integration/certs"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     # TODO(envoyproxy/windows-dev): Diagnose failure shown only on clang-cl build, see:
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     # TODO(envoyproxy/windows-dev): Diagnose timeout, why opt build test under Windows GCP RBE
