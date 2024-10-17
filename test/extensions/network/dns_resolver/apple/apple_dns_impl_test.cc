@@ -87,6 +87,12 @@ public:
                DNSServiceGetAddrInfoReply callBack, void* context));
 };
 
+MATCHER_P(HasTrace, expected_trace, "") {
+  std::vector<std::string> v = absl::StrSplit(arg, '=');
+  uint8_t trace = std::stoi(v.at(0));
+  return trace == static_cast<uint8_t>(expected_trace);
+}
+
 // This class tests the AppleDnsResolverImpl using actual calls to Apple's API. These tests have
 // limitations on the error conditions we are able to test as the Apple API is opaque, and prevents
 // usage of a test DNS server.
@@ -108,7 +114,7 @@ public:
       const std::string& address, const DnsLookupFamily lookup_family,
       const DnsResolver::ResolutionStatus expected_status, const bool expected_results,
       const bool exit_dispatcher = true,
-      const absl::optional<std::vector<HasTraceMatcherP<AppleDnsTrace>>>& expected_traces =
+      const absl::optional<std::vector<HasTraceMatcherP<AppleDnsTrace>>> expected_traces =
           absl::nullopt) {
     active_dns_query_ =
         resolver_->resolve(address, lookup_family,
@@ -203,12 +209,6 @@ protected:
   DnsResolverSharedPtr resolver_;
   ActiveDnsQuery* active_dns_query_;
 };
-
-MATCHER_P(HasTrace, expected_trace, "") {
-  std::vector<std::string> v = absl::StrSplit(arg, '=');
-  uint8_t trace = std::stoi(v.at(0));
-  return trace == static_cast<uint8_t>(expected_trace);
-}
 
 // By default in MacOS, it creates an AppleDnsResolver typed config.
 TEST_F(AppleDnsImplTest, DefaultAppleDnsResolverConstruction) {
