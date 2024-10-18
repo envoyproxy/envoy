@@ -35,5 +35,10 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: outlier detection
+  change: |
+    Added :ref:`extensions framework<envoy_v3_api_field_config.cluster.v3.OutlierDetection.monitors>` and implementation of
+    :ref:`consecutive errors extension<envoy_v3_api_msg_extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors>`.
+    Users can configure a range of HTTP codes which should be interpreted as errors.
 
 deprecated:

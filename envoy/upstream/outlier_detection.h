@@ -7,9 +7,12 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "absl/types/optional.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -47,6 +50,63 @@ enum class Result {
   ExtOriginRequestSuccess // Request was completed successfully.
 };
 
+class HttpCode {
+public:
+  HttpCode(uint32_t code) : code_(code) {}
+  HttpCode() = delete;
+  uint32_t code() const { return code_; }
+
+private:
+  uint32_t code_;
+};
+
+// LocalOriginEvent is used to report errors like resets, timeouts but also
+// successful connection attempts.
+class LocalOriginEvent {
+public:
+  LocalOriginEvent(Result result) : result_(result) {}
+  LocalOriginEvent() = delete;
+  Result result() const { return result_; }
+
+private:
+  Result result_;
+};
+
+/*
+ * Class carries result of a transaction with upstream entity
+ * or generated internally by Envoy.
+ */
+using ExtResult = absl::variant<HttpCode, LocalOriginEvent>;
+
+// Base class defining api for various types of monitors.
+// Each monitor may implement different health detection algorithm.
+class ExtMonitor {
+public:
+  using ExtMonitorCallback =
+      std::function<void(uint32_t /* enforce */, std::string /* runtime_key */)>;
+  virtual ~ExtMonitor() {}
+
+  // Method to report a result to extensions.
+  virtual void putResult(const ExtResult&) PURE;
+  virtual void setExtMonitorCallback(ExtMonitorCallback) PURE;
+  virtual void reset() PURE;
+};
+
+using ExtMonitorPtr = std::unique_ptr<ExtMonitor>;
+
+class ExtMonitorsSet {
+public:
+  void addMonitor(ExtMonitorPtr&& monitor) { monitors_.push_back(std::move(monitor)); }
+  template <class CALLABLE> void forEach(const CALLABLE& f) const {
+    for (auto& monitor : monitors_) {
+      f(monitor);
+    }
+  }
+  bool empty() const { return monitors_.empty(); }
+
+private:
+  absl::InlinedVector<ExtMonitorPtr, 3> monitors_;
+};
 /**
  * Monitor for per host data. Proxy filters should send pertinent data when available.
  */
@@ -167,9 +227,11 @@ public:
    * @param detector supplies the detector that is doing the ejection.
    * @param type supplies the type of the event.
    * @param enforced is true if the ejection took place; false, if only logging took place.
+   * @param monitor_name is optional name of failed extension monitor.
    */
   virtual void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
-                        envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) PURE;
+                        envoy::data::cluster::v3::OutlierEjectionType type, bool enforced,
+                        absl::optional<std::string> monitor_name) PURE;
 
   /**
    * Log an unejection event.
@@ -179,6 +241,30 @@ public:
 };
 
 using EventLoggerSharedPtr = std::shared_ptr<EventLogger>;
+
+using ExtMonitorCreateFn = std::function<ExtMonitorPtr()>;
+
+class ExtMonitorFactoryContext {
+public:
+  ExtMonitorFactoryContext(ProtobufMessage::ValidationVisitor& validation_visitor)
+      : validation_visitor_(validation_visitor) {}
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const {
+    return validation_visitor_;
+  }
+
+private:
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+class ExtMonitorFactory : public Envoy::Config::TypedFactory {
+public:
+  ~ExtMonitorFactory() override = default;
+
+  virtual ExtMonitorCreateFn createMonitor(const std::string& name, const Protobuf::Message& config,
+                                           ExtMonitorFactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.outlier_detection_monitors"; }
+};
 
 } // namespace Outlier
 } // namespace Upstream
