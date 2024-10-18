@@ -1647,6 +1647,7 @@ TEST_P(Http2DeferredProcessingIntegrationDeathTest,
   }
 
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedData(),
+               "(?s)" // Let dot match newline.
                "Crashing as request body over 1000!.*"
                "ActiveStream.*Http2::ConnectionImpl.*Dumping current stream.*"
                "ConnectionImpl::StreamImpl.*ConnectionImpl");
@@ -1661,6 +1662,7 @@ TEST_P(Http2DeferredProcessingIntegrationDeathTest,
     return;
   }
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedDataOfDeferredCloseStream(),
+               "(?s)" // Let dot match newline.
                "Crashing as response body over 1000!.*"
                "ActiveStream.*Http2::ConnectionImpl.*Dumping 1 Active Streams.*"
                "ConnectionImpl::StreamImpl.*ConnectionImpl");

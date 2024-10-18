@@ -889,9 +889,10 @@ TEST_F(OverloadManagerImplDeathTest, ProactiveResourceAllocateAndDeallocateResou
   bool resource_deallocated = manager->getThreadLocalOverloadState().tryDeallocateResource(
       Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
   EXPECT_TRUE(resource_deallocated);
-  EXPECT_DEATH(manager->getThreadLocalOverloadState().tryDeallocateResource(
-                   Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1),
-               ".*Cannot deallocate resource, current resource usage is lower than decrement.*");
+  EXPECT_DEATH(
+      manager->getThreadLocalOverloadState().tryDeallocateResource(
+          Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1),
+      "(?s).*Cannot deallocate resource, current resource usage is lower than decrement.*");
   manager->stop();
 }
 
