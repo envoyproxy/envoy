@@ -116,7 +116,7 @@ public:
       const std::string& address, const DnsLookupFamily lookup_family,
       const DnsResolver::ResolutionStatus expected_status, const bool expected_results,
       const bool exit_dispatcher = true,
-      const absl::optional<std::vector<HasTraceMatcherP<AppleDnsTrace>>> expected_traces =
+      const absl::optional<std::vector<HasTraceMatcherP<AppleDnsTrace>>>&& expected_traces =
           absl::nullopt) {
     active_dns_query_ =
         resolver_->resolve(address, lookup_family,
