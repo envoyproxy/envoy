@@ -741,6 +741,8 @@ protected:
   Event::FileReadyCb file_ready_cb_;
 };
 
+using AppleDnsImplFakeApiDeathTest = AppleDnsImplFakeApiTest;
+
 TEST_F(AppleDnsImplFakeApiTest, IncludeUnroutableFamiliesConfigFalse) {
   config_.set_include_unroutable_families(false);
   EXPECT_EQ(false, config_.include_unroutable_families());
@@ -786,7 +788,7 @@ TEST_F(AppleDnsImplFakeApiTest, ErrorInSocketAccess) {
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "dns.apple.socket_failure")->value());
 }
 
-TEST_F(AppleDnsImplFakeApiTest, InvalidFileEvent) {
+TEST_F(AppleDnsImplFakeApiDeathTest, InvalidFileEvent) {
   file_event_ = new NiceMock<Event::MockFileEvent>;
 
   const std::string hostname = "foo.com";
@@ -1304,7 +1306,7 @@ TEST_F(AppleDnsImplFakeApiTest, ResultWithOnlyNonAdditiveReplies) {
   dns_callback_executed.WaitForNotification();
 }
 
-TEST_F(AppleDnsImplFakeApiTest, ResultWithNullAddress) {
+TEST_F(AppleDnsImplFakeApiDeathTest, ResultWithNullAddress) {
   const std::string hostname = "foo.com";
   sockaddr_in addr4;
   memset(&addr4, 0, sizeof(addr4));

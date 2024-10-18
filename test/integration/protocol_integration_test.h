@@ -58,4 +58,8 @@ protected:
   const int buffer_limit_ = 100;
 };
 
+// DeathTest aliases.
+using ProtocolIntegrationDeathTest = ProtocolIntegrationTest;
+using DownstreamProtocolIntegrationDeathTest = DownstreamProtocolIntegrationTest;
+
 } // namespace Envoy

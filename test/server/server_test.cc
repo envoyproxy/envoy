@@ -347,6 +347,8 @@ protected:
   ServerInstanceImplTest() { version_ = GetParam(); }
 };
 
+using ServerInstanceImplDeathTest = ServerInstanceImplTest;
+
 // Custom StatsSink that just increments a counter when flush is called.
 class CustomStatsSink : public Stats::Sink {
 public:
@@ -391,6 +393,10 @@ private:
   std::function<void()> on_workers_started_cb_;
 };
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplDeathTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -406,7 +412,7 @@ TEST_P(ServerInstanceImplTest, WithErrorCustomInlineHeaders) {
       EnvoyException, "Header set-cookie cannot be registered as an inline header.");
 }
 
-TEST_P(ServerInstanceImplTest, WithDeathCustomInlineHeaders) {
+TEST_P(ServerInstanceImplDeathTest, WithDeathCustomInlineHeaders) {
 #if !defined(NDEBUG)
   // The finalize() of Http::CustomInlineHeaderRegistry will be called after the first successful
   // instantiation of InstanceImpl. If InstanceImpl is instantiated again and the inline header is
@@ -421,7 +427,7 @@ TEST_P(ServerInstanceImplTest, WithDeathCustomInlineHeaders) {
 }
 
 // Test whether the custom inline headers can be registered correctly.
-TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
+TEST_P(ServerInstanceImplDeathTest, WithCustomInlineHeaders) {
   static bool is_registered = false;
 
   if (!is_registered) {
@@ -784,7 +790,7 @@ TEST_P(ServerInstanceImplTest, ShutdownBeforeWorkersStarted) {
   server_thread->join();
 }
 
-TEST_P(ServerInstanceImplTest, Stats) {
+TEST_P(ServerInstanceImplDeathTest, Stats) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   options_.concurrency_ = 2;
@@ -1519,7 +1525,7 @@ public:
   bool isAsyncSignalSafe() const override { return false; }
 };
 
-TEST_P(ServerInstanceImplTest, WithFatalActions) {
+TEST_P(ServerInstanceImplDeathTest, WithFatalActions) {
   // Inject Safe Factory.
   NiceMock<Configuration::MockFatalActionFactory> mock_safe_factory;
   EXPECT_CALL(mock_safe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {

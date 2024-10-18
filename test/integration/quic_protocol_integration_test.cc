@@ -65,8 +65,19 @@ INSTANTIATE_TEST_SUITE_P(DownstreamProtocols, DownstreamProtocolIntegrationTest,
                              {Http::CodecType::HTTP3}, {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(DownstreamProtocols, DownstreamProtocolIntegrationDeathTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP3}, {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 // These will run with HTTP/3 downstream, and Http and HTTP/2 upstream.
 INSTANTIATE_TEST_SUITE_P(DownstreamProtocols, ProtocolIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(DownstreamProtocols, ProtocolIntegrationDeathTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP3},
                              {Http::CodecType::HTTP1, Http::CodecType::HTTP2})),
@@ -79,7 +90,19 @@ INSTANTIATE_TEST_SUITE_P(UpstreamProtocols, DownstreamProtocolIntegrationTest,
                              {Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(UpstreamProtocols, DownstreamProtocolIntegrationDeathTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP3})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 INSTANTIATE_TEST_SUITE_P(UpstreamProtocols, ProtocolIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP3})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(UpstreamProtocols, ProtocolIntegrationDeathTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
                              {Http::CodecType::HTTP3})),
