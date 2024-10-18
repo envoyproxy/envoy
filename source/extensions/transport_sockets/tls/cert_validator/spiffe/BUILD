@@ -27,6 +27,7 @@ envoy_cc_extension(
         "//source/common/common:utility_lib",
         "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/common/tls:stats_lib",
