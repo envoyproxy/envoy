@@ -15,7 +15,7 @@ namespace Tcp {
 namespace Generic {
 
 TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
-    Upstream::ThreadLocalCluster& thread_local_cluster,
+    Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
     TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
     Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
@@ -31,11 +31,11 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
       pool_type = Http::CodecType::HTTP1;
     }
     auto ret = std::make_unique<TcpProxy::HttpConnPool>(
-        thread_local_cluster, context, *config, upstream_callbacks, stream_decoder_callbacks,
+        host, thread_local_cluster, context, *config, upstream_callbacks, stream_decoder_callbacks,
         pool_type, downstream_info);
     return (ret->valid() ? std::move(ret) : nullptr);
   }
-  auto ret = std::make_unique<TcpProxy::TcpConnPool>(thread_local_cluster, context,
+  auto ret = std::make_unique<TcpProxy::TcpConnPool>(host, thread_local_cluster, context,
                                                      upstream_callbacks, downstream_info);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
