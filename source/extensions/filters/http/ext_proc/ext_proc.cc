@@ -1196,6 +1196,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // and filter is waiting for header processing response.
   // Otherwise, the response mode_override proto field is ignored.
   if (config_->allowModeOverride() && !config_->sendBodyWithoutWaitingForHeaderResponse() &&
+      (config_->processingMode().request_body_mode() != ProcessingMode::MXN)  &&
+      (config_->processingMode().response_body_mode() != ProcessingMode::MXN) &&
       inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
     const auto& mode_overide = response->mode_override();

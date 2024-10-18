@@ -312,7 +312,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         const uint32_t chunks_received =
             common_response.body_mutation().mxn_resp().chunks_received();
         if (body_mode_ != ProcessingMode::MXN || chunks_received > chunk_queue_.size()) {
-          ENVOY_LOG(debug, "Incorrect: chunks_received {} > queue size {}", chunks_received,
+          ENVOY_LOG(debug, "body_mode_ not MXN or chunks_received {} > queue size {}", chunks_received,
                     chunk_queue_.size());
           return absl::FailedPreconditionError(
               "spurious message: body_mode_ not MXN, or chunks_received is too big");
