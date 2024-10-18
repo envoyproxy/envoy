@@ -1026,19 +1026,10 @@ protected:
   }
 };
 
-using Http2DeferredProcessingIntegrationDeathTest = Http2DeferredProcessingIntegrationTest;
-
 // We run with buffer accounting in order to verify the amount of data in the
 // system. Buffer accounting isn't necessary for deferring http2 processing.
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2DeferredProcessingIntegrationTest,
-    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
-                     testing::Values(true)),
-    protocolTestParamsAndBoolToString);
-
-INSTANTIATE_TEST_SUITE_P(
-    IpVersions, Http2DeferredProcessingIntegrationDeathTest,
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
                      testing::Values(true)),
@@ -1636,6 +1627,15 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
 // If we don't install any signal handlers (i.e. due to compile options), we
 // won't get the crash report.
 #ifdef ENVOY_HANDLE_SIGNALS
+
+using Http2DeferredProcessingIntegrationDeathTest = Http2DeferredProcessingIntegrationTest;
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, Http2DeferredProcessingIntegrationDeathTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                     testing::Values(true)),
+    protocolTestParamsAndBoolToString);
 
 TEST_P(Http2DeferredProcessingIntegrationDeathTest,
        CanDumpCrashInformationWhenProcessingBufferedData) {
