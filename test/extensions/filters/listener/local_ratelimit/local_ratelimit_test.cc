@@ -7,6 +7,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 
 #include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
@@ -59,8 +60,8 @@ public:
   uint64_t initialize(const std::string& filter_yaml) {
     envoy::extensions::filters::listener::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYaml(filter_yaml, proto_config);
-    config_ = std::make_shared<FilterConfig>(proto_config, dispatcher_, *stats_store_.rootScope(),
-                                             runtime_);
+    config_ = std::make_shared<FilterConfig>(proto_config, dispatcher_, tls_,
+                                             *stats_store_.rootScope(), runtime_);
     return proto_config.token_bucket().max_tokens();
   }
 
@@ -68,6 +69,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   FilterConfigSharedPtr config_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
 };
 
 // Basic no rate limit case.
