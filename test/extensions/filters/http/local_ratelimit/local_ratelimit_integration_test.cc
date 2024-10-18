@@ -140,6 +140,40 @@ protected:
     }
   }
 
+  IntegrationStreamDecoderPtr makeRequest(const std::string& cluster,
+                                          const std::string& path = "/test/long/url") {
+    return codec_client_->makeRequestWithBody(
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", path},
+                                       {":scheme", "http"},
+                                       {":authority", "host"},
+                                       {"x-envoy-downstream-service-cluster", cluster}},
+        0);
+  }
+
+  void verifyResponse(IntegrationStreamDecoderPtr response, const std::string& expected_status,
+                      size_t expected_body_size) {
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ(expected_status, response->headers().getStatusValue());
+    EXPECT_EQ(expected_body_size, response->body().size());
+  }
+
+  void sendAndVerifyRequest(const std::string& cluster, const std::string& expected_status,
+                            size_t expected_body_size) {
+    auto response = makeRequest(cluster);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, 1);
+    verifyResponse(move(response), expected_status, expected_body_size);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ(0U, upstream_request_->bodyLength());
+  }
+  void sendRateLimitedRequest(const std::string& cluster) {
+    auto response = makeRequest(cluster);
+    verifyResponse(move(response), "429",
+                   18); // 18 is the expected body size for rate-limited responses.
+  }
+
   static constexpr absl::string_view filter_config_ =
       R"EOF(
 name: envoy.filters.http.local_ratelimit
@@ -343,41 +377,31 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
   initializeFilter(fmt::format(filter_config_with_blank_value_descriptor_, "false"));
+  // filter is adding dynamic descriptors based on the request header
+  // 'x-envoy-downstream-service-cluster' and the token bucket is set to 1 token per fill interval
+  // of 1000s which means only one request is allowed per 1000s for each unique value of
+  // 'x-envoy-downstream-service-cluster' header.
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"x-envoy-downstream-service-cluster", "foo"}},
-      0);
-
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(default_response_headers_, 1);
-
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(upstream_request_->complete());
-  EXPECT_EQ(0U, upstream_request_->bodyLength());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ(0, response->body().size());
-
+  sendAndVerifyRequest("foo", "200", 0);
   cleanupUpstreamAndDownstream();
 
+  // 1 token is exhausted for 'foo' cluster, so the next request with the same cluster should be
+  // rate limited.
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  response = codec_client_->makeRequestWithBody(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"x-envoy-downstream-service-cluster", "foo"}},
-      0);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("429", response->headers().getStatusValue());
-  EXPECT_EQ(18, response->body().size());
+  sendRateLimitedRequest("foo");
+  cleanupUpstreamAndDownstream();
+
+  // The next request with a different cluster, 'bar', should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("bar", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  // 1 token is exhausted for 'bar' cluster as well, so the next request with the same cluster
+  // should be rate limited.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRateLimitedRequest("bar");
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestPerProcess) {
