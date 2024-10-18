@@ -31,6 +31,16 @@ using testing::Return;
 namespace Envoy {
 
 namespace Server {
+
+class CallbackHandle : public ServerLifecycleNotifier::Handle {
+public:
+  explicit CallbackHandle(std::function<void()> cleanup) : cleanup_(std::move(cleanup)) {}
+  ~CallbackHandle() override { cleanup_(); }
+
+private:
+  std::function<void()> cleanup_;
+};
+
 class MockServerLifecycleNotifier2 : public ServerLifecycleNotifier {
 public:
   MockServerLifecycleNotifier2() = default;
@@ -629,6 +639,65 @@ TEST_P(WasmCommonTest, WASI) {
         return root_context;
       });
   wasm->start(plugin);
+}
+
+TEST_P(WasmCommonTest, ShutdownCallback) {
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  NiceMock<Server::MockServerLifecycleNotifier2> lifecycle_notifier;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  RemoteAsyncDataProviderPtr remote_data_provider;
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  *plugin_config.mutable_vm_config()->mutable_runtime() =
+      absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
+
+  ServerLifecycleNotifier::StageCallbackWithCompletion lifecycle_callback;
+  bool callback_unregistered = false;
+  EXPECT_CALL(lifecycle_notifier, registerCallback2(_, _))
+      .WillRepeatedly(
+          Invoke([&](ServerLifecycleNotifier::Stage,
+                     StageCallbackWithCompletion callback) -> ServerLifecycleNotifier::HandlePtr {
+            lifecycle_callback = callback;
+            return std::make_unique<Server::CallbackHandle>(
+                [&callback_unregistered] { callback_unregistered = true; });
+          }));
+
+  auto vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm")));
+  } else {
+    code = "CommonWasmTestCpp";
+  }
+  EXPECT_FALSE(code.empty());
+  vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+
+  WasmHandleSharedPtr wasm_handle;
+  createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,
+             remote_data_provider,
+             [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
+  EXPECT_NE(wasm_handle, nullptr);
+
+  // Deleting this handle unique pointer will unregister the callback.
+  // The handler is latched in shutdown_handler_, so this will be false.
+  EXPECT_FALSE(callback_unregistered);
+
+  wasm_handle.reset();
+  plugin.reset();
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher->clearDeferredDeleteList();
+
+  proxy_wasm::clearWasmCachesForTesting();
+  EXPECT_TRUE(callback_unregistered);
 }
 
 TEST_P(WasmCommonTest, VmCache) {
