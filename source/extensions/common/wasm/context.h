@@ -374,6 +374,22 @@ protected:
   Http::HeaderMap* getMap(WasmHeaderMapType type);
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);
 
+  void onHeadersModified(WasmHeaderMapType type) {
+    if (type != WasmHeaderMapType::RequestHeaders) {
+      return;
+    }
+
+    // Only do this for request headers.
+    if (!no_automatic_route_refresh_) {
+      clearRouteCache();
+    } else {
+      ENVOY_LOG_FIRST_N(critical, 5,
+                        "Route will no be refreshed automatically when request headers are "
+                        "modified by the wasm plugin. Refresh the route manually by calling the "
+                        "'clear_route_cache' foreign function. ");
+    }
+  }
+
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
   PluginHandleSharedPtr plugin_handle_{nullptr};
 
@@ -450,6 +466,9 @@ protected:
   // Filter state prototype declaration.
   absl::flat_hash_map<std::string, Filters::Common::Expr::CelStatePrototypeConstPtr>
       state_prototypes_;
+
+  const bool no_automatic_route_refresh_{
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_no_automatic_route_refresh")};
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 
