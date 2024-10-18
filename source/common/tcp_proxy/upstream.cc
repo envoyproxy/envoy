@@ -295,7 +295,7 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
       thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);
 }
 
-std::unique_ptr<Router::GenericConnPool>
+std::shared_ptr<Router::GenericConnPool>
 HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
                              Upstream::LoadBalancerContext* context,
                              absl::optional<Http::Protocol> protocol) {
@@ -308,7 +308,7 @@ HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
 
   return factory->createGenericConnPool(
       cluster, Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context);
+      decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context, cluster.info()->upstreamConfig()->typed_config());
 }
 
 HttpConnPool::~HttpConnPool() {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
+#include "contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha/golang.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/router.h"
 
@@ -9,28 +9,33 @@ namespace Extensions {
 namespace Upstreams {
 namespace Http {
 namespace Tcp {
+namespace Golang {
 
 /**
  * Config registration for the TcpConnPool. @see Router::GenericConnPoolFactory
  */
-class TcpGenericConnPoolFactory : public Router::GenericConnPoolFactory {
+class GolangGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
-  std::string name() const override { return "envoy.filters.connection_pools.http.tcp"; }
+  std::string name() const override { return "envoy.upstreams.http.tcp.golang"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         Upstream::ResourcePriority priority,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
-                        Upstream::LoadBalancerContext* ctx, const Protobuf::Message&) const override;
+                        Upstream::LoadBalancerContext* ctx,
+                        const Protobuf::Message& config) const override;
+
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto>();
+    return std::make_unique<
+        envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config>();
   }
 };
 
-DECLARE_FACTORY(TcpGenericConnPoolFactory);
+DECLARE_FACTORY(DubboTcpGenericConnPoolFactory);
 
-} // namespace Tcp
+} // namespace Golang
+} // namespace DubboTcp
 } // namespace Http
 } // namespace Upstreams
 } // namespace Extensions

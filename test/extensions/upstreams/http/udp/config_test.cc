@@ -25,6 +25,7 @@ protected:
   Upstream::ResourcePriority priority_ = Upstream::ResourcePriority::Default;
   Upstream::HostConstSharedPtr host_;
   UdpGenericConnPoolFactory factory_;
+  ProtobufTypes::MessagePtr message_{new Envoy::ProtobufWkt::Struct()};
 };
 
 TEST_F(UdpGenericConnPoolFactoryTest, CreateValidUdpConnPool) {
@@ -32,14 +33,14 @@ TEST_F(UdpGenericConnPoolFactoryTest, CreateValidUdpConnPool) {
   EXPECT_CALL(thread_local_cluster_.lb_, chooseHost).WillOnce(Return(host));
   EXPECT_TRUE(factory_.createGenericConnPool(thread_local_cluster_,
                                              Router::GenericConnPoolFactory::UpstreamProtocol::UDP,
-                                             priority_, Envoy::Http::Protocol::Http2, nullptr));
+                                             priority_, Envoy::Http::Protocol::Http2, nullptr, *message_));
 }
 
 TEST_F(UdpGenericConnPoolFactoryTest, CreateInvalidUdpConnPool) {
   EXPECT_CALL(thread_local_cluster_.lb_, chooseHost).WillOnce(Return(nullptr));
   EXPECT_FALSE(factory_.createGenericConnPool(thread_local_cluster_,
                                               Router::GenericConnPoolFactory::UpstreamProtocol::UDP,
-                                              priority_, Envoy::Http::Protocol::Http2, nullptr));
+                                              priority_, Envoy::Http::Protocol::Http2, nullptr, *message_));
 }
 
 } // namespace Udp
