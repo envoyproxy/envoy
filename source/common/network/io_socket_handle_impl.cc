@@ -28,6 +28,14 @@ constexpr int messageTypeContainsIP() {
 #endif
 }
 
+constexpr bool platformIsApple() {
+#ifdef __APPLE__
+  return true;
+#else
+  return false;
+#endif
+}
+
 in_addr addressFromMessage(const cmsghdr& cmsg) {
 #ifdef IP_RECVDSTADDR
   return *reinterpret_cast<const in_addr*>(CMSG_DATA(&cmsg));
@@ -167,9 +175,27 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     return Api::ioCallUint64ResultNoError();
   }
 
+#ifdef __APPLE__
+  sockaddr_in6 sin6;
+  if (domain_ == AF_INET6 && self_ip->version() == Address::IpVersion::v4) {
+    memset(&sin6, 0, sizeof(sin6));
+    sin6.sin6_family = AF_INET6;
+    sin6.sin6_port = reinterpret_cast<sockaddr_in*>(sock_addr)->sin_port;
+    sin6.sin6_addr.__u6_addr.__u6_addr32[2] = htonl(0xffff);
+    sin6.sin6_addr.__u6_addr.__u6_addr32[3] = peer_address.ip()->ipv4()->address();
+  }
+#endif
+
   msghdr message;
-  message.msg_name = reinterpret_cast<void*>(sock_addr);
-  message.msg_namelen = address_base->sockAddrLen();
+  if (platformIsApple() && domain_ == AF_INET6 && self_ip->version() == Address::IpVersion::v4) {
+#ifdef __APPLE__
+    message.msg_name = reinterpret_cast<void*>(&sin6);
+    message.msg_namelen = sizeof(sin6);
+#endif
+  } else {
+    message.msg_name = reinterpret_cast<void*>(sock_addr);
+    message.msg_namelen = address_base->sockAddrLen();
+  }
   message.msg_iov = iov.begin();
   message.msg_iovlen = num_slices_to_write;
   message.msg_flags = 0;
@@ -183,9 +209,14 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
 
+#ifdef __APPLE__
+    // Apple always wants IPv4-mapped IPv6 addresses for AF_INET6 sockets.
+    const size_t cmsg_space = (domain_ == AF_INET6) ? space_v6 : space_v4;
+#else
     // FreeBSD only needs in_addr size, but allocates more to unify code in two platforms.
     const size_t cmsg_space = (self_ip->version() == Address::IpVersion::v4) ? space_v4 : space_v6;
-    // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
+#endif
+
     absl::FixedArray<char> cbuf(cmsg_space);
     memset(cbuf.begin(), 0, cmsg_space);
 
@@ -195,17 +226,34 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     RELEASE_ASSERT(cmsg != nullptr, fmt::format("cbuf with size {} is not enough, cmsghdr size {}",
                                                 sizeof(cbuf), sizeof(cmsghdr)));
     if (self_ip->version() == Address::IpVersion::v4) {
-      cmsg->cmsg_level = IPPROTO_IP;
+      if (platformIsApple() && domain_ == AF_INET6) {
+        cmsg->cmsg_level = IPPROTO_IPV6;
+      } else {
+        cmsg->cmsg_level = IPPROTO_IP;
+      }
 #ifndef IP_SENDSRCADDR
-      cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
-      cmsg->cmsg_type = IP_PKTINFO;
-      auto pktinfo = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
-      pktinfo->ipi_ifindex = 0;
+      if (platformIsApple() && domain_ == AF_INET6) {
+#ifdef __APPLE__
+        cmsg->cmsg_len = CMSG_LEN(sizeof(in6_pktinfo));
+        cmsg->cmsg_type = IPV6_PKTINFO;
+
+        auto pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+        pktinfo->ipi6_ifindex = 0;
+        pktinfo->ipi6_addr.__u6_addr.__u6_addr32[2] = htonl(0xffff);
+        pktinfo->ipi6_addr.__u6_addr.__u6_addr32[3] = self_ip->ipv4()->address();
+#endif // __APPLE__
+      } else {
+        cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
+        cmsg->cmsg_type = IP_PKTINFO;
+
+        auto pktinfo = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
+        pktinfo->ipi_ifindex = 0;
 #ifdef WIN32
-      pktinfo->ipi_addr.s_addr = self_ip->ipv4()->address();
+        pktinfo->ipi_addr.s_addr = self_ip->ipv4()->address();
 #else
-      pktinfo->ipi_spec_dst.s_addr = self_ip->ipv4()->address();
-#endif
+        pktinfo->ipi_spec_dst.s_addr = self_ip->ipv4()->address();
+#endif // WIN32
+      }
 #else
       cmsg->cmsg_type = IP_SENDSRCADDR;
       cmsg->cmsg_len = CMSG_LEN(sizeof(in_addr));
