@@ -1026,6 +1026,7 @@ case $CI_TARGET in
         ;;
 
     refresh_compdb)
+        setup_clang_toolchain
         # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
         # So the compdb headers won't be overwritten by another bazel run.
         for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do
