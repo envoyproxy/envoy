@@ -61,8 +61,8 @@ void SharedRateLimitSingleton::removeIfUnused(const Key* key) {
 
 Config::Config(
     const envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& proto_config,
-    Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
-    Singleton::Manager& singleton_manager)
+    Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls, Stats::Scope& scope,
+    Runtime::Loader& runtime, Singleton::Manager& singleton_manager)
     : enabled_(proto_config.runtime_enabled(), runtime),
       stats_(generateStats(proto_config.stat_prefix(), scope)),
       shared_bucket_registry_(singleton_manager.getTyped<SharedRateLimitSingleton>(
@@ -75,7 +75,7 @@ Config::Config(
             PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval)),
         proto_config.token_bucket().max_tokens(),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.token_bucket(), tokens_per_fill, 1),
-        dispatcher,
+        dispatcher, tls,
         Protobuf::RepeatedPtrField<
             envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>());
   });

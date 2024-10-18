@@ -8,6 +8,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -28,12 +29,13 @@ public:
   uint64_t initialize(const std::string& filter_yaml) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml, proto_config);
-    config_ = std::make_shared<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
+    config_ = std::make_shared<Config>(proto_config, dispatcher_, tls_, *stats_store_.rootScope(),
                                        runtime_, singleton_manager_);
     return proto_config.token_bucket().max_tokens();
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   Singleton::ManagerImpl singleton_manager_;
@@ -137,7 +139,7 @@ public:
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml2, proto_config);
     const uint64_t config2_tokens = proto_config.token_bucket().max_tokens();
-    config2_ = std::make_shared<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
+    config2_ = std::make_shared<Config>(proto_config, dispatcher_, tls_, *stats_store_.rootScope(),
                                         runtime_, singleton_manager_);
 
     // This test just uses the initial tokens without ever refilling.
@@ -229,8 +231,8 @@ token_bucket:
     std::string yaml = fmt::format(yaml_template, i);
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(yaml, proto_config);
-    configs.push_back(std::make_unique<Config>(proto_config, dispatcher_, *stats_store_.rootScope(),
-                                               runtime_, singleton_manager_));
+    configs.push_back(std::make_unique<Config>(
+        proto_config, dispatcher_, tls_, *stats_store_.rootScope(), runtime_, singleton_manager_));
   }
 
   configs.clear();

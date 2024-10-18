@@ -52,16 +52,14 @@ class PerConnectionRateLimiter : public StreamInfo::FilterState::Object {
 public:
   PerConnectionRateLimiter(
       const std::chrono::milliseconds& fill_interval, uint32_t max_tokens, uint32_t tokens_per_fill,
-      Envoy::Event::Dispatcher& dispatcher,
+      Envoy::Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptor,
       bool always_consume_default_token_bucket)
-      : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor,
+      : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, tls, descriptor,
                       always_consume_default_token_bucket) {}
   static const std::string& key();
-  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() const {
-    return rate_limiter_;
-  }
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() { return rate_limiter_; }
 
 private:
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
@@ -90,6 +88,7 @@ public:
   requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
+  ThreadLocal::SlotAllocator& tls() { return tls_; }
   LocalRateLimitStats& stats() const { return stats_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   const Router::HeaderParser& requestHeadersParser() const { return *request_headers_parser_; }
@@ -164,6 +163,7 @@ private:
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
+  ThreadLocal::SlotAllocator& tls_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -193,7 +193,7 @@ private:
                            std::vector<RateLimit::LocalDescriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
-  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
   requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 

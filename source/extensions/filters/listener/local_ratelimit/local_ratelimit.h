@@ -36,7 +36,8 @@ class FilterConfig : Logger::Loggable<Logger::Id::filter> {
 public:
   FilterConfig(
       const envoy::extensions::filters::listener::local_ratelimit::v3::LocalRateLimit& proto_config,
-      Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime);
+      Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls, Stats::Scope& scope,
+      Runtime::Loader& runtime);
 
   ~FilterConfig() = default;
 
