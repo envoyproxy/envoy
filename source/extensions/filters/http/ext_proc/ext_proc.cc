@@ -72,6 +72,29 @@ initGrpcService(const ExtProcPerRoute& config) {
   return absl::nullopt;
 }
 
+void verifyProcessingModeConfig(const ExternalProcessor& config) {
+  const auto& processing_mode = config.processing_mode();
+  if (config.has_http_service()) {
+    // In case http_service configured, the processing mode can only support sending headers.
+    if (processing_mode.request_body_mode() != ProcessingMode::NONE ||
+        processing_mode.response_body_mode() != ProcessingMode::NONE ||
+        processing_mode.request_trailer_mode() == ProcessingMode::SEND ||
+        processing_mode.response_trailer_mode() == ProcessingMode::SEND) {
+      throw EnvoyException(
+          "If http_service is configured, processing modes can not send any body or trailer.");
+    }
+  }
+
+  if ((processing_mode.request_body_mode() == ProcessingMode::MXN) &&
+      (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
+    throw EnvoyException("If request_body_mode is MXN, then request_trailer_mode has to be SEND");
+  }
+  if ((processing_mode.response_body_mode() == ProcessingMode::MXN) &&
+      (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
+    throw EnvoyException("If response_body_mode is MXN, then response_trailer_mode has to be SEND");
+  }
+}
+
 std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
   std::vector<std::string> namespaces;
   for (const auto& single_ns : ns) {
@@ -231,16 +254,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
-  if (!grpc_service_.has_value()) {
-    // In case http_service configured, the processing mode can only support sending headers.
-    if (processing_mode_.request_body_mode() != ProcessingMode::NONE ||
-        processing_mode_.response_body_mode() != ProcessingMode::NONE ||
-        processing_mode_.request_trailer_mode() == ProcessingMode::SEND ||
-        processing_mode_.response_trailer_mode() == ProcessingMode::SEND) {
-      throw EnvoyException(
-          "If http_service is configured, processing modes can not send any body or trailer.");
-    }
-  }
+  // Validate processing mode configuration.
+  verifyProcessingModeConfig(config);
   if (config.disable_clear_route_cache() && (route_cache_action_ != ExternalProcessor::DEFAULT)) {
     throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
                          "be set to none-default at the same time.");
@@ -554,6 +569,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
+  state.setBodyReceived(true);
+
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
   }
@@ -572,10 +589,12 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   }
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    if (state.bodyMode() == ProcessingMode::STREAMED &&
-        config_->sendBodyWithoutWaitingForHeaderResponse()) {
-      ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
-                       "is STREAMED and send_body_without_waiting_for_header_response is enabled");
+    if ((state.bodyMode() == ProcessingMode::STREAMED &&
+         config_->sendBodyWithoutWaitingForHeaderResponse()) ||
+        state.bodyMode() == ProcessingMode::MXN) {
+      ENVOY_LOG(trace,
+                "Sending body data even header processing is still in progress as body mode "
+                "is MXN or STREAMED and send_body_without_waiting_for_header_response is enabled");
     } else {
       ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
       // We don't know what to do with the body until the response comes back.
@@ -617,8 +636,9 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     state.setPaused(true);
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
-  case ProcessingMode::STREAMED: {
-    // STREAMED body mode works as follows:
+  case ProcessingMode::STREAMED:
+  case ProcessingMode::MXN: {
+    // STREAMED or MXN body mode works as follows:
     //
     // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it
     // dispatches via gRPC message to the external processor, and then keeps in a queue. It
@@ -646,7 +666,11 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
 
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = setupBodyChunk(state, data, end_stream);
-    state.enqueueStreamingChunk(data, end_stream);
+    if (state.bodyMode() != ProcessingMode::MXN) {
+      state.enqueueStreamingChunk(data, end_stream);
+    } else {
+      data.drain(data.length());
+    }
     // If the current state is HeadersCallback, stays in that state.
     if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
       sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
@@ -835,9 +859,15 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   state.setTrailers(&trailers);
 
   if (state.callbackState() != ProcessorState::CallbackState::Idle) {
-    ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
-    state.setPaused(true);
-    return FilterTrailersStatus::StopIteration;
+    if (state.bodyMode() == ProcessingMode::MXN) {
+      ENVOY_LOG(
+          trace,
+          "Body mode is MXN, sending trailers even Envoy is waiting for header or body response");
+    } else {
+      ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
+      state.setPaused(true);
+      return FilterTrailersStatus::StopIteration;
+    }
   }
 
   if (!body_delivered &&
@@ -976,13 +1006,17 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *trailers_req->mutable_trailers());
-
   if (observability_mode) {
     ENVOY_LOG(debug, "Sending trailers message in observability mode");
   } else {
-    state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                               config_->messageTimeout(),
-                               ProcessorState::CallbackState::TrailersCallback);
+    if (state.callbackState() == ProcessorState::CallbackState::Idle) {
+      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
+                                 config_->messageTimeout(),
+                                 ProcessorState::CallbackState::TrailersCallback);
+    } else {
+      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
+                                 config_->messageTimeout(), state.callbackState());
+    }
     ENVOY_LOG(debug, "Sending trailers message");
   }
 
@@ -1168,6 +1202,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // and filter is waiting for header processing response.
   // Otherwise, the response mode_override proto field is ignored.
   if (config_->allowModeOverride() && !config_->sendBodyWithoutWaitingForHeaderResponse() &&
+      (config_->processingMode().request_body_mode() != ProcessingMode::MXN) &&
+      (config_->processingMode().response_body_mode() != ProcessingMode::MXN) &&
       inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
     const auto& mode_overide = response->mode_override();
