@@ -24,26 +24,14 @@ namespace {
 // A magic header value which marks header as not expected.
 constexpr char UnexpectedHeaderValue[] = "Unexpected header value";
 
-std::string ipAndDeferredProcessingParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
-  return fmt::format("{}_{}", TestUtility::ipVersionToString(std::get<0>(p.param)),
-                     std::get<1>(p.param) ? "WithDeferredProcessing" : "NoDeferredProcessing");
-}
-
 // TODO(kbaichoo): Remove parameterizing by deferred processing when the feature
 // is enabled by default. The parameterization is to avoid bit rot since it's
 // off by default.
 class GrpcJsonTranscoderIntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+    : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  GrpcJsonTranscoderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {
-    // Parameterize with defer processing to prevent bit rot as filter made
-    // assumptions of data flow, prior relying on eager processing.
-    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                      deferredProcessing() ? "true" : "false");
-  }
+  GrpcJsonTranscoderIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void SetUp() override {
     setUpstreamProtocol(Http::CodecType::HTTP2);
@@ -239,8 +227,6 @@ typed_config:
 
     config_helper_.addConfigModifier(modifier);
   }
-
-  bool deferredProcessing() const { return std::get<1>(GetParam()); }
 };
 
 class GrpcJsonTranscoderIntegrationTestWithSizeLimit : public GrpcJsonTranscoderIntegrationTest {
@@ -275,22 +261,18 @@ protected:
   uint32_t maxBodySize() const override { return 35; }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsDeferredProcessing, GrpcJsonTranscoderIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ipAndDeferredProcessingParamsToString);
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsDeferredProcessing, GrpcJsonTranscoderIntegrationTestWithSizeLimit1024,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ipAndDeferredProcessingParamsToString);
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsDeferredProcessing, GrpcJsonTranscoderIntegrationTestWithSizeLimit1,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ipAndDeferredProcessingParamsToString);
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsDeferredProcessing, GrpcJsonTranscoderIntegrationTestWithSizeLimit35,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ipAndDeferredProcessingParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTestWithSizeLimit1024,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTestWithSizeLimit1,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTestWithSizeLimit35,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
   HttpIntegrationTest::initialize();
@@ -529,7 +511,6 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueCaseMatch) {
 // After enable the "case_insensitive_enum_parsing" flag,
 // JSON enum value string can be in any case.
 TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
-
   // Enable case_insensitive_enum_parsing flag
   constexpr absl::string_view filter =
       R"EOF(
@@ -1554,41 +1535,20 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"([{"id":"1","author":"Neal Stephenson","title":"Readme"}])");
 
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // Over limit: The server streams two response messages. Because this is
-    // larger than the buffer limits, we end up buffering both results in the
-    // codec towards the upstream. When we finally process the buffered data, we
-    // end up resetting the stream as we've over the transcoder limit.
-    testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
-        Http::TestRequestHeaderMapImpl{
-            {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
-        "", {"shelf: 1"},
-        {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
-         R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
-        Status(),
-        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-        /*expected_response_body=*/"", false, false, "", true,
-        /*expect_response_complete=*/false);
-
-  } else {
-    // Over limit: The server streams two response messages. Even through the transcoder
-    // handles them independently, portions of the first message are still in the
-    // internal buffers while the second one is processed.
-    //
-    // Because the headers and body is already sent, the stream is closed with
-    // an incomplete response.
-    testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
-        Http::TestRequestHeaderMapImpl{
-            {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
-        "", {"shelf: 1"},
-        {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
-         R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
-        Status(),
-        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-        // Incomplete response, not valid JSON.
-        R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", false, false, "", true,
-        /*expect_response_complete=*/false);
-  }
+  // Over limit: The server streams two response messages. Because this is
+  // larger than the buffer limits, we end up buffering both results in the
+  // codec towards the upstream. When we finally process the buffered data, we
+  // end up resetting the stream as we've over the transcoder limit.
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"},
+      {R"(id: 1 author: "Neal Stephenson" title: "Readme")",
+       R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
+      Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      /*expected_response_body=*/"", false, false, "", true,
+      /*expect_response_complete=*/false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetUnderBufferLimit) {
@@ -1661,12 +1621,11 @@ public:
               "proto_descriptor": ""
             )EOF";
     config_helper_.prependFilter(filter);
-  }
-};
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsDeferredProcessing, OverrideConfigGrpcJsonTranscoderIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
-    ipAndDeferredProcessingParamsToString);
+  } // namespace
+};  // namespace Envoy
+INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
   // add bookstore per-route override
