@@ -71,6 +71,8 @@ constexpr absl::string_view DNSSanLocalCertificate = "dns_san_local_certificate"
 constexpr absl::string_view DNSSanPeerCertificate = "dns_san_peer_certificate";
 constexpr absl::string_view SHA256PeerCertificateDigest = "sha256_peer_certificate_digest";
 constexpr absl::string_view DownstreamTransportFailureReason = "transport_failure_reason";
+constexpr absl::string_view DownstreamBytesSent = "downstream_bytes_sent";
+constexpr absl::string_view DownstreamBytesReceived = "downstream_bytes_received";
 
 // Source properties
 constexpr absl::string_view Source = "source";

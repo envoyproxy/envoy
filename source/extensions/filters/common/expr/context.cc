@@ -224,6 +224,10 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
       return CelValue::CreateStringView(info_.downstreamTransportFailureReason());
     }
     return {};
+  } else if (value == DownstreamBytesSent) {
+    return CelValue::CreateInt64(info_.getDownstreamBytesMeter()->wireBytesSent());
+  } else if (value == DownstreamBytesReceived) {
+    return CelValue::CreateInt64(info_.getDownstreamBytesMeter()->wireBytesReceived());
   }
 
   auto ssl_info = info_.downstreamAddressProvider().sslConnection();
