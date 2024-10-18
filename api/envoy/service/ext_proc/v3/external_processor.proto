@@ -369,10 +369,6 @@ message MxnBodyResponse {
 
   // Set this flag to true if this is the last chunk of body response, regardless whether
   // there is trailer after it.
-  //
-  // In the case if the server needs to buffer large amount of data before sending back responses,
-  // to avoid Envoy timeout events being triggered, the server  needs to send a ``BodyMutation``
-  // message back to Envoy with ``end_of_body`` set to false.
   bool end_of_body = 2;
 }
 
