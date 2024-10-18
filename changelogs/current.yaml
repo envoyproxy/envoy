@@ -29,6 +29,9 @@ removed_config_or_runtime:
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
 
 new_features:
+- area: router_check_tool
+  change: |
+    Added support for loading runtime flags to all tests.
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.

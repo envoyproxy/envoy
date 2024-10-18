@@ -16,6 +16,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 #include "test/test_common/printers.h"
@@ -127,16 +128,35 @@ ToolConfig::ToolConfig(std::unique_ptr<Http::TestRequestHeaderMapImpl> request_h
 
 // static
 RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
+                                        const std::string& validation_config_file,
                                         const bool disable_deprecation_check) {
-  // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
-  envoy::config::route::v3::RouteConfiguration route_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
+
+  envoy::config::route::v3::RouteConfiguration route_config;
   TestUtility::loadFromFile(router_config_file, route_config, *api);
   assignUniqueRouteNames(route_config);
   assignRuntimeFraction(route_config);
+
+  envoy::RouterCheckToolSchema::Validation validation_config;
+  TestUtility::loadFromFile(validation_config_file, validation_config, *api);
+  TestUtility::validate(validation_config);
+
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
+
+  if (validation_config.has_runtime()) {
+    envoy::config::bootstrap::v3::LayeredRuntime layered_runtime;
+    layered_runtime.add_layers()->mutable_static_layer()->MergeFrom(validation_config.runtime());
+
+    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
+        factory_context->dispatcher_, factory_context->thread_local_, layered_runtime,
+        factory_context->local_info_, factory_context->api_.stats_store_,
+        factory_context->api_.random_,
+        factory_context->validation_context_.dynamicValidationVisitor(), factory_context->api());
+    THROW_IF_NOT_OK(loader.status());
+  }
+
   auto config = *Router::ConfigImpl::create(route_config, *factory_context,
                                             ProtobufMessage::getNullValidationVisitor(), false);
   if (!disable_deprecation_check) {
@@ -226,20 +246,11 @@ RouterCheckTool::RouterCheckTool(
       .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
 }
 
-Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
-  std::string contents = api.fileSystem().fileReadToEnd(file_path).value();
-  if (absl::EndsWith(file_path, ".yaml")) {
-    contents = MessageUtil::getJsonStringFromMessageOrError(ValueUtil::loadFromYaml(contents));
-  }
-  return Json::Factory::loadFromString(contents);
-}
-
 std::vector<envoy::RouterCheckToolSchema::ValidationItemResult>
 RouterCheckTool::compareEntries(const std::string& expected_routes) {
   envoy::RouterCheckToolSchema::Validation validation_config;
   auto stats = std::make_unique<Stats::IsolatedStoreImpl>();
   auto api = Api::createApiForTest(*stats);
-  const std::string contents = api->fileSystem().fileReadToEnd(expected_routes).value();
   TestUtility::loadFromFile(expected_routes, validation_config, *api);
   TestUtility::validate(validation_config);
 
