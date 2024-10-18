@@ -115,7 +115,8 @@ TEST(TestConfig, ConfigIsApplied) {
       "key: \"app_version\" value { string_value: \"1.2.3\" } }",
       "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
       "validation_context { trusted_ca {",
-  };
+      "initial_stream_window_size { value: 6291456 }",
+      "initial_connection_window_size { value: 15728640 }"};
 
   for (const auto& string : must_contain) {
     EXPECT_THAT(config_str, HasSubstr(string)) << "'" << string << "' not found in " << config_str;

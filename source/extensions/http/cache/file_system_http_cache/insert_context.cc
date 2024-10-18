@@ -193,7 +193,10 @@ void FileInsertContext::insertTrailers(const Http::ResponseTrailerMap& trailers,
   cancel_action_in_flight_ = std::move(queued.value());
 }
 
-void FileInsertContext::onDestroy() { cancelInsert("InsertContext destroyed prematurely"); }
+void FileInsertContext::onDestroy() {
+  lookup_context_->onDestroy();
+  cancelInsert("InsertContext destroyed prematurely");
+}
 
 void FileInsertContext::commit() {
   ASSERT(dispatcher()->isThreadSafe());

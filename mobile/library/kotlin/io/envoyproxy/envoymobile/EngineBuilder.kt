@@ -26,7 +26,7 @@ open class EngineBuilder() {
     )
   }
   private var logLevel = LogLevel.INFO
-  private var connectTimeoutSeconds = 30
+  private var connectTimeoutSeconds = 10
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10

@@ -64,7 +64,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
-RUNTIME_GUARD(envoy_reloadable_features_http_route_connect_proxy_by_default);
 RUNTIME_GUARD(envoy_reloadable_features_internal_authority_header_validator);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_remove_jwt_from_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_validate_uri);
@@ -113,7 +112,6 @@ RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
 RUNTIME_GUARD(envoy_restart_features_quic_handle_certs_with_shared_tls_code);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
-RUNTIME_GUARD(envoy_restart_features_use_fast_protobuf_hash);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
