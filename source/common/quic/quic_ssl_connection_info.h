@@ -32,6 +32,9 @@ public:
   const std::string& serialNumberPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& issuerPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& subjectPeerCertificate() const override { return EMPTY_STRING; }
+  Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override {
+    return absl::nullopt;
+  }
   const std::string& urlEncodedPemEncodedPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override {
     return EMPTY_STRING;

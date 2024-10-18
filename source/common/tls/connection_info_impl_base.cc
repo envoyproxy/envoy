@@ -376,6 +376,19 @@ const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {
   return cached_subject_peer_certificate_;
 }
 
+Ssl::ParsedX509NameOptConstRef ConnectionInfoImplBase::parsedSubjectPeerCertificate() const {
+  if (cached_parsed_subject_peer_certificate_) {
+    return Ssl::ParsedX509NameOptConstRef(*cached_parsed_subject_peer_certificate_);
+  }
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  if (!cert) {
+    ASSERT(!cached_parsed_subject_peer_certificate_);
+    return Ssl::ParsedX509NameOptConstRef();
+  }
+  cached_parsed_subject_peer_certificate_ = Utility::parseSubjectFromCertificate(*cert);
+  return Ssl::ParsedX509NameOptConstRef(*cached_parsed_subject_peer_certificate_);
+}
+
 const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
   if (!cached_subject_local_certificate_.empty()) {
     return cached_subject_local_certificate_;
