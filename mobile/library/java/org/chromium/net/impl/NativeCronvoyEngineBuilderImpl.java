@@ -69,6 +69,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
+  private int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
 
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
@@ -234,6 +235,12 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return this;
   }
 
+  public NativeCronvoyEngineBuilderImpl
+  setH3ConnectionKeepaliveInitialIntervalMilliseconds(int interval) {
+    mH3ConnectionKeepaliveInitialIntervalMilliseconds = interval;
+    return this;
+  }
+
   public NativeCronvoyEngineBuilderImpl setConnectTimeoutSeconds(int connectTimeout) {
     mConnectTimeoutSeconds = connectTimeout;
     return this;
@@ -302,6 +309,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
         mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
         keyValueStores, mRuntimeGuards, mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
-        mCaresFallbackResolvers);
+        mCaresFallbackResolvers, mH3ConnectionKeepaliveInitialIntervalMilliseconds);
   }
 }

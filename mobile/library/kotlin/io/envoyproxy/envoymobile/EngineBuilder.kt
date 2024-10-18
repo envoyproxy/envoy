@@ -66,6 +66,7 @@ open class EngineBuilder() {
   private var keyValueStores = mutableMapOf<String, EnvoyKeyValueStore>()
   private var enablePlatformCertificatesValidation = false
   private var upstreamTlsSni: String = ""
+  private var h3ConnectionKeepaliveInitialIntervalMilliseconds = 0
 
   /**
    * Sets a log level to use with Envoy.
@@ -549,6 +550,11 @@ open class EngineBuilder() {
     return this
   }
 
+  fun addH3ConnectionKeepaliveInitialIntervalMilliseconds(interval: Int): EngineBuilder {
+    this.h3ConnectionKeepaliveInitialIntervalMilliseconds = interval
+    return this
+  }
+
   /**
    * Builds and runs a new Engine instance with the provided configuration.
    *
@@ -598,6 +604,7 @@ open class EngineBuilder() {
         enablePlatformCertificatesValidation,
         upstreamTlsSni,
         caresFallbackResolvers,
+        h3ConnectionKeepaliveInitialIntervalMilliseconds,
       )
 
     return EngineImpl(engineType(), engineConfiguration, logLevel)
