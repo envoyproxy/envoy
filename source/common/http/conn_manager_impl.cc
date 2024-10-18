@@ -756,6 +756,17 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose(false);
 }
 
+void ConnectionManagerImpl::sendGoAwayandClose() {
+  if (!codec_ || codec_->protocol() != Protocol::Http2) {
+    return;
+  }
+  ENVOY_CONN_LOG(trace, "http2 connection manager sendGoAwayandClose",
+                 read_callbacks_->connection());
+  codec_->goAway();
+  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+                    "forced_goaway");
+}
+
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
                                                ConnectionManagerTracingStats& tracing_stats) {
   switch (tracing_reason) {
