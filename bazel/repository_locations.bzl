@@ -933,15 +933,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/google/googletest",
         # Pick up fix for MOCK_METHOD compilation with clang-cl for Windows (resolved after 1.10.0)
         # see https://github.com/google/googletest/issues/2490
-        version = "a4ab0abb93620ce26efad9de9296b73b16e88588",
-        sha256 = "7897bfaa5ad39a479177cfb5c3ce010184dbaee22a7c3727b212282871918751",
+        version = "1.15.2",
+        sha256 = "7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926",
         strip_prefix = "googletest-{version}",
-        urls = ["https://github.com/google/googletest/archive/{version}.tar.gz"],
-        release_date = "2020-09-10",
+        urls = ["https://github.com/google/googletest/releases/download/v{version}/googletest-{version}.tar.gz"],
+        release_date = "2024-07-31",
         use_category = ["test_only"],
         cpe = "cpe:2.3:a:google:google_test:*",
         license = "BSD-3-Clause",
-        license_url = "https://github.com/google/googletest/blob/{version}/LICENSE",
+        license_url = "https://github.com/google/googletest/blob/v{version}/LICENSE",
     ),
     com_google_protobuf = dict(
         project_name = "Protocol Buffers",
