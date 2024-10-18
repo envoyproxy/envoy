@@ -8,6 +8,7 @@ py_binary(
     srcs = ["deprecate_guards.py"],
     deps = [
         "@envoy_repo",
+        requirement("aio.run.runner"),
         requirement("gitpython"),
         requirement("pygithub"),
     ],
