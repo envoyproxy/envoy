@@ -194,7 +194,7 @@ def envoy_cc_test(
         ] + envoy_pch_deps(repository, "//test:test_pch"),
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
-        args = args + ["--gmock_default_mock_behavior=2"],
+        args = ["--gmock_default_mock_behavior=2"] + args,
         tags = coverage_tags,
         local = local,
         shard_count = shard_count,
