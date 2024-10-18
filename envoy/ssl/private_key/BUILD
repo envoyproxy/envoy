@@ -26,6 +26,7 @@ envoy_cc_library(
         ":private_key_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/registry",
+        "//envoy/server:factory_context_interface",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

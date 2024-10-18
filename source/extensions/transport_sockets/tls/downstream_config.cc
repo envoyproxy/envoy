@@ -24,8 +24,8 @@ DownstreamSslSocketFactory::createTransportSocketFactory(
           context, false);
   RETURN_IF_NOT_OK(server_config_or_error.status());
   return ServerSslSocketFactory::create(std::move(server_config_or_error.value()),
-                                        context.sslContextManager(), context.statsScope(),
-                                        server_names);
+                                        context.serverFactoryContext().sslContextManager(),
+                                        context.statsScope(), server_names);
 }
 
 ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {

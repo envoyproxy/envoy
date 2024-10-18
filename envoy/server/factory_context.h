@@ -145,6 +145,11 @@ public:
    * @return the server regex engine.
    */
   virtual Regex::Engine& regexEngine() PURE;
+
+  /**
+   * @return Ssl::ContextManager& the SSL context manager.
+   */
+  virtual Ssl::ContextManager& sslContextManager() PURE;
 };
 
 /**

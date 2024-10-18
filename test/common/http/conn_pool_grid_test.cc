@@ -1351,6 +1351,9 @@ namespace {
 TEST_F(ConnectivityGridTest, RealGrid) {
   initialize();
   testing::InSequence s;
+  testing::NiceMock<Ssl::MockContextManager> ssl_context_manager;
+  ON_CALL(factory_context_.server_context_, sslContextManager())
+      .WillByDefault(ReturnRef(ssl_context_manager));
   dispatcher_.allow_null_callback_ = true;
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
@@ -1392,8 +1395,10 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
   // Set the cluster up to have a quic transport socket.
   Envoy::Ssl::ClientContextConfigPtr config(new NiceMock<Ssl::MockClientContextConfig>());
   Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
-  EXPECT_CALL(factory_context_.context_manager_, createSslClientContext(_, _))
-      .WillOnce(Return(ssl_context));
+  testing::NiceMock<Ssl::MockContextManager> ssl_context_manager;
+  ON_CALL(factory_context_.server_context_, sslContextManager())
+      .WillByDefault(ReturnRef(ssl_context_manager));
+  EXPECT_CALL(ssl_context_manager, createSslClientContext(_, _)).WillOnce(Return(ssl_context));
   auto factory =
       *Quic::QuicClientTransportSocketFactory::create(std::move(config), factory_context_);
   factory->initialize();

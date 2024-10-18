@@ -188,8 +188,8 @@ ContextConfigImpl::ContextConfigImpl(
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
       if (provider->secret() != nullptr) {
-        auto config_or_error =
-            Ssl::TlsCertificateConfigImpl::create(*provider->secret(), factory_context, api_);
+        auto config_or_error = Ssl::TlsCertificateConfigImpl::create(
+            *provider->secret(), factory_context.serverFactoryContext());
         SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
         tls_certificate_configs_.emplace_back(std::move(*config_or_error));
       }
@@ -241,8 +241,8 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> ca
           for (const auto& tls_certificate_provider : tls_certificate_providers_) {
             auto* secret = tls_certificate_provider->secret();
             if (secret != nullptr) {
-              auto config_or_error =
-                  Ssl::TlsCertificateConfigImpl::create(*secret, factory_context_, api_);
+              auto config_or_error = Ssl::TlsCertificateConfigImpl::create(
+                  *secret, factory_context_.serverFactoryContext());
               RETURN_IF_NOT_OK(config_or_error.status());
               tls_certificate_configs_.emplace_back(std::move(*config_or_error));
             }
