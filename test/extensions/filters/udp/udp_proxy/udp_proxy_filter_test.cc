@@ -48,11 +48,33 @@ namespace UdpFilters {
 namespace UdpProxy {
 namespace {
 
-class TestUdpProxyFilter : public UdpProxyFilter {
+class TestUdpProxyFilter : public virtual UdpProxyFilter {
 public:
   using UdpProxyFilter::UdpProxyFilter;
 
+  TestUdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
+                     const UdpProxyFilterConfigSharedPtr& config)
+      : UdpProxyFilter(callbacks, config) {}
+
   MOCK_METHOD(Network::SocketPtr, createUdpSocket, (const Upstream::HostConstSharedPtr& host));
+};
+
+class TestStickySessionUdpProxyFilter : public TestUdpProxyFilter,
+                                        public StickySessionUdpProxyFilter {
+public:
+  TestStickySessionUdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
+                                  const UdpProxyFilterConfigSharedPtr& config)
+      : UdpProxyFilter(callbacks, config), TestUdpProxyFilter(callbacks, config),
+        StickySessionUdpProxyFilter(callbacks, config) {}
+};
+
+class TestPerPacketLoadBalancingUdpProxyFilter : public TestUdpProxyFilter,
+                                                 public PerPacketLoadBalancingUdpProxyFilter {
+public:
+  TestPerPacketLoadBalancingUdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
+                                           const UdpProxyFilterConfigSharedPtr& config)
+      : UdpProxyFilter(callbacks, config), TestUdpProxyFilter(callbacks, config),
+        PerPacketLoadBalancingUdpProxyFilter(callbacks, config) {}
 };
 
 Api::IoCallUint64Result makeNoError(uint64_t rc) {
@@ -84,10 +106,13 @@ class UdpProxyFilterTest : public UdpProxyFilterBase {
 public:
   struct TestSession {
     TestSession(UdpProxyFilterTest& parent,
-                const Network::Address::InstanceConstSharedPtr& upstream_address)
+                const Network::Address::InstanceConstSharedPtr& upstream_address,
+                bool is_cluster_available = true)
         : parent_(parent), upstream_address_(upstream_address),
           socket_(new NiceMock<Network::MockSocket>()) {
-      ON_CALL(*socket_, ipVersion()).WillByDefault(Return(upstream_address_->ip()->version()));
+      if (is_cluster_available) {
+        ON_CALL(*socket_, ipVersion()).WillByDefault(Return(upstream_address_->ip()->version()));
+      }
     }
 
     void expectSetIpTransparentSocketOption() {
@@ -256,7 +281,13 @@ public:
     }
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
                 getThreadLocalCluster("fake_cluster"));
-    filter_ = std::make_unique<TestUdpProxyFilter>(callbacks_, config_);
+
+    if (config_->usingPerPacketLoadBalancing()) {
+      filter_ = std::make_unique<TestPerPacketLoadBalancingUdpProxyFilter>(callbacks_, config_);
+    } else {
+      filter_ = std::make_unique<TestStickySessionUdpProxyFilter>(callbacks_, config_);
+    }
+
     expect_gro_ = expect_gro;
   }
 
@@ -270,10 +301,15 @@ public:
     filter_->onData(data);
   }
 
-  void expectSessionCreate(const Network::Address::InstanceConstSharedPtr& address) {
-    test_sessions_.emplace_back(*this, address);
+  void expectSessionCreate(const Network::Address::InstanceConstSharedPtr& address,
+                           bool is_cluster_available = true) {
+    test_sessions_.emplace_back(*this, address, is_cluster_available);
     TestSession& new_session = test_sessions_.back();
     new_session.idle_timer_ = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+    if (!is_cluster_available) {
+      return;
+    }
+
     EXPECT_CALL(*filter_, createUdpSocket(_))
         .WillOnce(Return(ByMove(Network::SocketPtr{test_sessions_.back().socket_})));
     EXPECT_CALL(
@@ -525,15 +561,15 @@ upstream_socket_config:
 
   filter_.reset();
   EXPECT_EQ(output_.size(), 3);
-  EXPECT_EQ(output_[0], "23 4 23 4 0 2 0");
+  EXPECT_EQ(output_[2], "23 4 23 4 0 2 0");
 
   const std::string session_access_log_regex =
       "(17 3 17 3 0|6 1 6 1 1) 10.0.0.(1|3):1000 10.0.0.2:80 20.0.0.1:443 "
       "[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12} " +
       AccessLogType_Name(AccessLog::AccessLogType::UdpSessionEnd);
 
+  EXPECT_TRUE(std::regex_match(output_[0], std::regex(session_access_log_regex)));
   EXPECT_TRUE(std::regex_match(output_[1], std::regex(session_access_log_regex)));
-  EXPECT_TRUE(std::regex_match(output_[2], std::regex(session_access_log_regex)));
 }
 
 // Route with source IP.
@@ -687,8 +723,8 @@ matcher:
 
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
-  EXPECT_EQ(output_.front(), "1 0 1 0");
-  EXPECT_EQ(output_.back(), "fake_cluster 0 10 1 0 2");
+  EXPECT_EQ(output_.back(), "1 0 1 0");
+  EXPECT_EQ(output_.front(), "fake_cluster 0 10 1 0 2");
 }
 
 // Verify upstream connect error handling.
@@ -730,8 +766,8 @@ matcher:
 
   filter_.reset();
   EXPECT_EQ(output_.size(), 2);
-  EXPECT_EQ(output_.front(), "0 1");
-  EXPECT_EQ(output_.back(), "fake_cluster 0 5 0 0 1");
+  EXPECT_EQ(output_.back(), "0 1");
+  EXPECT_EQ(output_.front(), "fake_cluster 0 5 0 0 1");
 }
 
 // No upstream host handling.
@@ -918,21 +954,23 @@ matcher:
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
-  // This should hit the session circuit breaker.
+  // This should hit the session circuit breaker, the session will be created but the cluster is
+  // full
+  expectSessionCreate(upstream_address_, false);
   recvDataFromDownstream("10.0.0.2:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                    .cluster_.info_->traffic_stats_->upstream_cx_overflow_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
   // Timing out the 1st session should allow us to create another.
   test_sessions_[0].idle_timer_->invokeCallback();
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
+  test_sessions_[2].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.2:1000", "10.0.0.2:80", "hello");
-  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(3, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 }
 
@@ -1310,6 +1348,9 @@ use_per_packet_load_balancing: true
   factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
       ->resetResourceManager(0, 0, 0, 0, 0);
 
+  // This should hit the session circuit breaker, the session will be created but the cluster is
+  // full
+  expectSessionCreate(upstream_address_, false);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                    .cluster_.info_->traffic_stats_->upstream_cx_overflow_.value());
