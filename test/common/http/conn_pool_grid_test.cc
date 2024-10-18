@@ -179,11 +179,11 @@ public:
 #else
         std::make_unique<PersistentQuicInfo>();
 #endif
-    host_ = std::make_shared<Upstream::HostImpl>(
+    host_ = std::shared_ptr<Upstream::HostImpl>(*Upstream::HostImpl::create(
         cluster_, host_impl_hostname_, *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
         nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::config::core::v3::UNKNOWN, simTime(), address_list_);
+        envoy::config::core::v3::UNKNOWN, simTime(), address_list_));
 
     grid_ = std::make_unique<ConnectivityGridForTest>(
         dispatcher_, random_, host_, Upstream::ResourcePriority::Default, socket_options_,
