@@ -2754,10 +2754,6 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
 // Test when the upstream request gets reset while the client is sending the body
 // with more data arriving but not buffering any data.
 TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request", "true"}});
-
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
@@ -2779,39 +2775,6 @@ TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) 
 
   EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started");
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-}
-
-// Test the original branch when local_reply_when_no_buffer_and_upstream_request runtime is false.
-TEST_F(RouterTest, NormalPathUpstreamResetDuringBodyDataTransferNotBuffering) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request",
-        "false"}});
-
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"}, {"myheader", "present"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, false);
-
-  const std::string body1("body1");
-  Buffer::OwnedImpl buf1(body1);
-  router_->decodeData(buf1, true);
-  EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
 // Test retrying a request, when the first attempt fails while the client
