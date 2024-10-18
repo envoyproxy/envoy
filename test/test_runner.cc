@@ -90,7 +90,7 @@ int TestRunner::runTests(int argc, char** argv) {
 
   // Use the recommended, but not default, "threadsafe" style for the Death Tests.
   // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
-  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
 
   // Set gtest properties
   // (https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#logging-additional-information),
