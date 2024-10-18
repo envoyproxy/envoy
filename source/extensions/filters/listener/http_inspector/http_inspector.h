@@ -2,11 +2,13 @@
 
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/codec.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/http1/balsa_parser.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/http1/parser.h"
 
@@ -124,6 +126,7 @@ private:
   std::unique_ptr<Http::Http1::Parser> parser_;
   NoOpParserCallbacks no_op_callbacks_;
   ssize_t nread_ = 0;
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 
 } // namespace HttpInspector
