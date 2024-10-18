@@ -10,8 +10,19 @@ INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationDeathTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 INSTANTIATE_TEST_SUITE_P(
     Protocols, ProtocolIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, ProtocolIntegrationDeathTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 

@@ -22,6 +22,9 @@ namespace {
 
 class CrashIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
+public:
+  void SetUp() override { GTEST_FLAG_SET(death_test_style, "threadsafe"); }
+
 protected:
   void initializeFilter(const std::string& filter_config) {
     config_helper_.prependFilter(filter_config);

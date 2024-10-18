@@ -26,6 +26,8 @@ public:
   }
 };
 
+using HeaderPrefixIntegrationDeathTest = HeaderPrefixIntegrationTest;
+
 TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.set_header_prefix("x-custom");
@@ -51,7 +53,7 @@ TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
 // In this case, the header prefix set in the bootstrap will not match the
 // singleton header prefix in SetUpTestSuite, and Envoy will RELEASE_ASSERT on
 // start-up.
-TEST_P(HeaderPrefixIntegrationTest, FailedCustomHeaderPrefix) {
+TEST_P(HeaderPrefixIntegrationDeathTest, FailedCustomHeaderPrefix) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.set_header_prefix("x-custom-but-not-set");
   });
@@ -59,6 +61,12 @@ TEST_P(HeaderPrefixIntegrationTest, FailedCustomHeaderPrefix) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Protocols, HeaderPrefixIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(Protocols, HeaderPrefixIntegrationDeathTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
                              {Http::CodecType::HTTP1})),

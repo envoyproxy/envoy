@@ -1017,10 +1017,19 @@ protected:
   }
 };
 
+using Http2DeferredProcessingIntegrationDeathTest = Http2DeferredProcessingIntegrationTest;
+
 // We run with buffer accounting in order to verify the amount of data in the
 // system. Buffer accounting isn't necessary for deferring http2 processing.
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2DeferredProcessingIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                     testing::Values(true)),
+    protocolTestParamsAndBoolToString);
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, Http2DeferredProcessingIntegrationDeathTest,
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
                      testing::Values(true)),
@@ -1595,7 +1604,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
 // won't get the crash report.
 #ifdef ENVOY_HANDLE_SIGNALS
 
-TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProcessingBufferedData) {
+TEST_P(Http2DeferredProcessingIntegrationDeathTest,
+       CanDumpCrashInformationWhenProcessingBufferedData) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
 
@@ -1605,8 +1616,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProces
                "ConnectionImpl::StreamImpl.*ConnectionImpl");
 }
 
-TEST_P(Http2DeferredProcessingIntegrationTest,
+TEST_P(Http2DeferredProcessingIntegrationDeathTest,
        CanDumpCrashInformationWhenProcessingBufferedDataOfDeferredCloseStream) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedDataOfDeferredCloseStream(),

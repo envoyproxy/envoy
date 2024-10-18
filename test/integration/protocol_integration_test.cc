@@ -230,7 +230,7 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   EXPECT_EQ("600", response->headers().getStatusValue());
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, AddInvalidDecodedData) {
+TEST_P(DownstreamProtocolIntegrationDeathTest, AddInvalidDecodedData) {
   EXPECT_ENVOY_BUG(
       {
         useAccessLog("%RESPONSE_CODE_DETAILS%");
@@ -250,7 +250,7 @@ TEST_P(DownstreamProtocolIntegrationTest, AddInvalidDecodedData) {
       "Invalid request data");
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, AddInvalidEncodedData) {
+TEST_P(DownstreamProtocolIntegrationDeathTest, AddInvalidEncodedData) {
   EXPECT_ENVOY_BUG(
       {
         useAccessLog("%RESPONSE_CODE_DETAILS%");
@@ -4945,7 +4945,8 @@ private:
   bool fail_ = false;
 };
 
-TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
+TEST_P(ProtocolIntegrationDeathTest, HandleUpstreamSocketCreationFail) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   AllowForceFail fail_socket_n_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
 

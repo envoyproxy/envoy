@@ -170,6 +170,8 @@ public:
   Envoy::Http::Matching::HttpMatchingDataImpl data_;
 };
 
+using CelMatcherDeathTest = CelMatcherTest;
+
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderMatched) {
   auto matcher_tree = buildMatcherTree(RequestHeaderCelExprString);
 
@@ -560,7 +562,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExprUseCel) 
   EXPECT_EQ(result.on_match_, absl::nullopt);
 }
 
-TEST_F(CelMatcherTest, NoCelExpression) {
+TEST_F(CelMatcherDeathTest, NoCelExpression) {
   EXPECT_DEATH(buildMatcherTree(RequestHeaderCelExprString, ExpressionType::NoExpression),
                ".*panic: unset oneof.*");
 }

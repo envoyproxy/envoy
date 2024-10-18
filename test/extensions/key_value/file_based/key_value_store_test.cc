@@ -42,6 +42,8 @@ protected:
   Event::SimulatedTimeSystem test_time_;
 };
 
+using KeyValueStoreDeathTest = KeyValueStoreTest;
+
 TEST_F(KeyValueStoreTest, Basic) {
   EXPECT_EQ(absl::nullopt, store_->get("foo"));
   store_->addOrUpdate("foo", "bar", absl::nullopt);
@@ -190,7 +192,7 @@ TEST_F(KeyValueStoreTest, Iterate) {
 }
 
 #ifndef NDEBUG
-TEST_F(KeyValueStoreTest, ShouldCrashIfIterateCallbackAddsOrUpdatesStore) {
+TEST_F(KeyValueStoreDeathTest, ShouldCrashIfIterateCallbackAddsOrUpdatesStore) {
   store_->addOrUpdate("foo", "bar", absl::nullopt);
   store_->addOrUpdate("baz", "eep", absl::nullopt);
   KeyValueStore::ConstIterateCb update_value_callback = [this](const std::string& key,
