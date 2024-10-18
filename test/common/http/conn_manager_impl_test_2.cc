@@ -3952,7 +3952,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
   setup();
   expectUhvTrailerCheck(HeaderValidator::ValidationResult(
                             HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
-                        HeaderValidator::TransformationResult::success(), false);
+                        HeaderValidator::TransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -3966,7 +3966,11 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
     return Http::okStatus();
   }));
 
-  EXPECT_CALL(response_encoder_.stream_, resetStream(_));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+        EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
+      }));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
