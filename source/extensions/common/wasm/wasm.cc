@@ -65,13 +65,13 @@ inline Wasm* getWasm(WasmHandleSharedPtr& base_wasm_handle) {
 
 void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifier) {
   auto weak = std::weak_ptr<Wasm>(std::static_pointer_cast<Wasm>(shared_from_this()));
-  lifecycle_notifier.registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-                                      [this, weak](Event::PostCb post_cb) {
-                                        auto lock = weak.lock();
-                                        if (lock) { // See if we are still alive.
-                                          server_shutdown_post_cb_ = std::move(post_cb);
-                                        }
-                                      });
+  shutdown_handler_ = lifecycle_notifier.registerCallback(
+      Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this, weak](Event::PostCb post_cb) {
+        auto lock = weak.lock();
+        if (lock) { // See if we are still alive.
+          server_shutdown_post_cb_ = std::move(post_cb);
+        }
+      });
 }
 
 Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
