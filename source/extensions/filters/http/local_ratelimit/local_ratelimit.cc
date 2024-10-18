@@ -61,7 +61,8 @@ FilterConfig::FilterConfig(
       rate_limited_grpc_status_(
           config.rate_limited_as_resource_exhausted()
               ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
-              : absl::nullopt) {
+              : absl::nullopt),
+      tls_(context.threadLocal()) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -108,8 +109,9 @@ FilterConfig::FilterConfig(
   }
 
   rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
-      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, descriptors_,
-      always_consume_default_token_bucket_, std::move(share_provider));
+      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, context.threadLocal(),
+      descriptors_, always_consume_default_token_bucket_, std::move(share_provider),
+      config.dynamic_descripters_lru_cache_limit());
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result FilterConfig::requestAllowed(
@@ -230,7 +232,7 @@ Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionR
   if (typed_state == nullptr) {
     auto limiter = std::make_shared<PerConnectionRateLimiter>(
         used_config_->fillInterval(), used_config_->maxTokens(), used_config_->tokensPerFill(),
-        decoder_callbacks_->dispatcher(), used_config_->descriptors(),
+        decoder_callbacks_->dispatcher(), config_->tls(), used_config_->descriptors(),
         used_config_->consumeDefaultTokenBucket());
 
     decoder_callbacks_->streamInfo().filterState()->setData(

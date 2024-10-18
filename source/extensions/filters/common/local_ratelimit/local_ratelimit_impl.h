@@ -80,6 +80,22 @@ using RateLimitTokenBucketSharedPtr = std::shared_ptr<RateLimitTokenBucket>;
 
 class LocalRateLimiterImpl;
 
+class ThreadLocalDynamicDescriptorsCache : public ThreadLocal::ThreadLocalObject {
+public:
+  ThreadLocalDynamicDescriptorsCache(
+      RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> cache)
+      : dynamic_descriptors_(cache) {}
+
+  const RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> cache() const {
+    return dynamic_descriptors_;
+  };
+
+private:
+  RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> dynamic_descriptors_;
+};
+using ThreadLocalDynamicDescriptorsCacheSharedPtr =
+    std::shared_ptr<ThreadLocalDynamicDescriptorsCache>;
+
 // Token bucket that implements based on the periodic timer.
 class TimerTokenBucket : public RateLimitTokenBucket {
 public:
@@ -146,10 +162,11 @@ public:
   LocalRateLimiterImpl(
       const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
       const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
+      ThreadLocal::SlotAllocator& tls,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
       bool always_consume_default_token_bucket = true,
-      ShareProviderSharedPtr shared_provider = nullptr);
+      ShareProviderSharedPtr shared_provider = nullptr, const uint32_t lru_size = 20);
   ~LocalRateLimiterImpl();
 
   Result requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
@@ -159,18 +176,20 @@ private:
   bool compareDescriptorEntries(const std::vector<RateLimit::DescriptorEntry>& request_entries,
                                 const std::vector<RateLimit::DescriptorEntry>& user_entries,
                                 std::vector<RateLimit::DescriptorEntry>& new_descriptor_entries);
-  void onDynDescIdleTimer();
+  void notifyMainThread(RateLimitTokenBucketSharedPtr token_bucket,
+                        RateLimit::LocalDescriptor new_descriptor);
+  const ThreadLocalDynamicDescriptorsCache& threadLocal() const {
+    return tls_->getTyped<ThreadLocalDynamicDescriptorsCache>();
+  }
 
   RateLimitTokenBucketSharedPtr default_token_bucket_;
 
   const Event::TimerPtr fill_timer_;
-  const Event::TimerPtr dynamic_desc_idle_timer_;
   TimeSource& time_source_;
   RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> descriptors_;
 
-  mutable absl::Mutex dyn_desc_lock_;
-  RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr>
-      dynamic_descriptors_ ABSL_GUARDED_BY(dyn_desc_lock_);
+  RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> dynamic_descriptors_;
+  ThreadLocal::SlotPtr tls_;
 
   // Refill counter is incremented per each refill timer hit.
   uint64_t refill_counter_{0};
@@ -180,6 +199,11 @@ private:
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
   const bool always_consume_default_token_bucket_{};
   const bool no_timer_based_rate_limit_token_bucket_{};
+  Event::Dispatcher& dispatcher_;
+
+  using LruList = std::list<RateLimit::LocalDescriptor>;
+  LruList lru_list_;
+  uint32_t lru_size_;
 
   friend class LocalRateLimiterImplTest;
   friend class TimerTokenBucket;

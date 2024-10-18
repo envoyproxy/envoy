@@ -168,6 +168,46 @@ typed_config:
   local_rate_limit_per_downstream_connection: {}
 )EOF";
 
+  static constexpr absl::string_view filter_config_with_blank_value_descriptor_ =
+      R"EOF(
+name: envoy.filters.http.local_ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: http_local_rate_limiter
+  token_bucket:
+    max_tokens: 2
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  filter_enabled:
+    runtime_key: local_rate_limit_enabled
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enforced:
+    runtime_key: local_rate_limit_enforced
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  response_headers_to_add:
+    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+      header:
+        key: x-local-rate-limit
+        value: 'true'
+  descriptors:
+  - entries:
+    - key: client_cluster
+    token_bucket:
+      max_tokens: 1
+      tokens_per_fill: 1
+      fill_interval: 1000s
+  rate_limits:
+  - actions:  # any actions in here
+    - request_headers:
+        header_name: x-envoy-downstream-service-cluster
+        descriptor_key: client_cluster
+  local_rate_limit_per_downstream_connection: {}
+)EOF";
+
   const std::string filter_config_with_local_cluster_rate_limit_ =
       R"EOF(
 name: envoy.filters.http.local_ratelimit
@@ -300,6 +340,45 @@ INSTANTIATE_TEST_SUITE_P(
     Protocols, LocalRateLimitFilterIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
+  initializeFilter(fmt::format(filter_config_with_blank_value_descriptor_, "false"));
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-envoy-downstream-service-cluster", "foo"}},
+      0);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, 1);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(0, response->body().size());
+
+  cleanupUpstreamAndDownstream();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"x-envoy-downstream-service-cluster", "foo"}},
+      0);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("429", response->headers().getStatusValue());
+  EXPECT_EQ(18, response->body().size());
+}
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestPerProcess) {
   initializeFilter(fmt::format(filter_config_, "false"));

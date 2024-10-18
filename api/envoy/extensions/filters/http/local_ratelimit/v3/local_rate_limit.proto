@@ -167,4 +167,8 @@ message LocalRateLimit {
   //   3. :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>`.
   //   4. :ref:`override limit <envoy_v3_api_field_config.route.v3.RateLimit.limit>`.
   repeated config.route.v3.RateLimit rate_limits = 17;
+
+  // Specifies limit for the lru cache which is used to store dynamic descriptors.
+  // Default is 20.
+  uint32 dynamic_descripters_lru_cache_limit = 18;
 }

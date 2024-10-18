@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <memory>
 
 #include "envoy/runtime/runtime.h"
 
@@ -175,18 +176,20 @@ bool AtomicTokenBucket::isIdle() {
 
 LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
-    const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
+    const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
     const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
-    bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider)
+    bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
+    uint32_t lru_size)
     : fill_timer_(fill_interval > std::chrono::milliseconds(0)
                       ? dispatcher.createTimer([this] { onFillTimer(); })
                       : nullptr),
-      dynamic_desc_idle_timer_(dispatcher.createTimer([this] { onDynDescIdleTimer(); })),
-      time_source_(dispatcher.timeSource()), share_provider_(std::move(shared_provider)),
+      time_source_(dispatcher.timeSource()), tls_(tls.allocateSlot()),
+      share_provider_(std::move(shared_provider)),
       always_consume_default_token_bucket_(always_consume_default_token_bucket),
       no_timer_based_rate_limit_token_bucket_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.no_timer_based_rate_limit_token_bucket")) {
+          "envoy.reloadable_features.no_timer_based_rate_limit_token_bucket")),
+      dispatcher_(dispatcher), lru_size_(lru_size == 0 ? 20 : lru_size) {
   if (fill_timer_ && fill_interval < std::chrono::milliseconds(50)) {
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
   }
@@ -203,10 +206,13 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
       !no_timer_based_rate_limit_token_bucket_) {
     fill_timer_->enableTimer(default_token_bucket_->fillInterval());
   }
+  RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> blank_descriptors;
 
-  if (dynamic_desc_idle_timer_) {
-    dynamic_desc_idle_timer_->enableTimer(std::chrono::milliseconds(5000));
-  }
+  ThreadLocalDynamicDescriptorsCacheSharedPtr empty(
+      new ThreadLocalDynamicDescriptorsCache(blank_descriptors));
+
+  tls_->set(
+      [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
 
   for (const auto& descriptor : descriptors) {
     RateLimit::LocalDescriptor new_descriptor;
@@ -252,24 +258,6 @@ LocalRateLimiterImpl::~LocalRateLimiterImpl() {
   if (fill_timer_ != nullptr) {
     fill_timer_->disableTimer();
   }
-  if (dynamic_desc_idle_timer_ != nullptr) {
-    dynamic_desc_idle_timer_->disableTimer();
-  }
-}
-
-void LocalRateLimiterImpl::onDynDescIdleTimer() {
-  absl::WriterMutexLock lock(&dyn_desc_lock_);
-  for (auto it = dynamic_descriptors_.begin(), end = dynamic_descriptors_.end(); it != end;) {
-    // `erase()` will invalidate `it`, so advance `it` first.
-    auto copy_it = it++;
-    if (copy_it->second->isIdle()) {
-      dynamic_descriptors_.erase(copy_it);
-      ENVOY_LOG(trace, "cleaned up idle descriptor: {}._ current size: {}",
-                copy_it->first.toString(), dynamic_descriptors_.size());
-    }
-  }
-
-  dynamic_desc_idle_timer_->enableTimer(std::chrono::milliseconds(5000));
 }
 
 void LocalRateLimiterImpl::onFillTimer() {
@@ -286,11 +274,8 @@ void LocalRateLimiterImpl::onFillTimer() {
   for (const auto& descriptor : descriptors_) {
     descriptor.second->onFillTimer(refill_counter_, share_factor);
   }
-  {
-    absl::ReaderMutexLock lock(&dyn_desc_lock_);
-    for (const auto& descriptor : dynamic_descriptors_) {
-      descriptor.second->onFillTimer(refill_counter_, share_factor);
-    }
+  for (const auto& descriptor : dynamic_descriptors_) {
+    descriptor.second->onFillTimer(refill_counter_, share_factor);
   }
 
   fill_timer_->enableTimer(default_token_bucket_->fillInterval());
@@ -312,11 +297,13 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
       // If the request descriptor is not found in the user descriptors, it could be a wildcard case
       // where value is left blank in the user configured descriptor entry. In this case, we need to
       // check if it matches any of the dynamic descriptors.
-      {
-        absl::ReaderMutexLock lock(&dyn_desc_lock_);
-        // find request descriptor in the existing dynamic descriptors. If it exists, add token
-        // bucket to matched_descriptors.
-        auto dynamic_iter = dynamic_descriptors_.find(request_descriptor);
+      // find request descriptor in the existing dynamic descriptors. If it exists, add token
+      // bucket to matched_descriptors.
+      auto dynamic_descriptors = threadLocal().cache();
+      if (dynamic_descriptors.empty()) {
+        ENVOY_LOG(debug, "dynamic_descriptors is empty");
+      } else {
+        auto dynamic_iter = dynamic_descriptors.find(request_descriptor);
         if (dynamic_iter != dynamic_descriptors_.end()) {
           matched_descriptors.push_back(dynamic_iter->second.get());
           continue;
@@ -358,17 +345,8 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
                        std::chrono::duration<double>(user_bucket->fillInterval()).count()),
               user_bucket->fillInterval(), user_bucket->multiplier(), *this);
         }
-
-        {
-          absl::WriterMutexLock lock(&dyn_desc_lock_);
-          auto result = dynamic_descriptors_.emplace(std::move(new_descriptor),
-                                                     std::move(per_descriptor_token_bucket));
-          if (!result.second) {
-            throw EnvoyException(absl::StrCat("duplicate descriptor in the local rate descriptor: ",
-                                              result.first->first.toString()));
-          }
-          matched_descriptors.push_back(result.first->second.get());
-        }
+        matched_descriptors.push_back(per_descriptor_token_bucket.get());
+        notifyMainThread(move(per_descriptor_token_bucket), std::move(new_descriptor));
       }
     }
   }
@@ -392,7 +370,7 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
       // token bucket.
       return {false, makeOptRefFromPtr<TokenBucketContext>(descriptor)};
     } else {
-      ENVOY_LOG(debug,
+      ENVOY_LOG(trace,
                 "request allowed by descriptor with fill rate: {}, maxToken: {}, remainingToken {}",
                 descriptor->fillRate(), descriptor->maxTokens(), descriptor->remainingTokens());
     }
@@ -415,6 +393,39 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
 
   ASSERT(!matched_descriptors.empty());
   return {true, makeOptRefFromPtr<TokenBucketContext>(matched_descriptors[0])};
+}
+
+void LocalRateLimiterImpl::notifyMainThread(RateLimitTokenBucketSharedPtr token_bucket,
+                                            RateLimit::LocalDescriptor new_descriptor) {
+  dispatcher_.post([this, token_bucket, new_descriptor]() -> void {
+    ENVOY_LOG(trace, "notifyMainThread: creating dynamic descriptor: {}",
+              new_descriptor.toString());
+    // add this bucket to cache.
+    // After updating cache, make a copy of the cache and update the tls with the new cache.
+    auto result = dynamic_descriptors_.emplace(new_descriptor, std::move(token_bucket));
+    if (!result.second) {
+      ENVOY_LOG(trace, "notifyMainThread: descriptor, {}, already in the cache",
+                result.first->first.toString());
+      return;
+    }
+    lru_list_.emplace_front(new_descriptor);
+    if (lru_list_.size() > lru_size_) {
+      auto lru_entry = lru_list_.back();
+      auto erased = dynamic_descriptors_.erase(lru_entry);
+      ENVOY_LOG(trace, "max size: {}, current size: {}, lru entry(descriptor): {}, erased: {}",
+                lru_size_, lru_list_.size(), lru_entry.toString(), erased);
+      lru_list_.pop_back();
+    }
+
+    // copy the cache and update the tls.
+    auto cache = dynamic_descriptors_;
+
+    tls_->set([cache](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+      auto copy =
+          std::make_shared<RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr>>(cache);
+      return std::make_shared<ThreadLocalDynamicDescriptorsCache>(*copy);
+    });
+  });
 }
 
 // Compare the request descriptor entries with the user descriptor entries. If all non-empty user
