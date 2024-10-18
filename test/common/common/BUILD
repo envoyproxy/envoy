@@ -193,7 +193,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "log_verbosity_update_test",
     srcs = ["log_verbosity_update_test.cc"],
-    args = ["--enable-fine-grain-logging"],
+    args = [
+        "--",
+        "--enable-fine-grain-logging",
+    ],
     rbe_pool = "2core",
     deps = [
         "//source/common/common:minimal_logger_lib",
@@ -204,7 +207,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "fine_grain_log_macros_test",
     srcs = ["log_macros_test.cc"],
-    args = ["--enable-fine-grain-logging"],
+    args = [
+        "--",
+        "--enable-fine-grain-logging",
+    ],
     rbe_pool = "2core",
     deps = [
         "//source/common/common:minimal_logger_lib",

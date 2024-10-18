@@ -1026,10 +1026,19 @@ protected:
   }
 };
 
+using Http2DeferredProcessingIntegrationDeathTest = Http2DeferredProcessingIntegrationTest;
+
 // We run with buffer accounting in order to verify the amount of data in the
 // system. Buffer accounting isn't necessary for deferring http2 processing.
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2DeferredProcessingIntegrationTest,
+    testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                         {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
+                     testing::Values(true)),
+    protocolTestParamsAndBoolToString);
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, Http2DeferredProcessingIntegrationDeathTest,
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
                      testing::Values(true)),
@@ -1628,7 +1637,9 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
 // won't get the crash report.
 #ifdef ENVOY_HANDLE_SIGNALS
 
-TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProcessingBufferedData) {
+TEST_P(Http2DeferredProcessingIntegrationDeathTest,
+       CanDumpCrashInformationWhenProcessingBufferedData) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
   if (!deferProcessingBackedUpStreams()) {
@@ -1636,19 +1647,22 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProces
   }
 
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedData(),
+               "(?s)" // Let dot match newline.
                "Crashing as request body over 1000!.*"
                "ActiveStream.*Http2::ConnectionImpl.*Dumping current stream.*"
                "ConnectionImpl::StreamImpl.*ConnectionImpl");
 }
 
-TEST_P(Http2DeferredProcessingIntegrationTest,
+TEST_P(Http2DeferredProcessingIntegrationDeathTest,
        CanDumpCrashInformationWhenProcessingBufferedDataOfDeferredCloseStream) {
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
   if (!deferProcessingBackedUpStreams()) {
     return;
   }
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedDataOfDeferredCloseStream(),
+               "(?s)" // Let dot match newline.
                "Crashing as response body over 1000!.*"
                "ActiveStream.*Http2::ConnectionImpl.*Dumping 1 Active Streams.*"
                "ConnectionImpl::StreamImpl.*ConnectionImpl");

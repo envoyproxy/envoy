@@ -1090,7 +1090,7 @@ TEST_F(OwnedImplTest, PrependEmpty) {
   EXPECT_EQ(0, buf.length());
 }
 
-TEST(OverflowDetectingUInt64, Arithmetic) {
+TEST(OverflowDetectingUInt64DeathTest, Arithmetic) {
   OverflowDetectingUInt64 length;
   length += 1;
   length -= 1;

@@ -489,9 +489,11 @@ public:
   testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
+using ConnectionHandlerDeathTest = ConnectionHandlerTest;
+
 // Verify that if a listener is removed while a rebalanced connection is in flight, we correctly
 // destroy the connection.
-TEST_F(ConnectionHandlerTest, RemoveListenerDuringRebalance) {
+TEST_F(ConnectionHandlerDeathTest, RemoveListenerDuringRebalance) {
   InSequence s;
 
   // For reasons I did not investigate, the death test below requires this, likely due to
