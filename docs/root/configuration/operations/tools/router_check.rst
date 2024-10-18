@@ -16,7 +16,7 @@ virtual host name, manual path rewrite, manual host rewrite, path redirect, and
 header field matches. Extensions for other test cases can be added. Details about installing the tool
 and sample tool input/output can be found at :ref:`installation <install_tools_route_table_check_tool>`.
 
-The route table check tool config is composed of an array of json test objects. Each test object is composed of
+The tests in the route table check tool config is composed of an array of json test objects. Each test object is composed of
 three parts.
 
 Test name
@@ -31,10 +31,14 @@ Validate
   The validate fields specify the expected values and test cases to check. At least one test
   case is required.
 
+The configuration also allows runtime flags to be set prior to running the tests.
+
 A simple tool configuration json has one test case and is written as follows. The test
 expects a cluster name match of "instant-server".::
 
-   tests
+   runtime:
+     re2.max_program_size.error_level: 32768
+   tests:
    - test_name: Cluster_name_test
      input:
        authority: api.lyft.com
@@ -44,7 +48,8 @@ expects a cluster name match of "instant-server".::
 
 .. code-block:: yaml
 
-  tests
+  runtime: ...
+  tests:
   - test_name: ...
     input:
       authority: ...

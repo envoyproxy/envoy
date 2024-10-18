@@ -18,7 +18,7 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessTest) {
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.golden.proto.json"));
-  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, tests_filename_, false);
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
       checktool.compareEntries(tests_filename_);
   EXPECT_EQ(test_results.size(), 33);
@@ -33,7 +33,7 @@ TEST(RouterCheckTest, RouterCheckTestRoutesSuccessShowOnlyFailuresTest) {
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.golden.proto.json"));
-  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, tests_filename_, false);
   checktool.setOnlyShowFailures();
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
       checktool.compareEntries(tests_filename_);
@@ -45,7 +45,7 @@ TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutes.yaml"));
   const std::string tests_filename_ =
       TestEnvironment::runfilesPath(absl::StrCat(kDir, "TestRoutesFailures.golden.proto.json"));
-  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, tests_filename_, false);
   checktool.setOnlyShowFailures();
   const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
       checktool.compareEntries(tests_filename_);
