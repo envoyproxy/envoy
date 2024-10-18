@@ -4,6 +4,7 @@
 #include "envoy/config/xds_resources_delegate.h"
 
 #include "source/common/config/custom_config_validators_impl.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/config/type_to_endpoint.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
@@ -62,8 +63,11 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
-    RETURN_IF_NOT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
-                                                                             api_config_source));
+    if (type_url !=
+        Envoy::Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()) {
+      RETURN_IF_NOT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(
+          cm_.primaryClusters(), api_config_source));
+    };
     RETURN_IF_NOT_OK(Utility::checkTransportVersion(api_config_source));
     switch (api_config_source.api_type()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
