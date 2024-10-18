@@ -169,11 +169,6 @@ bool AtomicTokenBucket::consume(double factor) {
   return token_bucket_.consume(cb) != 0.0;
 }
 
-bool AtomicTokenBucket::isIdle() {
-  return token_bucket_.secsSinceLastConsume() >
-         3 * std::chrono::duration<double>(fill_interval_).count();
-}
-
 LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
     const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,

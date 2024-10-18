@@ -70,7 +70,6 @@ public:
 class RateLimitTokenBucket : public TokenBucketContext {
 public:
   virtual bool consume(double factor = 1.0) PURE;
-  virtual bool isIdle() PURE;
   virtual void onFillTimer(uint64_t refill_counter, double factor = 1.0) PURE;
   virtual std::chrono::milliseconds fillInterval() const PURE;
   virtual double fillRate() const PURE;
@@ -105,7 +104,6 @@ public:
 
   // RateLimitTokenBucket
   bool consume(double factor) override;
-  bool isIdle() override { return false; /* TODO: implement*/ }
   void onFillTimer(uint64_t refill_counter, double factor) override;
   std::chrono::milliseconds fillInterval() const override { return fill_interval_; }
   double fillRate() const override { return fill_rate_; }
@@ -137,7 +135,6 @@ public:
 
   // RateLimitTokenBucket
   bool consume(double factor) override;
-  bool isIdle() override;
   void onFillTimer(uint64_t, double) override {}
   std::chrono::milliseconds fillInterval() const override { return fill_interval_; }
   double fillRate() const override { return token_bucket_.fillRate(); }
