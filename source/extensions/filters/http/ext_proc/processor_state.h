@@ -40,14 +40,9 @@ public:
   ChunkQueue& operator=(const ChunkQueue&) = delete;
   uint32_t bytesEnqueued() const { return bytes_enqueued_; }
   bool empty() const { return queue_.empty(); }
-  void push(Buffer::Instance& data, bool end_stream,
-            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
-                envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
-  QueuedChunkPtr
-  pop(Buffer::OwnedImpl& out_data,
-      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode =
-          envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
+  void push(Buffer::Instance& data, bool end_stream);
   void clear();
+  QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
   // the total number of chunks in the queue.
@@ -89,7 +84,7 @@ public:
                           const std::vector<std::string>& untyped_receiving_namespaces)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
         complete_body_available_(false), trailers_available_(false), body_replaced_(false),
-        partial_body_processed_(false), traffic_direction_(traffic_direction),
+        body_received_(false), partial_body_processed_(false), traffic_direction_(traffic_direction),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
         untyped_receiving_namespaces_(&untyped_receiving_namespaces) {}
@@ -112,6 +107,8 @@ public:
   void setHasNoBody(bool b) { no_body_ = b; }
   void setTrailersAvailable(bool d) { trailers_available_ = d; }
   bool bodyReplaced() const { return body_replaced_; }
+  bool bodyReceived() const { return body_received_; }
+  void setBodyReceived(bool b) { body_received_ = b; }
   bool partialBodyProcessed() const { return partial_body_processed_; }
 
   virtual void setProcessingMode(
@@ -246,10 +243,11 @@ protected:
   bool trailers_available_ : 1;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1;
+  // If true, some body data is received.
+  bool body_received_ : 1;
   // If true, we are in "buffered partial" mode and we already reached the buffer
   // limit, sent the body in a message, and got back a reply.
   bool partial_body_processed_ : 1;
-
   // If true, the server wants to see the headers
   bool send_headers_ : 1;
   // If true, the server wants to see the trailers

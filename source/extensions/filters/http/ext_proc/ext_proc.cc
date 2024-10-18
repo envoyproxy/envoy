@@ -569,6 +569,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
+  state.setBodyReceived(true);
+
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
   }
@@ -664,7 +666,11 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
 
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = setupBodyChunk(state, data, end_stream);
-    state.enqueueStreamingChunk(data, end_stream);
+    if (state.bodyMode() != ProcessingMode::MXN) {
+      state.enqueueStreamingChunk(data, end_stream);
+    } else {
+      data.drain(data.length());
+    }
     // If the current state is HeadersCallback, stays in that state.
     if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
       sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);

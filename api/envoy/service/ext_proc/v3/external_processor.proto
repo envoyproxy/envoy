@@ -367,32 +367,17 @@ message MxnBodyResponse {
   // Envoy sends this body mutation out as it is.
   bytes body = 1;
 
-  // Set this flag to true for the last body response.
+  // Set this flag to true if this is the last chunk of body response, regardless whether
+  // there is trailer after it.
+  //
+  // In the case if the server needs to buffer large amount of data before sending back responses,
+  // to avoid Envoy timeout events being triggered, the server  needs to send a ``BodyMutation``
+  // message back to Envoy with ``end_of_body`` set to false.
   bool end_of_body = 2;
-
-  // The ext_proc server sends this number to notify Envoy how many body chunks are received.
-  // The server may send a response message with ``chunks_received`` set to 1 for each body chunk it receives.
-  // It may also choose to wait for receiving multiple body chunks, then send an aggregated number back to Envoy for confirmation.
-  //
-  // After receives this, Envoy will
-  //
-  // * Stop the waiting timer in its state machine to avoid timeout events.
-  // * Consume that amount of chunks in it's queue to avoid flow control being triggered. This also enables more data chunks
-  //   be able to get into Envoy.
-  //
-  // In the situation when the ext_proc server needs to buffer large amount of data before sending back body responses, to avoid
-  // Envoy timeouts or flow control events being triggered, it should send standalone ``MxnBodyResponse`` messages with
-  // ``chunks_received`` field set back to Envoy.
-  //
-  // In the case the ext_proc server does not need to buffer large amount of data, and buffering time is short,  the server
-  // may choose to send a ``MxnBodyResponse`` message with both ``body`` and ``chunks_received`` field set.
-  // This can save some gRPC calls thus is a more efficient and recommended way for sending confirmation in such situation.
-  uint32 chunks_received = 3;
 }
 
-// Body mutation
+// This message specifies the body mutation Envoy will apply and send out.
 message BodyMutation {
-  // Sending this response for any body mode except MXN.
   oneof mutation {
     // The entire body to replace
     bytes body = 1;
@@ -403,6 +388,6 @@ message BodyMutation {
 
   // [#not-implemented-hide:]
   // Sending this response for MXN body mode.
-  // Only one of ``mxn_resp`` or above ``mutation`` can be set.
+  // Only one of ``mxn_resp`` or above ``mutation`` should be set.
   MxnBodyResponse mxn_resp = 3;
 }

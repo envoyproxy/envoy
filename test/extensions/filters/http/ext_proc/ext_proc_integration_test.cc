@@ -4933,9 +4933,6 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
     mxn_resp->set_body("r");
     bool end_of_body = (i == total_resp_body_msg - 1) ? true : false;
     mxn_resp->set_end_of_body(end_of_body);
-    if (i == 0) {
-      mxn_resp->set_chunks_received(total_req_body_msg);
-    }
     processor_stream_->sendGrpcMessage(response_body);
   }
 
@@ -5017,10 +5014,6 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
     mxn_resp->set_body("r");
     bool end_of_body = (i == total_resp_body_msg - 1) ? true : false;
     mxn_resp->set_end_of_body(end_of_body);
-    // Send confirmation for the rest of the received body chunks in the 1st response message.
-    if (i == 0) {
-      mxn_resp->set_chunks_received(total_req_body_msg);
-    }
     processor_stream_->sendGrpcMessage(response_body);
   }
 
@@ -5081,9 +5074,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   std::string body_received;
   bool end_stream = false;
   uint32_t total_req_body_msg = 0;
-  uint32_t confirm_msg_count = 0;
   bool header_resp_sent = false;
-  const uint32_t body_chunks = 4;
   while (!end_stream) {
     ProcessingRequest request;
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
@@ -5093,9 +5084,8 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
       // Buffer the entire body.
       body_received = absl::StrCat(body_received, request.request_body().body());
       total_req_body_msg++;
-      // After receiving every 4 body chunks, the server sends back a body response with
-      // chunks_received field set to 4 to notify Envoy how many body chunks are received.
-      if (total_req_body_msg % body_chunks == 0) {
+      // After receiving every 4 body chunks, the server sends back an empty response.
+      if (total_req_body_msg % 4 == 0) {
         if (!header_resp_sent) {
           // Before sending the 1st body response, sends a header response.
           processor_stream_->startGrpcStream();
@@ -5113,9 +5103,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
                              ->mutable_response()
                              ->mutable_body_mutation()
                              ->mutable_mxn_resp();
-        mxn_resp->set_chunks_received(body_chunks);
         mxn_resp->set_end_of_body(false);
-        confirm_msg_count++;
         processor_stream_->sendGrpcMessage(response_body);
       }
     } else {
@@ -5141,11 +5129,6 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
     mxn_resp->set_body("r");
     const bool end_of_body = (i == total_resp_body_msg - 1) ? true : false;
     mxn_resp->set_end_of_body(end_of_body);
-
-    // Send confirmation for the rest of the received body chunks in the 1st response message.
-    if (i == 0) {
-      mxn_resp->set_chunks_received(total_req_body_msg - confirm_msg_count * body_chunks);
-    }
     processor_stream_->sendGrpcMessage(response_body);
   }
 

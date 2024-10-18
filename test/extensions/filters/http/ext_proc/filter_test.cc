@@ -4467,11 +4467,12 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
   }
 
-  // Sending confirmation back to Envoy.
+  // Sending empty response back to Envoy.
   processResponseBody(
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-        body_mut->mutable_mxn_resp()->set_chunks_received(7);
+        body_mut->mutable_mxn_resp()->set_body("");
+         body_mut->mutable_mxn_resp()->set_end_of_body(false);
       },
       false);
 
@@ -4510,7 +4511,6 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
     processResponseBody(
         [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
           auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-          mxn_resp->set_chunks_received(1);
           mxn_resp->set_body(body.body());
           want_response_body.add(body.body());
         },
@@ -4532,27 +4532,18 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
   TestUtility::feedBufferWithRandomCharacters(last_resp_chunk, 10);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
 
-  // Send standalone messages to confirm the body chunks are received.
   processResponseBody(
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_chunks_received(3);
+        mxn_resp->set_end_of_body(false);
       },
       false);
-  processResponseBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_chunks_received(2);
-      },
-      false);
-
   // Now sends the body response back also confirms the received chunks.
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
         mxn_resp->set_body(" EEEEEEE ");
         want_response_body.add(" EEEEEEE ");
-        mxn_resp->set_chunks_received(2);
       },
       false);
   processResponseBody(
@@ -4560,15 +4551,6 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
         mxn_resp->set_body(" F ");
         want_response_body.add(" F ");
-        mxn_resp->set_chunks_received(1);
-      },
-      false);
-
-  // Sends another standalone messages to confirm the rest of the received body chunks.
-  processResponseBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_chunks_received(3);
       },
       false);
 
@@ -4643,7 +4625,6 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
         mxn_resp->set_end_of_body(false);
         mxn_resp->set_body(" AAAAA ");
         want_response_body.add(" AAAAA ");
-        mxn_resp->set_chunks_received(7);
       });
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
@@ -4713,7 +4694,6 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
         mxn_resp->set_end_of_body(false);
         mxn_resp->set_body(" AAAAA ");
         want_response_body.add(" AAAAA ");
-        mxn_resp->set_chunks_received(7);
       });
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
@@ -4806,54 +4786,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithFeatureDisabled) {
   processResponseBody(
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_chunks_received(2);
-      },
-      false);
-
-  // Verify spurious message is received.
-  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
-  filter_->onDestroy();
-}
-
-// M:N error test case: sending back MXN body response with garbage chunks_received number.
-TEST_F(HttpFilterTest, MXNBodyProcessingTestWithWrongChunksReceived) {
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    response_body_mode: "MXN"
-    response_trailer_mode: "SEND"
-  )EOF");
-
-  // Create synthetic HTTP request
-  HttpTestUtility::addDefaultHeaders(request_headers_);
-  request_headers_.setMethod("POST");
-  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
-
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  processRequestHeaders(false, absl::nullopt);
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
-
-  bool encoding_watermarked = false;
-  setUpEncodingWatermarking(encoding_watermarked);
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
-
-  for (int i = 0; i < 4; i++) {
-    // 4 request chunks are sent to the ext_proc server.
-    Buffer::OwnedImpl resp_chunk;
-    TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
-    EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
-  }
-
-  // Then the ext_proc server sends back a response with chunks_received as 5.
-  processResponseBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_chunks_received(5);
+        mxn_resp->set_end_of_body(false);
       },
       false);
 

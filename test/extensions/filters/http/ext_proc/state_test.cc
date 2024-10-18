@@ -157,28 +157,6 @@ TEST(StateTest, ConsolidateOne) {
   EXPECT_EQ(chunk.length, 5);
 }
 
-TEST(StateTest, BasicQueueMxn) {
-  ChunkQueue queue;
-  Buffer::OwnedImpl out_data;
-  Buffer::OwnedImpl data1("Hello");
-
-  EXPECT_EQ(queue.receivedData().length(), 0);
-  // After a push, verify the bytes tracking is increased, but actual data is not.
-  queue.push(data1, false, envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::MXN);
-  EXPECT_EQ(queue.receivedData().toString(), "");
-  EXPECT_FALSE(queue.empty());
-  EXPECT_EQ(5, queue.bytesEnqueued());
-  // After a pop, verify the bytes tracking is decreased, but actual data is not.
-  auto popped =
-      queue.pop(out_data, envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::MXN);
-  EXPECT_EQ(out_data.toString(), "");
-  EXPECT_FALSE(popped->end_stream);
-  EXPECT_EQ(popped->length, 5);
-  EXPECT_TRUE(queue.empty());
-  EXPECT_EQ(0, queue.bytesEnqueued());
-  EXPECT_EQ(queue.receivedData().length(), 0);
-}
-
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

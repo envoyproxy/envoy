@@ -91,10 +91,12 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
     ENVOY_LOG(debug, "Sending a chunk of buffered data ({})", buffered_chunk.length());
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-    enqueueStreamingChunk(buffered_chunk, end_stream);
+    if (bodyMode() != ProcessingMode::MXN) {
+      enqueueStreamingChunk(buffered_chunk, end_stream);
+    }
     filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
   }
-  if (queueBelowLowLimit()) {
+  if ((bodyMode() != ProcessingMode::MXN) && queueBelowLowLimit()) {
     clearWatermark();
   }
 }
@@ -122,7 +124,7 @@ ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_res
   }
 
   if (bodyMode() == ProcessingMode::MXN) {
-    if (!chunk_queue_.empty()) {
+    if (bodyReceived()) {
       return ProcessorState::CallbackState::StreamedBodyCallback;
     }
     if (trailers_available_) {
@@ -309,11 +311,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         ENVOY_LOG(debug, "MxN body response is received and body_mode_: {} ",
                   ProcessingMode::BodySendMode_Name(body_mode_));
         // mxn_resp will only be supported if the ext_proc filter has body_mode set to MXN.
-        const uint32_t chunks_received =
-            common_response.body_mutation().mxn_resp().chunks_received();
-        if (body_mode_ != ProcessingMode::MXN || chunks_received > chunk_queue_.size()) {
-          ENVOY_LOG(debug, "body_mode_ not MXN or chunks_received {} > queue size {}",
-                    chunks_received, chunk_queue_.size());
+        if (body_mode_ != ProcessingMode::MXN) {
           return absl::FailedPreconditionError(
               "spurious message: body_mode_ not MXN, or chunks_received is too big");
         }
@@ -373,8 +371,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       return absl::OkStatus();
     }
 
-    if (should_continue ||
-        (trailers_available_ && chunk_queue_.empty() && (body_mode_ != ProcessingMode::MXN))) {
+    if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
       continueIfNecessary();
     }
     return absl::OkStatus();
@@ -403,14 +400,14 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
 }
 
 void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream) {
-  chunk_queue_.push(data, end_stream, body_mode_);
+  chunk_queue_.push(data, end_stream);
   if (queueOverHighLimit()) {
     requestWatermark();
   }
 }
 
 QueuedChunkPtr ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
-  return chunk_queue_.pop(out_data, body_mode_);
+  return chunk_queue_.pop(out_data);
 }
 
 void ProcessorState::clearAsyncState() {
@@ -462,20 +459,6 @@ bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_res
 
 bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response) {
   const auto& mxn_resp = common_response.body_mutation().mxn_resp();
-  // If chunks_received field is encoded, clear the chunks from the queue, and clear the watermark.
-  const uint32_t chunks_received = mxn_resp.chunks_received();
-  if (chunks_received > 0) {
-    ENVOY_LOG(trace, "MxN: Clearing {} chunks of HTTP body from the queue", chunks_received);
-    for (uint32_t i = 0; i < chunks_received; i++) {
-      Buffer::OwnedImpl chunk_data;
-      (void)dequeueStreamingChunk(chunk_data);
-      chunk_data.drain(chunk_data.length());
-    }
-    if (queueBelowLowLimit()) {
-      clearWatermark();
-    }
-  }
-
   // If body mutation is encoded, send the body out.
   const auto& body = mxn_resp.body();
   const bool end_of_body = mxn_resp.end_of_body();
@@ -494,8 +477,8 @@ bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response
   if (body.size() > 0) {
     Buffer::OwnedImpl buffer;
     buffer.add(body);
-    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}",
-              buffer.length(), end_of_stream);
+    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}, end_of_body is {}",
+              buffer.length(), end_of_stream, end_of_body);
     injectDataToFilterChain(buffer, end_of_stream);
   }
 
@@ -601,8 +584,7 @@ void EncodingProcessorState::clearWatermark() {
   }
 }
 
-void ChunkQueue::push(Buffer::Instance& data, bool end_stream,
-                      ProcessingMode_BodySendMode body_mode) {
+void ChunkQueue::push(Buffer::Instance& data, bool end_stream) {
   // Adding the chunk into the queue.
   auto next_chunk = std::make_unique<QueuedChunk>();
   next_chunk->length = data.length();
@@ -611,14 +593,10 @@ void ChunkQueue::push(Buffer::Instance& data, bool end_stream,
   bytes_enqueued_ += data.length();
 
   // Adding the data to the buffer.
-  if (body_mode != ProcessingMode::MXN) {
-    received_data_.move(data);
-  } else {
-    data.drain(data.length());
-  }
+  received_data_.move(data);
 }
 
-QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data, ProcessingMode_BodySendMode body_mode) {
+QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data) {
   if (queue_.empty()) {
     return nullptr;
   }
@@ -627,10 +605,8 @@ QueuedChunkPtr ChunkQueue::pop(Buffer::OwnedImpl& out_data, ProcessingMode_BodyS
   queue_.pop_front();
   bytes_enqueued_ -= chunk->length;
 
-  if (body_mode != ProcessingMode::MXN) {
-    // Move the corresponding data out.
-    out_data.move(received_data_, chunk->length);
-  }
+  // Move the corresponding data out.
+  out_data.move(received_data_, chunk->length);
   return chunk;
 }
 
