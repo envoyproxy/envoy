@@ -211,14 +211,6 @@ In addition to all above, the following extra attributes are available to Wasm e
    plugin_name, string, Plugin name
    plugin_root_id, string, Plugin root ID
    plugin_vm_id, string, Plugin VM ID
-   node, :ref:`Node<envoy_v3_api_msg_config.core.v3.node>`, Local node description. DEPRECATED: please use `xds` attributes.
-   cluster_name, string, Upstream cluster name. DEPRECATED: please use `xds` attributes.
-   cluster_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream cluster metadata. DEPRECATED: please use `xds` attributes.
-   listener_direction, int, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`. DEPRECATED: please use `xds` attributes.
-   listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata. DEPRECATED: please use `xds` attributes.
-   route_name, string, Route name. DEPRECATED: please use `xds` attributes.
-   route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata. DEPRECATED: please use `xds` attributes.
-   upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata. DEPRECATED: please use `xds` attributes.
 
 Path expressions
 ----------------
