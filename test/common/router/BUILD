@@ -327,7 +327,7 @@ envoy_cc_test(
         "router_test.cc",
         "router_2_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     deps = [
         ":router_test_base_lib",
         "//source/common/buffer:buffer_lib",
