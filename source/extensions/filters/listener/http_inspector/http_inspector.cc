@@ -87,15 +87,11 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     }
 
     absl::string_view new_data = data.substr(nread_);
-    const size_t pos = new_data.find_first_of("\r\n");
+    const size_t pos = new_data.find_first_of('\n');
     if (pos != absl::string_view::npos) {
-      // Include \r or \n
-      if (new_data[pos] == '\r' && (pos + 1 < new_data.size())) {
-        // Including '\n' as BalsaParser executes on seeing '\n'.
-        new_data = new_data.substr(0, pos + 2);
-      } else {
-        new_data = new_data.substr(0, pos + 1);
-      }
+      // Include \n
+      new_data = new_data.substr(0, pos + 1);
+
       ssize_t rc = parser_->execute(new_data.data(), new_data.length());
       nread_ += rc;
       ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,

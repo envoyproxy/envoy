@@ -517,7 +517,6 @@ TEST_P(HttpInspectorTest, MultipleReadsHttp2) {
 }
 
 TEST_P(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
-  // http_parser returns invalid method
   if (parser_impl_ == Http1ParserImpl::BalsaParser) {
     return;
   }
@@ -526,7 +525,7 @@ TEST_P(HttpInspectorTest, MultipleReadsHttp2BadPreface) {
 }
 
 TEST_P(HttpInspectorTest, MultipleReadsHttp1) {
-  const absl::string_view data = "GET /anything HTTP/1.0\r";
+  const absl::string_view data = "GET /anything HTTP/1.0\r\n";
   testHttpInspectMultipleReadsFound(data, Http::Utility::AlpnNames::get().Http10);
 }
 
@@ -559,7 +558,7 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
   // with large request line even when they are split over
   // multiple recv calls.
   init();
-  absl::string_view method = "GET", http = "/index HTTP/1.0\r";
+  absl::string_view method = "GET", http = "/index HTTP/1.0\r\n";
   std::string spaces(Config::MAX_INSPECT_SIZE - method.size() - http.size(), ' ');
   const std::string data = absl::StrCat(method, spaces, http);
   {
@@ -627,8 +626,8 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
 
 TEST_P(HttpInspectorTest, Http1WithLargeHeader) {
   init();
-  absl::string_view request = "GET /index HTTP/1.0\rfield: ";
-  //                           0                  20
+  absl::string_view request = "GET /index HTTP/1.0\r\nfield: ";
+  //                           0                    21
   std::string value(Config::MAX_INSPECT_SIZE - request.size(), 'a');
   const std::string data = absl::StrCat(request, value);
 
@@ -637,11 +636,11 @@ TEST_P(HttpInspectorTest, Http1WithLargeHeader) {
 #ifdef WIN32
     EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
-    for (size_t i = 0; i < 20; i++) {
+    for (size_t i = 0; i < 21; i++) {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
           .WillOnce(Invoke(
               [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= 20);
+                ASSERT(length >= 21);
                 memcpy(buffer, data.data() + i, 1);
                 return Api::SysCallSizeResult{ssize_t(1), 0};
               }))
@@ -652,7 +651,7 @@ TEST_P(HttpInspectorTest, Http1WithLargeHeader) {
       return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
     }));
 
-    for (size_t i = 1; i <= 20; i++) {
+    for (size_t i = 1; i <= 21; i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
           .WillOnce(Invoke(
               [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
