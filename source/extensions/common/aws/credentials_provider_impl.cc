@@ -133,7 +133,6 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       initialization_timer_(initialization_timer), debug_name_(cluster_name) {
   // Async provider cluster setup
   if (context_ && useHttpAsyncClient()) {
-
     // Set up metadata credentials statistics
     scope_ = context_->api().rootScope().createScope(
         fmt::format("aws.metadata_credentials_provider.{}.", cluster_name_));
@@ -950,9 +949,16 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       }
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
 
-      // Handle edge case - if two web identity request signers are configured with different
-      // regions. This appends the region to the cluster name to differentiate the two.
-      auto cluster_name_ = absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
+      // Edge case handling for cluster naming.
+      //
+      // Region is appended to the cluster name, to differentiate between multiple web identity
+      // credential providers configured with different regions.
+      //
+      // UUID is also appended, to differentiate two identically configured web identity credential
+      // providers, as we cannot make these singletons
+
+      auto cluster_name_ = absl::StrCat(STS_TOKEN_CLUSTER, "-", region, "-",
+                                        context->api().randomGenerator().uuid());
 
       ENVOY_LOG(
           debug,
@@ -1002,6 +1008,46 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
         api, context, fetch_metadata_using_curl, MetadataFetcher::create, refresh_state,
         initialization_timer, EC2_METADATA_CLUSTER));
   }
+}
+
+// Container credentials and instance profile credentials are both singletons, as they exist only
+// once on the underlying host and are shared across all invocations of request signing consumer
+// extensions
+SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
+SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
+
+CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCredentialsProvider(
+    Api::Api& api, ServerFactoryContextOptRef context,
+    const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
+    absl::string_view credential_uri, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    std::chrono::seconds initialization_timer, absl::string_view authorization_token = {}) const {
+
+  return context->singletonManager().getTyped<ContainerCredentialsProvider>(
+      SINGLETON_MANAGER_REGISTERED_NAME(container_credentials_provider),
+      [context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
+       refresh_state, initialization_timer, authorization_token, cluster_name, &api] {
+        return std::make_shared<ContainerCredentialsProvider>(
+            api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
+            refresh_state, initialization_timer, authorization_token, cluster_name);
+      });
+}
+
+CredentialsProviderSharedPtr
+DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
+    Api::Api& api, ServerFactoryContextOptRef context,
+    const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    std::chrono::seconds initialization_timer, absl::string_view cluster_name) const {
+  return context->singletonManager().getTyped<InstanceProfileCredentialsProvider>(
+      SINGLETON_MANAGER_REGISTERED_NAME(instance_profile_credentials_provider),
+      [context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
+       initialization_timer, cluster_name, &api] {
+        return std::make_shared<InstanceProfileCredentialsProvider>(
+            api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
+            initialization_timer, cluster_name);
+      });
 }
 
 } // namespace Aws

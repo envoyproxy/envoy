@@ -251,6 +251,7 @@ protected:
  * https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials
  */
 class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBase,
+                                           public Envoy::Singleton::Instance,
                                            public MetadataFetcher::MetadataReceiver {
 public:
   InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
@@ -289,6 +290,7 @@ private:
  * https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html#enable_task_iam_roles
  */
 class ContainerCredentialsProvider : public MetadataCredentialsProviderBase,
+                                     public Envoy::Singleton::Instance,
                                      public MetadataFetcher::MetadataReceiver {
 public:
   ContainerCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
@@ -433,22 +435,14 @@ private:
       absl::string_view credential_uri,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
-      absl::string_view authorization_token = {}) const override {
-    return std::make_shared<ContainerCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
-        refresh_state, initialization_timer, authorization_token, cluster_name);
-  }
+      absl::string_view authorization_token) const override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer, absl::string_view cluster_name) const override {
-    return std::make_shared<InstanceProfileCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
-        initialization_timer, cluster_name);
-  }
+      std::chrono::seconds initialization_timer, absl::string_view cluster_name) const override;
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
