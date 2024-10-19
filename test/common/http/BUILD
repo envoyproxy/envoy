@@ -145,6 +145,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hash_policy_test",
+    srcs = ["hash_policy_test.cc"],
+    rbe_pool = "2core",
+    deps = [
+        "//source/common/http:hash_policy_lib",
+        "//test/mocks/network:network_mocks", 
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_wrappers_test",
     srcs = ["codec_wrappers_test.cc"],
     rbe_pool = "2core",
