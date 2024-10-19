@@ -341,9 +341,12 @@ key:
   fragments:
     - string_key: {}
 )EOF";
-  const std::string scoped_route1 = fmt::format(scoped_route_with_inline_route_config_tmpl, "scoped_route_0", "cluster_0", "foo-route");
-  const std::string scoped_route2 = fmt::format(scoped_route_with_inline_route_config_tmpl, "scoped_route_0", "cluster_1", "bar-route");
-  const std::string scoped_route3 = fmt::format(scoped_route_with_inline_route_config_tmpl, "scoped_route_1", "cluster_0", "foo-route");
+  const std::string scoped_route1 = fmt::format(scoped_route_with_inline_route_config_tmpl,
+                                                "scoped_route_0", "cluster_0", "foo-route");
+  const std::string scoped_route2 = fmt::format(scoped_route_with_inline_route_config_tmpl,
+                                                "scoped_route_0", "cluster_1", "bar-route");
+  const std::string scoped_route3 = fmt::format(scoped_route_with_inline_route_config_tmpl,
+                                                "scoped_route_1", "cluster_0", "foo-route");
 
   const std::string scoped_route_with_rds_subscription = R"EOF(
 name: scoped_route_0
@@ -380,7 +383,8 @@ key:
       /*backend_idx=*/0);
 
   // Replace foo-scope with a scoped route using an RDS subscription.
-  sendSrdsResponse({scoped_route_with_rds_subscription}, {scoped_route_with_rds_subscription}, {}, "2");
+  sendSrdsResponse({scoped_route_with_rds_subscription}, {scoped_route_with_rds_subscription}, {},
+                   "2");
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
   createRdsStream("route_config");
   test_server_->waitForCounterGe("http.config_test.rds.route_config.update_attempt", 1);

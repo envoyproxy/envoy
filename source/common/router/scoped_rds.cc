@@ -282,8 +282,8 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
           route_config_provider_manager_.createStaticRouteConfigProvider(
               scoped_route_config.route_configuration(), factory_context_,
               factory_context_.messageValidationContext().staticValidationVisitor());
-      scoped_route_info = std::make_shared<ScopedRouteInfo>(
-          std::move(scoped_route_config), route_config_provider->configCast());
+      scoped_route_info = std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config),
+                                                            route_config_provider->configCast());
       // If this is an update from a scoped route configuration specifying route_configuration_name
       // to one specifying route_configuration, then the RDS subscription is no longer needed. We
       // can remove the RDS config provider, but hold on to them until exiting the loop in case the
@@ -315,7 +315,8 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
         // For on demand scopes, create a rds helper with rds provider uninitialized.
         rds_config_provider_helper =
             std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name);
-        // scope_route_info->routeConfig() will be nullptr, because RouteConfiguration is not loaded.
+        // scope_route_info->routeConfig() will be nullptr, because RouteConfiguration is not
+        // loaded.
         scoped_route_info =
             std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
       }
