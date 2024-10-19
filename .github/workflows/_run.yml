@@ -93,15 +93,15 @@ on:
         default: |
           - run: |
               # disk space at beginning of build
-              df -h > "${TMP_REPORT}/df-pre"
+              df -h | tee "${TMP_REPORT}/df-pre"
             shell: bash
       report-post:
         type: string
         default: |
           - run: |
               # disk space at end of build
-              df -h > "${TMP_REPORT}/df-post"
-              (du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :) > "${TMP_REPORT}/du-post"
+              df -h | tee "${TMP_REPORT}/df-post"
+              (du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :) | tee "${TMP_REPORT}/du-post"
             shell: bash
       request:
         type: string
