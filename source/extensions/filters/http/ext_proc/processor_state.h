@@ -248,6 +248,7 @@ protected:
   // If true, we are in "buffered partial" mode and we already reached the buffer
   // limit, sent the body in a message, and got back a reply.
   bool partial_body_processed_ : 1;
+
   // If true, the server wants to see the headers
   bool send_headers_ : 1;
   // If true, the server wants to see the trailers

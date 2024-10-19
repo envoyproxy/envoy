@@ -20,36 +20,38 @@ using envoy::service::ext_proc::v3::TrailersResponse;
 
 void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                                           CallbackState callback_state) {
+  ENVOY_LOG(debug, "Start external processing call");
   callback_state_ = callback_state;
-  new_timeout_received_ = false;
-  if (bodyMode() == ProcessingMode::MXN) {
-    return;
+
+  if (bodyMode() != ProcessingMode::MXN) {
+    if (!message_timer_) {
+      message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
+    }
+    message_timer_->enableTimer(timeout);
+    ENVOY_LOG(debug, "Traffic direction {}: {} ms timer enabled", trafficDirectionDebugStr(),
+              timeout.count());
   }
 
-  if (!message_timer_) {
-    message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
-  }
-  message_timer_->enableTimer(timeout);
-  ENVOY_LOG(debug, "Traffic direction {}: {} ms timer enabled", trafficDirectionDebugStr(),
-            timeout.count());
   call_start_time_ = filter_callbacks_->dispatcher().timeSource().monotonicTime();
+  new_timeout_received_ = false;
+
 }
 
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                                            CallbackState next_state) {
+  ENVOY_LOG(debug, "Finish external processing call");
   filter_.logGrpcStreamInfo();
-  if (bodyMode() != ProcessingMode::MXN) {
-    stopMessageTimer();
 
-    if (call_start_time_.has_value()) {
-      std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
-          filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
-      ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
-      if (logging_info != nullptr) {
-        logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection());
-      }
-      call_start_time_ = absl::nullopt;
+  stopMessageTimer();
+
+  if (call_start_time_.has_value()) {
+    std::chrono::microseconds duration = std::chrono::duration_cast<std::chrono::microseconds>(
+        filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
+    ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
+    if (logging_info != nullptr) {
+      logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection());
     }
+    call_start_time_ = absl::nullopt;
   }
   callback_state_ = next_state;
   new_timeout_received_ = false;
@@ -318,10 +320,14 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
         // mxn_resp will only be supported if the ext_proc filter has body_mode set to MXN.
         if (body_mode_ != ProcessingMode::MXN) {
           return absl::FailedPreconditionError(
-              "spurious message: body_mode_ not MXN, or chunks_received is too big");
+              "spurious message: MXN response is received while body_mode_ is not MXN");
         }
         should_continue = handleMxnBodyResponse(common_response);
       } else {
+        if (body_mode_ == ProcessingMode::MXN) {
+          return absl::FailedPreconditionError(
+              "spurious message: Streamed response is received while body_mode_ is MXN");
+        }
         should_continue = handleStreamedBodyResponse(common_response);
       }
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {

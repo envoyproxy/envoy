@@ -367,13 +367,14 @@ message MxnBodyResponse {
   // Envoy sends this body mutation out as it is.
   bytes body = 1;
 
-  // Set this flag to true if this is the last chunk of body response, regardless whether
-  // there is trailer after it.
+  // Set this flag to true if this is the last chunk of body response,
+  // regardless whether there is trailer after it.
   bool end_of_body = 2;
 }
 
 // This message specifies the body mutation Envoy will apply and send out.
 message BodyMutation {
+  // Sending this response for none-MXN body mode.
   oneof mutation {
     // The entire body to replace
     bytes body = 1;
