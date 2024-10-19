@@ -59,7 +59,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "envoy_quic_proof_source_test",
     srcs = ["envoy_quic_proof_source_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     tags = ["nofips"],
     deps = [
         ":test_utils_lib",
