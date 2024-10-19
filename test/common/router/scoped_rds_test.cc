@@ -740,6 +740,49 @@ key:
             "foo_routes");
 }
 
+TEST_F(ScopedRdsTest, ScopedRdsSupportsInlineRds) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  setup();
+
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration:
+  name: route_config
+  virtual_hosts:
+    - name: virtual_host
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: baz }
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+
+  init_watcher_.expectReady(); // Only the SRDS parent_init_target_.
+  context_init_manager_.initialize(init_watcher_);
+  const auto decoded_resources = TestUtility::decodeResources({resource});
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").ok());
+  EXPECT_EQ(1UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  EXPECT_EQ(1UL, all_scopes_.value());
+  // Inline RDS doesn't count as an active scope.
+  EXPECT_EQ(0UL, active_scopes_.value());
+
+  // Verify the config is a ScopedConfigImpl instance, scope points to route_config already as there
+  // is no need to wait for RDS.
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
+                ->name(),
+            "route_config");
+}
+
 // Tests that conflict resources in the same push are detected.
 TEST_F(ScopedRdsTest, MultipleResourcesWithKeyConflictSotW) {
   setup();

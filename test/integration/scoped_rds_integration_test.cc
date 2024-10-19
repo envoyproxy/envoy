@@ -326,6 +326,106 @@ key:
       /*cluster_1 */ 1);
 }
 
+TEST_P(ScopedRdsIntegrationTest, SrdsWithInlineRouteConfiguration) {
+  constexpr absl::string_view scoped_route_with_inline_route_config_tmpl = R"EOF(
+name: {}
+route_configuration:
+  name: route_config
+  virtual_hosts:
+    - name: integration
+      domains: ["*"]
+      routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scoped_route1 = fmt::format(scoped_route_with_inline_route_config_tmpl, "scoped_route_0", "cluster_0", "foo-route");
+  const std::string scoped_route2 = fmt::format(scoped_route_with_inline_route_config_tmpl, "scoped_route_0", "cluster_1", "bar-route");
+  const std::string scoped_route3 = fmt::format(scoped_route_with_inline_route_config_tmpl, "scoped_route_1", "cluster_0", "foo-route");
+
+  const std::string scoped_route_with_rds_subscription = R"EOF(
+name: scoped_route_0
+route_configuration_name: route_config
+key:
+  fragments:
+    - string_key: foo-route
+)EOF";
+  const std::string route_config = R"EOF(
+      name: route_config
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: { prefix: "/" }
+          route: { cluster: cluster_1 }
+)EOF";
+
+  on_server_init_function_ = [&]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scoped_route1}, {scoped_route1}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo"}},
+      /*response_size=*/0,
+      /*backend_idx=*/0);
+
+  // Replace foo-scope with a scoped route using an RDS subscription.
+  sendSrdsResponse({scoped_route_with_rds_subscription}, {scoped_route_with_rds_subscription}, {}, "2");
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
+  createRdsStream("route_config");
+  test_server_->waitForCounterGe("http.config_test.rds.route_config.update_attempt", 1);
+  sendRdsResponse(route_config, "1");
+  test_server_->waitForCounterGe("http.config_test.rds.route_config.update_success", 1);
+
+  // foo-route now goes to cluster_1.
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo"}},
+      /*response_size=*/0,
+      /*backend_idx=*/1);
+
+  // Replace foo-scope with bar-scope, which uses an inlined RouteConfiguration.
+  sendSrdsResponse({scoped_route2}, {scoped_route2}, {}, "3");
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 3);
+
+  // foo-route now returns 404.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+
+  // bar-route now returns 200 and is routed to cluster_1.
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=bar-route"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo"}},
+      /*response_size=*/0,
+      /*backend_idx=*/1);
+}
+
 // Test that a bad config update updates the corresponding stats.
 TEST_P(ScopedRdsIntegrationTest, ConfigUpdateFailure) {
   // 'name' will fail to validate due to empty string.
