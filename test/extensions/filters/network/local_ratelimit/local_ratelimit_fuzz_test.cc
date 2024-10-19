@@ -11,7 +11,6 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/thread_local/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -56,7 +55,6 @@ DEFINE_PROTO_FUZZER(
     return;
   }
   static NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<ThreadLocal::MockInstance> tls;
   // TODO(zhxie): The GlobalTimeSystem in MockDispatcher will initialize itself into a
   // TestRealTimeSystem by default which is incompatible with the SimulatedTimeSystem in
   // MockReadFilterCallbacks. We will not need to change the time system after the switching of
@@ -70,8 +68,8 @@ DEFINE_PROTO_FUZZER(
       input.config();
   ConfigSharedPtr config = nullptr;
   try {
-    config = std::make_shared<Config>(proto_config, dispatcher, tls, *stats_store.rootScope(),
-                                      runtime, singleton_manager);
+    config = std::make_shared<Config>(proto_config, dispatcher, *stats_store.rootScope(), runtime,
+                                      singleton_manager);
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException in config's constructor: {}", e.what());
     return;

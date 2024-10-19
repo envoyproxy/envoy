@@ -70,8 +70,8 @@ class Config : Logger::Loggable<Logger::Id::filter> {
 public:
   Config(
       const envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& proto_config,
-      Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls, Stats::Scope& scope,
-      Runtime::Loader& runtime, Singleton::Manager& singleton_manager);
+      Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime,
+      Singleton::Manager& singleton_manager);
 
   ~Config();
 

@@ -52,14 +52,16 @@ class PerConnectionRateLimiter : public StreamInfo::FilterState::Object {
 public:
   PerConnectionRateLimiter(
       const std::chrono::milliseconds& fill_interval, uint32_t max_tokens, uint32_t tokens_per_fill,
-      Envoy::Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+      Envoy::Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptor,
       bool always_consume_default_token_bucket)
-      : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, tls, descriptor,
+      : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor,
                       always_consume_default_token_bucket) {}
   static const std::string& key();
-  Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() { return rate_limiter_; }
+  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() const {
+    return rate_limiter_;
+  }
 
 private:
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;

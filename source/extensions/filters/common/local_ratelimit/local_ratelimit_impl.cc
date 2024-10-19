@@ -171,15 +171,15 @@ bool AtomicTokenBucket::consume(double factor) {
 
 LocalRateLimiterImpl::LocalRateLimiterImpl(
     const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
-    const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+    const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
     const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
     bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
-    uint32_t lru_size)
+    uint32_t lru_size, ThreadLocal::SlotAllocator* tls, bool per_connection)
     : fill_timer_(fill_interval > std::chrono::milliseconds(0)
                       ? dispatcher.createTimer([this] { onFillTimer(); })
                       : nullptr),
-      time_source_(dispatcher.timeSource()), tls_(tls.allocateSlot()),
+      time_source_(dispatcher.timeSource()), tls_(tls != nullptr ? tls->allocateSlot() : nullptr),
       share_provider_(std::move(shared_provider)),
       always_consume_default_token_bucket_(always_consume_default_token_bucket),
       no_timer_based_rate_limit_token_bucket_(Runtime::runtimeFeatureEnabled(
@@ -205,14 +205,23 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
 
   ThreadLocalDynamicDescriptorsCacheSharedPtr empty(
       new ThreadLocalDynamicDescriptorsCache(blank_descriptors));
-
-  tls_->set(
-      [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
+  // in per connection rate limit mode, the dynamic descriptors are stored in the per connection
+  // which is per worker thread. So we don't need to store the dynamic descriptors in the main
+  // thread and share them with worker threads through thread local storage.
+  // In per connection mode, therefore, tls is nullptr.
+  if (tls_) {
+    tls_->set(
+        [empty](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return empty; });
+  }
 
   for (const auto& descriptor : descriptors) {
     RateLimit::LocalDescriptor new_descriptor;
     new_descriptor.entries_.reserve(descriptor.entries_size());
     for (const auto& entry : descriptor.entries()) {
+      if (entry.value().empty() && per_connection) {
+        throw EnvoyException(
+            "local rate descriptor value cannot be empty in per connection rate limit mode");
+      }
       new_descriptor.entries_.push_back({entry.key(), entry.value()});
     }
 
@@ -288,7 +297,8 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
     auto iter = descriptors_.find(request_descriptor);
     if (iter != descriptors_.end()) {
       matched_descriptors.push_back(iter->second.get());
-    } else {
+    } else if (tls_) { // tls_ is not nullptr means rate limiting is per envoy instance and not per
+                       // connection.
       // If the request descriptor is not found in the user descriptors, it could be a wildcard case
       // where value is left blank in the user configured descriptor entry. In this case, we need to
       // check if it matches any of the dynamic descriptors.

@@ -9,8 +9,7 @@ namespace LocalRateLimit {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::listener::local_ratelimit::v3::LocalRateLimit& proto_config,
-    Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls, Stats::Scope& scope,
-    Runtime::Loader& runtime)
+    Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime)
     : enabled_(proto_config.runtime_enabled(), runtime),
       stats_(generateStats(proto_config.stat_prefix(), scope)),
       rate_limiter_(
@@ -18,7 +17,7 @@ FilterConfig::FilterConfig(
               PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval)),
           proto_config.token_bucket().max_tokens(),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.token_bucket(), tokens_per_fill, 1),
-          dispatcher, tls,
+          dispatcher,
           Protobuf::RepeatedPtrField<
               envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>()) {}
 

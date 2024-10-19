@@ -159,11 +159,11 @@ public:
   LocalRateLimiterImpl(
       const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
       const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
-      ThreadLocal::SlotAllocator& tls,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
       bool always_consume_default_token_bucket = true,
-      ShareProviderSharedPtr shared_provider = nullptr, const uint32_t lru_size = 20);
+      ShareProviderSharedPtr shared_provider = nullptr, const uint32_t lru_size = 20,
+      ThreadLocal::SlotAllocator* tls = nullptr, bool per_connection = false);
   ~LocalRateLimiterImpl();
 
   Result requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);

@@ -109,9 +109,10 @@ FilterConfig::FilterConfig(
   }
 
   rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
-      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, context.threadLocal(),
-      descriptors_, always_consume_default_token_bucket_, std::move(share_provider),
-      config.dynamic_descripters_lru_cache_limit());
+      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, descriptors_,
+      always_consume_default_token_bucket_, std::move(share_provider),
+      config.dynamic_descripters_lru_cache_limit(), &(context.threadLocal()),
+      config.local_rate_limit_per_downstream_connection());
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result FilterConfig::requestAllowed(
@@ -226,22 +227,22 @@ Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionR
   ASSERT(used_config_->rateLimitPerConnection());
 
   auto typed_state =
-      decoder_callbacks_->streamInfo().filterState()->getDataMutable<PerConnectionRateLimiter>(
+      decoder_callbacks_->streamInfo().filterState()->getDataReadOnly<PerConnectionRateLimiter>(
           PerConnectionRateLimiter::key());
 
   if (typed_state == nullptr) {
     auto limiter = std::make_shared<PerConnectionRateLimiter>(
         used_config_->fillInterval(), used_config_->maxTokens(), used_config_->tokensPerFill(),
-        decoder_callbacks_->dispatcher(), config_->tls(), used_config_->descriptors(),
+        decoder_callbacks_->dispatcher(), used_config_->descriptors(),
         used_config_->consumeDefaultTokenBucket());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
         PerConnectionRateLimiter::key(), limiter, StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
-    return limiter->value();
+    return const_cast<Filters::Common::LocalRateLimit::LocalRateLimiterImpl&>(limiter->value());
   }
 
-  return typed_state->value();
+  return const_cast<Filters::Common::LocalRateLimit::LocalRateLimiterImpl&>(typed_state->value());
 }
 
 void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
