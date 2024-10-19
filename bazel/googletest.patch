@@ -1,0 +1,35 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index e407ae29..b1e3b7fb 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -56,12 +56,6 @@ config_setting(
+     constraint_values = ["@platforms//os:openbsd"],
+ )
+ 
+-# NOTE: Fuchsia is not an officially supported platform.
+-config_setting(
+-    name = "fuchsia",
+-    constraint_values = ["@platforms//os:fuchsia"],
+-)
+-
+ config_setting(
+     name = "msvc_compiler",
+     flag_values = {
+@@ -153,17 +147,6 @@ cc_library(
+             "@com_googlesource_code_re2//:re2",
+         ],
+         "//conditions:default": [],
+-    }) + select({
+-        # `gtest-death-test.cc` has `EXPECT_DEATH` that spawns a process,
+-        # expects it to crash and inspects its logs with the given matcher,
+-        # so that's why these libraries are needed.
+-        # Otherwise, builds targeting Fuchsia would fail to compile.
+-        ":fuchsia": [
+-            "@fuchsia_sdk//pkg/fdio",
+-            "@fuchsia_sdk//pkg/syslog",
+-            "@fuchsia_sdk//pkg/zx",
+-        ],
+-        "//conditions:default": [],
+     }),
+ )
+ 

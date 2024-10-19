@@ -1,6 +1,5 @@
 load("@aspect_bazel_lib//lib:repositories.bzl", "aspect_bazel_lib_dependencies")
 load("@bazel_features//:deps.bzl", "bazel_features_deps")
-load("@com_google_googletest//:googletest_deps.bzl", "googletest_deps")
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 load("@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:crates.bzl", "crate_repositories")
 load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
@@ -18,7 +17,6 @@ def envoy_dependencies_extra(
         python_version = PYTHON_VERSION,
         ignore_root_user_error = False):
     bazel_features_deps()
-    googletest_deps()
     emsdk_deps()
     raze_fetch_remote_crates()
     crate_repositories()
