@@ -108,9 +108,9 @@ public:
     TestSession(UdpProxyFilterTest& parent,
                 const Network::Address::InstanceConstSharedPtr& upstream_address,
                 bool is_cluster_available = true)
-        : parent_(parent), upstream_address_(upstream_address),
-          socket_(new NiceMock<Network::MockSocket>()) {
+        : parent_(parent), upstream_address_(upstream_address) {
       if (is_cluster_available) {
+        socket_ = new NiceMock<Network::MockSocket>();
         ON_CALL(*socket_, ipVersion()).WillByDefault(Return(upstream_address_->ip()->version()));
       }
     }
@@ -235,7 +235,7 @@ public:
     UdpProxyFilterTest& parent_;
     const Network::Address::InstanceConstSharedPtr upstream_address_;
     Event::MockTimer* idle_timer_{};
-    NiceMock<Network::MockSocket>* socket_;
+    NiceMock<Network::MockSocket>* socket_{};
     std::map<int, std::map<int, int>> sock_opts_;
     Event::FileReadyCb file_event_cb_;
   };
