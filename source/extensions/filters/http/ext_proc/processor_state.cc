@@ -34,7 +34,6 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
 
   call_start_time_ = filter_callbacks_->dispatcher().timeSource().monotonicTime();
   new_timeout_received_ = false;
-
 }
 
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
@@ -488,7 +487,9 @@ bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response
   if (body.size() > 0) {
     Buffer::OwnedImpl buffer;
     buffer.add(body);
-    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}, end_of_body is {}",
+    ENVOY_LOG(trace,
+              "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}, "
+              "end_of_body is {}",
               buffer.length(), end_of_stream, end_of_body);
     injectDataToFilterChain(buffer, end_of_stream);
   }

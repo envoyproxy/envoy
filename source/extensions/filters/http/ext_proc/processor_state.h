@@ -84,7 +84,8 @@ public:
                           const std::vector<std::string>& untyped_receiving_namespaces)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
         complete_body_available_(false), trailers_available_(false), body_replaced_(false),
-        body_received_(false), partial_body_processed_(false), traffic_direction_(traffic_direction),
+        body_received_(false), partial_body_processed_(false),
+        traffic_direction_(traffic_direction),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
         untyped_receiving_namespaces_(&untyped_receiving_namespaces) {}

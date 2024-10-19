@@ -4472,7 +4472,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
         body_mut->mutable_mxn_resp()->set_body("");
-         body_mut->mutable_mxn_resp()->set_end_of_body(false);
+        body_mut->mutable_mxn_resp()->set_end_of_body(false);
       },
       false);
 
