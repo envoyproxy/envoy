@@ -69,22 +69,33 @@ private:
 
 CacheInsertQueue::CacheInsertQueue(std::shared_ptr<HttpCache> cache,
                                    Http::StreamEncoderFilterCallbacks& encoder_callbacks,
-                                   InsertContextPtr insert_context, AbortInsertCallback abort)
+                                   InsertContextPtr insert_context, InsertQueueCallbacks& callbacks)
     : dispatcher_(encoder_callbacks.dispatcher()), insert_context_(std::move(insert_context)),
       low_watermark_bytes_(encoder_callbacks.encoderBufferLimit() / 2),
-      high_watermark_bytes_(encoder_callbacks.encoderBufferLimit()),
-      encoder_callbacks_(encoder_callbacks), abort_callback_(std::move(abort)), cache_(cache) {}
+      high_watermark_bytes_(encoder_callbacks.encoderBufferLimit()), callbacks_(callbacks),
+      cache_(cache) {}
 
 void CacheInsertQueue::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                                      const ResponseMetadata& metadata, bool end_stream) {
   end_stream_queued_ = end_stream;
   // While zero isn't technically true for the size of headers, headers are
   // typically excluded from the stream buffer limit.
+  fragment_in_flight_ = true;
   insert_context_->insertHeaders(
       response_headers, metadata,
       [this, end_stream](bool cache_success) { onFragmentComplete(cache_success, end_stream, 0); },
       end_stream);
-  fragment_in_flight_ = true;
+  // This requirement simplifies the cache implementation; most caches will have to
+  // do asynchronous operations, and so will post anyway. It is an error to call continueDecoding
+  // during decodeHeaders, and calling a callback inline *may* do that, therefore we
+  // require the cache to post. A previous version performed a post here to guarantee
+  // correct behavior, but that meant for async caches it would double-post - it makes
+  // more sense to single-post when it may not be necessary (in the rarer case of a cache
+  // not needing async action) than to double-post in the common async case.
+  // This requirement may become unnecessary after some more iterations result in
+  // continueDecoding no longer being a thing in this filter.
+  ASSERT(fragment_in_flight_,
+         "insertHeaders must post the callback to dispatcher, not just call it");
 }
 
 void CacheInsertQueue::insertBody(const Buffer::Instance& fragment, bool end_stream) {
@@ -96,19 +107,21 @@ void CacheInsertQueue::insertBody(const Buffer::Instance& fragment, bool end_str
     queue_size_bytes_ += sz;
     fragments_.push_back(std::make_unique<CacheInsertFragmentBody>(fragment, end_stream));
     if (!watermarked_ && queue_size_bytes_ > high_watermark_bytes_) {
-      if (encoder_callbacks_.has_value()) {
-        encoder_callbacks_.value().get().onEncoderFilterAboveWriteBufferHighWatermark();
+      if (callbacks_.has_value()) {
+        callbacks_->insertQueueOverHighWatermark();
       }
       watermarked_ = true;
     }
   } else {
+    fragment_in_flight_ = true;
     insert_context_->insertBody(
         Buffer::OwnedImpl(fragment),
         [this, end_stream](bool cache_success) {
           onFragmentComplete(cache_success, end_stream, 0);
         },
         end_stream);
-    fragment_in_flight_ = true;
+    ASSERT(fragment_in_flight_,
+           "insertBody must post the callback to dispatcher, not just call it");
   }
 }
 
@@ -117,9 +130,11 @@ void CacheInsertQueue::insertTrailers(const Http::ResponseTrailerMap& trailers) 
   if (fragment_in_flight_) {
     fragments_.push_back(std::make_unique<CacheInsertFragmentTrailers>(trailers));
   } else {
+    fragment_in_flight_ = true;
     insert_context_->insertTrailers(
         trailers, [this](bool cache_success) { onFragmentComplete(cache_success, true, 0); });
-    fragment_in_flight_ = true;
+    ASSERT(fragment_in_flight_,
+           "insertTrailers must post the callback to dispatcher, not just call it");
   }
 }
 
@@ -135,8 +150,8 @@ void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, s
   ASSERT(queue_size_bytes_ >= sz, "queue can't be emptied by more than its size");
   queue_size_bytes_ -= sz;
   if (watermarked_ && queue_size_bytes_ <= low_watermark_bytes_) {
-    if (encoder_callbacks_.has_value()) {
-      encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
+    if (callbacks_.has_value()) {
+      callbacks_->insertQueueUnderLowWatermark();
     }
     watermarked_ = false;
   }
@@ -144,17 +159,28 @@ void CacheInsertQueue::onFragmentComplete(bool cache_success, bool end_stream, s
     // canceled by cache; unwatermark if necessary, inform the filter if
     // it's still around, and delete the queue.
     if (watermarked_) {
-      if (encoder_callbacks_.has_value()) {
-        encoder_callbacks_.value().get().onEncoderFilterBelowWriteBufferLowWatermark();
+      if (callbacks_.has_value()) {
+        callbacks_->insertQueueUnderLowWatermark();
       }
       watermarked_ = false;
     }
     fragments_.clear();
     // Clearing self-ownership might provoke the destructor, so take a copy of the
     // abort callback to avoid reading from 'this' after it may be deleted.
-    auto abort_callback = std::move(abort_callback_);
+    //
+    // This complexity is necessary because if the queue *is not* currently
+    // self-owned, it will be deleted during insertQueueAborted, so
+    // clearing self_ownership_ second would be a write-after-destroy error.
+    // If it *is* currently self-owned, then we must still call the callback if
+    // any, but clearing self_ownership_ *first* would mean we got destroyed
+    // so we would no longer have access to the callback.
+    // Since destroying first *or* second can be an error, rearrange things
+    // so that destroying first *is not* an error. :)
+    auto callbacks = std::move(callbacks_);
     self_ownership_.reset();
-    std::move(abort_callback)();
+    if (callbacks.has_value()) {
+      callbacks->insertQueueAborted();
+    }
     return;
   }
   if (end_stream) {
@@ -178,12 +204,13 @@ void CacheInsertQueue::setSelfOwned(std::unique_ptr<CacheInsertQueue> self) {
   // If we sent a high watermark event, this is our last chance to unset it on the
   // stream, so we'd better do so.
   if (watermarked_) {
-    encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
+    if (callbacks_.has_value()) {
+      callbacks_->insertQueueUnderLowWatermark();
+    }
     watermarked_ = false;
   }
   // Disable all the callbacks, they're going to have nowhere to go.
-  abort_callback_ = []() {};
-  encoder_callbacks_.reset();
+  callbacks_.reset();
   if (fragments_.empty() && !fragment_in_flight_) {
     // If the queue is already empty we can just let it be destroyed immediately.
     return;

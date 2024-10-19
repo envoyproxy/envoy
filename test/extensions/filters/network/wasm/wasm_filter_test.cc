@@ -28,7 +28,8 @@ using proxy_wasm::ContextBase;
 
 class TestFilter : public Context {
 public:
-  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
+  TestFilter(Wasm* wasm, uint32_t root_context_id,
+             Common::Wasm::PluginHandleSharedPtr plugin_handle)
       : Context(wasm, root_context_id, plugin_handle) {}
   MOCK_CONTEXT_LOG_;
 

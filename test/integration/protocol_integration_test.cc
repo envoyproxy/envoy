@@ -462,7 +462,7 @@ TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
   waitForNextUpstreamRequest();
   EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::DownstreamPeriodic),
-            waitForAccessLog(access_log_name_));
+            waitForAccessLog(access_log_name_, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -4770,8 +4770,6 @@ private:
 };
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.allow_client_socket_creation_failure",
-                                    "true");
   AllowForceFail fail_socket_n_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
 

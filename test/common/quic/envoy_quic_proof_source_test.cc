@@ -195,6 +195,7 @@ public:
     auto factory = Extensions::TransportSockets::Tls::TlsCertificateSelectorConfigFactoryImpl::
         getDefaultTlsCertificateSelectorConfigFactory();
     ASSERT_TRUE(factory);
+    ASSERT_EQ("envoy.tls.certificate_selectors.default", factory->name());
     const ProtobufWkt::Any any;
     absl::Status creation_status = absl::OkStatus();
     auto tls_certificate_selector_factory_cb = factory->createTlsCertificateSelectorFactory(
