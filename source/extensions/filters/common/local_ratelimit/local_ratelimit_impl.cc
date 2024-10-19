@@ -309,7 +309,7 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
         ENVOY_LOG(debug, "dynamic_descriptors is empty");
       } else {
         auto dynamic_iter = dynamic_descriptors.find(request_descriptor);
-        if (dynamic_iter != dynamic_descriptors_.end()) {
+        if (dynamic_iter != dynamic_descriptors.end()) {
           matched_descriptors.push_back(dynamic_iter->second.get());
           continue;
         }
