@@ -50,6 +50,19 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "http_inspector_parser_callbacks_test",
+    srcs = ["http_inspector_parser_callbacks_test.cc"],
+    extension_names = ["envoy.filters.listener.http_inspector"],
+    rbe_pool = "2core",
+    deps = [
+        "//source/extensions/filters/listener/http_inspector:http_inspector_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "http_inspector_fuzz_test",
     srcs = ["http_inspector_fuzz_test.cc"],

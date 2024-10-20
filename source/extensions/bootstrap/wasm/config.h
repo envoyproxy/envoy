@@ -16,25 +16,11 @@ namespace Extensions {
 namespace Bootstrap {
 namespace Wasm {
 
+using Common::Wasm::PluginConfig;
+using Common::Wasm::PluginConfigPtr;
 using Common::Wasm::PluginHandleSharedPtrThreadLocal;
 using Envoy::Extensions::Common::Wasm::PluginHandleSharedPtr;
 using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
-
-class WasmService {
-public:
-  WasmService(PluginSharedPtr plugin, PluginHandleSharedPtr singleton)
-      : plugin_(plugin), singleton_(std::move(singleton)) {}
-  WasmService(PluginSharedPtr plugin,
-              ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>&& tls_slot)
-      : plugin_(plugin), tls_slot_(std::move(tls_slot)) {}
-
-private:
-  PluginSharedPtr plugin_;
-  PluginHandleSharedPtr singleton_;
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
-};
-
-using WasmServicePtr = std::unique_ptr<WasmService>;
 
 class WasmFactory : public Server::Configuration::BootstrapExtensionFactory {
 public:
@@ -53,9 +39,9 @@ public:
   WasmServiceExtension(const envoy::extensions::wasm::v3::WasmService& config,
                        Server::Configuration::ServerFactoryContext& context)
       : config_(config), context_(context) {}
-  WasmService& wasmService() {
-    ASSERT(wasm_service_ != nullptr);
-    return *wasm_service_;
+  PluginConfig& wasmService() {
+    ASSERT(plugin_config_ != nullptr);
+    return *plugin_config_;
   }
   void onServerInitialized() override;
 
@@ -64,8 +50,7 @@ private:
 
   envoy::extensions::wasm::v3::WasmService config_;
   Server::Configuration::ServerFactoryContext& context_;
-  WasmServicePtr wasm_service_;
-  RemoteAsyncDataProviderPtr remote_data_provider_;
+  PluginConfigPtr plugin_config_;
 };
 
 } // namespace Wasm
