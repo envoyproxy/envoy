@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.api_key_auth.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/sensitive.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.api_key_auth.v3";
+option java_outer_classname = "ApiKeyAuthProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/api_key_auth/v3;api_key_authv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: APIKey Auth]
+// APIKey Auth :ref:`configuration overview <config_http_filters_api_key_auth>`.
+// [#extension: envoy.filters.http.api_key_auth]
+
+// Basic HTTP authentication.
+//
+// Example:
+//
+// .. code-block:: yaml
+//
+//    location: HEADER
+//    name: X-API-KEY
+//    keys:
+//      inline_string: |-
+//        apikey1:user1
+//        apikey2:user2
+//
+message APIKeyAuth {
+  enum APIKeyLocation {
+    // The API key is expected to be in a header.
+    HEADER = 0;
+
+    // The API key is expected to be in a query parameter.
+    QUERY = 1;
+
+    // The API key is expected to be in a cookie.
+    COOKIE = 2;
+  }
+
+  // The location of the API key.
+  APIKeyLocation location = 1;
+
+  // The name of the header, query parameter, or cookie that contains the API key.
+  string name = 2;
+
+  // keys used to authenticate the user.
+  // It should be a map of apikey to user.
+  config.core.v3.DataSource keys = 3 [(udpa.annotations.sensitive) = true];
+
+  // The header name to forward an authenticated user.
+  //
+  // If it is not specified, the username will not be forwarded.
+  string forward_username_header = 4
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+}
+
+// Extra settings that may be added to per-route configuration for
+// a virtual host or a cluster.
+message APIKeyAuthPerRoute {
+  // keys used to authenticate the user for this route.
+  config.core.v3.DataSource keys = 1
+      [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
+}
