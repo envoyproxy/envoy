@@ -559,12 +559,10 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
     stats_->credential_refreshes_succeeded_.inc();
-    if (refresh_state_ == MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh) {
-      ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
-      refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
-      // Set receiver state in statistics
-      stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
-    }
+    ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
+    refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+    // Set receiver state in statistics
+    stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
   } else {
     cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
   }
