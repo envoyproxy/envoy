@@ -40,7 +40,7 @@ public:
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
                           const std::string& override_auto_sni_header = "",
                           const std::string& typed_dns_resolver_config = "",
-                          bool use_sub_cluster = false) {
+                          bool use_sub_cluster = false, double dns_query_timeout = 5) {
     const std::string filter_use_sub_cluster = R"EOF(
 name: dynamic_forward_proxy
 typed_config:
@@ -48,8 +48,8 @@ typed_config:
   sub_cluster_config:
     cluster_init_timeout: 5s
 )EOF";
-    const std::string filter_use_dns_cache =
-        fmt::format(R"EOF(
+    const std::string filter_use_dns_cache = fmt::format(
+        R"EOF(
 name: dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
@@ -59,11 +59,12 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     host_ttl: {}s
+    dns_query_timeout: {:.9f}s
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
 )EOF",
-                    Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_,
-                    max_pending_requests, key_value_config_, typed_dns_resolver_config);
+        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
+        max_pending_requests, key_value_config_, typed_dns_resolver_config);
     config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster : filter_use_dns_cache);
 
     config_helper_.prependFilter(fmt::format(R"EOF(
@@ -164,11 +165,12 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     host_ttl: {}s
+    dns_query_timeout: {:.9f}s
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
 )EOF",
-        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, max_pending_requests,
-        key_value_config_, typed_dns_resolver_config);
+        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
+        max_pending_requests, key_value_config_, typed_dns_resolver_config);
 
     TestUtility::loadFromYaml(use_sub_cluster ? cluster_type_config_use_sub_cluster
                                               : cluster_type_config_use_dns_cache,
@@ -437,6 +439,69 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
       name: envoy.network.dns_resolver.getaddrinfo
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
+}
+
+TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+  config_helper_.addRuntimeOverride("envoy.enable_dfp_dns_trace", "true");
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
+  autonomous_upstream_ = true;
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000000001);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("dns_resolution_failure{resolve_timeout:"));
+}
+
+TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
+  autonomous_upstream_ = true;
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000000001);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("dns_resolution_failure{resolve_timeout}"));
 }
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {

@@ -78,7 +78,8 @@ OpenTelemetryFormatter::FormatBuilder::toFormatListValue(
 
 std::vector<Formatter::FormatterProviderPtr>
 OpenTelemetryFormatter::FormatBuilder::toFormatStringValue(const std::string& string_format) const {
-  return Formatter::SubstitutionFormatParser::parse(string_format, commands_);
+  return THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatParser::parse(string_format, commands_),
+                               std::vector<Formatter::FormatterProviderPtr>);
 }
 
 ::opentelemetry::proto::common::v1::AnyValue OpenTelemetryFormatter::providersCallback(
