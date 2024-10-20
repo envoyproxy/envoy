@@ -91,9 +91,7 @@ Network::FilterStatus StickySessionUdpProxyFilter::onDataInternal(Network::UdpRe
       // to a healthy host. We may eventually want to make this behavior configurable, but for now
       // this will be the universal behavior.
       ClusterInfo* cluster = active_session->cluster();
-      if (cluster == nullptr) {
-        return Network::FilterStatus::StopIteration;
-      }
+      ASSERT(cluster);
 
       auto host = cluster->chooseHost(data.addresses_.peer_, nullptr);
       if (host != nullptr && host->coarseHealth() != Upstream::Host::Health::Unhealthy &&
