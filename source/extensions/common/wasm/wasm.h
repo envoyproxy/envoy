@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions/wasm/v3/wasm.pb.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/lifecycle_notifier.h"
@@ -154,11 +155,8 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle_(handle){};
-  PluginHandleSharedPtr& handle() { return handle_; }
-
-private:
-  PluginHandleSharedPtr handle_;
+  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle(std::move(handle)) {}
+  PluginHandleSharedPtr handle;
 };
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
@@ -182,6 +180,34 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
 void clearCodeCacheForTesting();
 void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);
 WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
+
+class PluginConfig : Logger::Loggable<Logger::Id::wasm> {
+public:
+  // TODO(wbpcode): the code of PluginConfig will be shared cross all Wasm extensions (loggers,
+  // http filters, etc.), we may extend the constructor to takes a static string view to tell
+  // the type of the plugin if needed.
+  PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
+               Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+               Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
+               const envoy::config::core::v3::Metadata* metadata, bool singleton);
+
+  std::shared_ptr<Context> createContext();
+  Wasm* wasm();
+  const PluginSharedPtr& plugin() { return plugin_; }
+
+private:
+  using SinglePluginHandle = PluginHandleSharedPtr;
+  using ThreadLocalPluginHandle = ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>;
+
+  PluginSharedPtr plugin_;
+  RemoteAsyncDataProviderPtr remote_data_provider_;
+  const bool is_singleton_handle_{};
+
+  absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;
+};
+
+using PluginConfigPtr = std::unique_ptr<PluginConfig>;
+using PluginConfigSharedPtr = std::shared_ptr<PluginConfig>;
 
 } // namespace Wasm
 } // namespace Common

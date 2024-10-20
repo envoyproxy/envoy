@@ -74,9 +74,9 @@ public:
   virtual const std::string& ocspStaplePath() const PURE;
 
   /**
-   * @return a stat prefix for the certificate.
+   * @return a name for the certificate.
    */
-  virtual const std::string& statPrefix() const PURE;
+  virtual const std::string& name() const PURE;
 };
 
 using TlsCertificateConfigPtr = std::unique_ptr<TlsCertificateConfig>;

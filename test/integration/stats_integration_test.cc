@@ -192,7 +192,7 @@ TEST_P(StatsIntegrationTest, WithExpiringCert) {
         TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
-    tls_certificate->set_stat_prefix("cert0");
+    tls_certificate->set_name("cert0");
   });
 
   initialize();

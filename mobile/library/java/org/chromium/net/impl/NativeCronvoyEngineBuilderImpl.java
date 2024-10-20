@@ -38,7 +38,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   // TODO(refactor) move unshared variables into their specific methods.
   private final List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
   private final EnvoyEventTracker mEnvoyEventTracker = null;
-  private final int mConnectTimeoutSeconds = 30;
+  private int mConnectTimeoutSeconds = 10;
   private final int mDnsRefreshSeconds = 60;
   private final int mDnsFailureRefreshSecondsBase = 2;
   private final int mDnsFailureRefreshSecondsMax = 10;
@@ -231,6 +231,11 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setUpstreamTlsSni(String sni) {
     mUpstreamTlsSni = sni;
+    return this;
+  }
+
+  public NativeCronvoyEngineBuilderImpl setConnectTimeoutSeconds(int connectTimeout) {
+    mConnectTimeoutSeconds = connectTimeout;
     return this;
   }
 

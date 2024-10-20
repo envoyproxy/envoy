@@ -252,9 +252,8 @@ message TlsCertificate {
   // [#not-implemented-hide:]
   repeated config.core.v3.DataSource signed_certificate_timestamp = 5;
 
-  // Optional. The prefix to use for stats related with this certificate.
-  // If not set, stats is not emitted.
-  string stat_prefix = 9;
+  // The name of this TLS certificate.
+  string name = 9;
 }
 
 message TlsSessionTicketKeys {

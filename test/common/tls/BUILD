@@ -283,6 +283,14 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "server_context_impl_test",
+    srcs = ["server_context_impl_test.cc"],
+    deps = [
+        "//source/common/tls:server_context_lib",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "tls_throughput_benchmark",
     srcs = ["tls_throughput_benchmark.cc"],

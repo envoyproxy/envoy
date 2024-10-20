@@ -172,8 +172,8 @@ public:
   const std::string PROXY_PROTOCOL_VERSION = "envoy.proxy_protocol_version";
   // Stats prefix for the proxy protocol listener filter.
   const std::string PROXY_PROTOCOL_PREFIX = "envoy.proxy_protocol_prefix";
-  // Stats prefix for TLS context.
-  const std::string TLS_CONTEXT_PREFIX = "envoy.tls_context";
+  // Name of TLS context.
+  const std::string TLS_CONTEXT_NAME = "envoy.tls_context";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;

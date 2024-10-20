@@ -43,12 +43,14 @@ namespace Ssl {
 struct TlsContextStats {
   ALL_TLS_CONTEXT_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 
-  static TlsContextStats generateStats(Stats::Scope& scope, const std::string& prefix) {
-    const auto final_prefix = fmt::format("tls_context.{}", prefix);
+  static TlsContextStats generateStats(Stats::Scope& scope, const std::string& name) {
+    const auto final_prefix = fmt::format("tls_context.{}", name);
     return TlsContextStats{ALL_TLS_CONTEXT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                                  POOL_GAUGE_PREFIX(scope, final_prefix))};
   }
 };
+
+const int EC_CURVE_INVALID_NID = -1;
 
 struct TlsContext {
   // Each certificate specified for the context has its own SSL_CTX. `SSL_CTXs`
@@ -59,7 +61,9 @@ struct TlsContext {
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
   std::unique_ptr<OcspResponseWrapper> ocsp_response_;
-  bool is_ecdsa_{};
+  // We initialize the curve name variable to EC_CURVE_INVALID_NID which is used as a sentinel value
+  // for "not an ECDSA context".
+  CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
 
@@ -85,10 +89,10 @@ using TlsContextConstRef = std::reference_wrapper<const TlsContext>;
 
 struct TlsContextStatsHelper {
   TlsContextStatsHelper(Server::Configuration::CommonFactoryContext& factory_context,
-                        Stats::Scope& scope, const std::string& prefix,
+                        Stats::Scope& scope, const std::string& name,
                         TlsContextConstRef tls_context)
       : factory_context_(factory_context),
-        stats_(std::make_unique<TlsContextStats>(TlsContextStats::generateStats(scope, prefix))),
+        stats_(std::make_unique<TlsContextStats>(TlsContextStats::generateStats(scope, name))),
         tls_context_(tls_context) {}
   void updateStats();
 
