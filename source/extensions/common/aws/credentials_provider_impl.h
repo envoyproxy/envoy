@@ -383,7 +383,7 @@ public:
       std::chrono::seconds initialization_timer) const PURE;
 
   virtual CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
@@ -392,7 +392,7 @@ public:
       absl::string_view authorization_token = {}) const PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -409,12 +409,15 @@ class DefaultCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
   DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
+      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+      absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl)
-      : DefaultCredentialsProviderChain(api, context, region, fetch_metadata_using_curl, *this) {}
+      : DefaultCredentialsProviderChain(api, context, singleton_manager, region,
+                                        fetch_metadata_using_curl, *this) {}
 
   DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
+      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+      absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       const CredentialsProviderChainFactories& factories);
 
@@ -429,7 +432,7 @@ private:
   }
 
   CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
@@ -438,7 +441,7 @@ private:
       absl::string_view authorization_token) const override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
