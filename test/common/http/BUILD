@@ -150,7 +150,7 @@ envoy_cc_test(
     rbe_pool = "2core",
     deps = [
         "//source/common/http:hash_policy_lib",
-        "//test/mocks/network:network_mocks", 
+        "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
     ],
 )

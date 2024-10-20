@@ -1,4 +1,5 @@
 #include "envoy/common/hashable.h"
+
 #include "source/common/http/hash_policy.h"
 #include "source/common/network/address_impl.h"
 
@@ -10,7 +11,6 @@
 namespace Envoy {
 namespace Http {
 
-
 class HashPolicyImplTest : public testing::Test {
 public:
   HashPolicyImplTest() : regex_engine_(std::make_shared<Envoy::Regex::GoogleReEngine>()) {}
@@ -21,7 +21,6 @@ public:
     hash_policy_impl_ = std::make_unique<HashPolicyImpl>(hash_policies_, *regex_engine_);
   }
 
-
 protected:
   Envoy::Regex::EnginePtr regex_engine_;
   TestRequestHeaderMapImpl headers_;
@@ -31,7 +30,7 @@ protected:
 };
 
 class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
-    absl::optional<uint64_t> hash() const override { return 1234567; };
+  absl::optional<uint64_t> hash() const override { return 1234567; };
 };
 
 // HeaderHashMethod: Verify hash is calculated correctly for a single header value
@@ -42,8 +41,9 @@ TEST_F(HashPolicyImplTest, HeaderHashForSingleHeaderValue) {
   setupHashPolicy(header_policy);
 
   headers_.addCopy("x-test-header", "test-value");
-  
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
+
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("test-value"));
 }
@@ -58,7 +58,8 @@ TEST_F(HashPolicyImplTest, MultipleHeaderValues) {
   headers_.addCopy("x-multi-header", "value1");
   headers_.addCopy("x-multi-header", "value2");
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
   ASSERT_TRUE(hash.has_value());
 
   absl::InlinedVector<absl::string_view, 1> sorted_header_values = {"value1", "value2"};
@@ -76,14 +77,16 @@ TEST_F(HashPolicyImplTest, HeaderHashMethodSameHashForDifferentHeaderOrder) {
   headers_.addCopy("x-reorder-header", "value1");
   headers_.addCopy("x-reorder-header", "value2");
 
-  absl::optional<uint64_t> hash1 = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
+  absl::optional<uint64_t> hash1 =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
   ASSERT_TRUE(hash1.has_value());
 
   headers_.remove("x-reorder-header");
   headers_.addCopy("x-reorder-header", "value2");
   headers_.addCopy("x-reorder-header", "value1");
 
-  absl::optional<uint64_t> hash2 = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
+  absl::optional<uint64_t> hash2 =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
   ASSERT_TRUE(hash2.has_value());
 
   EXPECT_EQ(hash1.value(), hash2.value());
@@ -96,7 +99,8 @@ TEST_F(HashPolicyImplTest, HeaderNotPresent) {
 
   setupHashPolicy(header_policy);
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
   EXPECT_FALSE(hash.has_value());
 }
 
@@ -116,12 +120,14 @@ TEST_F(HashPolicyImplTest, RegexRewriteApplied) {
 
   headers_.addCopy("x-test-header", "test-value");
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("replaced-value"));
 }
 
-//CookieHashMethod: Verifies that the hash is calculated correctly when a specified cookie is present.
+// CookieHashMethod: Verifies that the hash is calculated correctly when a specified cookie is
+// present.
 TEST_F(HashPolicyImplTest, CookieHashForPresentCookie) {
   envoy::config::route::v3::RouteAction::HashPolicy cookie_policy;
   cookie_policy.mutable_cookie()->set_name("test-cookie");
@@ -130,12 +136,14 @@ TEST_F(HashPolicyImplTest, CookieHashForPresentCookie) {
 
   headers_.setCopy(Http::LowerCaseString("cookie"), "test-cookie=cookie-value");
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("cookie-value"));
 }
 
-//CookieHashMethod: Verifies that a new cookie is set and the hash is calculated correctly when the cookie is absent but TTL is defined.
+// CookieHashMethod: Verifies that a new cookie is set and the hash is calculated correctly when the
+// cookie is absent but TTL is defined.
 TEST_F(HashPolicyImplTest, CookieHashForAbsentCookieWithTTL) {
   envoy::config::route::v3::RouteAction::HashPolicy cookie_policy;
   cookie_policy.mutable_cookie()->set_name("test-cookie");
@@ -144,24 +152,26 @@ TEST_F(HashPolicyImplTest, CookieHashForAbsentCookieWithTTL) {
   setupHashPolicy(cookie_policy);
 
   // Simulate the callback used for adding a new cookie when TTL is defined
-  Http::HashPolicy::AddCookieCallback add_cookie = [](const std::string&, const std::string&,
-                                                      const std::chrono::seconds&, const Http::CookieAttributeRefVector&) -> std::string {
-    return "new-cookie-value";
-  };
+  Http::HashPolicy::AddCookieCallback add_cookie =
+      [](const std::string&, const std::string&, const std::chrono::seconds&,
+         const Http::CookieAttributeRefVector&) -> std::string { return "new-cookie-value"; };
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&local_address_, headers_, add_cookie, nullptr);
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&local_address_, headers_, add_cookie, nullptr);
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("new-cookie-value"));
 }
 
-//CookieHashMethod: Verifies that no hash is generated when the cookie is absent and no TTL is defined.
+// CookieHashMethod: Verifies that no hash is generated when the cookie is absent and no TTL is
+// defined.
 TEST_F(HashPolicyImplTest, CookieHashForAbsentCookieWithoutTTL) {
   envoy::config::route::v3::RouteAction::HashPolicy cookie_policy;
   cookie_policy.mutable_cookie()->set_name("test-cookie");
 
   setupHashPolicy(cookie_policy);
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
   ASSERT_FALSE(hash.has_value());
 }
 
@@ -174,7 +184,8 @@ TEST_F(HashPolicyImplTest, IpHashForValidIp) {
 
   Network::Address::Ipv4Instance downstream_address{"192.168.1.1"};
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&downstream_address, headers_, nullptr, nullptr);
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&downstream_address, headers_, nullptr, nullptr);
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), HashUtil::xxHash64("192.168.1.1"));
 }
@@ -191,16 +202,17 @@ TEST_F(HashPolicyImplTest, IpHashForNullAddress) {
 
 // Test QueryParameterHashMethod to verify hash generation for a query parameter
 TEST_F(HashPolicyImplTest, QueryParameterHashForExistingParameter) {
-    envoy::config::route::v3::RouteAction::HashPolicy query_param_policy;
-    query_param_policy.mutable_query_parameter()->set_name("test-param");
+  envoy::config::route::v3::RouteAction::HashPolicy query_param_policy;
+  query_param_policy.mutable_query_parameter()->set_name("test-param");
 
-    setupHashPolicy(query_param_policy);
+  setupHashPolicy(query_param_policy);
 
-    headers_.setPath("/test?test-param=param-value");
+  headers_.setPath("/test?test-param=param-value");
 
-    absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
-    ASSERT_TRUE(hash.has_value());
-    EXPECT_EQ(hash.value(), HashUtil::xxHash64("param-value"));
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr);
+  ASSERT_TRUE(hash.has_value());
+  EXPECT_EQ(hash.value(), HashUtil::xxHash64("param-value"));
 }
 
 // Test QueryParameterHashMethod when the parameter is absent in the query string
@@ -213,7 +225,8 @@ TEST_F(HashPolicyImplTest, QueryParameterHashForAbsentParameter) {
   // Set up the path header without the target query parameter
   headers_.setPath("/test?some-param=other-value");
 
-  ASSERT_FALSE(hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr).has_value());
+  ASSERT_FALSE(
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr).has_value());
 }
 
 // Test QueryParameterHashMethod when the path header is absent
@@ -223,7 +236,8 @@ TEST_F(HashPolicyImplTest, QueryParameterHashForMissingPathHeader) {
 
   setupHashPolicy(query_param_policy);
 
-  ASSERT_FALSE(hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr).has_value());
+  ASSERT_FALSE(
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, nullptr).has_value());
 }
 
 // Test FilterStateHashMethod when the filter state has the expected key.
@@ -233,41 +247,47 @@ TEST_F(HashPolicyImplTest, FilterStateHashForExistingKey) {
 
   setupHashPolicy(filter_state_policy);
 
-  auto filter_state = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
   filter_state->setData("test-key", std::make_unique<HashableObj>(),
                         StreamInfo::FilterState::StateType::ReadOnly);
 
-  absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, filter_state);
+  absl::optional<uint64_t> hash =
+      hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, filter_state);
   ASSERT_TRUE(hash.has_value());
   EXPECT_EQ(hash.value(), 1234567UL);
 }
 
 // Test FilterStateHashMethod when the filter state key is absent.
 TEST_F(HashPolicyImplTest, FilterStateHashForAbsentKey) {
-    envoy::config::route::v3::RouteAction::HashPolicy filter_state_policy;
-    filter_state_policy.mutable_filter_state()->set_key("missing-key");
+  envoy::config::route::v3::RouteAction::HashPolicy filter_state_policy;
+  filter_state_policy.mutable_filter_state()->set_key("missing-key");
 
-    setupHashPolicy(filter_state_policy);
+  setupHashPolicy(filter_state_policy);
 
-    auto filter_state = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
-    filter_state->setData("another-key", std::make_unique<HashableObj>(), StreamInfo::FilterState::StateType::ReadOnly);
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
+  filter_state->setData("another-key", std::make_unique<HashableObj>(),
+                        StreamInfo::FilterState::StateType::ReadOnly);
 
-    ASSERT_FALSE(hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, filter_state).has_value()); // Expecting no hash generated
+  ASSERT_FALSE(hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, filter_state)
+                   .has_value()); // Expecting no hash generated
 }
 
 // Test FilterStateHashMethod when key has no value
 TEST_F(HashPolicyImplTest, FilterStateHashForNullFilterState) {
-    envoy::config::route::v3::RouteAction::HashPolicy filter_state_policy;
-    filter_state_policy.mutable_filter_state()->set_key("test-key");
+  envoy::config::route::v3::RouteAction::HashPolicy filter_state_policy;
+  filter_state_policy.mutable_filter_state()->set_key("test-key");
 
-    setupHashPolicy(filter_state_policy);
+  setupHashPolicy(filter_state_policy);
 
-    auto filter_state = std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
-    filter_state->setData("test-key", nullptr, StreamInfo::FilterState::StateType::ReadOnly);
+  auto filter_state =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Request);
+  filter_state->setData("test-key", nullptr, StreamInfo::FilterState::StateType::ReadOnly);
 
-    ASSERT_FALSE(hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, filter_state).has_value());
+  ASSERT_FALSE(hash_policy_impl_->generateHash(&local_address_, headers_, nullptr, filter_state)
+                   .has_value());
 }
-
 
 } // namespace Http
 } // namespace Envoy
