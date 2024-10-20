@@ -99,7 +99,8 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
 }
 
 // Logic for async metadata refresh is as follows:
-// Per subclass (instance profile, container credentials, web identity)
+// Once server has initialized (init target) and per inherited class (instance profile, container
+// credentials, web identity)
 // 1. Create a single cluster for async handling
 // 2. Create tls slot to hold cluster name and a refresh timer pointer. tls slot instantiation of
 // ThreadLocalCredentialsCache will register the subclass as a callback handler
@@ -111,7 +112,6 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
 // 5. Initial credential refresh occurs in main thread and continues in main thread periodically
 // refreshing based on expiration time
 //
-// The logic above occurs after init has completed, by using an init target
 
 // TODO(suniltheta): The field context is of type ServerFactoryContextOptRef so that an
 // optional empty value can be set. Especially in aws iam plugin the cluster manager
@@ -119,6 +119,7 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
 // reasons explained in https://github.com/envoyproxy/envoy/issues/27586 which cannot
 // utilize http async client here to fetch AWS credentials. For time being if context
 // is empty then will use libcurl to fetch the credentials.
+
 MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     Api::Api& api, ServerFactoryContextOptRef context,
     const CurlMetadataFetcher& fetch_metadata_using_curl,
@@ -164,6 +165,7 @@ MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::~ThreadLocalCreden
 }
 
 void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
+
   auto cluster = Utility::createInternalClusterStatic(cluster_name_, cluster_type_, uri_);
   // Async credential refresh timer. Only create this if it is the first time we're creating a
   // cluster
@@ -189,11 +191,7 @@ void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
                    cluster_type_str, cluster_name_, host_port);
   }
 
-  // TODO(suniltheta): use random number generator here for cluster version.
-  // While adding multiple clusters make sure that change in random version number across
-  // multiple clusters won't make Envoy delete/replace previously registered internal
-  // cluster.
-  context_->clusterManager().addOrUpdateCluster(cluster, "12345");
+  context_->clusterManager().addOrUpdateCluster(cluster, "");
 }
 
 // A thread local callback that occurs on every worker thread during cluster initialization.
@@ -956,8 +954,11 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       //
       // UUID is also appended, to differentiate two identically configured web identity credential
       // providers, as we cannot make these singletons
+      //
+      // TODO: @nbaws: Modify cluster creation logic for web identity credential providers
+      // to allow these also to be created as singletons
 
-      auto cluster_name_ = absl::StrCat(STS_TOKEN_CLUSTER, "-", region, "-",
+      auto cluster_name_ = absl::StrCat(STS_TOKEN_CLUSTER, "-", region, "_",
                                         context->api().randomGenerator().uuid());
 
       ENVOY_LOG(
@@ -1011,7 +1012,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
 }
 
 // Container credentials and instance profile credentials are both singletons, as they exist only
-// once on the underlying host and are shared across all invocations of request signing consumer
+// once on the underlying host and can be shared across all invocations of request signing consumer
 // extensions
 SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
 SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
