@@ -268,7 +268,7 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
   callbacks_->onGenericPoolReady(
       &connection.streamInfo(), std::move(upstream), host,
       latched_data->connection().connectionInfoProvider(),
-      latched_data->connection().streamInfo().downstreamAddressProvider().sslConnection());
+      latched_data->connection().streamInfo().upstreamInfo()->upstreamSslConnection());
 }
 
 HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -359,7 +359,7 @@ void HttpConnPool::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPt
     return;
   }
   combined_upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
-      *this, host, downstream_info_.downstreamAddressProvider().sslConnection()));
+      *this, host, downstream_info_.upstreamInfo()->upstreamSslConnection()));
 }
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -380,7 +380,7 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
   upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
-      *this, host, info.downstreamAddressProvider().sslConnection()));
+      *this, host, info.upstreamInfo()->upstreamSslConnection()));
 }
 
 void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& host,
@@ -404,7 +404,7 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
     : config_(config), downstream_info_(downstream_info), parent_(http_conn_pool),
       decoder_filter_callbacks_(decoder_callbacks), response_decoder_(*this),
       upstream_callbacks_(callbacks) {
-  auto is_ssl = downstream_info_.downstreamAddressProvider().sslConnection();
+  auto is_ssl = downstream_info_.upstreamInfo()->upstreamSslConnection();
   downstream_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.host(downstream_info_)},

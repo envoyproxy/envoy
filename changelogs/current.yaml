@@ -21,7 +21,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
-
+- area: upstream tcp tunneling http filters
+  change: |
+    A fix to a scenario where upstream is ssl and downstream is not or the other way around while using upstream http 
+    filters with tcp tunneling. ssl info is taken from the downstreamAddressProvider instead of the upstream_info.
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
