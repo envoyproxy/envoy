@@ -113,7 +113,7 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
 // refreshing based on expiration time
 //
 
-// TODO(suniltheta): The field context is of type Server::Configuration::ServerFactoryContext so
+// TODO(suniltheta): The field context is of type ServerFactoryContextOptRef so
 // that an optional empty value can be set. Especially in aws iam plugin the cluster manager
 // obtained from server factory context object is not fully initialized due to the
 // reasons explained in https://github.com/envoyproxy/envoy/issues/27586 which cannot
@@ -133,7 +133,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       cache_duration_(getCacheDuration()), refresh_state_(refresh_state),
       initialization_timer_(initialization_timer), debug_name_(cluster_name) {
   // Async provider cluster setup
-  if (useHttpAsyncClient()) {
+  if (useHttpAsyncClient() && context_) {
     // Set up metadata credentials statistics
     scope_ = api.rootScope().createScope(
         fmt::format("aws.metadata_credentials_provider.{}.", cluster_name_));
@@ -269,7 +269,7 @@ std::chrono::seconds MetadataCredentialsProviderBase::getCacheDuration() {
 }
 
 void MetadataCredentialsProviderBase::handleFetchDone() {
-  if (useHttpAsyncClient()) {
+  if (useHttpAsyncClient() && context_) {
     if (cache_duration_timer_ && !cache_duration_timer_->enabled()) {
       // Receiver state handles the initial credential refresh scenario. If for some reason we are
       // unable to perform credential refresh after cluster initialization has completed, we use a
@@ -403,7 +403,7 @@ void InstanceProfileCredentialsProvider::refresh() {
   token_req_message.headers().setCopy(Http::LowerCaseString(EC2_IMDS_TOKEN_TTL_HEADER),
                                       EC2_IMDS_TOKEN_TTL_DEFAULT_VALUE);
 
-  if (!useHttpAsyncClient()) {
+  if (!useHttpAsyncClient() || !context_) {
     // Using curl to fetch the AWS credentials where we first get the token.
     const auto token_string = fetch_metadata_using_curl_(token_req_message);
     if (token_string) {
@@ -555,7 +555,7 @@ void InstanceProfileCredentialsProvider::extractCredentials(
             session_token.empty() ? "" : "*****");
 
   last_updated_ = api_.timeSource().systemTime();
-  if (useHttpAsyncClient()) {
+  if (useHttpAsyncClient() && context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
     stats_->credential_refreshes_succeeded_.inc();
@@ -644,7 +644,7 @@ void ContainerCredentialsProvider::refresh() {
   message.headers().setHost(host);
   message.headers().setPath(path);
   message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
-  if (!useHttpAsyncClient()) {
+  if (!useHttpAsyncClient() || !context_) {
     // Using curl to fetch the AWS credentials.
     const auto credential_document = fetch_metadata_using_curl_(message);
     if (!credential_document) {
@@ -710,7 +710,7 @@ void ContainerCredentialsProvider::extractCredentials(
   }
 
   last_updated_ = api_.timeSource().systemTime();
-  if (useHttpAsyncClient()) {
+  if (useHttpAsyncClient() && context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
     ENVOY_LOG(debug, "Metadata receiver {} moving to Ready state", cluster_name_);
@@ -931,7 +931,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
 
   // WebIdentityCredentialsProvider can be used only if `context` is supplied which is required to
   // use http async http client to make http calls to fetch the credentials.
-  if (true) {
+  if (context) {
     const auto web_token_path = absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE));
     const auto role_arn = absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN));
     if (!web_token_path.empty() && !role_arn.empty()) {
