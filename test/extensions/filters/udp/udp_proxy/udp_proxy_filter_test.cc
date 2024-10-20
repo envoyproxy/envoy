@@ -1369,6 +1369,30 @@ TEST_F(UdpProxyFilterIpv6Test, SocketOptionForUseOriginalSrcIpInCaseOfIpv6) {
   ensureIpTransparentSocketOptions(upstream_address_v6_, "[2001:db8:85a3::9a2e:370:7335]:80", 0, 1);
 }
 
+// Verify that session will not be created when no route found.
+TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingNoRouteFound) {
+  InSequence s;
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+use_per_packet_load_balancing: true
+  )EOF"),
+        false /*has_cluster*/);
+
+  // We don't have "fake_cluster" cluster. We should not found a route for the session.
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+}
+
 // Make sure socket options should not be set if use_original_src_ip is not set.
 TEST_F(UdpProxyFilterIpv4Ipv6Test, NoSocketOptionIfUseOriginalSrcIpIsNotSet) {
   if (!isTransparentSocketOptionsSupported()) {
