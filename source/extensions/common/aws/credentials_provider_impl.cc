@@ -931,7 +931,6 @@ std::string sessionName(Api::Api& api) {
   return actual_session_name;
 }
 
-
 // Edge case handling for cluster naming.
 //
 // Region is appended to the cluster name, to differentiate between multiple web identity
@@ -944,8 +943,7 @@ std::string sessionName(Api::Api& api) {
 // to allow these also to be created as singletons
 
 std::string stsClusterName(absl::string_view region) {
-  return absl::StrCat(STS_TOKEN_CLUSTER, "-", region, "_",
-                                        context->api().randomGenerator().uuid());
+  return absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
 }
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
@@ -973,7 +971,9 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     if (!web_token_path.empty() && !role_arn.empty()) {
       const auto session_name = sessionName(api);
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-      const auto cluster_name = stsClusterName(region);
+      const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
+
+      const auto cluster_name = stsClusterName(region_uuid);
 
       ENVOY_LOG(
           debug,
@@ -1079,35 +1079,8 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     const std::string& role_arn = web_identity.role_arn();
     const std::string& token = web_identity.web_identity_token();
     const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-    const std::string cluster_name = stsClusterName(region);
-    const std::string role_session_name = sessionName(context.api());
-    const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
-    // This "two seconds" is a bit arbitrary, but matches the other places in the codebase.
-    const auto initialization_timer = std::chrono::seconds(2);
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context.api(), context, Extensions::Common::Aws::Utility::fetchMetadata,
-        MetadataFetcher::create, "", token, sts_endpoint, role_arn, role_session_name,
-        refresh_state, initialization_timer, cluster_name);
-  } else {
-    return absl::InvalidArgumentError("No AWS credential provider specified");
-  }
-}
-
-absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
-    Server::Configuration::ServerFactoryContext& context, absl::string_view region,
-    const envoy::extensions::common::aws::v3::AwsCredentialProvider& config) {
-  // The precedence order is: inline_credential > assume_role_with_web_identity.
-  if (config.has_inline_credential()) {
-    const auto& inline_credential = config.inline_credential();
-    return std::make_shared<InlineCredentialProvider>(inline_credential.access_key_id(),
-                                                      inline_credential.secret_access_key(),
-                                                      inline_credential.session_token());
-  } else if (config.has_assume_role_with_web_identity()) {
-    const auto& web_identity = config.assume_role_with_web_identity();
-    const std::string& role_arn = web_identity.role_arn();
-    const std::string& token = web_identity.web_identity_token();
-    const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-    const std::string cluster_name = stsClusterName(region);
+    const auto region_uuid = absl::StrCat(region, "_", context.api().randomGenerator().uuid());
+    const std::string cluster_name = stsClusterName(region_uuid);
     const std::string role_session_name = sessionName(context.api());
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     // This "two seconds" is a bit arbitrary, but matches the other places in the codebase.
