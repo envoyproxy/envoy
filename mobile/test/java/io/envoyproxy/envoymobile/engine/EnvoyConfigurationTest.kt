@@ -116,7 +116,7 @@ class EnvoyConfigurationTest {
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     enablePlatformCertificatesValidation: Boolean = false,
     upstreamTlsSni: String = "",
-
+    h3ConnectionKeepaliveInitialIntervalMilliseconds: Int = 0,
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       connectTimeoutSeconds,
@@ -159,6 +159,7 @@ class EnvoyConfigurationTest {
       enablePlatformCertificatesValidation,
       upstreamTlsSni,
       caresFallbackResolvers,
+      h3ConnectionKeepaliveInitialIntervalMilliseconds,
     )
   }
 
@@ -201,6 +202,8 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains(".xyz.com");
     assertThat(resolvedTemplate).contains("connection_options: \"5RTO\"");
     assertThat(resolvedTemplate).contains("client_connection_options: \"MPQC\"");
+    assertThat(resolvedTemplate).doesNotContain("connection_keepalive { initial_interval {")
+
 
     // Per Host Limits
     assertThat(resolvedTemplate).contains("max_connections { value: 543 }")
@@ -251,7 +254,8 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames = mutableListOf(),
       filterChain = mutableListOf(),
       runtimeGuards = mapOf("test_feature_false" to true),
-      trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
+      trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED,
+      h3ConnectionKeepaliveInitialIntervalMilliseconds = 200
     )
 
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
@@ -289,6 +293,17 @@ class EnvoyConfigurationTest {
 
     // enablePlatformCertificatesValidation = true
     assertThat(resolvedTemplate).doesNotContain("trusted_ca")
+
+    assertThat(resolvedTemplate).doesNotContain("quic_protocol_options")
+
+    val envoyConfiguration1 = buildTestEnvoyConfiguration(
+      enableHttp3 = true,
+      h3ConnectionKeepaliveInitialIntervalMilliseconds = 200
+    )
+
+    val resolvedTemplate1 = TestJni.createProtoString(envoyConfiguration1)
+    // h3ConnectionKeepaliveInitialIntervalMilliseconds = 200
+    assertThat(resolvedTemplate1).contains("connection_keepalive { initial_interval { nanos: 200000000 }")
   }
 
   @Test
