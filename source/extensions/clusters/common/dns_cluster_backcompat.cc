@@ -16,7 +16,6 @@ void createDnsClusterFromLegacyFields(
     dns_cluster.mutable_dns_refresh_rate()->CopyFrom(cluster.dns_refresh_rate());
   }
 
-  // FIXME: tests this
   if (cluster.has_dns_failure_refresh_rate()) {
     auto* new_refresh_rate = dns_cluster.mutable_dns_failure_refresh_rate();
     const auto& old_refresh_rate = cluster.dns_failure_refresh_rate();
