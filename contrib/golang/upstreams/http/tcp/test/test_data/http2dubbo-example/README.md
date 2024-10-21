@@ -1,19 +1,23 @@
-# Documentation for http2dubbo
+# Documentation for http2dubbo by golang extension
 
-* To support http2dubbo by go extension on envoy, we need to write two extension by golang: **golang-tcp-upstream** and **golang-http**.
+* To simply support http2dubbo by go extension on envoy, we only need to write one extension by golang: **golang-tcp-upstream**.
+* There are two funtion to achieve that.
 
 
-## Documentation for golang-tcp-upstream
-1. Support encoding message processing for upstream TCP requests in **EncodeData**(route and cluster have been determined, and targeted message processing can be performed for route and cluster)
+## EncodeData
+1. construct body from http to body
 
-2. Support the handling of conn connection status during the encoding stage of upstream TCP requests in **EncodeData**(for example, by setting end_stream=false to avoid envoy semi connected status)
+2. change dubbo method by envoy cluster_name or envoy router_name
 
-3. Support decoding message processing and aggregation for upstream TCP response in **onUpstreamData**.(for example, by setting end_stream=true to indicate that the message is encapsulated and can be passed to downstream)
+3. set remote half close for conn
 
-4. Aggregate the tcp messages received multiple times by onUpstreamData of tcp response in **OnUpstreamData**.
+4. set envoy self not half close for conn
 
-5. Support obtaining route and cluster information, which can be referenced for targeted processing in the above stages.
 
-## Documentation for golang-http
+## OnUpstreamData
 
-1. Support pure_protocol_convert from http2dubbo(in **DecodeData**) and dubbo2http(in **EncodeData**)
+1. verify dubbo frame format
+
+2. aggregate multi dubbo frame when server has big response
+
+3. convert body from dubbo to http 
