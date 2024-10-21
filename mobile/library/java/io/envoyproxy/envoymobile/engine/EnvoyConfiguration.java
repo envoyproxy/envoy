@@ -64,6 +64,7 @@ public class EnvoyConfiguration {
   public final Map<String, String> runtimeGuards;
   public final boolean enablePlatformCertificatesValidation;
   public final String upstreamTlsSni;
+  public final int h3ConnectionKeepaliveInitialIntervalMilliseconds;
 
   /**
    * Create a new instance of the configuration.
@@ -131,6 +132,8 @@ public class EnvoyConfiguration {
    * @param upstreamTlsSni                                the upstream TLS socket SNI override.
    * @param caresFallbackResolvers                        A list of host port pair that's used as
    *     c-ares's fallback resolvers.
+   * @param h3ConnectionKeepaliveInitialIntervalMilliseconds the initial keepalive ping timeout for
+   * HTTP/3.
    */
   public EnvoyConfiguration(
       int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
@@ -150,7 +153,8 @@ public class EnvoyConfiguration {
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, Map<String, Boolean> runtimeGuards,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni,
-      List<Pair<String, Integer>> caresFallbackResolvers) {
+      List<Pair<String, Integer>> caresFallbackResolvers,
+      int h3ConnectionKeepaliveInitialIntervalMilliseconds) {
     JniLibrary.load();
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
@@ -213,6 +217,8 @@ public class EnvoyConfiguration {
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.upstreamTlsSni = upstreamTlsSni;
+    this.h3ConnectionKeepaliveInitialIntervalMilliseconds =
+        h3ConnectionKeepaliveInitialIntervalMilliseconds;
   }
 
   public long createBootstrap() {
@@ -239,7 +245,7 @@ public class EnvoyConfiguration {
         enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
         h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
         perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
-        enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards,
-        caresFallbackResolvers);
+        enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards, caresFallbackResolvers,
+        h3ConnectionKeepaliveInitialIntervalMilliseconds);
   }
 }
