@@ -105,11 +105,14 @@ public:
     return config;
   }
 
-  void setup(uint32_t connections) { setup(connections, false, false, defaultConfig()); }
+  void setup(uint32_t connections) {
+    setup(connections, /*set_redirect_records=*/false, /*receive_before_connect=*/false,
+          defaultConfig());
+  }
 
   void setup(uint32_t connections,
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
-    setup(connections, false, false, config);
+    setup(connections, /*set_redirect_records=*/false, /*receive_before_connect=*/false, config);
   }
 
   void setup(uint32_t connections, bool set_redirect_records, bool receive_before_connect) {

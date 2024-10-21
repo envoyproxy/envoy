@@ -1809,26 +1809,28 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, ReceiveBeforeConnectEarlyDat
 }
 
 TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark) {
-  const uint32_t read_buffer_size = 1024;
-  const uint32_t write_buffer_size = 1024;
-  const uint32_t data_size = 16 * read_buffer_size;
-  config_helper_.setBufferLimits(read_buffer_size, write_buffer_size);
-
-  std::string data(data_size, 'a');
+  const uint32_t upstream_buffer_limit = 512;
+  const uint32_t downstream_buffer_limit = 1024;
+  const uint32_t data_size = 16 * downstream_buffer_limit;
+  config_helper_.setBufferLimits(upstream_buffer_limit, downstream_buffer_limit);
+  std::string data;
+  for (uint32_t i = 0; i < data_size / 4; i++)
+    data += "abcd";
 
   initialize();
   FakeRawConnectionPtr fake_upstream_connection;
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
 
   // First time data is sent, the PauseFilter stops the iteration.
-  ASSERT_TRUE(tcp_client->write(data.substr(0, read_buffer_size + 1)));
+  ASSERT_TRUE(tcp_client->write(data.substr(0, upstream_buffer_limit + 1)));
   ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   // Send the remaining data
-  ASSERT_TRUE(tcp_client->write(data.substr(read_buffer_size + 1)));
+  ASSERT_TRUE(tcp_client->write(data.substr(upstream_buffer_limit + 1)));
   test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   // Once the connection is established, the early data will be flushed to the upstream.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch(data.c_str())));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data_size));
   ASSERT_TRUE(fake_upstream_connection->write("response"));
   ASSERT_TRUE(fake_upstream_connection->close());

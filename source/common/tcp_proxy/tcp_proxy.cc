@@ -779,8 +779,8 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   } else if (receive_before_connect_) {
     // Buffer data received before upstream connection exists
-    ENVOY_CONN_LOG(debug, "buffering {} bytes as upstream connection is not established yet",
-                   read_callbacks_->connection(), data.length());
+    ENVOY_CONN_LOG(debug, "Early data received. Length: {}", read_callbacks_->connection(),
+                   data.length());
     early_data_buffer_.move(data);
     read_callbacks_->connection().readDisable(true);
     config_->stats().early_data_received_count_total_.inc();
@@ -915,11 +915,11 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
 void Filter::onUpstreamConnection() {
   connecting_ = false;
-  // If receive_before_connect is not enabled or we have some early data in the buffer, 
+  // If receive_before_connect is not enabled or we have some early data in the buffer,
   // means that we have previously read disabled the downstream. Now that the upstream
   // connection is established, we should enable reads back.
   bool should_read_enable = !receive_before_connect_ || early_data_buffer_.length() > 0;
-  
+
   // If we have received any data before upstream connection is established, send it to
   // the upstream connection.
   if (early_data_buffer_.length() > 0) {
