@@ -198,7 +198,6 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
       dns_address_, parent_.dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status, absl::string_view,
              std::list<Network::DnsResponse>&& response) -> void {
-        active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
         if (status == Network::DnsResolver::ResolutionStatus::Failure || response.empty()) {
           if (status == Network::DnsResolver::ResolutionStatus::Failure) {
@@ -224,6 +223,7 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
           parent_.redis_discovery_session_->registerDiscoveryAddress(std::move(response), port_);
           parent_.redis_discovery_session_->startResolveRedis();
         }
+        active_query_ = nullptr;
       });
 }
 
