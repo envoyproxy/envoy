@@ -16,14 +16,16 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Dynamic Modules common configuration]
 
-// Configuration of a dynamic module. A dynamic module is a shared object file that can be loaded via dlopen
-// by various Envoy extension points. Currently, only HTTP filter (envoy.filters.http.dynamic_modules) is supported.
+// Configuration of a dynamic module. A dynamic module is a shared object file that can be loaded at various Envoy
+// extension points. Currently, only HTTP filter (envoy.filters.http.dynamic_modules) is supported.
 //
-// How the module is loaded is determined by the extension point that uses it. For example, the HTTP filter
-// loads the module with dlopen on the first creation of the filter chain for the same shared object file.
+// All available dynamic modules are loaded at startup. They are not reloaded during the lifetime of the process.
+// Once a dynamic module is loaded, it is not unloaded until the process exits.
 //
-// Whether or not the shared object is the same is determined by the file path as well as the file's inode depending
-// on the platform. Notably, if the file path and the content of the file are the same, the shared object will be reused.
+// In Envoy, it searches for dynamic modules in the directory specified by the environment variable
+// ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``. All shared lbraries in the directory are loaded, and they can be
+// referenced by a name, following the naming convention of ``lib${name}.so`` as in the standard linker behavior.
+// For example, if the dynamic module's file name is ``libfoo.so``, the name is ``foo``.
 //
 // A module must be compatible with the ABI specified in :repo:`abi.h <source/extensions/dynamic_modules/abi.h>`.
 // Currently, compatibility is only guaranteed by an exact version match between the Envoy
@@ -39,8 +41,4 @@ message DynamicModuleConfig {
   // The actual search path is ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``. TODO: make the search path configurable via
   // command line options.
   string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Set true to prevent the module from being unloaded with dlclose.
-  // This is useful for modules that have global state that should not be unloaded.
-  bool do_not_close = 3;
 }

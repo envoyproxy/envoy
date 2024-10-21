@@ -27,7 +27,6 @@ TEST(DynamicModuleConfigFactory, LoadOK) {
   const std::string yaml = R"EOF(
 dynamic_module_config:
     name: no_op
-    do_not_close: true
 filter_name: foo
 filter_config: bar
 )EOF";

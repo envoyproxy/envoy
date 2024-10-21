@@ -14,8 +14,9 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
       raw_config, context.messageValidationVisitor());
 
   const auto& module_config = proto_config.dynamic_module_config();
-  const auto dynamic_module = Extensions::DynamicModules::newDynamicModuleByName(
-      module_config.name(), module_config.do_not_close());
+  // TODO: instead of loading modules here, we load the modules at the startup of Envoy.
+  const auto dynamic_module =
+      Extensions::DynamicModules::newDynamicModuleByName(module_config.name(), true);
   if (!dynamic_module.ok()) {
     return absl::InvalidArgumentError("Failed to load dynamic module: " +
                                       std::string(dynamic_module.status().message()));
