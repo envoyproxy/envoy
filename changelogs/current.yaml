@@ -43,5 +43,11 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: jwt_authn
+  change: |
+    Added  :ref:`refetch_jwks_on_kid_mismatch
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.refetch_jwks_on_kid_mismatch>`
+    to allow filter to refetch JWKS when extracted JWT's KID does not match cached JWKS's KID.
+
 
 deprecated:
