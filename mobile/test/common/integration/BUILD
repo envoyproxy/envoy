@@ -21,7 +21,7 @@ envoy_cc_test(
         ],
         "//conditions:default": [],
     }),
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     repository = "@envoy",
     shard_count = 6,
     deps = [

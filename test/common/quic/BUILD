@@ -227,7 +227,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_quic_listener_test",
     srcs = ["active_quic_listener_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     tags = ["nofips"],
     deps = [
         ":test_proof_source_lib",
