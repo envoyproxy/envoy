@@ -330,3 +330,31 @@ index 37d80e591..c17f61a76 100644
  #define PROTOBUF_DEBUG true
  #else
  #define PROTOBUF_DEBUG false
+diff --git a/src/google/protobuf/wire_format_lite.cc b/src/google/protobuf/wire_format_lite.cc
+index f6d97df6c..eeaaa8318 100644
+--- a/src/google/protobuf/wire_format_lite.cc
++++ b/src/google/protobuf/wire_format_lite.cc
+@@ -664,9 +664,11 @@ static size_t VarintSize(const T* data, const int n) {
+     if (x > 0x1FFFFF) sum++;
+     if (x > 0xFFFFFFF) sum++;
+   }
++#ifdef __clang__
+ // Clang is not smart enough to see that this loop doesn't run many times
+ // NOLINTNEXTLINE(google3-runtime-pragma-loop-hint): b/315043579
+ #pragma clang loop vectorize(disable) unroll(disable) interleave(disable)
++#endif
+   for (; i < n; i++) {
+     uint32_t x = data[i];
+     if (ZigZag) {
+@@ -706,9 +708,11 @@ static size_t VarintSize64(const T* data, const int n) {
+     if (x > 0x1FFFFF) sum++;
+     if (x > 0xFFFFFFF) sum++;
+   }
++#ifdef __clang__
+ // Clang is not smart enough to see that this loop doesn't run many times
+ // NOLINTNEXTLINE(google3-runtime-pragma-loop-hint): b/315043579
+ #pragma clang loop vectorize(disable) unroll(disable) interleave(disable)
++#endif
+   for (; i < n; i++) {
+     uint64_t x = data[i];
+     if (ZigZag) {
