@@ -294,6 +294,19 @@ index 66819966b..446d75420 100644
      }),
  )
  
+diff --git a/src/google/protobuf/map.cc b/src/google/protobuf/map.cc
+index 97cf262ea..df6b413d8 100644
+--- a/src/google/protobuf/map.cc
++++ b/src/google/protobuf/map.cc
+@@ -120,7 +120,7 @@ void UntypedMapBase::ClearTable(const ClearInput input) {
+   ABSL_DCHECK_NE(num_buckets_, kGlobalEmptyTableSize);
+ 
+   if (alloc_.arena() == nullptr) {
+-    const auto loop = [=](auto destroy_node) {
++    const auto loop = [&, this](auto destroy_node) {
+       const TableEntryPtr* table = table_;
+       for (map_index_t b = index_of_first_non_null_, end = num_buckets_;
+            b < end; ++b) {
 diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
 index 37d80e591..c17f61a76 100644
 --- a/src/google/protobuf/port_def.inc
