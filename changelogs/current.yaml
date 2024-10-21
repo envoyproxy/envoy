@@ -18,6 +18,10 @@ minor_behavior_changes:
   change: |
     The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the
     metadata (``DYNAMIC_METADATA``, ``CLUSTER_METADATA``, etc.) formatter.
+- area: scoped_rds
+  change: |
+    The :ref:`route_configuration <envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>` field
+    is supported when the `ScopedRouteConfiguration` resource is delivered via SRDS.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
