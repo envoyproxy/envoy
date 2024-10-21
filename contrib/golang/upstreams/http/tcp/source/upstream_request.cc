@@ -71,27 +71,16 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
     auto s = c.ParseFromString(any.value());
     ASSERT(s, "any.value() ParseFromString should always successful");
 
-    std::string config_str;
-    auto res = c.plugin_config().SerializeToString(&config_str);
-    ASSERT(res, "plugin_config SerializeToString should always successful");
-
     ENVOY_LOG(debug, "tcp upstream load tcp_upstream_golang library at parse config: {} {}", c.library_id(), c.library_path());
 
-    // loads DSO store a static map and a open handles leak will occur when the filter gets loaded and
-    // unloaded.
-    // TODO: unload DSO when filter updated.
-    auto dso_lib = Dso::DsoManager<Dso::TcpUpstreamDsoImpl>::load(c.library_id(), c.library_path(), c.plugin_name());
-    if (dso_lib == nullptr) {
+    dynamic_lib_ = Dso::DsoManager<Dso::TcpUpstreamDsoImpl>::load(c.library_id(), c.library_path(), c.plugin_name());
+    if (dynamic_lib_ == nullptr) {
       throw EnvoyException(fmt::format("tcp upstream : load library failed: {} {}", c.library_id(), c.library_path()));
     };
 
-    dynamic_lib_ = dso_lib;
-
-    if (dynamic_lib_) {
-      FilterConfigSharedPtr config = std::make_shared<FilterConfig>(c, dynamic_lib_);
-      config->newGoPluginConfig();
-      config_ = config;
-    }
+    FilterConfigSharedPtr conf = std::make_shared<FilterConfig>(c, dynamic_lib_);
+    conf->newGoPluginConfig();
+    config_ = conf;
     plugin_name_ = c.plugin_name();
 }
 
