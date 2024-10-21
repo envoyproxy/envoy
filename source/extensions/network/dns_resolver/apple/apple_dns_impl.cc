@@ -203,8 +203,7 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
     // Therefore, finish resolving with an error.
     pending_response_.status_ = ResolutionStatus::Failure;
     pending_response_.details_ = absl::StrCat("apple_dns_error_", error);
-    addTrace(static_cast<uint8_t>(AppleDnsTrace::Failed));
-    finishResolve();
+    finishResolve(AppleDnsTrace::Failed);
   }
 }
 
@@ -246,10 +245,11 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
   return pending_response_.all_responses_;
 }
 
-void AppleDnsResolverImpl::PendingResolution::finishResolve() {
+void AppleDnsResolverImpl::PendingResolution::finishResolve(AppleDnsTrace trace) {
   ENVOY_LOG_EVENT(debug, "apple_dns_resolution_complete",
                   "dns resolution for {} completed with status {}", dns_name_,
                   static_cast<int>(pending_response_.status_));
+  addTrace(static_cast<uint8_t>(trace));
   callback_(pending_response_.status_, std::move(pending_response_.details_),
             std::move(finalAddressList()));
 
@@ -362,8 +362,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     pending_response_.v4_responses_.clear();
     pending_response_.v6_responses_.clear();
 
-    addTrace(static_cast<uint8_t>(AppleDnsTrace::Failed));
-    finishResolve();
+    finishResolve(AppleDnsTrace::Failed);
     // Note: Nothing can follow this call to flushPendingQueries due to deletion of this
     // object upon resolution.
     return;
@@ -396,12 +395,9 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     ENVOY_LOG(debug, "DNS Resolver flushing queries pending callback");
     pending_response_.status_ = ResolutionStatus::Completed;
     pending_response_.details_ = absl::StrCat("apple_dns_completed_", error_code);
-    if (error_code == kDNSServiceErr_NoSuchRecord) {
-      addTrace(static_cast<uint8_t>(AppleDnsTrace::NoResult));
-    } else {
-      addTrace(static_cast<uint8_t>(AppleDnsTrace::Success));
-    }
-    finishResolve();
+    AppleDnsTrace trace = (error_code == kDNSServiceErr_NoSuchRecord) ? AppleDnsTrace::NoResult
+                                                                      : AppleDnsTrace::Success;
+    finishResolve(trace);
     // Note: Nothing can follow this call to finishResolve due to deletion of this
     // object upon resolution.
     return;

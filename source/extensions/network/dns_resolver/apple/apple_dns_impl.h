@@ -114,7 +114,7 @@ private:
     static DnsResponse buildDnsResponse(const struct sockaddr* address, uint32_t ttl);
 
     void onEventCallback(uint32_t events);
-    void finishResolve();
+    void finishResolve(AppleDnsTrace trace);
 
     // Returns true if at least one DNS response has been processed (even if empty) for the provided
     // `protocol`, or if no response is expected for the given protocol. Returns false otherwise.
