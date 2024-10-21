@@ -32,7 +32,7 @@ const (
 */
 func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bool) bool {
 
-	// =========== step 1: get dubbo args from http body =========== // 
+    // =========== step 1: get dubbo args from http body =========== // 
 	dubboArgs := make(map[string]interface{}, 0)
 	_ = json.Unmarshal(buffer.Bytes(), dubboArgs)
 
@@ -45,17 +45,18 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 	}
 
 
-	// =========== step 3: construct dubbo body for upstream req =========== // 
+    // =========== step 3: construct dubbo body for upstream req =========== // 
 	buf := httpBodyToDubbo(dubboMethod, dubboArgs)
 	_ = buffer.Set(buf)
 
 	
-	// =========== step 4: set remote half close by envoy router name =========== // 
+    // =========== step 4: set remote half close by envoy router name =========== // 
 	if f.callbacks.StreamInfo().GetRouteName() == f.config.routerNameForHalfClose {
 		f.callbacks.EnableHalfClose(true)
 	}
 
-	// =========== step 5: set envoy self not to half close conn =========== // 
+
+    // =========== step 5: set envoy self not to half close conn =========== // 
 	if !f.config.envoySelfEnableHalfClose {
 		return false
 	} 
@@ -82,7 +83,7 @@ const (
 */
 func (f *tcpUpstreamFilter) OnUpstreamData(buffer api.BufferInstance, endOfStream bool) api.UpstreamDataStatus {
 
-	// =========== step 1: verify dubbo frame format =========== // 
+    // =========== step 1: verify dubbo frame format =========== // 
 	if buffer.Len() < DUBBO_MAGIC_SIZE || binary.BigEndian.Uint16(buffer.Bytes()) != hessian.MAGIC {
 		api.LogErrorf("[OnUpstreamData] Protocol Magic error")
 		buffer.SetString(DUBBO_PROTOCOL_UPSTREAM_MAGIN_ERROR)
@@ -101,7 +102,7 @@ func (f *tcpUpstreamFilter) OnUpstreamData(buffer api.BufferInstance, endOfStrea
 	}
 
 
-	// =========== step 2: aggregate multi dubbo frame when server has big response =========== // 
+    // =========== step 2: aggregate multi dubbo frame when server has big response =========== // 
 	if buffer.Len() < (int(bodyLength) + hessian.HEADER_LENGTH) {
 		api.LogInfof("[OnUpstreamData] NeedMoreData for Body")
 		return api.UpstreamDataContinue
@@ -109,7 +110,7 @@ func (f *tcpUpstreamFilter) OnUpstreamData(buffer api.BufferInstance, endOfStrea
 	api.LogInfof("[OnUpstreamData] finish Aggregation for Body")
 
 
-	// =========== step 3: convert body from dubbo to http =========== // 
+    // =========== step 3: convert body from dubbo to http =========== // 
 	b := buffer.Bytes()[DUBBO_HEADER_SIZE:]
 	decoder := hessian.NewDecoder(b)
 	rsp, _ := decoder.Decode()
