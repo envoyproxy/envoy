@@ -45,7 +45,7 @@ Early reception and delayed upstream connection establishment
 ``TcpProxy`` filter  normally disables reading on the downstream connection until the upstream connection has been established. In some situations earlier filters in the filter chain may need to read data from the downstream connection before allowing the upstream connection to be established. This can be done by setting the ``StreamInfo`` filter state object for the key ``envoy.tcp_proxy.receive_before_connect``. Setting this filter state must happen in ``initializeReadFilterCallbacks()`` callback of the network filter so that is done before ``TcpProxy`` filter is initialized.
 
 Network filters can also pass data upto the ``TcpProxy`` filter before the upstream connection has been established, as ``TcpProxy`` filter now buffers data it receives before the upstream connection has been established to be sent when the upstream connection is established. Filters can also delay the upstream connection setup by returning ``StopIteration`` from their ``onNewConnection`` and ``onData`` callbacks.
-On receiving early data, TCP_PROXY will read disable the connection until the upstream connection is established. This is to prevent the connection from being closed by the peer if the upstream connection is not established in a timely manner.
+On receiving early data, TCP_PROXY will read disable the connection until the upstream connection is established. This is to protect the early buffer from overflowing.
 
 .. _config_network_filters_tcp_proxy_tunneling_over_http:
 

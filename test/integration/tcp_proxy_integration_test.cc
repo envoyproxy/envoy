@@ -1800,7 +1800,7 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, ReceiveBeforeConnectEarlyDat
   test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   // Once the connection is established, the early data will be flushed to the upstream.
-  ASSERT_TRUE(fake_upstream_connection->waitForData(10));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("helloworld")));
   ASSERT_TRUE(fake_upstream_connection->write("response"));
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -1809,22 +1809,27 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, ReceiveBeforeConnectEarlyDat
 }
 
 TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark) {
-  config_helper_.setBufferLimits(1024, 1024);
-  std::string data(1024 * 16, 'a');
+  const uint32_t read_buffer_size = 1024;
+  const uint32_t write_buffer_size = 1024;
+  const uint32_t data_size = 16 * read_buffer_size;
+  config_helper_.setBufferLimits(read_buffer_size, write_buffer_size);
+
+  std::string data(data_size, 'a');
 
   initialize();
   FakeRawConnectionPtr fake_upstream_connection;
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
 
   // First time data is sent, the PauseFilter stops the iteration.
-  ASSERT_TRUE(tcp_client->write(data.substr(0, 1024)));
+  ASSERT_TRUE(tcp_client->write(data.substr(0, read_buffer_size + 1)));
   ASSERT_FALSE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  ASSERT_TRUE(tcp_client->write(data.substr(1024)));
+  // Send the remaining data
+  ASSERT_TRUE(tcp_client->write(data.substr(read_buffer_size + 1)));
   test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   // Once the connection is established, the early data will be flushed to the upstream.
-  ASSERT_TRUE(fake_upstream_connection->waitForData(1024 * 16));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data_size));
   ASSERT_TRUE(fake_upstream_connection->write("response"));
   ASSERT_TRUE(fake_upstream_connection->close());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());

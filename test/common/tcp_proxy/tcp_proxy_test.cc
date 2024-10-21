@@ -476,7 +476,7 @@ TEST_P(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
 }
 
 TEST_P(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
-  setup(1, false, true);
+  setup(/*connections*/ 1, /*set_redirect_records*/ false, /*receive_before_connect*/ true);
   std::string early_data("early data");
   Buffer::OwnedImpl early_data_buffer(early_data);
 
@@ -484,11 +484,11 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
   // Also check that downstream connection is read disabled.
   EXPECT_CALL(*upstream_connections_.at(0), write(_, _)).Times(0);
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
-  filter_->onData(early_data_buffer, false);
+  filter_->onData(early_data_buffer, /*end_stream*/ false);
 
   // Now when upstream connection is established, early buffer will be sent.
   EXPECT_CALL(*upstream_connections_.at(0), write(BufferStringEqual(early_data), false));
-  raiseEventUpstreamConnected(0);
+  raiseEventUpstreamConnected(/*conn_index*/ 0);
 
   // Any further communications between client and server can resume normally.
   Buffer::OwnedImpl buffer("hello");
@@ -502,14 +502,14 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
 
 TEST_P(TcpProxyTest, ReceiveBeforeConnectNoEarlyData) {
   setup(1, /*set_redirect_records*/ false, /*receive_before_connect*/ true);
-  raiseEventUpstreamConnected(0, false);
+  raiseEventUpstreamConnected(/*conn_index*/ 0, /*expect_read_enable*/ false);
 
   // Any data sent after upstream connection is established is flushed directly to upstream,
   // and downstream connection is not read disabled.
   Buffer::OwnedImpl buffer("hello");
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(_)).Times(0);
   EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
-  filter_->onData(buffer, false);
+  filter_->onData(buffer, /*end_stream*/ false);
 
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
@@ -1419,7 +1419,7 @@ TEST_P(TcpProxyTest, UpstreamSocketOptionsReturnedEmpty) {
 }
 
 TEST_P(TcpProxyTest, TcpProxySetRedirectRecordsToUpstream) {
-  setup(1, /*set_redirect_records*/ true, /*receive_before_connect*/ false);
+  setup(/*connections*/ 1, /*set_redirect_records*/ true, /*receive_before_connect*/ false);
   EXPECT_TRUE(filter_->upstreamSocketOptions());
   auto iterator = std::find_if(
       filter_->upstreamSocketOptions()->begin(), filter_->upstreamSocketOptions()->end(),
