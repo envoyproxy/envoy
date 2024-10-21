@@ -8,6 +8,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/http/message.h"
 #include "envoy/server/factory_context.h"
 
@@ -322,11 +323,14 @@ private:
 class WebIdentityCredentialsProvider : public MetadataCredentialsProviderBase,
                                        public MetadataFetcher::MetadataReceiver {
 public:
+  // token and token_file_path are mutually exclusive. If token is not empty, token_file_path is
+  // not used, and vice versa.
   WebIdentityCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
                                  const CurlMetadataFetcher& fetch_metadata_using_curl,
                                  CreateMetadataFetcherCb create_metadata_fetcher_cb,
-                                 absl::string_view token_file_path, absl::string_view sts_endpoint,
-                                 absl::string_view role_arn, absl::string_view role_session_name,
+                                 absl::string_view token_file_path, absl::string_view token,
+                                 absl::string_view sts_endpoint, absl::string_view role_arn,
+                                 absl::string_view role_session_name,
                                  MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                  std::chrono::seconds initialization_timer,
                                  absl::string_view cluster_name);
@@ -335,8 +339,14 @@ public:
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
 
+  const std::string& tokenForTesting() const { return token_; }
+  const std::string& roleArnForTesting() const { return role_arn_; }
+
 private:
+  // token_ and token_file_path_ are mutually exclusive. If token_ is set, token_file_path_ is not
+  // used.
   const std::string token_file_path_;
+  const std::string token_;
   const std::string sts_endpoint_;
   const std::string role_arn_;
   const std::string role_session_name_;
@@ -377,8 +387,8 @@ public:
       Api::Api& api, ServerFactoryContextOptRef context,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
-      absl::string_view role_session_name,
+      absl::string_view token_file_path, absl::string_view token, absl::string_view sts_endpoint,
+      absl::string_view role_arn, absl::string_view role_session_name,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer) const PURE;
 
@@ -451,16 +461,40 @@ private:
       Api::Api& api, ServerFactoryContextOptRef context,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
-      absl::string_view role_session_name,
+      absl::string_view token_file_path, absl::string_view token, absl::string_view sts_endpoint,
+      absl::string_view role_arn, absl::string_view role_session_name,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer) const override {
     return std::make_shared<WebIdentityCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, token_file_path,
+        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, token_file_path, token,
         sts_endpoint, role_arn, role_session_name, refresh_state, initialization_timer,
         cluster_name);
   }
 };
+
+/**
+ * Credential provider based on an inline credential.
+ */
+class InlineCredentialProvider : public CredentialsProvider {
+public:
+  explicit InlineCredentialProvider(absl::string_view access_key_id,
+                                    absl::string_view secret_access_key,
+                                    absl::string_view session_token)
+      : credentials_(access_key_id, secret_access_key, session_token) {}
+
+  Credentials getCredentials() override { return credentials_; }
+
+private:
+  const Credentials credentials_;
+};
+
+/**
+ * Create an AWS credentials provider from the proto configuration instead of using the default
+ * credentials provider chain.
+ */
+absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
+    Server::Configuration::ServerFactoryContext& context, absl::string_view region,
+    const envoy::extensions::common::aws::v3::AwsCredentialProvider& config);
 
 using InstanceProfileCredentialsProviderPtr = std::shared_ptr<InstanceProfileCredentialsProvider>;
 using ContainerCredentialsProviderPtr = std::shared_ptr<ContainerCredentialsProvider>;

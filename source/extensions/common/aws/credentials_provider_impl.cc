@@ -737,15 +737,16 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
     const CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view token_file_path,
-    absl::string_view sts_endpoint, absl::string_view role_arn, absl::string_view role_session_name,
+    absl::string_view token, absl::string_view sts_endpoint, absl::string_view role_arn,
+    absl::string_view role_session_name,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view cluster_name = {})
     : MetadataCredentialsProviderBase(
           api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, cluster_name,
           envoy::config::cluster::v3::Cluster::LOGICAL_DNS /*cluster_type*/, sts_endpoint,
           refresh_state, initialization_timer),
-      token_file_path_(token_file_path), sts_endpoint_(sts_endpoint), role_arn_(role_arn),
-      role_session_name_(role_session_name) {}
+      token_file_path_(token_file_path), token_(token), sts_endpoint_(sts_endpoint),
+      role_arn_(role_arn), role_session_name_(role_session_name) {}
 
 bool WebIdentityCredentialsProvider::needsRefresh() {
   const auto now = api_.timeSource().systemTime();
@@ -767,11 +768,15 @@ void WebIdentityCredentialsProvider::refresh() {
 
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}", sts_endpoint_);
 
-  const auto web_token_file_or_error = api_.fileSystem().fileReadToEnd(token_file_path_);
-  if (!web_token_file_or_error.ok()) {
-    ENVOY_LOG(debug, "Unable to read AWS web identity credentials from {}", token_file_path_);
-    cached_credentials_ = Credentials();
-    return;
+  std::string identity_token = token_;
+  if (identity_token.empty()) {
+    const auto web_token_file_or_error = api_.fileSystem().fileReadToEnd(token_file_path_);
+    if (!web_token_file_or_error.ok()) {
+      ENVOY_LOG(debug, "Unable to read AWS web identity credentials from {}", token_file_path_);
+      cached_credentials_ = Credentials();
+      return;
+    }
+    identity_token = web_token_file_or_error.value();
   }
 
   Http::RequestMessageImpl message;
@@ -786,7 +791,7 @@ void WebIdentityCredentialsProvider::refresh() {
                   "&WebIdentityToken={}",
                   Envoy::Http::Utility::PercentEncoding::encode(role_session_name_),
                   Envoy::Http::Utility::PercentEncoding::encode(role_arn_),
-                  Envoy::Http::Utility::PercentEncoding::encode(web_token_file_or_error.value())));
+                  Envoy::Http::Utility::PercentEncoding::encode(identity_token)));
   // Use the Accept header to ensure that AssumeRoleWithWebIdentityResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
@@ -910,6 +915,39 @@ Credentials CredentialsProviderChain::getCredentials() {
   return Credentials();
 }
 
+std::string sessionName(Api::Api& api) {
+  const auto role_session_name = absl::NullSafeStringView(std::getenv(AWS_ROLE_SESSION_NAME));
+  std::string actual_session_name;
+  if (!role_session_name.empty()) {
+    actual_session_name = std::string(role_session_name);
+  } else {
+    // In practice, this value will be provided by the environment, so the placeholder value is
+    // not important. Some AWS SDKs use time in nanoseconds, so we'll just use that.
+    const auto now_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                               api.timeSource().systemTime().time_since_epoch())
+                               .count();
+    actual_session_name = fmt::format("{}", now_nanos);
+  }
+  return actual_session_name;
+}
+
+
+// Edge case handling for cluster naming.
+//
+// Region is appended to the cluster name, to differentiate between multiple web identity
+// credential providers configured with different regions.
+//
+// UUID is also appended, to differentiate two identically configured web identity credential
+// providers, as we cannot make these singletons
+//
+// TODO: @nbaws: Modify cluster creation logic for web identity credential providers
+// to allow these also to be created as singletons
+
+std::string stsClusterName(absl::string_view region) {
+  return absl::StrCat(STS_TOKEN_CLUSTER, "-", region, "_",
+                                        context->api().randomGenerator().uuid());
+}
+
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
     absl::string_view region,
@@ -933,41 +971,17 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     const auto web_token_path = absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE));
     const auto role_arn = absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN));
     if (!web_token_path.empty() && !role_arn.empty()) {
-      const auto role_session_name = absl::NullSafeStringView(std::getenv(AWS_ROLE_SESSION_NAME));
-      std::string actual_session_name;
-      if (!role_session_name.empty()) {
-        actual_session_name = std::string(role_session_name);
-      } else {
-        // In practice, this value will be provided by the environment, so the placeholder value is
-        // not important. Some AWS SDKs use time in nanoseconds, so we'll just use that.
-        const auto now_nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                   api.timeSource().systemTime().time_since_epoch())
-                                   .count();
-        actual_session_name = fmt::format("{}", now_nanos);
-      }
+      const auto session_name = sessionName(api);
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-
-      // Edge case handling for cluster naming.
-      //
-      // Region is appended to the cluster name, to differentiate between multiple web identity
-      // credential providers configured with different regions.
-      //
-      // UUID is also appended, to differentiate two identically configured web identity credential
-      // providers, as we cannot make these singletons
-      //
-      // TODO: @nbaws: Modify cluster creation logic for web identity credential providers
-      // to allow these also to be created as singletons
-
-      auto cluster_name_ = absl::StrCat(STS_TOKEN_CLUSTER, "-", region, "_",
-                                        context->api().randomGenerator().uuid());
+      const auto cluster_name = stsClusterName(region);
 
       ENVOY_LOG(
           debug,
           "Using web identity credentials provider with STS endpoint: {} and session name: {}",
-          sts_endpoint, actual_session_name);
+          sts_endpoint, session_name);
       add(factories.createWebIdentityCredentialsProvider(
-          api, context, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name_,
-          web_token_path, sts_endpoint, role_arn, actual_session_name, refresh_state,
+          api, context, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name,
+          web_token_path, "", sts_endpoint, role_arn, session_name, refresh_state,
           initialization_timer));
     }
   }
@@ -1049,6 +1063,62 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
             api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
             initialization_timer, cluster_name);
       });
+}
+
+absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
+    Server::Configuration::ServerFactoryContext& context, absl::string_view region,
+    const envoy::extensions::common::aws::v3::AwsCredentialProvider& config) {
+  // The precedence order is: inline_credential > assume_role_with_web_identity.
+  if (config.has_inline_credential()) {
+    const auto& inline_credential = config.inline_credential();
+    return std::make_shared<InlineCredentialProvider>(inline_credential.access_key_id(),
+                                                      inline_credential.secret_access_key(),
+                                                      inline_credential.session_token());
+  } else if (config.has_assume_role_with_web_identity()) {
+    const auto& web_identity = config.assume_role_with_web_identity();
+    const std::string& role_arn = web_identity.role_arn();
+    const std::string& token = web_identity.web_identity_token();
+    const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+    const std::string cluster_name = stsClusterName(region);
+    const std::string role_session_name = sessionName(context.api());
+    const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+    // This "two seconds" is a bit arbitrary, but matches the other places in the codebase.
+    const auto initialization_timer = std::chrono::seconds(2);
+    return std::make_shared<WebIdentityCredentialsProvider>(
+        context.api(), context, Extensions::Common::Aws::Utility::fetchMetadata,
+        MetadataFetcher::create, "", token, sts_endpoint, role_arn, role_session_name,
+        refresh_state, initialization_timer, cluster_name);
+  } else {
+    return absl::InvalidArgumentError("No AWS credential provider specified");
+  }
+}
+
+absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
+    Server::Configuration::ServerFactoryContext& context, absl::string_view region,
+    const envoy::extensions::common::aws::v3::AwsCredentialProvider& config) {
+  // The precedence order is: inline_credential > assume_role_with_web_identity.
+  if (config.has_inline_credential()) {
+    const auto& inline_credential = config.inline_credential();
+    return std::make_shared<InlineCredentialProvider>(inline_credential.access_key_id(),
+                                                      inline_credential.secret_access_key(),
+                                                      inline_credential.session_token());
+  } else if (config.has_assume_role_with_web_identity()) {
+    const auto& web_identity = config.assume_role_with_web_identity();
+    const std::string& role_arn = web_identity.role_arn();
+    const std::string& token = web_identity.web_identity_token();
+    const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+    const std::string cluster_name = stsClusterName(region);
+    const std::string role_session_name = sessionName(context.api());
+    const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+    // This "two seconds" is a bit arbitrary, but matches the other places in the codebase.
+    const auto initialization_timer = std::chrono::seconds(2);
+    return std::make_shared<WebIdentityCredentialsProvider>(
+        context.api(), context, Extensions::Common::Aws::Utility::fetchMetadata,
+        MetadataFetcher::create, "", token, sts_endpoint, role_arn, role_session_name,
+        refresh_state, initialization_timer, cluster_name);
+  } else {
+    return absl::InvalidArgumentError("No AWS credential provider specified");
+  }
 }
 
 } // namespace Aws
