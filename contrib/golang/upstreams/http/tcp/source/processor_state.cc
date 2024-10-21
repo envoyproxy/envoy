@@ -54,4 +54,3 @@ bool BufferList::checkExisting(Buffer::Instance* data) {
 } // namespace Upstreams
 } // namespace Extensions
 } // namespace Envoy
-
