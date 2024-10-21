@@ -10,6 +10,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/stats/symbol_table.h"
+#include "source/extensions/outlier_detection_monitors/common/monitor_base_impl.h"
 
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -35,6 +36,9 @@ public:
   MOCK_METHOD(double, successRate, (DetectorHostMonitor::SuccessRateMonitorType type), (const));
   MOCK_METHOD(void, successRate,
               (DetectorHostMonitor::SuccessRateMonitorType type, double new_success_rate));
+  MOCK_METHOD(std::string, getFailedExtensionMonitorName, (), (const));
+  MOCK_METHOD(std::string, getFailedExtensionMonitorExtraInfo, (), (const));
+  MOCK_METHOD(uint32_t, getFailedExtensionMonitorEnforce, (), (const));
 };
 
 class MockEventLogger : public EventLogger {
@@ -44,7 +48,8 @@ public:
 
   MOCK_METHOD(void, logEject,
               (const HostDescriptionConstSharedPtr& host, Detector& detector,
-               envoy::data::cluster::v3::OutlierEjectionType type, bool enforced));
+               envoy::data::cluster::v3::OutlierEjectionType type, bool enforced,
+               absl::optional<std::string>));
   MOCK_METHOD(void, logUneject, (const HostDescriptionConstSharedPtr& host));
 };
 
