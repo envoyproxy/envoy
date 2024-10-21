@@ -18,46 +18,38 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // APIKey Auth :ref:`configuration overview <config_http_filters_api_key_auth>`.
 // [#extension: envoy.filters.http.api_key_auth]
 
-// Basic HTTP authentication.
+// API Key HTTP authentication.
 //
 // Example:
 //
 // .. code-block:: yaml
 //
-//    location: HEADER
-//    name: X-API-KEY
+//    authentication_header: "X-API-KEY"
 //    keys:
 //      inline_string: |-
 //        apikey1:user1
 //        apikey2:user2
 //
 message APIKeyAuth {
-  enum APIKeyLocation {
-    // The API key is expected to be in a header.
-    HEADER = 0;
-
-    // The API key is expected to be in a query parameter.
-    QUERY = 1;
-
-    // The API key is expected to be in a cookie.
-    COOKIE = 2;
-  }
-
-  // The location of the API key.
-  APIKeyLocation location = 1;
-
-  // The name of the header, query parameter, or cookie that contains the API key.
-  string name = 2;
-
   // keys used to authenticate the user.
   // It should be a map of apikey to user.
-  config.core.v3.DataSource keys = 3 [(udpa.annotations.sensitive) = true];
+  config.core.v3.DataSource keys = 1 [(udpa.annotations.sensitive) = true];
 
   // The header name to forward an authenticated user.
   //
   // If it is not specified, the username will not be forwarded.
-  string forward_username_header = 4
+  string forward_username_header = 2
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // The location of the API key.
+  oneof location {
+    // The header name to fetch the key.
+    string authentication_header = 3;
+    // The query parameter name to fetch the key.
+    string authentication_query = 4;
+    // The cookie name to fetch the key.
+    string authentication_cookie = 5;
+  }
 }
 
 // Extra settings that may be added to per-route configuration for
