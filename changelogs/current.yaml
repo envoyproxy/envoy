@@ -21,6 +21,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: scoped_rds
+  change: |
+    Fixes scope key leak and spurious scope key conflicts when an update to an SRDS resource changes the key.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
