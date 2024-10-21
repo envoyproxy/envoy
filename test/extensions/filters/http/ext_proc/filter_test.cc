@@ -2854,7 +2854,7 @@ TEST_F(HttpFilterTest, RequestBodyModeMXNTrailerModeSKIP) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    request_body_mode: "MXN"
+    request_body_mode: "BIDIRECTIONAL_STREAMED"
     request_trailer_mode: "SKIP"
   )EOF";
 
@@ -2868,7 +2868,7 @@ TEST_F(HttpFilterTest, RequestBodyModeMXNTrailerModeSKIP) {
                 Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
             factory_context_);
       },
-      EnvoyException, "If request_body_mode is MXN, then request_trailer_mode has to be SEND");
+      EnvoyException, "If request_body_mode is BIDIRECTIONAL_STREAMED, then request_trailer_mode has to be SEND");
 }
 
 TEST_F(HttpFilterTest, ResponseBodyModeMXNTrailerModeSKIP) {
@@ -2877,7 +2877,7 @@ TEST_F(HttpFilterTest, ResponseBodyModeMXNTrailerModeSKIP) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    response_body_mode: "MXN"
+    response_body_mode: "BIDIRECTIONAL_STREAMED"
     response_trailer_mode: "SKIP"
   )EOF";
 
@@ -2891,7 +2891,7 @@ TEST_F(HttpFilterTest, ResponseBodyModeMXNTrailerModeSKIP) {
                 Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
             factory_context_);
       },
-      EnvoyException, "If response_body_mode is MXN, then response_trailer_mode has to be SEND");
+      EnvoyException, "If response_body_mode is BIDIRECTIONAL_STREAMED, then response_trailer_mode has to be SEND");
 }
 
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate
@@ -4426,14 +4426,13 @@ TEST_F(HttpFilterTest, StreamedTestInBothDirection) {
   filter_->onDestroy();
 }
 
-// External processing MXN test
 TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    response_body_mode: "MXN"
+    response_body_mode: "BIDIRECTIONAL_STREAMED"
     response_trailer_mode: "SEND"
   )EOF");
 
@@ -4469,22 +4468,22 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
 
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" AAAAA ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" AAAAA ");
         want_response_body.add(" AAAAA ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" BBBB ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" BBBB ");
         want_response_body.add(" BBBB ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" CCC ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" CCC ");
         want_response_body.add(" CCC ");
       },
       false);
@@ -4500,8 +4499,8 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
     processResponseBody(
         [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
-          auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-          mxn_resp->set_body(body.body());
+          auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+          streamed_resp->set_body(body.body());
           want_response_body.add(body.body());
         },
         false);
@@ -4525,31 +4524,31 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
   // Now sends the body response back also confirms the received chunks.
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" EEEEEEE ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" EEEEEEE ");
         want_response_body.add(" EEEEEEE ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" F ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" F ");
         want_response_body.add(" F ");
       },
       false);
 
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" GGGGGGGGG ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" GGGGGGGGG ");
         want_response_body.add(" GGGGGGGGG ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_end_of_stream(true);
-        mxn_resp->set_body(" HH ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_end_of_stream(true);
+        streamed_resp->set_body(" HH ");
         want_response_body.add(" HH ");
       },
       true);
@@ -4561,14 +4560,13 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
   filter_->onDestroy();
 }
 
-// External processing MXN test with trailer
 TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    response_body_mode: "MXN"
+    response_body_mode: "BIDIRECTIONAL_STREAMED"
     response_trailer_mode: "SEND"
   )EOF");
 
@@ -4605,14 +4603,14 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
 
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" AAAAA ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" AAAAA ");
         want_response_body.add(" AAAAA ");
       });
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" BBBB ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" BBBB ");
         want_response_body.add(" BBBB ");
       });
   processResponseTrailers(absl::nullopt, true);
@@ -4625,7 +4623,6 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
   filter_->onDestroy();
 }
 
-// External processing MXN test with server buffering header, body and trailer.
 TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
   initialize(R"EOF(
   grpc_service:
@@ -4633,7 +4630,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
       cluster_name: "ext_proc_server"
   processing_mode:
     response_header_mode: "SEND"
-    response_body_mode: "MXN"
+    response_body_mode: "BIDIRECTIONAL_STREAMED"
     response_trailer_mode: "SEND"
   )EOF");
 
@@ -4672,14 +4669,14 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
   processResponseHeadersAfterTrailer(absl::nullopt);
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" AAAAA ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" AAAAA ");
         want_response_body.add(" AAAAA ");
       });
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body(" BBBB ");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body(" BBBB ");
         want_response_body.add(" BBBB ");
       });
   processResponseTrailers(absl::nullopt, true);
@@ -4692,7 +4689,6 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
   filter_->onDestroy();
 }
 
-// External processing MXN test with client send header and trailer, no body.
 TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailerNoBody) {
   initialize(R"EOF(
   grpc_service:
@@ -4700,7 +4696,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailerNoBody) {
       cluster_name: "ext_proc_server"
   processing_mode:
     response_header_mode: "SEND"
-    response_body_mode: "MXN"
+    response_body_mode: "BIDIRECTIONAL_STREAMED"
     response_trailer_mode: "SEND"
   )EOF");
 
@@ -4729,8 +4725,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailerNoBody) {
   filter_->onDestroy();
 }
 
-// M:N error test case: sending back MXN body response but the body mode is not MXN
-TEST_F(HttpFilterTest, MXNBodyProcessingTestWithFeatureDisabled) {
+TEST_F(HttpFilterTest, MXNBodyProcessingTestWithFilterConfigNotMxn) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -4762,13 +4757,54 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithFeatureDisabled) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
   }
 
-  // Then the ext_proc server sends back a response with more_chunks set to true.
   processResponseBody(
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_body("AAA");
+        auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
+        streamed_resp->set_body("AAA");
       },
       false);
+
+  // Verify spurious message is received.
+  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, SendBodyMutationTestWithFilterConfigMxn) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_body_mode: "BIDIRECTIONAL_STREAMED"
+    response_trailer_mode: "SEND"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_chunk;
+  TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_chunk, true));
+
+  processResponseBody(
+      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("AAA");
+      },
+      true);
 
   // Verify spurious message is received.
   EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);

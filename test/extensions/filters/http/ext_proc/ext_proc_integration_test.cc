@@ -4892,7 +4892,7 @@ TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
 TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
   config_helper_.setBufferLimits(1024, 1024);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::MXN);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BIDIRECTIONAL_STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
@@ -4948,10 +4948,10 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
     ProcessingResponse response_body;
     auto* body_resp = response_body.mutable_request_body();
     auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
-    auto* mxn_resp = body_mut->mutable_mxn_resp();
-    mxn_resp->set_body("r");
+    auto* streamed_resp = body_mut->mutable_streamed_resp();
+    streamed_resp->set_body("r");
     const bool end_of_stream = (i == total_resp_body_msg - 1) ? true : false;
-    mxn_resp->set_end_of_stream(end_of_stream);
+    streamed_resp->set_end_of_stream(end_of_stream);
     processor_stream_->sendGrpcMessage(response_body);
   }
 
@@ -4961,11 +4961,11 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// Buffer the whole message including header, body and trailer before sending response in MXN mode.
+// Buffer the whole message including header, body and trailer before sending response.
 TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespMxnSmallBody) {
   config_helper_.setBufferLimits(1024, 1024);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::MXN);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BIDIRECTIONAL_STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
@@ -5025,11 +5025,11 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   const std::string body_upstream(total_resp_body_msg, 'r');
   for (uint32_t i = 0; i < total_resp_body_msg; i++) {
     ProcessingResponse response_body;
-    auto* mxn_resp = response_body.mutable_request_body()
+    auto* streamed_resp = response_body.mutable_request_body()
                          ->mutable_response()
                          ->mutable_body_mutation()
-                         ->mutable_mxn_resp();
-    mxn_resp->set_body("r");
+                         ->mutable_streamed_resp();
+    streamed_resp->set_body("r");
     processor_stream_->sendGrpcMessage(response_body);
   }
 
@@ -5047,12 +5047,12 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   verifyDownstreamResponse(*response, 200);
 }
 
-// The body is large. The server sends some body responses after buffering some amount of data
-// in MXN mode. The server continuously does so until the entire body processing is done.
+// The body is large. The server sends some body responses after buffering some amount of data.
+// The server continuously does so until the entire body processing is done.
 TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
   config_helper_.setBufferLimits(1024, 1024);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::MXN);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BIDIRECTIONAL_STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
@@ -5117,11 +5117,11 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
         ProcessingResponse response_body;
         for (uint32_t i = 0; i < 3; i++) {
           body_upstream += std::to_string(i);
-          auto* mxn_resp = response_body.mutable_request_body()
+          auto* streamed_resp = response_body.mutable_request_body()
                                ->mutable_response()
                                ->mutable_body_mutation()
-                               ->mutable_mxn_resp();
-          mxn_resp->set_body(std::to_string(i));
+                               ->mutable_streamed_resp();
+          streamed_resp->set_body(std::to_string(i));
           processor_stream_->sendGrpcMessage(response_body);
         }
       }
@@ -5137,11 +5137,11 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
 
   // Send one more body response at the end.
   ProcessingResponse response_body;
-  auto* mxn_resp = response_body.mutable_request_body()
+  auto* streamed_resp = response_body.mutable_request_body()
                        ->mutable_response()
                        ->mutable_body_mutation()
-                       ->mutable_mxn_resp();
-  mxn_resp->set_body("END");
+                       ->mutable_streamed_resp();
+  streamed_resp->set_body("END");
   processor_stream_->sendGrpcMessage(response_body);
   body_upstream += "END";
 

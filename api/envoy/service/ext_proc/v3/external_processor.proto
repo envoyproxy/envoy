@@ -362,8 +362,8 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
-// The body response message corresponding to MXN body mode.
-message MxnBodyResponse {
+// The body response message corresponding to BIDIRECTIONAL_STREAMED body mode.
+message StreamedBodyResponse {
   // Envoy sends this body mutation out as it is.
   bytes body = 1;
 
@@ -374,7 +374,7 @@ message MxnBodyResponse {
 
 // This message specifies the body mutation Envoy will apply and send out.
 message BodyMutation {
-  // Sending this response for none-MXN body mode.
+  // Sending this response for any body mode except BIDIRECTIONAL_STREAMED.
   oneof mutation {
     // The entire body to replace
     bytes body = 1;
@@ -384,7 +384,7 @@ message BodyMutation {
   }
 
   // [#not-implemented-hide:]
-  // Sending this response for MXN body mode.
-  // Only one of ``mxn_resp`` or above ``mutation`` should be set.
-  MxnBodyResponse mxn_resp = 3;
+  // Sending this response for BIDIRECTIONAL_STREAMED body mode.
+  // Only one of ``streamed_resp`` or above ``mutation`` should be set.
+  StreamedBodyResponse streamed_resp = 3;
 }

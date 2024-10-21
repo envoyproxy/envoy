@@ -23,7 +23,7 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
   ENVOY_LOG(debug, "Start external processing call");
   callback_state_ = callback_state;
 
-  if (bodyMode() != ProcessingMode::MXN) {
+  if (bodyMode() != ProcessingMode::BIDIRECTIONAL_STREAMED) {
     if (!message_timer_) {
       message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
     }
@@ -87,7 +87,7 @@ bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
   }
 }
 
-// Send buffered data in STREAMED or MXN body mode.
+// Send buffered data in STREAMED or BIDIRECTIONAL_STREAMED body mode.
 void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
   // Process the data being buffered in streaming mode.
   // Move the current buffer into the queue for remote processing and clear the buffered data.
@@ -97,12 +97,12 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
     ENVOY_LOG(debug, "Sending a chunk of buffered data ({})", buffered_chunk.length());
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-    if (bodyMode() != ProcessingMode::MXN) {
+    if (bodyMode() != ProcessingMode::BIDIRECTIONAL_STREAMED) {
       enqueueStreamingChunk(buffered_chunk, end_stream);
     }
     filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
   }
-  if ((bodyMode() != ProcessingMode::MXN) && queueBelowLowLimit()) {
+  if ((bodyMode() != ProcessingMode::BIDIRECTIONAL_STREAMED) && queueBelowLowLimit()) {
     clearWatermark();
   }
 }
@@ -129,7 +129,7 @@ ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_res
     return ProcessorState::CallbackState::StreamedBodyCallback;
   }
 
-  if (bodyMode() == ProcessingMode::MXN) {
+  if (bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
     if (bodyReceived()) {
       return ProcessorState::CallbackState::StreamedBodyCallback;
     }
@@ -216,7 +216,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         // let the doData callback handle body chunks until the end is reached.
         clearWatermark();
         return absl::OkStatus();
-      } else if (body_mode_ == ProcessingMode::STREAMED || body_mode_ == ProcessingMode::MXN) {
+      } else if (body_mode_ == ProcessingMode::STREAMED || body_mode_ == ProcessingMode::BIDIRECTIONAL_STREAMED) {
         sendBufferedDataInStreamedMode(false);
         continueIfNecessary();
         return absl::OkStatus();
@@ -250,7 +250,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         return absl::OkStatus();
       }
       if (send_trailers_ && trailers_available_) {
-        if (body_mode_ != ProcessingMode::MXN) {
+        if (body_mode_ != ProcessingMode::BIDIRECTIONAL_STREAMED) {
           // Trailers came in while we were waiting for this response, and the server
           // is not interested in the body, so send them now.
           filter_.sendTrailers(*this, *trailers_);
@@ -313,19 +313,19 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::Ok);
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      if (common_response.has_body_mutation() && common_response.body_mutation().has_mxn_resp()) {
-        ENVOY_LOG(debug, "MxN body response is received and body_mode_: {} ",
+      if (common_response.has_body_mutation() && common_response.body_mutation().has_streamed_resp()) {
+        ENVOY_LOG(debug, "BIDIRECTIONAL_STREAMED body response is received and body_mode_: {} ",
                   ProcessingMode::BodySendMode_Name(body_mode_));
-        // mxn_resp will only be supported if the ext_proc filter has body_mode set to MXN.
-        if (body_mode_ != ProcessingMode::MXN) {
+        // streamed_resp will only be supported if the ext_proc filter has body_mode set to BIDIRECTIONAL_STREAMED.
+        if (body_mode_ != ProcessingMode::BIDIRECTIONAL_STREAMED) {
           return absl::FailedPreconditionError(
-              "spurious message: MXN response is received while body_mode_ is not MXN");
+              "spurious message: streamed_resp response is received while body_mode_ is not BIDIRECTIONAL_STREAMED");
         }
         should_continue = handleMxnBodyResponse(common_response);
       } else {
-        if (body_mode_ == ProcessingMode::MXN) {
+        if (body_mode_ == ProcessingMode::BIDIRECTIONAL_STREAMED) {
           return absl::FailedPreconditionError(
-              "spurious message: Streamed response is received while body_mode_ is MXN");
+              "spurious message: Normal body mutation response is received while body_mode_ is BIDIRECTIONAL_STREAMED");
         }
         should_continue = handleStreamedBodyResponse(common_response);
       }
@@ -375,7 +375,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
 
     // Send trailers if they are available and no data pending for processing.
     if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
-      if (body_mode_ != ProcessingMode::MXN) {
+      if (body_mode_ != ProcessingMode::BIDIRECTIONAL_STREAMED) {
         filter_.sendTrailers(*this, *trailers_);
       }
       return absl::OkStatus();
@@ -390,10 +390,10 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   return absl::FailedPreconditionError("spurious message");
 }
 
-// If the body mode is MXN, then the trailers response may come back when
+// If the body mode is BIDIRECTIONAL_STREAMED, then the trailers response may come back when
 // the state is still waiting for body response.
 absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
-  if (callback_state_ == CallbackState::TrailersCallback || bodyMode() == ProcessingMode::MXN) {
+  if (callback_state_ == CallbackState::TrailersCallback || bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
     ENVOY_LOG(debug, "Applying response to buffered trailers, body_mode_ {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
     if (response.has_header_mutation()) {
@@ -471,14 +471,14 @@ bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_res
 }
 
 bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response) {
-  const auto& mxn_resp = common_response.body_mutation().mxn_resp();
-  const auto& body = mxn_resp.body();
-  const bool end_of_stream = mxn_resp.end_of_stream();
+  const auto& streamed_resp = common_response.body_mutation().streamed_resp();
+  const auto& body = streamed_resp.body();
+  const bool end_of_stream = streamed_resp.end_of_stream();
 
   if (body.size() > 0) {
     Buffer::OwnedImpl buffer;
     buffer.add(body);
-    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}",
+    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream in BIDIRECTIONAL_STREAMED mode. end_of_stream is {}",
               buffer.length(), end_of_stream);
     injectDataToFilterChain(buffer, end_of_stream);
   }

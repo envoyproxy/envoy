@@ -85,13 +85,13 @@ void verifyProcessingModeConfig(const ExternalProcessor& config) {
     }
   }
 
-  if ((processing_mode.request_body_mode() == ProcessingMode::MXN) &&
+  if ((processing_mode.request_body_mode() == ProcessingMode::BIDIRECTIONAL_STREAMED) &&
       (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
-    throw EnvoyException("If request_body_mode is MXN, then request_trailer_mode has to be SEND");
+    throw EnvoyException("If request_body_mode is BIDIRECTIONAL_STREAMED, then request_trailer_mode has to be SEND");
   }
-  if ((processing_mode.response_body_mode() == ProcessingMode::MXN) &&
+  if ((processing_mode.response_body_mode() == ProcessingMode::BIDIRECTIONAL_STREAMED) &&
       (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
-    throw EnvoyException("If response_body_mode is MXN, then response_trailer_mode has to be SEND");
+    throw EnvoyException("If response_body_mode is BIDIRECTIONAL_STREAMED, then response_trailer_mode has to be SEND");
   }
 }
 
@@ -591,10 +591,10 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
     if ((state.bodyMode() == ProcessingMode::STREAMED &&
          config_->sendBodyWithoutWaitingForHeaderResponse()) ||
-        state.bodyMode() == ProcessingMode::MXN) {
+        state.bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
       ENVOY_LOG(trace,
                 "Sending body data even header processing is still in progress as body mode "
-                "is MXN or STREAMED and send_body_without_waiting_for_header_response is enabled");
+                "is BIDIRECTIONAL_STREAMED or STREAMED and send_body_without_waiting_for_header_response is enabled");
     } else {
       ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
       // We don't know what to do with the body until the response comes back.
@@ -637,8 +637,8 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
   case ProcessingMode::STREAMED:
-  case ProcessingMode::MXN: {
-    // STREAMED or MXN body mode works as follows:
+  case ProcessingMode::BIDIRECTIONAL_STREAMED: {
+    // STREAMED or BIDIRECTIONAL_STREAMED body mode works as follows:
     //
     // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it
     // dispatches via gRPC message to the external processor, and then keeps in a queue. It
@@ -664,9 +664,8 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
       break;
     }
 
-    // Need to first enqueue the data into the chunk queue before sending.
     auto req = setupBodyChunk(state, data, end_stream);
-    if (state.bodyMode() != ProcessingMode::MXN) {
+    if (state.bodyMode() != ProcessingMode::BIDIRECTIONAL_STREAMED) {
       state.enqueueStreamingChunk(data, end_stream);
     } else {
       data.drain(data.length());
@@ -859,10 +858,10 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   state.setTrailers(&trailers);
 
   if (state.callbackState() != ProcessorState::CallbackState::Idle) {
-    if (state.bodyMode() == ProcessingMode::MXN) {
+    if (state.bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
       ENVOY_LOG(
           trace,
-          "Body mode is MXN, sending trailers even Envoy is waiting for header or body response");
+          "Body mode is BIDIRECTIONAL_STREAMED, sending trailers even Envoy is waiting for header or body response");
     } else {
       ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
       state.setPaused(true);
@@ -1202,8 +1201,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // and filter is waiting for header processing response.
   // Otherwise, the response mode_override proto field is ignored.
   if (config_->allowModeOverride() && !config_->sendBodyWithoutWaitingForHeaderResponse() &&
-      (config_->processingMode().request_body_mode() != ProcessingMode::MXN) &&
-      (config_->processingMode().response_body_mode() != ProcessingMode::MXN) &&
+      (config_->processingMode().request_body_mode() != ProcessingMode::BIDIRECTIONAL_STREAMED) &&
+      (config_->processingMode().response_body_mode() != ProcessingMode::BIDIRECTIONAL_STREAMED) &&
       inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
     const auto& mode_overide = response->mode_override();
