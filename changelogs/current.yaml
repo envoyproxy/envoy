@@ -24,6 +24,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
@@ -34,6 +37,11 @@ new_features:
     Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
     :ref:`failure_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.failure_policy>` for more details.
     The ``FAIL_RELOAD`` reload policy will be used by default.
+- area: aws_request_signing
+  change: |
+    Added an optional field :ref:`credential_provider
+    <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>`
+    to the AWS request signing filter to explicitly specify a source for AWS credentials.
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
