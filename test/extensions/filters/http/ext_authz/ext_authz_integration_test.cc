@@ -8,6 +8,7 @@
 #include "source/server/config_validation/server.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/extensions/filters/http/ext_authz/logging_test_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
 #include "test/test_common/test_runtime.h"
@@ -25,6 +26,8 @@ namespace Envoy {
 
 using Headers = std::vector<std::pair<const std::string, const std::string>>;
 
+constexpr char ExtAuthzFilterName[] = "envoy.filters.http.ext_authz";
+
 struct GrpcInitializeConfigOpts {
   bool disable_with_metadata = false;
   bool failure_mode_allow = false;
@@ -32,6 +35,11 @@ struct GrpcInitializeConfigOpts {
   uint64_t timeout_ms = 300'000; // 5 minutes.
   bool validate_mutations = false;
   bool retry_5xx = false;
+  // In some tests a request is never sent. If a request is never sent, stats are not set. In those
+  // tests, we need to be able to override this to false.
+  absl::optional<bool> expect_stats_override;
+  // In timeout tests we expect zero response bytes.
+  bool stats_expect_response_bytes = true;
 };
 
 struct WaitForSuccessfulUpstreamResponseOpts {
@@ -48,7 +56,7 @@ class ExtAuthzGrpcIntegrationTest
     : public Grpc::BaseGrpcClientIntegrationParamTest,
       public HttpIntegrationTest,
       public testing::TestWithParam<
-          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>> {
+          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool, bool>> {
 
 public:
   ExtAuthzGrpcIntegrationTest()
@@ -56,12 +64,13 @@ public:
 
   static std::string testParamsToString(
       const ::testing::TestParamInfo<
-          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool>>& p) {
+          std::tuple<std::tuple<Network::Address::IpVersion, Grpc::ClientType>, bool, bool>>& p) {
     return fmt::format(
-        "{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(std::get<0>(p.param))),
+        "{}_{}_{}_{}", TestUtility::ipVersionToString(std::get<0>(std::get<0>(p.param))),
         std::get<1>(std::get<0>(p.param)) == Grpc::ClientType::GoogleGrpc ? "GoogleGrpc"
                                                                           : "EnvoyGrpc",
-        std::get<1>(p.param) ? "RawHeaders" : "LegacyHeaders");
+        std::get<1>(p.param) ? "RawHeaders" : "LegacyHeaders",
+        std::get<2>(p.param) ? "EmitFilterStateStats" : "DoNotEmitFilterStateStats");
   }
 
   // BaseGrpcClientIntegrationParamTest
@@ -72,6 +81,8 @@ public:
   Grpc::ClientType clientType() const override { return std::get<1>(std::get<0>(GetParam())); }
 
   bool encodeRawHeaders() const { return std::get<1>(GetParam()); }
+
+  bool emitFilterStateStats() const { return std::get<2>(GetParam()); }
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -119,6 +130,12 @@ public:
       proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
 
+      if (emitFilterStateStats()) {
+        proto_config_.set_emit_filter_state_stats(true);
+        *(*proto_config_.mutable_filter_metadata()->mutable_fields())["foo"]
+             .mutable_string_value() = "bar";
+      }
+
       // Add labels and verify they are passed.
       std::map<std::string, std::string> labels;
       labels["label_1"] = "value_1";
@@ -137,9 +154,28 @@ public:
       *bootstrap.mutable_node()->mutable_metadata() = metadata;
 
       envoy::config::listener::v3::Filter ext_authz_filter;
-      ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+      ext_authz_filter.set_name(ExtAuthzFilterName);
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+
+      if (emitFilterStateStats()) {
+        test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+        logging_filter_config.set_logging_id("envoy.filters.http.ext_authz");
+        logging_filter_config.set_upstream_cluster_name("ext_authz_cluster");
+        logging_filter_config.set_expect_stats(opts.expect_stats_override.value_or(true));
+        logging_filter_config.set_expect_envoy_grpc_specific_stats(clientType() ==
+                                                                   Grpc::ClientType::EnvoyGrpc);
+        logging_filter_config.set_expect_response_bytes(opts.stats_expect_response_bytes);
+
+        // Set the same filter metadata to the ext authz filter and the logging test filter.
+        *(*logging_filter_config.mutable_filter_metadata()->mutable_fields())["foo"]
+             .mutable_string_value() = "bar";
+
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
+        logging_filter.set_name("logging_filter");
+        logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
+      }
     });
   }
 
@@ -600,6 +636,8 @@ attributes:
   void expectFilterDisableCheck(bool deny_at_disable, bool disable_with_metadata,
                                 const std::string& expected_status) {
     GrpcInitializeConfigOpts opts;
+    // Request is never sent; stats will not be emitted.
+    opts.expect_stats_override = false;
     opts.disable_with_metadata = disable_with_metadata;
     initializeConfig(opts);
     setDenyAtDisableRuntimeConfig(deny_at_disable, disable_with_metadata);
@@ -936,7 +974,8 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
-                         testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool()),
+                         testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool(),
+                                          testing::Bool()),
                          ExtAuthzGrpcIntegrationTest::testParamsToString);
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
@@ -1104,6 +1143,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
 
 TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   GrpcInitializeConfigOpts opts;
+  opts.stats_expect_response_bytes = false;
   opts.failure_mode_allow = false;
   opts.timeout_ms = 1;
   initializeConfig(opts);
@@ -1181,6 +1221,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
 
 TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   GrpcInitializeConfigOpts init_opts;
+  init_opts.stats_expect_response_bytes = false;
   init_opts.failure_mode_allow = true;
   init_opts.timeout_ms = 1;
   initializeConfig(init_opts);
@@ -1566,6 +1607,92 @@ body_format:
   EXPECT_EQ("401", response->headers().Status()->value().getStringView());
   // Without fixing the bug, "content-type" and "content-length" are overridden by the ext_authz
   // responses as its "content-type: fake-type" and "content-length: 0".
+  EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
+  EXPECT_EQ("26", response->headers().ContentLength()->value().getStringView());
+
+  const std::string expected_body = R"({
+      "code": 401,
+      "message": ""
+})";
+  EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_body));
+
+  cleanup();
+}
+
+// This will trigger the http async client sendLocalReply since the websocket upgrade failed.
+// Verify that there is no response code duplication and crash in the async stream destructor.
+TEST_P(ExtAuthzLocalReplyIntegrationTest, AsyncClientSendLocalReply) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    ext_authz_cluster->set_name("ext_authz");
+
+    envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config;
+    // Explicitly allow upgrade and connection header.
+    const std::string ext_authz_config = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 300s
+  allowed_headers:
+    patterns:
+    - exact: upgrade
+    - exact: connection
+  )EOF";
+    TestUtility::loadFromYaml(ext_authz_config, proto_config);
+
+    envoy::config::listener::v3::Filter ext_authz_filter;
+    ext_authz_filter.set_name("envoy.filters.http.ext_authz");
+    ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+  });
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.add_upgrade_configs()->set_upgrade_type("websocket"); });
+
+  const std::string local_reply_yaml = R"EOF(
+body_format:
+  json_format:
+    code: "%RESPONSE_CODE%"
+    message: "%LOCAL_REPLY_BODY%"
+  )EOF";
+  envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig
+      local_reply_config;
+  TestUtility::loadFromYaml(local_reply_yaml, local_reply_config);
+  config_helper_.setLocalReply(local_reply_config);
+
+  HttpIntegrationTest::initialize();
+
+  auto conn = makeClientConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(std::move(conn));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"upgrade", "websocket"},
+                                     {"connection", "Upgrade"}});
+
+  AssertionResult result =
+      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+  RELEASE_ASSERT(result, result.message());
+  FakeStreamPtr ext_authz_request;
+  result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request);
+  RELEASE_ASSERT(result, result.message());
+
+  // This will fail the websocket upgrade.
+  Http::TestResponseHeaderMapImpl ext_authz_response_headers{
+      {":status", "401"},
+      {"content-type", "fake-type"},
+  };
+  ext_authz_request->encodeHeaders(ext_authz_response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  EXPECT_EQ("401", response->headers().Status()->value().getStringView());
   EXPECT_EQ("application/json", response->headers().ContentType()->value().getStringView());
   EXPECT_EQ("26", response->headers().ContentLength()->value().getStringView());
 

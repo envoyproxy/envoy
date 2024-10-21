@@ -45,7 +45,6 @@
 #include "source/common/http/user_agent.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
-#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -157,6 +156,7 @@ private:
       still_alive_.reset();
     }
 
+    void log(AccessLog::AccessLogType type);
     void completeRequest();
 
     const Network::Connection* connection();
@@ -190,7 +190,19 @@ private:
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
     std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-      return filter_manager_.accessLogHandlers();
+      std::list<AccessLog::InstanceSharedPtr> combined_log_handlers(
+          filter_manager_.accessLogHandlers());
+      std::list<AccessLog::InstanceSharedPtr> config_log_handlers_(
+          connection_manager_.config_->accessLogs());
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.filter_access_loggers_first")) {
+        combined_log_handlers.insert(combined_log_handlers.begin(), config_log_handlers_.begin(),
+                                     config_log_handlers_.end());
+      } else {
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers_.begin(),
+                                     config_log_handlers_.end());
+      }
+      return combined_log_handlers;
     }
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
     // (i.e. possibly after this stream has been destroyed).
@@ -205,10 +217,9 @@ private:
     }
 
     // ScopeTrackedObject
-    ExecutionContext* executionContext() const override {
-      return getConnectionExecutionContext(connection_manager_.read_callbacks_->connection());
+    OptRef<const StreamInfo::StreamInfo> trackedStream() const override {
+      return filter_manager_.trackedStream();
     }
-
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_);
@@ -327,7 +338,8 @@ private:
           : codec_saw_local_complete_(false), codec_encode_complete_(false),
             on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
             is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true), deferred_to_next_io_iteration_(false) {}
+            decorated_propagate_(true), deferred_to_next_io_iteration_(false),
+            deferred_end_stream_(false) {}
 
       // It's possibly for the codec to see the completed response but not fully
       // encode it.

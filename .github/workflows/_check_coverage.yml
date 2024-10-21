@@ -1,0 +1,62 @@
+name: Check/coverage
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      gcp-key:
+        required: true
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-coverage
+  cancel-in-progress: true
+
+
+jobs:
+  coverage:
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.name ||matrix.target }}
+    with:
+      # bazel-extra: '--config=remote-envoy-engflow'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
+      diskspace-hack: ${{ matrix.diskspace-hack || false }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+        lower than limit
+      rbe: true
+      request: ${{ inputs.request }}
+      steps-post: |
+        - run: ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ matrix.target }}-upload'
+          shell: bash
+          env:
+            GCS_ARTIFACT_BUCKET: ${{ inputs.trusted && 'envoy-postsubmit' || 'envoy-pr' }}
+            GCS_REDIRECT_PATH: ${{ fromJSON(inputs.request).request.pr || fromJSON(inputs.request).request.target-branch }}
+      target: ${{ matrix.target }}
+      timeout-minutes: 180
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: coverage
+          name: Coverage
+          diskspace-hack: true
+        - target: fuzz_coverage
+          name: Fuzz coverage

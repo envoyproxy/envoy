@@ -33,35 +33,57 @@ absl::optional<Key> variedRequestKey(const LookupRequest& request,
 
 class SimpleLookupContext : public LookupContext {
 public:
-  SimpleLookupContext(SimpleHttpCache& cache, LookupRequest&& request)
-      : cache_(cache), request_(std::move(request)) {}
+  SimpleLookupContext(Event::Dispatcher& dispatcher, SimpleHttpCache& cache,
+                      LookupRequest&& request)
+      : dispatcher_(dispatcher), cache_(cache), request_(std::move(request)) {}
 
   void getHeaders(LookupHeadersCallback&& cb) override {
     auto entry = cache_.lookup(request_);
     body_ = std::move(entry.body_);
     trailers_ = std::move(entry.trailers_);
-    cb(entry.response_headers_ ? request_.makeLookupResult(std::move(entry.response_headers_),
-                                                           std::move(entry.metadata_), body_.size())
-                               : LookupResult{},
-       body_.empty() && trailers_ == nullptr);
+    LookupResult result = entry.response_headers_
+                              ? request_.makeLookupResult(std::move(entry.response_headers_),
+                                                          std::move(entry.metadata_), body_.size())
+                              : LookupResult{};
+    bool end_stream = body_.empty() && trailers_ == nullptr;
+    dispatcher_.post([result = std::move(result), cb = std::move(cb), end_stream,
+                      cancelled = cancelled_]() mutable {
+      if (!*cancelled) {
+        std::move(cb)(std::move(result), end_stream);
+      }
+    });
   }
 
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
     ASSERT(range.end() <= body_.length(), "Attempt to read past end of body.");
-    cb(std::make_unique<Buffer::OwnedImpl>(&body_[range.begin()], range.length()),
-       trailers_ == nullptr && range.end() == body_.length());
+    auto result = std::make_unique<Buffer::OwnedImpl>(&body_[range.begin()], range.length());
+    bool end_stream = trailers_ == nullptr && range.end() == body_.length();
+    dispatcher_.post([result = std::move(result), cb = std::move(cb), end_stream,
+                      cancelled = cancelled_]() mutable {
+      if (!*cancelled) {
+        std::move(cb)(std::move(result), end_stream);
+      }
+    });
   }
 
   // The cache must call cb with the cached trailers.
   void getTrailers(LookupTrailersCallback&& cb) override {
     ASSERT(trailers_);
-    cb(std::move(trailers_));
+    dispatcher_.post(
+        [cb = std::move(cb), trailers = std::move(trailers_), cancelled = cancelled_]() mutable {
+          if (!*cancelled) {
+            std::move(cb)(std::move(trailers));
+          }
+        });
   }
 
   const LookupRequest& request() const { return request_; }
-  void onDestroy() override {}
+  void onDestroy() override { *cancelled_ = true; }
+  Event::Dispatcher& dispatcher() const { return dispatcher_; }
 
 private:
+  Event::Dispatcher& dispatcher_;
+  std::shared_ptr<bool> cancelled_ = std::make_shared<bool>(false);
   SimpleHttpCache& cache_;
   const LookupRequest request_;
   std::string body_;
@@ -70,13 +92,18 @@ private:
 
 class SimpleInsertContext : public InsertContext {
 public:
-  SimpleInsertContext(LookupContext& lookup_context, SimpleHttpCache& cache)
-      : key_(dynamic_cast<SimpleLookupContext&>(lookup_context).request().key()),
-        request_headers_(
-            dynamic_cast<SimpleLookupContext&>(lookup_context).request().requestHeaders()),
-        vary_allow_list_(
-            dynamic_cast<SimpleLookupContext&>(lookup_context).request().varyAllowList()),
-        cache_(cache) {}
+  SimpleInsertContext(SimpleLookupContext& lookup_context, SimpleHttpCache& cache)
+      : dispatcher_(lookup_context.dispatcher()), key_(lookup_context.request().key()),
+        request_headers_(lookup_context.request().requestHeaders()),
+        vary_allow_list_(lookup_context.request().varyAllowList()), cache_(cache) {}
+
+  void post(InsertCallback cb, bool result) {
+    dispatcher_.post([cb = std::move(cb), result = result, cancelled = cancelled_]() mutable {
+      if (!*cancelled) {
+        std::move(cb)(result);
+      }
+    });
+  }
 
   void insertHeaders(const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata, InsertCallback insert_success,
@@ -85,9 +112,9 @@ public:
     response_headers_ = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers);
     metadata_ = metadata;
     if (end_stream) {
-      insert_success(commit());
+      post(std::move(insert_success), commit());
     } else {
-      insert_success(true);
+      post(std::move(insert_success), true);
     }
   }
 
@@ -98,9 +125,9 @@ public:
 
     body_.add(chunk);
     if (end_stream) {
-      ready_for_next_chunk(commit());
+      post(std::move(ready_for_next_chunk), commit());
     } else {
-      ready_for_next_chunk(true);
+      post(std::move(ready_for_next_chunk), true);
     }
   }
 
@@ -108,10 +135,10 @@ public:
                       InsertCallback insert_complete) override {
     ASSERT(!committed_);
     trailers_ = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers);
-    insert_complete(commit());
+    post(std::move(insert_complete), commit());
   }
 
-  void onDestroy() override {}
+  void onDestroy() override { *cancelled_ = true; }
 
 private:
   bool commit() {
@@ -126,6 +153,8 @@ private:
     }
   }
 
+  Event::Dispatcher& dispatcher_;
+  std::shared_ptr<bool> cancelled_ = std::make_shared<bool>(false);
   Key key_;
   const Http::RequestHeaderMap& request_headers_;
   const VaryAllowList& vary_allow_list_;
@@ -139,32 +168,38 @@ private:
 } // namespace
 
 LookupContextPtr SimpleHttpCache::makeLookupContext(LookupRequest&& request,
-                                                    Http::StreamDecoderFilterCallbacks&) {
-  return std::make_unique<SimpleLookupContext>(*this, std::move(request));
+                                                    Http::StreamFilterCallbacks& callbacks) {
+  return std::make_unique<SimpleLookupContext>(callbacks.dispatcher(), *this, std::move(request));
 }
 
 void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
                                     const Http::ResponseHeaderMap& response_headers,
                                     const ResponseMetadata& metadata,
-                                    std::function<void(bool)> on_complete) {
+                                    UpdateHeadersCallback on_complete) {
   const auto& simple_lookup_context = static_cast<const SimpleLookupContext&>(lookup_context);
   const Key& key = simple_lookup_context.request().key();
   absl::WriterMutexLock lock(&mutex_);
   auto iter = map_.find(key);
+  auto post_complete = [on_complete = std::move(on_complete),
+                        &dispatcher = simple_lookup_context.dispatcher()](bool result) mutable {
+    dispatcher.post([on_complete = std::move(on_complete), result]() mutable {
+      std::move(on_complete)(result);
+    });
+  };
   if (iter == map_.end() || !iter->second.response_headers_) {
-    on_complete(false);
+    std::move(post_complete)(false);
     return;
   }
   if (VaryHeaderUtils::hasVary(*iter->second.response_headers_)) {
     absl::optional<Key> varied_key =
         variedRequestKey(simple_lookup_context.request(), *iter->second.response_headers_);
     if (!varied_key.has_value()) {
-      on_complete(false);
+      std::move(post_complete)(false);
       return;
     }
     iter = map_.find(varied_key.value());
     if (iter == map_.end() || !iter->second.response_headers_) {
-      on_complete(false);
+      std::move(post_complete)(false);
       return;
     }
   }
@@ -172,7 +207,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 
   applyHeaderUpdate(response_headers, *entry.response_headers_);
   entry.metadata_ = metadata;
-  on_complete(true);
+  std::move(post_complete)(true);
 }
 
 SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
@@ -276,9 +311,12 @@ bool SimpleHttpCache::varyInsert(const Key& request_key,
 }
 
 InsertContextPtr SimpleHttpCache::makeInsertContext(LookupContextPtr&& lookup_context,
-                                                    Http::StreamEncoderFilterCallbacks&) {
+                                                    Http::StreamFilterCallbacks&) {
   ASSERT(lookup_context != nullptr);
-  return std::make_unique<SimpleInsertContext>(*lookup_context, *this);
+  auto ret = std::make_unique<SimpleInsertContext>(
+      dynamic_cast<SimpleLookupContext&>(*lookup_context), *this);
+  lookup_context->onDestroy();
+  return ret;
 }
 
 constexpr absl::string_view Name = "envoy.extensions.http.cache.simple";

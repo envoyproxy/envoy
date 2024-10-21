@@ -21,36 +21,14 @@ WasmSinkFactory::createStatsSink(const Protobuf::Message& proto_config,
       MessageUtil::downcastAndValidate<const envoy::extensions::stat_sinks::wasm::v3::Wasm&>(
           proto_config, context.messageValidationContext().staticValidationVisitor());
 
-  auto plugin = std::make_shared<Common::Wasm::Plugin>(
-      config.config(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(),
-      nullptr);
-
-  auto wasm_sink = std::make_unique<WasmStatSink>(plugin, nullptr);
-
-  auto callback = [&wasm_sink, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
-    if (!base_wasm) {
-      if (plugin->fail_open_) {
-        ENVOY_LOG(error, "Unable to create Wasm Stat Sink {}", plugin->name_);
-      } else {
-        ENVOY_LOG(critical, "Unable to create Wasm Stat Sink {}", plugin->name_);
-      }
-      return;
-    }
-    wasm_sink->setSingleton(Common::Wasm::getOrCreateThreadLocalPlugin(
-        base_wasm, plugin, context.mainThreadDispatcher()));
-  };
-
-  if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),
-                                context.initManager(), context.mainThreadDispatcher(),
-                                context.api(), context.lifecycleNotifier(), remote_data_provider_,
-                                std::move(callback))) {
-    throw Common::Wasm::WasmException(
-        fmt::format("Unable to create Wasm Stat Sink {}", plugin->name_));
-  }
+  auto plugin_config = std::make_unique<Common::Wasm::PluginConfig>(
+      config.config(), context, context.scope(), context.initManager(),
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, nullptr, true);
 
   context.api().customStatNamespaces().registerStatNamespace(
       Extensions::Common::Wasm::CustomStatNamespace);
-  return wasm_sink;
+
+  return std::make_unique<WasmStatSink>(std::move(plugin_config));
 }
 
 ProtobufTypes::MessagePtr WasmSinkFactory::createEmptyConfigProto() {

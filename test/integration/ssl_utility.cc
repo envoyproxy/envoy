@@ -25,8 +25,18 @@ namespace Ssl {
 
 void initializeUpstreamTlsContextConfig(
     const ClientSslTransportOptions& options,
-    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context,
+    bool connect_to_upstream) {
   const std::string rundir = TestEnvironment::runfilesDirectory();
+  if (connect_to_upstream) {
+    tls_context.mutable_common_tls_context()
+        ->mutable_validation_context()
+        ->mutable_trusted_ca()
+        ->set_filename(rundir + "/test/config/integration/certs/upstreamcacert.pem");
+    tls_context.set_sni("foo.lyft.com");
+    return;
+  }
+
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       ->mutable_trusted_ca()
@@ -81,6 +91,9 @@ void initializeUpstreamTlsContextConfig(
   }
   for (const std::string& algorithm : options.sigalgs_) {
     common_context->mutable_tls_params()->add_signature_algorithms(algorithm);
+  }
+  for (const std::string& curve : options.curves_) {
+    common_context->mutable_tls_params()->add_ecdh_curves(curve);
   }
   if (!options.sni_.empty()) {
     tls_context.set_sni(options.sni_);

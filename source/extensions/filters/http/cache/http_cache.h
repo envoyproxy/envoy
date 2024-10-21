@@ -122,19 +122,20 @@ struct CacheInfo {
   bool supports_range_requests_ = false;
 };
 
-using LookupBodyCallback = std::function<void(Buffer::InstancePtr&&, bool end_stream)>;
-using LookupHeadersCallback = std::function<void(LookupResult&&, bool end_stream)>;
-using LookupTrailersCallback = std::function<void(Http::ResponseTrailerMapPtr&&)>;
-using InsertCallback = std::function<void(bool success_ready_for_more)>;
+using LookupBodyCallback = absl::AnyInvocable<void(Buffer::InstancePtr&&, bool end_stream)>;
+using LookupHeadersCallback = absl::AnyInvocable<void(LookupResult&&, bool end_stream)>;
+using LookupTrailersCallback = absl::AnyInvocable<void(Http::ResponseTrailerMapPtr&&)>;
+using InsertCallback = absl::AnyInvocable<void(bool success_ready_for_more)>;
+using UpdateHeadersCallback = absl::AnyInvocable<void(bool)>;
 
 // Manages the lifetime of an insertion.
 class InsertContext {
 public:
   // Accepts response_headers for caching. Only called once.
   //
-  // Implementations MUST call insert_complete(true) on success, or
-  // insert_complete(false) to attempt to abort the insertion. This
-  // call may be made asynchronously, but any async operation that can
+  // Implementations MUST post to the filter's dispatcher insert_complete(true)
+  // on success, or insert_complete(false) to attempt to abort the insertion.
+  // This call may be made asynchronously, but any async operation that can
   // potentially silently fail must include a timeout, to avoid memory leaks.
   virtual void insertHeaders(const Http::ResponseHeaderMap& response_headers,
                              const ResponseMetadata& metadata, InsertCallback insert_complete,
@@ -149,17 +150,17 @@ public:
   // InsertContextPtr. A cache can abort the insertion by passing 'false' into
   // ready_for_next_fragment.
   //
-  // The cache implementation MUST call ready_for_next_fragment. This call may be
-  // made asynchronously, but any async operation that can potentially silently
-  // fail must include a timeout, to avoid memory leaks.
+  // The cache implementation MUST post ready_for_next_fragment to the filter's
+  // dispatcher. This post may be made asynchronously, but any async operation
+  // that can potentially silently fail must include a timeout, to avoid memory leaks.
   virtual void insertBody(const Buffer::Instance& fragment, InsertCallback ready_for_next_fragment,
                           bool end_stream) PURE;
 
   // Inserts trailers into the cache.
   //
-  // The cache implementation MUST call insert_complete. This call may be
-  // made asynchronously, but any async operation that can potentially silently
-  // fail must include a timeout, to avoid memory leaks.
+  // The cache implementation MUST post insert_complete to the filter's dispatcher.
+  // This call may be made asynchronously, but any async operation that can
+  // potentially silently fail must include a timeout, to avoid memory leaks.
   virtual void insertTrailers(const Http::ResponseTrailerMap& trailers,
                               InsertCallback insert_complete) PURE;
 
@@ -199,6 +200,9 @@ public:
   // implementation should wait until that is known before calling the callback,
   // and must pass a LookupResult with range_details_->satisfiable_ = false
   // if the request is invalid.
+  //
+  // A cache that posts the callback must wrap it such that if the LookupContext is
+  // destroyed before the callback is executed, the callback is not executed.
   virtual void getHeaders(LookupHeadersCallback&& cb) PURE;
 
   // Reads the next fragment from the cache, calling cb when the fragment is ready.
@@ -228,11 +232,17 @@ public:
   // getBody requests bytes  0-23 .......... callback with bytes 0-9
   // getBody requests bytes 10-23 .......... callback with bytes 10-19
   // getBody requests bytes 20-23 .......... callback with bytes 20-23
+  //
+  // A cache that posts the callback must wrap it such that if the LookupContext is
+  // destroyed before the callback is executed, the callback is not executed.
   virtual void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) PURE;
 
   // Get the trailers from the cache. Only called if the request reached the end of
   // the body and LookupBodyCallback did not pass true for end_stream. The
   // Http::ResponseTrailerMapPtr passed to cb must not be null.
+  //
+  // A cache that posts the callback must wrap it such that if the LookupContext is
+  // destroyed before the callback is executed, the callback is not executed.
   virtual void getTrailers(LookupTrailersCallback&& cb) PURE;
 
   // This routine is called prior to a LookupContext being destroyed. LookupContext is responsible
@@ -248,7 +258,7 @@ public:
   // 5. [Other thread] RPC completes and calls RPCLookupContext::onRPCDone.
   // --> RPCLookupContext's destructor and onRpcDone cause a data race in RPCLookupContext.
   // onDestroy() should cancel any outstanding async operations and, if necessary,
-  // it should block on that cancellation to avoid data races. InsertContext must not invoke any
+  // it should block on that cancellation to avoid data races. LookupContext must not invoke any
   // callbacks to the CacheFilter after having onDestroy() invoked.
   virtual void onDestroy() PURE;
 
@@ -267,13 +277,13 @@ public:
   // read access to a cache entry before its write is complete. In this case the
   // content-length value may be unset.
   virtual LookupContextPtr makeLookupContext(LookupRequest&& request,
-                                             Http::StreamDecoderFilterCallbacks& callbacks) PURE;
+                                             Http::StreamFilterCallbacks& callbacks) PURE;
 
   // Returns an InsertContextPtr to manage the state of a cache insertion.
   // Responses with a chunked transfer-encoding must be dechunked before
   // insertion.
   virtual InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
-                                             Http::StreamEncoderFilterCallbacks& callbacks) PURE;
+                                             Http::StreamFilterCallbacks& callbacks) PURE;
 
   // Precondition: lookup_context represents a prior cache lookup that required
   // validation.
@@ -289,7 +299,7 @@ public:
   virtual void updateHeaders(const LookupContext& lookup_context,
                              const Http::ResponseHeaderMap& response_headers,
                              const ResponseMetadata& metadata,
-                             std::function<void(bool)> on_complete) PURE;
+                             UpdateHeadersCallback on_complete) PURE;
 
   // Returns statically known information about a cache.
   virtual CacheInfo cacheInfo() const PURE;

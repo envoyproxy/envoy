@@ -25,6 +25,7 @@ build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
 build --enable_platform_specific_config
+build --incompatible_merge_fixed_and_default_shell_env
 
 # Pass CC, CXX and LLVM_CONFIG variables from the environment.
 # We assume they have stable values, so this won't cause action cache misses.
@@ -41,10 +42,6 @@ build:windows --action_env=PATH --host_action_env=PATH
 # Allow stamped caches to bust when local filesystem changes.
 # Requires setting `BAZEL_VOLATILE_DIRTY` in the env.
 build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
-
-# Prevent stamped caches from busting (eg in PRs)
-# Requires setting `BAZEL_FAKE_SCM_REVISION` in the env.
-build --action_env=BAZEL_FAKE_SCM_REVISION --host_action_env=BAZEL_FAKE_SCM_REVISION
 
 build --test_summary=terse
 
@@ -94,7 +91,7 @@ build:clang-pch --spawn_strategy=local
 build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Use gold linker for gcc compiler.
-build:gcc --linkopt=-fuse-ld=gold
+build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --test_env=HEAPCHECK=
 build:gcc --action_env=BAZEL_COMPILER=gcc
 build:gcc --action_env=CC=gcc --action_env=CXX=g++
@@ -256,17 +253,17 @@ build:cache-local --remote_cache=grpc://localhost:9092
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 build:rbe-toolchain-clang --config=rbe-toolchain
-build:rbe-toolchain-clang --platforms=@envoy_build_tools//toolchains:rbe_linux_clang_platform
-build:rbe-toolchain-clang --host_platform=@envoy_build_tools//toolchains:rbe_linux_clang_platform
-build:rbe-toolchain-clang --crosstool_top=@envoy_build_tools//toolchains/configs/linux/clang/cc:toolchain
-build:rbe-toolchain-clang --extra_toolchains=@envoy_build_tools//toolchains/configs/linux/clang/config:cc-toolchain
+build:rbe-toolchain-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
+build:rbe-toolchain-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
+build:rbe-toolchain-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
+build:rbe-toolchain-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain
 build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++
 
 build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
-build:rbe-toolchain-clang-libc++ --platforms=@envoy_build_tools//toolchains:rbe_linux_clang_libcxx_platform
-build:rbe-toolchain-clang-libc++ --host_platform=@envoy_build_tools//toolchains:rbe_linux_clang_libcxx_platform
-build:rbe-toolchain-clang-libc++ --crosstool_top=@envoy_build_tools//toolchains/configs/linux/clang_libcxx/cc:toolchain
-build:rbe-toolchain-clang-libc++ --extra_toolchains=@envoy_build_tools//toolchains/configs/linux/clang_libcxx/config:cc-toolchain
+build:rbe-toolchain-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_libcxx_platform
+build:rbe-toolchain-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_libcxx_platform
+build:rbe-toolchain-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
+build:rbe-toolchain-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain
 build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
 build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
@@ -290,20 +287,10 @@ build:rbe-toolchain-tsan --linkopt=-Wl,-rpath,/opt/libcxx_tsan/lib
 build:rbe-toolchain-tsan --config=clang-tsan
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
-build:rbe-toolchain-gcc --platforms=@envoy_build_tools//toolchains:rbe_linux_gcc_platform
-build:rbe-toolchain-gcc --host_platform=@envoy_build_tools//toolchains:rbe_linux_gcc_platform
-build:rbe-toolchain-gcc --crosstool_top=@envoy_build_tools//toolchains/configs/linux/gcc/cc:toolchain
-build:rbe-toolchain-gcc --extra_toolchains=@envoy_build_tools//toolchains/configs/linux/gcc/config:cc-toolchain
-
-build:rbe-toolchain-msvc-cl --host_platform=@envoy_build_tools//toolchains:rbe_windows_msvc_cl_platform
-build:rbe-toolchain-msvc-cl --platforms=@envoy_build_tools//toolchains:rbe_windows_msvc_cl_platform
-build:rbe-toolchain-msvc-cl --crosstool_top=@envoy_build_tools//toolchains/configs/windows/msvc-cl/cc:toolchain
-build:rbe-toolchain-msvc-cl --extra_toolchains=@envoy_build_tools//toolchains/configs/windows/msvc-cl/config:cc-toolchain
-
-build:rbe-toolchain-clang-cl --host_platform=@envoy_build_tools//toolchains:rbe_windows_clang_cl_platform
-build:rbe-toolchain-clang-cl --platforms=@envoy_build_tools//toolchains:rbe_windows_clang_cl_platform
-build:rbe-toolchain-clang-cl --crosstool_top=@envoy_build_tools//toolchains/configs/windows/clang-cl/cc:toolchain
-build:rbe-toolchain-clang-cl --extra_toolchains=@envoy_build_tools//toolchains/configs/windows/clang-cl/config:cc-toolchain
+build:rbe-toolchain-gcc --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
+build:rbe-toolchain-gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
+build:rbe-toolchain-gcc --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/gcc/cc:toolchain
+build:rbe-toolchain-gcc --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain
 
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
@@ -524,19 +511,27 @@ build:rbe-engflow --bes_timeout=3600s
 build:rbe-engflow --bes_upload_mode=fully_async
 build:rbe-engflow --nolegacy_important_outputs
 
-build:cache-envoy-engflow --google_default_credentials=false
+# RBE (Engflow Envoy)
+build:common-envoy-engflow --google_default_credentials=false
+build:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
+build:common-envoy-engflow --grpc_keepalive_time=30s
+
 build:cache-envoy-engflow --remote_cache=grpcs://morganite.cluster.engflow.com
 build:cache-envoy-engflow --remote_timeout=3600s
-build:cache-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:cache-envoy-engflow --grpc_keepalive_time=30s
 build:bes-envoy-engflow --bes_backend=grpcs://morganite.cluster.engflow.com/
 build:bes-envoy-engflow --bes_results_url=https://morganite.cluster.engflow.com/invocation/
 build:bes-envoy-engflow --bes_timeout=3600s
 build:bes-envoy-engflow --bes_upload_mode=fully_async
-build:rbe-envoy-engflow --config=cache-envoy-engflow
-build:rbe-envoy-engflow --config=bes-envoy-engflow
+build:bes-envoy-engflow --nolegacy_important_outputs
 build:rbe-envoy-engflow --remote_executor=grpcs://morganite.cluster.engflow.com
 build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:7adc40c09508f957624c4d2e0f5aeecb73a59207ee6ded53b107eac828c091b2
+build:rbe-envoy-engflow --jobs=200
+build:rbe-envoy-engflow --define=engflow_rbe=true
+
+build:remote-envoy-engflow --config=common-envoy-engflow
+build:remote-envoy-engflow --config=cache-envoy-engflow
+build:remote-envoy-engflow --config=bes-envoy-engflow
+build:remote-envoy-engflow --config=rbe-envoy-engflow
 
 #############################################################################
 # debug: Various Bazel debugging flags

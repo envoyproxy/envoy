@@ -45,6 +45,7 @@ deadcode
 DFP
 Dynatrace
 DOM
+DONTFRAG
 Gasd
 GiB
 IPTOS
@@ -1537,3 +1538,4 @@ NAT
 NXDOMAIN
 DNAT
 RSP
+EWMA

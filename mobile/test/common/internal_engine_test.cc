@@ -476,7 +476,7 @@ protected:
     stream_callbacks.on_headers_ = [&](const Http::ResponseHeaderMap&, bool /* end_stream */,
                                        envoy_stream_intel) {
       // Gets the thread priority, so we can check that it's the same thread priority we set.
-      context.thread_priority = getpriority(PRIO_PROCESS, 0);
+      context.thread_priority = engine->threadFactory().currentThreadPriority();
     };
     stream_callbacks.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) {
       context.on_complete_notification.Notify();
@@ -496,19 +496,15 @@ protected:
   }
 };
 
-// The setpriority() call fails on some Apple environments.
-// TODO(abeyad): investigate what to do for Apple.
-#ifndef __APPLE__
 TEST_F(ThreadPriorityInternalEngineTest, SetThreadPriority) {
   const int expected_thread_priority = 10;
   const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
   EXPECT_EQ(actual_thread_priority, expected_thread_priority);
 }
-#endif
 
 TEST_F(ThreadPriorityInternalEngineTest, SetOutOfRangeThreadPriority) {
-  // 42 is outside the range of acceptable thread priorities.
-  const int expected_thread_priority = 42;
+  // 102 is outside the range of acceptable thread priorities on all platforms.
+  const int expected_thread_priority = 102;
   const int actual_thread_priority = startEngineWithPriority(expected_thread_priority);
   // The `setpriority` system call doesn't define what happens when the thread priority is out of
   // range, and the behavior could be system dependent. On Linux, if the supplied priority value

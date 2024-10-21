@@ -4,6 +4,7 @@ import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVeri
 
 import java.nio.charset.StandardCharsets;
 import android.content.Context;
+import android.util.Pair;
 import androidx.annotation.VisibleForTesting;
 import com.google.protobuf.Struct;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
@@ -37,7 +38,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   // TODO(refactor) move unshared variables into their specific methods.
   private final List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
   private final EnvoyEventTracker mEnvoyEventTracker = null;
-  private final int mConnectTimeoutSeconds = 30;
+  private int mConnectTimeoutSeconds = 10;
   private final int mDnsRefreshSeconds = 60;
   private final int mDnsFailureRefreshSecondsBase = 2;
   private final int mDnsFailureRefreshSecondsMax = 10;
@@ -50,6 +51,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mUseCares = false;
+  private final List<Pair<String, Integer>> mCaresFallbackResolvers = new ArrayList<>();
   private boolean mForceV6 = true;
   private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
@@ -95,6 +97,17 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setUseCares(boolean enable) {
     mUseCares = enable;
+    return this;
+  }
+
+  /**
+   * Add a fallback resolver to c_cares.
+   *
+   * @param host ip address string
+   * @param port port for the resolver
+   */
+  public NativeCronvoyEngineBuilderImpl addCaresFallbackResolver(String host, int port) {
+    mCaresFallbackResolvers.add(new Pair<String, Integer>(host, port));
     return this;
   }
 
@@ -221,6 +234,11 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return this;
   }
 
+  public NativeCronvoyEngineBuilderImpl setConnectTimeoutSeconds(int connectTimeout) {
+    mConnectTimeoutSeconds = connectTimeout;
+    return this;
+  }
+
   /**
    * Indicates to skip the TLS certificate verification.
    *
@@ -278,11 +296,12 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
         mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mForceV6,
         mUseGro, quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
-        quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(),
-        mEnableSocketTag, mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
-        mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
-        mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
-        platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation, mUpstreamTlsSni);
+        quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(),
+        numTimeoutsToTriggerPortMigration(), mEnableSocketTag, mEnableInterfaceBinding,
+        mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
+        mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
+        mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
+        keyValueStores, mRuntimeGuards, mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
+        mCaresFallbackResolvers);
   }
 }

@@ -72,7 +72,7 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
     ENVOY_LOG_EVENT(debug, "apple_dns_immediate_resolution",
                     "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
                     dns_name, address->asString());
-    callback(DnsResolver::ResolutionStatus::Success, "apple_dns_success",
+    callback(DnsResolver::ResolutionStatus::Completed, "apple_dns_immediate_success",
              {DnsResponse(address, std::chrono::seconds(60))});
     return {nullptr, true};
   }
@@ -188,7 +188,7 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
     // events indicates that the sd_ref state is broken.
     // Therefore, finish resolving with an error.
     pending_response_.status_ = ResolutionStatus::Failure;
-    pending_response_.details_ = absl::StrCat(error);
+    pending_response_.details_ = absl::StrCat("apple_dns_error_", error);
     finishResolve();
   }
 }
@@ -378,6 +378,8 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   if (!(flags & kDNSServiceFlagsMoreComing) && isAddressFamilyProcessed(kDNSServiceProtocol_IPv4) &&
       isAddressFamilyProcessed(kDNSServiceProtocol_IPv6)) {
     ENVOY_LOG(debug, "DNS Resolver flushing queries pending callback");
+    pending_response_.status_ = ResolutionStatus::Completed;
+    pending_response_.details_ = absl::StrCat("apple_dns_completed_", error_code);
     finishResolve();
     // Note: Nothing can follow this call to finishResolve due to deletion of this
     // object upon resolution.

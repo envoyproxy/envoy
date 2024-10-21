@@ -9,7 +9,7 @@ namespace RateLimitQuota {
 
 Grpc::RawAsyncClientSharedPtr
 getOrThrow(absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error) {
-  THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+  THROW_IF_NOT_OK_REF(client_or_error.status());
   return client_or_error.value();
 }
 
@@ -64,14 +64,17 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 // This function covers both periodical report and immediate report case, with the difference that
 // bucked id in periodical report case is empty.
 void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
-  if (stream_ != nullptr) {
-    // Build the report and then send the report to RLQS server.
-    // `end_stream` should always be set to false as we don't want to close the stream locally.
-    stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
-  } else {
-    // Don't send any reports if stream has already been closed.
-    ENVOY_LOG(debug, "The stream has already been closed; no reports will be sent.");
+  if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "The RLQS stream has been closed and must be restarted to send reports.");
+    if (absl::Status err = startStream(nullptr); !err.ok()) {
+      ENVOY_LOG(error, "Failed to start the stream to send reports.");
+      return;
+    }
   }
+
+  // Build the report and then send the report to RLQS server.
+  // `end_stream` should always be set to false as we don't want to close the stream locally.
+  stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
 }
 
 void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
@@ -97,8 +100,18 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
       switch (action.bucket_action_case()) {
       case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
           kQuotaAssignmentAction: {
-        quota_buckets_[bucket_id]->cached_action = action;
+        absl::optional<BucketAction> cached_action = quota_buckets_[bucket_id]->cached_action;
         quota_buckets_[bucket_id]->current_assignment_time = time_source_.monotonicTime();
+
+        if (cached_action.has_value() &&
+            Protobuf::util::MessageDifferencer::Equals(*cached_action, action)) {
+          ENVOY_LOG(debug,
+                    "Cached action matches the incoming response so only TTL is updated for bucket "
+                    "id: {}",
+                    bucket_id);
+          break;
+        }
+        quota_buckets_[bucket_id]->cached_action = action;
         if (quota_buckets_[bucket_id]->cached_action->has_quota_assignment_action()) {
           auto rate_limit_strategy = quota_buckets_[bucket_id]
                                          ->cached_action->quota_assignment_action()
@@ -165,20 +178,27 @@ void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
   stream_ = nullptr;
 }
 
-absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
+absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo* stream_info) {
   // Starts stream if it has not been opened yet.
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Trying to start the new gRPC stream");
+    auto stream_options = Http::AsyncClient::RequestOptions();
+    if (stream_info) {
+      stream_options.setParentContext(Http::AsyncClient::ParentContext{stream_info});
+    }
     stream_ = aync_client_.start(
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
-        *this,
-        Http::AsyncClient::RequestOptions().setParentContext(
-            Http::AsyncClient::ParentContext{&stream_info}));
+        *this, stream_options);
   }
 
-  // Returns error status if start failed (i.e., stream_ is nullptr).
-  return stream_ == nullptr ? absl::InternalError("Failed to start the stream") : absl::OkStatus();
+  // If still null after attempting a start.
+  if (stream_ == nullptr) {
+    return absl::InternalError("Failed to start the stream");
+  }
+
+  ENVOY_LOG(debug, "gRPC stream has been started");
+  return absl::OkStatus();
 }
 
 } // namespace RateLimitQuota

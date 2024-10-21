@@ -67,6 +67,51 @@ envoy_entry_point(
 )
 
 genrule(
+    name = "generate_release_hash_bin",
+    outs = ["generate_release_hash.sh"],
+    cmd = """
+    echo "
+#!/usr/bin/env bash
+
+set -e -o pipefail
+
+git ls-remote --tags https://github.com/envoyproxy/envoy \\\\
+    | grep -E 'refs/tags/v[0-9]+\\\\.[0-9]+\\\\.[0-9]+$$' \\\\
+    | sort -u \\\\
+    | sha256sum \\\\
+    | cut -d ' ' -f 1" > $@
+    chmod +x $@
+    """
+)
+
+sh_binary(
+    name = "generate_release_hash",
+    srcs = [":generate_release_hash_bin"],
+    visibility = ["//visibility:public"],
+)
+
+# This sets a default hash based on currently visible tagged versions.
+# Its very questionably hermetic, making assumptions about git, the repo remotes and so on.
+# The general idea here is to make this cache blow any time there are release changes.
+# You can use the above sh_binary to generate a custom/correct hash to override below.
+genrule(
+    name = "default_release_hash",
+    outs = ["default_release_hash.txt"],
+    cmd = """
+    $(location :generate_release_hash) > $@
+    """,
+    stamp = True,
+    tags = ["no-remote-exec"],
+    tools = [":generate_release_hash"],
+)
+
+label_flag(
+    name = "release-hash",
+    build_setting_default = ":default_release_hash",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
     name = "project",
     outs = ["project.json"],
     cmd = """
@@ -74,6 +119,7 @@ genrule(
     """,
     tools = [
         ":get_project_json",
+        ":release-hash",
         "@envoy//:VERSION.txt",
         "@envoy//changelogs",
     ],

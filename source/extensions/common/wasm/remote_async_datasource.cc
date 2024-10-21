@@ -13,12 +13,6 @@ static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
 static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
 static constexpr uint32_t RetryCount = 1;
 
-absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source) {
-  return source.specifier_case() == envoy::config::core::v3::DataSource::SpecifierCase::kFilename
-             ? absl::make_optional(source.filename())
-             : absl::nullopt;
-}
-
 RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     Upstream::ClusterManager& cm, Init::Manager& manager,
     const envoy::config::core::v3::RemoteDataSource& source, Event::Dispatcher& dispatcher,
@@ -32,7 +26,7 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
 
   auto strategy_or_error = Config::Utility::prepareJitteredExponentialBackOffStrategy(
       source, random, RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds);
-  THROW_IF_STATUS_NOT_OK(strategy_or_error, throw);
+  THROW_IF_NOT_OK_REF(strategy_or_error.status());
   backoff_strategy_ = std::move(strategy_or_error.value());
 
   retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });

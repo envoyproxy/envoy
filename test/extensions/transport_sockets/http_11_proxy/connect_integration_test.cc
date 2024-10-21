@@ -74,7 +74,7 @@ typed_config:
           bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
       envoy::config::core::v3::TransportSocket inner_socket;
       inner_socket.CopyFrom(*transport_socket);
-      if (inner_socket.name().empty()) {
+      if (set_inner_transport_socket_ && inner_socket.name().empty()) {
         inner_socket.set_name("envoy.transport_sockets.raw_buffer");
       }
       transport_socket->set_name("envoy.transport_sockets.http_11_proxy");
@@ -124,8 +124,9 @@ typed_config:
     // Strip the CONNECT upgrade.
     std::string prefix_data;
     const std::string hostname(default_request_headers_.getHostValue());
+    const std::string port = Http::HeaderUtility::hostHasPort(hostname) ? "" : ":443";
     ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", &prefix_data));
-    EXPECT_EQ(absl::StrCat("CONNECT ", hostname, ":443 HTTP/1.1\r\n\r\n"), prefix_data);
+    EXPECT_EQ(absl::StrCat("CONNECT ", hostname, port, " HTTP/1.1\r\n\r\n"), prefix_data);
 
     absl::string_view content_length = include_content_length ? "Content-Length: 0\r\n" : "";
     // Ship the CONNECT response.
@@ -134,11 +135,27 @@ typed_config:
   }
   bool use_alpn_ = false;
   bool try_http3_ = false;
+
+  // If true, we'll explicitly set the inner "transport_socket" field to raw buffer if it is not
+  // configured.
+  bool set_inner_transport_socket_ = true;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http11ConnectHttpIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+// Test that request/response is successful via plaintext if the inner transport socket is not set.
+TEST_P(Http11ConnectHttpIntegrationTest, NoInnerTransportSocketSet) {
+  set_inner_transport_socket_ = false;
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
 
 // Test that with no connect-proxy header, the transport socket is a no-op.
 TEST_P(Http11ConnectHttpIntegrationTest, NoHeader) {
@@ -508,6 +525,34 @@ TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddressLegacy) {
   // Wait for the encapsulated response to be received.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(Http11ConnectHttpIntegrationTest, HostWithPort) {
+  initialize();
+
+  absl::string_view second_upstream_address(fake_upstreams_[1]->localAddress()->asStringView());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // The connect-proxy header will be stripped by the header-to-proxy-filter and inserted as
+  // metadata.
+  default_request_headers_.setCopy(Envoy::Http::LowerCaseString("connect-proxy"),
+                                   second_upstream_address);
+  default_request_headers_.setHost("sni.lyft.com:443");
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  stripConnectUpgradeAndRespond();
+
+  // Enable reading on the new stream, and read the encapsulated request.
+  ASSERT_TRUE(fake_upstream_connection_->readDisable(false));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Wait for the encapsulated response to be received.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace

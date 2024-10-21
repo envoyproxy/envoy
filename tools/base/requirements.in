@@ -7,12 +7,13 @@ aiohttp>=3.8.1
 aioquic>=0.9.21
 cffi>=1.15.0
 clang-format==14.0.6
-clang-tidy==14.0.6
+clang-tidy==19.1.0
 colorama
 coloredlogs
-cryptography>=42.0.0
+cryptography>=43.0.1
 dependatool>=0.2.2
 envoy.base.utils>=0.5.0
+envoy.ci.report>=0.0.3
 envoy.code.check>=0.5.12
 envoy.dependency.check>=0.1.10
 envoy.distribution.release>=0.0.9
@@ -36,6 +37,7 @@ ply
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
 protobuf<5.29.0
 pygithub
+pyopenssl>=24.2.1
 pyreadline
 pyyaml
 setuptools

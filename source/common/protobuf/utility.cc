@@ -214,18 +214,7 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_fast_protobuf_hash")) {
-    return DeterministicProtoHash::hash(message);
-  } else {
-    std::string text_format;
-    Protobuf::TextFormat::Printer printer;
-    printer.SetExpandAny(true);
-    printer.SetUseFieldNumber(true);
-    printer.SetSingleLineMode(true);
-    printer.SetHideUnknownFields(true);
-    printer.PrintToString(message, &text_format);
-    return HashUtil::xxHash64(text_format);
-  }
+  return DeterministicProtoHash::hash(message);
 #else
   return HashUtil::xxHash64(message.SerializeAsString());
 #endif
@@ -936,7 +925,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                                ProtobufMessage::ValidationVisitor& validation_visitor,
                                Api::Api& api) {
   auto file_or_error = api.fileSystem().fileReadToEnd(path);
-  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  THROW_IF_NOT_OK_REF(file_or_error.status());
   const std::string contents = file_or_error.value();
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {

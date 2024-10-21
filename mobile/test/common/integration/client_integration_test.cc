@@ -206,13 +206,7 @@ void ClientIntegrationTest::basicTest() {
                                    std::to_string(request_data.length()));
 
   EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
-  stream_callbacks.on_data_ = [this](const Buffer::Instance& buffer, uint64_t length,
-                                     bool end_stream, envoy_stream_intel) {
-    if (end_stream) {
-      std::string response_body(length, ' ');
-      buffer.copyOut(0, length, response_body.data());
-      EXPECT_EQ(response_body, "");
-    }
+  stream_callbacks.on_data_ = [this](const Buffer::Instance&, uint64_t, bool, envoy_stream_intel) {
     cc_.on_data_calls_++;
   };
 
@@ -700,7 +694,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
                        true);
   Network::TestResolver::unblockResolve();
   terminal_callback_.waitReady();
-  EXPECT_EQ(2, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
+  EXPECT_LE(2, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
 }
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {

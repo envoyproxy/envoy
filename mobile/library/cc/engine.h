@@ -3,6 +3,7 @@
 #include <functional>
 
 #include "library/cc/stream_client.h"
+#include "library/common/engine_types.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -20,6 +21,9 @@ public:
 
   std::string dumpStats();
   StreamClientSharedPtr streamClient();
+  void onDefaultNetworkChanged(NetworkType network);
+  void onDefaultNetworkUnavailable();
+  void onDefaultNetworkAvailable();
 
   envoy_status_t terminate();
   Envoy::InternalEngine* engine() { return engine_; }

@@ -71,7 +71,7 @@ TEST(TestConfig, ConfigIsApplied) {
       .addQuicHint("www.def.com", 443)
       .addQuicCanonicalSuffix(".opq.com")
       .addQuicCanonicalSuffix(".xyz.com")
-      .enablePortMigration(true)
+      .setNumTimeoutsToTriggerPortMigration(4)
       .addConnectTimeoutSeconds(123)
       .addDnsRefreshSeconds(456)
       .addDnsMinRefreshSeconds(567)
@@ -111,12 +111,12 @@ TEST(TestConfig, ConfigIsApplied) {
       "key: \"always_use_v6\" value { bool_value: true }",
       "key: \"prefer_quic_client_udp_gro\" value { bool_value: true }",
       "key: \"test_feature_false\" value { bool_value: true }",
-      "key: \"allow_client_socket_creation_failure\" value { bool_value: true }",
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
       "key: \"app_version\" value { string_value: \"1.2.3\" } }",
       "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
       "validation_context { trusted_ca {",
-  };
+      "initial_stream_window_size { value: 6291456 }",
+      "initial_connection_window_size { value: 15728640 }"};
 
   for (const auto& string : must_contain) {
     EXPECT_THAT(config_str, HasSubstr(string)) << "'" << string << "' not found in " << config_str;

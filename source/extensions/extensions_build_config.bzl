@@ -248,6 +248,7 @@ EXTENSIONS = {
     "envoy.resource_monitors.fixed_heap":               "//source/extensions/resource_monitors/fixed_heap:config",
     "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
     "envoy.resource_monitors.global_downstream_max_connections":   "//source/extensions/resource_monitors/downstream_connections:config",
+    "envoy.resource_monitors.cpu_utilization":          "//source/extensions/resource_monitors/cpu_utilization:config",
 
     #
     # Stat sinks
@@ -495,6 +496,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.ring_hash":         "//source/extensions/load_balancing_policies/ring_hash:config",
     "envoy.load_balancing_policies.subset":            "//source/extensions/load_balancing_policies/subset:config",
     "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
+    "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
 
     #
     # HTTP Early Header Mutation

@@ -24,3 +24,4 @@ Common messages (XDS)
   ../../xds/core/v3/resource_locator.proto
   ../../xds/core/v3/resource_name.proto
   ../../xds/type/v3/typed_struct.proto
+  ../../xds/data/orca/v3/orca_load_report.proto
