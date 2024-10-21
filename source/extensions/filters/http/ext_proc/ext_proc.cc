@@ -87,11 +87,13 @@ void verifyProcessingModeConfig(const ExternalProcessor& config) {
 
   if ((processing_mode.request_body_mode() == ProcessingMode::BIDIRECTIONAL_STREAMED) &&
       (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
-    throw EnvoyException("If request_body_mode is BIDIRECTIONAL_STREAMED, then request_trailer_mode has to be SEND");
+    throw EnvoyException(
+        "If request_body_mode is BIDIRECTIONAL_STREAMED, then request_trailer_mode has to be SEND");
   }
   if ((processing_mode.response_body_mode() == ProcessingMode::BIDIRECTIONAL_STREAMED) &&
       (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
-    throw EnvoyException("If response_body_mode is BIDIRECTIONAL_STREAMED, then response_trailer_mode has to be SEND");
+    throw EnvoyException("If response_body_mode is BIDIRECTIONAL_STREAMED, then "
+                         "response_trailer_mode has to be SEND");
   }
 }
 
@@ -592,9 +594,9 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     if ((state.bodyMode() == ProcessingMode::STREAMED &&
          config_->sendBodyWithoutWaitingForHeaderResponse()) ||
         state.bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
-      ENVOY_LOG(trace,
-                "Sending body data even header processing is still in progress as body mode "
-                "is BIDIRECTIONAL_STREAMED or STREAMED and send_body_without_waiting_for_header_response is enabled");
+      ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
+                       "is BIDIRECTIONAL_STREAMED or STREAMED and "
+                       "send_body_without_waiting_for_header_response is enabled");
     } else {
       ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
       // We don't know what to do with the body until the response comes back.
@@ -859,9 +861,8 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 
   if (state.callbackState() != ProcessorState::CallbackState::Idle) {
     if (state.bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
-      ENVOY_LOG(
-          trace,
-          "Body mode is BIDIRECTIONAL_STREAMED, sending trailers even Envoy is waiting for header or body response");
+      ENVOY_LOG(trace, "Body mode is BIDIRECTIONAL_STREAMED, sending trailers even Envoy is "
+                       "waiting for header or body response");
     } else {
       ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
       state.setPaused(true);

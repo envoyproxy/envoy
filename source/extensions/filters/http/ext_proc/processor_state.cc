@@ -216,7 +216,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         // let the doData callback handle body chunks until the end is reached.
         clearWatermark();
         return absl::OkStatus();
-      } else if (body_mode_ == ProcessingMode::STREAMED || body_mode_ == ProcessingMode::BIDIRECTIONAL_STREAMED) {
+      } else if (body_mode_ == ProcessingMode::STREAMED ||
+                 body_mode_ == ProcessingMode::BIDIRECTIONAL_STREAMED) {
         sendBufferedDataInStreamedMode(false);
         continueIfNecessary();
         return absl::OkStatus();
@@ -313,19 +314,23 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::Ok);
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      if (common_response.has_body_mutation() && common_response.body_mutation().has_streamed_resp()) {
+      if (common_response.has_body_mutation() &&
+          common_response.body_mutation().has_streamed_resp()) {
         ENVOY_LOG(debug, "BIDIRECTIONAL_STREAMED body response is received and body_mode_: {} ",
                   ProcessingMode::BodySendMode_Name(body_mode_));
-        // streamed_resp will only be supported if the ext_proc filter has body_mode set to BIDIRECTIONAL_STREAMED.
+        // streamed_resp will only be supported if the ext_proc filter has body_mode set to
+        // BIDIRECTIONAL_STREAMED.
         if (body_mode_ != ProcessingMode::BIDIRECTIONAL_STREAMED) {
           return absl::FailedPreconditionError(
-              "spurious message: streamed_resp response is received while body_mode_ is not BIDIRECTIONAL_STREAMED");
+              "spurious message: streamed_resp response is received while body_mode_ is not "
+              "BIDIRECTIONAL_STREAMED");
         }
         should_continue = handleMxnBodyResponse(common_response);
       } else {
         if (body_mode_ == ProcessingMode::BIDIRECTIONAL_STREAMED) {
           return absl::FailedPreconditionError(
-              "spurious message: Normal body mutation response is received while body_mode_ is BIDIRECTIONAL_STREAMED");
+              "spurious message: Normal body mutation response is received while body_mode_ is "
+              "BIDIRECTIONAL_STREAMED");
         }
         should_continue = handleStreamedBodyResponse(common_response);
       }
@@ -393,7 +398,8 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
 // If the body mode is BIDIRECTIONAL_STREAMED, then the trailers response may come back when
 // the state is still waiting for body response.
 absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
-  if (callback_state_ == CallbackState::TrailersCallback || bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
+  if (callback_state_ == CallbackState::TrailersCallback ||
+      bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
     ENVOY_LOG(debug, "Applying response to buffered trailers, body_mode_ {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
     if (response.has_header_mutation()) {
@@ -478,7 +484,9 @@ bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response
   if (body.size() > 0) {
     Buffer::OwnedImpl buffer;
     buffer.add(body);
-    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream in BIDIRECTIONAL_STREAMED mode. end_of_stream is {}",
+    ENVOY_LOG(trace,
+              "Injecting {} bytes of data to filter stream in BIDIRECTIONAL_STREAMED mode. "
+              "end_of_stream is {}",
               buffer.length(), end_of_stream);
     injectDataToFilterChain(buffer, end_of_stream);
   }

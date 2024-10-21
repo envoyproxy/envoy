@@ -4892,7 +4892,8 @@ TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
 TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
   config_helper_.setBufferLimits(1024, 1024);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BIDIRECTIONAL_STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(
+      ProcessingMode::BIDIRECTIONAL_STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
@@ -4965,7 +4966,8 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
 TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespMxnSmallBody) {
   config_helper_.setBufferLimits(1024, 1024);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BIDIRECTIONAL_STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(
+      ProcessingMode::BIDIRECTIONAL_STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
@@ -5026,9 +5028,9 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   for (uint32_t i = 0; i < total_resp_body_msg; i++) {
     ProcessingResponse response_body;
     auto* streamed_resp = response_body.mutable_request_body()
-                         ->mutable_response()
-                         ->mutable_body_mutation()
-                         ->mutable_streamed_resp();
+                              ->mutable_response()
+                              ->mutable_body_mutation()
+                              ->mutable_streamed_resp();
     streamed_resp->set_body("r");
     processor_stream_->sendGrpcMessage(response_body);
   }
@@ -5052,7 +5054,8 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
 TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
   config_helper_.setBufferLimits(1024, 1024);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BIDIRECTIONAL_STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(
+      ProcessingMode::BIDIRECTIONAL_STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
@@ -5118,9 +5121,9 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
         for (uint32_t i = 0; i < 3; i++) {
           body_upstream += std::to_string(i);
           auto* streamed_resp = response_body.mutable_request_body()
-                               ->mutable_response()
-                               ->mutable_body_mutation()
-                               ->mutable_streamed_resp();
+                                    ->mutable_response()
+                                    ->mutable_body_mutation()
+                                    ->mutable_streamed_resp();
           streamed_resp->set_body(std::to_string(i));
           processor_stream_->sendGrpcMessage(response_body);
         }
@@ -5138,9 +5141,9 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
   // Send one more body response at the end.
   ProcessingResponse response_body;
   auto* streamed_resp = response_body.mutable_request_body()
-                       ->mutable_response()
-                       ->mutable_body_mutation()
-                       ->mutable_streamed_resp();
+                            ->mutable_response()
+                            ->mutable_body_mutation()
+                            ->mutable_streamed_resp();
   streamed_resp->set_body("END");
   processor_stream_->sendGrpcMessage(response_body);
   body_upstream += "END";
