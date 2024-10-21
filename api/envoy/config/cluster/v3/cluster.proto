@@ -954,7 +954,7 @@ message Cluster {
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
   // This field is deprecated in favor of :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` and
-  // will be ignored :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is set.
+  // will be ignored if :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is set.
   google.protobuf.Duration dns_refresh_rate = 16 [
     deprecated = true,
     (validate.rules).duration = {gt {nanos: 1000000}},
@@ -971,7 +971,7 @@ message Cluster {
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
   // This field is deprecated in favor of :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` and
-  // will be ignored :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is set.
+  // will be ignored if :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is set.
   google.protobuf.Duration dns_jitter = 58
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -984,7 +984,7 @@ message Cluster {
   // :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>` this setting is
   // ignored.
   // This field is deprecated in favor of :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` and
-  // will be ignored :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is set.
+  // will be ignored if :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is set.
   RefreshRate dns_failure_refresh_rate = 44
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -992,7 +992,7 @@ message Cluster {
   // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
   // resolution.
   // This field is deprecated in favor of :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` and
-  // will be ignored :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is set.
+  // will be ignored if :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is set.
   bool respect_dns_ttl = 39
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

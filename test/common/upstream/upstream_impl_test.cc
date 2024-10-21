@@ -93,7 +93,7 @@ protected:
 namespace {
 
 // Usually, the factory is in charge of parsing the cluster config and creating the DNS cluster,
-// but we can't use a factory to create because we need to inject out mock DNS resolver.
+// but we can't use a factory to create because we need to inject our mock DNS resolver.
 absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
 makeStrictDnsClusterFromDnsResolver(const envoy::config::cluster::v3::Cluster& cluster_config,
                                     ClusterFactoryContext& factory_context,
