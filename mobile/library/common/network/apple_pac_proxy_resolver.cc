@@ -13,13 +13,16 @@ namespace Network {
 
 namespace {
 
+CFStringRef pacRunLoopMode() {
+  static const CFStringRef runloop_mode = CFSTR("envoy.PacProxyResolver");
+  return runloop_mode;
+}
+
 // Creates a CFURLRef from a C++ string URL.
 CFURLRef createCFURL(const std::string& url_string) {
-  auto cf_url_string =
-      CFStringCreateWithCString(kCFAllocatorDefault, url_string.c_str(), kCFStringEncodingUTF8);
-  auto cf_url = CFURLCreateWithString(kCFAllocatorDefault, cf_url_string, /*baseURL=*/nullptr);
-  CFRelease(cf_url_string);
-  return cf_url;
+  return CFURLCreateWithBytes(kCFAllocatorDefault,
+                              reinterpret_cast<const UInt8*>(url_string.c_str()),
+                              url_string.length(), kCFStringEncodingUTF8, nullptr);
 }
 
 } // namespace
@@ -31,16 +34,15 @@ void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFEr
   std::unique_ptr<ProxySettingsResolvedCallback> completion_callback(
       static_cast<ProxySettingsResolvedCallback*>(ptr));
 
-  std::vector<ProxySettings> proxies;
-  if (cf_error != nullptr || cf_proxies == nullptr) {
+  if (cf_error == nullptr) {
     ENVOY_BUG(cf_error != nullptr, Apple::toString(CFErrorCopyDescription(cf_error)));
-    // Treat the error case as if no proxy was configured. Seems to be consistent with what iOS
-    // system (URLSession) is doing.
-    (*completion_callback)(proxies);
-    return;
   }
 
-  for (int i = 0; i < CFArrayGetCount(cf_proxies); i++) {
+  // Treat the error case as if no proxy was configured. Seems to be consistent with what iOS
+  // system (URLSession) is doing.
+  const int num_proxy_entries = cf_proxies != nullptr ? CFArrayGetCount(cf_proxies) : 0;
+  std::vector<ProxySettings> proxies;
+  for (int i = 0; i < num_proxy_entries; i++) {
     CFDictionaryRef cf_dictionary =
         static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(cf_proxies, i));
     CFStringRef cf_proxy_type =
@@ -65,6 +67,8 @@ void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFEr
   }
 
   (*completion_callback)(proxies);
+
+  CFRunLoopStop(CFRunLoopGetCurrent());
 }
 
 CFRunLoopSourceRef
@@ -80,13 +84,29 @@ ApplePacProxyResolver::createPacUrlResolverSource(CFURLRef cf_proxy_autoconfigur
 }
 
 void ApplePacProxyResolver::resolveProxies(
-    const std::string& target_url, const std::string& proxy_autoconfiguration_file_url,
+    const std::string& proxy_autoconfiguration_file_url, const std::string& target_url,
     ProxySettingsResolvedCallback proxy_resolution_completed) {
   CFURLRef cf_target_url = createCFURL(target_url);
   CFURLRef cf_proxy_autoconfiguration_file_url = createCFURL(proxy_autoconfiguration_file_url);
+  if (cf_target_url == nullptr || cf_proxy_autoconfiguration_file_url == nullptr) {
+    return;
+  }
 
   std::unique_ptr<ProxySettingsResolvedCallback> completion_callback =
       std::make_unique<ProxySettingsResolvedCallback>(std::move(proxy_resolution_completed));
+
+  // This dummy call to CFNetworkCopyProxiesForURL initializes some state within CFNetwork that is
+  // required by CFNetworkExecuteProxyAutoConfigurationURL.
+  // Chrome/Cronet on Apple does the same:
+  // https://source.chromium.org/chromium/chromium/src/+/main:net/proxy_resolution/proxy_resolver_apple.cc;l=241-248;drc=f5eeebaebe332e71aadfd5c43ec485cb23f0c7f8
+  CFDictionaryRef empty_dictionary =
+      CFDictionaryCreate(nullptr, nullptr, nullptr, 0, nullptr, nullptr);
+  CFArrayRef empty_result = CFNetworkCopyProxiesForURL(cf_target_url, empty_dictionary);
+  CFRelease(empty_dictionary);
+  if (empty_result) {
+    CFRelease(empty_result);
+  }
+
   // According to https://developer.apple.com/documentation/corefoundation/cfstreamclientcontext,
   // the version must be 0.
   auto context = std::make_unique<CFStreamClientContext>(
@@ -102,7 +122,9 @@ void ApplePacProxyResolver::resolveProxies(
   CFRunLoopSourceRef run_loop_source = createPacUrlResolverSource(
       cf_proxy_autoconfiguration_file_url, cf_target_url, context.release());
 
-  CFRunLoopAddSource(CFRunLoopGetCurrent(), run_loop_source, kCFRunLoopDefaultMode);
+  CFRunLoopAddSource(CFRunLoopGetCurrent(), run_loop_source, pacRunLoopMode());
+  CFRunLoopRunInMode(pacRunLoopMode(), DBL_MAX, false);
+  CFRunLoopRemoveSource(CFRunLoopGetCurrent(), run_loop_source, pacRunLoopMode());
 
   CFRelease(cf_target_url);
   CFRelease(cf_proxy_autoconfiguration_file_url);
