@@ -45,8 +45,6 @@ public:
   QueuedChunkPtr pop(Buffer::OwnedImpl& out_data);
   const QueuedChunk& consolidate();
   Buffer::OwnedImpl& receivedData() { return received_data_; }
-  // the total number of chunks in the queue.
-  uint32_t size() { return queue_.size(); }
 
 private:
   std::deque<QueuedChunkPtr> queue_;

@@ -390,9 +390,13 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   return absl::FailedPreconditionError("spurious message");
 }
 
+// If the body mode is MXN, then the trailers response may come back when
+// the state is still waiting for body response.
 absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
-  if (callback_state_ == CallbackState::TrailersCallback) {
-    ENVOY_LOG(debug, "Applying response to buffered trailers");
+  if (callback_state_ == CallbackState::TrailersCallback ||
+      bodyMode() == ProcessingMode::MXN) {
+    ENVOY_LOG(debug, "Applying response to buffered trailers, body_mode_ {}",
+              ProcessingMode::BodySendMode_Name(body_mode_));
     if (response.has_header_mutation()) {
       auto mut_status = MutationUtils::applyHeaderMutations(
           response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
@@ -469,36 +473,24 @@ bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_res
 
 bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response) {
   const auto& mxn_resp = common_response.body_mutation().mxn_resp();
-  // If body mutation is encoded, send the body out.
   const auto& body = mxn_resp.body();
-  const bool end_of_body = mxn_resp.end_of_body();
-  bool end_of_stream;
-  if (!end_of_body) {
-    end_of_stream = false;
-  } else {
-    if (trailers_available_) {
-      end_of_stream = false;
-    } else {
-      // If trailers are not available, and server sends end_of_body = true, then this
-      // means there is no trailer, and the end_of_stream is received when processing body.
-      end_of_stream = true;
-    }
-  }
+  const bool end_of_stream = mxn_resp.end_of_stream();
+
   if (body.size() > 0) {
     Buffer::OwnedImpl buffer;
     buffer.add(body);
     ENVOY_LOG(trace,
-              "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}, "
-              "end_of_body is {}",
-              buffer.length(), end_of_stream, end_of_body);
+              "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}",
+              buffer.length(), end_of_stream);
     injectDataToFilterChain(buffer, end_of_stream);
   }
 
   if (end_of_stream) {
     onFinishProcessorCall(Grpc::Status::Ok);
-  } else if (end_of_body) {
-    onFinishProcessorCall(Grpc::Status::Ok, CallbackState::TrailersCallback);
   } else {
+    // Set the state to CallbackState::StreamedBodyCallback to wait for more bodies.
+    // However, this could be the last chunk of body, and trailers are right after it.
+    // The function to handle trailers response needs to consider this.
     onFinishProcessorCall(Grpc::Status::Ok, CallbackState::StreamedBodyCallback);
   }
 

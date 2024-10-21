@@ -4950,8 +4950,8 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
     auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
     auto* mxn_resp = body_mut->mutable_mxn_resp();
     mxn_resp->set_body("r");
-    bool end_of_body = (i == total_resp_body_msg - 1) ? true : false;
-    mxn_resp->set_end_of_body(end_of_body);
+    const bool end_of_stream = (i == total_resp_body_msg - 1) ? true : false;
+    mxn_resp->set_end_of_stream(end_of_stream);
     processor_stream_->sendGrpcMessage(response_body);
   }
 
@@ -4962,7 +4962,6 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
 }
 
 // Buffer the whole message including header, body and trailer before sending response in MXN mode.
-// The body is small. So, no need to send standalone chunks_received confirmation message.
 TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespMxnSmallBody) {
   config_helper_.setBufferLimits(1024, 1024);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
@@ -5031,8 +5030,6 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
                          ->mutable_body_mutation()
                          ->mutable_mxn_resp();
     mxn_resp->set_body("r");
-    bool end_of_body = (i == total_resp_body_msg - 1) ? true : false;
-    mxn_resp->set_end_of_body(end_of_body);
     processor_stream_->sendGrpcMessage(response_body);
   }
 
@@ -5050,10 +5047,9 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   verifyDownstreamResponse(*response, 200);
 }
 
-// Buffer the whole message including header, body and trailer before sending response in MXN mode.
-// The body is large. So, need to send standalone body mutation response messages with
-// chunks_received field set to avoid timeout or flow control being triggered.
-TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespMxnLargeBody) {
+// The body is large. The server sends some body responses after buffering some amount of data
+// in MXN mode. The server continously does so until the entire body processing is done.
+TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
   config_helper_.setBufferLimits(1024, 1024);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::MXN);
@@ -5094,16 +5090,17 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   bool end_stream = false;
   uint32_t total_req_body_msg = 0;
   bool header_resp_sent = false;
+  std::string body_upstream;
+
   while (!end_stream) {
     ProcessingRequest request;
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(request.has_request_body() || request.has_request_trailers());
-    // If it is not trailer, then it is body.
     if (!request.has_request_trailers()) {
       // Buffer the entire body.
       body_received = absl::StrCat(body_received, request.request_body().body());
       total_req_body_msg++;
-      // After receiving every 4 body chunks, the server sends back an empty response.
+      // After receiving every 4 body chunks, the server sends back three body responses.
       if (total_req_body_msg % 4 == 0) {
         if (!header_resp_sent) {
           // Before sending the 1st body response, sends a header response.
@@ -5118,12 +5115,15 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
           header_resp_sent = true;
         }
         ProcessingResponse response_body;
-        auto* mxn_resp = response_body.mutable_request_body()
-                             ->mutable_response()
-                             ->mutable_body_mutation()
-                             ->mutable_mxn_resp();
-        mxn_resp->set_end_of_body(false);
-        processor_stream_->sendGrpcMessage(response_body);
+        for (uint32_t i = 0; i < 3; i++) {
+          body_upstream += std::to_string(i);
+          auto* mxn_resp = response_body.mutable_request_body()
+                           ->mutable_response()
+                           ->mutable_body_mutation()
+                           ->mutable_mxn_resp();
+          mxn_resp->set_body(std::to_string(i));
+          processor_stream_->sendGrpcMessage(response_body);
+        }
       }
     } else {
       // request_trailer is received.
@@ -5135,21 +5135,15 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   EXPECT_TRUE(end_stream);
   EXPECT_EQ(body_received, body_sent);
 
-  // Send half amount of body responses back.
-  uint32_t total_resp_body_msg = total_req_body_msg / 2;
-  const std::string body_upstream(total_resp_body_msg, 'r');
-
-  for (uint32_t i = 0; i < total_resp_body_msg; i++) {
-    ProcessingResponse response_body;
-    auto* mxn_resp = response_body.mutable_request_body()
-                         ->mutable_response()
-                         ->mutable_body_mutation()
-                         ->mutable_mxn_resp();
-    mxn_resp->set_body("r");
-    const bool end_of_body = (i == total_resp_body_msg - 1) ? true : false;
-    mxn_resp->set_end_of_body(end_of_body);
-    processor_stream_->sendGrpcMessage(response_body);
-  }
+  // Send one more body response at the end.
+  ProcessingResponse response_body;
+  auto* mxn_resp = response_body.mutable_request_body()
+                   ->mutable_response()
+                   ->mutable_body_mutation()
+                   ->mutable_mxn_resp();
+  mxn_resp->set_body("END");
+  processor_stream_->sendGrpcMessage(response_body);
+  body_upstream += "END";
 
   // The ext_proc server sends back the trailer response.
   ProcessingResponse response_trailer;

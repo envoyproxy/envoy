@@ -4467,16 +4467,6 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
   }
 
-  // Sending empty response back to Envoy.
-  processResponseBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* body_mut = resp.mutable_response()->mutable_body_mutation();
-        body_mut->mutable_mxn_resp()->set_body("");
-        body_mut->mutable_mxn_resp()->set_end_of_body(false);
-      },
-      false);
-
-  // Then the ext_proc server sent back 3 mutated data chunks
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
@@ -4532,12 +4522,6 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
   TestUtility::feedBufferWithRandomCharacters(last_resp_chunk, 10);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
 
-  processResponseBody(
-      [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_end_of_body(false);
-      },
-      false);
   // Now sends the body response back also confirms the received chunks.
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
@@ -4564,7 +4548,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_end_of_body(true);
+        mxn_resp->set_end_of_stream(true);
         mxn_resp->set_body(" HH ");
         want_response_body.add(" HH ");
       },
@@ -4622,14 +4606,12 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_end_of_body(false);
         mxn_resp->set_body(" AAAAA ");
         want_response_body.add(" AAAAA ");
       });
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_end_of_body(true);
         mxn_resp->set_body(" BBBB ");
         want_response_body.add(" BBBB ");
       });
@@ -4691,14 +4673,12 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_end_of_body(false);
         mxn_resp->set_body(" AAAAA ");
         want_response_body.add(" AAAAA ");
       });
   processResponseBodyMxnAfterTrailer(
       [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_end_of_body(true);
         mxn_resp->set_body(" BBBB ");
         want_response_body.add(" BBBB ");
       });
@@ -4786,7 +4766,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithFeatureDisabled) {
   processResponseBody(
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
         auto* mxn_resp = resp.mutable_response()->mutable_body_mutation()->mutable_mxn_resp();
-        mxn_resp->set_end_of_body(false);
+        mxn_resp->set_body("AAA");
       },
       false);
 
