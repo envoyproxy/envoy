@@ -6,8 +6,8 @@ Configuration: Dynamic from control plane
 These instructions are slightly more complex as you must also set up a control plane to provide Envoy with its
 configuration.
 
-There are a number of control planes compatible with Envoy's API such as `Gloo <https://docs.solo.io/gloo/latest/>`_
-or `Istio <https://istio.io>`_.
+There are a number of control planes compatible with Envoy's API. Within the Envoy project you an leverage `Envoy Gateway <https://gateway.envoyproxy.io/docs/>`_
+You can find more control plane implementations, both CNCF Open Source control planes, and vendor provided control planes on the `Community page <https://www.envoyproxy.io/community>`_. 
 
 You may also wish to explore implementing your own control plane, in which case the
 `Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_ provides a reference implementation
