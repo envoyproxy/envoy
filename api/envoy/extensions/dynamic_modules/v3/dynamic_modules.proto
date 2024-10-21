@@ -17,7 +17,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: Dynamic Modules common configuration]
 
 // Configuration of a dynamic module. A dynamic module is a shared object file that can be loaded via dlopen
-// by a various Envoy extension points. Currently, only HTTP filter (envoy.filters.http.dynamic_modules) is supported.
+// by various Envoy extension points. Currently, only HTTP filter (envoy.filters.http.dynamic_modules) is supported.
 //
 // How the module is loaded is determined by the extension point that uses it. For example, the HTTP filter
 // loads the module with dlopen on the first creation of the filter chain for the same shared object file.
