@@ -45,12 +45,12 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 	}
 
 
-    // =========== step 3: construct dubbo body for upstream req =========== // 
+    // =========== step 3: construct dubbo body with dubboMethod and dubboArgs for upstream req =========== // 
 	buf := httpBodyToDubbo(dubboMethod, dubboArgs)
 	_ = buffer.Set(buf)
 
 	
-    // =========== step 4: set remote half close by envoy router name =========== // 
+    // =========== step 4: enable remote half close conn by envoy router name =========== // 
 	if f.callbacks.StreamInfo().GetRouteName() == f.config.routerNameForHalfClose {
 		f.callbacks.EnableHalfClose(true)
 	}
