@@ -43,5 +43,8 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: stats ads
+  change: |
+    Fixed metric for ADS disconnection counters, extracting the tag from ``grpc.ads_cluster.*`` counter stats.
 
 deprecated:
