@@ -5048,7 +5048,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
 }
 
 // The body is large. The server sends some body responses after buffering some amount of data
-// in MXN mode. The server continously does so until the entire body processing is done.
+// in MXN mode. The server continuously does so until the entire body processing is done.
 TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
   config_helper_.setBufferLimits(1024, 1024);
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
@@ -5118,9 +5118,9 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
         for (uint32_t i = 0; i < 3; i++) {
           body_upstream += std::to_string(i);
           auto* mxn_resp = response_body.mutable_request_body()
-                           ->mutable_response()
-                           ->mutable_body_mutation()
-                           ->mutable_mxn_resp();
+                               ->mutable_response()
+                               ->mutable_body_mutation()
+                               ->mutable_mxn_resp();
           mxn_resp->set_body(std::to_string(i));
           processor_stream_->sendGrpcMessage(response_body);
         }
@@ -5138,9 +5138,9 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
   // Send one more body response at the end.
   ProcessingResponse response_body;
   auto* mxn_resp = response_body.mutable_request_body()
-                   ->mutable_response()
-                   ->mutable_body_mutation()
-                   ->mutable_mxn_resp();
+                       ->mutable_response()
+                       ->mutable_body_mutation()
+                       ->mutable_mxn_resp();
   mxn_resp->set_body("END");
   processor_stream_->sendGrpcMessage(response_body);
   body_upstream += "END";

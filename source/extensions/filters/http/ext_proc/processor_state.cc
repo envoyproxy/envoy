@@ -393,8 +393,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
 // If the body mode is MXN, then the trailers response may come back when
 // the state is still waiting for body response.
 absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& response) {
-  if (callback_state_ == CallbackState::TrailersCallback ||
-      bodyMode() == ProcessingMode::MXN) {
+  if (callback_state_ == CallbackState::TrailersCallback || bodyMode() == ProcessingMode::MXN) {
     ENVOY_LOG(debug, "Applying response to buffered trailers, body_mode_ {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
     if (response.has_header_mutation()) {
@@ -479,8 +478,7 @@ bool ProcessorState::handleMxnBodyResponse(const CommonResponse& common_response
   if (body.size() > 0) {
     Buffer::OwnedImpl buffer;
     buffer.add(body);
-    ENVOY_LOG(trace,
-              "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}",
+    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream in MxN mode. end_of_stream is {}",
               buffer.length(), end_of_stream);
     injectDataToFilterChain(buffer, end_of_stream);
   }
