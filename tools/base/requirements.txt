@@ -512,9 +512,9 @@ docutils==0.20.1 \
     #   envoy-docs-sphinx-runner
     #   sphinx
     #   sphinx-rtd-theme
-envoy-base-utils==0.5.5 \
-    --hash=sha256:2341b7618c92969e3ac5fc43dd16fcc39d132981ffff3f0ddbabf08a336a6fa1 \
-    --hash=sha256:a72af1df5680d4fcdeb91f06d19b7495d740f8b9a8a1549c012272e10fdd59ea
+envoy-base-utils==0.5.6 \
+    --hash=sha256:52ec3d91909a31703512ad54b74d6c1601d1c47626ad2ec97eb6cf15e2d55826 \
+    --hash=sha256:ffe42c2f41e225b4caa3a8c11b001b1c2a62a96045449fca2aca749b1648bcce
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -1493,10 +1493,16 @@ types-orjson==3.6.2 \
     --hash=sha256:22ee9a79236b6b0bfb35a0684eded62ad930a88a56797fa3c449b026cf7dbfe4 \
     --hash=sha256:cf9afcc79a86325c7aff251790338109ed6f6b1bab09d2d4262dd18c85a3c638
     # via aio-core
+types-protobuf==5.28.0.20240924 \
+    --hash=sha256:5cecf612ccdefb7dc95f7a51fb502902f20fc2e6681cd500184aaa1b3931d6a7 \
+    --hash=sha256:d181af8a256e5a91ce8d5adb53496e880efd9144c7d54483e3653332b60296f0
+    # via envoy-base-utils
 types-pytz==2024.2.0.20241003 \
     --hash=sha256:3e22df1336c0c6ad1d29163c8fda82736909eb977281cb823c57f8bae07118b7 \
     --hash=sha256:575dc38f385a922a212bac00a7d6d2e16e141132a3c955078f4a4fd13ed6cb44
-    # via aio-core
+    # via
+    #   aio-core
+    #   envoy-base-utils
 types-pyyaml==6.0.12.20240917 \
     --hash=sha256:392b267f1c0fe6022952462bf5d6523f31e37f6cea49b14cee7ad634b6301570 \
     --hash=sha256:d1405a86f9576682234ef83bcb4e6fff7c9305c8b1fbad5e0bcd4f7dbdc9c587
