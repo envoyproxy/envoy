@@ -43,6 +43,7 @@ envoy_cc_test(
     name = "sigv4_signer_corpus_test",
     srcs = ["sigv4_signer_corpus_test.cc"],
     data = ["@com_github_awslabs_aws_c_auth//:sigv4_tests"],
+    rbe_pool = "2core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -58,6 +59,7 @@ envoy_cc_test(
     name = "sigv4a_signer_corpus_test",
     srcs = ["sigv4a_signer_corpus_test.cc"],
     data = ["@com_github_awslabs_aws_c_auth//:sigv4a_tests"],
+    rbe_pool = "4core",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -150,6 +152,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
 

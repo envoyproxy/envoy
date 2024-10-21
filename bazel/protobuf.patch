@@ -125,7 +125,7 @@ index 66819966b..446d75420 100644
  )
  
 diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
-index 37d80e591..3dddd4ecf 100644
+index 37d80e591..c17f61a76 100644
 --- a/src/google/protobuf/port_def.inc
 +++ b/src/google/protobuf/port_def.inc
 @@ -856,7 +856,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
@@ -137,13 +137,13 @@ index 37d80e591..3dddd4ecf 100644
  // This error has been generally flaky, but we need to disable it specifically
  // to fix https://github.com/protocolbuffers/protobuf/issues/12313
  #pragma clang diagnostic ignored "-Wunused-parameter"
-@@ -925,6 +925,9 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
+@@ -925,7 +925,8 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
  #pragma warning(disable: 4125)
  #endif
  
-+#if defined(__GNUC__)
-+#pragma GCC diagnostic ignored "-Wundef"
-+#endif
- #if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
+-#if PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
++#if defined(PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII) && \
++  PROTOBUF_ENABLE_DEBUG_LOGGING_MAY_LEAK_PII
  #define PROTOBUF_DEBUG true
  #else
+ #define PROTOBUF_DEBUG false

@@ -24,11 +24,22 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: router
+  change: |
+    Removed runtime guard ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
+- area: http
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
 
 new_features:
+- area: aws_request_signing
+  change: |
+    Added an optional field :ref:`credential_provider
+    <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>`
+    to the AWS request signing filter to explicitly specify a source for AWS credentials.
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
