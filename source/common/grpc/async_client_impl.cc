@@ -139,6 +139,10 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
     return;
   }
 
+  if (options_.sidestream_watermark_callbacks != nullptr) {
+    stream_->setWatermarkCallbacks(*options_.sidestream_watermark_callbacks);
+  }
+
   // TODO(htuch): match Google gRPC base64 encoding behavior for *-bin headers, see
   // https://github.com/envoyproxy/envoy/pull/2444#discussion_r163914459.
   headers_message_ = Common::prepareHeaders(
