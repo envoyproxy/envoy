@@ -49,8 +49,6 @@ public:
 
   bool earlyDataEnabled() const { return enable_early_data_; }
 
-  bool handleCertsWithSharedTlsCode() const { return handle_certs_with_shared_tls_code_; }
-
 protected:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
                                    Ssl::ServerContextConfigPtr config,
@@ -63,7 +61,6 @@ protected:
 private:
   absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr> createSslServerContext() const;
 
-  const bool handle_certs_with_shared_tls_code_;
   Envoy::Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   Ssl::ServerContextConfigPtr config_;
