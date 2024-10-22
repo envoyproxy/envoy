@@ -55,9 +55,6 @@ public:
   virtual SSL* ssl() const PURE;
 
 private:
-  // Original:
-  //    sizeof(::Envoy::Extensions::TransportSockets::Tls::ConnectionInfoImplBase) == 656
-
   enum class CachedValueTag : uint8_t {
     Alpn,
     SessionId,
