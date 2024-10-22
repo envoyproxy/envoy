@@ -263,7 +263,7 @@ absl::Span<const std::string> ConnectionInfoImplBase::ipSansPeerCertificate() co
     ASSERT(cached_ip_san_peer_certificate_.empty());
     return cached_ip_san_peer_certificate_;
   }
-  cached_ip_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_IPADD, true);
+  cached_ip_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_IPADD);
   return cached_ip_san_peer_certificate_;
 }
 
