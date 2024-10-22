@@ -288,7 +288,7 @@ envoy_extension_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     deps = [
         ":mocks",
         ":utility_lib",
