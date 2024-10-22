@@ -139,6 +139,7 @@ TEST_P(WasmHttpFilterTest, HeadersOnlyRequestHeadersOnlyWithEnvVars) {
   // Verify that route cache is cleared when modifying HTTP request headers.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter().setDecoderFilterCallbacks(decoder_callbacks);
+  EXPECT_CALL(decoder_callbacks.downstream_callbacks_, clearRouteCache()).Times(2);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
@@ -167,6 +168,7 @@ TEST_P(WasmHttpFilterTest, AllHeadersAndTrailers) {
   // Verify that route cache is cleared when modifying HTTP request headers.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter().setDecoderFilterCallbacks(decoder_callbacks);
+  EXPECT_CALL(decoder_callbacks.downstream_callbacks_, clearRouteCache()).Times(2);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));

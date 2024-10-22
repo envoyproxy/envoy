@@ -160,8 +160,15 @@ WasmResult Buffer::copyFrom(size_t start, size_t length, std::string_view data) 
 }
 
 Context::Context() = default;
-Context::Context(Wasm* wasm) : ContextBase(wasm) {}
+Context::Context(Wasm* wasm) : ContextBase(wasm) {
+  if (wasm != nullptr) {
+    abi_version_ = wasm->abi_version_;
+  }
+}
 Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, plugin) {
+  if (wasm != nullptr) {
+    abi_version_ = wasm->abi_version_;
+  }
   root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
