@@ -14,7 +14,7 @@ envoy_cc_mock(
     name = "aws_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/common/aws:credentials_provider_interface",
@@ -27,7 +27,7 @@ envoy_cc_mock(
 envoy_cc_test(
     name = "sigv4_signer_impl_test",
     srcs = ["sigv4_signer_impl_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -41,7 +41,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "sigv4a_signer_impl_test",
     srcs = ["sigv4a_signer_impl_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
@@ -61,7 +61,7 @@ envoy_cc_test(
             "-DENVOY_SSL_FIPS",
         ],
     ),
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:utility_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -72,7 +72,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "region_provider_impl_test",
     srcs = ["region_provider_impl_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:region_provider_impl_lib",
         "//test/test_common:environment_lib",
@@ -82,7 +82,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "metadata_fetcher_test",
     srcs = ["metadata_fetcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//test/extensions/common/aws:aws_mocks",
@@ -99,7 +99,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "credentials_provider_impl_test",
     srcs = ["credentials_provider_impl_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
@@ -117,7 +117,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "credentials_provider_test",
     srcs = ["credentials_provider_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/aws:credentials_provider_interface",
     ],
@@ -129,7 +129,7 @@ envoy_cc_test(
     srcs = [
         "aws_metadata_fetcher_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:fmt_lib",
         "//source/extensions/common/aws:utility_lib",

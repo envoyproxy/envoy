@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/common/matcher:matcher_lib",
         "//test/test_common:utility_lib",
@@ -22,7 +22,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "trie_matcher_test",
     srcs = ["trie_matcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/common/network:address_lib",

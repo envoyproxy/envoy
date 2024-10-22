@@ -33,7 +33,7 @@ envoy_cc_fuzz_test(
     name = "ext_proc_unit_test_fuzz",
     srcs = ["ext_proc_unit_test_fuzz.cc"],
     corpus = "ext_proc_corpus",
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":ext_proc_mocks",
         ":ext_proc_unit_test_fuzz_proto_cc_proto",

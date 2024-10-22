@@ -22,7 +22,7 @@ envoy_extension_cc_test(
         "//test/extensions/stats_sinks/wasm/test_data:test_context_cpp.wasm",
     ]),
     extension_names = ["envoy.stat_sinks.wasm"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/stat_sinks/wasm:config",
@@ -41,7 +41,7 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.stat_sinks.wasm"],
     external_deps = ["abseil_optional"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/stats:stats_lib",

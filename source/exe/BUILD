@@ -28,7 +28,7 @@ envoy_cc_binary(
         "//bazel:windows_opt_build": ["generate_pdb_file"],
         "//conditions:default": [],
     }),
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     stamped = True,
     deps = [":envoy_main_entry_lib"],
 )
@@ -59,7 +59,7 @@ envoy_cc_library(
     external_deps = [
         "abseil_symbolize",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":envoy_main_common_lib",
         ":platform_impl_lib",
@@ -72,7 +72,7 @@ envoy_cc_library(
     name = "stripped_main_base_lib",
     srcs = ["stripped_main_base.cc"],
     hdrs = ["stripped_main_base.h"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":platform_impl_lib",
         ":process_wide_lib",
@@ -106,7 +106,7 @@ envoy_cc_library(
     hdrs = [
         "main_common.h",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":platform_impl_lib",
         ":process_wide_lib",

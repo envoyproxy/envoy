@@ -24,7 +24,7 @@ envoy_cc_test(
     }),
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     external_deps = ["quiche_quic_platform"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         "//source/common/memory:stats_lib",

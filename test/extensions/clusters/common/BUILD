@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "logical_host_test",
     srcs = ["logical_host_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/clusters/common:logical_host_lib",
         "//test/mocks/upstream:host_mocks",

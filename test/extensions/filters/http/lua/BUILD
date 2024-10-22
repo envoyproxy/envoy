@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "lua_filter_test",
     srcs = ["lua_filter_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",
@@ -36,7 +36,7 @@ envoy_extension_cc_test(
     name = "wrappers_test",
     srcs = ["wrappers_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -53,7 +53,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["lua_integration_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/lua:config",
         "//test/config:v2_link_hacks",
@@ -68,7 +68,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.lua"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/lua:config",
         "//test/mocks/server:factory_context_mocks",
