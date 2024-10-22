@@ -18,7 +18,7 @@ envoy_extension_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_interface",
@@ -39,7 +39,7 @@ envoy_extension_cc_test_library(
     srcs = ["integration.cc"],
     hdrs = ["integration.h"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
@@ -67,7 +67,7 @@ envoy_extension_cc_test(
     name = "app_exception_impl_test",
     srcs = ["app_exception_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
@@ -80,7 +80,7 @@ envoy_extension_cc_test(
     name = "buffer_helper_test",
     srcs = ["buffer_helper_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//source/extensions/filters/network/thrift_proxy:buffer_helper_lib",
@@ -93,7 +93,7 @@ envoy_extension_cc_test(
     name = "conn_state_test",
     srcs = ["conn_state_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/thrift_proxy:conn_state_lib",
         "//test/test_common:printers_lib",
@@ -105,7 +105,7 @@ envoy_extension_cc_test(
     name = "auto_transport_impl_test",
     srcs = ["auto_transport_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -119,7 +119,7 @@ envoy_extension_cc_test(
     name = "framed_transport_impl_test",
     srcs = ["framed_transport_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -133,7 +133,7 @@ envoy_extension_cc_test(
     name = "header_transport_impl_test",
     srcs = ["header_transport_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -148,7 +148,7 @@ envoy_extension_cc_test(
     name = "unframed_transport_impl_test",
     srcs = ["unframed_transport_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -162,7 +162,7 @@ envoy_extension_cc_test(
     name = "auto_protocol_impl_test",
     srcs = ["auto_protocol_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -176,7 +176,7 @@ envoy_extension_cc_test(
     name = "binary_protocol_impl_test",
     srcs = ["binary_protocol_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -191,7 +191,7 @@ envoy_extension_cc_test(
     name = "compact_protocol_impl_test",
     srcs = ["compact_protocol_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -206,7 +206,7 @@ envoy_extension_cc_test(
     name = "twitter_protocol_impl_test",
     srcs = ["twitter_protocol_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -221,7 +221,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         "//source/extensions/filters/network/thrift_proxy:config",
@@ -238,7 +238,7 @@ envoy_extension_cc_test(
     name = "conn_manager_test",
     srcs = ["conn_manager_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -260,7 +260,7 @@ envoy_extension_cc_test(
     name = "decoder_test",
     srcs = ["decoder_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -275,7 +275,7 @@ envoy_extension_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
         "//test/test_common:printers_lib",
@@ -287,7 +287,7 @@ envoy_extension_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -311,7 +311,7 @@ envoy_extension_cc_test(
     name = "router_ratelimit_test",
     srcs = ["router_ratelimit_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -332,7 +332,7 @@ envoy_extension_cc_test(
     name = "route_matcher_test",
     srcs = ["route_matcher_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//source/extensions/filters/network/thrift_proxy/router:config",
@@ -349,7 +349,7 @@ envoy_extension_cc_test(
     name = "thrift_object_impl_test",
     srcs = ["thrift_object_impl_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -367,7 +367,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":integration_lib",
@@ -386,7 +386,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":integration_lib",
         ":utility_lib",
@@ -401,7 +401,7 @@ envoy_extension_cc_test(
     name = "shadow_writer_test",
     srcs = ["shadow_writer_test.cc"],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         ":utility_lib",
@@ -426,7 +426,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_names = ["envoy.filters.network.thrift_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":integration_lib",
         "//test/test_common:network_utility_lib",

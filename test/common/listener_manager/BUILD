@@ -24,7 +24,7 @@ envoy_cc_test(
         "internal_listener.yaml",
         "internal_listener_missing_bootstrap.yaml",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -70,7 +70,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/common/api:os_sys_calls_lib",
@@ -107,7 +107,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
     srcs = ["listener_manager_impl_quic_only_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":listener_manager_impl_test_lib",
@@ -130,7 +130,7 @@ envoy_cc_test(
     name = "filter_chain_manager_impl_test",
     srcs = ["filter_chain_manager_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
@@ -166,7 +166,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/listener_manager:lds_api_lib",
         "//source/common/protobuf:utility_lib",
@@ -190,7 +190,7 @@ envoy_cc_benchmark_binary(
         "benchmark",
         "googletest",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "//source/common/listener_manager:filter_chain_manager_lib",

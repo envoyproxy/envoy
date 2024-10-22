@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "header_test",
     srcs = ["header_test.cc"],
     extension_names = ["envoy.http.stateful_session.header"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:utility_lib",
         "//source/extensions/http/stateful_session/header:header_lib",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.stateful_session.header"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//source/extensions/http/stateful_session/header:config",

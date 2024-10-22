@@ -21,6 +21,7 @@ envoy_extension_cc_test(
         "@io_opentracing_cpp//mocktracer:libmocktracer_plugin.so",
     ],
     extension_names = ["envoy.tracers.dynamic_ot"],
+    rbe_pool = "6gig",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [

@@ -16,7 +16,7 @@ envoy_cc_test_binary(
     external_deps = [
         "abseil_symbolize",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
@@ -38,7 +38,7 @@ envoy_sh_test(
         "//source/server/admin/html:admin_web_files",
         "//test/integration:test_utility.sh",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
 
     # This test fails on windows trying to poll the server for the admin
     # address. Failure is:
