@@ -2009,7 +2009,7 @@ envoy_cc_test(
     srcs = [
         "tcp_async_client_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     deps = [
         ":integration_lib",
         "//test/integration/filters:test_network_async_tcp_filter_lib",
