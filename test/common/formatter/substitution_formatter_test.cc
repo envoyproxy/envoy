@@ -1363,6 +1363,84 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_EMAIL_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, emailSansPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_EMAIL_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, emailSansPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_EMAIL_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, emailSansPeerCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_EMAIL_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_OTHERNAME_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, othernameSansPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_OTHERNAME_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, othernameSansPeerCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_OTHERNAME_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, othernameSansPeerCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_OTHERNAME_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -1477,6 +1555,84 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_IP_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_EMAIL_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, emailSansLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_EMAIL_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, emailSansLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_EMAIL_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, emailSansLocalCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_EMAIL_SAN");
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_OTHERNAME_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san"};
+    EXPECT_CALL(*connection_info, othernameSansLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("san")));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_OTHERNAME_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    const std::vector<std::string> sans{"san1", "san2"};
+    EXPECT_CALL(*connection_info, othernameSansLocalCertificate()).WillRepeatedly(Return(sans));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ("san1,san2", upstream_format.formatWithContext({}, stream_info));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_OTHERNAME_SAN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    EXPECT_CALL(*connection_info, othernameSansLocalCertificate())
+        .WillRepeatedly(Return(std::vector<std::string>()));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_OTHERNAME_SAN");
     EXPECT_EQ(absl::nullopt, upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -2699,9 +2855,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
 
     DynamicMetadataFormatter formatter("com.test", {"nan_val"}, absl::optional<size_t>());
     absl::optional<std::string> value = formatter.format(stream_info);
-    EXPECT_EQ("google.protobuf.Value cannot encode double values for nan, because it would be "
-              "parsed as a string",
-              value.value());
+    EXPECT_EQ("null", value.value());
   }
 
   {
@@ -2713,9 +2867,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
 
     DynamicMetadataFormatter formatter("com.test", {"inf_val"}, absl::optional<size_t>());
     absl::optional<std::string> value = formatter.format(stream_info);
-    EXPECT_EQ("google.protobuf.Value cannot encode double values for infinity, because it would be "
-              "parsed as a string",
-              value.value());
+    EXPECT_EQ("inf", value.value());
   }
 }
 
@@ -4475,7 +4627,6 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
 
   JsonFormatterImpl formatter(key_mapping, false);
   const std::string out_json = formatter.formatWithContext(formatter_context, stream_info);
-  std::cout << out_json << std::endl;
   EXPECT_TRUE(TestUtility::jsonStringEqual(out_json, expected));
 }
 

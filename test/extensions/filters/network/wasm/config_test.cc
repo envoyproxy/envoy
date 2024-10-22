@@ -154,7 +154,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCode) {
   WasmFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProto(proto_config, context_).IgnoreError(),
-      Extensions::Common::Wasm::WasmException, "Unable to create Wasm network filter test");
+      Extensions::Common::Wasm::WasmException, "Unable to create Wasm plugin test");
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
@@ -174,7 +174,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenNackConfig) {
   WasmFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProto(proto_config, context_).IgnoreError(),
-      Extensions::Common::Wasm::WasmException, "Unable to create Wasm network filter test");
+      Extensions::Common::Wasm::WasmException, "Unable to create Wasm plugin test");
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
@@ -194,8 +194,8 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  filter_config.wasmForTest()->fail(proxy_wasm::FailState::RuntimeError, "");
-  auto context = filter_config.createFilter();
+  filter_config.wasm()->fail(proxy_wasm::FailState::RuntimeError, "");
+  auto context = filter_config.createContext();
   EXPECT_EQ(context->wasm(), nullptr);
   EXPECT_TRUE(context->isFailed());
 }
@@ -218,8 +218,8 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpen) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  filter_config.wasmForTest()->fail(proxy_wasm::FailState::RuntimeError, "");
-  EXPECT_EQ(filter_config.createFilter(), nullptr);
+  filter_config.wasm()->fail(proxy_wasm::FailState::RuntimeError, "");
+  EXPECT_EQ(filter_config.createContext(), nullptr);
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefault) {
@@ -241,12 +241,12 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  auto wasm = filter_config.wasmForTest();
+  auto wasm = filter_config.wasm();
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_log"));
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_http_call"));
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_log"));
-  EXPECT_FALSE(filter_config.createFilter() == nullptr);
+  EXPECT_FALSE(filter_config.createContext() == nullptr);
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
@@ -270,12 +270,12 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   NetworkFilters::Wasm::FilterConfig filter_config(proto_config, context_);
-  auto wasm = filter_config.wasmForTest();
+  auto wasm = filter_config.wasm();
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_log"));
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_new_connection"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_http_call"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_on_log"));
-  EXPECT_FALSE(filter_config.createFilter() == nullptr);
+  EXPECT_FALSE(filter_config.createContext() == nullptr);
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
@@ -336,7 +336,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   WasmFilterConfig factory;
   EXPECT_THROW_WITH_MESSAGE(
       factory.createFilterFactoryFromProto(proto_config, context_).IgnoreError(),
-      Envoy::Extensions::Common::Wasm::WasmException, "Unable to create Wasm network filter ");
+      Envoy::Extensions::Common::Wasm::WasmException, "Unable to create Wasm plugin ");
   const std::string valid_yaml =
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
@@ -409,7 +409,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
       .WillRepeatedly(ReturnRef(threadlocal));
   threadlocal.registered_ = false;
   auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
-  EXPECT_EQ(filter_config->createFilter(), nullptr);
+  EXPECT_EQ(filter_config->createContext(), nullptr);
   EXPECT_CALL(init_watcher_, ready());
   context_.initManager().initialize(init_watcher_);
   auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
@@ -418,7 +418,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   async_callbacks->onSuccess(request, std::move(response));
   EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
   threadlocal.registered_ = true;
-  EXPECT_NE(filter_config->createFilter(), nullptr);
+  EXPECT_NE(filter_config->createContext(), nullptr);
 }
 
 TEST_P(WasmNetworkFilterConfigTest, FailedToGetThreadLocalPlugin) {
@@ -449,11 +449,12 @@ TEST_P(WasmNetworkFilterConfigTest, FailedToGetThreadLocalPlugin) {
   threadlocal.registered_ = true;
   auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
   ASSERT_EQ(threadlocal.current_slot_, 1);
-  ASSERT_NE(filter_config->createFilter(), nullptr);
+  ASSERT_NE(filter_config->createContext(), nullptr);
 
-  // If the thread local plugin handle returns nullptr, `createFilter` should return nullptr
-  threadlocal.data_[0] = std::make_shared<PluginHandleSharedPtrThreadLocal>(nullptr);
-  EXPECT_EQ(filter_config->createFilter(), nullptr);
+  // If the thread local plugin handle returns nullptr, `createContext` should return nullptr
+  threadlocal.data_[0] =
+      std::make_shared<Extensions::Common::Wasm::PluginHandleSharedPtrThreadLocal>(nullptr);
+  EXPECT_EQ(filter_config->createContext(), nullptr);
 }
 
 } // namespace Wasm

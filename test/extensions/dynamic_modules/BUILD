@@ -22,7 +22,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:no_program_init",
         "//test/extensions/dynamic_modules/test_data/rust:program_init_fail",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":util",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -35,7 +35,7 @@ envoy_cc_test(
     data = [
         "//source/extensions/dynamic_modules:abi.h",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",

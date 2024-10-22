@@ -115,9 +115,8 @@ FileSystemHttpCache::makeVaryKey(const Key& base, const VaryAllowList& vary_allo
   return vary_key;
 }
 
-LookupContextPtr
-FileSystemHttpCache::makeLookupContext(LookupRequest&& lookup,
-                                       Http::StreamDecoderFilterCallbacks& callbacks) {
+LookupContextPtr FileSystemHttpCache::makeLookupContext(LookupRequest&& lookup,
+                                                        Http::StreamFilterCallbacks& callbacks) {
   return std::make_unique<FileLookupContext>(callbacks.dispatcher(), *this, std::move(lookup));
 }
 
@@ -352,12 +351,14 @@ std::string FileSystemHttpCache::generateFilename(const Key& key) const {
 }
 
 InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& lookup_context,
-                                                        Http::StreamEncoderFilterCallbacks&) {
+                                                        Http::StreamFilterCallbacks&) {
   auto file_lookup_context = std::unique_ptr<FileLookupContext>(
       dynamic_cast<FileLookupContext*>(lookup_context.release()));
   ASSERT(file_lookup_context);
   if (file_lookup_context->workInProgress()) {
-    return std::make_unique<DontInsertContext>();
+    auto ret = std::make_unique<DontInsertContext>(*file_lookup_context->dispatcher());
+    file_lookup_context->onDestroy();
+    return ret;
   }
   return std::make_unique<FileInsertContext>(shared_from_this(), std::move(file_lookup_context));
 }

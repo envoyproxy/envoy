@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "resource_provider_test",
     srcs = ["resource_provider_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
