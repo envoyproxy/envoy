@@ -53,7 +53,7 @@ bool TcpListenerImpl::rejectCxOverGlobalLimit() const {
   }
 }
 
-void TcpListenerImpl::onSocketEvent(short flags) {
+absl::Status TcpListenerImpl::onSocketEvent(short flags) {
   ASSERT(bind_to_port_);
   ASSERT(flags & (Event::FileReadyType::Read));
 
@@ -98,12 +98,15 @@ void TcpListenerImpl::onSocketEvent(short flags) {
     // effect if the socket is a v4 socket, but for v6 sockets this will create an IPv4 remote
     // address if an IPv4 local_address was created from an IPv6 mapped IPv4 address.
 
-    const Address::InstanceConstSharedPtr remote_address =
-        (remote_addr.ss_family == AF_UNIX)
-            ? io_handle->peerAddress()
-            : Address::addressFromSockAddrOrThrow(remote_addr, remote_addr_len,
-                                                  local_address->ip()->version() ==
-                                                      Address::IpVersion::v6);
+    Address::InstanceConstSharedPtr remote_address;
+    if (remote_addr.ss_family == AF_UNIX) {
+      remote_address = io_handle->peerAddress();
+    } else {
+      auto address_or_error = Address::addressFromSockAddr(
+          remote_addr, remote_addr_len, local_address->ip()->version() == Address::IpVersion::v6);
+      RETURN_IF_NOT_OK_REF(address_or_error.status());
+      remote_address = *address_or_error;
+    }
 
     cb_.onAccept(std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address,
                                                       remote_address, overload_state_,
@@ -113,6 +116,7 @@ void TcpListenerImpl::onSocketEvent(short flags) {
   ENVOY_LOG_MISC(trace, "TcpListener accepted {} new connections.",
                  connections_accepted_from_kernel_count);
   cb_.recordConnectionsAcceptedOnSocketEvent(connections_accepted_from_kernel_count);
+  return absl::OkStatus();
 }
 
 TcpListenerImpl::TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
@@ -137,11 +141,7 @@ TcpListenerImpl::TcpListenerImpl(Event::Dispatcher& dispatcher, Random::RandomGe
     // transient accept errors or early termination due to accepting
     // max_connections_to_accept_per_socket_event connections.
     socket_->ioHandle().initializeFileEvent(
-        dispatcher,
-        [this](uint32_t events) {
-          onSocketEvent(events);
-          return absl::OkStatus();
-        },
+        dispatcher, [this](uint32_t events) { return onSocketEvent(events); },
         Event::FileTriggerType::Level, Event::FileReadyType::Read);
   }
 }

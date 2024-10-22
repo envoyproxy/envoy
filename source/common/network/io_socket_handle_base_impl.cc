@@ -74,7 +74,8 @@ Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::localAddress() {
     throwEnvoyExceptionOrPanic(fmt::format("getsockname failed for '{}': ({}) {}", fd_,
                                            result.errno_, errorDetails(result.errno_)));
   }
-  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
+  return THROW_OR_RETURN_VALUE(Address::addressFromSockAddr(ss, ss_len, socket_v6only_),
+                               Address::InstanceConstSharedPtr);
 }
 
 Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::peerAddress() {
@@ -102,7 +103,8 @@ Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
+  return THROW_OR_RETURN_VALUE(Address::addressFromSockAddr(ss, ss_len, socket_v6only_),
+                               Address::InstanceConstSharedPtr);
 }
 
 absl::optional<std::chrono::milliseconds> IoSocketHandleBaseImpl::lastRoundTripTime() {
