@@ -214,8 +214,7 @@ FilterConfig::FilterConfig(
           PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
-      use_refresh_token_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, use_refresh_token, true)),
+      use_refresh_token_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, use_refresh_token, true)),
       disable_id_token_set_cookie_(proto_config.disable_id_token_set_cookie()),
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
       disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()) {

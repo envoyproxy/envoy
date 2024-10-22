@@ -286,10 +286,11 @@ typed_config:
   }
 
   void waitForOAuth2Response(absl::string_view token_secret, bool expect_failure = false) {
-    std::chrono::milliseconds timeout = expect_failure ? std::chrono::milliseconds(1) : std::chrono::milliseconds(500);
-    
-    AssertionResult result =
-      fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_oauth2_connection_, timeout);
+    std::chrono::milliseconds timeout =
+        expect_failure ? std::chrono::milliseconds(1) : std::chrono::milliseconds(500);
+
+    AssertionResult result = fake_upstreams_.back()->waitForHttpConnection(
+        *dispatcher_, fake_oauth2_connection_, timeout);
 
     if (expect_failure) {
       // Assert that the connection failed, as expected
@@ -384,7 +385,8 @@ typed_config:
     cleanup();
   }
 
-  void doRefreshTokenFlow(absl::string_view token_secret, absl::string_view hmac_secret, bool expect_failure = false) {
+  void doRefreshTokenFlow(absl::string_view token_secret, absl::string_view hmac_secret,
+                          bool expect_failure = false) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     Http::TestRequestHeaderMapImpl headers{
