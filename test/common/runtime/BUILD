@@ -19,7 +19,7 @@ filegroup(
 envoy_cc_test(
     name = "runtime_protos_test",
     srcs = ["runtime_protos_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/runtime:runtime_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -33,7 +33,7 @@ envoy_cc_test(
     name = "runtime_impl_test",
     srcs = ["runtime_impl_test.cc"],
     data = glob(["test_data/**"]) + ["filesystem_setup.sh"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/config:runtime_utility_lib",
         "//source/common/runtime:runtime_lib",
@@ -69,7 +69,7 @@ envoy_cc_test(
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.test_feature_true",
     ],
     coverage = False,
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/runtime:runtime_lib",
     ],
@@ -84,7 +84,7 @@ envoy_cc_test(
         "--runtime-feature-disable-for-tests=envoy.reloadable_features.test_feature_false",
     ],
     coverage = False,
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/runtime:runtime_lib",
     ],
