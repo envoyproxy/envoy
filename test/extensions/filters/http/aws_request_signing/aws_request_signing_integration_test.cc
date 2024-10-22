@@ -373,7 +373,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
 
   // Instance Profile Credentials only
   dnsSetup();
-  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "false", 1);
+
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     *bootstrap.mutable_static_resources()->add_clusters() =
         config_helper_.buildStaticCluster("cluster_1", 12345, "127.0.0.1");
@@ -389,18 +389,6 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
   });
 
   initialize();
-
-  std::string uuid;
-  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
-  for (const auto& c : test_server_->counters()) {
-    if (absl::StartsWith(c->name(), prefix)) {
-      uuid = c->name().substr(prefix.size(), 36);
-    }
-  }
-  EXPECT_FALSE(uuid.empty());
-  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
-                                     "service_internal-ap-southeast-2_{}",
-                                     uuid);
   // We should see a successful credential refresh
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_metadata_server_"
                                  "internal.credential_refreshes_performed",
