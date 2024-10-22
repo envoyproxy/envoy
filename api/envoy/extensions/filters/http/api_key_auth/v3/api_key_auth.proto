@@ -27,35 +27,29 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    authentication_header: "X-API-KEY"
 //    keys:
 //      inline_string: |-
-//        apikey1:user1
-//        apikey2:user2
+//        clientID1:apiKey1
+//        clientID2:apiKey2
 //
 message APIKeyAuth {
-  // keys used to authenticate the user.
-  // It should be a map of apikey to user.
+  // keys used to authenticate the client.
+  // It should be a map of apikey to client.
   config.core.v3.DataSource keys = 1 [(udpa.annotations.sensitive) = true];
 
-  // The header name to forward an authenticated user.
-  //
-  // If it is not specified, the username will not be forwarded.
-  string forward_username_header = 2
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
-
-  // The location of the API key.
-  oneof location {
-    // The header name to fetch the key.
-    string authentication_header = 3;
-    // The query parameter name to fetch the key.
-    string authentication_query = 4;
-    // The cookie name to fetch the key.
-    string authentication_cookie = 5;
-  }
+  // The header name to fetch the key.
+  // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
+  string authentication_header = 2;
+  // The query parameter name to fetch the key.
+  // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
+  string authentication_query = 3;
+  // The cookie name to fetch the key.
+  // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
+  string authentication_cookie = 4;
 }
 
 // Extra settings that may be added to per-route configuration for
 // a virtual host or a cluster.
 message APIKeyAuthPerRoute {
-  // keys used to authenticate the user for this route.
+  // keys used to authenticate the client for this route.
   config.core.v3.DataSource keys = 1
       [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
 }
