@@ -21,7 +21,6 @@ envoy_cc_test(
         ],
         "//conditions:default": [],
     }),
-    rbe_pool = "4core",
     repository = "@envoy",
     shard_count = 6,
     deps = [
@@ -71,7 +70,6 @@ envoy_cc_test_library(
     data = [
         "@envoy//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
     repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",
