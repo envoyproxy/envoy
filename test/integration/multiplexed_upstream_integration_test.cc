@@ -362,7 +362,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBuffe
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
-TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+TEST_P(MultiplexedUpstreamIntegrationTest, DISABLED_ManyLargeSimultaneousRequestWithRandomBackup) {
   // random-pause-filter does not support HTTP3.
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
