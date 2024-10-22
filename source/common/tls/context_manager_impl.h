@@ -43,6 +43,7 @@ public:
     return private_key_method_manager_;
   };
   void removeContext(const Envoy::Ssl::ContextSharedPtr& old_context) override;
+  void updateTlsCertificateExpiryStats() override;
 
 private:
   Server::Configuration::CommonFactoryContext& factory_context_;
