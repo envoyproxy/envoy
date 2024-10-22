@@ -100,13 +100,6 @@ Http::RequestHeaderMapPtr buildRequestHeaderMapFromPairs(const Pairs& pairs) {
 
 template <typename P> static uint32_t headerSize(const P& p) { return p ? p->size() : 0; }
 
-Upstream::HostDescriptionConstSharedPtr getHost(const StreamInfo::StreamInfo* info) {
-  if (info && info->upstreamInfo() && info->upstreamInfo().value().get().upstreamHost()) {
-    return info->upstreamInfo().value().get().upstreamHost();
-  }
-  return nullptr;
-}
-
 } // namespace
 
 // Test support.
@@ -442,10 +435,7 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
   return WasmResult::SerializationFailure;
 }
 
-#define PROPERTY_TOKENS(_f)                                                                        \
-  _f(NODE) _f(LISTENER_DIRECTION) _f(LISTENER_METADATA) _f(CLUSTER_NAME) _f(CLUSTER_METADATA)      \
-      _f(ROUTE_NAME) _f(ROUTE_METADATA) _f(PLUGIN_NAME) _f(UPSTREAM_HOST_METADATA)                 \
-          _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)
+#define PROPERTY_TOKENS(_f) _f(PLUGIN_NAME) _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)
 
 static inline std::string downCase(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -520,57 +510,6 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   }
-  case PropertyToken::NODE:
-    if (root_local_info_) {
-      return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
-    } else if (plugin_) {
-      return CelProtoWrapper::CreateMessage(&plugin()->localInfo().node(), arena);
-    }
-    break;
-  case PropertyToken::LISTENER_DIRECTION:
-    if (plugin_) {
-      return CelValue::CreateInt64(plugin()->direction());
-    }
-    break;
-  case PropertyToken::LISTENER_METADATA:
-    if (plugin_) {
-      return CelProtoWrapper::CreateMessage(plugin()->listenerMetadata(), arena);
-    }
-    break;
-  case PropertyToken::CLUSTER_NAME:
-    if (getHost(info)) {
-      return CelValue::CreateString(&getHost(info)->cluster().name());
-    } else if (info && info->route() && info->route()->routeEntry()) {
-      return CelValue::CreateString(&info->route()->routeEntry()->clusterName());
-    } else if (info && info->upstreamClusterInfo().has_value() &&
-               info->upstreamClusterInfo().value()) {
-      return CelValue::CreateString(&info->upstreamClusterInfo().value()->name());
-    }
-    break;
-  case PropertyToken::CLUSTER_METADATA:
-    if (getHost(info)) {
-      return CelProtoWrapper::CreateMessage(&getHost(info)->cluster().metadata(), arena);
-    } else if (info && info->upstreamClusterInfo().has_value() &&
-               info->upstreamClusterInfo().value()) {
-      return CelProtoWrapper::CreateMessage(&info->upstreamClusterInfo().value()->metadata(),
-                                            arena);
-    }
-    break;
-  case PropertyToken::UPSTREAM_HOST_METADATA:
-    if (getHost(info)) {
-      return CelProtoWrapper::CreateMessage(getHost(info)->metadata().get(), arena);
-    }
-    break;
-  case PropertyToken::ROUTE_NAME:
-    if (info) {
-      return CelValue::CreateString(&info->getRouteName());
-    }
-    break;
-  case PropertyToken::ROUTE_METADATA:
-    if (info && info->route()) {
-      return CelProtoWrapper::CreateMessage(&info->route()->metadata(), arena);
-    }
-    break;
   case PropertyToken::PLUGIN_NAME:
     if (plugin_) {
       return CelValue::CreateStringView(plugin()->name_);

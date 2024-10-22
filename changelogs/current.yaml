@@ -8,6 +8,8 @@ behavior_changes:
     But it could be done explicitly by call the ``clear_route_cache`` foreign function.
     This behavior change could be disabled temporarily by setting the runtime flag
     ``envoy_reloadable_features_wasm_no_automatic_route_refresh`` to false.
+- area: wasm
+    Remove previously deprecated xDS attributes from ``get_property``, use ``xds`` attributes instead.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -30,16 +32,31 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: router
+  change: |
+    Removed runtime guard ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
+- area: http
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
 
 new_features:
+- area: aws_request_signing
+  change: |
+    Added an optional field :ref:`credential_provider
+    <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>`
+    to the AWS request signing filter to explicitly specify a source for AWS credentials.
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
 - area: wasm
   change: |
     added ``clear_route_cache`` foreign function to clear the route cache.
+- area: access_log
+  change: |
+    Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
+    %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
 
 deprecated:

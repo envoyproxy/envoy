@@ -5,6 +5,8 @@
 #include <ios>
 #include <string>
 
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
@@ -1954,6 +1956,10 @@ public:
                          MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+    std::string token_file_path;
+    if (token_.empty()) {
+      token_file_path = TestEnvironment::writeStringToFileForTest("web_token_file", "web_token");
+    }
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
         *api_, context_,
         [this](Http::RequestMessage& message) -> absl::optional<std::string> {
@@ -1963,9 +1969,8 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        TestEnvironment::writeStringToFileForTest("web_token_file", "web_token"),
-        "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn", "role-session-name",
-        refresh_state, initialization_timer, "credentials_provider_cluster");
+        token_file_path, token_, "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn",
+        "role-session-name", refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 
   void
@@ -1984,6 +1989,10 @@ public:
   setupProviderWithLibcurl(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
                                MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                            std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
+    std::string token_file_path;
+    if (token_.empty()) {
+      token_file_path = TestEnvironment::writeStringToFileForTest("web_token_file", "web_token");
+    }
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
         *api_, context_,
@@ -1994,21 +2003,22 @@ public:
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
-        TestEnvironment::writeStringToFileForTest("web_token_file", "web_token"),
-        "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn", "role-session-name",
-        refresh_state, initialization_timer, "credentials_provider_cluster");
+        token_file_path, token_, "sts.region.amazonaws.com:443", "aws:iam::123456789012:role/arn",
+        "role-session-name", refresh_state, initialization_timer, "credentials_provider_cluster");
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document) {
-    Http::TestRequestHeaderMapImpl headers{{":path",
-                                            "/?Action=AssumeRoleWithWebIdentity"
-                                            "&Version=2011-06-15&RoleSessionName=role-session-name"
-                                            "&RoleArn=aws:iam::123456789012:role/arn"
-                                            "&WebIdentityToken=web_token"},
-                                           {":authority", "sts.region.amazonaws.com"},
-                                           {":scheme", "https"},
-                                           {":method", "GET"},
-                                           {"Accept", "application/json"}};
+    std::string exp_token = token_.empty() ? "web_token" : token_;
+    Http::TestRequestHeaderMapImpl headers{
+        {":path", "/?Action=AssumeRoleWithWebIdentity"
+                  "&Version=2011-06-15&RoleSessionName=role-session-name"
+                  "&RoleArn=aws:iam::123456789012:role/arn"
+                  "&WebIdentityToken=" +
+                      exp_token},
+        {":authority", "sts.region.amazonaws.com"},
+        {":scheme", "https"},
+        {":method", "GET"},
+        {"Accept", "application/json"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
         .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
                                    Http::RequestMessage&, Tracing::Span&,
@@ -2049,6 +2059,7 @@ public:
   NiceMock<Upstream::MockThreadLocalCluster> test_cluster{};
   Init::TargetHandlePtr init_target_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
+  std::string token_ = "";
 };
 
 TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
@@ -2074,6 +2085,9 @@ TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, EmptyDocument) {
+  // Test that the static prefetched token will be used instead of the local file.
+  token_ = "prefetched_token";
+
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(200, std::move(std::string()));
@@ -2468,7 +2482,7 @@ public:
                 (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view, absl::string_view,
-                 absl::string_view, absl::string_view,
+                 absl::string_view, absl::string_view, absl::string_view,
                  MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
@@ -2564,7 +2578,7 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_,
               createWebIdentityCredentialsProvider(
-                  Ref(*api_), _, _, _, _, "/path/to/web_token", "sts.region.amazonaws.com:443",
+                  Ref(*api_), _, _, _, _, "/path/to/web_token", _, "sts.region.amazonaws.com:443",
                   "aws:iam::123456789012:role/arn", "1234567890000000", _, _));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
 
@@ -2580,7 +2594,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
   EXPECT_CALL(factories_,
               createWebIdentityCredentialsProvider(
-                  Ref(*api_), _, _, _, _, "/path/to/web_token", "sts.region.amazonaws.com:443",
+                  Ref(*api_), _, _, _, _, "/path/to/web_token", _, "sts.region.amazonaws.com:443",
                   "aws:iam::123456789012:role/arn", "role-session-name", _, _));
   DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
                                         factories_);
@@ -2633,6 +2647,59 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
 
   const Credentials ret_creds = chain.getCredentials();
   EXPECT_EQ(creds, ret_creds);
+}
+
+TEST(CreateCredentialsProviderFromConfig, InlineCredential) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::extensions::common::aws::v3::InlineCredentialProvider inline_credential;
+  inline_credential.set_access_key_id("TestAccessKey");
+  inline_credential.set_secret_access_key("TestSecret");
+  inline_credential.set_session_token("TestSessionToken");
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider base;
+  base.mutable_inline_credential()->CopyFrom(inline_credential);
+
+  absl::StatusOr<CredentialsProviderSharedPtr> provider =
+      createCredentialsProviderFromConfig(context, "test-region", base);
+  EXPECT_TRUE(provider.ok());
+  EXPECT_NE(nullptr, provider.value());
+  const Credentials creds = provider.value()->getCredentials();
+  EXPECT_EQ("TestAccessKey", creds.accessKeyId().value());
+  EXPECT_EQ("TestSecret", creds.secretAccessKey().value());
+  EXPECT_EQ("TestSessionToken", creds.sessionToken().value());
+}
+
+TEST(CreateCredentialsProviderFromConfig, AssumeRoleWithWebIdentity) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider
+      assume_role_provider;
+  assume_role_provider.set_role_arn("arn:aws:iam::123456789012:role/role-name");
+  assume_role_provider.set_web_identity_token("this-is-a-token");
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider base;
+  base.mutable_assume_role_with_web_identity()->CopyFrom(assume_role_provider);
+
+  absl::StatusOr<CredentialsProviderSharedPtr> provider =
+      createCredentialsProviderFromConfig(context, "test-region", base);
+  EXPECT_TRUE(provider.ok());
+  EXPECT_NE(nullptr, provider.value());
+
+  const auto* web_identity_provider =
+      dynamic_cast<WebIdentityCredentialsProvider*>(provider.value().get());
+  EXPECT_NE(nullptr, web_identity_provider);
+
+  const std::string& token = web_identity_provider->tokenForTesting();
+  const std::string& role_arn = web_identity_provider->roleArnForTesting();
+  EXPECT_EQ("this-is-a-token", token);
+  EXPECT_EQ("arn:aws:iam::123456789012:role/role-name", role_arn);
+}
+
+TEST(CreateCredentialsProviderFromConfig, InvalidEnum) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  envoy::extensions::common::aws::v3::AwsCredentialProvider base;
+  absl::StatusOr<CredentialsProviderSharedPtr> result =
+      createCredentialsProviderFromConfig(context, "foo", base);
+  EXPECT_FALSE(result.ok());
 }
 
 } // namespace Aws
