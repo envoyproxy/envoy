@@ -270,3 +270,15 @@ envoy_cc_test(
         "//test/test_common:registry_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "xds_manager_impl_test",
+    srcs = ["xds_manager_impl_test.cc"],
+    rbe_pool = "2core",
+    deps = [
+        "//source/common/config:xds_manager_lib",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:status_utility_lib",
+    ],
+)

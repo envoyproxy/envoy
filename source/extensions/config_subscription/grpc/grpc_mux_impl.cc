@@ -300,9 +300,8 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
 
 absl::Status
 GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
-                             Grpc::RawAsyncClientPtr&& failover_async_client,
-                             CustomConfigValidatorsPtr&& custom_config_validators,
-                             Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
+                             Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+                             BackOffStrategyPtr&& backoff_strategy,
                              const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
@@ -319,9 +318,8 @@ GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
   grpc_stream_ = createGrpcStreamObject(std::move(primary_async_client),
                                         std::move(failover_async_client), service_method, scope,
                                         std::move(backoff_strategy), *rate_limit_settings_or_error);
-
-  // Update the config validators.
-  config_validators_ = std::move(custom_config_validators);
+  // No need to update the config_validators_ as they may contain some state
+  // that needs to be kept across different GrpcMux objects.
 
   // Start the subscriptions over the grpc_stream.
   grpc_stream_->establishNewStream();
