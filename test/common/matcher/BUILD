@@ -22,7 +22,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "list_matcher_test",
     srcs = ["list_matcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":test_utility_lib",
         "//source/common/matcher:list_matcher_lib",
@@ -33,7 +33,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "exact_map_matcher_test",
     srcs = ["exact_map_matcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":test_utility_lib",
         "//source/common/matcher:exact_map_matcher_lib",
@@ -44,7 +44,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "prefix_map_matcher_test",
     srcs = ["prefix_map_matcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":test_utility_lib",
         "//source/common/matcher:prefix_map_matcher_lib",
@@ -55,7 +55,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "field_matcher_test",
     srcs = ["field_matcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":test_utility_lib",
         "//source/common/matcher:field_matcher_lib",
@@ -67,7 +67,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "value_input_matcher_test",
     srcs = ["value_input_matcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/matcher:value_input_matcher_lib",
         "//test/test_common:utility_lib",
@@ -77,7 +77,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":test_utility_lib",
         "//source/common/matcher:matcher_lib",

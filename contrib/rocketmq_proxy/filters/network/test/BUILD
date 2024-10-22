@@ -14,7 +14,7 @@ envoy_cc_mock(
     name = "mocks_lib",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//contrib/rocketmq_proxy/filters/network/source:config",
         "//contrib/rocketmq_proxy/filters/network/source/router:router_lib",
@@ -43,7 +43,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -66,7 +66,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_manager_test",
     srcs = ["conn_manager_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//test/common/stats:stat_test_utility_lib",
@@ -82,7 +82,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "active_message_test",
     srcs = ["active_message_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//contrib/rocketmq_proxy/filters/network/source:config",
@@ -97,7 +97,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//contrib/rocketmq_proxy/filters/network/source:config",
         "//test/mocks/local_info:local_info_mocks",
@@ -123,7 +123,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "route_matcher_test",
     srcs = ["route_matcher_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//contrib/rocketmq_proxy/filters/network/source/router:route_matcher",
         "//test/test_common:utility_lib",

@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = ["cluster_test.cc"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/router:string_accessor_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",

@@ -75,7 +75,7 @@ envoy_cc_library(
     srcs = ["server.cc"],
     hdrs = ["server.h"],
     external_deps = ["abseil_optional"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":admin_lib",
         ":api_lib",
