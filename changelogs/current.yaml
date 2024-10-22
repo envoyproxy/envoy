@@ -21,7 +21,7 @@ minor_behavior_changes:
 - area: scoped_rds
   change: |
     The :ref:`route_configuration <envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>` field
-    is supported when the `ScopedRouteConfiguration` resource is delivered via SRDS.
+    is supported when the ``ScopedRouteConfiguration`` resource is delivered via SRDS.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
