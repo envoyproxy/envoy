@@ -1,5 +1,4 @@
 #include "source/extensions/common/wasm/wasm.h"
-#include "wasm.h"
 
 #include <algorithm>
 #include <chrono>
