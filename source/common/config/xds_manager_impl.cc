@@ -20,9 +20,9 @@ XdsManagerImpl::validateAdsConfig(const envoy::config::core::v3::ApiConfigSource
   auto& validation_visitor = validation_context_.staticValidationVisitor();
   TRY_ASSERT_MAIN_THREAD { MessageUtil::validate(config_source, validation_visitor); }
   END_TRY
-  catch (const EnvoyException& e) {
+  CATCH(const EnvoyException& e, {
     return absl::InternalError(e.what());
-  }
+  });
   return absl::OkStatus();
 }
 
