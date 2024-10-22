@@ -41,7 +41,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:test_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_restriction_cpp.wasm",
     ]),
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:hex_lib",
