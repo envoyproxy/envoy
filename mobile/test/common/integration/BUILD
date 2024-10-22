@@ -71,6 +71,7 @@ envoy_cc_test_library(
     data = [
         "@envoy//test/config/integration/certs",
     ],
+    rbe_pool = "2core",
     repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",

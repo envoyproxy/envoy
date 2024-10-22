@@ -38,7 +38,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     tags = ["skip_on_windows"],
     deps = [
         ":mock_server_lib",
