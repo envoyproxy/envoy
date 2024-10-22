@@ -369,7 +369,6 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   // Instance Profile Credentials only
   dnsSetup();
