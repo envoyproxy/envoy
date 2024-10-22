@@ -15,7 +15,7 @@ envoy_cc_test_library(
         "ssl_integration_test_base.cc",
     ],
     hdrs = ["ssl_integration_test_base.h"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration:http_integration_lib",
@@ -33,7 +33,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":sni_to_header_filter_lib",
         ":ssl_integration_test_lib",

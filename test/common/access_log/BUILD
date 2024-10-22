@@ -17,7 +17,7 @@ envoy_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/access_log:access_log_lib",
         "//source/common/stream_info:utility_lib",
@@ -47,7 +47,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "access_log_manager_impl_test",
     srcs = ["access_log_manager_impl_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/access_log:access_log_manager_lib",
         "//source/common/stats:stats_lib",

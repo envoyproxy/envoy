@@ -25,7 +25,7 @@ envoy_py_test(
         "//tools/h3_request",
     ],
     exec_properties = select({
-        "//bazel:engflow_rbe": {"Pool": "2core"},
+        "//bazel:engflow_rbe": {"Pool": "6gig"},
         "//conditions:default": {},
     }),
     main = select({

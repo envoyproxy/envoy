@@ -34,7 +34,7 @@ envoy_extension_cc_test(
     external_deps = [
         "dd_trace_cpp",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [

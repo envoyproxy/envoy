@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     external_deps = [
         "abseil_synchronization",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/common:time_interface",
         "//envoy/registry",
@@ -41,7 +41,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.watchdog.profile_action"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//envoy/server:guarddog_config_interface",
