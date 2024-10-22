@@ -15,7 +15,7 @@ OCSP Response Data:
     Next Update: Oct 22 14:50:30 2026 GMT
 
     Response Extensions:
-        OCSP Nonce: 
+        OCSP Nonce:
             0410D26A9562C852A29C61A0799E51252A7A
     Signature Algorithm: sha256WithRSAEncryption
          a3:43:04:dc:64:84:b0:b4:81:ef:58:40:50:e1:69:10:ed:4a:
@@ -68,9 +68,9 @@ Certificate:
                     46:09
                 Exponent: 65537 (0x10001)
         X509v3 extensions:
-            X509v3 Subject Key Identifier: 
+            X509v3 Subject Key Identifier:
                 48:B7:0F:A8:E2:F9:8B:E2:7B:82:F2:DE:38:9F:32:2C:FC:F8:1C:CB
-            X509v3 Authority Key Identifier: 
+            X509v3 Authority Key Identifier:
                 keyid:48:B7:0F:A8:E2:F9:8B:E2:7B:82:F2:DE:38:9F:32:2C:FC:F8:1C:CB
 
             X509v3 Basic Constraints: critical
