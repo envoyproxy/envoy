@@ -291,6 +291,12 @@ void AsyncStreamImpl::closeStream() {
 void AsyncStreamImpl::resetStream() { cleanup(); }
 
 void AsyncStreamImpl::cleanup() {
+  // Unsubscribe the side stream watermark callbacks, if hasn't done so.
+  if (options_.sidestream_watermark_callbacks != nullptr) {
+    stream_->removeWatermarkCallbacks();
+    options_.sidestream_watermark_callbacks = nullptr;
+  }
+
   if (!http_reset_) {
     http_reset_ = true;
     stream_->reset();
