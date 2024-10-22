@@ -10,16 +10,11 @@ Kubernetes `Gateway API <https://gateway-api.sigs.k8s.io/>`_ resources and Envoy
 
 .. note::
 
-   For latest up to date Quickstart installation documentation visit the Envoy Gateway docs site on  `gateway.envoyproxy.io/docs/ <https://gateway.envoyproxy.io/docs/>`_.
+   Access the Envoy Gateway Quickstart installation documentation on  `gateway.envoyproxy.io/docs/tasks/quickstart/ <https://gateway.envoyproxy.io/docs/tasks/quickstart/>`_.
 
 
 What to explore next?
 ---------------------
-
-In this quickstart, you have:
-* Installed Envoy Gateway
-* Deployed a backend service, and a gateway
-* Configured the gateway using Kubernetes Gateway API resources [Gateway](https://gateway-api.sigs.k8s.io/api-types/gateway/) and [HttpRoute](https://gateway-api.sigs.k8s.io/api-types/httproute/) to direct incoming requests over HTTP to the backend service.
 
 Here is a suggested list of follow-on tasks to guide you in your exploration of Envoy Gateway:
 
