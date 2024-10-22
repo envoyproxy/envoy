@@ -20,7 +20,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":private_key_provider_proto_cc_proto",
         "//source/common/secret:sds_api_lib",
@@ -48,7 +48,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
