@@ -41,7 +41,7 @@ envoy_cc_test_library(
     name = "listener_manager_impl_test_lib",
     hdrs = ["listener_manager_impl_test.h"],
     data = ["//test/common/tls/test_data:certs"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":config_cc_proto",
         "//source/common/formatter:formatter_extension_lib",
