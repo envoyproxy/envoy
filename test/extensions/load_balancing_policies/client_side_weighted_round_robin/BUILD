@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.load_balancing_policies.client_side_weighted_round_robin"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
         "//test/mocks/server:factory_context_mocks",
@@ -43,7 +43,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.load_balancing_policies.client_side_weighted_round_robin"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
