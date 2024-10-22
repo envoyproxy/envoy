@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     external_deps = [
         "msgpack",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/fluentd:config",
         "//test/mocks/server:factory_context_mocks",
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
     extension_names = ["envoy.access_loggers.fluentd"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/fluentd:substitution_formatter_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -47,7 +47,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["fluentd_access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.fluentd"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/fluentd:config",
         "//source/extensions/filters/network/tcp_proxy:config",

@@ -70,7 +70,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "network_utility_test",
     srcs = ["network_utility_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":environment_lib",
         ":network_utility_lib",
@@ -210,7 +210,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -248,7 +248,7 @@ envoy_cc_library(
 envoy_cc_test(
     name = "global_test",
     srcs = ["global_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":global_lib",
     ],
@@ -316,7 +316,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "status_utility_test",
     srcs = ["status_utility_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":status_utility_lib",
     ],
@@ -325,7 +325,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "simulated_time_system_test",
     srcs = ["simulated_time_system_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":simulated_time_system_lib",
         ":utility_lib",
@@ -338,7 +338,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "test_time_system_test",
     srcs = ["test_time_system_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":simulated_time_system_lib",
         ":test_time_lib",

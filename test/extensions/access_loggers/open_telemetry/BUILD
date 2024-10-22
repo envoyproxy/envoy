@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     name = "grpc_access_log_impl_test",
     srcs = ["grpc_access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/protobuf",
@@ -36,7 +36,7 @@ envoy_extension_cc_test(
     name = "access_log_impl_test",
     srcs = ["access_log_impl_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/common:time_interface",
         "//source/common/protobuf",
@@ -60,7 +60,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/open_telemetry:access_log_lib",
         "//source/extensions/access_loggers/open_telemetry:config",
@@ -75,7 +75,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["access_log_integration_test.cc"],
     extension_names = ["envoy.access_loggers.open_telemetry"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
@@ -102,7 +102,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.access_loggers.open_telemetry"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
@@ -134,7 +134,7 @@ envoy_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",

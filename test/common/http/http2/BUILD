@@ -18,7 +18,7 @@ envoy_cc_test(
     external_deps = [
         "quiche_http2_adapter",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     shard_count = 5,
     deps = [
         ":codec_impl_test_util",
@@ -67,7 +67,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http2:conn_pool_lib",
@@ -107,7 +107,7 @@ envoy_cc_test_library(
     name = "frame_replay_lib",
     srcs = ["frame_replay.cc"],
     hdrs = ["frame_replay.h"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
@@ -131,7 +131,7 @@ envoy_cc_test(
         "response_header_corpus/simple_example_huffman",
         "response_header_corpus/simple_example_plain",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
@@ -145,7 +145,7 @@ envoy_cc_test(
         "quiche_http2_adapter",
         "quiche_http2_test_tools",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:random_generator_lib",
@@ -162,7 +162,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "http2_frame_test",
     srcs = ["http2_frame_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/http:metadata_interface",
         "//source/common/http/http2:metadata_encoder_lib",
@@ -173,7 +173,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "protocol_constraints_test",
     srcs = ["protocol_constraints_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http/http2:protocol_constraints_lib",
         "//test/common/memory:memory_test_utility_lib",
@@ -186,7 +186,7 @@ envoy_cc_fuzz_test(
     name = "response_header_fuzz_test",
     srcs = ["response_header_fuzz_test.cc"],
     corpus = "response_header_corpus",
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
@@ -198,7 +198,7 @@ envoy_cc_fuzz_test(
     name = "request_header_fuzz_test",
     srcs = ["request_header_fuzz_test.cc"],
     corpus = "request_header_corpus",
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":frame_replay_lib",
         "//test/common/http/http2:codec_impl_test_util",
@@ -219,7 +219,7 @@ envoy_cc_fuzz_test(
     external_deps = [
         "nghttp2",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":hpack_fuzz_proto_cc_proto",
         "//test/test_common:utility_lib",
@@ -239,7 +239,7 @@ envoy_cc_fuzz_test(
     external_deps = [
         "nghttp2",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":http2_connection_proto_cc_proto",
         "//source/common/http/http2:codec_lib",
