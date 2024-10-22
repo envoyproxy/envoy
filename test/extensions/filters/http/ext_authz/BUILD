@@ -75,7 +75,7 @@ envoy_extension_cc_test(
         "ext_authz.yaml",
     ],
     extension_names = ["envoy.filters.http.ext_authz"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         ":logging_test_filter_lib",
