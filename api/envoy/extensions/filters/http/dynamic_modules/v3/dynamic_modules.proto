@@ -30,7 +30,7 @@ message DynamicModuleFilter {
 
   // The name for this filter configuration. This can be used to distinguish between different filter implementations
   // inside a dynamic module. For example, a module can have completely different filter implementations.
-  // When Envoy receives this configuration, it passes the filter_name to the dynami module's HTTP filter config init function
+  // When Envoy receives this configuration, it passes the filter_name to the dynamic module's HTTP filter config init function
   // together with the filter_config.
   // That way a module can decide which in-module filter implementation to use based on the name at load time.
   string filter_name = 2;

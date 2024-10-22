@@ -20,7 +20,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // by various Envoy extension points. Currently, only HTTP filter (envoy.filters.http.dynamic_modules) is supported.
 //
 // How a module is loaded is determined by the extension point that uses it. For example, the HTTP filter
-// loads the module with dlopen when Envoy receieves a configuration that references the module at load time.
+// loads the module with dlopen when Envoy receives a configuration that references the module at load time.
 // If loading the module fails, the configuration will be rejected.
 //
 // Whether or not the shared object is the same is determined by the file path as well as the file's inode depending
