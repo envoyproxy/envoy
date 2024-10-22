@@ -13,7 +13,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//contrib/generic_proxy/filters/network/source/codecs/dubbo:config",
         "//contrib/generic_proxy/filters/network/test/mocks:codec_mocks",

@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.local_ratelimit"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/filters/http/local_ratelimit:local_ratelimit_lib",
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.local_ratelimit"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/local_ratelimit:config",
         "//test/mocks/server:server_mocks",
@@ -45,7 +45,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["local_ratelimit_integration_test.cc"],
     extension_names = ["envoy.filters.http.local_ratelimit"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = [
         "cpu:3",
     ],

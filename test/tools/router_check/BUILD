@@ -17,7 +17,7 @@ envoy_cc_test_binary(
     name = "router_check_tool",
     srcs = ["router_check.cc"],
     linkstatic = envoy_select_linkstatic(),
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [":router_check_main_lib"] + select({
         "//bazel:coverage_build": [],
         "//bazel:windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
@@ -38,7 +38,7 @@ envoy_cc_test_library(
     ],
     copts = ["-DHAVE_LONG_LONG"],
     external_deps = ["tclap"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":validation_proto_cc_proto",
         "//source/common/common:random_generator_lib",

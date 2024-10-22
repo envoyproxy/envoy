@@ -13,7 +13,7 @@ envoy_package()
 envoy_cc_test(
     name = "eds_test",
     srcs = ["eds_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:eds_lib",
@@ -49,7 +49,7 @@ envoy_cc_benchmark_binary(
     external_deps = [
         "benchmark",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/config:xds_resources_delegate_interface",
         "//source/common/config:protobuf_link_hacks",
@@ -86,7 +86,7 @@ envoy_benchmark_test(
 envoy_cc_test(
     name = "leds_test",
     srcs = ["leds_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:leds_lib",

@@ -64,7 +64,7 @@ envoy_cc_test_library(
     external_deps = [
         "quiche_http2_adapter",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
@@ -121,7 +121,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "random_test",
     srcs = ["random_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//test/fuzz:random_lib",
     ],
