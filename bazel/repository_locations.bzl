@@ -1383,7 +1383,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "3.8.0",
         sha256 = "e0297cc6fdb09ef9d9905751b25d2b629c17528f8629b60561eeff87ce29099c",
         strip_prefix = "kafka_2.13-{version}",
-        urls = ["https://archive.apache.org/dist/kafka/{version}/kafka_2.13-{version}.tgz"],
+        urls = ["https://downloads.apache.org/kafka/{version}/kafka_2.13-{version}.tgz"],
         release_date = "2024-07-23",
         use_category = ["test_only"],
     ),
