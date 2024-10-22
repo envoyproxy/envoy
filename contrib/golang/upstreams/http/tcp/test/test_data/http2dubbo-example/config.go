@@ -19,8 +19,8 @@ func init() {
 
 type config struct {
 	routerNameForEnableRemoteHalfClose string
-	clusterNameForMock string
-	envoySelfEnableHalfClose bool
+	clusterNameForGrayTraffic          string
+	envoySelfEnableHalfClose           bool
 }
 
 type parser struct {
@@ -41,7 +41,7 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 		return nil, errors.New("missing cluster_for_mock")
 	}
 	if clusterNameStr, ok := clusterName.(string); ok {
-		conf.clusterNameForMock = clusterNameStr
+		conf.clusterNameForGrayTraffic = clusterNameStr
 	} else {
 		return nil, fmt.Errorf("cluster_for_mock: expect string while got %T", clusterName)
 	}
@@ -69,14 +69,21 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 	return conf, nil
 }
 
+// Merge implements api.StreamFilterConfigParser.
+func (p *parser) Merge(parentConfig interface{}, childConfig interface{}) interface{} {
+	return childConfig
+}
+
 func filterFactory(c interface{}, callbacks api.TcpUpstreamCallbackHandler) api.TcpUpstreamFilter {
 	conf, ok := c.(*config)
 	if !ok {
 		panic("unexpected config type")
 	}
 	return &tcpUpstreamFilter{
-		callbacks: callbacks,
-		config:    conf,
+		callbacks:      callbacks,
+		config:         conf,
+		dubboMethod:    "method-default",
+		dubboInterface: "interface-default",
 	}
 }
 

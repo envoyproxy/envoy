@@ -99,23 +99,25 @@ type NetworkCAPI interface {
 }
 
  type TcpUpstreamCAPI interface {
-	 // UpstreamConnEnableHalfClose upstream conn EnableHalfClose
-	 UpstreamConnEnableHalfClose(f unsafe.Pointer, enableHalfClose int)
- 
-	 GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte
-	 DrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64)
-	 SetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
-	 SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
-	 GetStringValue(r unsafe.Pointer, id int) (string, bool)
- 
-	 Finalize(r unsafe.Pointer, reason int)
- 
-	 // /* These APIs are related to config, use the pointer of config. */
-	 ConfigFinalize(c unsafe.Pointer)
- 
-	 /* These APIs have nothing to do with request */
-	 Log(level LogType, message string)
-	 LogLevel() LogType
+	// UpstreamConnEnableHalfClose upstream conn EnableHalfClose
+	UpstreamConnEnableHalfClose(f unsafe.Pointer, enableHalfClose int)
+
+	HttpGetHeader(s unsafe.Pointer, key string) string
+	HttpCopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
+	GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte
+	DrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64)
+	SetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
+	GetStringValue(r unsafe.Pointer, id int) (string, bool)
+
+	Finalize(r unsafe.Pointer, reason int)
+
+	// /* These APIs are related to config, use the pointer of config. */
+	ConfigFinalize(c unsafe.Pointer)
+
+	/* These APIs have nothing to do with request */
+	Log(level LogType, message string)
+	LogLevel() LogType
  }
  
 type CommonCAPI interface {

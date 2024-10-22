@@ -132,8 +132,6 @@ bool TcpUpstream::initRequest() {
 void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "tcp upstream encodeData: {}", data.toString());
 
-  initRequest();
-
   ProcessorState& state = encoding_state_;
   Buffer::Instance& buffer = state.doDataList.push(data);
   auto s = dynamic_cast<processState*>(&state);
@@ -153,11 +151,26 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   upstream_conn_data_->connection().write(data, end_stream);
 }
 
+void TcpUpstream::doHeadersGo(ProcessorState& state, const Envoy::Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
+  state.headers = &headers;
+  auto s = dynamic_cast<processState*>(&state);
+  state.setFilterState(FilterState::ProcessingData);
+
+  dynamic_lib_->envoyGoEncodeHeader(
+  s, end_stream ? 1 : 0, headers.size(),headers.byteSize());
+
+  }
+
 Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
                                                bool end_stream) {
    
   ENVOY_LOG(debug, "tcp upstream encodeHeaders: {}", headers);
 
+  initRequest();
+
+  ProcessorState& state = encoding_state_;
+  doHeadersGo(state, headers, end_stream);
+  
   // Headers should only happen once, so use this opportunity to add the proxy
   // proto header, if configured.
 
@@ -256,6 +269,73 @@ void TcpUpstream::onBelowWriteBufferLowWatermark() {
   if (upstream_request_) {
     upstream_request_->onBelowWriteBufferLowWatermark();
   }
+}
+
+
+CAPIStatus TcpUpstream::getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
+                             int* value_len) {
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  auto m = state.headers;
+  if (m == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+  auto result = m->get(Envoy::Http::LowerCaseString(key));
+
+  if (!result.empty()) {
+    auto str = result[0]->value().getStringView();
+    *value_data = reinterpret_cast<uint64_t>(str.data());
+    *value_len = str.length();
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+void copyHeaderMapToGo(const Envoy::Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
+  auto i = 0;
+  m.iterate([&i, &go_strs, &go_buf](const Envoy::Http::HeaderEntry& header) -> Envoy::Http::HeaderMap::Iterate {
+    // It's safe to use StringView here, since we will copy them into Golang.
+    auto key = header.key().getStringView();
+    auto value = header.value().getStringView();
+
+    auto len = key.length();
+    // go_strs is the heap memory of go, and the length is twice the number of headers. So range it
+    // is safe.
+    go_strs[i].n = len;
+    go_strs[i].p = go_buf;
+    // go_buf is the heap memory of go, and the length is the total length of all keys and values in
+    // the header. So use memcpy is safe.
+    memcpy(go_buf, key.data(), len); // NOLINT(safe-memcpy)
+    go_buf += len;
+    i++;
+
+    len = value.length();
+    go_strs[i].n = len;
+    // go_buf may be an invalid pointer in Golang side when len is 0.
+    if (len > 0) {
+      go_strs[i].p = go_buf;
+      memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
+      go_buf += len;
+    }
+    i++;
+    return Envoy::Http::HeaderMap::Iterate::Continue;
+  });
+}
+
+CAPIStatus TcpUpstream::copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf) {
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  auto headers = state.headers;
+  if (headers == nullptr) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+  copyHeaderMapToGo(*headers, go_strs, go_buf);
+  return CAPIStatus::CAPIOK;
 }
 
 CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data) {

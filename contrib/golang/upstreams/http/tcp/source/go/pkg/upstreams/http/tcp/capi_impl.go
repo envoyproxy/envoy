@@ -32,6 +32,7 @@ package tcp
 */
 import "C"
 import (
+	"runtime"
 	"strings"
 	"unsafe"
 
@@ -42,6 +43,15 @@ import (
 const (
 	ValueRouteName   = 1
 	ValueClusterName = 2
+
+	// NOTE: this is a trade-off value.
+	// When the number of header is less this value, we could use the slice on the stack,
+	// otherwise, we have to allocate a new slice on the heap,
+	// and the slice on the stack will be wasted.
+	// So, we choose a value that many requests' number of header is less than this value.
+	// But also, it should not be too large, otherwise it might be waste stack memory.
+	maxStackAllocedHeaderSize = 16
+	maxStackAllocedSliceLen   = maxStackAllocedHeaderSize * 2
 )
 
 var cAPI api.TcpUpstreamCAPI = &cgoApiImpl{}
@@ -89,6 +99,49 @@ func (c *cgoApiImpl) UpstreamConnEnableHalfClose(r unsafe.Pointer, enableHalfClo
 	defer req.mutex.Unlock()
 
 	C.envoyGoTcpUpstreamConnEnableHalfClose(unsafe.Pointer(req.req), C.int(enableHalfClose))
+}
+
+func (c *cgoApiImpl) HttpGetHeader(s unsafe.Pointer, key string) string {
+	state := (*processState)(s)
+	var valueData C.uint64_t
+	var valueLen C.int
+	res := C.envoyGoTcpUpstreamGetHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
+	handleCApiStatus(res)
+	return unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
+}
+
+func (c *cgoApiImpl) HttpCopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
+	state := (*processState)(s)
+	var strs []string
+	if num <= maxStackAllocedHeaderSize {
+		// NOTE: only const length slice may be allocated on stack.
+		strs = make([]string, maxStackAllocedSliceLen)
+	} else {
+		// TODO: maybe we could use a memory pool for better performance,
+		// since these go strings in strs, will be copied into the following map.
+		strs = make([]string, num*2)
+	}
+	// NOTE: this buffer can not be reused safely,
+	// since strings may refer to this buffer as string data, and string is const in go.
+	// we have to make sure the all strings is not using before reusing,
+	// but strings may be alive beyond the request life.
+	buf := make([]byte, bytes)
+	res := C.envoyGoTcpUpstreamCopyHeaders(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
+	handleCApiStatus(res)
+
+	m := make(map[string][]string, num)
+	for i := uint64(0); i < num*2; i += 2 {
+		key := strs[i]
+		value := strs[i+1]
+
+		if v, found := m[key]; !found {
+			m[key] = []string{value}
+		} else {
+			m[key] = append(v, value)
+		}
+	}
+	runtime.KeepAlive(buf)
+	return m
 }
 
 func (c *cgoApiImpl) GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte {

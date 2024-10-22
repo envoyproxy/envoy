@@ -19,6 +19,8 @@ package tcp
 
 import (
 	"strconv"
+	"strings"
+	"sync"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -31,6 +33,150 @@ const (
 	errNotInGo         = "not proccessing Go"
 	errInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
 )
+
+// api.HeaderMap
+type headerMapImpl struct {
+	state       *processState
+	headers     map[string][]string
+	headerNum   uint64
+	headerBytes uint64
+	mutex       sync.Mutex
+}
+
+type requestOrResponseHeaderMapImpl struct {
+	headerMapImpl
+}
+
+func (h *requestOrResponseHeaderMapImpl) initHeaders() {
+	if h.headers == nil {
+		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.state), h.headerNum, h.headerBytes)
+	}
+}
+
+func (h *requestOrResponseHeaderMapImpl) GetRaw(key string) string {
+	// GetRaw is case-sensitive
+	return cAPI.HttpGetHeader(unsafe.Pointer(h.state), key)
+}
+
+func (h *requestOrResponseHeaderMapImpl) Get(key string) (string, bool) {
+	key = strings.ToLower(key)
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initHeaders()
+	value, ok := h.headers[key]
+	if !ok {
+		return "", false
+	}
+	return value[0], ok
+}
+
+func (h *requestOrResponseHeaderMapImpl) Values(key string) []string {
+	key = strings.ToLower(key)
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initHeaders()
+	value, ok := h.headers[key]
+	if !ok {
+		return nil
+	}
+	return value
+}
+
+func (h *requestOrResponseHeaderMapImpl) Set(key, value string) {
+	panic("do not support this action")
+}
+
+func (h *requestOrResponseHeaderMapImpl) Add(key, value string) {
+	panic("do not support this action")
+}
+
+func (h *requestOrResponseHeaderMapImpl) Del(key string) {
+	panic("do not support this action")
+}
+
+func (h *requestOrResponseHeaderMapImpl) Range(f func(key, value string) bool) {
+	// To avoid dead lock, methods with lock(Get, Values, Set, Add, Del) should not be used in func f.
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initHeaders()
+	for key, values := range h.headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
+}
+
+func (h *requestOrResponseHeaderMapImpl) RangeWithCopy(f func(key, value string) bool) {
+	// There is no dead lock risk in RangeWithCopy, but copy may introduce performance cost.
+	h.mutex.Lock()
+	h.initHeaders()
+	copied_headers := make(map[string][]string)
+	for key, values := range h.headers {
+		copied_headers[key] = values
+	}
+	h.mutex.Unlock()
+	for key, values := range copied_headers {
+		for _, value := range values {
+			if !f(key, value) {
+				return
+			}
+		}
+	}
+}
+
+func (h *requestOrResponseHeaderMapImpl) GetAllHeaders() map[string][]string {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initHeaders()
+	copiedHeaders := make(map[string][]string)
+	for key, value := range h.headers {
+		copiedHeaders[key] = make([]string, len(value))
+		copy(copiedHeaders[key], value)
+	}
+	return copiedHeaders
+}
+
+// api.RequestHeaderMap
+type requestHeaderMapImpl struct {
+	requestOrResponseHeaderMapImpl
+}
+
+var _ api.RequestHeaderMap = (*requestHeaderMapImpl)(nil)
+
+func (h *requestHeaderMapImpl) Scheme() string {
+	v, _ := h.Get(":scheme")
+	return v
+}
+
+func (h *requestHeaderMapImpl) Method() string {
+	v, _ := h.Get(":method")
+	return v
+}
+
+func (h *requestHeaderMapImpl) Path() string {
+	v, _ := h.Get(":path")
+	return v
+}
+
+func (h *requestHeaderMapImpl) Host() string {
+	v, _ := h.Get(":authority")
+	return v
+}
+
+func (h *requestHeaderMapImpl) SetMethod(method string) {
+	panic("do not support this action")
+}
+
+func (h *requestHeaderMapImpl) SetPath(path string) {
+	panic("do not support this action")
+}
+
+func (h *requestHeaderMapImpl) SetHost(host string) {
+	panic("do not support this action")
+}
+
 
 // api.BufferInstance
 type httpBuffer struct {

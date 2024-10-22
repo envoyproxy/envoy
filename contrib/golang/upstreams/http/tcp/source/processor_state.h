@@ -75,6 +75,7 @@ public:
   bool isBufferDataEmpty() { return data_buffer_ == nullptr || data_buffer_->length() == 0; };
   void drainBufferData();
 
+  const Envoy::Http::RequestOrResponseHeaderMap* headers{nullptr};
   BufferList doDataList;
 
 protected:

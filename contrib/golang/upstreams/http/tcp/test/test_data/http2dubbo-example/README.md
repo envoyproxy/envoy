@@ -3,6 +3,8 @@
 * To simply support http2dubbo by go extension on envoy, we only need to write one extension by golang: **golang-tcp-upstream**.
 * There are two funtion to achieve that.
 
+## EncodeHeaders
+1. get message from header fo upstream req
 
 ## EncodeData
 1. construct body from http to body

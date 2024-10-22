@@ -261,12 +261,12 @@ func (*EmptyUpstreamFilter) OnData(buffer []byte, endOfStream bool) FilterStatus
 func (*EmptyUpstreamFilter) OnEvent(event ConnectionEvent) {
 }
 
- type TcpUpstreamCallbackHandler interface {
-	 FilterCallbackHandler
-	 // EnableHalfClose only for upstream connection
-	 EnableHalfClose(enabled bool)
- }
- 
+type TcpUpstreamCallbackHandler interface {
+	FilterCallbackHandler
+	// EnableHalfClose only for upstream connection
+	EnableHalfClose(enabled bool)
+}
+
 type ConnectionCallback interface {
 	// StreamInfo returns the stream info of the connection
 	StreamInfo() StreamInfo
@@ -343,32 +343,35 @@ type GaugeMetric interface {
 type HistogramMetric interface {
 }
 
- type TcpUpstreamFilter interface {
-	 // Invoked when data is delivered from the upstream connection.
-	 EncodeData(buffer BufferInstance, endOfStream bool) (EndStream bool)
-	 // Called when data is read on from tcp upstream.
-	 OnUpstreamData(buffer BufferInstance, endOfStream bool) UpstreamDataStatus
-	 // destroy filter
-	 OnDestroy(DestroyReason)
- }
- 
- func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) bool {
-	 return true
- }
- 
- func (*EmptyTcpUpstreamFilter) OnUpstreamData(buffer BufferInstance, endOfStream bool) UpstreamDataStatus {
-	 return UpstreamDataFinish
- }
- 
- func (*EmptyTcpUpstreamFilter) OnDestroy(DestroyReason) {
- }
- 
- type TcpUpstreamFactory func(config interface{}, callbacks TcpUpstreamCallbackHandler) TcpUpstreamFilter
- 
- type TcpUpstreamConfigParser interface {
-	 // Parse the proto message to any Go value, and return error to reject the config.
-	 // This is called when Envoy receives the config from the control plane.
-	 // Also, you can define Metrics through the callbacks, and the callbacks will be nil when parsing the route config.
-	 Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
- }
- 
+type TcpUpstreamFilter interface {
+	EncodeHeaders(headerMap RequestHeaderMap, endOfStream bool)
+	// Invoked when data is delivered from the upstream connection.
+	EncodeData(buffer BufferInstance, endOfStream bool) (EndStream bool)
+	// Called when data is read on from tcp upstream.
+	OnUpstreamData(buffer BufferInstance, endOfStream bool) UpstreamDataStatus
+	// destroy filter
+	OnDestroy(DestroyReason)
+}
+
+func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, endOfStream bool) {
+}
+
+func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) bool {
+	return true
+}
+
+func (*EmptyTcpUpstreamFilter) OnUpstreamData(buffer BufferInstance, endOfStream bool) UpstreamDataStatus {
+	return UpstreamDataFinish
+}
+
+func (*EmptyTcpUpstreamFilter) OnDestroy(DestroyReason) {
+}
+
+type TcpUpstreamFactory func(config interface{}, callbacks TcpUpstreamCallbackHandler) TcpUpstreamFilter
+
+type TcpUpstreamConfigParser interface {
+	// Parse the proto message to any Go value, and return error to reject the config.
+	// This is called when Envoy receives the config from the control plane.
+	// Also, you can define Metrics through the callbacks, and the callbacks will be nil when parsing the route config.
+	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
+}

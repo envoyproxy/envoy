@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"dubbo.apache.org/dubbo-go/v3/common/constant"
 	"dubbo.apache.org/dubbo-go/v3/filter/generic/generalizer"
+	"dubbo.apache.org/dubbo-go/v3/remoting"
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 
 	hessian "github.com/apache/dubbo-go-hessian2"
@@ -17,52 +19,59 @@ type tcpUpstreamFilter struct {
 
 	callbacks api.TcpUpstreamCallbackHandler
 	config    *config
+
+	dubboMethod    string
+	dubboInterface string
 }
 
-const (
-	DEFAULT_METHOD = "method-default"
-)
+/*
+EncodeHeaders Usage:
+1. get dubbo method from headers
+2. get dubbo interface from headers
+*/
+func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, endOfStream bool) {
+	dubboMethod, _ := headerMap.Get("dubbo_method")
+	dubboInterface, _ := headerMap.Get("dubbo_interface")
+
+	f.dubboMethod = dubboMethod
+	f.dubboInterface = dubboInterface
+}
 
 /*
-	EncodeData Usage:
-	1. construct body from http to body
-	2. change dubbo method by envoy cluster_name or envoy router_name
-	3. set remote half close for conn
-	4. set envoy self not half close for conn
+EncodeData Usage:
+1. construct body from http to body
+2. change dubbo interface by envoy cluster_name or envoy router_name
+3. set remote half close for conn
+4. set envoy self not half close for conn
 */
 func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bool) bool {
 
-    // =========== step 1: get dubbo args from http body =========== // 
+	// =========== step 1: get dubbo args from http body =========== //
 	dubboArgs := make(map[string]interface{}, 0)
 	_ = json.Unmarshal(buffer.Bytes(), dubboArgs)
 
-
-    // =========== step 2: get dubbo req method by envoy cluster-name =========== // 
-	dubboMethod := DEFAULT_METHOD
+	// =========== step 2: assign dubbo interface for gray traffic by cluster =========== //
 	clusterName, _ := f.callbacks.StreamInfo().VirtualClusterName()
-	if clusterName == f.config.clusterNameForMock {
-		dubboMethod = fmt.Sprintf("method-for-cluster-%s", clusterName)
+	if clusterName == f.config.clusterNameForGrayTraffic {
+		f.dubboInterface = fmt.Sprintf("interface-for-gray-traffic-cluster-%s", clusterName)
 	}
 
-
-    // =========== step 3: construct dubbo body with dubboMethod and dubboArgs for upstream req =========== // 
-	buf := httpBodyToDubbo(dubboMethod, dubboArgs)
+	// =========== step 3: construct dubbo body with dubboMethod, dubboInterface, dubboArgs for upstream req =========== //
+	buf := httpBodyToDubbo(f.dubboMethod, f.dubboInterface, dubboArgs)
 	_ = buffer.Set(buf)
 
-	
-    // =========== step 4: enable remote half close conn by envoy router name =========== // 
-	if f.callbacks.StreamInfo().GetRouteName() == f.config.routerNameForHalfClose {
+	// =========== step 4: enable remote half close conn by envoy router name =========== //
+	if f.callbacks.StreamInfo().GetRouteName() == f.config.routerNameForEnableRemoteHalfClose {
 		f.callbacks.EnableHalfClose(true)
 	}
 
-
-    // =========== step 5: set envoy self not to half close conn =========== // 
+	// =========== step 5: set envoy self not to half close conn =========== //
 	if !f.config.envoySelfEnableHalfClose {
 		return false
-	} 
+	}
 
 	return true
-	
+
 }
 
 const (
@@ -71,19 +80,19 @@ const (
 	DUBBO_HEADER_SIZE   = 16
 
 	DUBBO_PROTOCOL_UPSTREAM_MAGIN_ERROR string = "protocol_magic_error"
-	DUBBO_PROTOCOL_HEADER_LENGTH_ERROR string = "magin_error"
-	DUBBO_PROTOCOL_TOO_MANY_DATA string = "too_many_data"
+	DUBBO_PROTOCOL_HEADER_LENGTH_ERROR  string = "magin_error"
+	DUBBO_PROTOCOL_TOO_MANY_DATA        string = "too_many_data"
 )
 
 /*
-	OnUpstreamData Usage:
-	1. verify dubbo frame format
-	2. aggregate multi dubbo frame when server has big response
-	3. convert body from dubbo to http 
+OnUpstreamData Usage:
+1. verify dubbo frame format
+2. aggregate multi dubbo frame when server has big response
+3. convert body from dubbo to http
 */
 func (f *tcpUpstreamFilter) OnUpstreamData(buffer api.BufferInstance, endOfStream bool) api.UpstreamDataStatus {
 
-    // =========== step 1: verify dubbo frame format =========== // 
+	// =========== step 1: verify dubbo frame format =========== //
 	if buffer.Len() < DUBBO_MAGIC_SIZE || binary.BigEndian.Uint16(buffer.Bytes()) != hessian.MAGIC {
 		api.LogErrorf("[OnUpstreamData] Protocol Magic error")
 		buffer.SetString(DUBBO_PROTOCOL_UPSTREAM_MAGIN_ERROR)
@@ -101,16 +110,14 @@ func (f *tcpUpstreamFilter) OnUpstreamData(buffer api.BufferInstance, endOfStrea
 		return api.UpstreamDataFailure
 	}
 
-
-    // =========== step 2: aggregate multi dubbo frame when server has big response =========== // 
+	// =========== step 2: aggregate multi dubbo frame when server has big response =========== //
 	if buffer.Len() < (int(bodyLength) + hessian.HEADER_LENGTH) {
 		api.LogInfof("[OnUpstreamData] NeedMoreData for Body")
 		return api.UpstreamDataContinue
 	}
 	api.LogInfof("[OnUpstreamData] finish Aggregation for Body")
 
-
-    // =========== step 3: convert body from dubbo to http =========== // 
+	// =========== step 3: convert body from dubbo to http =========== //
 	b := buffer.Bytes()[DUBBO_HEADER_SIZE:]
 	decoder := hessian.NewDecoder(b)
 	rsp, _ := decoder.Decode()
@@ -123,7 +130,7 @@ func (*tcpUpstreamFilter) OnDestroy(reason api.DestroyReason) {
 	api.LogInfof("golang-test [http2rpc][OnDestroy] , reason: %+v", reason)
 }
 
-func httpBodyToDubbo(methodName string, dubboArgs map[string]interface{}) []byte {
+func httpBodyToDubbo(methodName, interfaceName string, dubboArgs map[string]interface{}) []byte {
 	types := make([]string, 0, len(dubboArgs))
 	args := make([]hessian.Object, 0, len(dubboArgs))
 	attchments := map[string]interface{}{
@@ -139,11 +146,7 @@ func httpBodyToDubbo(methodName string, dubboArgs map[string]interface{}) []byte
 		if err != nil {
 			api.LogErrorf("failed to get type, %v", err)
 		}
-		obj, err := g.Generalize(arg)
-		if err != nil {
-			api.LogErrorf("generalization failed, %v", err)
-			return api.Continue
-		}
+		obj, _ := g.Generalize(arg)
 		types = append(types, typ)
 		args = append(args, obj)
 	}
@@ -154,8 +157,8 @@ func httpBodyToDubbo(methodName string, dubboArgs map[string]interface{}) []byte
 		args,
 	}
 	newIvc := invocation2.NewRPCInvocation(constant.Generic, newArgs, attchments)
-	newIvc.SetAttachment(constant.PathKey, "com.alibaba.nacos.example.dubbo.service.DemoService")
-	newIvc.SetAttachment(constant.InterfaceKey, "com.alibaba.nacos.example.dubbo.service.DemoService")
+	newIvc.SetAttachment(constant.PathKey, interfaceName)
+	newIvc.SetAttachment(constant.InterfaceKey, interfaceName)
 	newIvc.SetAttachment(constant.VersionKey, "1.0.0")
 	api.LogInfo(fmt.Sprintf("newIvc: %+v", newIvc))
 

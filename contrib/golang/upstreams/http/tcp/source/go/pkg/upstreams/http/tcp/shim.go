@@ -133,24 +133,48 @@ func getRequest(r *C.httpRequest) *httpRequest {
 	return Requests.GetReq(r)
 }
 
+//export envoyGoEncodeHeader
+func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes uint64) {
+	state := getOrCreateState(s)
+
+	req := state.request
+	if req.pInfo.paniced {
+		return
+	}
+	defer state.RecoverPanic()
+
+	filter := req.tcpUpstreamFilter
+	header := &requestHeaderMapImpl{
+		requestOrResponseHeaderMapImpl{
+			headerMapImpl{
+				state:       state,
+				headerNum:   headerNum,
+				headerBytes: headerBytes,
+			},
+		},
+	}
+	filter.EncodeHeaders(header, endStream == 1)
+
+	return
+}
+
 //export envoyGoEncodeData
 func envoyGoEncodeData(s *C.processState, endStream, buffer, length uint64) uint64 {
 	state := getOrCreateState(s)
 
 	req := state.request
-	filter := req.tcpUpstreamFilter
 	buf := &httpBuffer{
 		state:               state,
 		envoyBufferInstance: buffer,
 		length:              length,
 	}
-
 	if req.pInfo.paniced {
 		buf.SetString(req.pInfo.details)
 		return uint64(api.EndStream)
 	}
 	defer state.RecoverPanic()
 
+	filter := req.tcpUpstreamFilter
 	if filter.EncodeData(buf, endStream == uint64(api.EndStream)) {
 		return uint64(api.EndStream)
 	} else {
@@ -164,19 +188,18 @@ func envoyGoOnUpstreamData(s *C.processState, endStream, buffer, length uint64) 
 	state := getOrCreateState(s)
 
 	req := state.request
-	filter := req.tcpUpstreamFilter
 	buf := &httpBuffer{
 		state:               state,
 		envoyBufferInstance: buffer,
 		length:              length,
 	}
-
 	if req.pInfo.paniced {
 		buf.SetString(req.pInfo.details)
 		return uint64(api.UpstreamDataFailure)
 	}
 	defer state.RecoverPanic()
 
+	filter := req.tcpUpstreamFilter
 	return uint64(filter.OnUpstreamData(buf, endStream == 1))
 }
 

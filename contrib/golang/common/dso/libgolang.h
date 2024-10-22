@@ -200,7 +200,11 @@ extern GoUint64 envoyGoOnTcpUpstreamConfig(GoUint64 library_id_ptr, GoUint64 lib
 
 // go:linkname envoyGoTcpUpstreamDestroyHttpPluginConfig
 // github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http.envoyGoTcpUpstreamDestroyPluginConfig
-extern void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 id, GoInt need_delay);                                                   
+extern void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 id, GoInt need_delay);
+
+// go:linkname envoyGoEncodeHeader
+// github.com/envoyproxy/envoy/contrib/golang/filters/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp.envoyGoEncodeHeader
+extern void envoyGoEncodeHeader(processState* r, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes);
 
 // go:linkname envoyGoEncodeData
 // github.com/envoyproxy/envoy/contrib/golang/filters/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp.envoyGoEncodeData

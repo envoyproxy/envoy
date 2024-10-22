@@ -194,6 +194,8 @@ public:
               FilterConfigSharedPtr config);
   ~TcpUpstream() override;            
 
+  void doHeadersGo(ProcessorState& state, const Envoy::Http::RequestOrResponseHeaderMap& headers, bool end_stream);
+
   // GenericUpstream
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
@@ -211,6 +213,8 @@ public:
   void onBelowWriteBufferLowWatermark() override;
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+  CAPIStatus getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data, int* value_len);
+  CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
   CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
   CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
   CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,

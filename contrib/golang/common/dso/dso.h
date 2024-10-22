@@ -212,6 +212,8 @@ public:
 
   virtual void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0, GoInt p1) PURE;
 
+  virtual void envoyGoEncodeHeader(processState* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) PURE;
+
   virtual GoUint64 envoyGoEncodeData(processState* state, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) PURE;
 
   virtual GoUint64 envoyGoOnUpstreamData(processState* state, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) PURE;
@@ -229,6 +231,8 @@ public:
 
   void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0, GoInt p1) override;
 
+  void envoyGoEncodeHeader(processState* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) override;
+
   GoUint64 envoyGoEncodeData(processState* state, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) override;
 
   GoUint64 envoyGoOnUpstreamData(processState* state, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) override;
@@ -239,6 +243,8 @@ private:
   GoUint64 (*envoy_go_on_tcp_upstream_config_)(httpConfig* p0) = {nullptr};
 
   void (*envoy_go_tcp_upstream_destroy_plugin_config_)(GoUint64 p0, GoInt p1) = {nullptr};
+
+  void (*envoy_go_encode_header_)(processState* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3) = {nullptr};
 
   GoUint64 (*envoy_go_on_encode_data_)(processState* state, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) = {nullptr};
                                             
