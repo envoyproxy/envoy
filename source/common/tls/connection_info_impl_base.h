@@ -54,34 +54,50 @@ public:
 
   virtual SSL* ssl() const PURE;
 
-protected:
-  mutable std::string cached_sha_256_peer_certificate_digest_;
-  mutable std::vector<std::string> cached_sha_256_peer_certificate_digests_;
-  mutable std::string cached_sha_1_peer_certificate_digest_;
-  mutable std::vector<std::string> cached_sha_1_peer_certificate_digests_;
-  mutable std::string cached_serial_number_peer_certificate_;
-  mutable std::vector<std::string> cached_serial_numbers_peer_certificates_;
-  mutable std::string cached_issuer_peer_certificate_;
-  mutable std::string cached_subject_peer_certificate_;
-  mutable std::string cached_subject_local_certificate_;
-  mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
-  mutable std::string cached_url_encoded_pem_encoded_peer_cert_chain_;
-  mutable std::vector<std::string> cached_uri_san_peer_certificate_;
-  mutable std::vector<std::string> cached_uri_san_local_certificate_;
-  mutable std::vector<std::string> cached_dns_san_peer_certificate_;
-  mutable std::vector<std::string> cached_dns_san_local_certificate_;
-  mutable std::vector<std::string> cached_ip_san_peer_certificate_;
-  mutable std::vector<std::string> cached_ip_san_local_certificate_;
-  mutable std::vector<std::string> cached_email_san_peer_certificate_;
-  mutable std::vector<std::string> cached_email_san_local_certificate_;
-  mutable std::vector<std::string> cached_othername_san_peer_certificate_;
-  mutable std::vector<std::string> cached_othername_san_local_certificate_;
-  mutable std::vector<std::string> cached_oid_peer_certificate_;
-  mutable std::vector<std::string> cached_oid_local_certificate_;
-  mutable std::string cached_session_id_;
-  mutable std::string cached_tls_version_;
-  mutable std::string alpn_;
-  mutable std::string sni_;
+private:
+  // Original:
+  //    sizeof(::Envoy::Extensions::TransportSockets::Tls::ConnectionInfoImplBase) == 656
+
+  enum class CachedValueTag : uint8_t {
+    Alpn,
+    SessionId,
+    Sni,
+    TlsVersion,
+    UriSanLocalCertificate,
+    DnsSansLocalCertificate,
+    IpSansLocalCertificate,
+    Sha256PeerCertificateDigest,
+    Sha256PeerCertificateChainDigests,
+    Sha1PeerCertificateDigest,
+    Sha1PeerCertificateChainDigests,
+    SerialNumberPeerCertificate,
+    SerialNumbersPeerCertificates,
+    IssuerPeerCertificate,
+    SubjectPeerCertificate,
+    SubjectLocalCertificate,
+    EmailSansLocalCertificate,
+    OthernameSansLocalCertificate,
+    UriSanPeerCertificate,
+    EmailSansPeerCertificate,
+    OthernameSansPeerCertificate,
+    UrlEncodedPemEncodedPeerCertificate,
+    UrlEncodedPemEncodedPeerCertificateChain,
+    DnsSansPeerCertificate,
+    IpSansPeerCertificate,
+    OidsPeerCertificate,
+    OidsLocalCertificate,
+  };
+
+  template <typename ValueType>
+  const ValueType& getCachedValue(CachedValueTag tag,
+                                  std::function<ValueType(SSL* ssl)> create) const;
+
+  // For any given instance of this class, most of the accessors are never called, so
+  // having fixed space for cached data that isn't used is a waste. Instead, create a lookup
+  // table of cached values that are created on demand. Use a node_hash_map so that returned
+  // references are not invalidated when additional items are added.
+  using CachedValue = absl::variant<std::string, std::vector<std::string>>;
+  mutable absl::node_hash_map<CachedValueTag, CachedValue> cached_values_;
 };
 
 } // namespace Tls
