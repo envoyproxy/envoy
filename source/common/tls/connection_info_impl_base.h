@@ -55,6 +55,7 @@ public:
   virtual SSL* ssl() const PURE;
 
 private:
+  // Enum values should be the name of the calling function, but capitalized.
   enum class CachedValueTag : uint8_t {
     Alpn,
     SessionId,
@@ -85,9 +86,11 @@ private:
     OidsLocalCertificate,
   };
 
+  // Retrieve the given tag from the set of cached values, or create the value via the supplied
+  // create function and cache it. The returned reference is valid for the lifetime of this object.
   template <typename ValueType>
-  const ValueType& getCachedValue(CachedValueTag tag,
-                                  std::function<ValueType(SSL* ssl)> create) const;
+  const ValueType& getCachedValueOrCreate(CachedValueTag tag,
+                                          std::function<ValueType(SSL* ssl)> create) const;
 
   // For any given instance of this class, most of the accessors are never called, so
   // having fixed space for cached data that isn't used is a waste. Instead, create a lookup
