@@ -2838,6 +2838,22 @@ public:
     }
   }
 
+  void cleanUpSecondXdsConnection() {
+    // Cleanup the second xds connection if used.
+    if (second_xds_connection_ != nullptr) {
+      AssertionResult result = second_xds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = second_xds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      second_xds_connection_.reset();
+    }
+  }
+
+  void TearDown() override {
+    cleanUpSecondXdsConnection();
+    AdsIntegrationTest::TearDown();
+  }
+
   // Second ADS stream.
   FakeUpstream* second_xds_upstream_{};
   FakeHttpConnectionPtr second_xds_connection_;
