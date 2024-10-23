@@ -7,6 +7,7 @@ behavior_changes:
     The route cache will not be cleared by default if the wasm extension modified the request headers and
     the ABI version of wasm extension is larger then 0.2.1.
 - area: wasm
+  change: |
     Remove previously deprecated xDS attributes from ``get_property``, use ``xds`` attributes instead.
 
 minor_behavior_changes:
