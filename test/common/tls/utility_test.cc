@@ -120,6 +120,15 @@ TEST(UtilityTest, TestGetIssuer) {
             Utility::getIssuerFromCertificate(*cert));
 }
 
+TEST(UtilityTest, TestParseIssuer) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  Envoy::Ssl::ParsedX509NamePtr issuer = Utility::parseIssuerFromCertificate(*cert);
+  EXPECT_EQ("Test CA", issuer->commonName_);
+  EXPECT_EQ(1, issuer->organizationName_.size());
+  EXPECT_EQ("Lyft", issuer->organizationName_[0]);
+}
+
 TEST(UtilityTest, TestGetSerialNumber) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));

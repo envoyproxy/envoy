@@ -630,6 +630,11 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedParsedPeerSubject()->commonName_, subject->commonName_);
         EXPECT_EQ(options.expectedParsedPeerSubject()->organizationName_,
                   subject->organizationName_);
+        // Assert twice to ensure a cached value is returned and still valid.
+        const auto& subject2 = server_connection->ssl()->parsedSubjectPeerCertificate();
+        EXPECT_EQ(options.expectedParsedPeerSubject()->commonName_, subject2->commonName_);
+        EXPECT_EQ(options.expectedParsedPeerSubject()->organizationName_,
+                  subject2->organizationName_);
       }
       if (!options.expectedLocalSubject().empty()) {
         EXPECT_EQ(options.expectedLocalSubject(),
@@ -689,6 +694,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha1PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
+        EXPECT_EQ(absl::nullopt, server_connection->ssl()->parsedSubjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->emailSansPeerCertificate());

@@ -411,6 +411,10 @@ std::string Utility::getSubjectFromCertificate(X509& cert) {
   return getRFC2253NameFromCertificate(cert, CertName::Subject);
 }
 
+Envoy::Ssl::ParsedX509NamePtr Utility::parseIssuerFromCertificate(X509& cert) {
+  return parseX509NameFromCertificate(cert, CertName::Issuer);
+}
+
 Envoy::Ssl::ParsedX509NamePtr Utility::parseSubjectFromCertificate(X509& cert) {
   return parseX509NameFromCertificate(cert, CertName::Subject);
 }

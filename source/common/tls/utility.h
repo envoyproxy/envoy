@@ -88,6 +88,13 @@ std::string getIssuerFromCertificate(X509& cert);
 std::string getSubjectFromCertificate(X509& cert);
 
 /**
+ * Parse the well-known attribute values of issuer from certificate.
+ * @param cert the certificate
+ * @return Envoy::Ssl::ParsedX509NameConstSharedPtr the struct contains the parsed values.
+ */
+Envoy::Ssl::ParsedX509NamePtr parseIssuerFromCertificate(X509& cert);
+
+/**
  * Parse the well-known attribute values of subject from certificate.
  * @param cert the certificate
  * @return Envoy::Ssl::ParsedX509NameConstSharedPtr the struct contains the parsed values.

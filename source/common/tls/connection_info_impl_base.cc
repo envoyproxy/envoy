@@ -387,7 +387,7 @@ Ssl::ParsedX509NameOptConstRef ConnectionInfoImplBase::parsedSubjectPeerCertific
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
     ASSERT(!cached_parsed_subject_peer_certificate_);
-    return Ssl::ParsedX509NameOptConstRef();
+    return absl::nullopt;
   }
   cached_parsed_subject_peer_certificate_ = Utility::parseSubjectFromCertificate(*cert);
   return Ssl::ParsedX509NameOptConstRef(*cached_parsed_subject_peer_certificate_);
