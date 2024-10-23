@@ -34,7 +34,7 @@ envoy_cc_fuzz_test(
     name = "ext_proc_unit_test_fuzz",
     srcs = ["ext_proc_unit_test_fuzz.cc"],
     corpus = "ext_proc_corpus",
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         ":ext_proc_mocks",

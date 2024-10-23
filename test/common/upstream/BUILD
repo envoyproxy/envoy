@@ -93,7 +93,7 @@ envoy_cc_test(
     external_deps = [
         "abseil_optional",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "4core",
     deps = [
         ":test_cluster_manager",
         "//source/common/router:context_lib",
@@ -281,7 +281,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "load_balancer_impl_test",
     srcs = ["load_balancer_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":utility_lib",
         "//source/common/common:random_generator_lib",
@@ -486,6 +486,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//source/common/upstream:thread_aware_lb_lib",

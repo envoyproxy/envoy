@@ -49,6 +49,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["credential_injector_integration_test.cc"],
     extension_names = ["envoy.filters.http.credential_injector"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/credential_injector:config",
         "//source/extensions/http/injected_credentials/generic:config",
