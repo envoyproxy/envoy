@@ -4906,8 +4906,8 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
   auto encoder_decoder = codec_client_->startRequest(default_headers);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  // Downstream client sending 16k data.
-  const std::string body_sent(16 * 1024, 's');
+  // Downstream client sending 64k data.
+  const std::string body_sent(64 * 1024, 's');
   codec_client_->sendData(*request_encoder_, body_sent, true);
 
   // The ext_proc server receives the headers.
@@ -4917,7 +4917,6 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
   ASSERT_TRUE(header_request.has_request_headers());
 
-  // The ext_proc server receives 16 chunks of body, each chunk size is 1k.
   std::string body_received;
   bool end_stream = false;
   uint32_t total_req_body_msg = 0;
@@ -4981,7 +4980,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   auto encoder_decoder = codec_client_->startRequest(default_headers);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  const std::string body_sent(16 * 1024, 's');
+  const std::string body_sent(128 * 1024, 's');
   codec_client_->sendData(*request_encoder_, body_sent, false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
@@ -5069,8 +5068,8 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
   auto encoder_decoder = codec_client_->startRequest(default_headers);
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  // Send 128k data.
-  const std::string body_sent(128 * 1024, 's');
+
+  const std::string body_sent(256 * 1024, 's');
   codec_client_->sendData(*request_encoder_, body_sent, false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
@@ -5103,8 +5102,8 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
       // Buffer the entire body.
       body_received = absl::StrCat(body_received, request.request_body().body());
       total_req_body_msg++;
-      // After receiving every 4 body chunks, the server sends back three body responses.
-      if (total_req_body_msg % 4 == 0) {
+      // After receiving every 7 body chunks, the server sends back three body responses.
+      if (total_req_body_msg % 7 == 0) {
         if (!header_resp_sent) {
           // Before sending the 1st body response, sends a header response.
           processor_stream_->startGrpcStream();
