@@ -17,9 +17,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
-        "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
-        "//test/mocks/server:server_factory_context_mocks",
     ],
 )
 
@@ -34,6 +32,5 @@ envoy_cc_test(
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
-        "//test/mocks/server:server_mocks",
     ],
 )
