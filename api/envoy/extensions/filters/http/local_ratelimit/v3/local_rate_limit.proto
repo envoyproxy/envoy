@@ -168,7 +168,12 @@ message LocalRateLimit {
   //   4. :ref:`override limit <envoy_v3_api_field_config.route.v3.RateLimit.limit>`.
   repeated config.route.v3.RateLimit rate_limits = 17;
 
-  // Specifies limit for the lru cache which is used to store dynamic descriptors.
+  // Specifies the max dynamic descriptors kept in the cache for a particular wildcarded descriptor
+  // configured in the global :ref:`descriptors<envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.descriptors>`.
+  // Wildcarded descriptor means descriptor has one or more entries `value` omitted. For example if user has configured two descriptors
+  // with blank value entries, then max dynamic descriptors stored in the LRU cache will be 2 * dynamic_descripters_lru_cache_limit.
+  // Actual number of dynamic descriptors will depend on the cardinality of unique values received from the http request for the omitted
+  // values.
   // Default is 20.
   uint32 dynamic_descripters_lru_cache_limit = 18;
 }
