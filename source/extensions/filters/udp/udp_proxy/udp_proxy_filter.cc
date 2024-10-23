@@ -751,7 +751,6 @@ bool UdpProxyFilter::ActiveSession::setClusterInfo() {
     return false;
   }
 
-  ENVOY_LOG(debug, "cluster_ != nullptr");
   if (!cluster_->cluster_.info()
            ->resourceManager(Upstream::ResourcePriority::Default)
            .connections()
