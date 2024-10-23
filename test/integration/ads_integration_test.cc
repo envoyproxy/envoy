@@ -2890,7 +2890,7 @@ TEST_P(AdsReplacementIntegrationTest, AdipReplaceAdsConfig) {
   // Expect a reset from the first xDS source.
   EXPECT_TRUE(xds_stream_->waitForReset());
 
-  // Allow a connection to the seconds xDS source.
+  // Allow a connection to the second xDS source.
   AssertionResult result =
       second_xds_upstream_->waitForHttpConnection(*dispatcher_, second_xds_connection_);
   RELEASE_ASSERT(result, result.message());
@@ -2916,15 +2916,11 @@ TEST_P(AdsReplacementIntegrationTest, AdipReplaceAdsConfig) {
       Config::TypeUrl::get().Cluster, {buildCluster("replaced_cluster")},
       {buildCluster("replaced_cluster")}, {}, "replaced1", {}, second_xds_stream_.get());
 
-  // Wait for an updated EDS request, and CDS ACK.
+  // Wait for an updated EDS request.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "original1",
                                       {"replaced_cluster"}, {"replaced_cluster"}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "",
                                       second_xds_stream_.get()));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "replaced1", {}, {}, {},
-                                      false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                                      second_xds_stream_.get()));
-
   // Send an EDS response.
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
@@ -2932,7 +2928,10 @@ TEST_P(AdsReplacementIntegrationTest, AdipReplaceAdsConfig) {
       {buildClusterLoadAssignment("replaced_cluster")}, {}, "replaced1", {},
       second_xds_stream_.get());
 
-  // Expect an EDS ACK.
+  // Wait for a CDS and EDS ACKs.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "replaced1", {}, {}, {},
+                                      false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      second_xds_stream_.get()));
   EXPECT_TRUE(compareDiscoveryRequest(
       Config::TypeUrl::get().ClusterLoadAssignment, "replaced1", {"replaced_cluster_1"}, {}, {},
       false, Grpc::Status::WellKnownGrpcStatus::Ok, "", second_xds_stream_.get()));
