@@ -75,7 +75,6 @@ public:
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
-  EngineBuilder& setForceAlwaysUsev6(bool value);
   // Adds the hostnames that should be pre-resolved by DNS prior to the first request issued for
   // that host. When invoked, any previous preresolve hostname entries get cleared and only the ones
   // provided in the hostnames argument get set.
@@ -184,7 +183,6 @@ private:
   std::vector<std::pair<std::string, int>> quic_hints_;
   std::vector<std::string> quic_suffixes_;
   int num_timeouts_to_trigger_port_migration_ = 0;
-  bool always_use_v6_ = false;
 #if defined(__APPLE__)
   // TODO(abeyad): once stable, consider setting the default to true.
   bool respect_system_proxy_settings_ = false;

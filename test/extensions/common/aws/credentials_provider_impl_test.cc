@@ -2486,14 +2486,14 @@ public:
                  MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
-                (Api::Api&, ServerFactoryContextOptRef,
+                (Api::Api&, ServerFactoryContextOptRef, Singleton::Manager&,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, absl::string_view, absl::string_view,
                  MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                  absl::string_view),
                 (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
-                (Api::Api&, ServerFactoryContextOptRef,
+                (Api::Api&, ServerFactoryContextOptRef, Singleton::Manager&,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                  std::chrono::seconds, absl::string_view),
@@ -2505,51 +2505,53 @@ public:
   Api::ApiPtr api_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-
   NiceMock<MockCredentialsProviderChainFactories> factories_;
 };
 
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_,
+              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
+                                        DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _))
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _))
       .Times(0);
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
+                                        DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "false", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
+  EXPECT_CALL(factories_,
+              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
+  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
+                                        DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createContainerCredentialsProvider(
-                              Ref(*api_), _, _, _, _, "169.254.170.2:80/path/to/creds", _, _, ""));
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
+  EXPECT_CALL(factories_,
+              createContainerCredentialsProvider(Ref(*api_), _, _, _, _, _,
+                                                 "169.254.170.2:80/path/to/creds", _, _, ""));
+  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
+                                        DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_, createContainerCredentialsProvider(
-                              Ref(*api_), _, _, _, _, "http://host/path/to/creds", _, _, ""));
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
+                              Ref(*api_), _, _, _, _, _, "http://host/path/to/creds", _, _, ""));
+  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
+                                        DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
@@ -2557,18 +2559,19 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
   EXPECT_CALL(factories_,
-              createContainerCredentialsProvider(Ref(*api_), _, _, _, _,
+              createContainerCredentialsProvider(Ref(*api_), _, _, _, _, _,
                                                  "http://host/path/to/creds", _, _, "auth_token"));
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
+                                        DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
+  EXPECT_CALL(factories_,
+              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
+  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
+                                        DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
@@ -2580,10 +2583,11 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
               createWebIdentityCredentialsProvider(
                   Ref(*api_), _, _, _, _, "/path/to/web_token", _, "sts.region.amazonaws.com:443",
                   "aws:iam::123456789012:role/arn", "1234567890000000", _, _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_,
+              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
+                                        DummyMetadataFetcher(), factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
@@ -2591,13 +2595,14 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   EXPECT_CALL(factories_, createCredentialsFileCredentialsProvider(Ref(*api_)));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_,
+              createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   EXPECT_CALL(factories_,
               createWebIdentityCredentialsProvider(
                   Ref(*api_), _, _, _, _, "/path/to/web_token", _, "sts.region.amazonaws.com:443",
                   "aws:iam::123456789012:role/arn", "role-session-name", _, _));
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
+                                        DummyMetadataFetcher(), factories_);
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {
