@@ -48,7 +48,7 @@ public:
   MOCK_METHOD(envoy_netconf_t, addUpstreamSocketOptions,
               (Network::Socket::OptionsSharedPtr options));
 
-  MOCK_METHOD(void, onDnsHostAddOrUpdate,
+  MOCK_METHOD(absl::Status, onDnsHostAddOrUpdate,
               (const std::string& /*host*/,
                const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&));
   MOCK_METHOD(void, onDnsHostRemove, (const std::string& /*host*/));

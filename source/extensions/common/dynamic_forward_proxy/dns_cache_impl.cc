@@ -495,7 +495,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
     primary_host_info->host_info_->setDetails(details_with_maybe_trace);
 
-    runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    THROW_IF_NOT_OK(runAddUpdateCallbacks(host, primary_host_info->host_info_));
     primary_host_info->host_info_->setFirstResolveComplete();
     address_changed = true;
     stats_.host_address_changed_.inc();
@@ -530,11 +530,12 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   }
 }
 
-void DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
-                                         const DnsHostInfoSharedPtr& host_info) {
+absl::Status DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
+                                                 const DnsHostInfoSharedPtr& host_info) {
   for (auto* callbacks : update_callbacks_) {
-    callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info);
+    RETURN_IF_NOT_OK(callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info));
   }
+  return absl::OkStatus();
 }
 
 void DnsCacheImpl::runResolutionCompleteCallbacks(const std::string& host,

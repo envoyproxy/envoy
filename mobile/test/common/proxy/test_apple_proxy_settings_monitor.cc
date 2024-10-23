@@ -47,7 +47,7 @@ CFDictionaryRef TestAppleSystemProxySettingsMonitor::getSystemProxySettingsWithP
                         kCFNetworkProxiesProxyAutoConfigURLString};
 
   // Interpret the host + port as the location from which to obtain the PAC file.
-  const std::string pac_file_url = absl::StrCat("http://", host_, ":", port_);
+  const std::string pac_file_url = absl::StrCat("http://", host_, ":", port_, "/proxy.pac");
   const void* values[] = {
       CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &one_),
       CFStringCreateWithCString(kCFAllocatorDefault, pac_file_url.c_str(), kCFStringEncodingUTF8)};
