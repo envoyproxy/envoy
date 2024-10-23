@@ -85,7 +85,6 @@
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
-                                        forceIPv6:(BOOL)forceIPv6
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
                                    upstreamTlsSni:(nullable NSString *)upstreamTlsSni
                        respectSystemProxySettings:(BOOL)respectSystemProxySettings
@@ -132,7 +131,6 @@
   self.enableInterfaceBinding = enableInterfaceBinding;
   self.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
   self.enforceTrustChainVerification = enforceTrustChainVerification;
-  self.forceIPv6 = forceIPv6;
   self.enablePlatformCertificateValidation = enablePlatformCertificateValidation;
   self.upstreamTlsSni = upstreamTlsSni;
   self.respectSystemProxySettings = respectSystemProxySettings;
@@ -203,7 +201,6 @@
   builder.enableDrainPostDnsRefresh(self.enableDrainPostDnsRefresh);
   builder.enableInterfaceBinding(self.enableInterfaceBinding);
   builder.enforceTrustChainVerification(self.enforceTrustChainVerification);
-  builder.setForceAlwaysUsev6(self.forceIPv6);
   builder.addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       self.h2ConnectionKeepaliveIdleIntervalMilliseconds);
   builder.addH2ConnectionKeepaliveTimeoutSeconds(self.h2ConnectionKeepaliveTimeoutSeconds);
