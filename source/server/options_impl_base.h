@@ -55,6 +55,9 @@ public:
     parent_shutdown_time_ = parent_shutdown_time;
   }
   void setDrainStrategy(Server::DrainStrategy drain_strategy) { drain_strategy_ = drain_strategy; }
+  void setCompliancePolicy(Server::CompliancePolicy compliance_policy) {
+    compliance_policy_ = compliance_policy;
+  }
   void setLogLevel(spdlog::level::level_enum log_level) { log_level_ = log_level; }
   absl::Status setLogLevel(absl::string_view log_level);
   void setLogFormat(const std::string& log_format) {
@@ -117,6 +120,7 @@ public:
   std::chrono::seconds drainTime() const override { return drain_time_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
   Server::DrainStrategy drainStrategy() const override { return drain_strategy_; }
+  Server::CompliancePolicy compliancePolicy() const override { return compliance_policy_; }
 
   spdlog::level::level_enum logLevel() const override { return log_level_; }
   const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
@@ -199,6 +203,7 @@ private:
   std::chrono::seconds drain_time_{600};
   std::chrono::seconds parent_shutdown_time_{900};
   Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
+  Server::CompliancePolicy compliance_policy_{Server::CompliancePolicy::None};
   Server::Mode mode_{Server::Mode::Serve};
   bool hot_restart_disabled_{false};
   bool signal_handling_enabled_{true};

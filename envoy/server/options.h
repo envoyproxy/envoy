@@ -61,6 +61,24 @@ enum class DrainStrategy {
   Immediate,
 };
 
+/**
+ * Specify the FIPS compliance policy
+ */
+enum class CompliancePolicy {
+  /**
+   * No policy (Default ?)
+   */
+  None,
+
+  /**
+   * fips_202205 TLS 1.2 or 1.3
+   * See
+   * https://boringssl.googlesource.com/boringssl/+/451ea3ca3e0b61273333162564f16d190f6b6d14%5E%21/
+   */
+  FIPS_202205,
+
+};
+
 using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v3::CommandLineOptions>;
 
 /**
@@ -115,6 +133,11 @@ public:
    * @return the strategy that defines behaviour of DrainManager::drainClose();
    */
   virtual DrainStrategy drainStrategy() const PURE;
+
+  /**
+   * @return the fips compliance policy
+   */
+  virtual CompliancePolicy compliancePolicy() const PURE;
 
   /**
    * @return the delay before shutting down the parent envoy in a hot restart,
