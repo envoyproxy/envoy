@@ -651,11 +651,7 @@ ClusterManagerImpl::replaceAds(const envoy::config::core::v3::ApiConfigSource& a
 
   // Primary client must not be null, as the primary xDS source must be a valid one.
   // The failover_client may be null (no failover defined).
-  if (primary_client == nullptr) {
-    return absl::InternalError(
-        fmt::format("Could not create a valid primary gRPC service from the following config {}",
-                    ads_config.DebugString()));
-  }
+  ASSERT(primary_client != nullptr);
 
   // This will cause a disconnect from the current sources, and replacement of the clients.
   status = ads_mux_->updateMuxSource(std::move(primary_client), std::move(failover_client),
