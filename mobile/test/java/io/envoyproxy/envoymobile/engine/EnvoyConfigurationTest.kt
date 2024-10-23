@@ -84,7 +84,6 @@ class EnvoyConfigurationTest {
     enableHttp3: Boolean = true,
     enableCares: Boolean = false,
     caresFallbackResolvers: MutableList<Pair<String, Int>> = mutableListOf(Pair("1.2.3.4", 88)),
-    forceV6: Boolean = true,
     enableGro: Boolean = false,
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
@@ -132,7 +131,6 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableCares,
-      forceV6,
       enableGro,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
@@ -183,9 +181,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("hostname1")
     assertThat(resolvedTemplate).contains("hostname1")
     assertThat(resolvedTemplate).contains("num_retries { value: 3 }")
-
-    // Forcing IPv6
-    assertThat(resolvedTemplate).contains("key: \"always_use_v6\" value { bool_value: true }")
 
     // H2 Ping
     assertThat(resolvedTemplate).contains("connection_idle_interval { nanos: 222000000 }")
