@@ -25,7 +25,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":sni_to_header_filter_lib",
         ":ssl_integration_test_lib",

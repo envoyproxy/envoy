@@ -472,6 +472,7 @@ envoy_cmake(
             "libLLVMDemangle.a",
         ],
     }),
+    rbe_pool = "4core",
     tags = ["skip_on_windows"],
     alwayslink = True,
 )
