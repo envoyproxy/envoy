@@ -450,20 +450,6 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
 #endif
 }
 
-void MessageUtil::unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-#if defined(ENVOY_ENABLE_FULL_PROTOS)
-  if (!any_message.UnpackTo(&message)) {
-    throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}",
-                                           message.GetDescriptor()->full_name(),
-                                           any_message.DebugString()));
-#else
-  if (!message.ParseFromString(any_message.value())) {
-    throwEnvoyExceptionOrPanic(
-        fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
-#endif
-  }
-}
-
 absl::Status MessageUtil::unpackTo(const ProtobufWkt::Any& any_message,
                                    Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
