@@ -14,6 +14,8 @@ envoy_cc_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:no_op",
     ],
+    # factory_context_mocks needs this.
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_lib",
         "//test/extensions/dynamic_modules:util",
@@ -28,6 +30,8 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:no_op",
         "//test/extensions/dynamic_modules/test_data/rust:no_op",
     ],
+    # http_mocks needs this.
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
