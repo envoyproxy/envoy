@@ -53,5 +53,8 @@ new_features:
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
     %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
+- area: tracers
+  change: |
+    Set resource ``telemetry.sdk.*`` and scope ``otel.scope.name|version`` attributes for the OpenTelemetry tracer.
 
 deprecated:
