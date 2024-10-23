@@ -8,7 +8,6 @@ import "envoy/config/core/v3/resolver.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.network.dns_resolver.cares.v3";
 option java_outer_classname = "CaresDnsResolverProto";
@@ -26,7 +25,7 @@ message CaresDnsResolverConfig {
   // :ref:`use_resolvers_as_fallback<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
   // below dictates if the DNS client should override system defaults or only use the provided
   // resolvers if the system defaults are not available, i.e., as a fallback.
-  repeated config.core.v3.Address resolvers = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated config.core.v3.Address resolvers = 1;
 
   // If true use the resolvers listed in the
   // :ref:`resolvers<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.resolvers>`

@@ -20,7 +20,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "ratelimit_config_test",
     srcs = ["ratelimit_config_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":ratelimit_config_test_proto_cc_proto",
         "//source/common/http:header_map_lib",
