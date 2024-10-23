@@ -39,7 +39,7 @@ envoy_cc_test(
         "EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar",
         "GODEBUG": "cgocheck=0",
     },
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":example_configs_test_lib",
     ],

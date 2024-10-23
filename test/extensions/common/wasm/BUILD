@@ -42,7 +42,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:test_restriction_cpp.wasm",
     ]),
     external_deps = ["abseil_optional"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:hex_lib",

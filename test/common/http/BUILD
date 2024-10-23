@@ -278,7 +278,7 @@ envoy_cc_test(
         "conn_manager_impl_test.cc",
         "conn_manager_impl_test_2.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",

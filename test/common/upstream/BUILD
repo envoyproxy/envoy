@@ -480,6 +480,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":utility_lib",
         "//source/common/upstream:thread_aware_lb_lib",

@@ -82,7 +82,7 @@ envoy_cc_test(
     name = "extra_extensions_test",
     size = "large",
     srcs = ["extra_extensions_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         "//test/test_common:environment_lib",
     ] + select({
@@ -111,7 +111,7 @@ envoy_cc_test(
     data = [
         "//source/extensions:extensions_metadata.yaml",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         "//test/test_common:environment_lib",
     ] + select({

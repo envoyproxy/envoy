@@ -120,6 +120,8 @@ def envoy_cmake(
         postfix_script = "",
         copy_pdb = False,
         pdb_name = "",
+        rbe_pool = None,
+        repository = "",
         cmake_files_dir = "$BUILD_TMPDIR/CMakeFiles",
         generate_crosstool_file = False,
         generate_args = ["-GNinja"],
@@ -128,6 +130,10 @@ def envoy_cmake(
     cache_entries.update(default_cache_entries)
     cache_entries_debug = dict(cache_entries)
     cache_entries_debug.update(debug_cache_entries)
+    exec_properties = select({
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
 
     pf = ""
     if copy_pdb:
@@ -153,6 +159,7 @@ def envoy_cmake(
             "@envoy//bazel:dbg_build": cache_entries_debug,
             "//conditions:default": cache_entries,
         }),
+        exec_properties = exec_properties,
         generate_args = generate_args,
         targets = targets,
         # TODO: Remove install target and make this work
