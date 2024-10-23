@@ -1332,7 +1332,9 @@ use_per_packet_load_balancing: true
 TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingCannotCreateConnection) {
   InSequence s;
 
-  setup(readConfig(R"EOF(
+  const std::string session_access_log_format = "%RESPONSE_FLAGS%";
+
+  setup(accessLogConfig(R"EOF(
 stat_prefix: foo
 matcher:
   on_no_match:
@@ -1342,7 +1344,8 @@ matcher:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
         cluster: fake_cluster
 use_per_packet_load_balancing: true
-  )EOF"));
+  )EOF",
+                        session_access_log_format, ""));
 
   // Don't allow for any session.
   factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
@@ -1354,6 +1357,8 @@ use_per_packet_load_balancing: true
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                    .cluster_.info_->traffic_stats_->upstream_cx_overflow_.value());
+  EXPECT_EQ(output_.size(), 1);
+  EXPECT_EQ(output_.front(), StreamInfo::ResponseFlagUtils::UPSTREAM_OVERFLOW);
 }
 
 // Make sure socket option is set correctly if use_original_src_ip is set in case of ipv6.

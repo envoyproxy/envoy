@@ -756,6 +756,7 @@ bool UdpProxyFilter::ActiveSession::setClusterInfo() {
            .connections()
            .canCreate()) {
     ENVOY_LOG(debug, "cannot create new connection.");
+    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
     cluster_->cluster_.info()->trafficStats()->upstream_cx_overflow_.inc();
     return false;
   }
