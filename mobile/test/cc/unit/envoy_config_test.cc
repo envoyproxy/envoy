@@ -84,7 +84,6 @@ TEST(TestConfig, ConfigIsApplied) {
       .addRuntimeGuard("test_feature_false", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
-      .setForceAlwaysUsev6(true)
       .setUseGroIfAvailable(true)
       .setDeviceOs("probably-ubuntu-on-CI");
 
@@ -108,7 +107,6 @@ TEST(TestConfig, ConfigIsApplied) {
       "num_timeouts_to_trigger_port_migration { value: 4 }",
       "idle_network_timeout { seconds: 30 }",
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
-      "key: \"always_use_v6\" value { bool_value: true }",
       "key: \"prefer_quic_client_udp_gro\" value { bool_value: true }",
       "key: \"test_feature_false\" value { bool_value: true }",
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
