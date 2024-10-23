@@ -376,9 +376,7 @@ protected:
 
   void onHeadersModified(WasmHeaderMapType type) {
     if (type != WasmHeaderMapType::RequestHeaders ||
-        // No automatic route refresh if the ABI version is larger than 0.2.1 and the
-        // auto-refresh is disabled.
-        (no_auto_route_refresh_ && abi_version_ > proxy_wasm::AbiVersion::ProxyWasm_0_2_1)) {
+        abi_version_ > proxy_wasm::AbiVersion::ProxyWasm_0_2_1) {
       return;
     }
     clearRouteCache();
@@ -461,8 +459,6 @@ protected:
   absl::flat_hash_map<std::string, Filters::Common::Expr::CelStatePrototypeConstPtr>
       state_prototypes_;
 
-  const bool no_auto_route_refresh_{
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_no_automatic_route_refresh")};
   proxy_wasm::AbiVersion abi_version_{proxy_wasm::AbiVersion::Unknown};
 };
 using ContextSharedPtr = std::shared_ptr<Context>;

@@ -165,7 +165,11 @@ Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, 
   root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
-    : ContextBase(wasm, root_context_id, plugin_handle), plugin_handle_(plugin_handle) {}
+    : ContextBase(wasm, root_context_id, plugin_handle), plugin_handle_(plugin_handle) {
+  if (wasm != nullptr) {
+    abi_version_ = wasm->abi_version_;
+  }
+}
 
 Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
 Plugin* Context::plugin() const { return static_cast<Plugin*>(plugin_.get()); }
