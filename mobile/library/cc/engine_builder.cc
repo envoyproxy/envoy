@@ -227,11 +227,6 @@ EngineBuilder& EngineBuilder::setNumTimeoutsToTriggerPortMigration(int num_timeo
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
-  always_use_v6_ = value;
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) {
   enable_interface_binding_ = interface_binding_on;
   return *this;
@@ -862,7 +857,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  (*reloadable_features.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
   (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(
       use_gro_if_available_);
   ProtobufWkt::Struct& restart_features =
