@@ -33,6 +33,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.
+- area: dns
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.dns_reresolve_on_eai_again`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
@@ -46,5 +49,9 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: access_log
+  change: |
+    Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
+    %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
 
 deprecated:
