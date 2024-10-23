@@ -2847,7 +2847,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsReplacementIntegrationTest,
                          ADS_INTEGRATION_PARAMS);
 
-TEST_P(AdsReplacementIntegrationTest, AdipReplaceAdsConfig) {
+TEST_P(AdsReplacementIntegrationTest, ReplaceAdsConfig) {
   initializeTwoAds();
 
   // Check that the node is sent in each request.
