@@ -53,7 +53,7 @@ jobs:
       steps-pre: ${{ matrix.steps-pre }}
       target: ${{ matrix.target }}
       target-name: ${{ matrix.target-name }}
-      timeout-minutes: 90
+      timeout-minutes: 120
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
     strategy:
       fail-fast: false
