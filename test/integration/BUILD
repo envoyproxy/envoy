@@ -136,7 +136,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -508,7 +508,7 @@ envoy_cc_test(
     srcs = [
         "http2_flood_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 6,
     tags = [
         "cpu:3",
@@ -1041,7 +1041,7 @@ envoy_cc_test(
     name = "idle_timeout_integration_test",
     size = "large",
     srcs = ["idle_timeout_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     # As this test has many pauses for idle timeouts, it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 8,
@@ -1920,7 +1920,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 30,
     tags = [
         "cpu:3",
@@ -2009,7 +2009,7 @@ envoy_cc_test(
     srcs = [
         "tcp_async_client_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":integration_lib",
         "//test/integration/filters:test_network_async_tcp_filter_lib",
@@ -2107,7 +2107,7 @@ envoy_cc_test(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],
@@ -2421,7 +2421,7 @@ envoy_cc_test(
     name = "direct_response_integration_test",
     size = "large",
     srcs = ["direct_response_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:2",
     ],
