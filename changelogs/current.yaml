@@ -51,7 +51,7 @@ new_features:
     Added support for P-384 and P-521 curves for TLS server certificates.
 - area: xds
   change: |
-    Added support for ADS replacement by invoking `xdsManager().setAdsConfigSource()` with a new config source.
+    Added support for ADS replacement by invoking ``xdsManager().setAdsConfigSource()`` with a new config source.
 - area: access_log
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
