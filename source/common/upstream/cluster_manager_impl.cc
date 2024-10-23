@@ -62,18 +62,6 @@ void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
   }
 }
 
-// Helper function to make sure each protocol in expected_protocols is present
-// in protocols (only used for an ASSERT in debug builds)
-bool contains(const std::vector<Http::Protocol>& protocols,
-              const std::vector<Http::Protocol>& expected_protocols) {
-  for (auto protocol : expected_protocols) {
-    if (std::find(protocols.begin(), protocols.end(), protocol) == protocols.end()) {
-      return false;
-    }
-  }
-  return true;
-}
-
 absl::optional<Http::HttpServerPropertiesCache::Origin>
 getOrigin(const Network::TransportSocketOptionsConstSharedPtr& options, HostConstSharedPtr host) {
   std::string sni = std::string(host->transportSocketFactory().defaultServerNameIndication());
