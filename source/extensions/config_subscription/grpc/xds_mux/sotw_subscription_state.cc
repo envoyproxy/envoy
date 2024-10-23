@@ -59,7 +59,8 @@ void SotwSubscriptionState::handleGoodResponse(
       }
 
       auto decoded_resource =
-          DecodedResourceImpl::fromResource(*resource_decoder_, any, message.version_info());
+          THROW_OR_RETURN_VALUE(DecodedResourceImpl::fromResource(*resource_decoder_, any, message.version_info()),
+                                DecodedResourceImplPtr);
       setResourceTtl(*decoded_resource);
       if (isHeartbeatResource(*decoded_resource, message.version_info())) {
         continue;
@@ -124,7 +125,8 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
       }
 
       TRY_ASSERT_MAIN_THREAD {
-        auto decoded_resource = DecodedResourceImpl::fromResource(*resource_decoder_, resource);
+        auto decoded_resource = THROW_OR_RETURN_VALUE(DecodedResourceImpl::fromResource(*resource_decoder_, resource),
+                                                      DecodedResourceImplPtr);
         setResourceTtl(*decoded_resource);
         if (unaccounted > 0) {
           --unaccounted;

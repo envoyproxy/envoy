@@ -177,7 +177,7 @@ virtual_hosts: null
     const auto decoded_resources = TestUtility::decodeResources<RouteConfiguration>(response);
     THROW_IF_NOT_OK(
         server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
-            decoded_resources.refvec_, response.version_info()));
+            decoded_resources->refvec_, response.version_info()));
   }
 
   NiceMock<Init::MockManager> outer_init_manager_;
