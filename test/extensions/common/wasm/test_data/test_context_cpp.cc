@@ -94,20 +94,57 @@ FilterDataStatus DupReplyContext::onRequestBody(size_t, bool) {
   return FilterDataStatus::Continue;
 }
 
-class PanicReplyContext : public Context {
+class LocalReplyInRequestAndResponseContext : public Context {
 public:
-  explicit PanicReplyContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  explicit LocalReplyInRequestAndResponseContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
+  FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
+private:
+  EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
+};
+
+FilterHeadersStatus LocalReplyInRequestAndResponseContext::onRequestHeaders(uint32_t, bool) {
+  sendLocalResponse(200, "ok", "body", {});
+  return FilterHeadersStatus::Continue;
+}
+
+FilterHeadersStatus LocalReplyInRequestAndResponseContext::onResponseHeaders(uint32_t, bool) {
+  sendLocalResponse(200, "ok", "body", {});
+  return FilterHeadersStatus::Continue;
+}
+
+class PanicInRequestContext : public Context {
+public:
+  explicit PanicInRequestContext(uint32_t id, RootContext* root) : Context(id, root) {}
   FilterDataStatus onRequestBody(size_t body_buffer_length, bool end_of_stream) override;
 
 private:
   EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
 };
 
-FilterDataStatus PanicReplyContext::onRequestBody(size_t, bool) {
-  sendLocalResponse(200, "not send", "body", {});
-  int* badptr = nullptr;
-  *badptr = 0; // NOLINT(clang-analyzer-core.NullDereference)
+FilterDataStatus PanicInRequestContext::onRequestBody(size_t, bool) {
+  abort();
   return FilterDataStatus::Continue;
+}
+
+class PanicInResponseContext : public Context {
+public:
+  explicit PanicInResponseContext(uint32_t id, RootContext* root) : Context(id, root) {}
+  FilterHeadersStatus onResponseHeaders(uint32_t, bool) override;
+  FilterHeadersStatus onRequestHeaders(uint32_t, bool) override;
+
+private:
+  EnvoyRootContext* root() { return static_cast<EnvoyRootContext*>(Context::root()); }
+};
+
+FilterHeadersStatus PanicInResponseContext::onRequestHeaders(uint32_t, bool) {
+  sendLocalResponse(200, "ok", "body", {});
+  return FilterHeadersStatus::Continue;
+}
+
+FilterHeadersStatus PanicInResponseContext::onResponseHeaders(uint32_t, bool) {
+  abort();
+  return FilterHeadersStatus::Continue;
 }
 
 class InvalidGrpcStatusReplyContext : public Context {
@@ -127,9 +164,15 @@ FilterDataStatus InvalidGrpcStatusReplyContext::onRequestBody(size_t size, bool)
 static RegisterContextFactory register_DupReplyContext(CONTEXT_FACTORY(DupReplyContext),
                                                        ROOT_FACTORY(EnvoyRootContext),
                                                        "send local reply twice");
-static RegisterContextFactory register_PanicReplyContext(CONTEXT_FACTORY(PanicReplyContext),
+static RegisterContextFactory register_LocalReplyInRequestAndResponseContext(CONTEXT_FACTORY(LocalReplyInRequestAndResponseContext),
                                                          ROOT_FACTORY(EnvoyRootContext),
-                                                         "panic after sending local reply");
+                                                         "local reply in request and response");
+static RegisterContextFactory register_PanicInRequestContext(CONTEXT_FACTORY(PanicInRequestContext),
+                                                         ROOT_FACTORY(EnvoyRootContext),
+                                                         "panic during request processing");
+static RegisterContextFactory register_PanicInResponseContext(CONTEXT_FACTORY(PanicInResponseContext),
+                                                         ROOT_FACTORY(EnvoyRootContext),
+                                                         "panic during response processing");
 
 static RegisterContextFactory register_InvalidGrpcStatusReplyContext(CONTEXT_FACTORY(InvalidGrpcStatusReplyContext),
                                                          ROOT_FACTORY(EnvoyRootContext),

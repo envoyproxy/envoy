@@ -55,6 +55,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:test_context_cpp_plugin",
         "//test/extensions/common/wasm/test_data:test_cpp_plugin",
         "//test/extensions/common/wasm/test_data:test_restriction_cpp_plugin",
+        "//test/mocks/local_reply:local_reply_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
