@@ -1357,6 +1357,8 @@ use_per_packet_load_balancing: true
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                    .cluster_.info_->traffic_stats_->upstream_cx_overflow_.value());
+
+  filter_.reset();
   EXPECT_EQ(output_.size(), 1);
   EXPECT_EQ(output_.front(), StreamInfo::ResponseFlagUtils::UPSTREAM_OVERFLOW);
 }
