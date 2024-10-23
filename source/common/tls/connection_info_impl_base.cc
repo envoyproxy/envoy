@@ -15,312 +15,276 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+template <typename ValueType>
+const ValueType&
+ConnectionInfoImplBase::getCachedValueOrCreate(CachedValueTag tag,
+                                               std::function<ValueType(SSL* ssl)> create) const {
+  auto it = cached_values_.find(tag);
+  if (it != cached_values_.end()) {
+    const ValueType* val = absl::get_if<ValueType>(&it->second);
+    ASSERT(val != nullptr, "Incorrect type in variant");
+    if (val != nullptr) {
+      return *val;
+    }
+  }
+
+  auto [inserted_it, inserted] = cached_values_.emplace(tag, create(ssl()));
+  return absl::get<ValueType>(inserted_it->second);
+}
+
 bool ConnectionInfoImplBase::peerCertificatePresented() const {
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
+  const STACK_OF(CRYPTO_BUFFER)* cert(SSL_get0_peer_certificates(ssl()));
   return cert != nullptr;
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::uriSanLocalCertificate() const {
-  if (!cached_uri_san_local_certificate_.empty()) {
-    return cached_uri_san_local_certificate_;
-  }
-
-  // The cert object is not owned.
-  X509* cert = SSL_get_certificate(ssl());
-  if (!cert) {
-    ASSERT(cached_uri_san_local_certificate_.empty());
-    return cached_uri_san_local_certificate_;
-  }
-  cached_uri_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return cached_uri_san_local_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::UriSanLocalCertificate, [](SSL* ssl) {
+        // The cert object is not owned.
+        X509* cert = SSL_get_certificate(ssl);
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_URI);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::dnsSansLocalCertificate() const {
-  if (!cached_dns_san_local_certificate_.empty()) {
-    return cached_dns_san_local_certificate_;
-  }
-
-  X509* cert = SSL_get_certificate(ssl());
-  if (!cert) {
-    ASSERT(cached_dns_san_local_certificate_.empty());
-    return cached_dns_san_local_certificate_;
-  }
-  cached_dns_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_DNS);
-  return cached_dns_san_local_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::DnsSansLocalCertificate, [](SSL* ssl) {
+        X509* cert = SSL_get_certificate(ssl);
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_DNS);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::ipSansLocalCertificate() const {
-  if (!cached_ip_san_local_certificate_.empty()) {
-    return cached_ip_san_local_certificate_;
-  }
-
-  X509* cert = SSL_get_certificate(ssl());
-  if (!cert) {
-    ASSERT(cached_ip_san_local_certificate_.empty());
-    return cached_ip_san_local_certificate_;
-  }
-  cached_ip_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_IPADD);
-  return cached_ip_san_local_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::IpSansLocalCertificate, [](SSL* ssl) {
+        X509* cert = SSL_get_certificate(ssl);
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_IPADD);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::emailSansLocalCertificate() const {
-  if (!cached_email_san_local_certificate_.empty()) {
-    return cached_email_san_local_certificate_;
-  }
-
-  X509* cert = SSL_get_certificate(ssl());
-  if (!cert) {
-    ASSERT(cached_email_san_local_certificate_.empty());
-    return cached_email_san_local_certificate_;
-  }
-  cached_email_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_EMAIL);
-  return cached_email_san_local_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::EmailSansLocalCertificate, [](SSL* ssl) {
+        X509* cert = SSL_get_certificate(ssl);
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_EMAIL);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::othernameSansLocalCertificate() const {
-  if (!cached_othername_san_local_certificate_.empty()) {
-    return cached_othername_san_local_certificate_;
-  }
-
-  X509* cert = SSL_get_certificate(ssl());
-  if (!cert) {
-    ASSERT(cached_othername_san_local_certificate_.empty());
-    return cached_othername_san_local_certificate_;
-  }
-  cached_othername_san_local_certificate_ = Utility::getSubjectAltNames(*cert, GEN_OTHERNAME);
-  return cached_othername_san_local_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::OthernameSansLocalCertificate, [](SSL* ssl) {
+        X509* cert = SSL_get_certificate(ssl);
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_OTHERNAME);
+      });
 }
 
 const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
-  if (!cached_sha_256_peer_certificate_digest_.empty()) {
-    return cached_sha_256_peer_certificate_digest_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_sha_256_peer_certificate_digest_.empty());
-    return cached_sha_256_peer_certificate_digest_;
-  }
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::Sha256PeerCertificateDigest, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::string{};
+        }
 
-  std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
-  unsigned int n;
-  X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
-  RELEASE_ASSERT(n == computed_hash.size(), "");
-  cached_sha_256_peer_certificate_digest_ = Hex::encode(computed_hash);
-  return cached_sha_256_peer_certificate_digest_;
+        std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+        unsigned int n;
+        X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
+        RELEASE_ASSERT(n == computed_hash.size(), "");
+        return Hex::encode(computed_hash);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::sha256PeerCertificateChainDigests() const {
-  if (!cached_sha_256_peer_certificate_digests_.empty()) {
-    return cached_sha_256_peer_certificate_digests_;
-  }
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::Sha256PeerCertificateChainDigests, [](SSL* ssl) {
+        STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+        if (cert_chain == nullptr) {
+          return std::vector<std::string>{};
+        }
 
-  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
-  if (cert_chain == nullptr) {
-    ASSERT(cached_sha_256_peer_certificate_digests_.empty());
-    return cached_sha_256_peer_certificate_digests_;
-  }
-
-  cached_sha_256_peer_certificate_digests_ =
-      Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
-        std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
-        unsigned int n;
-        X509_digest(&cert, EVP_sha256(), computed_hash.data(), &n);
-        RELEASE_ASSERT(n == computed_hash.size(), "");
-        return Hex::encode(computed_hash);
+        return Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+          std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
+          unsigned int n;
+          X509_digest(&cert, EVP_sha256(), computed_hash.data(), &n);
+          RELEASE_ASSERT(n == computed_hash.size(), "");
+          return Hex::encode(computed_hash);
+        });
       });
-
-  return cached_sha_256_peer_certificate_digests_;
 }
 
 const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
-  if (!cached_sha_1_peer_certificate_digest_.empty()) {
-    return cached_sha_1_peer_certificate_digest_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_sha_1_peer_certificate_digest_.empty());
-    return cached_sha_1_peer_certificate_digest_;
-  }
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::Sha1PeerCertificateDigest, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::string{};
+        }
 
-  std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
-  unsigned int n;
-  X509_digest(cert.get(), EVP_sha1(), computed_hash.data(), &n);
-  RELEASE_ASSERT(n == computed_hash.size(), "");
-  cached_sha_1_peer_certificate_digest_ = Hex::encode(computed_hash);
-  return cached_sha_1_peer_certificate_digest_;
-}
-
-absl::Span<const std::string> ConnectionInfoImplBase::sha1PeerCertificateChainDigests() const {
-  if (!cached_sha_1_peer_certificate_digests_.empty()) {
-    return cached_sha_1_peer_certificate_digests_;
-  }
-
-  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
-  if (cert_chain == nullptr) {
-    ASSERT(cached_sha_1_peer_certificate_digests_.empty());
-    return cached_sha_1_peer_certificate_digests_;
-  }
-
-  cached_sha_1_peer_certificate_digests_ =
-      Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
         std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
         unsigned int n;
-        X509_digest(&cert, EVP_sha1(), computed_hash.data(), &n);
+        X509_digest(cert.get(), EVP_sha1(), computed_hash.data(), &n);
         RELEASE_ASSERT(n == computed_hash.size(), "");
         return Hex::encode(computed_hash);
       });
+}
 
-  return cached_sha_1_peer_certificate_digests_;
+absl::Span<const std::string> ConnectionInfoImplBase::sha1PeerCertificateChainDigests() const {
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::Sha1PeerCertificateChainDigests, [](SSL* ssl) {
+        STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+        if (cert_chain == nullptr) {
+          return std::vector<std::string>{};
+        }
+
+        return Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+          std::vector<uint8_t> computed_hash(SHA_DIGEST_LENGTH);
+          unsigned int n;
+          X509_digest(&cert, EVP_sha1(), computed_hash.data(), &n);
+          RELEASE_ASSERT(n == computed_hash.size(), "");
+          return Hex::encode(computed_hash);
+        });
+      });
 }
 
 const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate() const {
-  if (!cached_url_encoded_pem_encoded_peer_certificate_.empty()) {
-    return cached_url_encoded_pem_encoded_peer_certificate_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_url_encoded_pem_encoded_peer_certificate_.empty());
-    return cached_url_encoded_pem_encoded_peer_certificate_;
-  }
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::UrlEncodedPemEncodedPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::string{};
+        }
 
-  bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  RELEASE_ASSERT(buf != nullptr, "");
-  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1, "");
-  const uint8_t* output;
-  size_t length;
-  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
-  absl::string_view pem(reinterpret_cast<const char*>(output), length);
-  cached_url_encoded_pem_encoded_peer_certificate_ = absl::StrReplaceAll(
-      pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
-  return cached_url_encoded_pem_encoded_peer_certificate_;
+        bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+        RELEASE_ASSERT(buf != nullptr, "");
+        RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1, "");
+        const uint8_t* output;
+        size_t length;
+        RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
+        absl::string_view pem(reinterpret_cast<const char*>(output), length);
+        return absl::StrReplaceAll(
+            pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
+      });
 }
 
 const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateChain() const {
-  if (!cached_url_encoded_pem_encoded_peer_cert_chain_.empty()) {
-    return cached_url_encoded_pem_encoded_peer_cert_chain_;
-  }
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::UrlEncodedPemEncodedPeerCertificateChain, [](SSL* ssl) {
+        STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+        if (cert_chain == nullptr) {
+          return std::string{};
+        }
 
-  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
-  if (cert_chain == nullptr) {
-    ASSERT(cached_url_encoded_pem_encoded_peer_cert_chain_.empty());
-    return cached_url_encoded_pem_encoded_peer_cert_chain_;
-  }
+        std::string result;
+        for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
+          X509* cert = sk_X509_value(cert_chain, i);
 
-  for (uint64_t i = 0; i < sk_X509_num(cert_chain); i++) {
-    X509* cert = sk_X509_value(cert_chain, i);
+          bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
+          RELEASE_ASSERT(buf != nullptr, "");
+          RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert) == 1, "");
+          const uint8_t* output;
+          size_t length;
+          RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
 
-    bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-    RELEASE_ASSERT(buf != nullptr, "");
-    RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert) == 1, "");
-    const uint8_t* output;
-    size_t length;
-    RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
-
-    absl::string_view pem(reinterpret_cast<const char*>(output), length);
-    cached_url_encoded_pem_encoded_peer_cert_chain_ = absl::StrCat(
-        cached_url_encoded_pem_encoded_peer_cert_chain_,
-        absl::StrReplaceAll(
-            pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}}));
-  }
-  return cached_url_encoded_pem_encoded_peer_cert_chain_;
+          absl::string_view pem(reinterpret_cast<const char*>(output), length);
+          absl::StrAppend(
+              &result,
+              absl::StrReplaceAll(
+                  pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}}));
+        }
+        return result;
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::uriSanPeerCertificate() const {
-  if (!cached_uri_san_peer_certificate_.empty()) {
-    return cached_uri_san_peer_certificate_;
-  }
-
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_uri_san_peer_certificate_.empty());
-    return cached_uri_san_peer_certificate_;
-  }
-  cached_uri_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_URI);
-  return cached_uri_san_peer_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::UriSanPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_URI);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::dnsSansPeerCertificate() const {
-  if (!cached_dns_san_peer_certificate_.empty()) {
-    return cached_dns_san_peer_certificate_;
-  }
-
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_dns_san_peer_certificate_.empty());
-    return cached_dns_san_peer_certificate_;
-  }
-  cached_dns_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_DNS);
-  return cached_dns_san_peer_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::DnsSansPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_DNS);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::ipSansPeerCertificate() const {
-  if (!cached_ip_san_peer_certificate_.empty()) {
-    return cached_ip_san_peer_certificate_;
-  }
-
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_ip_san_peer_certificate_.empty());
-    return cached_ip_san_peer_certificate_;
-  }
-  cached_ip_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_IPADD, true);
-  return cached_ip_san_peer_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::IpSansPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_IPADD, true);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::emailSansPeerCertificate() const {
-  if (!cached_email_san_peer_certificate_.empty()) {
-    return cached_email_san_peer_certificate_;
-  }
-
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_email_san_peer_certificate_.empty());
-    return cached_email_san_peer_certificate_;
-  }
-  cached_email_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_EMAIL);
-  return cached_email_san_peer_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::EmailSansPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_EMAIL);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::othernameSansPeerCertificate() const {
-  if (!cached_othername_san_peer_certificate_.empty()) {
-    return cached_othername_san_peer_certificate_;
-  }
-
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_othername_san_peer_certificate_.empty());
-    return cached_othername_san_peer_certificate_;
-  }
-  cached_othername_san_peer_certificate_ = Utility::getSubjectAltNames(*cert, GEN_OTHERNAME);
-  return cached_othername_san_peer_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::OthernameSansPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getSubjectAltNames(*cert, GEN_OTHERNAME);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::oidsPeerCertificate() const {
-  if (!cached_oid_peer_certificate_.empty()) {
-    return cached_oid_peer_certificate_;
-  }
-
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_oid_peer_certificate_.empty());
-    return cached_oid_peer_certificate_;
-  }
-  cached_oid_peer_certificate_ = Utility::getCertificateExtensionOids(*cert);
-  return cached_oid_peer_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::OidsPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getCertificateExtensionOids(*cert);
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::oidsLocalCertificate() const {
-  if (!cached_oid_local_certificate_.empty()) {
-    return cached_oid_local_certificate_;
-  }
-
-  X509* cert = SSL_get_certificate(ssl());
-  if (!cert) {
-    ASSERT(cached_oid_local_certificate_.empty());
-    return cached_oid_local_certificate_;
-  }
-  cached_oid_local_certificate_ = Utility::getCertificateExtensionOids(*cert);
-  return cached_oid_local_certificate_;
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::OidsLocalCertificate, [](SSL* ssl) {
+        X509* cert = SSL_get_certificate(ssl);
+        if (!cert) {
+          return std::vector<std::string>{};
+        }
+        return Utility::getCertificateExtensionOids(*cert);
+      });
 }
 
 uint16_t ConnectionInfoImplBase::ciphersuiteId() const {
@@ -345,104 +309,85 @@ std::string ConnectionInfoImplBase::ciphersuiteString() const {
 }
 
 const std::string& ConnectionInfoImplBase::tlsVersion() const {
-  if (!cached_tls_version_.empty()) {
-    return cached_tls_version_;
-  }
-  cached_tls_version_ = SSL_get_version(ssl());
-  return cached_tls_version_;
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::TlsVersion, [](SSL* ssl) { return std::string(SSL_get_version(ssl)); });
 }
 
 const std::string& ConnectionInfoImplBase::alpn() const {
-  if (alpn_.empty()) {
+  return getCachedValueOrCreate<std::string>(CachedValueTag::Alpn, [](SSL* ssl) {
     const unsigned char* proto;
     unsigned int proto_len;
-    SSL_get0_alpn_selected(ssl(), &proto, &proto_len);
+    SSL_get0_alpn_selected(ssl, &proto, &proto_len);
     if (proto != nullptr) {
-      alpn_ = std::string(reinterpret_cast<const char*>(proto), proto_len);
+      return std::string(reinterpret_cast<const char*>(proto), proto_len);
     }
-  }
-  return alpn_;
+    return std::string{};
+  });
 }
 
 const std::string& ConnectionInfoImplBase::sni() const {
-  if (sni_.empty()) {
-    const char* proto = SSL_get_servername(ssl(), TLSEXT_NAMETYPE_host_name);
+  return getCachedValueOrCreate<std::string>(CachedValueTag::Sni, [](SSL* ssl) {
+    const char* proto = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
     if (proto != nullptr) {
-      sni_ = std::string(proto);
+      return std::string(proto);
     }
-  }
-  return sni_;
+    return std::string{};
+  });
 }
 
 const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {
-  if (!cached_serial_number_peer_certificate_.empty()) {
-    return cached_serial_number_peer_certificate_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_serial_number_peer_certificate_.empty());
-    return cached_serial_number_peer_certificate_;
-  }
-  cached_serial_number_peer_certificate_ = Utility::getSerialNumberFromCertificate(*cert.get());
-  return cached_serial_number_peer_certificate_;
+  return getCachedValueOrCreate<std::string>(
+      CachedValueTag::SerialNumberPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::string{};
+        }
+        return Utility::getSerialNumberFromCertificate(*cert.get());
+      });
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::serialNumbersPeerCertificates() const {
-  if (!cached_serial_numbers_peer_certificates_.empty()) {
-    return cached_serial_numbers_peer_certificates_;
-  }
+  return getCachedValueOrCreate<std::vector<std::string>>(
+      CachedValueTag::SerialNumbersPeerCertificates, [](SSL* ssl) {
+        STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl);
+        if (cert_chain == nullptr) {
+          return std::vector<std::string>{};
+        }
 
-  STACK_OF(X509)* cert_chain = SSL_get_peer_full_cert_chain(ssl());
-  if (cert_chain == nullptr) {
-    ASSERT(cached_serial_numbers_peer_certificates_.empty());
-    return cached_serial_numbers_peer_certificates_;
-  }
-
-  cached_serial_numbers_peer_certificates_ =
-      Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
-        return Utility::getSerialNumberFromCertificate(cert);
+        return Utility::mapX509Stack(*cert_chain, [](X509& cert) -> std::string {
+          return Utility::getSerialNumberFromCertificate(cert);
+        });
       });
-
-  return cached_serial_numbers_peer_certificates_;
 }
 
 const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
-  if (!cached_issuer_peer_certificate_.empty()) {
-    return cached_issuer_peer_certificate_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_issuer_peer_certificate_.empty());
-    return cached_issuer_peer_certificate_;
-  }
-  cached_issuer_peer_certificate_ = Utility::getIssuerFromCertificate(*cert);
-  return cached_issuer_peer_certificate_;
+  return getCachedValueOrCreate<std::string>(CachedValueTag::IssuerPeerCertificate, [](SSL* ssl) {
+    bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+    if (!cert) {
+      return std::string{};
+    }
+    return Utility::getIssuerFromCertificate(*cert);
+  });
 }
 
 const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {
-  if (!cached_subject_peer_certificate_.empty()) {
-    return cached_subject_peer_certificate_;
-  }
-  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
-  if (!cert) {
-    ASSERT(cached_subject_peer_certificate_.empty());
-    return cached_subject_peer_certificate_;
-  }
-  cached_subject_peer_certificate_ = Utility::getSubjectFromCertificate(*cert);
-  return cached_subject_peer_certificate_;
+  return getCachedValueOrCreate<std::string>(CachedValueTag::SubjectPeerCertificate, [](SSL* ssl) {
+    bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+    if (!cert) {
+      return std::string{};
+    }
+    return Utility::getSubjectFromCertificate(*cert);
+  });
 }
 
 const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
-  if (!cached_subject_local_certificate_.empty()) {
-    return cached_subject_local_certificate_;
-  }
-  X509* cert = SSL_get_certificate(ssl());
-  if (!cert) {
-    ASSERT(cached_subject_local_certificate_.empty());
-    return cached_subject_local_certificate_;
-  }
-  cached_subject_local_certificate_ = Utility::getSubjectFromCertificate(*cert);
-  return cached_subject_local_certificate_;
+  return getCachedValueOrCreate<std::string>(CachedValueTag::SubjectLocalCertificate, [](SSL* ssl) {
+    X509* cert = SSL_get_certificate(ssl);
+    if (!cert) {
+      return std::string{};
+    }
+    return Utility::getSubjectFromCertificate(*cert);
+  });
 }
 
 absl::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() const {
@@ -462,19 +407,16 @@ absl::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() c
 }
 
 const std::string& ConnectionInfoImplBase::sessionId() const {
-  if (!cached_session_id_.empty()) {
-    return cached_session_id_;
-  }
-  SSL_SESSION* session = SSL_get_session(ssl());
-  if (session == nullptr) {
-    ASSERT(cached_session_id_.empty());
-    return cached_session_id_;
-  }
+  return getCachedValueOrCreate<std::string>(CachedValueTag::SessionId, [](SSL* ssl) {
+    SSL_SESSION* session = SSL_get_session(ssl);
+    if (session == nullptr) {
+      return std::string{};
+    }
 
-  unsigned int session_id_length = 0;
-  const uint8_t* session_id = SSL_SESSION_get_id(session, &session_id_length);
-  cached_session_id_ = Hex::encode(session_id, session_id_length);
-  return cached_session_id_;
+    unsigned int session_id_length = 0;
+    const uint8_t* session_id = SSL_SESSION_get_id(session, &session_id_length);
+    return Hex::encode(session_id, session_id_length);
+  });
 }
 
 } // namespace Tls
