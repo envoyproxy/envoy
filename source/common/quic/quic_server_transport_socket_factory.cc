@@ -171,8 +171,9 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   }
   auto ctx =
       std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
-  auto [tls_context, ocsp_staple_action] = ctx->findTlsContext(
-      sni, true /* TODO: ecdsa_capable */, false /* TODO: ocsp_capable */, cert_matched_sni);
+  auto [tls_context, ocsp_staple_action] =
+      ctx->findTlsContext(sni, Ssl::CurveNIDVector{NID_X9_62_prime256v1} /* TODO: ecdsa_capable */,
+                          false /* TODO: ocsp_capable */, cert_matched_sni);
 
   // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ``ssl_ctx``.
   // Both of these members are themselves reference counted, so it is safe to use them after

@@ -54,11 +54,9 @@ enum class InsertStatus {
   // The CacheFilter started an insert, but aborted it because the cache wasn't
   // ready as a body chunk came in.
   InsertAbortedCacheCongested,
-  // The CacheFilter started an insert, but couldn't finish it because the
-  // stream was closed before the response finished. Until the CacheFilter
-  // supports caching response trailers, this will also be reported if it tries
-  // to cache a response with trailers.
-  InsertAbortedResponseIncomplete,
+  // The CacheFilter started an insert, but the filter was reset before the insert
+  // completed. The insert may or may not have gone on to completion independently.
+  FilterAbortedBeforeInsertComplete,
   // The CacheFilter attempted to update the headers of an existing cache entry.
   // This doesn't indicate  whether or not the update succeeded.
   HeaderUpdate,

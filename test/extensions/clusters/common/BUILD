@@ -23,7 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "logical_host_test",
     srcs = ["logical_host_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/clusters/common:logical_host_lib",
         "//test/mocks/network:transport_socket_mocks",
@@ -34,7 +34,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "logical_host_integration_test",
     srcs = ["logical_host_integration_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/common:logical_host_lib",

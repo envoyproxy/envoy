@@ -1697,18 +1697,18 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
-  HostImpl host(cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-                std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
-                locality,
-                envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-                envoy::config::core::v3::UNKNOWN, simTime());
-  EXPECT_EQ(cluster.info_.get(), &host.cluster());
-  EXPECT_EQ("lyft.com", host.hostname());
-  EXPECT_TRUE(host.canary());
-  EXPECT_EQ("oceania", host.locality().region());
-  EXPECT_EQ("hello", host.locality().zone());
-  EXPECT_EQ("world", host.locality().sub_zone());
-  EXPECT_EQ(1, host.priority());
+  std::unique_ptr<HostImpl> host = *HostImpl::create(
+      cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
+  EXPECT_EQ(cluster.info_.get(), &host->cluster());
+  EXPECT_EQ("lyft.com", host->hostname());
+  EXPECT_TRUE(host->canary());
+  EXPECT_EQ("oceania", host->locality().region());
+  EXPECT_EQ("hello", host->locality().zone());
+  EXPECT_EQ("world", host->locality().sub_zone());
+  EXPECT_EQ(1, host->priority());
 }
 
 TEST_F(HostImplTest, CreateConnection) {
@@ -1723,11 +1723,11 @@ TEST_F(HostImplTest, CreateConnection) {
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime());
+      envoy::config::core::v3::UNKNOWN, simTime()));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1761,11 +1761,11 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1808,11 +1808,11 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   auto proxy_info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
@@ -1866,11 +1866,11 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1919,11 +1919,11 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -2062,16 +2062,15 @@ TEST_F(HostImplTest, SkipActiveHealthCheckFlag) {
 // This is a regression test for oss-fuzz issue
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=11095
 TEST_F(HostImplTest, HealthPipeAddress) {
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
-        config.set_port_value(8000);
-        HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr,
-                                  nullptr, envoy::config::core::v3::Locality().default_instance(),
-                                  config, 1, simTime());
-      },
-      EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
+  config.set_port_value(8000);
+  EXPECT_EQ(HostDescriptionImpl::create(
+                info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr, nullptr,
+                envoy::config::core::v3::Locality().default_instance(), config, 1, simTime())
+                .status()
+                .message(),
+            "Invalid host configuration: non-zero port for non-IP address");
 }
 
 TEST_F(HostImplTest, HostAddressList) {
@@ -2086,10 +2085,10 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
   config.set_hostname("foo");
-  HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
-                            nullptr, envoy::config::core::v3::Locality().default_instance(), config,
-                            1, simTime());
-  EXPECT_EQ("foo", descr.hostnameForHealthChecks());
+  std::unique_ptr<HostDescriptionImpl> descr = *HostDescriptionImpl::create(
+      info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr, nullptr,
+      envoy::config::core::v3::Locality().default_instance(), config, 1, simTime());
+  EXPECT_EQ("foo", descr->hostnameForHealthChecks());
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
