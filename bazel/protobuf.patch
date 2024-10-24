@@ -358,3 +358,54 @@ index f6d97df6c..eeaaa8318 100644
    for (; i < n; i++) {
      uint64_t x = data[i];
      if (ZigZag) {
+diff --git a/upb/message/internal/accessors.h b/upb/message/internal/accessors.h
+index 5bbfb1e0b..6c6da17fd 100644
+--- a/upb/message/internal/accessors.h
++++ b/upb/message/internal/accessors.h
+@@ -163,7 +163,7 @@ UPB_INLINE void UPB_PRIVATE(_upb_Message_SetPresence)(
+   }
+ }
+ 
+-UPB_INLINE void UPB_PRIVATE(_upb_MiniTableField_DataCopy)(
++UPB_INLINE_IF_NOT_GCC void UPB_PRIVATE(_upb_MiniTableField_DataCopy)(
+     const upb_MiniTableField* f, void* to, const void* from) {
+   switch (UPB_PRIVATE(_upb_MiniTableField_GetRep)(f)) {
+     case kUpb_FieldRep_1Byte:
+@@ -183,7 +183,7 @@ UPB_INLINE void UPB_PRIVATE(_upb_MiniTableField_DataCopy)(
+   UPB_UNREACHABLE();
+ }
+ 
+-UPB_INLINE bool UPB_PRIVATE(_upb_MiniTableField_DataEquals)(
++UPB_INLINE_IF_NOT_GCC bool UPB_PRIVATE(_upb_MiniTableField_DataEquals)(
+     const upb_MiniTableField* f, const void* a, const void* b) {
+   switch (UPB_PRIVATE(_upb_MiniTableField_GetRep)(f)) {
+     case kUpb_FieldRep_1Byte:
+diff --git a/upb/port/def.inc b/upb/port/def.inc
+index 6aa1835f4..9a2545bd0 100644
+--- a/upb/port/def.inc
++++ b/upb/port/def.inc
+@@ -81,6 +81,12 @@ Error, UINTPTR_MAX is undefined
+ #define UPB_INLINE static
+ #endif
+ 
++#if defined(__GNUC__) && !defined(__clang__)
++#define UPB_INLINE_IF_NOT_GCC static
++#else
++#define UPB_INLINE_IF_NOT_GCC UPB_INLINE
++#endif
++
+ #ifdef UPB_BUILD_API
+ #define UPB_API UPB_EXPORT
+ #define UPB_API_INLINE UPB_EXPORT
+diff --git a/upb/port/undef.inc b/upb/port/undef.inc
+index d8453ffec..4240e5923 100644
+--- a/upb/port/undef.inc
++++ b/upb/port/undef.inc
+@@ -12,6 +12,7 @@
+ #undef UPB_MAPTYPE_STRING
+ #undef UPB_EXPORT
+ #undef UPB_INLINE
++#undef UPB_INLINE_IF_NOT_GCC
+ #undef UPB_API
+ #undef UPB_API_INLINE
+ #undef UPB_ALIGN_UP
