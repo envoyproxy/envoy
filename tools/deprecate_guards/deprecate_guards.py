@@ -25,11 +25,10 @@ from git import Repo
 
 import envoy_repo
 
-try:
-    input = raw_input  # Python 2
-except NameError:
-    pass  # Python 3
+from aio.run import runner
 
+
+ENVOY_REPO = "envoyproxy/envoy"
 # Tag issues created with these labels.
 LABELS = ['deprecation', 'tech debt', 'no stalebot']
 
@@ -44,7 +43,7 @@ def get_confirmation():
     return input('Creates issues? [yN] ').strip().lower() in ('y', 'yes')
 
 
-def create_issues(access_token, runtime_and_pr):
+def create_issues(repo, access_token, runtime_and_pr):
     """Create issues in GitHub for code to clean up old runtime guarded features.
 
     Args:
@@ -52,7 +51,7 @@ def create_issues(access_token, runtime_and_pr):
         runtime_and_pr: a list of runtime guards and the PRs and commits they were added.
     """
     git = github.Github(access_token)
-    repo = git.get_repo('envoyproxy/envoy')
+    repo = git.get_repo(repo)
 
     # Find GitHub label objects for LABELS.
     labels = []
@@ -186,17 +185,38 @@ def get_runtime_and_pr():
     sys.exit(1)
 
 
+class DeprecationRunner(runner.Runner):
+
+    def add_arguments(self, parser):
+        super().add_arguments(parser)
+        parser.add_argument("--dry-run", action="store_true")
+        parser.add_argument("--repo", default=ENVOY_REPO)
+
+    async def run(self):
+        runtime_and_pr = get_runtime_and_pr()
+
+        if not runtime_and_pr:
+            print('No code is deprecated.')
+            return
+
+        if self.args.dry_run:
+            for item in runtime_and_pr:
+                print(item)
+            return
+
+        access_token = os.getenv('GITHUB_TOKEN')
+        if not access_token:
+            print(
+                'Missing GITHUB_TOKEN: see instructions in tools/deprecate_guards/deprecate_guards.py'
+            )
+            return 1
+
+        create_issues(access_token, runtime_and_pr)
+
+
+def main(*args):
+    return DeprecationRunner(*args)()
+
+
 if __name__ == '__main__':
-    runtime_and_pr = get_runtime_and_pr()
-
-    if not runtime_and_pr:
-        print('No code is deprecated.')
-        sys.exit(0)
-
-    access_token = os.getenv('GITHUB_TOKEN')
-    if not access_token:
-        print(
-            'Missing GITHUB_TOKEN: see instructions in tools/deprecate_guards/deprecate_guards.py')
-        sys.exit(1)
-
-    create_issues(access_token, runtime_and_pr)
+    sys.exit(main(*sys.argv[1:]))
