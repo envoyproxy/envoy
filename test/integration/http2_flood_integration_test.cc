@@ -30,20 +30,13 @@ namespace {
 const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 
-bool deferredProcessing(std::tuple<Network::Address::IpVersion, Http2Impl, bool> params) {
-  return std::get<2>(params);
-}
-
 } // namespace
 
 std::string testParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http2Impl, bool>>
-        params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http2Impl>> params) {
   const Http2Impl http2_codec_impl = std::get<1>(params.param);
   return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
-                      http2_codec_impl == Http2Impl::Oghttp2 ? "Oghttp2" : "Nghttp2",
-                      deferredProcessing(params.param) ? "WithDeferredProcessing"
-                                                       : "NoDeferredProcessing");
+                      http2_codec_impl == Http2Impl::Oghttp2 ? "Oghttp2" : "Nghttp2");
 }
 
 // It is important that the new socket interface is installed before any I/O activity starts and
@@ -54,7 +47,7 @@ std::string testParamsToString(
 // TODO(#28841) parameterize to run with and without UHV
 class Http2FloodMitigationTest
     : public SocketInterfaceSwap,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http2Impl, bool>>,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, Http2Impl>>,
       public Http2RawFrameIntegrationTest {
 public:
   Http2FloodMitigationTest()
@@ -69,8 +62,6 @@ public:
                hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
     config_helper_.addConfigModifier(configureProxyStatus());
     setupHttp2ImplOverrides(std::get<1>(GetParam()));
-    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                      deferredProcessing(GetParam()) ? "true" : "false");
   }
 
   void enableUhvRuntimeFeature() {
@@ -99,8 +90,7 @@ protected:
 INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2FloodMitigationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::ValuesIn({Http2Impl::Nghttp2, Http2Impl::Oghttp2}),
-                     ::testing::Bool()),
+                     testing::ValuesIn({Http2Impl::Nghttp2, Http2Impl::Oghttp2})),
     testParamsToString);
 
 void Http2FloodMitigationTest::initializeUpstreamFloodTest() {
@@ -603,74 +593,6 @@ TEST_P(Http2FloodMitigationTest, Trailers) {
 
   // Wait for connection to be flooded with outbound trailers and disconnected.
   tcp_client_->waitForDisconnect();
-
-  // If the server codec had incorrectly thrown an exception on flood detection it would cause
-  // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed
-  // connections.
-  ASSERT_EQ(1, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
-  ASSERT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_destroy")->value());
-  // Verify that the flood check was triggered
-  EXPECT_EQ(1, test_server_->counter("http2.outbound_flood")->value());
-}
-
-// Verify flood detection by the WINDOW_UPDATE frame when a decoder filter is resuming reading from
-// the downstream via DecoderFilterBelowWriteBufferLowWatermark.
-TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
-  // This test depends on data flowing through a backed up stream eagerly (e.g. the
-  // backpressure-filter triggers above watermark when it receives headers from
-  // the downstream, and only goes below watermark if the response body has
-  // passed through the filter.). With defer processing of backed up streams however
-  // the data won't be eagerly processed as the stream is backed up.
-  // TODO(kbaichoo): Remove this test when removing this feature tag.
-  if (deferredProcessing(GetParam())) {
-    return;
-  }
-  config_helper_.prependFilter(R"EOF(
-  name: backpressure-filter
-  )EOF");
-  config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
-  // Set low window sizes in the server codec as nghttp2 sends WINDOW_UPDATE only after it consumes
-  // more than 25% of the window.
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        auto* h2_options = hcm.mutable_http2_protocol_options();
-        h2_options->mutable_initial_stream_window_size()->set_value(70000);
-        h2_options->mutable_initial_connection_window_size()->set_value(70000);
-      });
-  autonomous_upstream_ = true;
-  autonomous_allow_incomplete_streams_ = true;
-  beginSession();
-
-  write_matcher_->setWriteReturnsEgain();
-
-  // pre-fill two away from overflow
-  const auto request = Http2Frame::makePostRequest(
-      Http2Frame::makeClientStreamId(0), "host", "/test/long/url",
-      {Http2Frame::Header("response_data_blocks", "998"), Http2Frame::Header("no_trailers", "0")});
-  sendFrame(request);
-
-  // The backpressure-filter disables reading when it sees request headers, and it should prevent
-  // WINDOW_UPDATE to be sent on the following DATA frames. Send enough DATA to consume more than
-  // 25% of the 70K window so that nghttp2 will send WINDOW_UPDATE on read resumption.
-  auto data_frame =
-      Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(0), std::string(16384, '0'));
-  sendFrame(data_frame);
-  sendFrame(data_frame);
-  data_frame = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(0), std::string(16384, '1'),
-                                         Http2Frame::DataFlags::EndStream);
-  sendFrame(data_frame);
-
-  // Upstream will respond with 998 DATA frames and the backpressure-filter filter will re-enable
-  // reading on the last DATA frame. This will cause nghttp2 to send two WINDOW_UPDATE frames for
-  // stream and connection windows. Together with response DATA frames it should overflow outbound
-  // frame queue. Wait for connection to be flooded with outbound WINDOW_UPDATE frame and
-  // disconnected.
-  tcp_client_->waitForDisconnect();
-
-  EXPECT_EQ(1,
-            test_server_->counter("http.config_test.downstream_flow_control_paused_reading_total")
-                ->value());
 
   // If the server codec had incorrectly thrown an exception on flood detection it would cause
   // the entire upstream to be disconnected. Verify it is still active, and there are no destroyed

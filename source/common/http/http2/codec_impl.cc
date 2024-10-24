@@ -202,8 +202,6 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       data_deferred_(false), received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
-      defer_processing_backedup_streams_(
-          Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)),
       extend_stream_lifetime_flag_(false) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
@@ -442,7 +440,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData(bool schedule_next_iteration) {
-  if (defer_processing_backedup_streams_ && stream_manager_.hasBufferedBodyOrTrailers()) {
+  if (stream_manager_.hasBufferedBodyOrTrailers()) {
     if (!process_buffered_data_callback_) {
       process_buffered_data_callback_ = parent_.connection_.dispatcher().createSchedulableCallback(
           [this]() { processBufferedData(); });
@@ -459,36 +457,24 @@ void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData(bool schedule_
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
-  // If `defer_processing_backedup_streams_`, read disabling here can become
-  // dangerous as it can prevent us from processing buffered data.
-  if (!defer_processing_backedup_streams_) {
-    ENVOY_CONN_LOG(debug, "recv buffer over limit ", parent_.connection_);
-    ASSERT(!pending_receive_buffer_high_watermark_called_);
-    pending_receive_buffer_high_watermark_called_ = true;
-    readDisable(true);
-  }
+  // Due to deferred processing of backed up streams, this is a NOP: read
+  // disabling here can become dangerous as it can prevent us from processing
+  // buffered data.
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
-  // If `defer_processing_backedup_streams_`, we don't read disable on
+  // Due to deferred processing of backed up streams, we don't read disable on
   // high watermark, so we shouldn't read disable here.
-  if (defer_processing_backedup_streams_) {
-    if (shouldAllowPeerAdditionalStreamWindow()) {
-      // We should grant additional stream window here, in case the
-      // `pending_recv_buffer_` was blocking flow control updates
-      // from going to the peer.
-      grantPeerAdditionalStreamWindow();
-    }
-  } else {
-    ENVOY_CONN_LOG(debug, "recv buffer under limit ", parent_.connection_);
-    ASSERT(pending_receive_buffer_high_watermark_called_);
-    pending_receive_buffer_high_watermark_called_ = false;
-    readDisable(false);
+  if (shouldAllowPeerAdditionalStreamWindow()) {
+    // We should grant additional stream window here, in case the
+    // `pending_recv_buffer_` was blocking flow control updates
+    // from going to the peer.
+    grantPeerAdditionalStreamWindow();
   }
 }
 
 void ConnectionImpl::StreamImpl::decodeData() {
-  if (defer_processing_backedup_streams_ && buffersOverrun()) {
+  if (buffersOverrun()) {
     ENVOY_CONN_LOG(trace, "Stream {} buffering decodeData() call.", parent_.connection_,
                    stream_id_);
     stream_manager_.body_buffered_ = true;
@@ -508,7 +494,7 @@ void ConnectionImpl::StreamImpl::decodeData() {
     // data than the defer_processing_segment_size. Otherwise, push the
     // entire buffer through.
     const bool decode_data_in_chunk =
-        defer_processing_backedup_streams_ && stream_manager_.decodeAsChunks() &&
+        stream_manager_.decodeAsChunks() &&
         pending_recv_data_->length() > stream_manager_.defer_processing_segment_size_;
 
     if (decode_data_in_chunk) {
@@ -580,7 +566,7 @@ bool ConnectionImpl::StreamImpl::maybeDeferDecodeTrailers() {
   // 1) Buffers are overrun
   // 2) There's buffered body which should get processed before these trailers
   //    to avoid losing data.
-  if (defer_processing_backedup_streams_ && (buffersOverrun() || stream_manager_.body_buffered_)) {
+  if (buffersOverrun() || stream_manager_.body_buffered_) {
     stream_manager_.trailers_buffered_ = true;
     ENVOY_CONN_LOG(trace, "Stream {} buffering decodeTrailers() call.", parent_.connection_,
                    stream_id_);
@@ -1484,7 +1470,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
 
       stream->runResetCallbacks(reason, absl::string_view());
 
-    } else if (stream->defer_processing_backedup_streams_ && !stream->reset_reason_.has_value() &&
+    } else if (!stream->reset_reason_.has_value() &&
                stream->stream_manager_.hasBufferedBodyOrTrailers()) {
       ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
       // Buffer the call, rely on the stream->process_buffered_data_callback_
@@ -1729,15 +1715,9 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 }
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // Notify the streams based on least recently encoding to the connection.
-    for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
-      (*it)->runLowWatermarkCallbacks();
-    }
-  } else {
-    for (auto& stream : active_streams_) {
-      stream->runLowWatermarkCallbacks();
-    }
+  // Notify the streams based on least recently encoding to the connection.
+  for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
+    (*it)->runLowWatermarkCallbacks();
   }
 }
 
