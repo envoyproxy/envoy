@@ -9328,25 +9328,9 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
   Http::TestRequestHeaderMapImpl headers = genPathlessHeaders("example.com", "CONNECT");
 
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "true"}});
-
-    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                          creation_status_);
-    EXPECT_FALSE(config.route(headers, 0)->routeEntry()->connectConfig());
-  }
-
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "false"}});
-
-    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                          creation_status_);
-    EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
-  }
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_FALSE(config.route(headers, 0)->routeEntry()->connectConfig());
 }
 
 TEST_F(RouteConfigurationV2, ConnectTerminate) {
@@ -9367,25 +9351,9 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
   Http::TestRequestHeaderMapImpl headers = genPathlessHeaders("example.com", "CONNECT");
 
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "true"}});
-
-    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                          creation_status_);
-    EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
-  }
-
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "false"}});
-
-    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                          creation_status_);
-    EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
-  }
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
 }
 
 // Verifies that we're creating a new instance of the retry plugins on each call instead of
