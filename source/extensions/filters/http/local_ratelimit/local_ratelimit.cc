@@ -61,7 +61,8 @@ FilterConfig::FilterConfig(
       rate_limited_grpc_status_(
           config.rate_limited_as_resource_exhausted()
               ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
-              : absl::nullopt) {
+              : absl::nullopt),
+      tls_(context.threadLocal()) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token
@@ -109,7 +110,9 @@ FilterConfig::FilterConfig(
 
   rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
       fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, descriptors_,
-      always_consume_default_token_bucket_, std::move(share_provider));
+      always_consume_default_token_bucket_, std::move(share_provider),
+      config.dynamic_descripters_lru_cache_limit(),
+      config.local_rate_limit_per_downstream_connection());
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result FilterConfig::requestAllowed(
@@ -220,7 +223,7 @@ Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_desc
              : used_config_->requestAllowed(request_descriptors);
 }
 
-const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
+Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
   ASSERT(used_config_->rateLimitPerConnection());
 
   auto typed_state =
@@ -236,10 +239,10 @@ const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConne
     decoder_callbacks_->streamInfo().filterState()->setData(
         PerConnectionRateLimiter::key(), limiter, StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
-    return limiter->value();
+    return const_cast<Filters::Common::LocalRateLimit::LocalRateLimiterImpl&>(limiter->value());
   }
 
-  return typed_state->value();
+  return const_cast<Filters::Common::LocalRateLimit::LocalRateLimiterImpl&>(typed_state->value());
 }
 
 void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,

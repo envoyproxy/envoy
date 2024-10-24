@@ -90,6 +90,7 @@ public:
   requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
+  ThreadLocal::SlotAllocator& tls() { return tls_; }
   LocalRateLimitStats& stats() const { return stats_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   const Router::HeaderParser& requestHeadersParser() const { return *request_headers_parser_; }
@@ -164,6 +165,7 @@ private:
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
+  ThreadLocal::SlotAllocator& tls_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -193,7 +195,7 @@ private:
                            std::vector<RateLimit::LocalDescriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
-  const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
   requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
 
