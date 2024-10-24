@@ -32,19 +32,6 @@ const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interf
   return sock_interface == nullptr ? &SocketInterfaceSingleton::get() : sock_interface;
 }
 
-void throwOnError(absl::Status status) {
-  if (!status.ok()) {
-    throwEnvoyExceptionOrPanic(status.ToString());
-  }
-}
-
-InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
-  if (!address.ok()) {
-    throwOnError(address.status());
-  }
-  return *address;
-}
-
 } // namespace
 
 bool forceV6() {
@@ -108,16 +95,6 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
   }
 }
 
-Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss,
-                                                           socklen_t ss_len, bool v6only) {
-  // Though we don't have any test coverage where address validation in addressFromSockAddr() fails,
-  // this code is called in worker thread and can throw in theory. In that case, the program will
-  // crash due to uncaught exception. In practice, we don't expect any address validation in
-  // addressFromSockAddr() to fail in worker thread.
-  StatusOr<InstanceConstSharedPtr> address = addressFromSockAddr(ss, ss_len, v6only);
-  return throwOnError(address);
-}
-
 Address::InstanceConstSharedPtr
 addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t fd, bool v6only) {
   // Set v6only to false so that mapped-v6 address can be normalize to v4
@@ -138,7 +115,7 @@ addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t f
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   initHelper(address);
 }
 
@@ -148,7 +125,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, const SocketInterface* so
 Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -163,7 +140,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
 
 Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -296,7 +273,7 @@ InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::addressWithoutScopeId() const {
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   initHelper(address, v6only);
 }
 
@@ -306,7 +283,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* so
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface, bool v6only)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   sockaddr_in6 addr_in;
   memset(&addr_in, 0, sizeof(addr_in));
   addr_in.sin6_family = AF_INET6;
