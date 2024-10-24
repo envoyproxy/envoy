@@ -57,7 +57,6 @@ enum class WasmEvent : int {
   RuntimeError,
   VmCreated,
   VmShutDown,
-  VmReload,
   VmReloadBackoff,
   VmReloadSuccess,
   VmReloadFailure,

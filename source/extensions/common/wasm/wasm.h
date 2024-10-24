@@ -216,7 +216,7 @@ private:
    * handle is reloaded.
    * @return the wasm pointer of the latest handle.
    */
-  Wasm* mayReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper);
+  Wasm* maybeReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper);
 
   StatsHandlerSharedPtr stats_handler_;
   FailurePolicy failure_policy_;

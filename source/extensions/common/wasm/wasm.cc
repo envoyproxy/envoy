@@ -489,9 +489,9 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
 }
 
 // Simple helper function to get the Wasm* from a WasmHandle.
-Wasm* wasmHandleWasm(WasmHandleSharedPtr& h) { return h != nullptr ? h->wasm().get() : nullptr; }
+Wasm* getWasmOrNull(WasmHandleSharedPtr& h) { return h != nullptr ? h->wasm().get() : nullptr; }
 
-Wasm* PluginConfig::mayReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper) {
+Wasm* PluginConfig::maybeReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper) {
   // base_wasm_ is null means the plugin is not loaded successfully. Return anyway.
   if (base_wasm_ == nullptr) {
     return nullptr;
@@ -502,7 +502,7 @@ Wasm* PluginConfig::mayReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper) 
     return nullptr;
   }
 
-  Wasm* wasm = wasmHandleWasm(handle_wrapper.handle->wasmHandle());
+  Wasm* wasm = getWasmOrNull(handle_wrapper.handle->wasmHandle());
 
   // Only runtime failure will be handled by reloading logic. If the wasm is not failed or
   // failed with other errors, return it directly.
@@ -527,24 +527,24 @@ Wasm* PluginConfig::mayReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper) 
     return wasm;
   }
 
-  stats_handler_->onEvent(WasmEvent::VmReload);
-
   // Reload the handle and update it if the new handle is not failed. The timestamp will be
   // updated anyway.
   handle_wrapper.last_load = now;
   PluginHandleSharedPtr new_load = getOrCreateThreadLocalPlugin(base_wasm_, plugin_, dispatcher);
   if (new_load != nullptr) {
-    Wasm* new_wasm = wasmHandleWasm(new_load->wasmHandle());
+    Wasm* new_wasm = getWasmOrNull(new_load->wasmHandle());
     if (new_wasm == nullptr || new_wasm->isFailed()) {
       stats_handler_->onEvent(WasmEvent::VmReloadFailure);
     } else {
       stats_handler_->onEvent(WasmEvent::VmReloadSuccess);
       handle_wrapper.handle = new_load;
     }
+  } else {
+    stats_handler_->onEvent(WasmEvent::VmReloadFailure);
   }
 
   ASSERT(handle_wrapper.handle != nullptr);
-  return wasmHandleWasm(handle_wrapper.handle->wasmHandle());
+  return getWasmOrNull(handle_wrapper.handle->wasmHandle());
 }
 
 std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPluginHandleAndWasm() {
@@ -555,7 +555,7 @@ std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPlug
   if (is_singleton_handle_) {
     ASSERT(absl::holds_alternative<SinglePluginHandle>(plugin_handle_));
     OptRef<SinglePluginHandle> singleton_handle = absl::get<SinglePluginHandle>(plugin_handle_);
-    return {singleton_handle, mayReloadHandleIfNeeded(singleton_handle.ref())};
+    return {singleton_handle, maybeReloadHandleIfNeeded(singleton_handle.ref())};
   }
 
   ASSERT(absl::holds_alternative<ThreadLocalPluginHandle>(plugin_handle_));
@@ -568,7 +568,7 @@ std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPlug
     return {OptRef<SinglePluginHandle>{}, nullptr};
   }
 
-  return {plugin_handle_holder, mayReloadHandleIfNeeded(*plugin_handle_holder)};
+  return {plugin_handle_holder, maybeReloadHandleIfNeeded(*plugin_handle_holder)};
 }
 
 PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
@@ -663,7 +663,7 @@ std::shared_ptr<Context> PluginConfig::createContext() {
   }
 
   // FAIL_RELOAD is handled by the getPluginHandleAndWasm() call. If the latest
-  // wasm is still failed, return nullptr or an sense less Context.
+  // wasm is still failed, return nullptr or an empty Context.
   if (!wasm || wasm->isFailed()) {
     if (failure_policy_ == FailurePolicy::FAIL_OPEN) {
       // Fail open skips adding this filter to callbacks.

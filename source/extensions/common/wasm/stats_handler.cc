@@ -87,9 +87,6 @@ StatsHandler::StatsHandler(Stats::Scope& parent_scope, const std::string& prefix
 
 void StatsHandler::onEvent(WasmEvent event) const {
   switch (event) {
-  case WasmEvent::VmReload:
-    wasm_stats_.vm_reload_.inc();
-    break;
   case WasmEvent::VmReloadBackoff:
     wasm_stats_.vm_reload_backoff_.inc();
     break;

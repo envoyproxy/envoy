@@ -1596,7 +1596,6 @@ vm_config:
     EXPECT_NE(initial_wasm, context_wasm);
     EXPECT_EQ(context_wasm->fail_state(), proxy_wasm::FailState::Ok);
 
-    EXPECT_EQ(plugin_config_->wasmStats().vm_reload_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_success_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_backoff_.value(), 0);
 
@@ -1614,7 +1613,6 @@ vm_config:
     // The previous wasm will be returned.
     EXPECT_EQ(plugin_config_->wasm(), context_wasm);
 
-    EXPECT_EQ(plugin_config_->wasmStats().vm_reload_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_success_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_backoff_.value(), 1);
 
