@@ -84,7 +84,6 @@ TEST(TestConfig, ConfigIsApplied) {
       .addRuntimeGuard("test_feature_false", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
-      .setUseGroIfAvailable(true)
       .setDeviceOs("probably-ubuntu-on-CI");
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
