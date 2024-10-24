@@ -97,7 +97,7 @@ ActiveQuicListener::ActiveQuicListener(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, *config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
-      *connection_id_generator_, std::move(debug_visitor_factory));
+      *connection_id_generator_, debug_visitor_factory);
 
   // Create udp_packet_writer
   Network::UdpPacketWriterPtr udp_packet_writer =
@@ -261,7 +261,7 @@ void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterCh
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names, ProtobufMessage::ValidationVisitor& validation_visitor,
-    Server::Configuration::ServerFactoryContext& context)
+    Server::Configuration::ListenerFactoryContext& context)
     : concurrency_(concurrency), enabled_(config.enabled()), quic_stat_names_(quic_stat_names),
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
@@ -313,12 +313,13 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
   // Initialize connection debug visitor factory if one is configured.
   if (config.has_connection_debug_visitor_config()) {
-    connection_debug_visitor_factory_ =
-        Config::Utility::getAndCheckFactory<EnvoyQuicConnectionDebugVisitorFactoryInterface>(
+    auto& factory =
+        Config::Utility::getAndCheckFactory<EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface>(
             config.connection_debug_visitor_config());
-    if (connection_debug_visitor_factory_.has_value()) {
-      connection_debug_visitor_factory_->setContext(context_.processContext());
-    }
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        config.connection_debug_visitor_config().typed_config(),
+        context_.messageValidationVisitor(), factory);
+    connection_debug_visitor_factory_ = factory.createFactory(*message, context_);
   }
 
   // Initialize connection ID generator factory.
@@ -349,7 +350,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
             *Config::Utility::translateToFactoryConfig(config.server_preferred_address_config(),
                                                        validation_visitor,
                                                        server_preferred_address_config_factory),
-            validation_visitor, context_);
+            validation_visitor, context_.serverFactoryContext());
   }
 
   worker_selector_ =
@@ -437,7 +438,7 @@ ActiveQuicListenerFactory::createActiveQuicListener(
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, receive_ecn_, crypto_server_stream_factory,
       proof_source_factory, std::move(cid_generator), worker_selector_,
-      connection_debug_visitor_factory_, reject_new_connections_);
+      makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_);
 }
 
 } // namespace Quic

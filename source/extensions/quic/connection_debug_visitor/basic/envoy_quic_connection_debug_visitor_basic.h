@@ -41,6 +41,13 @@ private:
 
 class EnvoyQuicConnectionDebugVisitorFactoryBasic
     : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
+  std::unique_ptr<quic::QuicConnectionDebugVisitor>
+  createQuicConnectionDebugVisitor(Event::Dispatcher&, quic::QuicSession* session,
+                                   const StreamInfo::StreamInfo& stream_info) override;
+};
+
+class EnvoyQuicConnectionDebugVisitorFactoryFactoryBasic
+    : public EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface {
 public:
   std::string name() const override { return "envoy.quic.connection_debug_visitor.basic"; }
 
@@ -48,9 +55,10 @@ public:
     return std::make_unique<envoy::extensions::quic::connection_debug_visitor::v3::BasicConfig>();
   }
 
-  std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(quic::QuicSession* session,
-                                   const StreamInfo::StreamInfo& stream_info) override;
+  EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr
+  createFactory(const Protobuf::Message&, Server::Configuration::ListenerFactoryContext&) override {
+    return std::make_unique<EnvoyQuicConnectionDebugVisitorFactoryBasic>();
+  }
 };
 
 DECLARE_FACTORY(EnvoyQuicConnectionDebugVisitorFactoryBasic);

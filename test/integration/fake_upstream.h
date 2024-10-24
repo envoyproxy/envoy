@@ -39,6 +39,7 @@
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_factory_context.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/active_quic_listener.h"
@@ -866,7 +867,7 @@ private:
         if (context_ == nullptr) {
           // Only initialize this when needed to avoid slowing down non-QUIC integration tests.
           context_ = std::make_unique<
-              testing::NiceMock<Server::Configuration::MockServerFactoryContext>>();
+              testing::NiceMock<Server::Configuration::MockListenerFactoryContext>>();
         }
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
             parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
@@ -931,7 +932,7 @@ private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
     const Network::ListenerInfoConstSharedPtr listener_info_;
-    std::unique_ptr<Server::Configuration::MockServerFactoryContext> context_;
+    std::unique_ptr<Server::Configuration::MockListenerFactoryContext> context_;
   };
 
   void threadRoutine();

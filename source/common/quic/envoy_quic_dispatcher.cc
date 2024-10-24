@@ -53,7 +53,7 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     quic::ConnectionIdGeneratorInterface& generator,
-    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef&& debug_visitor_factory)
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
     : quic::QuicDispatcher(&quic_config, crypto_config, version_manager, std::move(helper),
                            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
                            std::move(alarm_factory), expected_server_connection_id_length,
@@ -65,7 +65,7 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
       quic_stats_(generateStats(listener_config.listenerScope())),
       connection_stats_({QUIC_CONNECTION_STATS(
           POOL_COUNTER_PREFIX(listener_config.listenerScope(), "quic.connection"))}),
-      debug_visitor_factory_(std::move(debug_visitor_factory)) {}
+      debug_visitor_factory_(debug_visitor_factory) {}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
                                              quic::QuicErrorCode error,

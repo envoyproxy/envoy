@@ -1143,6 +1143,7 @@ envoy_cc_test_library(
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
@@ -2561,7 +2562,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
-        "//source/extensions/quic/connection_debug_visitor:envoy_quic_connection_debug_visitor_basic",
+        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/tls/cert_validator:timed_cert_validator",
