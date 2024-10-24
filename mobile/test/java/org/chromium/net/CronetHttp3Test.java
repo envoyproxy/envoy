@@ -194,7 +194,7 @@ public class CronetHttp3Test {
   @Test
   @SmallTest
   @Feature({"Cronet"})
-  public void testNoRetryPostAfterHandshake() throws Exception {
+  public void testRetryPostAfterHandshake() throws Exception {
     setUp(printEnvoyLogs);
 
     // Do the initial HTTP/2 request to get the alt-svc response.
@@ -219,10 +219,10 @@ public class CronetHttp3Test {
 
     // Both HTTP/3 and HTTP/2 servers will reset after the request.
     assertTrue(callback.mOnErrorCalled);
-    // There are 2 requests - the initial HTTP/2 alt-svc request and the HTTP/3 request.
-    // By default, POST requests will not retry.
+    // There are 3 requests - the initial HTTP/2 alt-svc request and the HTTP/3 request.
+    // By default, POST requests will now retry.
     String stats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(stats.contains("cluster.base.upstream_rq_total: 2"));
+    assertTrue(stats.contains("cluster.base.upstream_rq_total: 3"));
   }
 
   // Set up to use HTTP/3, then force HTTP/3 to fail post-handshake. The request should

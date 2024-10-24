@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: wasm
+  change: |
+    Remove previously deprecated xDS attributes from ``get_property``, use ``xds`` attributes instead.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -28,16 +31,40 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: router
+  change: |
+    Removed runtime guard ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
+- area: load balancing
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.edf_lb_host_scheduler_init_fix`` and legacy code paths.
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.
+- area: dns
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.dns_reresolve_on_eai_again`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime flag ``envoy.restart_features.quic_handle_certs_with_shared_tls_code`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
 
 new_features:
+- area: aws_request_signing
+  change: |
+    Added an optional field :ref:`credential_provider
+    <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>`
+    to the AWS request signing filter to explicitly specify a source for AWS credentials.
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: access_log
+  change: |
+    Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
+    %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
+- area: http_inspector
+  change: |
+    Added default-false ``envoy.reloadable_features.http_inspector_use_balsa_parser`` for HttpInspector to use BalsaParser.
 
 deprecated:

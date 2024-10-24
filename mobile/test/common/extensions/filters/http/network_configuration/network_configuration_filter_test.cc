@@ -48,7 +48,7 @@ public:
   MOCK_METHOD(envoy_netconf_t, addUpstreamSocketOptions,
               (Network::Socket::OptionsSharedPtr options));
 
-  MOCK_METHOD(void, onDnsHostAddOrUpdate,
+  MOCK_METHOD(absl::Status, onDnsHostAddOrUpdate,
               (const std::string& /*host*/,
                const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&));
   MOCK_METHOD(void, onDnsHostRemove, (const std::string& /*host*/));
@@ -191,6 +191,7 @@ public:
   MOCK_METHOD(Network::ProxyResolutionResult, resolveProxy,
               (const std::string& target_url_string, std::vector<Network::ProxySettings>& proxies,
                Network::ProxySettingsResolvedCallback proxy_resolution_completed));
+  MOCK_METHOD(void, setDispatcher, (Event::Dispatcher * dispatcher));
 };
 
 class NetworkConfigurationFilterProxyResolverApiTest : public NetworkConfigurationFilterTest {

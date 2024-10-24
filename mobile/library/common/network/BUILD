@@ -108,6 +108,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":proxy_settings_lib",
+        "@envoy//envoy/event:dispatcher_interface",
     ],
 )
 
@@ -150,6 +151,9 @@ envoy_cc_library(
             "//library/common/apple:utility_lib",
             "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
             "//library/common/types:c_types_lib",
+            "@envoy//envoy/event:dispatcher_interface",
+            "@envoy//source/common/common:thread_impl_lib_posix",
+            "@envoy//source/common/common:thread_lib",
         ],
         "//conditions:default": [],
     }),
