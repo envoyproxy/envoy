@@ -14,7 +14,7 @@ class TlsCertificateConfigImpl : public TlsCertificateConfig {
 public:
   static absl::StatusOr<std::unique_ptr<TlsCertificateConfigImpl>>
   create(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-         Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api);
+         Server::Configuration::ServerFactoryContext& factory_context);
 
   const std::string& certificateChain() const override { return certificate_chain_; }
   const std::string& certificateChainPath() const override { return certificate_chain_path_; }
@@ -33,8 +33,7 @@ public:
 private:
   TlsCertificateConfigImpl(
       const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
-      absl::Status& creation_status);
+      Server::Configuration::ServerFactoryContext& factory_context, absl::Status& creation_status);
 
   const std::string certificate_chain_;
   const std::string certificate_chain_path_;

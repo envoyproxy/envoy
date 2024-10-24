@@ -185,7 +185,7 @@ public:
   CryptoMbPrivateKeyMethodProvider(
       const envoy::extensions::private_key_providers::cryptomb::v3alpha::
           CryptoMbPrivateKeyMethodConfig& config,
-      Server::Configuration::TransportSocketFactoryContext& private_key_provider_context,
+      Server::Configuration::ServerFactoryContext& private_key_provider_context,
       IppCryptoSharedPtr ipp);
 
   // Ssl::PrivateKeyMethodProvider

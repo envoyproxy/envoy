@@ -74,7 +74,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       }));
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
-  ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
+  ON_CALL(factory_context_.server_context_, sslContextManager())
+      .WillByDefault(ReturnRef(context_manager_));
   ON_CALL(factory_context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
 
 #ifndef ENVOY_ADMIN_FUNCTIONALITY

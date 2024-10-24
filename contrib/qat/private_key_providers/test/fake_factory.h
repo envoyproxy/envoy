@@ -78,7 +78,7 @@ public:
   // Ssl::PrivateKeyMethodProviderInstanceFactory
   Ssl::PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
       const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& message,
-      Server::Configuration::TransportSocketFactoryContext& private_key_provider_context) override;
+      Server::Configuration::ServerFactoryContext& private_key_provider_context) override;
   std::string name() const override { return "qat"; };
 };
 

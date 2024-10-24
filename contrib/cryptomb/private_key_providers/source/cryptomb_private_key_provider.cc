@@ -681,11 +681,10 @@ void CryptoMbPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
 CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::cryptomb::v3alpha::
         CryptoMbPrivateKeyMethodConfig& conf,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp)
-    : api_(factory_context.serverFactoryContext().api()),
-      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(
-          factory_context.serverFactoryContext().threadLocal())),
-      stats_(generateCryptoMbStats("cryptomb", factory_context.statsScope())) {
+    Server::Configuration::ServerFactoryContext& factory_context, IppCryptoSharedPtr ipp)
+    : api_(factory_context.api()),
+      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(factory_context.threadLocal())),
+      stats_(generateCryptoMbStats("cryptomb", factory_context.scope())) {
 
   if (!ipp->mbxIsCryptoMbApplicable(0)) {
     ENVOY_LOG(warn, "Multi-buffer CPU instructions not available.");
