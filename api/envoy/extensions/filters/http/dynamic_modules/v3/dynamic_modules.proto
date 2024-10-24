@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: HTTP filter for dynamic modules]
+
+// Configuration of the HTTP filter for dynamic modules. This filter allows loading shared object files
+// that can be loaded via dlopen by the HTTP filter.
+//
+// A module can be loaded by multiple HTTP filters, hence the program can be structured in a way that
+// the module is loaded only once and shared across multiple filters providing multiple functionalities.
+//
+// Currently, the implementation is work in progress and not usable.
+message DynamicModuleFilter {
+  // Specifies the shared-object level configuration.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1;
+
+  // The name for this filter configuration. This can be used to distinguish between different filter implementations
+  // inside a dynamic module. For example, a module can have completely different filter implementations.
+  // When Envoy receives this configuration, it passes the filter_name to the dynamic module's HTTP filter config init function
+  // together with the filter_config.
+  // That way a module can decide which in-module filter implementation to use based on the name at load time.
+  string filter_name = 2;
+
+  // The configuration for the filter chosen by filter_name. This is passed to the module's HTTP filter initialization function.
+  // Together with the filter_name, the module can decide which in-module filter implementation to use and
+  // fine-tune the behavior of the filter.
+  //
+  // For example, if a module has two filter implementations, one for logging and one for header manipulation,
+  // filter_name is used to choose either logging or header manipulation. The filter_config can be used to
+  // configure the logging level or the header manipulation behavior.
+  string filter_config = 3;
+}

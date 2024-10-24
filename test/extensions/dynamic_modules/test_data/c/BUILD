@@ -2,7 +2,10 @@ load("//test/extensions/dynamic_modules/test_data/c:test_data.bzl", "test_progra
 
 licenses(["notice"])  # Apache 2
 
-package(default_visibility = ["//test/extensions/dynamic_modules:__pkg__"])
+package(default_visibility = [
+    "//test/extensions/dynamic_modules:__pkg__",
+    "//test/extensions/dynamic_modules/http:__pkg__",
+])
 
 test_program(name = "no_op")
 

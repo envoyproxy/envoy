@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "compressor_test",
     srcs = ["brotli_compressor_impl_test.cc"],
     extension_names = ["envoy.compression.brotli.compressor"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/compression/brotli/compressor:config",
         "//source/extensions/compression/brotli/decompressor:decompressor_lib",
