@@ -2,6 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
+#include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 #include "test/mocks/server/tracer_factory_context.h"
@@ -81,8 +82,21 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
 
   EXPECT_EQ(resource.schema_url_, "");
 
-  // Only the service name was added to the resource
-  EXPECT_EQ(1, resource.attributes_.size());
+  // Expected default attributes
+  ResourceAttributes expected_attributes = {
+      {"service.name", "my-service"},
+      {"telemetry.sdk.language", "cpp"},
+      {"telemetry.sdk.name", "envoy"},
+      {"telemetry.sdk.version", Envoy::VersionInfo::version()}};
+
+  EXPECT_EQ(4, resource.attributes_.size());
+
+  for (auto& actual : resource.attributes_) {
+    auto expected = expected_attributes.find(actual.first);
+
+    EXPECT_TRUE(expected != expected_attributes.end());
+    EXPECT_EQ(expected->second, actual.second);
+  }
 }
 
 // Verifies a resource with the default service name is returned when no detectors + static service
@@ -103,7 +117,7 @@ TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
   EXPECT_EQ(resource.schema_url_, "");
 
   // service.name receives the unknown value when not configured
-  EXPECT_EQ(1, resource.attributes_.size());
+  EXPECT_EQ(4, resource.attributes_.size());
   auto service_name = resource.attributes_.find("service.name");
   EXPECT_EQ("unknown_service:envoy", service_name->second);
 }
@@ -129,7 +143,12 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
 
   // Expected merged attributes from all detectors
   ResourceAttributes expected_attributes = {
-      {"service.name", "my-service"}, {"key1", "val1"}, {"key2", "val2"}};
+      {"service.name", "my-service"},
+      {"telemetry.sdk.language", "cpp"},
+      {"telemetry.sdk.name", "envoy"},
+      {"telemetry.sdk.version", Envoy::VersionInfo::version()},
+      {"key1", "val1"},
+      {"key2", "val2"}};
 
   const std::string yaml_string = R"EOF(
     grpc_service:
@@ -155,7 +174,7 @@ TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
 
   // The resource should contain all 3 merged attributes
   // service.name + 1 for each detector
-  EXPECT_EQ(3, resource.attributes_.size());
+  EXPECT_EQ(6, resource.attributes_.size());
 
   for (auto& actual : resource.attributes_) {
     auto expected = expected_attributes.find(actual.first);

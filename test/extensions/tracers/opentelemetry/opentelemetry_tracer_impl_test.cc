@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
@@ -203,6 +204,9 @@ resource_spans:
       value:
         string_value: "val1"
   scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
     spans:
       trace_id: "AAA"
       span_id: "AAA"
@@ -217,7 +221,10 @@ resource_spans:
   ON_CALL(stream_info_, startTime()).WillByDefault(Return(timestamp));
 
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
-  TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
   auto* expected_span =
       request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
   expected_span->set_trace_id(absl::HexStringToBytes(trace_id_hex));
@@ -577,6 +584,9 @@ resource_spans:
       value:
         string_value: "val1"
   scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
     spans:
       trace_id: "AAA"
       span_id: "AAA"
@@ -594,7 +604,10 @@ resource_spans:
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
-  TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
   std::string generated_int_hex = Hex::uint64ToHex(generated_int);
   auto* expected_span =
       request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
@@ -647,6 +660,9 @@ resource_spans:
       value:
         string_value: "val1"
   scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
     spans:
       trace_id: "AAA"
       span_id: "AAA"
@@ -669,7 +685,10 @@ resource_spans:
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
-  TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
   std::string generated_int_hex = Hex::uint64ToHex(generated_int);
   auto* expected_span =
       request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
@@ -724,6 +743,9 @@ resource_spans:
       value:
         string_value: "val1"
   scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
     spans:
       trace_id: "AAA"
       span_id: "AAA"
@@ -752,7 +774,10 @@ resource_spans:
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
-  TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
   std::string generated_int_hex = Hex::uint64ToHex(generated_int);
   auto* expected_span =
       request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
@@ -847,6 +872,9 @@ resource_spans:
       value:
         string_value: "val1"
   scope_spans:
+    scope:
+      name: "envoy"
+      version: {}
     spans:
       trace_id: "AAA"
       span_id: "AAA"
@@ -857,7 +885,10 @@ resource_spans:
   )";
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest request_proto;
   int64_t timestamp_ns = std::chrono::nanoseconds(timestamp.time_since_epoch()).count();
-  TestUtility::loadFromYaml(fmt::format(request_yaml, timestamp_ns, timestamp_ns), request_proto);
+  absl::string_view envoy_version = Envoy::VersionInfo::version();
+
+  TestUtility::loadFromYaml(fmt::format(request_yaml, envoy_version, timestamp_ns, timestamp_ns),
+                            request_proto);
   std::string generated_int_hex = Hex::uint64ToHex(generated_int);
   auto* expected_span =
       request_proto.mutable_resource_spans(0)->mutable_scope_spans(0)->mutable_spans(0);
