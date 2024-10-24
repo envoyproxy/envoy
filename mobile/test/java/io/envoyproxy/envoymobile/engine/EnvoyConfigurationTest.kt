@@ -197,7 +197,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("client_connection_options: \"MPQC\"");
     assertThat(resolvedTemplate).doesNotContain("connection_keepalive { initial_interval {")
 
-
     // Per Host Limits
     assertThat(resolvedTemplate).contains("max_connections { value: 543 }")
 
@@ -262,6 +261,9 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("envoy.network.dns_resolver.cares")
     assertThat(resolvedTemplate).contains("address: \"1.2.3.4\"");
     assertThat(resolvedTemplate).contains("port_value: 88");
+
+    // UDP GRO enabled by default
+    assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")
 
     // enableDNSCache = true
     assertThat(resolvedTemplate).contains("key: \"dns_persistent_cache\"")
