@@ -239,7 +239,7 @@ absl::Span<const std::string> ConnectionInfoImplBase::ipSansPeerCertificate() co
         if (!cert) {
           return std::vector<std::string>{};
         }
-        return Utility::getSubjectAltNames(*cert, GEN_IPADD, true);
+        return Utility::getSubjectAltNames(*cert, GEN_IPADD);
       });
 }
 
