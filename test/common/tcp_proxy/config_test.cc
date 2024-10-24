@@ -680,6 +680,13 @@ TEST(ConfigTest, AccessLogConfig) {
 
 class TcpProxyNonDeprecatedConfigRoutingTest : public testing::Test {
 public:
+  TcpProxyNonDeprecatedConfigRoutingTest() {
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+            chooseHost(_))
+        .WillByDefault(Return(factory_context_.server_factory_context_.cluster_manager_
+                                  .thread_local_cluster_.lb_.host_));
+  }
+
   void setup() {
     const std::string yaml = R"EOF(
     stat_prefix: name
@@ -717,7 +724,7 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
-              tcpConnPool(_, _))
+              tcpConnPool(_, _, _))
       .WillOnce(Return(absl::nullopt));
   absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info;
   EXPECT_CALL(connection_.stream_info_, setUpstreamClusterInfo(_))
@@ -736,6 +743,10 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
 class TcpProxyHashingTest : public testing::Test {
 public:
   void setup(const std::string& yaml) {
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+            chooseHost(_))
+        .WillByDefault(Return(factory_context_.server_factory_context_.cluster_manager_
+                                  .thread_local_cluster_.lb_.host_));
     factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
@@ -785,9 +796,14 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
 
     // Ensure there is no remote address (MockStreamInfo sets one by default), and expect no hash.
     mock_connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+            chooseHost(_))
+        .WillByDefault(Return(factory_context_.server_factory_context_.cluster_manager_
+                                  .thread_local_cluster_.lb_.host_));
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
-                tcpConnPool(_, _))
-        .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+                tcpConnPool(_, _, _))
+        .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                            Upstream::LoadBalancerContext* context) {
           EXPECT_FALSE(context->computeHashKey().has_value());
           return absl::nullopt;
         }));
@@ -800,8 +816,9 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
         std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
-                tcpConnPool(_, _))
-        .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+                tcpConnPool(_, _, _))
+        .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                            Upstream::LoadBalancerContext* context) {
           EXPECT_TRUE(context->computeHashKey().has_value());
           return absl::nullopt;
         }));
@@ -827,8 +844,9 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
     initializeFilter(filter_callbacks, mock_connection);
     // Expect no hash when filter state is unset.
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
-                tcpConnPool(_, _))
-        .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+                tcpConnPool(_, _, _))
+        .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                            Upstream::LoadBalancerContext* context) {
           EXPECT_FALSE(context->computeHashKey().has_value());
           return absl::nullopt;
         }));
@@ -842,8 +860,9 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
                                                     StreamInfo::FilterState::StateType::ReadOnly,
                                                     StreamInfo::FilterState::LifeSpan::FilterChain);
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
-                tcpConnPool(_, _))
-        .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+                tcpConnPool(_, _, _))
+        .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                            Upstream::LoadBalancerContext* context) {
           EXPECT_EQ(31337, context->computeHashKey().value());
           return absl::nullopt;
         }));

@@ -347,7 +347,9 @@ public:
     http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, api_->randomGenerator(),
                                                     host_ptr_, Upstream::ResourcePriority::Default,
                                                     nullptr, nullptr, state_);
-    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_))
+        .WillRepeatedly(Return(cm_.thread_local_cluster_.lb_.host_));
+    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
