@@ -20,7 +20,6 @@ using testing::Eq;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::WhenDynamicCastTo;
 
 namespace Envoy {
 namespace Server {
@@ -268,8 +267,8 @@ TEST_F(HotRestartingChildTest, ForwardsPacketToRegisteredListenerOnMatch) {
   packet->set_receive_time_epoch_microseconds(packet_timestamp);
   Network::MockUdpListenerWorkerRouter mock_worker_router;
   EXPECT_CALL(*mock_udp_listener_config,
-              listenerWorkerRouter(WhenDynamicCastTo<const Network::Address::Ipv4Instance&>(
-                  Eq(dynamic_cast<const Network::Address::Ipv4Instance&>(*test_listener_addr)))))
+              listenerWorkerRouter(
+                  Eq(dynamic_cast<const Network::Address::Ipv4Instance&>(*test_listener_addr))))
       .WillOnce(ReturnRef(mock_worker_router));
   EXPECT_CALL(mock_worker_router,
               deliver(worker_index, IsUdpWith(test_listener_addr, test_remote_addr, udp_contents,

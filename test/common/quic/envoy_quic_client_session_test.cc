@@ -225,6 +225,11 @@ protected:
 INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionTest,
                          testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
 
+using EnvoyQuicClientSessionDeathTest = EnvoyQuicClientSessionTest;
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionTests, EnvoyQuicClientSessionDeathTest,
+                         testing::ValuesIn(quic::CurrentSupportedHttp3Versions()));
+
 TEST_P(EnvoyQuicClientSessionTest, ShutdownNoOp) { http_connection_->shutdownNotice(); }
 
 TEST_P(EnvoyQuicClientSessionTest, NewStream) {
@@ -445,7 +450,7 @@ TEST_P(EnvoyQuicClientSessionTest, VerifyContext) {
   EXPECT_TRUE(verify_context.extraValidationContext().callbacks->ioHandle().isOpen());
 }
 
-TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnRaiseEvent) {
+TEST_P(EnvoyQuicClientSessionDeathTest, VerifyContextAbortOnRaiseEvent) {
   auto& verify_context =
       dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
   EXPECT_DEATH(verify_context.extraValidationContext().callbacks->raiseEvent(
@@ -453,21 +458,21 @@ TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnRaiseEvent) {
                "unexpectedly reached");
 }
 
-TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnShouldDrainReadBuffer) {
+TEST_P(EnvoyQuicClientSessionDeathTest, VerifyContextAbortOnShouldDrainReadBuffer) {
   auto& verify_context =
       dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
   EXPECT_DEATH(verify_context.extraValidationContext().callbacks->shouldDrainReadBuffer(),
                "unexpectedly reached");
 }
 
-TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnSetTransportSocketIsReadable) {
+TEST_P(EnvoyQuicClientSessionDeathTest, VerifyContextAbortOnSetTransportSocketIsReadable) {
   auto& verify_context =
       dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
   EXPECT_DEATH(verify_context.extraValidationContext().callbacks->setTransportSocketIsReadable(),
                "unexpectedly reached");
 }
 
-TEST_P(EnvoyQuicClientSessionTest, VerifyContextAbortOnFlushWriteBuffer) {
+TEST_P(EnvoyQuicClientSessionDeathTest, VerifyContextAbortOnFlushWriteBuffer) {
   auto& verify_context =
       dynamic_cast<EnvoyQuicProofVerifyContext&>(crypto_stream_factory_.lastVerifyContext().ref());
   EXPECT_DEATH(verify_context.extraValidationContext().callbacks->flushWriteBuffer(),
