@@ -6,37 +6,40 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
+
+#include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 
 namespace Envoy {
 namespace Upstream {
 
 absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
 StrictDnsClusterImpl::create(const envoy::config::cluster::v3::Cluster& cluster,
+                             const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
                              ClusterFactoryContext& context,
                              Network::DnsResolverSharedPtr dns_resolver) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<StrictDnsClusterImpl>(
-      new StrictDnsClusterImpl(cluster, context, dns_resolver, creation_status));
-
+  auto ret = std::unique_ptr<StrictDnsClusterImpl>(new StrictDnsClusterImpl(
+      cluster, dns_cluster, context, std::move(dns_resolver), creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                           ClusterFactoryContext& context,
-                                           Network::DnsResolverSharedPtr dns_resolver,
-                                           absl::Status& creation_status)
+StrictDnsClusterImpl::StrictDnsClusterImpl(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+    ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
+    absl::Status& creation_status)
     : BaseDynamicClusterImpl(cluster, context, creation_status),
       load_assignment_(cluster.load_assignment()),
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
-      dns_refresh_rate_ms_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      dns_jitter_ms_(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter, 0)),
-      respect_dns_ttl_(cluster.respect_dns_ttl()) {
-  failure_backoff_strategy_ =
-      Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
-          cluster, dns_refresh_rate_ms_.count(),
-          context.serverFactoryContext().api().randomGenerator());
+      dns_refresh_rate_ms_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_refresh_rate, 5000))),
+      dns_jitter_ms_(PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_jitter, 0)),
+      respect_dns_ttl_(dns_cluster.respect_dns_ttl()) {
+  failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
+      dns_cluster, dns_refresh_rate_ms_.count(),
+      context.serverFactoryContext().api().randomGenerator());
 
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
@@ -222,13 +225,24 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 }
 
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                           ClusterFactoryContext& context) {
+StrictDnsClusterFactory::createClusterWithConfig(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
+    Upstream::ClusterFactoryContext& context) {
+  absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>> cluster_or_error;
   auto dns_resolver_or_error = selectDnsResolver(cluster, context);
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
-  auto cluster_or_error =
-      StrictDnsClusterImpl::create(cluster, context, std::move(dns_resolver_or_error.value()));
+  if (cluster.has_cluster_type()) {
+    cluster_or_error = StrictDnsClusterImpl::create(cluster, proto_config, context,
+                                                    std::move(*dns_resolver_or_error));
+  } else {
+    envoy::extensions::clusters::dns::v3::DnsCluster proto_config_legacy{};
+    createDnsClusterFromLegacyFields(cluster, proto_config_legacy);
+    cluster_or_error = StrictDnsClusterImpl::create(cluster, proto_config_legacy, context,
+                                                    std::move(*dns_resolver_or_error));
+  }
+
   RETURN_IF_NOT_OK(cluster_or_error.status());
   return std::make_pair(std::shared_ptr<StrictDnsClusterImpl>(std::move(*cluster_or_error)),
                         nullptr);
@@ -237,7 +251,7 @@ StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Clu
 /**
  * Static registration for the strict dns cluster factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(StrictDnsClusterFactory, ClusterFactory);
+REGISTER_FACTORY(StrictDnsClusterFactory, Upstream::ClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy
