@@ -232,11 +232,6 @@ EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) 
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool use_gro_if_available) {
-  use_gro_if_available_ = use_gro_if_available;
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::setUdpSocketReceiveBufferSize(int32_t size) {
   udp_socket_receive_buffer_size_ = size;
   return *this;
@@ -857,8 +852,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(
-      use_gro_if_available_);
+  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(true);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
   for (auto& guard_and_value : restart_runtime_guards_) {

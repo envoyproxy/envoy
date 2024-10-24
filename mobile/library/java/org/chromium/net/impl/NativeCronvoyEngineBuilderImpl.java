@@ -52,7 +52,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mUseCares = false;
   private final List<Pair<String, Integer>> mCaresFallbackResolvers = new ArrayList<>();
-  private boolean mUseGro = true;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
@@ -108,17 +107,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl addCaresFallbackResolver(String host, int port) {
     mCaresFallbackResolvers.add(new Pair<String, Integer>(host, port));
-    return this;
-  }
-
-  /**
-   * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
-   * system.
-   *
-   * @param enable If true, use UDP GRO.
-   */
-  public NativeCronvoyEngineBuilderImpl setUseGro(boolean enable) {
-    mUseGro = enable;
     return this;
   }
 
@@ -290,7 +278,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro,
+        mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares,
         quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
         quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(),
         numTimeoutsToTriggerPortMigration(), mEnableSocketTag, mEnableInterfaceBinding,
