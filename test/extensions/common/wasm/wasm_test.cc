@@ -1,11 +1,15 @@
+#include "envoy/http/filter.h"
+#include "envoy/http/filter_factory.h"
 #include "envoy/server/lifecycle_notifier.h"
 
 #include "source/common/common/hex.h"
 #include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/filter_manager.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
+#include "test/mocks/local_reply/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -1310,7 +1314,6 @@ public:
                 return new TestContext(wasm, plugin);
               });
   }
-
   void setupContext() { setupFilterBase<TestContext>(); }
 
   TestContext& rootContext() { return *static_cast<TestContext*>(root_context_); }
@@ -1392,30 +1395,6 @@ TEST_P(WasmCommonContextTest, EmptyContext) {
   root_context_->validateConfiguration("", plugin_);
 }
 
-// test that we don't send the local reply twice, even though it's specified in the wasm code
-TEST_P(WasmCommonContextTest, DuplicateLocalReply) {
-  std::string code;
-  if (std::get<0>(GetParam()) != "null") {
-    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
-        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
-  } else {
-    // The name of the Null VM plugin.
-    code = "CommonWasmTestContextCpp";
-  }
-  EXPECT_FALSE(code.empty());
-
-  setup(code, "context", "send local reply twice");
-  setupContext();
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-      .WillOnce([this](Http::ResponseHeaderMap&, bool) { context().onResponseHeaders(0, false); });
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _, _, testing::Eq("ok")));
-
-  // Create in-VM context.
-  context().onCreate();
-  EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, context().onRequestBody(0, false));
-}
-
 // test that we don't send the local reply twice when the wasm code panics
 TEST_P(WasmCommonContextTest, LocalReplyWhenPanic) {
   std::string code;
@@ -1423,12 +1402,12 @@ TEST_P(WasmCommonContextTest, LocalReplyWhenPanic) {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
         "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
   } else {
-    // no need test the Null VM plugin.
+    // Let's not cause crashes in Null VM
     return;
   }
   EXPECT_FALSE(code.empty());
 
-  setup(code, "context", "panic after sending local reply");
+  setup(code, "context", "panic during request processing");
   setupContext();
   // In the case of VM failure, failStream is called, so we need to make sure that we don't send the
   // local reply twice.
@@ -1490,6 +1469,125 @@ TEST_P(WasmCommonContextTest, ProcessValidGRPCStatusCodeAsEmptyInLocalReply) {
   // Create in-VM context.
   context().onCreate();
   EXPECT_EQ(proxy_wasm::FilterDataStatus::StopIterationNoBuffer, context().onRequestBody(1, false));
+}
+
+class WasmLocalReplyTest : public WasmCommonContextTest {
+public:
+  WasmLocalReplyTest() = default;
+
+  void setup(const std::string& code, std::string vm_configuration, std::string root_id = "") {
+    WasmCommonContextTest::setup(code, vm_configuration, root_id);
+    filter_manager_ = std::make_unique<Http::DownstreamFilterManager>(
+        filter_manager_callbacks_, dispatcher_, connection_, 0, nullptr, true, 10000,
+        filter_factory_, local_reply_, protocol_, time_source_, filter_state_, overload_manager_);
+    request_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}};
+    request_data_ = Envoy::Buffer::OwnedImpl("body");
+  }
+
+  Http::StreamFilterSharedPtr filter() { return context_; }
+
+  Http::FilterFactoryCb createWasmFilter() {
+    return [this](Http::FilterChainFactoryCallbacks& callbacks) {
+      callbacks.addStreamFilter(filter());
+    };
+  }
+
+  void setupContext() {
+    WasmCommonContextTest::setupContext();
+    ON_CALL(filter_factory_, createFilterChain(_))
+        .WillByDefault(Invoke([this](Http::FilterChainManager& manager) -> bool {
+          auto factory = createWasmFilter();
+          manager.applyFilterFactoryCb({}, factory);
+          return true;
+        }));
+    ON_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillByDefault(Return(makeOptRef(*request_headers_)));
+    filter_manager_->createFilterChain();
+    filter_manager_->requestHeadersInitialized();
+  }
+
+  std::unique_ptr<Http::FilterManager> filter_manager_;
+  NiceMock<Http::MockFilterManagerCallbacks> filter_manager_callbacks_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Envoy::Http::MockFilterChainFactory> filter_factory_;
+  NiceMock<LocalReply::MockLocalReply> local_reply_;
+  Http::Protocol protocol_{Http::Protocol::Http2};
+  NiceMock<MockTimeSystem> time_source_;
+  StreamInfo::FilterStateSharedPtr filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
+  NiceMock<Server::MockOverloadManager> overload_manager_;
+  Http::RequestHeaderMapPtr request_headers_;
+  Envoy::Buffer::OwnedImpl request_data_;
+};
+
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmLocalReplyTest,
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values);
+
+TEST_P(WasmLocalReplyTest, DuplicateLocalReply) {
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+  } else {
+    // Skip the Null plugin
+    return;
+  }
+  EXPECT_FALSE(code.empty());
+
+  setup(code, "context", "send local reply twice");
+  setupContext();
+
+  // Even if sendLocalReply is called multiple times it should only generate a single
+  // response to the client, so encodeHeaders should only be called once
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  filter_manager_->decodeData(request_data_, false);
+  filter_manager_->destroyFilters();
+}
+
+TEST_P(WasmLocalReplyTest, LocalReplyInRequestAndResponse) {
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+  } else {
+    code = "CommonWasmTestContextCpp";
+  }
+  EXPECT_FALSE(code.empty());
+
+  setup(code, "context", "local reply in request and response");
+  setupContext();
+
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  filter_manager_->decodeData(request_data_, false);
+  filter_manager_->destroyFilters();
+}
+
+TEST_P(WasmLocalReplyTest, PanicDuringResponse) {
+  std::string code;
+  if (std::get<0>(GetParam()) != "null") {
+    code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
+        "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
+  } else {
+    // Let's not cause crashes in Null VM
+    return;
+  }
+  EXPECT_FALSE(code.empty());
+
+  setup(code, "context", "panic during response processing");
+  setupContext();
+
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
+  EXPECT_CALL(filter_manager_callbacks_, endStream());
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  filter_manager_->decodeData(request_data_, false);
+  filter_manager_->destroyFilters();
 }
 
 } // namespace Wasm
