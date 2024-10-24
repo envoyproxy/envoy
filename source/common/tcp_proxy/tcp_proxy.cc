@@ -915,24 +915,23 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
 void Filter::onUpstreamConnection() {
   connecting_ = false;
-  // If receive_before_connect is not enabled or we have some early data in the buffer,
-  // means that we have previously read disabled the downstream. Now that the upstream
-  // connection is established, we should enable reads back.
-  bool should_read_enable = !receive_before_connect_ || early_data_buffer_.length() > 0;
 
   // If we have received any data before upstream connection is established, send it to
   // the upstream connection.
   if (early_data_buffer_.length() > 0) {
+    // Early data should only happen when receive_before_connect is enabled.
+    ASSERT(receive_before_connect_ == true);
+
     ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent() Flushing early data buffer to upstream",
                    read_callbacks_->connection());
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
     upstream_->encodeData(early_data_buffer_, early_data_end_stream_);
     ASSERT(0 == early_data_buffer_.length());
-  }
 
-  if (should_read_enable) {
+    // Re-enable downstream reads now that the early data buffer is flushed.
+    read_callbacks_->connection().readDisable(false);
+  } else if (!receive_before_connect_) {
     // Re-enable downstream reads now that the upstream connection is established
-    // and early data if any has been flushed to the upstream.
     read_callbacks_->connection().readDisable(false);
   }
 
