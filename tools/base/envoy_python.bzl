@@ -1,7 +1,6 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@aspect_bazel_lib//lib:yq.bzl", "yq")
-load("@base_pip3//:requirements.bzl", "requirement", base_entry_point = "entry_point")
-load("@envoy_toolshed//py:macros.bzl", "entry_point")
+load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 
