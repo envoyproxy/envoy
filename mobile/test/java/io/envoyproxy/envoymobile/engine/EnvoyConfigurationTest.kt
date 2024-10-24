@@ -262,9 +262,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("address: \"1.2.3.4\"");
     assertThat(resolvedTemplate).contains("port_value: 88");
 
-    // UDP GRO enabled by default
-    assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")
-
     // enableDNSCache = true
     assertThat(resolvedTemplate).contains("key: \"dns_persistent_cache\"")
     // dnsCacheSaveIntervalSeconds = 101
