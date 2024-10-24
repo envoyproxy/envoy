@@ -47,24 +47,23 @@ def swift_repos():
 def kotlin_repos():
     http_archive(
         name = "rules_java",
-        sha256 = "241822bf5fad614e3e1c42431002abd9af757136fa590a6a7870c6e0640a82e3",
-        strip_prefix = "rules_java-6.4.0",
-        url = "https://github.com/bazelbuild/rules_java/archive/6.4.0.tar.gz",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:rules_java.patch"],
+        urls = [
+            "https://github.com/bazelbuild/rules_java/releases/download/7.9.1/rules_java-7.9.1.tar.gz",
+        ],
+        sha256 = "e1df5fec7d4dde1f8b0a79d3622b3351552d4c05c9ea1671165351a58493a2c6",
     )
 
     http_archive(
         name = "rules_jvm_external",
-        sha256 = "b17d7388feb9bfa7f2fa09031b32707df529f26c91ab9e5d909eb1676badd9a6",
-        strip_prefix = "rules_jvm_external-4.5",
-        url = "https://github.com/bazelbuild/rules_jvm_external/archive/4.5.zip",
+        strip_prefix = "rules_jvm_external-6.2",
+        sha256 = "808cb5c30b5f70d12a2a745a29edc46728fd35fa195c1762a596b63ae9cebe05",
+        url = "https://github.com/bazelbuild/rules_jvm_external/releases/download/6.2/rules_jvm_external-6.2.tar.gz",
     )
 
     http_archive(
-        name = "io_bazel_rules_kotlin",
-        sha256 = "01293740a16e474669aba5b5a1fe3d368de5832442f164e4fbfc566815a8bc3a",
-        urls = ["https://github.com/bazelbuild/rules_kotlin/releases/download/v1.8/rules_kotlin_release.tgz"],
+        name = "rules_kotlin",
+        sha256 = "3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43",
+        url = "https://github.com/bazelbuild/rules_kotlin/releases/download/v1.9.6/rules_kotlin-v1.9.6.tar.gz",
     )
 
     http_archive(
@@ -97,8 +96,15 @@ def kotlin_repos():
 
 def android_repos():
     http_archive(
-        name = "build_bazel_rules_android",
-        urls = ["https://github.com/bazelbuild/rules_android/archive/refs/tags/v0.1.1.zip"],
+        name = "rules_android",
         sha256 = "cd06d15dd8bb59926e4d65f9003bfc20f9da4b2519985c27e190cddc8b7a7806",
         strip_prefix = "rules_android-0.1.1",
+        url = "https://github.com/bazelbuild/rules_android/archive/refs/tags/v0.1.1.zip",
+    )
+
+    http_archive(
+        name = "rules_android_ndk",
+        sha256 = "65aedff0cd728bee394f6fb8e65ba39c4c5efb11b29b766356922d4a74c623f5",
+        strip_prefix = "rules_android_ndk-0.1.2",
+        url = "https://github.com/bazelbuild/rules_android_ndk/releases/download/v0.1.2/rules_android_ndk-v0.1.2.tar.gz",
     )

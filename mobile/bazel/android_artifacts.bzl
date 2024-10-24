@@ -1,6 +1,6 @@
-load("@build_bazel_rules_android//android:rules.bzl", "android_binary")
 load("@envoy_mobile//bazel:dokka.bzl", "sources_javadocs")
 load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
+load("@rules_android//android:rules.bzl", "android_binary")
 load("@rules_java//java:defs.bzl", "java_binary")
 
 # This file is based on https://github.com/aj-michael/aar_with_jni which is
@@ -157,7 +157,7 @@ def _create_aar(name, archive_name, classes_jar, jni_archive, proguard_rules, vi
         final_dir=$$(mktemp -d)
         cp $$src_classes_jar $$final_dir/classes.jar
         cd $$final_dir
-        unzip $$original_directory/$$src_jni_archive_apk > /dev/null
+        unzip $$original_directory/$$src_jni_archive_apk
         if [[ -d lib ]]; then
             mv lib jni
         else
@@ -165,7 +165,7 @@ def _create_aar(name, archive_name, classes_jar, jni_archive, proguard_rules, vi
         fi
         cp $$original_directory/$$src_proguard_txt ./proguard.txt
         cp $$original_directory/$$src_manifest_xml AndroidManifest.xml
-        zip -r tmp.aar * > /dev/null
+        zip -r tmp.aar *
         cp tmp.aar $$original_directory/$@
         """,
         visibility = visibility,
