@@ -185,7 +185,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   if (config_->maxConnectionDuration()) {
     connection_duration_timer_ =
-        dispatcher_->createTimer([this]() -> void { onConnectionDurationTimeout(); });
+        dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout,
+                                       [this]() -> void { onConnectionDurationTimeout(); });
     connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
   }
 
