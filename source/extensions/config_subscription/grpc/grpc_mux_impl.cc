@@ -420,7 +420,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
 
       auto decoded_resource =
-          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info());
+          THROW_OR_RETURN_VALUE(DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info()),
+                                DecodedResourceImplPtr);
 
       if (!isHeartbeatResource(type_url, *decoded_resource)) {
         resources.emplace_back(std::move(decoded_resource));

@@ -97,7 +97,7 @@ public:
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
             response_pb, "cluster_name");
-    EXPECT_CALL(callbacks_, onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
+    EXPECT_CALL(callbacks_, onConfigUpdate(DecodedResourcesEq(decoded_resources->refvec_), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
     if (accept) {
       version_ = version;

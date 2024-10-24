@@ -700,15 +700,15 @@ public:
   }
 
   template <class MessageType>
-  static Config::DecodedResourcesWrapper
+  static std::unique_ptr<Config::DecodedResourcesWrapper>
   decodeResources(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                   const std::string& version, const std::string& name_field = "name") {
     TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
-    return Config::DecodedResourcesWrapper(resource_decoder, resources, version);
+    return *Config::DecodedResourcesWrapper::create(resource_decoder, resources, version);
   }
 
   template <class MessageType>
-  static Config::DecodedResourcesWrapper
+  static std::unique_ptr<Config::DecodedResourcesWrapper>
   decodeResources(const envoy::service::discovery::v3::DiscoveryResponse& resources,
                   const std::string& name_field = "name") {
     return decodeResources<MessageType>(resources.resources(), resources.version_info(),

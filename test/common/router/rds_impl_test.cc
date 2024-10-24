@@ -272,12 +272,12 @@ TEST_F(RdsImplTest, Basic) {
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_TRUE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      rds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // 2nd request with same response. Based on hash should not reload config.
   EXPECT_TRUE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      rds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
   EXPECT_EQ(nullptr, route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}}));
 
   // Load the config and verified shared count.
@@ -324,7 +324,7 @@ TEST_F(RdsImplTest, Basic) {
   // Make sure we don't lookup/verify clusters.
   EXPECT_CALL(server_factory_context_.cluster_manager_, getThreadLocalCluster(Eq("bar"))).Times(0);
   EXPECT_TRUE(
-      rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+      rds_callbacks_->onConfigUpdate(decoded_resources_2->refvec_, response2.version_info()).ok());
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
                        ->routeEntry()
                        ->clusterName());
@@ -384,7 +384,7 @@ TEST_F(RdsImplTest, UnknownFacotryForPerVirtualHostTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       EXPECT_TRUE(
-          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok()),
+          rds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok()),
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
@@ -456,7 +456,7 @@ http_filters:
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_TRUE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      rds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
 }
 
 // validate there will be exception throw when unknown factory found for per route typed config.
@@ -507,7 +507,7 @@ TEST_F(RdsImplTest, UnknownFacotryForPerRouteTypedConfig) {
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
       EXPECT_TRUE(
-          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok()),
+          rds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok()),
       EnvoyException,
       "Didn't find a registered implementation for 'filter.unknown' with type URL: "
       "'google.protobuf.Struct'");
@@ -539,7 +539,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
   EXPECT_TRUE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      rds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
   // Sadly the RdsRouteConfigSubscription privately inherited from
   // SubscriptionCallbacks, so we has to use reinterpret_cast here.
   RdsRouteConfigSubscription* rds_subscription =
@@ -565,7 +565,7 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
 
-  EXPECT_EQ(rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info())
+  EXPECT_EQ(rds_callbacks_->onConfigUpdate(decoded_resources_2->refvec_, response2.version_info())
                 .message(),
             "Unexpected RDS configuration (expecting foo_route_config): "
             "INVALID_NAME_FOR_route_config");
@@ -628,7 +628,7 @@ TEST_F(RdsImplTest, VHDSandRDSupdateTogether) {
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_TRUE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      rds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
   EXPECT_TRUE(rds_->configCast()->usesVhds());
 
   EXPECT_EQ("foo", route(Http::TestRequestHeaderMapImpl{{":authority", "foo"}, {":path", "/foo"}})
@@ -861,7 +861,7 @@ dynamic_route_configs:
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_TRUE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      rds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
       universal_name_matcher);
   const auto& route_config_dump3 =
@@ -1138,7 +1138,7 @@ resources:
 
   EXPECT_THROW_WITH_MESSAGE(
       EXPECT_TRUE(
-          rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok()),
+          rds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok()),
       EnvoyException, "Only a single wildcard domain is permitted in route foo_route_config");
 
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](

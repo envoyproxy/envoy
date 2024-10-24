@@ -467,7 +467,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
           EXPECT_TRUE(config_discovery_test.filter_factory_.created_);
         }));
     ASSERT_TRUE(config_discovery_test.callbacks_
-                    ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
+                    ->onConfigUpdate(decoded_resources->refvec_, response.version_info())
                     .ok());
     EXPECT_NE(absl::nullopt, config_discovery_test.provider_->config());
     EXPECT_EQ(1UL,
@@ -484,7 +484,7 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
     ASSERT_TRUE(config_discovery_test.callbacks_
-                    ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
+                    ->onConfigUpdate(decoded_resources->refvec_, response.version_info())
                     .ok());
 
     EXPECT_EQ(1UL,

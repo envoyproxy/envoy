@@ -245,7 +245,7 @@ TEST_F(LdsApiTest, Basic) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
   EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      lds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
 
   EXPECT_EQ("0", lds_->versionInfo());
 
@@ -279,7 +279,7 @@ TEST_F(LdsApiTest, Basic) {
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
   EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+      lds_callbacks_->onConfigUpdate(decoded_resources_2->refvec_, response2.version_info()).ok());
   EXPECT_EQ("1", lds_->versionInfo());
 }
 
@@ -313,7 +313,7 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
   EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      lds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
 
   EXPECT_EQ("0", lds_->versionInfo());
 
@@ -332,7 +332,7 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
   EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+      lds_callbacks_->onConfigUpdate(decoded_resources_2->refvec_, response2.version_info()).ok());
   EXPECT_EQ("1", lds_->versionInfo());
 }
 
@@ -365,7 +365,7 @@ resources:
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
   EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      lds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
 
   constexpr absl::string_view response2_basic = R"EOF(
 version_info: '1'
@@ -405,7 +405,7 @@ resources:
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
   EXPECT_NO_THROW(EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok()));
+      lds_callbacks_->onConfigUpdate(decoded_resources_2->refvec_, response2.version_info()).ok()));
 }
 
 // Validate behavior when the config fails delivery at the subscription level.
@@ -454,7 +454,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response1);
   EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      lds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
 
   EXPECT_EQ("0", lds_->versionInfo());
 
@@ -488,7 +488,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::listener::v3::Listener>(response2);
   EXPECT_TRUE(
-      lds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+      lds_callbacks_->onConfigUpdate(decoded_resources_2->refvec_, response2.version_info()).ok());
 }
 
 } // namespace

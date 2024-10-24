@@ -152,7 +152,7 @@ public:
 
     if (modify) {
       EXPECT_CALL(callbacks_,
-                  onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), version))
+                  onConfigUpdate(DecodedResourcesEq(decoded_resources->refvec_), version))
           .WillOnce(ThrowOnRejectedConfig(accept));
     }
     if (!accept) {

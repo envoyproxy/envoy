@@ -264,7 +264,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
 
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetTypeName() == struct_type) {
         out_proto.CheckTypeAndMergeFrom(typed_struct.value());
@@ -279,7 +279,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetTypeName() == struct_type) {
         out_proto.CheckTypeAndMergeFrom(typed_struct.value());
@@ -295,11 +295,11 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } // out_proto is expecting Struct, unpack directly
     else if (type != struct_type || out_proto.GetTypeName() == struct_type) {
-      MessageUtil::unpackToOrThrow(typed_config, out_proto);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, out_proto));
     } else {
 #ifdef ENVOY_ENABLE_YAML
       ProtobufWkt::Struct struct_config;
-      MessageUtil::unpackToOrThrow(typed_config, struct_config);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, struct_config));
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
 #else
       IS_ENVOY_BUG("Attempting to use JSON structs with JSON compiled out");

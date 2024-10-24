@@ -106,7 +106,7 @@ resources:
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
   EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      cds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
   EXPECT_EQ("0", cds_->versionInfo());
 
   const std::string response2_yaml = R"EOF(
@@ -120,7 +120,7 @@ resources:
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
   EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+      cds_callbacks_->onConfigUpdate(decoded_resources_2->refvec_, response2.version_info()).ok());
   EXPECT_EQ("1", cds_->versionInfo());
 }
 
@@ -286,7 +286,7 @@ resources:
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
   EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      cds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
   EXPECT_EQ("0", cds_->versionInfo());
 
   const std::string response2_yaml = R"EOF(
@@ -317,7 +317,7 @@ resources:
   const auto decoded_resources_2 =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response2);
   EXPECT_TRUE(
-      cds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()).ok());
+      cds_callbacks_->onConfigUpdate(decoded_resources_2->refvec_, response2.version_info()).ok());
 
   EXPECT_EQ("1", cds_->versionInfo());
 }
@@ -354,7 +354,7 @@ resources:
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(response1);
   EXPECT_FALSE(
-      cds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()).ok());
+      cds_callbacks_->onConfigUpdate(decoded_resources->refvec_, response1.version_info()).ok());
   EXPECT_EQ("", cds_->versionInfo());
 }
 
