@@ -106,6 +106,7 @@ TEST(TestConfig, ConfigIsApplied) {
       "num_timeouts_to_trigger_port_migration { value: 4 }",
       "idle_network_timeout { seconds: 30 }",
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
+      "key: \"prefer_quic_client_udp_gro\" value { bool_value: true }",
       "key: \"test_feature_false\" value { bool_value: true }",
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
       "key: \"app_version\" value { string_value: \"1.2.3\" } }",
