@@ -22,13 +22,14 @@ namespace QuicStats {
 
 #define ALL_QUIC_STATS(COUNTER, GAUGE, HISTOGRAM)                                                  \
   COUNTER(cx_tx_packets_total)                                                                     \
-  COUNTER(cx_packets_retransmitted_total)                                                          \
-  COUNTER(cx_amplification_throttling_total)                                                       \
+  COUNTER(cx_tx_packets_retransmitted_total)                                                       \
+  COUNTER(cx_tx_amplification_throttling_total)                                                    \
+  COUNTER(cx_rx_packets_total)                                                                     \
   COUNTER(cx_path_degrading_total)                                                                 \
   COUNTER(cx_forward_progress_after_path_degrading_total)                                          \
-  HISTOGRAM(cx_tx_percent_retransmitted_pkts, Percent)                                             \
   HISTOGRAM(cx_srtt_us, Microseconds)                                                              \
-  HISTOGRAM(cx_tx_estimated_bandwidth_bytes_per_second, Bytes)
+  HISTOGRAM(cx_tx_estimated_bandwidth_bytes_per_second, Bytes)                                     \
+  HISTOGRAM(cx_tx_percent_retransmitted_packets, Percent)
 
 struct QuicStats {
   ALL_QUIC_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
@@ -57,6 +58,7 @@ private:
 
   quic::QuicPacketCount last_packets_sent_{};
   quic::QuicPacketCount last_packets_retransmitted_{};
+  quic::QuicPacketCount last_packets_received_{};
   size_t last_num_amplification_throttling_{};
   size_t last_num_path_degrading_{};
   size_t last_num_forward_progress_after_path_degrading_{};
@@ -65,7 +67,7 @@ private:
 class Config : public Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryInterface {
 public:
   Config(const envoy::extensions::quic::connection_debug_visitor::quic_stats::v3::Config& config,
-         Server::Configuration::ListenerFactoryContext& listener_context);
+         Stats::Scope& scope);
 
   std::unique_ptr<quic::QuicConnectionDebugVisitor>
   createQuicConnectionDebugVisitor(Event::Dispatcher& dispatcher, quic::QuicSession* session,

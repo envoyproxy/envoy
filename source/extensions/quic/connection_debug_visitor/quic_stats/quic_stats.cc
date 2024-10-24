@@ -20,7 +20,6 @@ namespace QuicStats {
 QuicStatsVisitor::QuicStatsVisitor(Config& config, Event::Dispatcher& dispatcher,
                                    quic::QuicSession* session)
     : config_(config), session_(*session) {
-  ASSERT(session != nullptr);
   if (config_.update_period_.has_value()) {
     timer_ = dispatcher.createTimer([this]() {
       recordStats();
@@ -75,14 +74,16 @@ void QuicStatsVisitor::recordStats() {
 
     const uint64_t percent_retransmissions =
         (retrans_diff * static_cast<uint64_t>(Stats::Histogram::PercentScale)) / pkts_diff;
-    config_.stats_.cx_tx_percent_retransmitted_pkts_.recordValue(percent_retransmissions);
+    config_.stats_.cx_tx_percent_retransmitted_packets_.recordValue(percent_retransmissions);
   }
 
   update_counter(config_.stats_.cx_tx_packets_total_, last_packets_sent_, quic_stats.packets_sent);
-  update_counter(config_.stats_.cx_packets_retransmitted_total_, last_packets_retransmitted_,
+  update_counter(config_.stats_.cx_tx_packets_retransmitted_total_, last_packets_retransmitted_,
                  quic_stats.packets_retransmitted);
-  update_counter(config_.stats_.cx_amplification_throttling_total_,
+  update_counter(config_.stats_.cx_tx_amplification_throttling_total_,
                  last_num_amplification_throttling_, quic_stats.num_amplification_throttling);
+  update_counter(config_.stats_.cx_rx_packets_total_, last_packets_received_,
+                 quic_stats.packets_received);
   update_counter(config_.stats_.cx_path_degrading_total_, last_num_path_degrading_,
                  quic_stats.num_path_degrading);
   update_counter(config_.stats_.cx_forward_progress_after_path_degrading_total_,
@@ -100,9 +101,9 @@ void QuicStatsVisitor::recordStats() {
 
 Config::Config(
     const envoy::extensions::quic::connection_debug_visitor::quic_stats::v3::Config& config,
-    Server::Configuration::ListenerFactoryContext& listener_context)
+    Stats::Scope& scope)
     : update_period_(PROTOBUF_GET_OPTIONAL_MS(config, update_period)),
-      stats_(generateStats(listener_context.listenerScope())) {}
+      stats_(generateStats(scope)) {}
 
 QuicStats Config::generateStats(Stats::Scope& scope) {
   constexpr absl::string_view prefix("quic_stats");
@@ -124,7 +125,7 @@ QuicStatsFactoryFactory::createFactory(
   return std::make_unique<Config>(
       dynamic_cast<
           const envoy::extensions::quic::connection_debug_visitor::quic_stats::v3::Config&>(config),
-      server_context);
+      server_context.listenerScope());
 }
 
 REGISTER_FACTORY(QuicStatsFactoryFactory,

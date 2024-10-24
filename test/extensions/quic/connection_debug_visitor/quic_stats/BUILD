@@ -14,7 +14,6 @@ envoy_cc_test(
     deps = [
         "//source/extensions/quic/connection_debug_visitor/quic_stats:quic_stats_lib",
         "//test/mocks/event:event_mocks",
-        "//test/mocks/server:listener_factory_context_mocks",
     ],
 )
 
