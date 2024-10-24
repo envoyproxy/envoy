@@ -170,6 +170,70 @@ public:
   NiceMock<Network::MockWriteFilterCallbacks> write_filter_callbacks_;
 };
 
+inline envoy::extensions::wasm::v3::PluginConfig
+getWasmPluginConfigForTest(absl::string_view runtime, absl::string_view wasm_file_path,
+                           absl::string_view wasm_module_name, absl::string_view plugin_root_id,
+                           bool singleton = false, absl::string_view plugin_configuration = {}) {
+
+  const std::string plugin_config_yaml = fmt::format(
+      R"EOF(
+      name: 'test_wasm_singleton_{}'
+      root_id: '{}'
+      vm_config:
+        runtime: 'envoy.wasm.runtime.{}'
+        configuration:
+          "@type": "type.googleapis.com/google.protobuf.StringValue"
+          value: '{}'
+      )EOF",
+      singleton, plugin_root_id, runtime, plugin_configuration);
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  TestUtility::loadFromYaml(plugin_config_yaml, plugin_config);
+
+  if (runtime == "null") {
+    plugin_config.mutable_vm_config()->mutable_code()->mutable_local()->set_inline_bytes(
+        std::string(wasm_module_name));
+  } else {
+    const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir }}/" + std::string(wasm_file_path))));
+    plugin_config.mutable_vm_config()->mutable_code()->mutable_local()->set_inline_bytes(code);
+  }
+
+  return plugin_config;
+}
+
+template <typename Base = testing::Test> class WasmPluginConfigTestBase : public Base {
+public:
+  WasmPluginConfigTestBase() = default;
+
+  // NOLINTNEXTLINE(readability-identifier-naming)
+  void SetUp() override { clearCodeCacheForTesting(); }
+
+  void setUp(const envoy::extensions::wasm::v3::PluginConfig plugin_config,
+             bool singleton = false) {
+    plugin_config_ = std::make_shared<PluginConfig>(
+        plugin_config, server_, server_.scope(), server_.initManager(),
+        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr, singleton);
+  }
+
+  void createStreamContext() {
+    context_ = plugin_config_->createContext();
+    if (context_ != nullptr) {
+      context_->setDecoderFilterCallbacks(decoder_callbacks_);
+      context_->setEncoderFilterCallbacks(encoder_callbacks_);
+      context_->onCreate();
+    }
+  }
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_;
+  PluginConfigSharedPtr plugin_config_;
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+
+  std::shared_ptr<Context> context_;
+};
+
 } // namespace Wasm
 } // namespace Common
 } // namespace Extensions
