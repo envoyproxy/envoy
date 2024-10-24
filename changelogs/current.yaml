@@ -21,6 +21,10 @@ minor_behavior_changes:
   change: |
     The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the
     metadata (``DYNAMIC_METADATA``, ``CLUSTER_METADATA``, etc.) formatter.
+- area: quic
+  change: |
+    Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

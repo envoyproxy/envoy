@@ -106,6 +106,8 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_sta
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
+// TODO(#33474) remove once validated in non-mobile Envoy.
+RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
 RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
@@ -133,8 +135,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
 // TODO(pksohn): enable after canarying fix for https://github.com/envoyproxy/envoy/issues/29930
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
-// TODO(#33474) removed it once GRO packet dropping is fixed.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
 // TODO(alyssar) evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
 // TODO(alyssar) evaluate and either make this a config knob or remove.
