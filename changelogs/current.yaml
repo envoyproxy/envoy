@@ -66,5 +66,10 @@ new_features:
 - area: http_inspector
   change: |
     Added default-false ``envoy.reloadable_features.http_inspector_use_balsa_parser`` for HttpInspector to use BalsaParser.
+- area: overload
+  change: |
+    add support for scaling :ref:`max connection duration
+    <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_MAX>`.
+    This can be used to reduce the max connection duration in response to overload.
 
 deprecated:
