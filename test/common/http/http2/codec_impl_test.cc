@@ -64,10 +64,8 @@ namespace {
 // the MockRequestDecoder::decodeHeaders() method. With UHV enabled it invokes UHV's
 // validateRequestHeaderMap() method. This will validate and apply transformations expected by the
 // test, before passing it to the base class MockRequestDecoder::decodeHeaders() method. If UHV
-// validation fails it calls the `sendLocalReply` on the decoder, indicating validation error. This
-// class also handles behavior specific to the H/2 codec, where it resets requests with headers
-// containing underscores (when configured), instead of sending 400. See
-// https://github.com/envoyproxy/envoy/issues/24466
+// validation fails it calls the `sendLocalReply` on the decoder and sends 400,
+// indicating a validation error.
 class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
 public:
   MockRequestDecoderShimWithUhv() = default;
@@ -94,11 +92,8 @@ public:
         }
         failure_details = transformation_result.details();
       }
-      if (failure_details != UhvResponseCodeDetail::get().InvalidUnderscore) {
-        sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
-                       nullptr, absl::nullopt, failure_details);
-      }
-      response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+      sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
+                     nullptr, absl::nullopt, failure_details);
       // These tests assume that connection is not closed on protocol errors
     } else {
       MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
@@ -2871,8 +2866,9 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
   request_headers.addCopy("bad_header", "something");
-
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  TestRequestHeaderMapImpl expected_headers(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
   EXPECT_EQ(
@@ -2895,6 +2891,9 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAllowed) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
   EXPECT_EQ(0, server_stats_store_.counter("http2.dropped_headers_with_underscores").value());
+  EXPECT_EQ(
+      0,
+      server_stats_store_.counter("http2.requests_rejected_with_underscores_in_headers").value());
 }
 
 // This is the HTTP/2 variant of the HTTP/1 regression test for CVE-2019-18801.
