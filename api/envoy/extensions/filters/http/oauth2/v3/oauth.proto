@@ -148,7 +148,7 @@ message OAuth2Config {
 
   // If set to true, allows automatic access token refresh using the associated refresh token (see
   // `RFC 6749 section 6 <https://datatracker.ietf.org/doc/html/rfc6749#section-6>`_), provided that the OAuth server supports that.
-  // Default value is false.
+  // Default value is true.
   google.protobuf.BoolValue use_refresh_token = 12;
 
   // The default lifetime in seconds of the access token, if omitted by the authorization server.

@@ -21,6 +21,11 @@ minor_behavior_changes:
   change: |
     The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the
     metadata (``DYNAMIC_METADATA``, ``CLUSTER_METADATA``, etc.) formatter.
+- area: oauth2
+  change: |
+    :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
+    is now enabled by default. This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.oauth2_use_refresh_token`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

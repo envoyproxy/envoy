@@ -234,7 +234,6 @@ typed_config:
         sds_config:
           path_config_source:
             path: "{{ test_tmpdir }}/hmac_secret.yaml"
-    use_refresh_token: true
     auth_scopes:
     - user
     - openid
@@ -286,9 +285,19 @@ typed_config:
     EXPECT_EQ(secret.value(), token_secret);
   }
 
-  void waitForOAuth2Response(absl::string_view token_secret) {
-    AssertionResult result =
-        fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_oauth2_connection_);
+  void waitForOAuth2Response(absl::string_view token_secret, bool expect_failure = false) {
+    std::chrono::milliseconds timeout =
+        expect_failure ? std::chrono::milliseconds(1) : std::chrono::milliseconds(500);
+
+    AssertionResult result = fake_upstreams_.back()->waitForHttpConnection(
+        *dispatcher_, fake_oauth2_connection_, timeout);
+
+    if (expect_failure) {
+      // Assert that the connection failed, as expected
+      ASSERT_FALSE(result) << "Expected failure in connection, but it succeeded.";
+      return;
+    }
+
     RELEASE_ASSERT(result, result.message());
     result = fake_oauth2_connection_->waitForNewStream(*dispatcher_, oauth2_request_);
     RELEASE_ASSERT(result, result.message());
@@ -376,7 +385,8 @@ typed_config:
     cleanup();
   }
 
-  void doRefreshTokenFlow(absl::string_view token_secret, absl::string_view hmac_secret) {
+  void doRefreshTokenFlow(absl::string_view token_secret, absl::string_view hmac_secret,
+                          bool expect_failure = false) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     Http::TestRequestHeaderMapImpl headers{
@@ -389,7 +399,10 @@ typed_config:
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
 
-    waitForOAuth2Response(token_secret);
+    waitForOAuth2Response(token_secret, expect_failure);
+    if (expect_failure) {
+      return;
+    }
 
     AssertionResult result =
         fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
@@ -648,6 +661,82 @@ TEST_P(OauthIntegrationTestWithBasicAuth, AuthenticationFlow) {
   };
   initialize();
   doAuthenticationFlow("token_secret", "hmac_secret");
+}
+
+class OauthUseRefreshTokenDisabled : public OauthIntegrationTest {
+  void setOauthConfig() override {
+    config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
+name: oauth
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+  config:
+    token_endpoint:
+      cluster: oauth
+      uri: oauth.com/token
+      timeout: 3s
+    retry_policy:
+      retry_back_off:
+        base_interval: 1s
+        max_interval: 10s
+      num_retries: 5
+    authorization_endpoint: https://oauth.com/oauth/authorize/
+    redirect_uri: "%REQ(x-forwarded-proto)%://%REQ(:authority)%/callback"
+    redirect_path_matcher:
+      path:
+        exact: /callback
+    signout_path:
+      path:
+        exact: /signout
+    credentials:
+      client_id: foo
+      token_secret:
+        name: token
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/token_secret.yaml"
+      hmac_secret:
+        name: hmac
+        sds_config:
+          path_config_source:
+            path: "{{ test_tmpdir }}/hmac_secret.yaml"
+    use_refresh_token: false
+    auth_scopes:
+    - user
+    - openid
+    - email
+    resources:
+    - oauth2-resource
+    - http://example.com
+    - https://example.com
+)EOF"));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthUseRefreshTokenDisabled,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+TEST_P(OauthUseRefreshTokenDisabled, FailRefreshTokenFlow) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+
+  initialize();
+
+  // 1. Do one authentication flow.
+  doAuthenticationFlow("token_secret", "hmac_secret");
+
+  // 2. Reload secrets.
+  EXPECT_EQ(test_server_->counter("sds.token.update_success")->value(), 1);
+  EXPECT_EQ(test_server_->counter("sds.hmac.update_success")->value(), 1);
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("token_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("token_secret.yaml"));
+  test_server_->waitForCounterEq("sds.token.update_success", 2, std::chrono::milliseconds(5000));
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("hmac_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("hmac_secret.yaml"));
+  test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
+  // 3. Do one refresh token flow. This should fail.
+  doRefreshTokenFlow("token_secret_1", "hmac_secret_1", /* expect_failure */ true);
 }
 
 } // namespace
