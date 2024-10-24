@@ -2623,7 +2623,7 @@ envoy_cc_test(
     name = "weighted_cluster_integration_test",
     size = "large",
     srcs = ["weighted_cluster_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],
