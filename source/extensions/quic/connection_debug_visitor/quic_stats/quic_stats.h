@@ -36,7 +36,7 @@ struct QuicStats {
 
 class Config;
 
-// Visitor class that writes connection-level information to info logs.
+// Visitor class that publishes various QUICHE connection stats as Envoy stats.
 class QuicStatsVisitor : public quic::QuicConnectionDebugVisitor {
 public:
   QuicStatsVisitor(Config& config, Event::Dispatcher& dispatcher, quic::QuicSession* session);
