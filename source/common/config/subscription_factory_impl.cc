@@ -63,8 +63,10 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
     const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
-    if (type_url !=
-        Envoy::Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.skip_backing_cluster_check_for_sds") &&
+        type_url !=
+            Envoy::Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()) {
       RETURN_IF_NOT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(
           cm_.primaryClusters(), api_config_source));
     };
