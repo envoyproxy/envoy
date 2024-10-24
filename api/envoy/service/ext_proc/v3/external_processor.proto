@@ -362,9 +362,19 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
-// Replace the entire message body chunk received in the corresponding
-// HttpBody message with this new body, or clear the body.
+// The body response message corresponding to BIDIRECTIONAL_STREAMED body mode.
+message StreamedBodyResponse {
+  // Envoy sends this body mutation out as it is.
+  bytes body = 1;
+
+  // Set this flag to true if this is the last chunk of body responses,
+  // and there is no trailers behind it.
+  bool end_of_stream = 2;
+}
+
+// This message specifies the body mutation Envoy will apply and send out.
 message BodyMutation {
+  // Sending this response for any body mode except BIDIRECTIONAL_STREAMED.
   oneof mutation {
     // The entire body to replace
     bytes body = 1;
@@ -372,4 +382,9 @@ message BodyMutation {
     // Clear the corresponding body chunk
     bool clear_body = 2;
   }
+
+  // [#not-implemented-hide:]
+  // Sending this response for BIDIRECTIONAL_STREAMED body mode.
+  // Only one of ``streamed_resp`` or above ``mutation`` should be set.
+  StreamedBodyResponse streamed_resp = 3;
 }
