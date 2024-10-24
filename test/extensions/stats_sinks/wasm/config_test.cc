@@ -74,13 +74,6 @@ TEST_P(WasmStatSinkConfigTest, CreateWasmFromEmpty) {
                             "Unable to create Wasm plugin ");
 }
 
-TEST_P(WasmStatSinkConfigTest, CreateWasmFailOpen) {
-  envoy::extensions::stat_sinks::wasm::v3::Wasm config;
-  config.mutable_config()->set_fail_open(true);
-  EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm plugin ");
-}
-
 TEST_P(WasmStatSinkConfigTest, CreateWasmFromWASM) {
   initializeWithConfig(config_);
 

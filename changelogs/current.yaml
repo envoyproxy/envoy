@@ -51,6 +51,11 @@ removed_config_or_runtime:
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
 
 new_features:
+- area: wasm
+  change: |
+    Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
+    :ref:`failure_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.failure_policy>` for more details.
+    The ``FAIL_RELOAD`` reload policy will be used by default.
 - area: aws_request_signing
   change: |
     Added an optional field :ref:`credential_provider
