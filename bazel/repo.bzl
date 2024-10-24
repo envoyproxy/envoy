@@ -50,7 +50,7 @@ def _envoy_repo_impl(repository_ctx):
     repository_ctx.file("WORKSPACE", "")
     repository_ctx.file("BUILD", '''
 load("@rules_python//python:defs.bzl", "py_library")
-load("@envoy//tools/base:envoy_python.bzl", "envoy_entry_point")
+load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//:path.bzl", "PATH")
 
 py_library(
@@ -59,11 +59,11 @@ py_library(
     visibility = ["//visibility:public"],
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "get_project_json",
-    pkg = "envoy.base.utils",
+    pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project_data",
-    init_data = [":__init__.py"],
+    data = [":__init__.py"],
 )
 
 genrule(
@@ -126,61 +126,63 @@ genrule(
     visibility = ["//visibility:public"],
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "release",
     args = [
         "release",
         PATH,
         "--release-message-path=$(location @envoy//changelogs:summary)",
     ],
-    data = ["@envoy//changelogs:summary"],
-    pkg = "envoy.base.utils",
+    data = [
+        ":__init__.py",
+        "@envoy//changelogs:summary",
+    ],
+    pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    init_data = [":__init__.py"],
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "dev",
     args = [
         "dev",
         PATH,
     ],
-    pkg = "envoy.base.utils",
+    pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    init_data = [":__init__.py"],
+    data = [":__init__.py"],
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "sync",
     args = [
         "sync",
         PATH,
     ],
-    pkg = "envoy.base.utils",
+    pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    init_data = [":__init__.py"],
+    data = [":__init__.py"],
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "publish",
     args = [
         "publish",
         PATH,
     ],
-    pkg = "envoy.base.utils",
+    pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    init_data = [":__init__.py"],
+    data = [":__init__.py"],
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "trigger",
     args = [
         "trigger",
         PATH,
     ],
-    pkg = "envoy.base.utils",
+    pkg = "@base_pip3//envoy_base_utils",
     script = "envoy.project",
-    init_data = [":__init__.py"],
+    data = [":__init__.py"],
 )
 
 ''')

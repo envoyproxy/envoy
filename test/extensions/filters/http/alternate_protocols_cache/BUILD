@@ -34,7 +34,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.alternate_protocols_cache"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 2,
     tags = [
         "cpu:3",
