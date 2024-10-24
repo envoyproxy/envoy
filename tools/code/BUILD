@@ -1,12 +1,12 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(
     "//test/extensions/filters/network/common/fuzz:config.bzl",
     "READFILTER_FUZZ_FILTERS",
     "READFILTER_NOFUZZ_FILTERS",
 )
-load("//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
@@ -31,7 +31,7 @@ jq(
     filter = ".[0] * .[1]",
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "check",
     args = [
         "--codeowners=$(location //:CODEOWNERS)",
@@ -41,6 +41,7 @@ envoy_entry_point(
         "--path=%s" % PATH,
         "-b shellcheck:$(location @com_github_aignas_rules_shellcheck//:shellcheck)",
         "-b gofmt:$(location @go_sdk//:bin/gofmt)",
+        "-x bazel/repo.bzl",
     ],
     data = [
         ":extensions_build_config",
@@ -49,7 +50,8 @@ envoy_entry_point(
         "@com_github_aignas_rules_shellcheck//:shellcheck",
         "@go_sdk//:bin/gofmt",
     ],
-    pkg = "envoy.code.check",
+    pkg = "@base_pip3//envoy_code_check",
+    script = "envoy.code.check",
 )
 
 genrule(

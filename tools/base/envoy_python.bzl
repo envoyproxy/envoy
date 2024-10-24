@@ -3,6 +3,7 @@ load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 load("@base_pip3//:requirements.bzl", "requirement", base_entry_point = "entry_point")
 load("@envoy_toolshed//py:macros.bzl", "entry_point")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 
 ENVOY_PYTOOL_NAMESPACE = [
     ":py-init",
@@ -38,29 +39,6 @@ def envoy_pytool_library(
         **kwargs
     )
 
-def envoy_entry_point(
-        name,
-        pkg,
-        entry_point_script = "@envoy//tools/base:entry_point.py",
-        entry_point_alias = base_entry_point,
-        script = None,
-        data = None,
-        init_data = ENVOY_PYTOOL_NAMESPACE,
-        deps = None,
-        args = None,
-        visibility = ["//visibility:public"]):
-    entry_point(
-        name = name,
-        pkg = pkg,
-        script = script,
-        entry_point_script = entry_point_script,
-        entry_point_alias = entry_point_alias,
-        data = (data or []) + init_data,
-        deps = deps,
-        args = args,
-        visibility = visibility,
-    )
-
 def envoy_jinja_env(
         name,
         templates,
@@ -68,8 +46,7 @@ def envoy_jinja_env(
         env_kwargs = {},
         init_data = ENVOY_PYTOOL_NAMESPACE,
         data = [],
-        deps = [],
-        entry_point_alias = base_entry_point):
+        deps = []):
     """This provides a prebuilt jinja environment that can be imported as a module.
 
     Templates are compiled to a python module for faster loading, and the generated environment
@@ -155,12 +132,11 @@ def envoy_jinja_env(
         ],
     )
 
-    envoy_entry_point(
+    py_console_script_binary(
         name = name_entry_point,
-        pkg = "envoy.base.utils",
+        pkg = "@base_pip3//envoy_base_utils",
         script = "envoy.jinja_env",
         deps = deps,
-        entry_point_alias = entry_point_alias,
     )
 
     native.genrule(
@@ -254,8 +230,7 @@ def envoy_py_data(
         name,
         src,
         init_data = ENVOY_PYTOOL_NAMESPACE,
-        format = None,
-        entry_point_alias = base_entry_point):
+        format = None):
     """Preload JSON/YAML data as a python lib.
 
     Data is loaded to python and then dumped to a pickle file.
@@ -305,10 +280,9 @@ def envoy_py_data(
     name_env_py = "%s.py" % name
     pickle_arg = "$(location %s)" % name_pickle
 
-    envoy_entry_point(
+    py_console_script_binary(
         name = name_entry_point,
-        entry_point_alias = entry_point_alias,
-        pkg = "envoy.base.utils",
+        pkg = "@base_pip3//envoy_base_utils",
         script = "envoy.data_env",
     )
 
@@ -358,8 +332,7 @@ def envoy_gencontent(
             "trim_blocks": True,
             "lstrip_blocks": True,
         },
-        template_deps = [],
-        entry_point_alias = base_entry_point):
+        template_deps = []):
     '''Generate templated output from a Jinja template and JSON/Yaml sources.
 
     `srcs`, `yaml_srcs` and `**json_kwargs` are passed to `envoy_genjson`.
@@ -399,7 +372,6 @@ def envoy_gencontent(
         name = "%s_data" % name,
         src = ":%s_json" % name,
         init_data = init_data,
-        entry_point_alias = entry_point_alias,
     )
     envoy_jinja_env(
         name = name_tpl,
@@ -407,7 +379,6 @@ def envoy_gencontent(
         env_kwargs = template_kwargs,
         templates = [template],
         filters = template_filters,
-        entry_point_alias = entry_point_alias,
     )
     native.genrule(
         name = "%s_generate_content_py" % name,
