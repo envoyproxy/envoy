@@ -31,6 +31,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/config/xds_manager_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -757,6 +758,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
   RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
+
+  // Create the xDS-Manager and pass the cluster manager that was created above.
+  ASSERT(config_.clusterManager());
+  xds_manager_ =
+      std::make_unique<Config::XdsManagerImpl>(*config_.clusterManager(), validation_context_);
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.

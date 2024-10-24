@@ -111,6 +111,13 @@ void IntegrationTestServer::unsetDynamicContextParam(absl::string_view resource_
   });
 }
 
+void IntegrationTestServer::setAdsConfigSource(
+    const envoy::config::core::v3::ApiConfigSource& config_source) {
+  server().dispatcher().post([this, config_source]() {
+    absl::Status status = server().xdsManager().setAdsConfigSource(config_source);
+  });
+}
+
 void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
     absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,

@@ -107,8 +107,7 @@ public:
 
   absl::Status
   updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
-                  Grpc::RawAsyncClientPtr&& failover_async_client,
-                  CustomConfigValidatorsPtr&& custom_config_validators, Stats::Scope& scope,
+                  Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
                   BackOffStrategyPtr&& backoff_strategy,
                   const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
 
@@ -299,8 +298,8 @@ public:
                                    SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                                    const SubscriptionOptions&) override;
 
-  absl::Status updateMuxSource(Grpc::RawAsyncClientPtr&&, Grpc::RawAsyncClientPtr&&,
-                               CustomConfigValidatorsPtr&&, Stats::Scope&, BackOffStrategyPtr&&,
+  absl::Status updateMuxSource(Grpc::RawAsyncClientPtr&&, Grpc::RawAsyncClientPtr&&, Stats::Scope&,
+                               BackOffStrategyPtr&&,
                                const envoy::config::core::v3::ApiConfigSource&) override {
     return absl::UnimplementedError("");
   }

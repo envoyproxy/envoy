@@ -151,6 +151,7 @@ void ValidationInstance::initialize(const Options& options,
   THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
   THROW_IF_NOT_OK(runtime().initialize(clusterManager()));
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(clusterManager(), validation_context_);
 }
 
 void ValidationInstance::shutdown() {

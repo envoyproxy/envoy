@@ -9,6 +9,8 @@
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/tls/server_context_config_impl.h"
+#include "source/common/tls/server_ssl_socket.h"
 #include "source/common/version/version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -2752,6 +2754,225 @@ TEST_P(AdsIntegrationTest, SrdsPausedDuringLds) {
   EXPECT_TRUE(compareDiscoveryRequest(rds_type_url, "1", {"route_0", "route_1"}, {}, {}));
 
   test_server_->waitForCounterEq("listener_manager.listener_create_success", 2);
+}
+
+// ADS integration tests that exercise the ADS-replacement mechanism.
+class AdsReplacementIntegrationTest : public AdsIntegrationTest {
+public:
+  AdsReplacementIntegrationTest() {}
+
+  void createXdsUpstream() override {
+    // Create the first ADS upstream.
+    AdsIntegrationTest::createXdsUpstream();
+    // Create the second (replacement) ADS upstream.
+    if (tls_xds_upstream_ == false) {
+      addFakeUpstream(Http::CodecType::HTTP2);
+    } else {
+      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+      auto* common_tls_context = tls_context.mutable_common_tls_context();
+      common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http2);
+      auto* tls_cert = common_tls_context->add_tls_certificates();
+      tls_cert->mutable_certificate_chain()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+      tls_cert->mutable_private_key()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+      auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+          tls_context, factory_context_, false);
+
+      // upstream_stats_store_ was initialized by AdsIntegrationTest::createXdsUpstream().
+      ASSERT(upstream_stats_store_ != nullptr);
+      auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+          std::move(cfg), context_manager_, *upstream_stats_store_->rootScope(),
+          std::vector<std::string>{});
+      addFakeUpstream(std::move(context), Http::CodecType::HTTP2, /*autonomous_upstream=*/false);
+    }
+    second_xds_upstream_ = fake_upstreams_.back().get();
+  }
+
+  // Initializes the replacement ADS stream.
+  void initSecondAds() {
+    AssertionResult result =
+        second_xds_upstream_->waitForHttpConnection(*dispatcher_, second_xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForNewStream(*dispatcher_, second_xds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    second_xds_stream_->startGrpcStream();
+  }
+
+  void initializeTwoAds() {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+      auto* grpc_service = ads_config->add_grpc_services();
+      setGrpcService(*grpc_service, "ads_cluster", xds_upstream_->localAddress());
+      auto* ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ads_cluster->set_name("ads_cluster");
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext context;
+      auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
+      validation_context->mutable_trusted_ca()->set_filename(
+          TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      auto* san_matcher = validation_context->add_match_typed_subject_alt_names();
+      san_matcher->mutable_matcher()->set_suffix("lyft.com");
+      san_matcher->set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+      if (clientType() == Grpc::ClientType::GoogleGrpc) {
+        auto* google_grpc = grpc_service->mutable_google_grpc();
+        auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
+        ssl_creds->mutable_root_certs()->set_filename(
+            TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+      }
+      ads_cluster->mutable_transport_socket()->set_name("envoy.transport_sockets.tls");
+      ads_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(context);
+
+      // Add the second ADS cluster (copy the ads_cluster and update its name).
+      auto* second_ads_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      second_ads_cluster->MergeFrom(bootstrap.static_resources().clusters()[1]);
+      second_ads_cluster->set_name("second_ads_cluster");
+    });
+    HttpIntegrationTest::initialize();
+    if (xds_stream_ == nullptr) {
+      createXdsConnection();
+      AssertionResult result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+    }
+  }
+
+  void cleanUpSecondXdsConnection() {
+    // Cleanup the second xds connection if used.
+    if (second_xds_connection_ != nullptr) {
+      AssertionResult result = second_xds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = second_xds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      second_xds_connection_.reset();
+    }
+  }
+
+  void TearDown() override {
+    cleanUpSecondXdsConnection();
+    AdsIntegrationTest::TearDown();
+  }
+
+  // Second ADS stream.
+  FakeUpstream* second_xds_upstream_{};
+  FakeHttpConnectionPtr second_xds_connection_;
+  FakeStreamPtr second_xds_stream_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsReplacementIntegrationTest,
+                         ADS_INTEGRATION_PARAMS);
+
+TEST_P(AdsReplacementIntegrationTest, ReplaceAdsConfig) {
+  initializeTwoAds();
+
+  // Check that the node is sent in each request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {},
+      "original1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                      {"cluster_0"}, {"cluster_0"}, {}, false));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")},
+      {buildClusterLoadAssignment("cluster_0")}, {}, "original1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "original1", {}, {}, {}, false));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}, false));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "original1",
+                                      {"cluster_0"}, {}, {}, false));
+
+  // Prepare the second ADS server config.
+  envoy::config::core::v3::ApiConfigSource new_ads_config;
+  new_ads_config.set_api_type((sotwOrDelta() == Grpc::SotwOrDelta::Sotw) ||
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
+                                  ? envoy::config::core::v3::ApiConfigSource::GRPC
+                                  : envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+  new_ads_config.set_set_node_on_first_message_only(true);
+  auto* grpc_service = new_ads_config.add_grpc_services();
+  if (clientType() == Grpc::ClientType::GoogleGrpc) {
+    auto* google_grpc = grpc_service->mutable_google_grpc();
+    auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
+    ssl_creds->mutable_root_certs()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+  }
+  setGrpcService(*grpc_service, "second_ads_cluster", second_xds_upstream_->localAddress());
+
+  // Replace the ADS config.
+  test_server_->setAdsConfigSource(new_ads_config);
+
+  // Expect a reset from the first xDS source.
+  EXPECT_TRUE(xds_stream_->waitForReset());
+
+  // Allow a connection to the second xDS source.
+  AssertionResult result =
+      second_xds_upstream_->waitForHttpConnection(*dispatcher_, second_xds_connection_);
+  RELEASE_ASSERT(result, result.message());
+  result = second_xds_connection_->waitForNewStream(*dispatcher_, second_xds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  second_xds_stream_->startGrpcStream();
+
+  const absl::flat_hash_map<std::string, std::string> cds_eds_initial_resource_versions_map{
+      {"cluster_0", "original1"}};
+  const absl::flat_hash_map<std::string, std::string> empty_initial_resource_versions_map;
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().Cluster, "", {}, {}, {}, true, Grpc::Status::WellKnownGrpcStatus::Ok,
+      "", second_xds_stream_.get(), OptRef(cds_eds_initial_resource_versions_map)));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}, {"cluster_0"}, {}, false,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", second_xds_stream_.get(),
+      OptRef(cds_eds_initial_resource_versions_map)));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().Listener, "", {}, {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok,
+      "", second_xds_stream_.get(), OptRef(empty_initial_resource_versions_map)));
+  // Send a CDS response with new resources.
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TypeUrl::get().Cluster, {buildCluster("replaced_cluster")},
+      {buildCluster("replaced_cluster")}, {}, "replaced1", {}, second_xds_stream_.get());
+
+  // Wait for an updated EDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "original1",
+                                      {"replaced_cluster"}, {"replaced_cluster"}, {}, false,
+                                      Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      second_xds_stream_.get()));
+  // Send an EDS response.
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment,
+      {buildClusterLoadAssignment("replaced_cluster")},
+      {buildClusterLoadAssignment("replaced_cluster")}, {}, "replaced1", {},
+      second_xds_stream_.get());
+
+  // Wait for a CDS and EDS ACKs.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "replaced1", {}, {}, {},
+                                      false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      second_xds_stream_.get()));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().ClusterLoadAssignment, "replaced1", {"replaced_cluster_1"}, {}, {},
+      false, Grpc::Status::WellKnownGrpcStatus::Ok, "", second_xds_stream_.get()));
+
+  // Continue with LDS and RDS, and send a request-response.
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      {buildListener("listener_0", "route_config_0")}, {}, "replaced1", {},
+      second_xds_stream_.get());
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}, {"route_config_0"}, {},
+      false, Grpc::Status::WellKnownGrpcStatus::Ok, "", second_xds_stream_.get()));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration,
+      {buildRouteConfig("route_config_0", "replaced_cluster")},
+      {buildRouteConfig("route_config_0", "replaced_cluster")}, {}, "replaced1", {},
+      second_xds_stream_.get());
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "replaced1", {}, {}, {},
+                                      false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      second_xds_stream_.get()));
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TypeUrl::get().RouteConfiguration, "replaced1", {"route_config_0"}, {}, {}, false,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", second_xds_stream_.get()));
+
+  makeSingleRequest();
 }
 
 } // namespace Envoy

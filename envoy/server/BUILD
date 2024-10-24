@@ -117,6 +117,7 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//envoy/api:api_interface",
         "//envoy/common:mutex_tracer",
+        "//envoy/config:xds_manager_interface",
         "//envoy/event:timer_interface",
         "//envoy/http:context_interface",
         "//envoy/http:query_params_interface",
