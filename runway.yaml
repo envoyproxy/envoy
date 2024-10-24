@@ -1,0 +1,25 @@
+---
+deployments:
+- name: envoy-build
+  modules:
+  - path: ./
+    environments:
+      ci:
+        pre_build_steps:
+        - echo "Checking out cicd_trial branch"
+        - git checkout cicd_trial
+        - echo "Connecting to EC2 instance and triggering Bazel build in a screen session"
+        - |
+          tsh ssh suryadeepr@ip-10-217-182-252.ec2.internal << EOF
+          cd ~/valgrind_build/envoy/
+          git checkout v1.28.0-dbaas
+          git pull origin v1.28.0-dbaas
+          screen -dmS bazel_build bash -c '
+            export CC=/usr/bin/clang
+            export CXX=/usr/bin/clang++
+            bazel build --config=clang --config=libc++ -c dbg --copt=-g --copt=-fno-omit-frame-pointer --copt=-Os --copt=-fdebug-types-section --features=per_object_debug_info --linkopt=-Wl,--strip-debug --cxxopt=-std=c++17 --host_cxxopt=-std=c++17 --cxxopt=-stdlib=libc++ --linkopt=-stdlib=libc++ --strip=never //source/exe:envoy-static --subcommands --verbose_failures > build_output.log 2>&1'
+          EOF
+        post_build_steps:
+        - echo "Build command issued to EC2"
+        - echo "Checking build status log"
+        - tsh ssh suryadeepr@ip-10-217-182-252.ec2.internal "cat /path/to/project/build_status.log"
