@@ -52,7 +52,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mUseCares = false;
   private final List<Pair<String, Integer>> mCaresFallbackResolvers = new ArrayList<>();
-  private boolean mUseGro = false;
+  private boolean mUseGro = true;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;

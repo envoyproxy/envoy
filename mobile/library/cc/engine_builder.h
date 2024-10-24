@@ -197,7 +197,7 @@ private:
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
-  bool use_gro_if_available_ = false;
+  bool use_gro_if_available_ = true;
 
   // This is the same value Cronet uses for QUIC:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
