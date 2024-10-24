@@ -37,6 +37,7 @@ message APIKeyAuth {
   config.core.v3.DataSource keys = 1 [(udpa.annotations.sensitive) = true];
 
   // The header name to fetch the key.
+  // If multiple values are present in the given header, the filter rejects the request.
   // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
   string authentication_header = 2;
   // The query parameter name to fetch the key.
