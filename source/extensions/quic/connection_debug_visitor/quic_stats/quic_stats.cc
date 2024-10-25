@@ -97,6 +97,8 @@ void QuicStatsVisitor::recordStats() {
     config_.stats_.cx_tx_estimated_bandwidth_bytes_per_second_.recordValue(
         quic_stats.estimated_bandwidth.ToBytesPerPeriod(quic::QuicTime::Delta::FromSeconds(1)));
   }
+  config_.stats_.cx_tx_mtu_bytes_.recordValue(quic_stats.egress_mtu);
+  config_.stats_.cx_rx_mtu_bytes_.recordValue(quic_stats.ingress_mtu);
 }
 
 Config::Config(

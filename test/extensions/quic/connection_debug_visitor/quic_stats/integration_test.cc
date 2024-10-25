@@ -53,12 +53,15 @@ TEST_P(QuicStatsIntegrationTest, Basic) {
 
   auto validateCounterRange = [this](const std::string& name, uint64_t lower, uint64_t upper) {
     auto counter = test_server_->counter(absl::StrCat("listener.test.quic_stats.", name));
+    ENVOY_LOG(info, "counter {}: {}, expected range {}-{}", name, counter->value(), lower, upper);
     EXPECT_GE(counter->value(), lower);
     EXPECT_LE(counter->value(), upper);
   };
   auto validateHistogramRange = [this](const std::string& name, int64_t lower, int64_t upper) {
     auto histogram = test_server_->histogram(absl::StrCat("listener.test.quic_stats.", name));
     auto& summary = histogram->cumulativeStatistics();
+    ENVOY_LOG(info, "histogram {}: {}, expected range {}-{}", name, summary.sampleSum(), lower,
+              upper);
 
     // With only 1 sample, the `sampleSum()` is the one value that has been recorded.
     EXPECT_EQ(1, summary.sampleCount());
@@ -79,6 +82,8 @@ TEST_P(QuicStatsIntegrationTest, Basic) {
   validateHistogramRange("cx_tx_estimated_bandwidth_bytes_per_second", 100,
                          1024ULL * 1024ULL * 1024ULL * 1024ULL /* 1 TB/s */);
   validateHistogramRange("cx_tx_percent_retransmitted_packets", 0, 10);
+  validateHistogramRange("cx_tx_mtu_bytes", 500, 65535);
+  validateHistogramRange("cx_rx_mtu_bytes", 500, 65535);
 }
 
 } // namespace QuicStats
