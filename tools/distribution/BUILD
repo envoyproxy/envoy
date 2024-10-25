@@ -1,6 +1,7 @@
 load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_pytool_binary")
+load("//tools/base:envoy_python.bzl", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
@@ -9,19 +10,22 @@ envoy_package()
 
 envoy_py_namespace()
 
-envoy_entry_point(
+py_console_script_binary(
     name = "release",
-    pkg = "envoy.distribution.release",
+    pkg = "@base_pip3//envoy_distribution_release",
+    script = "envoy.distribution.release",
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "sign",
-    pkg = "envoy.gpg.sign",
+    pkg = "@base_pip3//envoy_gpg_sign",
+    script = "envoy.gpg.sign",
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "verify",
-    pkg = "envoy.distribution.verify",
+    pkg = "@base_pip3//envoy_distribution_verify",
+    script = "envoy.distribution.verify",
 )
 
 envoy_pytool_binary(

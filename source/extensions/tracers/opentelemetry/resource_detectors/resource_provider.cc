@@ -4,6 +4,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/utility.h"
+#include "source/common/version/version.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,9 +17,20 @@ bool isEmptyResource(const Resource& resource) { return resource.attributes_.emp
 Resource createInitialResource(const std::string& service_name) {
   Resource resource{};
 
-  // Creates initial resource with the static service.name attribute.
+  // Creates initial resource with the static service.name and telemetry.sdk.* attributes.
   resource.attributes_[std::string(kServiceNameKey.data(), kServiceNameKey.size())] =
       service_name.empty() ? std::string{kDefaultServiceName} : service_name;
+
+  resource
+      .attributes_[std::string(kTelemetrySdkLanguageKey.data(), kTelemetrySdkLanguageKey.size())] =
+      kDefaultTelemetrySdkLanguage;
+
+  resource.attributes_[std::string(kTelemetrySdkNameKey.data(), kTelemetrySdkNameKey.size())] =
+      kDefaultTelemetrySdkName;
+
+  resource
+      .attributes_[std::string(kTelemetrySdkVersionKey.data(), kTelemetrySdkVersionKey.size())] =
+      Envoy::VersionInfo::version();
 
   return resource;
 }
