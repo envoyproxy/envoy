@@ -367,8 +367,9 @@ message StreamedBodyResponse {
   // Envoy sends this body mutation out as it is.
   bytes body = 1;
 
-  // Set this flag to true if this is the last chunk of body responses,
-  // and there is no trailers behind it.
+  // Set this flag to true if the server has received a body request with
+  // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.HttpBody.end_of_stream>` set to true,
+  // and this is the last chunk of body responses.
   bool end_of_stream = 2;
 }
 

@@ -71,16 +71,15 @@ message ProcessingMode {
     BUFFERED_PARTIAL = 3;
 
     // [#not-implemented-hide:]
-    // Envoy streams the body to the server in pieces as they arrive. The data is not stored in
-    // the internal queue. Only data size is stored there for tracking and flow control purpose.
+    // Envoy streams the body to the server in pieces as they arrive.
     //
     // Server may choose to buffer any number chunks of data before processing them.
     // After finish buffering, server processes the buffered data. Then it splits the processed
     // data into any number of chunks, and stream them back to Envoy one by one.
-    // The individual chunk size is recommended to be smaller than 64K bytes, or smaller than
+    // Server may continuously do so until the complete body is processed.
+    // The individual response chunk size is recommended to be no greater than 64K bytes, or
     // :ref:`max_receive_message_length <envoy_v3_api_field_config.core.v3.GrpcService.EnvoyGrpc.max_receive_message_length>`
-    // if EnvoyGrpc is used, and ``max_receive_message_length`` is configured.
-    // The server may continuously do so until the complete body is processed.
+    // if EnvoyGrpc is used.
     //
     // Server may also choose to buffer the entire message, including the headers (if header mode is
     // ``SEND``), the entire body, and the trailers (if present), before sending back any response.
