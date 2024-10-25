@@ -39,8 +39,6 @@ RUNTIME_GUARD(envoy_reloadable_features_defer_processing_backedup_streams);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_dns_details);
 RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
-RUNTIME_GUARD(envoy_reloadable_features_dns_reresolve_on_eai_again);
-RUNTIME_GUARD(envoy_reloadable_features_edf_lb_host_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_edf_lb_locality_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
@@ -111,7 +109,6 @@ RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
 RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
-RUNTIME_GUARD(envoy_restart_features_quic_handle_certs_with_shared_tls_code);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
@@ -126,10 +123,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
-// TODO(mattklein123): Flip this to true and/or remove completely once verified by Envoy Mobile.
-// TODO(mattklein123): Also unit test this if this sticks and this becomes the default for Apple &
-// Android.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
 // TODO(vikaschoudhary16) flip this to true only after all the
 // TcpProxy::Filter::HttpStreamDecoderFilterCallbacks are implemented or commented as unnecessary
 FALSE_RUNTIME_GUARD(envoy_restart_features_upstream_http_filters_with_tcp_proxy);
@@ -155,6 +148,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change);
 // TODO(botengyao): this will be default true in the next release after this warning release.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
+// Adding runtime flag to use balsa_parser for http_inspector.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
