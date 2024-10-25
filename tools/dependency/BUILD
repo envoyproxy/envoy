@@ -1,8 +1,9 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_entry_point", "envoy_genjson", "envoy_pytool_binary")
+load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
@@ -36,7 +37,7 @@ envoy_genjson(
     """,
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "check",
     args = [
         "--repository_locations=$(location :filtered-dependencies)",
@@ -52,14 +53,16 @@ envoy_entry_point(
         ":preloaded_cve_data": [":cve_data"],
         "//conditions:default": [],
     }),
-    pkg = "envoy.dependency.check",
+    pkg = "@base_pip3//envoy_dependency_check",
+    script = "envoy.dependency.check",
     deps = [requirement("orjson")],
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "dependatool",
     args = ["--path=%s" % PATH],
-    pkg = "dependatool",
+    pkg = "@base_pip3//dependatool",
+    script = "dependatool",
 )
 
 envoy_pytool_binary(
@@ -85,9 +88,10 @@ py_binary(
     deps = [":validate"],
 )
 
-envoy_entry_point(
+py_console_script_binary(
     name = "cve_download",
-    pkg = "envoy.dependency.check",
+    pkg = "@base_pip3//envoy_dependency_check",
+    script = "envoy.dependency.check",
     deps = [requirement("orjson")],
 )
 
