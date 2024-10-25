@@ -444,6 +444,79 @@ TEST_P(OverloadScaledTimerIntegrationTest, MaxConnectionDuration) {
   codec_client_->close();
 }
 
+TEST_P(OverloadScaledTimerIntegrationTest, Http1SafeMaxConnectionDuration) {
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              cm) -> void {
+        cm.set_http1_safe_max_connection_duration(true);
+        // Drain timeout is not used for max_connection_duration if
+        // http1_safe_max_connection_duration is enabled.
+        cm.mutable_drain_timeout()->MergeFrom(ProtobufUtil::TimeUtil::SecondsToDuration(0));
+        cm.mutable_common_http_protocol_options()->mutable_max_connection_duration()->MergeFrom(
+            ProtobufUtil::TimeUtil::SecondsToDuration(20));
+      });
+
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
+      timer_scale_factors:
+        - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+          min_timeout: 5s
+    )EOF"));
+
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "sni.lyft.com"}};
+
+  // Create an HTTP connection and complete a request.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // At this point, the connection should be idle but still open.
+  ASSERT_TRUE(codec_client_->connected());
+
+  // Set the load so the timer is reduced but not to the minimum value.
+  updateResource(0.8);
+  test_server_->waitForGaugeGe("overload.envoy.overload_actions.reduce_timeouts.scale_percent", 50);
+  // Advancing past the minimum time shouldn't close the connection.
+  timeSystem().advanceTimeWait(std::chrono::seconds(5));
+
+  // Increase load so that the minimum time has now elapsed.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                               100);
+
+  // Wait for the proxy to notice and take action for the overload.
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  if (GetParam().downstream_protocol == Http::CodecType::HTTP1) {
+    // There's no drain timer. We can even advance time again and the connection will still be
+    // intact.
+    timeSystem().advanceTimeWait(std::chrono::seconds(5));
+    // For HTTP1, Envoy will start draining but will wait to close the
+    // connection. If a new stream comes in, it will set the connection header
+    // to "close" on the response and close the connection after.
+    auto response = codec_client_->makeRequestWithBody(request_headers, 10);
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 10));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ(response->headers().getConnectionValue(), "close");
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  }
+  codec_client_->close();
+}
+
 TEST_P(OverloadScaledTimerIntegrationTest, HTTP3CloseIdleHttpConnectionsDuringHandshake) {
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP3) {
     return;
