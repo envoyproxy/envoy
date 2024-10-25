@@ -249,7 +249,7 @@ TEST_F(ClusterTest, BasicFlow) {
 
   // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
@@ -259,7 +259,7 @@ TEST_F(ClusterTest, BasicFlow) {
 
   // After changing the address, LB will immediately resolve the new address with a refresh.
   updateTestHostAddress("host1:0", "2.3.4.5");
-  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("2.3.4.5:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
@@ -282,13 +282,13 @@ TEST_F(ClusterTest, OutlierDetection) {
   InSequence s;
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
             lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]).ok());
   EXPECT_CALL(*host_map_["host2:0"], touch());
   EXPECT_EQ("5.6.7.8:0",
             lb_->chooseHost(setHostAndReturnContext("host2:0"))->address()->asString());
@@ -321,7 +321,7 @@ TEST_F(ClusterTest, FilterStateHostOverride) {
   makeTestHost("host1:0", "1.2.3.4");
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]);
+  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
             lb_->chooseHost(setFilterStateHostAndReturnContext("host1:0"))->address()->asString());

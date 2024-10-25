@@ -88,7 +88,11 @@ def _cc_deps():
         ],
     )
     external_http_archive("com_google_protofieldextraction")
-    external_http_archive("com_google_protoprocessinglib")
+    external_http_archive(
+        "com_google_protoprocessinglib",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:proto_processing_lib.patch"],
+    )
     external_http_archive("ocp")
     native.bind(
         name = "path_matcher",
@@ -485,8 +489,6 @@ def _com_github_facebook_zstd():
 def _com_google_cel_cpp():
     external_http_archive(
         "com_google_cel_cpp",
-        patches = ["@envoy//bazel:cel-cpp.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_google_perfetto():

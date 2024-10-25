@@ -93,14 +93,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   const Api::SysCallSocketResult result =
       Api::OsSysCallsSingleton::get().socket(domain, flags, protocol);
   if (!SOCKET_VALID(result.return_value_)) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.restart_features.allow_client_socket_creation_failure")) {
-      IS_ENVOY_BUG(fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-      return nullptr;
-    } else {
-      RELEASE_ASSERT(!SOCKET_VALID(result.return_value_),
-                     fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-    }
+    IS_ENVOY_BUG(fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+    return nullptr;
   }
   IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain, options);
 
@@ -108,14 +102,8 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
   const int rc = io_handle->setBlocking(false).return_value_;
   if (SOCKET_FAILURE(result.return_value_)) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.restart_features.allow_client_socket_creation_failure")) {
-      IS_ENVOY_BUG(fmt::format("Unable to set socket non-blocking: got error: {}", rc));
-      return nullptr;
-    } else {
-      RELEASE_ASSERT(SOCKET_FAILURE(rc),
-                     fmt::format("Unable to set socket non-blocking: got error: {}", rc));
-    }
+    IS_ENVOY_BUG(fmt::format("Unable to set socket non-blocking: got error: {}", rc));
+    return nullptr;
   }
 #endif
 

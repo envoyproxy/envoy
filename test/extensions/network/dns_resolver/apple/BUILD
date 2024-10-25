@@ -14,7 +14,7 @@ envoy_cc_test(
         "//bazel:apple": ["apple_dns_impl_test.cc"],
         "//conditions:default": [],
     }),
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
