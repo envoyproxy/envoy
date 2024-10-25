@@ -71,5 +71,8 @@ new_features:
 - area: http_inspector
   change: |
     Added default-false ``envoy.reloadable_features.http_inspector_use_balsa_parser`` for HttpInspector to use BalsaParser.
+- area: tracers
+  change: |
+    Set resource ``telemetry.sdk.*`` and scope ``otel.scope.name|version`` attributes for the OpenTelemetry tracer.
 
 deprecated:
