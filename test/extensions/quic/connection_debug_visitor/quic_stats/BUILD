@@ -25,6 +25,6 @@ envoy_cc_test(
     rbe_pool = "2core",
     deps = [
         "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
-        "//test/integration:integration_lib",
+        "//test/integration:http_integration_lib",
     ],
 )
