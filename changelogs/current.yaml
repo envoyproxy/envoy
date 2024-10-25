@@ -21,15 +21,33 @@ minor_behavior_changes:
   change: |
     The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the
     metadata (``DYNAMIC_METADATA``, ``CLUSTER_METADATA``, etc.) formatter.
+- area: http
+  change: |
+    If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
+    is set to false, Envoy will not parse the trace reason from the ``x-request-id`` header to ensure reads and writes of
+    trace reason be consistant.
+    If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
+    is set to true and external ``x-request-id`` value is used, the trace reason in the external request id will not
+    be trusted and will be cleared.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tls
+  change: |
+    Support operations on IP SANs when the IP version is not supported by the host operating system, for example
+    an IPv6 SAN can now be used on a host not supporting IPv6 addresses.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: router
   change: |
     Removed runtime guard ``envoy_reloadable_features_send_local_reply_when_no_buffer_and_upstream_request``.
+- area: load balancing
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.edf_lb_host_scheduler_init_fix`` and legacy code paths.
+- area: grpc
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status``.
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.
@@ -39,11 +57,19 @@ removed_config_or_runtime:
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_reresolve_on_eai_again`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime flag ``envoy.restart_features.quic_handle_certs_with_shared_tls_code`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
 
 new_features:
+- area: wasm
+  change: |
+    Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
+    :ref:`failure_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.failure_policy>` for more details.
+    The ``FAIL_RELOAD`` reload policy will be used by default.
 - area: aws_request_signing
   change: |
     Added an optional field :ref:`credential_provider
@@ -56,5 +82,11 @@ new_features:
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
     %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
+- area: http_inspector
+  change: |
+    Added default-false ``envoy.reloadable_features.http_inspector_use_balsa_parser`` for HttpInspector to use BalsaParser.
+- area: tracers
+  change: |
+    Set resource ``telemetry.sdk.*`` and scope ``otel.scope.name|version`` attributes for the OpenTelemetry tracer.
 
 deprecated:

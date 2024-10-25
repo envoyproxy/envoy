@@ -38,7 +38,6 @@ RUNTIME_GUARD(envoy_reloadable_features_consistent_header_validation);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_dns_details);
 RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
-RUNTIME_GUARD(envoy_reloadable_features_edf_lb_host_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_edf_lb_locality_scheduler_init_fix);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
@@ -102,13 +101,11 @@ RUNTIME_GUARD(envoy_reloadable_features_use_http_client_to_fetch_aws_credentials
 RUNTIME_GUARD(envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san);
 RUNTIME_GUARD(envoy_reloadable_features_use_typed_metadata_in_proxy_protocol_listener);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
-RUNTIME_GUARD(envoy_reloadable_features_validate_grpc_header_before_log_grpc_status);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
 RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
-RUNTIME_GUARD(envoy_restart_features_quic_handle_certs_with_shared_tls_code);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
@@ -148,6 +145,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change);
 // TODO(botengyao): this will be default true in the next release after this warning release.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
+// Adding runtime flag to use balsa_parser for http_inspector.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

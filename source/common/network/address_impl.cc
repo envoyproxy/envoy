@@ -260,14 +260,18 @@ uint32_t Ipv6Instance::Ipv6Helper::port() const { return ntohs(address_.sin6_por
 bool Ipv6Instance::Ipv6Helper::v6only() const { return v6only_; };
 
 std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
+  return makeFriendlyAddress(address_);
+}
+
+std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress(const sockaddr_in6& address) {
   char str[INET6_ADDRSTRLEN];
-  const char* ptr = inet_ntop(AF_INET6, &address_.sin6_addr, str, INET6_ADDRSTRLEN);
+  const char* ptr = inet_ntop(AF_INET6, &address.sin6_addr, str, INET6_ADDRSTRLEN);
   ASSERT(str == ptr);
-  if (address_.sin6_scope_id != 0) {
+  if (address.sin6_scope_id != 0) {
     // Note that here we don't use the `if_indextoname` that will give a more user friendly
     // output just because in the past created a performance bottleneck if the machine had a
     // lot of IPv6 Link local addresses.
-    return absl::StrCat(ptr, "%", scopeId());
+    return absl::StrCat(ptr, "%", address.sin6_scope_id);
   }
   return ptr;
 }
@@ -335,6 +339,10 @@ Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bo
     return;
   }
   initHelper(address, v6only);
+}
+
+std::string Ipv6Instance::sockaddrToString(const sockaddr_in6& addr) {
+  return Ipv6Helper::makeFriendlyAddress(addr);
 }
 
 namespace {
