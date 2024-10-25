@@ -1042,6 +1042,22 @@ subjectPeerCertificate()
 Return the subject field of the peer certificate in RFC 2253 format. Returns ``""`` if there is no
 peer certificate, or no subject.
 
+parsedSubjectPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local parsedSubject = downstreamSslConnection:parsedSubjectPeerCertificate()
+  if parsedSubject then
+    print("CN: " .. parsedSubject:commonName())
+    print("O: " .. table.concat(parsedSubject:organizationName(), ","))
+  end
+
+Returns :repo:`connection <envoy/ssl/parsed_x509_name.h>` parsed from subject field of the peer
+certificate. Returns nil if there is no peer certificate.
+
+Returns a :ref:`parsed name object <config_http_filters_lua_parsed_name>`.
+
 uriSanPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1185,3 +1201,28 @@ tlsVersion()
   downstreamSslConnection:tlsVersion()
 
 Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS connection.
+
+.. _config_http_filters_lua_parsed_name:
+
+Parsed name object API
+----------------------
+
+commonName()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  parsedSubject:commonName()
+
+Returns the string representation of CN field from the X.509 name. Returns ``""`` if there is no such
+field or if the field can't be converted to UTF8 string.
+
+organizationName()
+^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  parsedSubject:organizationName()
+
+Returns the string representation of O fields (as a table) from the X.509 name. Returns an empty
+table if there is no such field or if the field can't be converted to UTF8 string.
