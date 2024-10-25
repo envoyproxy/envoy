@@ -380,8 +380,8 @@ const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {
   });
 }
 
-const Ssl::ParsedX509NamePtr& ConnectionInfoImplBase::parsedSubjectPeerCertificate() const {
-  return getCachedValueOrCreate<Ssl::ParsedX509NamePtr>(
+Ssl::ParsedX509NameOptConstRef ConnectionInfoImplBase::parsedSubjectPeerCertificate() const {
+  const auto& parsedName = getCachedValueOrCreate<Ssl::ParsedX509NamePtr>(
       CachedValueTag::ParsedSubjectPeerCertificate, [](SSL* ssl) {
         bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
         if (!cert) {
@@ -389,6 +389,11 @@ const Ssl::ParsedX509NamePtr& ConnectionInfoImplBase::parsedSubjectPeerCertifica
         }
         return Utility::parseSubjectFromCertificate(*cert);
       });
+
+  if (parsedName) {
+    return Ssl::ParsedX509NameOptConstRef(*parsedName);
+  }
+  return absl::nullopt;
 }
 
 const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {

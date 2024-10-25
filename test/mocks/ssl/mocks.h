@@ -52,7 +52,7 @@ public:
   MOCK_METHOD(absl::Span<const std::string>, serialNumbersPeerCertificates, (), (const));
   MOCK_METHOD(const std::string&, issuerPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, subjectPeerCertificate, (), (const));
-  MOCK_METHOD(const ParsedX509NamePtr&, parsedSubjectPeerCertificate, (), (const));
+  MOCK_METHOD(ParsedX509NameOptConstRef, parsedSubjectPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, subjectLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificateChain, (), (const));

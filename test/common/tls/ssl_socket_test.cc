@@ -694,7 +694,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sha1PeerCertificateDigest());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->urlEncodedPemEncodedPeerCertificate());
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
-        EXPECT_EQ(nullptr, server_connection->ssl()->parsedSubjectPeerCertificate());
+        EXPECT_EQ(absl::nullopt, server_connection->ssl()->parsedSubjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->emailSansPeerCertificate());
