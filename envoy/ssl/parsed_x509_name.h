@@ -24,7 +24,6 @@ struct ParsedX509Name {
   // TODO: add more well known fields such as L, OU, C, DC, UID etc.
 };
 
-using ParsedX509NameOptConstRef = OptRef<const ParsedX509Name>;
 using ParsedX509NamePtr = std::unique_ptr<ParsedX509Name>;
 
 } // namespace Ssl

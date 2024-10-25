@@ -100,7 +100,7 @@ public:
    * @return the well-known attribute values parsed from subject field of the peer certificate.
    *         Returns absl::nullopt if there is no peer certificate.
    **/
-  virtual ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const PURE;
+  virtual const ParsedX509NamePtr& parsedSubjectPeerCertificate() const PURE;
 
   /**
    * @return absl::Span<const std::string> the URIs in the SAN field of the peer certificate.

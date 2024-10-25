@@ -28,7 +28,7 @@ public:
   absl::Span<const std::string> serialNumbersPeerCertificates() const override;
   const std::string& issuerPeerCertificate() const override;
   const std::string& subjectPeerCertificate() const override;
-  Ssl::ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const override;
+  const Ssl::ParsedX509NamePtr& parsedSubjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
@@ -73,6 +73,7 @@ private:
     SerialNumbersPeerCertificates,
     IssuerPeerCertificate,
     SubjectPeerCertificate,
+    ParsedSubjectPeerCertificate,
     SubjectLocalCertificate,
     EmailSansLocalCertificate,
     OthernameSansLocalCertificate,
@@ -97,7 +98,7 @@ private:
   // having fixed space for cached data that isn't used is a waste. Instead, create a lookup
   // table of cached values that are created on demand. Use a node_hash_map so that returned
   // references are not invalidated when additional items are added.
-  using CachedValue = absl::variant<std::string, std::vector<std::string>>;
+  using CachedValue = absl::variant<std::string, std::vector<std::string>, Ssl::ParsedX509NamePtr>;
   mutable absl::node_hash_map<CachedValueTag, CachedValue> cached_values_;
 };
 
