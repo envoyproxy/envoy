@@ -48,6 +48,37 @@ TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
   dispatcher_helper_.runDispatcher();
 }
 
+TEST_P(EnvoyGrpcFlowControlTest, BasicStreamFlowControlWithStreamOption) {
+  // Configure the connection buffer limit to 1KB
+  connection_buffer_limits_ = 1024;
+  // Create large request string that will trigger watermark given buffer limit above.
+  std::string large_request = std::string(64 * 1024, 'a');
+
+  // Set watermark_callbacks_ so that sidestream watermark callback will be registered with stream
+  // options. option.
+  testing::StrictMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  watermark_callbacks_ = &watermark_callbacks;
+
+  initialize();
+  auto stream = createStream(empty_metadata_);
+
+  // Expect that flow control kicks in and watermark calls are triggered.
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+
+  // Create send request with large request string.
+  helloworld::HelloRequest request_msg;
+  request_msg.set_name(large_request);
+
+  RequestArgs request_args;
+  request_args.request = &request_msg;
+  stream->sendRequest(request_args);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS,

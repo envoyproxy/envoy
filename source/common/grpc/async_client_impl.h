@@ -93,7 +93,12 @@ public:
     stream_->setWatermarkCallbacks(callbacks);
   }
 
-  void removeWatermarkCallbacks() override { stream_->removeWatermarkCallbacks(); }
+  void removeWatermarkCallbacks() override {
+    if (options_.sidestream_watermark_callbacks != nullptr) {
+      stream_->removeWatermarkCallbacks();
+      options_.sidestream_watermark_callbacks = nullptr;
+    }
+  }
 
 protected:
   Upstream::ClusterInfoConstSharedPtr cluster_info_;

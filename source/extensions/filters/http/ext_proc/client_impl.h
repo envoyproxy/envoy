@@ -30,7 +30,7 @@ public:
   ExternalProcessorStreamPtr
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-        const Http::AsyncClient::StreamOptions& options,
+        Http::AsyncClient::StreamOptions& options,
         Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) override;
   void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& request, bool end_stream,
                    const uint64_t stream_id, RequestCallbacks* callbacks,
@@ -49,7 +49,7 @@ public:
   // Factory method: create and return `ExternalProcessorStreamPtr`; return nullptr on failure.
   static ExternalProcessorStreamPtr
   create(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-         ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options,
+         ExternalProcessorCallbacks& callbacks, Http::AsyncClient::StreamOptions& options,
          Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks);
 
   void send(ProcessingRequest&& request, bool end_stream) override;

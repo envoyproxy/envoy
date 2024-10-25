@@ -495,6 +495,9 @@ public:
     options.setMetadata(m);
     options.setSendInternal(send_internal_header_stream_option_);
     options.setSendXff(send_xff_header_stream_option_);
+    if (watermark_callbacks_ != nullptr) {
+      options.setSidestreamWatermarkCallbacks(watermark_callbacks_);
+    }
     stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream, options);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
@@ -562,6 +565,7 @@ public:
   bool send_xff_header_stream_option_{true};
   // Connection buffer limits, 0 means default limit from config is used.
   uint32_t connection_buffer_limits_{0};
+  testing::StrictMock<Http::MockSidestreamWatermarkCallbacks>* watermark_callbacks_{nullptr};
 };
 
 // The integration test for Envoy gRPC and Google gRPC. It uses `TestRealTimeSystem`.
