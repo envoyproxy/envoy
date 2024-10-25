@@ -24,9 +24,6 @@ namespace {
 // A magic header value which marks header as not expected.
 constexpr char UnexpectedHeaderValue[] = "Unexpected header value";
 
-// TODO(kbaichoo): Remove parameterizing by deferred processing when the feature
-// is enabled by default. The parameterization is to avoid bit rot since it's
-// off by default.
 class GrpcJsonTranscoderIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {

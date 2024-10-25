@@ -26,8 +26,7 @@ public:
 
   void bidirectionalStreaming(uint32_t bytes);
   void manySimultaneousRequests(uint32_t request_bytes, uint32_t max_response_bytes,
-                                uint32_t num_streams = 50,
-                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+                                uint32_t num_streams = 50);
 
   bool use_alpn_{false};
 
@@ -264,9 +263,9 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLim
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
 }
 
-void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(
-    uint32_t request_bytes, uint32_t max_response_bytes, uint32_t num_requests,
-    std::chrono::milliseconds timeout) {
+void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes,
+                                                                  uint32_t max_response_bytes,
+                                                                  uint32_t num_requests) {
   TestRandomGenerator rand;
   std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
@@ -294,7 +293,7 @@ void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(
   }
 
   for (uint32_t i = 0; i < num_requests; ++i) {
-    ASSERT_TRUE(responses[i]->waitForEndStream(timeout));
+    ASSERT_TRUE(responses[i]->waitForEndStream());
     if (i % 2 != 0) {
       EXPECT_TRUE(responses[i]->complete());
       EXPECT_EQ("200", responses[i]->headers().getStatusValue());
@@ -362,6 +361,9 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBuffe
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
+// TODO(kbaichoo): fix this test to work with deferred processing.
+// We've augmented the pause filter to lower the watermark when the filter has raised above
+// watermark but will follow up with getting the timing correct in another PR.
 TEST_P(MultiplexedUpstreamIntegrationTest, DISABLED_ManyLargeSimultaneousRequestWithRandomBackup) {
   // random-pause-filter does not support HTTP3.
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
@@ -372,8 +374,9 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DISABLED_ManyLargeSimultaneousRequest
   name: random-pause-filter
 )EOF");
 
-  // Increase the timeout since there will be delays added by the pause filter.
-  manySimultaneousRequests(1024 * 20, 1024 * 20, 50, TestUtility::DefaultTimeout * 2);
+  // TODO(kbaichoo): either change the ordering of how the responses wait on endstream or increase
+  // the timeout since there will be delays added by the pause filter.
+  manySimultaneousRequests(1024 * 20, 1024 * 20, 50);
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
