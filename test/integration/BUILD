@@ -539,7 +539,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 10,
     tags = [
         "cpu:3",
@@ -1692,7 +1692,7 @@ envoy_cc_test(
     name = "listener_extension_discovery_integration_test",
     size = "large",
     srcs = ["listener_extension_discovery_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",

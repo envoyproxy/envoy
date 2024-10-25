@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     name = "command_splitter_impl_test",
     srcs = ["command_splitter_impl_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
