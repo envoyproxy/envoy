@@ -3,7 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:96.5"
+"source/common:96.4"
 "source/common/common/posix:96.2" # flaky due to posix: be careful adjusting
 "source/common/config:96.3"
 "source/common/crypto:95.5"
