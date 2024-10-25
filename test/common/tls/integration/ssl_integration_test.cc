@@ -382,11 +382,7 @@ TEST_P(SslIntegrationTest, LogPeerIpSanUnsupportedIpVersion) {
 
   checkStats();
   auto result = waitForAccessLog(listener_access_log_name_);
-  if (version_ == Network::Address::IpVersion::v4) {
-    EXPECT_EQ(result, "1.2.3.4");
-  } else {
-    EXPECT_EQ(result, "0:1:2:3::4");
-  }
+  EXPECT_EQ(result, "1.2.3.4,0:1:2:3::4");
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {

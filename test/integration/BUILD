@@ -59,7 +59,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(
         ["ads_integration_test.cc"],
     ),
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],
@@ -537,7 +537,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 10,
     tags = [
         "cpu:3",
@@ -1697,7 +1697,7 @@ envoy_cc_test(
     name = "listener_extension_discovery_integration_test",
     size = "large",
     srcs = ["listener_extension_discovery_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -2628,7 +2628,7 @@ envoy_cc_test(
     name = "weighted_cluster_integration_test",
     size = "large",
     srcs = ["weighted_cluster_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],

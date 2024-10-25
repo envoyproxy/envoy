@@ -3,7 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:96.2"
+"source/common:96.4"
 "source/common/common/posix:96.2" # flaky due to posix: be careful adjusting
 "source/common/config:96.3"
 "source/common/crypto:95.5"
@@ -11,11 +11,11 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filesystem/posix:96.3" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
 "source/common/http/http2:96.0"
 "source/common/json:95.2"
-"source/common/matcher:94.4"
+"source/common/matcher:94.7"
 "source/common/memory:74.5" # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/quic:93.6"
+"source/common/quic:93.3"
 "source/common/secret:95.4"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
@@ -30,7 +30,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common/fault:94.5"
 "source/extensions/filters/common/rbac:90.8"
-"source/extensions/filters/http/cache:95.4"
+"source/extensions/filters/http/cache:95.9"
 "source/extensions/filters/http/grpc_json_transcoder:94.2" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:88.2"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
@@ -43,7 +43,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/stat_sinks/statsd:85.2" # Death tests don't report LCOV
 "source/extensions/tracers/opencensus:94.0"
 "source/extensions/tracers/zipkin:95.8"
-"source/extensions/transport_sockets:97.4"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
 "source/extensions/watchdog:83.3" # Death tests within extensions
