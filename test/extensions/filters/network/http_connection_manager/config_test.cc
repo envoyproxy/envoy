@@ -2399,7 +2399,7 @@ public:
   TestRequestIDExtension(const test::http_connection_manager::CustomRequestIDExtension& config)
       : config_(config) {}
 
-  void set(Http::RequestHeaderMap&, bool) override {}
+  void set(Http::RequestHeaderMap&, bool, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
   absl::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
     return absl::nullopt;

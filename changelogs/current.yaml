@@ -21,6 +21,14 @@ minor_behavior_changes:
   change: |
     The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the
     metadata (``DYNAMIC_METADATA``, ``CLUSTER_METADATA``, etc.) formatter.
+- area: http
+  change: |
+    If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
+    is set to false, Envoy will not parse the trace reason from the ``x-request-id`` header to ensure reads and writes of
+    trace reason be consistant.
+    If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
+    is set to true and external ``x-request-id`` value is used, the trace reason in the external request id will not
+    be trusted and will be cleared.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

@@ -278,11 +278,8 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
 
   // Generate x-request-id for all edge requests, or if there is none.
   if (config.generateRequestId()) {
-    auto rid_extension = config.requestIDExtension();
-    // Unconditionally set a request ID if we are allowed to override it from
-    // the edge. Otherwise just ensure it is set.
-    const bool force_set = !config.preserveExternalRequestId() && edge_request;
-    rid_extension->set(request_headers, force_set);
+    config.requestIDExtension()->set(request_headers, edge_request,
+                                     config.preserveExternalRequestId());
   }
 
   if (connection.connecting() && request_headers.get(Headers::get().EarlyData).empty()) {
