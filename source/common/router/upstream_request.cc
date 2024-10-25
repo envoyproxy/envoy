@@ -86,9 +86,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
-      calling_encode_headers_(false), upstream_canary_(false), router_sent_end_stream_(false),
-      encode_trailers_(false), retried_(false), awaiting_headers_(true),
-      outlier_detection_timeout_recorded_(false),
+      upstream_canary_(false), router_sent_end_stream_(false), encode_trailers_(false),
+      retried_(false), awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
       paused_for_websocket_(false), reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
@@ -462,12 +461,9 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
   }
   clearRequestEncoder();
   awaiting_headers_ = false;
-  if (!calling_encode_headers_) {
-    stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
-    parent_.onUpstreamReset(reason, transport_failure_reason, *this);
-  } else {
-    deferred_reset_reason_ = reason;
-  }
+
+  stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
+  parent_.onUpstreamReset(reason, transport_failure_reason, *this);
 }
 
 void UpstreamRequest::resetStream() {
