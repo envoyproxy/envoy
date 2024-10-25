@@ -162,7 +162,9 @@ protected:
   WatchMap& watchMapFor(const std::string& type_url);
   void handleEstablishedStream();
   void handleStreamEstablishmentFailure(bool next_attempt_may_send_initial_resource_version);
-  void genericHandleResponse(const std::string& type_url, const RS& response_proto,
+  // May modify the order of the resources in response_proto to put all the
+  // non-heartbeat resources first.
+  void genericHandleResponse(const std::string& type_url, RS& response_proto,
                              ControlPlaneStats& control_plane_stats);
   void trySendDiscoveryRequests();
   bool skipSubsequentNode() const { return skip_subsequent_node_; }

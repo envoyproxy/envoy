@@ -275,7 +275,7 @@ void GrpcMuxImpl<S, F, RQ, RS>::sendGrpcMessage(RQ& msg_proto, S& sub_state) {
 
 template <class S, class F, class RQ, class RS>
 void GrpcMuxImpl<S, F, RQ, RS>::genericHandleResponse(const std::string& type_url,
-                                                      const RS& response_proto,
+                                                      RS& response_proto,
                                                       ControlPlaneStats& control_plane_stats) {
   auto sub = subscriptions_.find(type_url);
   if (sub == subscriptions_.end()) {

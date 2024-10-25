@@ -17,6 +17,13 @@ minor_behavior_changes:
     instead of a string.
     This behavior change could be disabled temporarily by setting the runtime
     ``envoy.reloadable_features.logging_with_fast_json_formatter`` to false.
+- area: xds
+  change: |
+    A minor delta-xDS optimization that avoids copying resources when ingesting them was introduced.
+    No impact to the behavior is expected, but a runtime flag was added as this may impact config-ingestion
+    related extensions (e.g., custom-config-validators, config-tracker), as the order of the elements passed
+    to the callback functions may be different. This change can be temporarily reverted
+    by setting ``envoy.reloadable_features.xds_prevent_resource_copy`` to ``false``.
 - area: formatter
   change: |
     The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the

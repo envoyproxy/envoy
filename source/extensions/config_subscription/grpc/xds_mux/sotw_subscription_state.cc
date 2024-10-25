@@ -44,7 +44,7 @@ void SotwSubscriptionState::markStreamFresh(bool) {
 }
 
 void SotwSubscriptionState::handleGoodResponse(
-    const envoy::service::discovery::v3::DiscoveryResponse& message) {
+    envoy::service::discovery::v3::DiscoveryResponse& message) {
   std::vector<DecodedResourcePtr> non_heartbeat_resources;
 
   {
