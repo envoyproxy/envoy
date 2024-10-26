@@ -268,7 +268,6 @@ void AuthenticatorImpl::startVerify() {
 
   auto jwks_obj = jwks_data_->getJwksObj();
   if (jwks_obj != nullptr && !jwks_data_->isExpired()) {
-    // TODO(arulthileeban): Additional features discussed in #14557 could be added.
     if (jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch()) {
       if (!jwt_->kid_.empty()) {
         for (const auto& jwk : jwks_obj->keys()) {
@@ -289,21 +288,31 @@ void AuthenticatorImpl::startVerify() {
   // fine for provider name requirements, as each provider has only one issuer, but for allow
   // missing or failed there can be more than one issuers. This can be optimized; the same remote
   // jwks fetching can be shared by two requests.
-  if (jwks_data_->getJwtProvider().has_remote_jwks()) {
+  if (jwks_data_->getJwtProvider().has_remote_jwks() &&
+      !(jwks_data_->isRemoteJwksFetchAllowed() ^ /* XAND on isRemoteJwksFetchAllowed and KidMismatch
+                                                    Config */
+        jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch())) {
     if (!fetcher_) {
       fetcher_ = create_jwks_fetcher_cb_(cm_, jwks_data_->getJwtProvider().remote_jwks());
     }
     fetcher_->fetch(*parent_span_, *this);
+    jwks_data_->allowRemoteJwksFetch(absl::nullopt, true);
     return;
   }
   // No valid keys for this issuer. This may happen as a result of incorrect local
-  // JWKS configuration.
+  // JWKS configuration or backoff during remote fetching.
   doneWithStatus(Status::JwksNoValidKeys);
 }
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   jwks_cache_.stats().jwks_fetch_success_.inc();
-  const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
+  const Status status =
+      jwks_data_
+          ->setRemoteJwks(
+              std::move(jwks),
+              jwks_data_->getJwtProvider().remote_jwks().has_async_fetch() &&
+                  jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch())
+          ->getStatus();
   if (status != Status::Ok) {
     doneWithStatus(status);
   } else {
@@ -423,6 +432,7 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     // move the ownership of "owned_jwt_" into the function.
     jwks_data_->getJwtCache().insert(curr_token_->token(), std::move(owned_jwt_));
   }
+  jwks_data_->allowRemoteJwksFetch(true, false);
   doneWithStatus(Status::Ok);
 }
 
@@ -454,6 +464,13 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   if (Status::Ok != status) {
     // Forward the failed status to dynamic metadata
     ENVOY_LOG(debug, "status is: {}", ::google::jwt_verify::getStatusString(status));
+
+    // Kick off or update backoff and disallow fetch when fetch/verification is due to KID mismatch
+    // and fails.
+    if (jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch() &&
+        jwks_data_->getJwksObj() != nullptr && !jwks_data_->isExpired()) {
+      jwks_data_->allowRemoteJwksFetch(false, false);
+    }
 
     std::string failed_status_in_metadata;
 

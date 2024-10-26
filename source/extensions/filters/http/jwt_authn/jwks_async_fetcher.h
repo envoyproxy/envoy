@@ -41,6 +41,9 @@ public:
   static std::chrono::seconds
   getCacheDuration(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks);
 
+  // Reset async fetch timer to default value.
+  void resetFetchTimer();
+
 private:
   // Fetch the Jwks
   void fetch();
