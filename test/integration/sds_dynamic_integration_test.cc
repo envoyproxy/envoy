@@ -125,7 +125,8 @@ protected:
   }
 
   void setUpSdsConfig(envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig* secret_config,
-                      const std::string& secret_name) {
+                      const std::string& secret_name,
+                      const std::string& sds_cluster = "sds_cluster.lyft.com") {
     secret_config->set_name(secret_name);
     auto* config_source = secret_config->mutable_sds_config();
     config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -133,7 +134,7 @@ protected:
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
     auto* grpc_service = api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, "sds_cluster.lyft.com", sdsUpstream()->localAddress());
+    setGrpcService(*grpc_service, sds_cluster, sdsUpstream()->localAddress());
   }
 
   envoy::extensions::transport_sockets::tls::v3::Secret getServerSecretRsa() {
