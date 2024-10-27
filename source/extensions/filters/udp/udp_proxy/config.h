@@ -219,7 +219,13 @@ public:
                      config, context.messageValidationVisitor()));
     return [shared_config](Network::UdpListenerFilterManager& filter_manager,
                            Network::UdpReadFilterCallbacks& callbacks) -> void {
-      filter_manager.addReadFilter(std::make_unique<UdpProxyFilter>(callbacks, shared_config));
+      if (shared_config->usingPerPacketLoadBalancing()) {
+        filter_manager.addReadFilter(
+            std::make_unique<PerPacketLoadBalancingUdpProxyFilter>(callbacks, shared_config));
+      } else {
+        filter_manager.addReadFilter(
+            std::make_unique<StickySessionUdpProxyFilter>(callbacks, shared_config));
+      }
     };
   }
 
