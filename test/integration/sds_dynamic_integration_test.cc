@@ -125,8 +125,7 @@ protected:
   }
 
   void setUpSdsConfig(envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig* secret_config,
-                      const std::string& secret_name,
-                      std::string sds_cluster_name = "sds_cluster.lyft.com") {
+                      const std::string& secret_name) {
     secret_config->set_name(secret_name);
     auto* config_source = secret_config->mutable_sds_config();
     config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -134,7 +133,7 @@ protected:
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
     auto* grpc_service = api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, sds_cluster_name, sdsUpstream()->localAddress());
+    setGrpcService(*grpc_service, "sds_cluster.lyft.com", sdsUpstream()->localAddress());
   }
 
   envoy::extensions::transport_sockets::tls::v3::Secret getServerSecretRsa() {
@@ -386,76 +385,76 @@ protected:
 
 // We don't care about multiple gRPC types here, Envoy gRPC is fine, the
 // interest is on the filesystem.
-// INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicKeyRotationIntegrationTest,
-//                          testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicKeyRotationIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
 
-// // Validate that a basic key-cert rotation works via symlink rename.
-// TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
-//   v3_resource_api_ = true;
-//   TestEnvironment::exec(
-//       {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+// Validate that a basic key-cert rotation works via symlink rename.
+TEST_P(SdsDynamicKeyRotationIntegrationTest, BasicRotation) {
+  v3_resource_api_ = true;
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
 
-//   on_server_init_function_ = [this]() {
-//     createSdsStream(*sdsUpstream());
-//     sendSdsResponse(getCurrentServerSecret());
-//   };
-//   initialize();
+  on_server_init_function_ = [this]() {
+    createSdsStream(*sdsUpstream());
+    sendSdsResponse(getCurrentServerSecret());
+  };
+  initialize();
 
-//   // Initial update from filesystem.
-//   waitForSdsUpdateStats(1);
+  // Initial update from filesystem.
+  waitForSdsUpdateStats(1);
 
-//   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-//     return makeSslClientConnection();
-//   };
-//   // First request with server{cert,key}.pem.
-//   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
-//   cleanupUpstreamAndDownstream();
-//   // Rotate.
-//   TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/new"),
-//                               TestEnvironment::temporaryPath("root/current"));
-//   waitForSdsUpdateStats(2);
-//   // The rotation is not a SDS attempt, so no change to these stats.
-//   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
-//   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  // First request with server{cert,key}.pem.
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+  cleanupUpstreamAndDownstream();
+  // Rotate.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/new"),
+                              TestEnvironment::temporaryPath("root/current"));
+  waitForSdsUpdateStats(2);
+  // The rotation is not a SDS attempt, so no change to these stats.
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
-//   // First request with server_ecdsa{cert,key}.pem.
-//   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
-// }
+  // First request with server_ecdsa{cert,key}.pem.
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+}
 
-// // Validate that rotating to a directory with missing certs is handled.
-// TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
-//   v3_resource_api_ = true;
-//   TestEnvironment::exec(
-//       {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+// Validate that rotating to a directory with missing certs is handled.
+TEST_P(SdsDynamicKeyRotationIntegrationTest, EmptyRotation) {
+  v3_resource_api_ = true;
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
 
-//   on_server_init_function_ = [this]() {
-//     createSdsStream(*sdsUpstream());
-//     sendSdsResponse(getCurrentServerSecret());
-//   };
-//   initialize();
+  on_server_init_function_ = [this]() {
+    createSdsStream(*sdsUpstream());
+    sendSdsResponse(getCurrentServerSecret());
+  };
+  initialize();
 
-//   // Initial update from filesystem.
-//   waitForSdsUpdateStats(1);
+  // Initial update from filesystem.
+  waitForSdsUpdateStats(1);
 
-//   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-//     return makeSslClientConnection();
-//   };
-//   // First request with server{cert,key}.pem.
-//   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
-//   cleanupUpstreamAndDownstream();
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  // First request with server{cert,key}.pem.
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+  cleanupUpstreamAndDownstream();
 
-//   // Rotate to an empty directory, this should fail.
-//   TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/empty"),
-//                               TestEnvironment::temporaryPath("root/current"));
-//   test_server_->waitForCounterEq("sds.server_cert_rsa.key_rotation_failed", 1);
-//   waitForSdsUpdateStats(1);
-//   // The rotation is not a SDS attempt, so no change to these stats.
-//   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
-//   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+  // Rotate to an empty directory, this should fail.
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("root/empty"),
+                              TestEnvironment::temporaryPath("root/current"));
+  test_server_->waitForCounterEq("sds.server_cert_rsa.key_rotation_failed", 1);
+  waitForSdsUpdateStats(1);
+  // The rotation is not a SDS attempt, so no change to these stats.
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
-//   // Requests continue to work with key/cert pair.
-//   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
-// }
+  // Requests continue to work with key/cert pair.
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+}
 
 // A test that SDS server send a good server secret for a static listener.
 // The first ssl request should be OK.
@@ -1260,37 +1259,37 @@ tls_certificate:
   }
 };
 
-// INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamPrivateKeyIntegrationTest,
-//                          testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsDynamicDownstreamPrivateKeyIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
-// // Validate that a basic SDS updates work with a private key provider.
-// TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
-//   v3_resource_api_ = true;
+// Validate that a basic SDS updates work with a private key provider.
+TEST_P(SdsDynamicDownstreamPrivateKeyIntegrationTest, BasicPrivateKeyProvider) {
+  v3_resource_api_ = true;
 
-//   TestEnvironment::exec(
-//       {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
 
-//   // Set up the private key provider.
-//   Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
-//   Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
-//       test_private_key_method_factory(test_factory);
+  // Set up the private key provider.
+  Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
+  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
+      test_private_key_method_factory(test_factory);
 
-//   on_server_init_function_ = [this]() {
-//     createSdsStream(*sdsUpstream());
-//     sendSdsResponse(getCurrentServerPrivateKeyProviderSecret());
-//   };
-//   initialize();
+  on_server_init_function_ = [this]() {
+    createSdsStream(*sdsUpstream());
+    sendSdsResponse(getCurrentServerPrivateKeyProviderSecret());
+  };
+  initialize();
 
-//   EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
-//   EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
+  EXPECT_EQ(1, test_server_->counter("sds.server_cert_rsa.update_success")->value());
+  EXPECT_EQ(0, test_server_->counter("sds.server_cert_rsa.update_rejected")->value());
 
-//   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
-//     return makeSslClientConnection();
-//   };
-//   testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection();
+  };
+  testRouterHeaderOnlyRequestAndResponse(&creator, dataPlaneUpstreamIndex());
 
-//   cleanupUpstreamAndDownstream();
-// }
+  cleanupUpstreamAndDownstream();
+}
 
 class SdsCdsPrivateKeyIntegrationTest : public SdsCdsIntegrationTest {
 public:
@@ -1320,54 +1319,54 @@ tls_certificate:
   }
 };
 
-// INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsCdsPrivateKeyIntegrationTest,
-//                          testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, SdsCdsPrivateKeyIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams(true)), sdsTestParamsToString);
 
 // Test private key providers in SDS+CDS setup.
-// TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
-//   v3_resource_api_ = true;
+TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
+  v3_resource_api_ = true;
 
-//   TestEnvironment::exec(
-//       {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
+  TestEnvironment::exec(
+      {TestEnvironment::runfilesPath("test/integration/sds_dynamic_key_rotation_setup.sh")});
 
-//   // Set up the private key provider.
-//   Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
-//   Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
-//       test_private_key_method_factory(test_factory);
+  // Set up the private key provider.
+  Extensions::PrivateKeyMethodProvider::TestPrivateKeyMethodFactory test_factory;
+  Registry::InjectFactory<Ssl::PrivateKeyMethodProviderInstanceFactory>
+      test_private_key_method_factory(test_factory);
 
-//   on_server_init_function_ = [this]() {
-//     {
-//       // CDS.
-//       AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_,
-//       xds_connection_); EXPECT_TRUE(result); result =
-//       xds_connection_->waitForNewStream(*dispatcher_, xds_stream_); EXPECT_TRUE(result);
-//       xds_stream_->startGrpcStream();
-//       sendCdsResponse();
-//     }
-//     {
-//       // SDS.
-//       AssertionResult result = sdsUpstream()->waitForHttpConnection(*dispatcher_,
-//       sds_connection_); EXPECT_TRUE(result);
+  on_server_init_function_ = [this]() {
+    {
+      // CDS.
+      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
+      EXPECT_TRUE(result);
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      EXPECT_TRUE(result);
+      xds_stream_->startGrpcStream();
+      sendCdsResponse();
+    }
+    {
+      // SDS.
+      AssertionResult result = sdsUpstream()->waitForHttpConnection(*dispatcher_, sds_connection_);
+      EXPECT_TRUE(result);
 
-//       result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
-//       EXPECT_TRUE(result);
-//       sds_stream_->startGrpcStream();
-//       sendSdsResponse2(getCurrentServerPrivateKeyProviderSecret(), *sds_stream_);
-//     }
-//   };
-//   initialize();
+      result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+      EXPECT_TRUE(result);
+      sds_stream_->startGrpcStream();
+      sendSdsResponse2(getCurrentServerPrivateKeyProviderSecret(), *sds_stream_);
+    }
+  };
+  initialize();
 
-//   test_server_->waitForCounterGe(
-//       "cluster.dynamic.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
-//   // The 4 clusters are CDS,SDS,static and dynamic cluster.
-//   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+  test_server_->waitForCounterGe(
+      "cluster.dynamic.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+  // The 4 clusters are CDS,SDS,static and dynamic cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 
-//   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {},
-//   {},
-//                                                              {}, "42");
-//   // Successfully removed the dynamic cluster.
-//   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
-// }
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {}, "42");
+  // Successfully removed the dynamic cluster.
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+}
 
 } // namespace Ssl
 } // namespace Envoy
