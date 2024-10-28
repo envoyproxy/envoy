@@ -1,0 +1,86 @@
+name: Publish
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      ENVOY_CI_SYNC_APP_ID:
+      ENVOY_CI_SYNC_APP_KEY:
+      ENVOY_CI_PUBLISH_APP_ID:
+      ENVOY_CI_PUBLISH_APP_KEY:
+    inputs:
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: >-
+    ${{ github.actor != 'trigger-release-envoy[bot]'
+        && github.event.inputs.head_ref
+        || github.run_id
+    }}-${{ github.event.workflow.id }}-publish
+  cancel-in-progress: true
+
+
+jobs:
+  publish:
+    secrets:
+      app-id: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}
+      app-key: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
+    permissions:
+      contents: read
+      packages: read
+    name: ${{ matrix.name || matrix.target }}
+    uses: ./.github/workflows/_run.yml
+    with:
+      target: ${{ matrix.target }}
+      rbe: false
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      downloads: |
+        release.signed: release.signed
+      source: ${{ matrix.source }}
+      request: ${{ inputs.request }}
+      steps-pre: ${{ matrix.steps-pre }}
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: publish
+          name: github
+          source: |
+            export ENVOY_COMMIT=${{ fromJSON(inputs.request).request.sha }}
+            export ENVOY_REPO=${{ github.repository }}
+            export ENVOY_PUBLISH_DRY_RUN=${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
+
+  publish_docs:
+    # For normal commits to Envoy main this will trigger an update in the website repo,
+    # which will update its envoy dep shas, and rebuild the website for the latest docs
+    #
+    # For commits that create a release, it instead triggers an update in the archive repo,
+    # which builds a static version of the docs for the release and commits it to the archive.
+    # In turn the archive repo triggers an update in the website so the new release docs are
+    # included in the published site
+    if: ${{ inputs.trusted && github.repository == 'envoyproxy/envoy' }}
+    runs-on: ubuntu-22.04
+    needs:
+    - publish
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.37
+      id: appauth
+      with:
+        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.2.37
+      with:
+        ref: main
+        repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
+        token: ${{ steps.appauth.outputs.token }}
+        workflow: envoy-sync.yaml
+        inputs: |
+          commit_sha: ${{ fromJSON(inputs.request).request.version.dev && github.sha || '' }}
