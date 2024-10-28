@@ -11,3 +11,16 @@ index 69c9bda..d293092 100644
      }),
      alwayslink = 1,
  )
+diff --git a/bazel/external/wasmtime.BUILD b/bazel/external/wasmtime.BUILD
+index 79a331f..27da86e 100644
+--- a/bazel/external/wasmtime.BUILD
++++ b/bazel/external/wasmtime.BUILD
+@@ -21,7 +21,7 @@ genrule(
+         "crates/c-api/include/wasm.h",
+     ],
+     outs = [
+-        "include/prefixed_wasm.h",
++        "crates/c-api/include/prefixed_wasm.h",
+     ],
+     cmd = """
+         sed -e 's/\\ wasm_/\\ wasmtime_wasm_/g' \
