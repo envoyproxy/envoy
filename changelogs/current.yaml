@@ -29,6 +29,11 @@ minor_behavior_changes:
     If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
     is set to true and external ``x-request-id`` value is used, the trace reason in the external request id will not
     be trusted and will be cleared.
+- area: oauth2
+  change: |
+    :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
+    is now enabled by default. This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.oauth2_use_refresh_token`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -45,6 +50,9 @@ removed_config_or_runtime:
 - area: load balancing
   change: |
     Removed runtime guard ``envoy.reloadable_features.edf_lb_host_scheduler_init_fix`` and legacy code paths.
+- area: grpc
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status``.
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.

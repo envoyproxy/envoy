@@ -801,7 +801,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (redirect_config_ != nullptr && redirect_config_->path_redirect_has_query_ &&
       redirect_config_->strip_query_) {
-    ENVOY_LOG(warn,
+    ENVOY_LOG(debug,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
               redirect_config_->path_redirect_);

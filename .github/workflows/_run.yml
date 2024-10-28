@@ -286,6 +286,10 @@ jobs:
         BAZEL_BUILD_EXTRA_OPTIONS="--google_credentials=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE} --config=remote-ci --config=rbe-google"
         echo "BAZEL_BUILD_EXTRA_OPTIONS=${BAZEL_BUILD_EXTRA_OPTIONS}" >> "$GITHUB_ENV"
 
+    - run: |
+        echo "${{ vars.ENVOY_CI_BAZELRC }}" > repo.bazelrc
+      if: ${{ vars.ENVOY_CI_BAZELRC }}
+
     - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.2.37
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
