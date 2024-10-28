@@ -917,6 +917,37 @@ CAPIStatus Filter::clearRouteCache() {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::refreshRouteCache() {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  if (isThreadSafe()) {
+    ENVOY_LOG(debug, "golang filter refreshing route cache");
+    refreshRouteCacheInternal();
+  } else {
+    ENVOY_LOG(debug, "golang filter posting refresh route cache callback");
+    auto weak_ptr = weak_from_this();
+    getDispatcher().post([this, weak_ptr] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        ENVOY_LOG(debug, "golang filter refreshing route cache");
+        refreshRouteCacheInternal();
+      } else {
+        ENVOY_LOG(info, "golang filter has gone or destroyed in refreshRouteCache");
+      }
+    });
+  }
+  return CAPIStatus::CAPIOK;
+}
+
+void Filter::refreshRouteCacheInternal() {
+  decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+  // When the route cache is clear, the next call to route() will refresh the cache and return the
+  // pointer to the latest matched route. We don't need the returned pointer.
+  decoding_state_.getFilterCallbacks()->route();
+}
+
 CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
   // lock until this function return since it may running in a Go thread.
   Thread::LockGuard lock(mutex_);

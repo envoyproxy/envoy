@@ -240,6 +240,10 @@ func (r *httpRequest) ClearRouteCache() {
 	cAPI.ClearRouteCache(unsafe.Pointer(r))
 }
 
+func (r *httpRequest) RefreshRouteCache() {
+	cAPI.RefreshRouteCache(unsafe.Pointer(r))
+}
+
 func (r *httpRequest) Continue(status api.StatusType) {
 	if status == api.LocalReply {
 		fmt.Printf("warning: LocalReply status is useless after sendLocalReply, ignoring")

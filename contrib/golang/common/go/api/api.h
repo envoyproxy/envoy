@@ -97,6 +97,7 @@ CAPIStatus envoyGoFilterHttpRemoveTrailer(void* s, void* key_data, int key_len);
 
 /* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
 CAPIStatus envoyGoFilterHttpClearRouteCache(void* r);
+CAPIStatus envoyGoFilterHttpRefreshRouteCache(void* r);
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, uint64_t* value);
 

@@ -244,6 +244,11 @@ CAPIStatus envoyGoFilterHttpClearRouteCache(void* r) {
       r, [](std::shared_ptr<Filter>& filter) -> CAPIStatus { return filter->clearRouteCache(); });
 }
 
+CAPIStatus envoyGoFilterHttpRefreshRouteCache(void* r) {
+  return envoyGoFilterHandlerWrapper(
+      r, [](std::shared_ptr<Filter>& filter) -> CAPIStatus { return filter->refreshRouteCache(); });
+}
+
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, uint64_t* value_data, int* value_len) {
   return envoyGoFilterHandlerWrapper(
       r, [id, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {

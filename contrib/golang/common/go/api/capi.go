@@ -44,6 +44,7 @@ type HttpCAPI interface {
 
 	/* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
 	ClearRouteCache(r unsafe.Pointer)
+	RefreshRouteCache(r unsafe.Pointer)
 
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)

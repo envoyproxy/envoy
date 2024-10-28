@@ -307,6 +307,12 @@ func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer) {
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) RefreshRouteCache(r unsafe.Pointer) {
+	req := (*httpRequest)(r)
+	res := C.envoyGoFilterHttpRefreshRouteCache(unsafe.Pointer(req.req))
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpGetStringValue(r unsafe.Pointer, id int) (string, bool) {
 	req := (*httpRequest)(r)
 	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
