@@ -14,6 +14,10 @@ bug_fixes:
 - area: happy_eyeballs
   change: |
     Validate that ``additional_address`` are IP addresses instead of crashing when sorting.
+- area: balsa
+  change: |
+    Fix incorrect handling of non-101 1xx responses. This fix can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
