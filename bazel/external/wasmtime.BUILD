@@ -7,7 +7,7 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "helpers_lib",
     srcs = [
-        "crates/runtime/src/helpers.c",
+        "crates/wasmtime/src/runtime/vm/helpers.c",
     ],
     visibility = ["//visibility:private"],
 )
