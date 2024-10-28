@@ -17,8 +17,8 @@ namespace UdpProxy {
 namespace SessionFilters {
 namespace PerSessionCluster {
 
-using PerSessionClusterSetterFilterConfig = test::extensions::filters::udp::udp_proxy::
-    session_filters::PerSessionClusterSetterFilterConfig;
+using PerSessionClusterSetterFilterConfig =
+    test::extensions::filters::udp::udp_proxy::session_filters::PerSessionClusterSetterFilterConfig;
 
 using ReadFilter = Network::UdpSessionReadFilter;
 using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
@@ -56,8 +56,7 @@ private:
   createFilterFactoryFromProtoTyped(const PerSessionClusterSetterFilterConfig& config,
                                     Server::Configuration::FactoryContext&) override {
     return [config](Network::UdpSessionFilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addReadFilter(
-          std::make_unique<PerSessionClusterSetterFilter>(config.cluster()));
+      callbacks.addReadFilter(std::make_unique<PerSessionClusterSetterFilter>(config.cluster()));
     };
   }
 };

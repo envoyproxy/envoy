@@ -46,7 +46,8 @@ UdpProxyFilter::~UdpProxyFilter() {
 }
 
 bool UdpProxyFilter::addOrUpdateCluster(const std::string& cluster_name) {
-  Upstream::ThreadLocalCluster* cluster = config_->clusterManager().getThreadLocalCluster(cluster_name);
+  Upstream::ThreadLocalCluster* cluster =
+      config_->clusterManager().getThreadLocalCluster(cluster_name);
   if (cluster == nullptr) {
     return false;
   }
@@ -174,8 +175,7 @@ UdpProxyFilter::getClusterInfo(const Network::UdpRecvData::LocalPeerAddresses& a
   return cluster_infos_[route].get();
 }
 
-UdpProxyFilter::ClusterInfo*
-UdpProxyFilter::getClusterInfo(const std::string& cluster_name) {
+UdpProxyFilter::ClusterInfo* UdpProxyFilter::getClusterInfo(const std::string& cluster_name) {
   if (cluster_infos_.contains(cluster_name)) {
     return cluster_infos_[cluster_name].get();
   }
@@ -771,8 +771,8 @@ bool UdpProxyFilter::ActiveSession::setClusterInfo() {
     return true;
   }
 
-  const auto* per_session_cluster = udp_session_info_.filterState()->getDataReadOnly<PerSessionCluster>(
-          PerSessionCluster::key());
+  const auto* per_session_cluster =
+      udp_session_info_.filterState()->getDataReadOnly<PerSessionCluster>(PerSessionCluster::key());
   if (per_session_cluster != nullptr) {
     cluster_ = filter_.getClusterInfo(per_session_cluster->value());
   } else {
