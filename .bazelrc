@@ -530,7 +530,6 @@ build:rbe-envoy-engflow --define=engflow_rbe=true
 
 build:remote-envoy-engflow --config=common-envoy-engflow
 build:remote-envoy-engflow --config=cache-envoy-engflow
-build:remote-envoy-engflow --config=bes-envoy-engflow
 build:remote-envoy-engflow --config=rbe-envoy-engflow
 
 #############################################################################
@@ -555,6 +554,7 @@ common:debug --config=debug-sandbox
 common:debug --config=debug-coverage
 common:debug --config=debug-tests
 
+try-import %workspace%/repo.bazelrc
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
 try-import %workspace%/local_tsan.bazelrc
