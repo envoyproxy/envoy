@@ -185,6 +185,7 @@ envoy_extension_cc_test(
         "//source/extensions/retry/host/previous_hosts:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/integration/filters:encode_backpressure_filter_config_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/proto:helloworld_proto_cc_proto",
         "//test/test_common:test_runtime_lib",
