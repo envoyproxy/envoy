@@ -1618,8 +1618,9 @@ public:
               "proto_descriptor": ""
             )EOF";
     config_helper_.prependFilter(filter);
-  } // namespace
-};  // namespace Envoy
+  }
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);

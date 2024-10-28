@@ -374,7 +374,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, DISABLED_ManyLargeSimultaneousRequest
   name: random-pause-filter
 )EOF");
 
-  // TODO(kbaichoo): either change the ordering of how the responses wait on endstream or increase
+  // TODO(kbaichoo): either change the ordering of how the responses wait on end stream or increase
   // the timeout since there will be delays added by the pause filter.
   manySimultaneousRequests(1024 * 20, 1024 * 20, 50);
 }
