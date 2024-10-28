@@ -697,6 +697,8 @@ TEST_P(WasmCommonTest, ShutdownCallback) {
   dispatcher->clearDeferredDeleteList();
 
   proxy_wasm::clearWasmCachesForTesting();
+
+  // The callback is executed.
   EXPECT_TRUE(callback_unregistered);
 }
 
