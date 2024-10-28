@@ -10,6 +10,10 @@ namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 
+const std::string& PerSessionCluster::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.udp_proxy.cluster");
+}
+
 UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
                                const UdpProxyFilterConfigSharedPtr& config)
     : UdpListenerReadFilter(callbacks), config_(config),
@@ -19,13 +23,7 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
   for (const auto& entry : config_->allClusterNames()) {
-    Upstream::ThreadLocalCluster* cluster = config->clusterManager().getThreadLocalCluster(entry);
-    if (cluster != nullptr) {
-      Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
-        return *cluster;
-      };
-      onClusterAddOrUpdate(cluster->info()->name(), command);
-    }
+    addOrUpdateCluster(entry);
   }
 
   if (!config_->proxyAccessLogs().empty()) {
@@ -45,6 +43,19 @@ UdpProxyFilter::~UdpProxyFilter() {
       access_log->log({}, udp_proxy_stats_.value());
     }
   }
+}
+
+bool UdpProxyFilter::addOrUpdateCluster(const std::string& cluster_name) {
+  Upstream::ThreadLocalCluster* cluster = config_->clusterManager().getThreadLocalCluster(cluster_name);
+  if (cluster == nullptr) {
+    return false;
+  }
+
+  Upstream::ThreadLocalClusterCommand command = [&cluster]() -> Upstream::ThreadLocalCluster& {
+    return *cluster;
+  };
+  onClusterAddOrUpdate(cluster->info()->name(), command);
+  return true;
 }
 
 void UdpProxyFilter::onClusterAddOrUpdate(absl::string_view cluster_name,
@@ -161,6 +172,20 @@ UdpProxyFilter::getClusterInfo(const Network::UdpRecvData::LocalPeerAddresses& a
   }
 
   return cluster_infos_[route].get();
+}
+
+UdpProxyFilter::ClusterInfo*
+UdpProxyFilter::getClusterInfo(const std::string& cluster_name) {
+  if (cluster_infos_.contains(cluster_name)) {
+    return cluster_infos_[cluster_name].get();
+  }
+
+  if (!addOrUpdateCluster(cluster_name)) {
+    config_->stats().downstream_sess_no_route_.inc();
+    return nullptr;
+  }
+
+  return cluster_infos_[cluster_name].get();
 }
 
 void UdpProxyFilter::removeSession(ActiveSession* session) {
@@ -746,7 +771,14 @@ bool UdpProxyFilter::ActiveSession::setClusterInfo() {
     return true;
   }
 
-  cluster_ = filter_.getClusterInfo(addresses_);
+  const auto* per_session_cluster = udp_session_info_.filterState()->getDataReadOnly<PerSessionCluster>(
+          PerSessionCluster::key());
+  if (per_session_cluster != nullptr) {
+    cluster_ = filter_.getClusterInfo(per_session_cluster->value());
+  } else {
+    cluster_ = filter_.getClusterInfo(addresses_);
+  }
+
   if (cluster_ == nullptr) {
     return false;
   }

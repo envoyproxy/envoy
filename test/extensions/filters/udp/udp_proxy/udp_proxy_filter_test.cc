@@ -15,6 +15,8 @@
 #include "test/extensions/filters/udp/udp_proxy/mocks.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.pb.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/socket.h"
@@ -279,8 +281,6 @@ public:
       factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
           {"fake_cluster"});
     }
-    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
-                getThreadLocalCluster("fake_cluster"));
 
     if (config_->usingPerPacketLoadBalancing()) {
       filter_ = std::make_unique<TestPerPacketLoadBalancingUdpProxyFilter>(callbacks_, config_);
@@ -1707,6 +1707,43 @@ session_filters:
   filter_.reset();
   EXPECT_EQ(output_.size(), 1);
   EXPECT_THAT(output_.front(), testing::HasSubstr("session_complete"));
+}
+
+TEST_F(UdpProxyFilterTest, PerSessionCluster) {
+  InSequence s;
+
+  const std::string session_access_log_format =
+      "%DYNAMIC_METADATA(udp.proxy.session:cluster_name)%";
+
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: other_cluster
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.PerSessionClusterSetterFilterConfig
+    cluster: fake_cluster
+  )EOF",
+                        session_access_log_format, ""));
+  // Basic flow.
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+
+  filter_.reset();
+  EXPECT_EQ(output_.size(), 1);
+  EXPECT_EQ(output_.front(), "fake_cluster");
 }
 
 using MockUdpTunnelingConfig = SessionFilters::MockUdpTunnelingConfig;

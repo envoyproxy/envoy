@@ -44,6 +44,8 @@ envoy_extension_cc_test(
         "//source/extensions/matching/network/common:inputs_lib",
         "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_config_lib",
         "//test/extensions/filters/udp/udp_proxy/session_filters:drainer_filter_proto_cc_proto",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:psc_setter_filter_config_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:psc_setter_filter_proto_cc_proto",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:stream_encoder_mock",
         "//test/mocks/network:socket_mocks",
