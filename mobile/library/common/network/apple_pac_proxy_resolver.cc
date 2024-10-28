@@ -34,9 +34,7 @@ void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFEr
   std::unique_ptr<ProxySettingsResolvedCallback> completion_callback(
       static_cast<ProxySettingsResolvedCallback*>(ptr));
 
-  if (cf_error == nullptr) {
-    ENVOY_BUG(cf_error != nullptr, Apple::toString(CFErrorCopyDescription(cf_error)));
-  }
+  // TODO(abeyad): Do something useful with `cf_error` if it is not null.
 
   // Treat the error case as if no proxy was configured. Seems to be consistent with what iOS
   // system (URLSession) is doing.
