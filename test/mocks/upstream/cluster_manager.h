@@ -53,7 +53,7 @@ public:
   MOCK_METHOD(bool, isShutdown, ());
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
   MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, ());
-  MOCK_METHOD(absl::Status, replaceAds,
+  MOCK_METHOD(absl::Status, replaceAdsMux,
               (const envoy::config::core::v3::ApiConfigSource& ads_config));
   MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
   MOCK_METHOD(const std::string, versionInfo, (), (const));

@@ -32,7 +32,7 @@ public:
 TEST_F(XdsManagerImplTest, AdsConfigSourceSetterSuccess) {
   envoy::config::core::v3::ApiConfigSource config_source;
   config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-  EXPECT_CALL(cm_, replaceAds(ProtoEq(config_source))).WillOnce(Return(absl::OkStatus()));
+  EXPECT_CALL(cm_, replaceAdsMux(ProtoEq(config_source))).WillOnce(Return(absl::OkStatus()));
   absl::Status res = xds_manager_impl_.setAdsConfigSource(config_source);
   EXPECT_TRUE(res.ok());
 }
@@ -42,7 +42,7 @@ TEST_F(XdsManagerImplTest, AdsConfigSourceSetterSuccess) {
 TEST_F(XdsManagerImplTest, AdsConfigSourceSetterFailure) {
   envoy::config::core::v3::ApiConfigSource config_source;
   config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-  EXPECT_CALL(cm_, replaceAds(ProtoEq(config_source)))
+  EXPECT_CALL(cm_, replaceAdsMux(ProtoEq(config_source)))
       .WillOnce(Return(absl::InternalError("error")));
   absl::Status res = xds_manager_impl_.setAdsConfigSource(config_source);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));

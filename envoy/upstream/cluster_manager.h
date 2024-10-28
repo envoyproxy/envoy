@@ -369,11 +369,12 @@ public:
 
   /**
    * Replaces the current ADS mux with a new one based on the given config.
-   * Assumes that the given ads_config is yntactically valid (according to the PGV constraints).
+   * Assumes that the given ads_config is syntactically valid (according to the PGV constraints).
    * @param ads_config an ADS config source to use.
    * @return the status of the operation.
    */
-  virtual absl::Status replaceAds(const envoy::config::core::v3::ApiConfigSource& ads_config) PURE;
+  virtual absl::Status
+  replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) PURE;
 
   /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.

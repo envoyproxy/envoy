@@ -584,7 +584,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
 }
 
 absl::Status
-ClusterManagerImpl::replaceAds(const envoy::config::core::v3::ApiConfigSource& ads_config) {
+ClusterManagerImpl::replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) {
   // If there was no ADS defined, reject replacement.
   const auto& bootstrap = server_.bootstrap();
   if (!bootstrap.has_dynamic_resources() || !bootstrap.dynamic_resources().has_ads_config()) {

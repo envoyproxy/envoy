@@ -4778,7 +4778,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementNoPriorAdsRejection) {
   )EOF",
                             new_ads_config);
 
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
   EXPECT_EQ(res.message(),
             "Cannot replace an ADS config when one wasn't previously configured in the bootstrap");
@@ -4871,7 +4871,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementPrimaryOnly) {
         EXPECT_EQ(failover_async_client, nullptr);
         return absl::OkStatus();
       }));
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_TRUE(res.ok());
 }
 
@@ -4966,7 +4966,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementPrimaryAndFailover) {
         EXPECT_NE(failover_async_client, nullptr);
         return absl::OkStatus();
       }));
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_TRUE(res.ok());
 }
 
@@ -5014,7 +5014,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementUnknownCluster) {
   )EOF",
                             new_ads_config);
 
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(res.message(), "Unknown gRPC client cluster 'ads_cluster2'");
 }
@@ -5096,7 +5096,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementUnknownFailoverCluster) {
   )EOF",
                             new_ads_config);
 
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(res.message(), "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'");
 }
@@ -5154,7 +5154,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
           cluster_name: ads_cluster
   )EOF",
                             new_ads_config);
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
   EXPECT_EQ(res.message(),
             "Cannot replace an ADS config with a different api_type (expected: GRPC)");
@@ -5216,7 +5216,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementInvalidBackoffRejection) {
               max_interval: 10s
   )EOF",
                             new_ads_config);
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(res.message(), "max_interval must be greater than or equal to the base_interval");
 }
@@ -5238,7 +5238,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
           }));
 
   // Use GRPC type which is supported, but make sure that it will return
-  // AGGREGATED_GRPC when invoking replaceAds() to emulate a type which is not
+  // AGGREGATED_GRPC when invoking replaceAdsMux() to emulate a type which is not
   // supported.
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -5276,7 +5276,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
           cluster_name: ads_cluster
   )EOF",
                             new_ads_config);
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
   EXPECT_EQ(res.message(),
             "Cannot replace an ADS config with a different api_type (expected: GRPC)");
@@ -5341,7 +5341,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) 
           cluster_name: ads_cluster
   )EOF",
                             new_ads_config);
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
   EXPECT_THAT(res.message(),
               HasSubstr("Cannot replace config_validators in ADS config (different size)"));
@@ -5414,7 +5414,7 @@ TEST_F(ClusterManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection
             number_value: 7.0
   )EOF",
                             new_ads_config);
-  const auto res = cluster_manager_->replaceAds(new_ads_config);
+  const auto res = cluster_manager_->replaceAdsMux(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
   EXPECT_THAT(res.message(),
               HasSubstr("Cannot replace config_validators in ADS config (different contents)"));

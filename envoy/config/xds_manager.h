@@ -26,8 +26,8 @@ public:
    * Set the ADS ConfigSource Envoy should use that will replace the current ADS
    * server.
    * @param ads_config the ADS config of the new server.
-   * @return true if the ADS config is valid (points to a valid static server),
-   *         or false otherwise.
+   * @return Ok if the ADS config is valid (points to a valid static server),
+   *         or an error otherwise.
    */
   virtual absl::Status
   setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source) PURE;

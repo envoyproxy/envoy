@@ -12,7 +12,7 @@ XdsManagerImpl::setAdsConfigSource(const envoy::config::core::v3::ApiConfigSourc
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   RETURN_IF_NOT_OK(validateAdsConfig(config_source));
 
-  return cm_.replaceAds(config_source);
+  return cm_.replaceAdsMux(config_source);
 }
 
 absl::Status
