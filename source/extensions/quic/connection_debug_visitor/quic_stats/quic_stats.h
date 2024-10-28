@@ -27,11 +27,11 @@ namespace QuicStats {
   COUNTER(cx_rx_packets_total)                                                                     \
   COUNTER(cx_path_degrading_total)                                                                 \
   COUNTER(cx_forward_progress_after_path_degrading_total)                                          \
-  HISTOGRAM(cx_srtt_us, Microseconds)                                                              \
-  HISTOGRAM(cx_tx_estimated_bandwidth_bytes_per_second, Bytes)                                     \
+  HISTOGRAM(cx_rtt_us, Microseconds)                                                               \
+  HISTOGRAM(cx_tx_estimated_bandwidth, Bytes)                                                      \
   HISTOGRAM(cx_tx_percent_retransmitted_packets, Percent)                                          \
-  HISTOGRAM(cx_tx_mtu_bytes, Bytes)                                                                \
-  HISTOGRAM(cx_rx_mtu_bytes, Bytes)
+  HISTOGRAM(cx_tx_mtu, Bytes)                                                                      \
+  HISTOGRAM(cx_rx_mtu, Bytes)
 
 struct QuicStats {
   ALL_QUIC_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)

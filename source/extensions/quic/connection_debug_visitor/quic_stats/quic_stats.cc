@@ -91,14 +91,14 @@ void QuicStatsVisitor::recordStats() {
                  quic_stats.num_forward_progress_after_path_degrading);
 
   if (quic_stats.srtt_us > 0) {
-    config_.stats_.cx_srtt_us_.recordValue(quic_stats.srtt_us);
+    config_.stats_.cx_rtt_us_.recordValue(quic_stats.srtt_us);
   }
   if (!quic_stats.estimated_bandwidth.IsZero() && !quic_stats.estimated_bandwidth.IsInfinite()) {
-    config_.stats_.cx_tx_estimated_bandwidth_bytes_per_second_.recordValue(
+    config_.stats_.cx_tx_estimated_bandwidth_.recordValue(
         quic_stats.estimated_bandwidth.ToBytesPerPeriod(quic::QuicTime::Delta::FromSeconds(1)));
   }
-  config_.stats_.cx_tx_mtu_bytes_.recordValue(quic_stats.egress_mtu);
-  config_.stats_.cx_rx_mtu_bytes_.recordValue(quic_stats.ingress_mtu);
+  config_.stats_.cx_tx_mtu_.recordValue(quic_stats.egress_mtu);
+  config_.stats_.cx_rx_mtu_.recordValue(quic_stats.ingress_mtu);
 }
 
 Config::Config(

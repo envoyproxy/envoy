@@ -118,12 +118,12 @@ TEST_F(QuicStatsTest, Values) {
   EXPECT_EQ(4, counterValue("cx_rx_packets_total"));
   EXPECT_EQ(5, counterValue("cx_path_degrading_total"));
   EXPECT_EQ(6, counterValue("cx_forward_progress_after_path_degrading_total"));
-  EXPECT_EQ(7U, histogramValue("cx_srtt_us"));
-  EXPECT_EQ(8U, histogramValue("cx_tx_estimated_bandwidth_bytes_per_second"));
+  EXPECT_EQ(7U, histogramValue("cx_rtt_us"));
+  EXPECT_EQ(8U, histogramValue("cx_tx_estimated_bandwidth"));
   EXPECT_EQ((1U * Stats::Histogram::PercentScale) / 2U,
             histogramValue("cx_tx_percent_retransmitted_packets"));
-  EXPECT_EQ(9U, histogramValue("cx_tx_mtu_bytes"));
-  EXPECT_EQ(10U, histogramValue("cx_rx_mtu_bytes"));
+  EXPECT_EQ(9U, histogramValue("cx_tx_mtu"));
+  EXPECT_EQ(10U, histogramValue("cx_rx_mtu"));
 
   // Trigger the timer again with unchanged values. The metrics should be unchanged (but the
   // histograms should have emitted the value again).
@@ -134,13 +134,13 @@ TEST_F(QuicStatsTest, Values) {
   EXPECT_EQ(4, counterValue("cx_rx_packets_total"));
   EXPECT_EQ(5, counterValue("cx_path_degrading_total"));
   EXPECT_EQ(6, counterValue("cx_forward_progress_after_path_degrading_total"));
-  EXPECT_EQ(7U, histogramValue("cx_srtt_us"));
-  EXPECT_EQ(8U, histogramValue("cx_tx_estimated_bandwidth_bytes_per_second"));
+  EXPECT_EQ(7U, histogramValue("cx_rtt_us"));
+  EXPECT_EQ(8U, histogramValue("cx_tx_estimated_bandwidth"));
   // No more packets were transmitted (numerator and denominator deltas are zero), so no value
   // should be emitted.
   EXPECT_EQ(absl::nullopt, histogramValue("cx_tx_percent_retransmitted_packets"));
-  EXPECT_EQ(9U, histogramValue("cx_tx_mtu_bytes"));
-  EXPECT_EQ(10U, histogramValue("cx_rx_mtu_bytes"));
+  EXPECT_EQ(9U, histogramValue("cx_tx_mtu"));
+  EXPECT_EQ(10U, histogramValue("cx_rx_mtu"));
 
   // Set stats on 2nd socket. Values should be combined.
   quic_stats2->stats_.packets_retransmitted = 1;
@@ -160,12 +160,12 @@ TEST_F(QuicStatsTest, Values) {
   EXPECT_EQ(5, counterValue("cx_rx_packets_total"));
   EXPECT_EQ(6, counterValue("cx_path_degrading_total"));
   EXPECT_EQ(7, counterValue("cx_forward_progress_after_path_degrading_total"));
-  EXPECT_EQ(1U, histogramValue("cx_srtt_us"));
-  EXPECT_EQ(1U, histogramValue("cx_tx_estimated_bandwidth_bytes_per_second"));
+  EXPECT_EQ(1U, histogramValue("cx_rtt_us"));
+  EXPECT_EQ(1U, histogramValue("cx_tx_estimated_bandwidth"));
   EXPECT_EQ(Stats::Histogram::PercentScale /* 100% */,
             histogramValue("cx_tx_percent_retransmitted_packets"));
-  EXPECT_EQ(1U, histogramValue("cx_tx_mtu_bytes"));
-  EXPECT_EQ(1U, histogramValue("cx_rx_mtu_bytes"));
+  EXPECT_EQ(1U, histogramValue("cx_tx_mtu"));
+  EXPECT_EQ(1U, histogramValue("cx_rx_mtu"));
 
   // Update the first socket again.
   quic_stats_->stats_.packets_retransmitted++;
@@ -185,12 +185,12 @@ TEST_F(QuicStatsTest, Values) {
   EXPECT_EQ(6, counterValue("cx_rx_packets_total"));
   EXPECT_EQ(7, counterValue("cx_path_degrading_total"));
   EXPECT_EQ(8, counterValue("cx_forward_progress_after_path_degrading_total"));
-  EXPECT_EQ(20U, histogramValue("cx_srtt_us"));
-  EXPECT_EQ(21U, histogramValue("cx_tx_estimated_bandwidth_bytes_per_second"));
+  EXPECT_EQ(20U, histogramValue("cx_rtt_us"));
+  EXPECT_EQ(21U, histogramValue("cx_tx_estimated_bandwidth"));
   EXPECT_EQ(Stats::Histogram::PercentScale /* 100% */,
             histogramValue("cx_tx_percent_retransmitted_packets"));
-  EXPECT_EQ(22U, histogramValue("cx_tx_mtu_bytes"));
-  EXPECT_EQ(23U, histogramValue("cx_rx_mtu_bytes"));
+  EXPECT_EQ(22U, histogramValue("cx_tx_mtu"));
+  EXPECT_EQ(23U, histogramValue("cx_rx_mtu"));
 }
 
 } // namespace QuicStats

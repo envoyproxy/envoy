@@ -83,11 +83,11 @@ are rooted at *listener.<address>.quic_stats.*:
    cx_rx_packets_total, Counter, Total number of packets received
    cx_path_degrading_total, Counter, Number of times that network path degradation was detected
    cx_forward_progress_after_path_degrading_total, Counter, Number of times that forward progress was made after the path degraded
-   cx_srtt_us, Histogram, Smoothed round trip time estimate in microseconds
-   cx_tx_estimated_bandwidth_bytes_per_second, Histogram, Estimated connection bandwith in bytes per second
+   cx_rtt_us, Histogram, Smoothed round trip time estimate in microseconds
+   cx_tx_estimated_bandwidth, Histogram, Estimated connection bandwith in bytes per second
    cx_tx_percent_retransmitted_packets, Histogram, Percent of packets on a connection which were retransmistted
-   cx_tx_mtu_bytes, Histogram, The maximum packet size that will be sent for a connection
-   cx_rx_mtu_bytes, Histogram, The size of the largest packet received from the peer
+   cx_tx_mtu, Histogram, The maximum packet size that will be sent for a connection
+   cx_rx_mtu, Histogram, The size of the largest packet received from the peer
 
 .. _config_listener_stats_per_handler:
 

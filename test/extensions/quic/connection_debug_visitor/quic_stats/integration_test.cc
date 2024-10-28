@@ -48,7 +48,7 @@ TEST_P(QuicStatsIntegrationTest, Basic) {
   // Validate that these stats exist (in the correct namespace), and wait for values to be available
   // before validating values and ranges. Gauges/counters and histograms go through slightly
   // different paths, so check each to avoid test flakes.
-  test_server_->waitUntilHistogramHasSamples("listener.test.quic_stats.cx_srtt_us");
+  test_server_->waitUntilHistogramHasSamples("listener.test.quic_stats.cx_rtt_us");
   test_server_->waitForCounterGe("listener.test.quic_stats.cx_tx_packets_total", 1);
 
   auto validateCounterRange = [this](const std::string& name, uint64_t lower, uint64_t upper) {
@@ -78,12 +78,12 @@ TEST_P(QuicStatsIntegrationTest, Basic) {
   validateCounterRange("cx_rx_packets_total", 2, 20);
   validateCounterRange("cx_path_degrading_total", 0, 2);
   validateCounterRange("cx_forward_progress_after_path_degrading_total", 0, 2);
-  validateHistogramRange("cx_srtt_us", 1, test_duration_us.count());
-  validateHistogramRange("cx_tx_estimated_bandwidth_bytes_per_second", 100,
+  validateHistogramRange("cx_rtt_us", 1, test_duration_us.count());
+  validateHistogramRange("cx_tx_estimated_bandwidth", 100,
                          1024ULL * 1024ULL * 1024ULL * 1024ULL /* 1 TB/s */);
   validateHistogramRange("cx_tx_percent_retransmitted_packets", 0, 10);
-  validateHistogramRange("cx_tx_mtu_bytes", 500, 65535);
-  validateHistogramRange("cx_rx_mtu_bytes", 500, 65535);
+  validateHistogramRange("cx_tx_mtu", 500, 65535);
+  validateHistogramRange("cx_rx_mtu", 500, 65535);
 }
 
 } // namespace QuicStats
