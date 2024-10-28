@@ -607,6 +607,7 @@ TEST_P(Http2CodecImplTest, ClientUnexpectedHeaders) {
 
   Http::Status status = Http2CodecImplTestFixture::onConnBeginHeaders(client_.get(), 3);
   EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.message(), testing::HasSubstr("stream 3 is already gone"));
 }
 
 TEST_P(Http2CodecImplTest, SimpleRequestResponseOldApi) {
