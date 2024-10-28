@@ -31,8 +31,7 @@ public:
                                               TimeSource& time_source) override;
 
   Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
-                                             const Protobuf::Message&,
-                                             ProtobufMessage::ValidationVisitor&) override {
+                                             const Protobuf::Message&) override {
     return std::make_unique<ClusterProvidedLbConfig>();
   }
 };

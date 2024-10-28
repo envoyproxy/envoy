@@ -29,8 +29,7 @@ public:
                                               TimeSource& time_source) override;
 
   Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
-                                             const Protobuf::Message& config,
-                                             ProtobufMessage::ValidationVisitor&) override {
+                                             const Protobuf::Message& config) override {
     auto active_or_legacy =
         Common::ActiveOrLegacy<Upstream::RingHashLbProto, Upstream::ClusterProto>::get(&config);
 

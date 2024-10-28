@@ -2,6 +2,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.pb.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
@@ -34,8 +35,7 @@ public:
   }
 
   Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext& context,
-                                             const Protobuf::Message& config,
-                                             ProtobufMessage::ValidationVisitor&) override {
+                                             const Protobuf::Message& config) override {
     const auto& lb_config = dynamic_cast<const ClientSideWeightedRoundRobinLbProto&>(config);
     return Upstream::LoadBalancerConfigPtr{new Upstream::ClientSideWeightedRoundRobinLbConfig(
         lb_config, context.mainThreadDispatcher())};

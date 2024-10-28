@@ -18,7 +18,6 @@ TEST(ClientSideWeightedRoundRobinConfigTest, ValidateFail) {
   NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
   NiceMock<Upstream::MockPrioritySet> thread_local_priority_set;
   NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
-  NiceMock<Upstream::MockLoadBalancerFactoryContext> lb_factory_context;
   ON_CALL(lb_factory_context, mainThreadDispatcher())
       .WillByDefault(ReturnRef(mock_thread_dispatcher));
 
@@ -31,8 +30,7 @@ TEST(ClientSideWeightedRoundRobinConfigTest, ValidateFail) {
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.client_side_weighted_round_robin", factory.name());
 
-  auto lb_config = factory.loadConfig(lb_factory_context, *factory.createEmptyConfigProto(),
-                                      context.messageValidationVisitor());
+  auto lb_config = factory.loadConfig(context, *factory.createEmptyConfigProto());
 
   auto thread_aware_lb =
       factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,

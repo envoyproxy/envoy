@@ -26,7 +26,7 @@ public:
 
   Upstream::LoadBalancerConfigPtr
   loadConfig(Upstream::LoadBalancerFactoryContext& lb_factory_context,
-             const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& visitor) override;
+             const Protobuf::Message& config) override;
 };
 
 } // namespace Subset

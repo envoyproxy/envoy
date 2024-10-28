@@ -91,13 +91,11 @@ public:
 
   static absl::StatusOr<Result>
   getTypedLbConfigFromLegacyProtoWithoutSubset(LoadBalancerFactoryContext& lb_factory_context,
-                                               const ClusterProto& cluster,
-                                               ProtobufMessage::ValidationVisitor& visitor);
+                                               const ClusterProto& cluster);
 
   static absl::StatusOr<Result>
   getTypedLbConfigFromLegacyProto(LoadBalancerFactoryContext& lb_factory_context,
-                                  const ClusterProto& cluster,
-                                  ProtobufMessage::ValidationVisitor& visitor);
+                                  const ClusterProto& cluster);
 };
 
 /**

@@ -13,6 +13,11 @@
 #include "xds/data/orca/v3/orca_load_report.pb.h"
 
 namespace Envoy {
+namespace Server {
+namespace Configuration {
+class ServerFactoryContext;
+} // namespace Configuration
+} // namespace Server
 namespace Http {
 namespace ConnectionPool {
 class ConnectionLifetimeCallbacks;
@@ -271,15 +276,7 @@ using LoadBalancerConfigPtr = std::unique_ptr<LoadBalancerConfig>;
 /**
  * Context information passed to a load balancer factory to use when creating a load balancer.
  */
-class LoadBalancerFactoryContext {
-public:
-  virtual ~LoadBalancerFactoryContext() = default;
-
-  /**
-   * @return Event::Dispatcher& the main thread dispatcher.
-   */
-  virtual Event::Dispatcher& mainThreadDispatcher() PURE;
-};
+using LoadBalancerFactoryContext = Server::Configuration::ServerFactoryContext;
 
 /**
  * Factory config for load balancers. To support a load balancing policy of
@@ -314,12 +311,9 @@ public:
    * @param lb_factory_context supplies the load balancer factory context.
    * @param config supplies the typed proto config of the load balancer. A dynamic_cast could
    *        be performed on the config to the expected proto type.
-   * @param visitor supplies the validation visitor that will be used to validate the embedded
-   *        Any proto message.
    */
   virtual LoadBalancerConfigPtr loadConfig(LoadBalancerFactoryContext& lb_factory_context,
-                                           const Protobuf::Message& config,
-                                           ProtobufMessage::ValidationVisitor& visitor) PURE;
+                                           const Protobuf::Message& config) PURE;
 
   std::string category() const override { return "envoy.load_balancing_policies"; }
 };
