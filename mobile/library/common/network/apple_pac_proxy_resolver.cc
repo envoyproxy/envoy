@@ -35,6 +35,7 @@ void proxyAutoConfigurationResultCallback(void* ptr, CFArrayRef cf_proxies, CFEr
       static_cast<ProxySettingsResolvedCallback*>(ptr));
 
   // TODO(abeyad): Do something useful with `cf_error` if it is not null.
+  UNREFERENCED_PARAMETER(cf_error);
 
   // Treat the error case as if no proxy was configured. Seems to be consistent with what iOS
   // system (URLSession) is doing.
