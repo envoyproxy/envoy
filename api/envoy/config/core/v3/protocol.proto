@@ -39,19 +39,16 @@ message QuicKeepAliveSettings {
   //
   // If zero, disable keepalive probing.
   // If absent, use the QUICHE default interval to probe.
-  google.protobuf.Duration max_interval = 1 [(validate.rules).duration = {
-    lte {}
-    gte {seconds: 1}
-  }];
+  google.protobuf.Duration max_interval = 1;
 
   // The interval to send the first few keep-alive probing packets to prevent connection from hitting the idle timeout. Subsequent probes will be sent, each one with an interval exponentially longer than previous one, till it reaches :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`. And the probes afterwards will always use :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`.
   //
   // The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to prevent idle timeout and smaller than max_interval to take effect.
   //
-  // If absent or zero, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`  is also zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
+  // If absent, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>` is zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
   google.protobuf.Duration initial_interval = 2 [(validate.rules).duration = {
     lte {}
-    gte {seconds: 1}
+    gte {nanos: 1000000}
   }];
 }
 
