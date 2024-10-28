@@ -170,7 +170,7 @@ std::string Utility::getSerialNumberFromCertificate(X509& cert) {
   return "";
 }
 
-std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type, bool skip_unsupported) {
+std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {
   std::vector<std::string> subject_alt_names;
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(&cert, NID_subject_alt_name, nullptr, nullptr)));
@@ -179,15 +179,7 @@ std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type, bool 
   }
   for (const GENERAL_NAME* san : san_names.get()) {
     if (san->type == type) {
-      if (skip_unsupported) {
-        // An IP SAN for an unsupported IP version will throw an exception.
-        // TODO(ggreenway): remove this when IP address construction no longer throws.
-        TRY_NEEDS_AUDIT_ADDRESS { subject_alt_names.push_back(generalNameAsString(san)); }
-        END_TRY CATCH(const EnvoyException& e,
-                      { ENVOY_LOG_MISC(debug, "Error reading SAN, value skipped: {}", e.what()); });
-      } else {
-        subject_alt_names.push_back(generalNameAsString(san));
-      }
+      subject_alt_names.push_back(generalNameAsString(san));
     }
   }
   return subject_alt_names;
@@ -216,16 +208,14 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       sin.sin_port = 0;
       sin.sin_family = AF_INET;
       safeMemcpyUnsafeSrc(&sin.sin_addr, general_name->d.ip->data);
-      Network::Address::Ipv4Instance addr(&sin);
-      san = addr.ip()->addressAsString();
+      san = Network::Address::Ipv4Instance::sockaddrToString(sin);
     } else if (general_name->d.ip->length == 16) {
       sockaddr_in6 sin6;
       memset(&sin6, 0, sizeof(sin6));
       sin6.sin6_port = 0;
       sin6.sin6_family = AF_INET6;
       safeMemcpyUnsafeSrc(&sin6.sin6_addr, general_name->d.ip->data);
-      Network::Address::Ipv6Instance addr(sin6);
-      san = addr.ip()->addressAsString();
+      san = Network::Address::Ipv6Instance::sockaddrToString(sin6);
     }
     break;
   }

@@ -36,6 +36,7 @@ namespace Wasm {
 
 using CreateContextFn =
     std::function<ContextBase*(Wasm* wasm, const std::shared_ptr<Plugin>& plugin)>;
+using FailurePolicy = envoy::extensions::wasm::v3::FailurePolicy;
 
 class WasmHandle;
 
@@ -156,8 +157,12 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle(std::move(handle)) {}
-  PluginHandleSharedPtr handle;
+  PluginHandleSharedPtr handle{};
+  MonotonicTime last_load{};
+
+  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr h, MonotonicTime t = {})
+      : handle(std::move(h)), last_load(t) {}
+  PluginHandleSharedPtrThreadLocal() = default;
 };
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
@@ -195,15 +200,34 @@ public:
   std::shared_ptr<Context> createContext();
   Wasm* wasm();
   const PluginSharedPtr& plugin() { return plugin_; }
+  WasmStats& wasmStats() { return stats_handler_->wasmStats(); }
+
+  using SinglePluginHandle = PluginHandleSharedPtrThreadLocal;
+  using ThreadLocalPluginHandle = ThreadLocal::TypedSlotPtr<SinglePluginHandle>;
 
 private:
-  using SinglePluginHandle = PluginHandleSharedPtr;
-  using ThreadLocalPluginHandle = ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>;
+  /**
+   * Get the latest wasm and plugin handle wrapper. The plugin handle may be reloaded if
+   * the wasm is failed and the policy allows it.
+   */
+  std::pair<OptRef<SinglePluginHandle>, Wasm*> getPluginHandleAndWasm();
 
+  /**
+   * May reload the handle if the wasm if failed. The input handle will be updated if the
+   * handle is reloaded.
+   * @return the wasm pointer of the latest handle.
+   */
+  Wasm* maybeReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper);
+
+  StatsHandlerSharedPtr stats_handler_;
+  FailurePolicy failure_policy_;
+  // This backoff strategy implementation is thread-safe and could be shared across multiple
+  // workers.
+  std::unique_ptr<JitteredLowerBoundBackOffStrategy> reload_backoff_;
   PluginSharedPtr plugin_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
   const bool is_singleton_handle_{};
-
+  WasmHandleSharedPtr base_wasm_{};
   absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;
 };
 
