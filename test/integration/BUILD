@@ -31,7 +31,7 @@ envoy_cc_test_library(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":http_integration_lib",
         "//source/common/common:matchers_lib",
@@ -2515,7 +2515,7 @@ envoy_cc_test(
         "//conditions:default": ["quic_protocol_integration_test.cc"],
     }),
     data = ["//test/config/integration/certs"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     shard_count = 16,
     tags = [
         "cpu:4",

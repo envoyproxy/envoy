@@ -160,6 +160,8 @@ public:
     }
     return makeOptRef(retry_policy_.value());
   }
+  bool shouldUseRefreshToken(
+      const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
