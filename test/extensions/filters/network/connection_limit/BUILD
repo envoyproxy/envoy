@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["connection_limit_integration_test.cc"],
     extension_names = ["envoy.filters.network.connection_limit"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         "//source/extensions/filters/network/connection_limit:config",
         "//source/extensions/filters/network/tcp_proxy:config",

@@ -18,9 +18,6 @@ namespace Envoy {
 namespace Network {
 namespace Address {
 
-// Add an address-specific version for easier searching.
-#define TRY_NEEDS_AUDIT_ADDRESS TRY_NEEDS_AUDIT
-
 /**
  * Check whether we are a) on Android or an Apple platform and b) configured via runtime to always
  * use v6 sockets.
@@ -233,6 +230,13 @@ public:
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
   absl::string_view addressType() const override { return "default"; }
 
+  /**
+   * Convenience function to convert an IPv6 address to canonical string format.
+   * @param addr address to format.
+   * @return the address in dotted-decimal string format.
+   */
+  static std::string sockaddrToString(const sockaddr_in6& addr);
+
   // Validate that IPv6 is supported on this platform
   static absl::Status validateProtocolSupported();
 
@@ -262,6 +266,7 @@ private:
     InstanceConstSharedPtr addressWithoutScopeId() const override;
 
     std::string makeFriendlyAddress() const;
+    static std::string makeFriendlyAddress(const sockaddr_in6& address);
 
     sockaddr_in6 address_;
     // Is IPv4 compatibility (https://tools.ietf.org/html/rfc3493#page-11) disabled?

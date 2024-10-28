@@ -505,7 +505,8 @@ build:rbe-engflow --remote_executor=grpcs://envoy.cluster.engflow.com
 build:rbe-engflow --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:rbe-engflow --bes_results_url=https://envoy.cluster.engflow.com/invocation/
 build:rbe-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:rbe-engflow --grpc_keepalive_time=30s
+build:rbe-engflow --grpc_keepalive_time=60s
+build:rbe-engflow --grpc_keepalive_timeout=30s
 build:rbe-engflow --remote_timeout=3600s
 build:rbe-engflow --bes_timeout=3600s
 build:rbe-engflow --bes_upload_mode=fully_async
@@ -514,7 +515,8 @@ build:rbe-engflow --nolegacy_important_outputs
 # RBE (Engflow Envoy)
 build:common-envoy-engflow --google_default_credentials=false
 build:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:common-envoy-engflow --grpc_keepalive_time=30s
+build:common-envoy-engflow --grpc_keepalive_time=60s
+build:common-envoy-engflow --grpc_keepalive_timeout=30s
 
 build:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
 build:cache-envoy-engflow --remote_timeout=3600s
@@ -530,7 +532,6 @@ build:rbe-envoy-engflow --define=engflow_rbe=true
 
 build:remote-envoy-engflow --config=common-envoy-engflow
 build:remote-envoy-engflow --config=cache-envoy-engflow
-build:remote-envoy-engflow --config=bes-envoy-engflow
 build:remote-envoy-engflow --config=rbe-envoy-engflow
 
 #############################################################################
@@ -555,6 +556,7 @@ common:debug --config=debug-sandbox
 common:debug --config=debug-coverage
 common:debug --config=debug-tests
 
+try-import %workspace%/repo.bazelrc
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
 try-import %workspace%/local_tsan.bazelrc
