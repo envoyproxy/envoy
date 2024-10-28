@@ -780,6 +780,7 @@ bool UdpProxyFilter::ActiveSession::setClusterInfo() {
   }
 
   if (cluster_ == nullptr) {
+    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound);
     return false;
   }
 
