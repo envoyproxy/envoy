@@ -330,7 +330,7 @@ public:
 
 class MockQuicConnectionDebugVisitor : public quic::QuicConnectionDebugVisitor {
 public:
-  MockQuicConnectionDebugVisitor(quic::QuicSession* session,
+  MockQuicConnectionDebugVisitor(quic::QuicSession& session,
                                  const StreamInfo::StreamInfo& stream_info)
       : session_(session), stream_info_(stream_info) {}
 
@@ -338,7 +338,7 @@ public:
               (const quic::QuicConnectionCloseFrame&, quic::ConnectionCloseSource), ());
   MOCK_METHOD(void, OnConnectionCloseFrame, (const quic::QuicConnectionCloseFrame&), ());
 
-  quic::QuicSession* session_;
+  quic::QuicSession& session_;
   const StreamInfo::StreamInfo& stream_info_;
 };
 
@@ -346,7 +346,7 @@ class TestEnvoyQuicConnectionDebugVisitorFactory
     : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
 public:
   std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(Event::Dispatcher&, quic::QuicSession* session,
+  createQuicConnectionDebugVisitor(Event::Dispatcher&, quic::QuicSession& session,
                                    const StreamInfo::StreamInfo& stream_info) override {
     auto debug_visitor = std::make_unique<MockQuicConnectionDebugVisitor>(session, stream_info);
     mock_debug_visitor_ = debug_visitor.get();

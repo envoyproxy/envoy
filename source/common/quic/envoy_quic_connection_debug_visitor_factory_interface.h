@@ -20,7 +20,7 @@ public:
 
   // Returns a debug visitor to be attached to a Quic Connection.
   virtual std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(Event::Dispatcher& dispatcher, quic::QuicSession* session,
+  createQuicConnectionDebugVisitor(Event::Dispatcher& dispatcher, quic::QuicSession& session,
                                    const StreamInfo::StreamInfo& stream_info) PURE;
 };
 

@@ -35,7 +35,7 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1000), _)).Times(AtLeast(1));
     }
     config_ = std::make_unique<Config>(cfg, *store_.rootScope());
-    quic_stats_ = std::make_unique<TestQuicStatsVisitor>(*config_, dispatcher_, nullptr);
+    quic_stats_ = std::make_unique<TestQuicStatsVisitor>(*config_, dispatcher_);
   }
 
   uint64_t counterValue(absl::string_view name) {
@@ -98,7 +98,7 @@ TEST_F(QuicStatsTest, Values) {
   timer2 = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(*timer2, enableTimer(std::chrono::milliseconds(1000), _)).Times(AtLeast(1));
   std::unique_ptr<TestQuicStatsVisitor> quic_stats2 =
-      std::make_unique<TestQuicStatsVisitor>(*config_, dispatcher_, nullptr);
+      std::make_unique<TestQuicStatsVisitor>(*config_, dispatcher_);
 
   // After the first call, stats should be set to exactly these values.
   quic_stats_->stats_.packets_retransmitted = 1;

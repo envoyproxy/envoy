@@ -23,7 +23,7 @@ namespace Quic {
 class EnvoyQuicConnectionDebugVisitorBasic : public quic::QuicConnectionDebugVisitor,
                                              private Logger::Loggable<Logger::Id::connection> {
 public:
-  EnvoyQuicConnectionDebugVisitorBasic(quic::QuicSession* session,
+  EnvoyQuicConnectionDebugVisitorBasic(quic::QuicSession& session,
                                        const StreamInfo::StreamInfo& stream_info)
       : session_(session), stream_info_(stream_info) {
     // Workaround for gcc not understanding [[maybe_unused]] for class members.
@@ -35,14 +35,14 @@ public:
                           quic::ConnectionCloseSource source) override;
 
 private:
-  quic::QuicSession* session_;
+  quic::QuicSession& session_;
   const StreamInfo::StreamInfo& stream_info_;
 };
 
 class EnvoyQuicConnectionDebugVisitorFactoryBasic
     : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
   std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(Event::Dispatcher&, quic::QuicSession* session,
+  createQuicConnectionDebugVisitor(Event::Dispatcher&, quic::QuicSession& session,
                                    const StreamInfo::StreamInfo& stream_info) override;
 };
 

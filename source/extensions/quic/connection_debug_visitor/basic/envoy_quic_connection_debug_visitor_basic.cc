@@ -17,13 +17,13 @@ namespace Quic {
 void EnvoyQuicConnectionDebugVisitorBasic::OnConnectionClosed(
     const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source) {
   ENVOY_LOG(info, "Quic connection from {} with id {} closed {} with details: {}",
-            session_->peer_address().ToString(), session_->connection_id().ToString(),
+            session_.peer_address().ToString(), session_.connection_id().ToString(),
             quic::ConnectionCloseSourceToString(source), frame.error_details);
 }
 
 std::unique_ptr<quic::QuicConnectionDebugVisitor>
 EnvoyQuicConnectionDebugVisitorFactoryBasic::createQuicConnectionDebugVisitor(
-    Event::Dispatcher&, quic::QuicSession* session, const StreamInfo::StreamInfo& stream_info) {
+    Event::Dispatcher&, quic::QuicSession& session, const StreamInfo::StreamInfo& stream_info) {
   return std::make_unique<EnvoyQuicConnectionDebugVisitorBasic>(session, stream_info);
 }
 

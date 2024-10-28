@@ -17,9 +17,8 @@ namespace Quic {
 namespace ConnectionDebugVisitors {
 namespace QuicStats {
 
-QuicStatsVisitor::QuicStatsVisitor(Config& config, Event::Dispatcher& dispatcher,
-                                   quic::QuicSession* session)
-    : config_(config), session_(*session) {
+QuicStatsVisitor::QuicStatsVisitor(Config& config, Event::Dispatcher& dispatcher)
+    : config_(config) {
   if (config_.update_period_.has_value()) {
     timer_ = dispatcher.createTimer([this]() {
       recordStats();
@@ -37,7 +36,7 @@ void QuicStatsVisitor::OnConnectionClosed(const quic::QuicConnectionCloseFrame&,
   recordStats();
 }
 
-const quic::QuicConnectionStats& QuicStatsVisitor::getQuicStats() {
+const quic::QuicConnectionStats& QuicStatsVisitorProd::getQuicStats() {
   return session_.connection()->GetStats();
 }
 
@@ -115,9 +114,9 @@ QuicStats Config::generateStats(Stats::Scope& scope) {
 }
 
 std::unique_ptr<quic::QuicConnectionDebugVisitor>
-Config::createQuicConnectionDebugVisitor(Event::Dispatcher& dispatcher, quic::QuicSession* session,
+Config::createQuicConnectionDebugVisitor(Event::Dispatcher& dispatcher, quic::QuicSession& session,
                                          const StreamInfo::StreamInfo&) {
-  return std::make_unique<QuicStatsVisitor>(*this, dispatcher, session);
+  return std::make_unique<QuicStatsVisitorProd>(*this, dispatcher, session);
 }
 
 Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr

@@ -42,21 +42,20 @@ class Config;
 // Visitor class that publishes various QUICHE connection stats as Envoy stats.
 class QuicStatsVisitor : public quic::QuicConnectionDebugVisitor {
 public:
-  QuicStatsVisitor(Config& config, Event::Dispatcher& dispatcher, quic::QuicSession* session);
+  QuicStatsVisitor(Config& config, Event::Dispatcher& dispatcher);
 
   // quic::QuicConnectionDebugVisitor
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
 
   // This is virtual so that tests can override it.
-  virtual const quic::QuicConnectionStats& getQuicStats();
+  virtual const quic::QuicConnectionStats& getQuicStats() PURE;
 
 private:
   void recordStats();
 
   Config& config_;
   Event::TimerPtr timer_;
-  quic::QuicSession& session_;
 
   quic::QuicPacketCount last_packets_sent_{};
   quic::QuicPacketCount last_packets_retransmitted_{};
@@ -66,13 +65,24 @@ private:
   size_t last_num_forward_progress_after_path_degrading_{};
 };
 
+class QuicStatsVisitorProd final : public QuicStatsVisitor {
+public:
+  QuicStatsVisitorProd(Config& config, Event::Dispatcher& dispatcher, quic::QuicSession& session)
+      : QuicStatsVisitor(config, dispatcher), session_(session) {}
+
+  const quic::QuicConnectionStats& getQuicStats() override;
+
+private:
+  quic::QuicSession& session_;
+};
+
 class Config : public Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryInterface {
 public:
   Config(const envoy::extensions::quic::connection_debug_visitor::quic_stats::v3::Config& config,
          Stats::Scope& scope);
 
   std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(Event::Dispatcher& dispatcher, quic::QuicSession* session,
+  createQuicConnectionDebugVisitor(Event::Dispatcher& dispatcher, quic::QuicSession& session,
                                    const StreamInfo::StreamInfo& stream_info) override;
 
   const absl::optional<std::chrono::milliseconds> update_period_;
