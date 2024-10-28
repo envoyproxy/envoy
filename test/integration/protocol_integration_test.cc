@@ -21,6 +21,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_annotations.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/protocol_options.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -3949,7 +3950,7 @@ TEST_P(
 
   constexpr uint32_t window_size = 65535;
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+      ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
           .value();
   http2_options.mutable_initial_stream_window_size()->set_value(window_size);
@@ -4033,7 +4034,7 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   initialize();
 
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+      ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
           .value();
   http2_options.mutable_initial_stream_window_size()->set_value(65535);
@@ -5001,7 +5002,7 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
 
   initialize();
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+      ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
           .value();
   http2_options.mutable_initial_stream_window_size()->set_value(kStreamWindowSize);
@@ -5089,7 +5090,7 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseWithErrorBeforeClient) {
 
   initialize();
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+      ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
           .value();
   http2_options.mutable_initial_stream_window_size()->set_value(64 * 1024);
@@ -5133,7 +5134,7 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedR
 
   initialize();
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+      ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
           .value();
   http2_options.mutable_initial_stream_window_size()->set_value(kStreamWindowSize);

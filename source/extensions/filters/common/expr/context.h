@@ -5,6 +5,7 @@
 
 #include "source/common/grpc/status.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
@@ -121,7 +122,7 @@ public:
     }
     auto str = std::string(key.StringOrDie().value());
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consistent_header_validation")) {
-      if (!Http::HeaderUtility::headerNameIsValid(str)) {
+      if (!Http::HeaderValidation::headerNameIsValid(str)) {
         // Reject key if it is an invalid header string
         return {};
       }

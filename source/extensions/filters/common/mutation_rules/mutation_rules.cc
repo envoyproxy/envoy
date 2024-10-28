@@ -2,6 +2,7 @@
 
 #include "source/common/common/macros.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -99,7 +100,8 @@ bool Checker::isAllowed(CheckOperation op, const LowerCaseString& header_name) c
 
 bool Checker::isValidValue(const LowerCaseString& header_name,
                            absl::string_view header_value) const {
-  if (!absl::StartsWith(header_name, ":") && !HeaderUtility::headerValueIsValid(header_value)) {
+  if (!absl::StartsWith(header_name, ":") &&
+      !Http::HeaderValidation::headerValueIsValid(header_value)) {
     // For non-internal headers, make sure that value matches character set.
     return false;
   }
@@ -107,7 +109,7 @@ bool Checker::isValidValue(const LowerCaseString& header_name,
   // badly if set to invalid values.
   const auto& hdrs = Http::Headers::get();
   if ((header_name == hdrs.Host || header_name == hdrs.HostLegacy) &&
-      !HeaderUtility::authorityIsValid(header_value)) {
+      !Http::HeaderValidation::authorityIsValid(header_value)) {
     return false;
   }
   if (header_name == hdrs.Scheme && !Http::Utility::schemeIsValid(header_value)) {

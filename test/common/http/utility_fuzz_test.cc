@@ -1,3 +1,4 @@
+#include "source/common/http/protocol_options.h"
 #include "source/common/http/utility.h"
 
 #include "test/common/http/utility_fuzz.pb.validate.h"
@@ -86,7 +87,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kInitializeAndValidate: {
     const auto& options = input.initialize_and_validate();
-    auto options_or_error = Http2::Utility::initializeAndValidateOptions(options);
+    auto options_or_error = Http2::ProtocolOptions::initializeAndValidateOptions(options);
     if (options_or_error.status().ok()) {
       absl::string_view msg = options_or_error.status().message();
       // initializeAndValidateOptions throws exceptions for 4 different reasons due to malformed

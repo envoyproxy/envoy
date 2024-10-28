@@ -338,7 +338,7 @@ public:
             headers->setReferenceKey(Headers::get().Method, "GET");
           }
           if (headers->Host() != nullptr &&
-              !HeaderUtility::authorityIsValid(headers->getHostValue())) {
+              !HeaderValidation::authorityIsValid(headers->getHostValue())) {
             // Sanitize host header so we don't fail at ASSERTs that verify header sanity checks
             // which should have been performed by the codec.
             headers->setHost(Fuzz::replaceInvalidHostCharacters(headers->getHostValue()));

@@ -13,6 +13,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/http/http1/settings.h"
+#include "source/common/http/protocol_options.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
@@ -188,7 +189,8 @@ absl::StatusOr<std::shared_ptr<ProtocolOptionsConfigImpl>>
 ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     const envoy::extensions::upstreams::http::v3::HttpProtocolOptions& options,
     Server::Configuration::ServerFactoryContext& server_context) {
-  auto options_or_error = Http2::Utility::initializeAndValidateOptions(getHttp2Options(options));
+  auto options_or_error =
+      Http2::ProtocolOptions::initializeAndValidateOptions(getHttp2Options(options));
   RETURN_IF_NOT_OK_REF(options_or_error.status());
   auto cache_options_or_error = getAlternateProtocolsCacheOptions(options, server_context);
   RETURN_IF_NOT_OK_REF(cache_options_or_error.status());
@@ -207,7 +209,7 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
     bool use_downstream_protocol, bool use_http2,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
-  auto options_or_error = Http2::Utility::initializeAndValidateOptions(http2_options);
+  auto options_or_error = Http2::ProtocolOptions::initializeAndValidateOptions(http2_options);
   RETURN_IF_NOT_OK_REF(options_or_error.status());
   return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
       http1_settings, options_or_error.value(), common_options, upstream_options,
@@ -235,7 +237,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       use_downstream_protocol_(options.has_use_downstream_protocol_config()),
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
       use_alpn_(options.has_auto_config()) {
-  ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
+  ASSERT(Http2::ProtocolOptions::initializeAndValidateOptions(http2_options_).status().ok());
 }
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
@@ -249,7 +251,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       http2_options_(validated_http2_options), common_http_protocol_options_(common_options),
       upstream_http_protocol_options_(upstream_options),
       use_downstream_protocol_(use_downstream_protocol), use_http2_(use_http2) {
-  ASSERT(Http2::Utility::initializeAndValidateOptions(validated_http2_options).status().ok());
+  ASSERT(
+      Http2::ProtocolOptions::initializeAndValidateOptions(validated_http2_options).status().ok());
 }
 
 LEGACY_REGISTER_FACTORY(ProtocolOptionsConfigFactory, Server::Configuration::ProtocolOptionsFactory,

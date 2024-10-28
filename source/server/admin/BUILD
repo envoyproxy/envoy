@@ -78,6 +78,7 @@ envoy_cc_library(
         "//source/common/http:default_server_string_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:protocol_options_lib",
         "//source/common/http:utility_lib",
         "//source/common/listener_manager:listener_info_lib",
         "//source/common/listener_manager:listener_manager_lib",

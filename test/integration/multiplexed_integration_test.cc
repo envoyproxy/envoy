@@ -18,6 +18,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/http/protocol_options.h"
 #include "source/common/network/socket_option_impl.h"
 
 #include "test/integration/filters/stop_and_continue_filter_config.pb.h"
@@ -222,7 +223,7 @@ TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeout) {
   const size_t stream_flow_control_window =
       downstream_protocol_ == Http::CodecType::HTTP3 ? 32 * 1024 : 65535;
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+      ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
           .value();
   http2_options.mutable_initial_stream_window_size()->set_value(stream_flow_control_window);
@@ -2994,7 +2995,7 @@ TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
   request_encoder_ = &encoder_decoder.first;
 
   std::string value = std::string(1, 2);
-  EXPECT_FALSE(Http::HeaderUtility::headerValueIsValid(value));
+  EXPECT_FALSE(Http::HeaderValidation::headerValueIsValid(value));
   codec_client_->sendTrailers(*request_encoder_,
                               Http::TestRequestTrailerMapImpl{{"trailer", value}});
   ASSERT_TRUE(response->waitForReset());

@@ -28,6 +28,7 @@
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/protocol_options.h"
 #include "source/common/listener_manager/listener_impl.h"
 #include "source/common/memory/utils.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -286,7 +287,7 @@ Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection
   return Http::ConnectionManagerUtility::autoCreateCodec(
       connection, data, callbacks, *server_.stats().rootScope(), server_.api().randomGenerator(),
       http1_codec_stats_, http2_codec_stats_, Http::Http1Settings(),
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+      ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
           .value(),
       maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),

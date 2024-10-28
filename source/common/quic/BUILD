@@ -299,6 +299,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_validation_lib",
         "@com_github_google_quiche//:quic_server_http_spdy_session_lib",
         "@com_google_absl//absl/types:optional",
     ] + envoy_select_enable_http_datagrams([
@@ -335,6 +336,7 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
+        "//source/common/http:header_validation_lib",
         "@com_github_google_quiche//:quic_core_http_client_lib",
     ] + envoy_select_enable_http_datagrams([
         ":http_datagram_handler",

@@ -40,6 +40,7 @@ envoy_cc_extension(
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",
         "//source/common/http:filter_chain_helper_lib",
+        "//source/common/http:protocol_options_lib",
         "//source/common/http:request_id_extension_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",

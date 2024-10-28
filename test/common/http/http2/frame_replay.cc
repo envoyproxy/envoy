@@ -2,7 +2,7 @@
 
 #include "source/common/common/hex.h"
 #include "source/common/common/macros.h"
-#include "source/common/http/utility.h"
+#include "source/common/http/protocol_options.h"
 
 #include "test/common/http/common.h"
 #include "test/test_common/environment.h"
@@ -61,7 +61,7 @@ void FrameUtils::fixupHeaders(Frame& frame) {
 }
 
 CodecFrameInjector::CodecFrameInjector(const std::string& injector_name)
-    : options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
+    : options_(::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
                    envoy::config::core::v3::Http2ProtocolOptions())
                    .value()),
       injector_name_(injector_name) {}

@@ -3,7 +3,7 @@
 #include "envoy/api/os_sys_calls.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -106,8 +106,8 @@ SubstitutionFormatUtils::parseSubcommandHeaders(absl::string_view subcommand) {
   }
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consistent_header_validation")) {
-    if (!Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(main_header)) ||
-        !Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(alternative_header))) {
+    if (!Http::HeaderValidation::headerNameIsValid(absl::AsciiStrToLower(main_header)) ||
+        !Http::HeaderValidation::headerNameIsValid(absl::AsciiStrToLower(alternative_header))) {
       return absl::InvalidArgumentError(
           "Invalid header configuration. Format string contains invalid characters.");
     }

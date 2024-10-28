@@ -390,6 +390,7 @@ envoy_cc_library(
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/http:header_validation_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
         "//source/common/network:proxy_protocol_filter_state_lib",
@@ -523,7 +524,6 @@ envoy_cc_library(
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
-        ":http_option_limits_lib",
         ":message_lib",
         "//bazel/external/http_parser",
         "//envoy/common:regex_interface",
@@ -541,11 +541,24 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_google_quiche//:http2_adapter_http2_protocol",
-        "@com_google_absl//absl/container:node_hash_set",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "protocol_options_lib",
+    srcs = ["protocol_options.cc"],
+    hdrs = ["protocol_options.h"],
+    deps = [
+        ":exception_lib",
+        ":http_option_limits_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/protobuf:utility_lib",
+        "@com_github_google_quiche//:http2_adapter_http2_protocol",
+        "@com_google_absl//absl/container:node_hash_set",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -554,7 +567,6 @@ envoy_cc_library(
     srcs = ["header_utility.cc"],
     hdrs = ["header_utility.h"],
     deps = [
-        ":character_set_validation_lib",
         ":header_map_lib",
         ":status_lib",
         ":utility_lib",
@@ -563,18 +575,29 @@ envoy_cc_library(
         "//envoy/http:header_map_interface",
         "//envoy/http:header_validator_interface",
         "//source/common/common:matchers_lib",
-        "//source/common/common:minimal_logger_lib",
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
-        "@com_github_google_quiche//:http2_adapter",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ] + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
+)
+
+envoy_cc_library(
+    name = "header_validation_lib",
+    srcs = ["header_validation.cc"],
+    hdrs = ["header_validation.h"],
+    deps = [
+        ":character_set_validation_lib",
+        ":header_map_lib",
+        ":status_lib",
+        "//source/common/common:minimal_logger_lib",
+        "@com_github_google_quiche//:http2_adapter",
     ] + envoy_select_enable_http_datagrams([
         "@com_github_google_quiche//:quiche_common_structured_headers_lib",
-    ]) + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
+    ]),
 )
 
 envoy_cc_library(

@@ -26,6 +26,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:codes_lib",
+        "//source/common/http:header_validation_lib",
         "//source/common/http:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/runtime:runtime_protos_lib",

@@ -28,6 +28,7 @@
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http1/settings.h"
 #include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/protocol_options.h"
 #include "source/common/http/request_id_extension_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
@@ -367,7 +368,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
-      http3_options_(Http3::Utility::initializeAndValidateOptions(
+      http3_options_(Http3::ProtocolOptions::initializeAndValidateOptions(
           config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
@@ -438,7 +439,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     return;
   }
 
-  auto options_or_error = Http2::Utility::initializeAndValidateOptions(
+  auto options_or_error = Http2::ProtocolOptions::initializeAndValidateOptions(
       config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
       config.stream_error_on_invalid_http_message());
   SET_AND_RETURN_IF_NOT_OK(options_or_error.status(), creation_status);

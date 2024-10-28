@@ -93,6 +93,7 @@ envoy_cc_test(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":http2_adapter_chunked_buffer",
         ":quiche_common_platform_test",
         "@com_google_absl//absl/strings",
     ],
@@ -128,6 +129,7 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         ":http2_adapter_event_forwarder",
+        ":http2_adapter_http2_protocol",
         ":http2_core_protocol_lib",
         ":http2_test_tools_mock_spdy_framer_visitor_lib",
         ":quiche_common_platform_test",

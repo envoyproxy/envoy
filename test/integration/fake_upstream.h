@@ -29,6 +29,7 @@
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/http3/codec_stats.h"
+#include "source/common/http/protocol_options.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -639,7 +640,8 @@ struct FakeUpstreamConfig {
   };
 
   FakeUpstreamConfig(Event::TestTimeSystem& time_system) : time_system_(time_system) {
-    http2_options_ = ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options_).value();
+    http2_options_ =
+        ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(http2_options_).value();
     // Legacy options which are always set.
     http2_options_.set_allow_connect(true);
     http2_options_.set_allow_metadata(true);

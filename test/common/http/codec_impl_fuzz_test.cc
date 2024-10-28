@@ -13,8 +13,10 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_validation.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/protocol_options.h"
 #include "source/common/http/conn_manager_utility.h"
 
 #include "test/common/http/codec_impl_fuzz.pb.validate.h"
@@ -68,7 +70,7 @@ Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& s
 
   // If the server accepts a HTTP/1.0 then the default host must be valid.
   if (h1_settings.accept_http_10_ &&
-      !HeaderUtility::authorityIsValid(h1_settings.default_host_for_http_10_)) {
+      !HeaderValidation::authorityIsValid(h1_settings.default_host_for_http_10_)) {
     throw EnvoyException("Invalid Http1ServerSettings, HTTP/1.0 is enabled and "
                          "'default_host_for_http_10' has invalid hostname, skipping test.");
   }
@@ -78,7 +80,7 @@ Http1Settings fromHttp1Settings(const test::common::http::Http1ServerSettings& s
 envoy::config::core::v3::Http2ProtocolOptions
 fromHttp2Settings(const test::common::http::Http2Settings& settings) {
   envoy::config::core::v3::Http2ProtocolOptions options(
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+      ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
           .value());
   // We apply an offset and modulo interpretation to settings to ensure that

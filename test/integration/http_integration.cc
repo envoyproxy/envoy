@@ -21,6 +21,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_annotations.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/protocol_options.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -271,7 +272,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->max_response_headers_count_ = 200;
   if (!http2_options.has_value()) {
-    http2_options = Http2::Utility::initializeAndValidateOptions(
+    http2_options = Http2::ProtocolOptions::initializeAndValidateOptions(
                         envoy::config::core::v3::Http2ProtocolOptions())
                         .value();
     http2_options.value().set_allow_connect(true);

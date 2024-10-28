@@ -19,6 +19,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/balsa_parser.h"
 #include "source/common/http/http1/header_formatter.h"
@@ -445,7 +446,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   // downstream codecs decode.
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  RETURN_IF_ERROR(HeaderUtility::checkValidRequestHeaders(headers));
+  RETURN_IF_ERROR(HeaderValidation::checkValidRequestHeaders(headers));
 #endif
 
   const HeaderEntry* method = headers.Method();
@@ -812,7 +813,7 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
   }
 
   absl::string_view header_value{data, length};
-  if (!Http::HeaderUtility::headerValueIsValid(header_value)) {
+  if (!Http::HeaderValidation::headerValueIsValid(header_value)) {
     ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
     error_code_ = Http::Code::BadRequest;
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters));
@@ -1218,7 +1219,7 @@ Envoy::StatusOr<CallbackResult> ServerConnectionImpl::onHeadersCompleteBase() {
     RETURN_IF_ERROR(checkProtocolVersion(*headers));
 
     // Make sure the host is valid.
-    auto details = HeaderUtility::requestHeadersValid(*headers);
+    auto details = HeaderValidation::requestHeadersValid(*headers);
     if (details.has_value()) {
       RETURN_IF_ERROR(sendProtocolError(details.value().get()));
       return codecProtocolError(

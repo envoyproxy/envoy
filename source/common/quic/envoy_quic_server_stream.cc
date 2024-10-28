@@ -9,6 +9,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation.h"
 #include "source/common/http/utility.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -181,7 +182,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #ifndef ENVOY_ENABLE_UHV
   // These checks are now part of UHV
   if (Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
-      Http::HeaderUtility::checkValidRequestHeaders(*headers) != Http::okStatus() ||
+      Http::HeaderValidation::checkValidRequestHeaders(*headers) != Http::okStatus() ||
       (headers->Protocol() && !spdy_session()->allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);
@@ -203,7 +204,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
 #endif
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (Http::HeaderUtility::isCapsuleProtocol(*headers) ||
+  if (Http::HeaderValidation::isCapsuleProtocol(*headers) ||
       Http::HeaderUtility::isConnectUdpRequest(*headers)) {
     useCapsuleProtocol();
     // HTTP/3 Datagrams sent over CONNECT-UDP are already congestion controlled, so make it bypass

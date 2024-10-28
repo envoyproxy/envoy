@@ -2,7 +2,7 @@
 
 #include "envoy/http/header_map.h"
 
-#include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -119,7 +119,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
   }
 
   for (const auto& hdr : mutation.remove_headers()) {
-    if (!Http::HeaderUtility::headerNameIsValid(hdr)) {
+    if (!Http::HeaderValidation::headerNameIsValid(hdr)) {
       ENVOY_LOG(debug, "remove_headers contain invalid character, may not be removed.");
       rejected_mutations.inc();
       return absl::InvalidArgumentError("Invalid character in remove_headers mutation.");
@@ -154,8 +154,8 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
     }
 
     const absl::string_view header_value = sh.header().raw_value();
-    if (!Http::HeaderUtility::headerNameIsValid(sh.header().key()) ||
-        !Http::HeaderUtility::headerValueIsValid(header_value)) {
+    if (!Http::HeaderValidation::headerNameIsValid(sh.header().key()) ||
+        !Http::HeaderValidation::headerValueIsValid(header_value)) {
       ENVOY_LOG(debug,
                 "set_headers contain invalid character in key or value, may not be appended.");
       rejected_mutations.inc();

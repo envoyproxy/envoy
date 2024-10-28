@@ -111,6 +111,8 @@ envoy_proto_library(
             ":codec_impl_fuzz_proto_cc_proto",
             "//source/common/http:conn_manager_lib",
             "//source/common/http:header_map_lib",
+            "//source/common/http:header_validation_lib",
+            "//source/common/http:protocol_options_lib",
             "//source/common/http:rds_lib",
             "//source/common/http/http1:codec_lib",
             "//source/common/http/http2:codec_lib",
@@ -412,6 +414,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "header_validation_test",
+    srcs = ["header_validation_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http:header_validation_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "user_agent_test",
     srcs = ["user_agent_test.cc"],
     rbe_pool = "6gig",
@@ -437,6 +450,7 @@ envoy_cc_fuzz_test(
     rbe_pool = "6gig",
     deps = [
         ":utility_fuzz_proto_cc_proto",
+        "//source/common/http:protocol_options_lib",
         "//source/common/http:utility_lib",
         "//test/fuzz:utility_lib",
         "//test/test_common:utility_lib",
@@ -450,6 +464,7 @@ envoy_cc_test(
     deps = [
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:protocol_options_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//test/mocks/http:http_mocks",
@@ -457,6 +472,15 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "protocol_options_test",
+    srcs = ["protocol_options_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http:protocol_options_lib",
     ],
 )
 

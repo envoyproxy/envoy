@@ -129,20 +129,6 @@ public:
   static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
-   * Validates that a header value is valid, according to RFC 7230, section 3.2.
-   * http://tools.ietf.org/html/rfc7230#section-3.2
-   * @return bool true if the header values are valid, according to the aforementioned RFC.
-   */
-  static bool headerValueIsValid(const absl::string_view header_value);
-
-  /**
-   * Validates that a header name is valid, according to RFC 7230, section 3.2.
-   * http://tools.ietf.org/html/rfc7230#section-3.2
-   * @return bool true if the header name is valid, according to the aforementioned RFC.
-   */
-  static bool headerNameIsValid(absl::string_view header_key);
-
-  /**
    * Checks if header name contains underscore characters.
    * Underscore character is allowed in header names by the RFC-7230 and this check is implemented
    * as a security measure due to systems that treat '_' and '-' as interchangeable. Envoy by
@@ -150,12 +136,6 @@ public:
    * @return bool true if header name contains underscore characters.
    */
   static bool headerNameContainsUnderscore(const absl::string_view header_name);
-
-  /**
-   * Validates that the characters in the authority are valid.
-   * @return bool true if the header values are valid, false otherwise.
-   */
-  static bool authorityIsValid(const absl::string_view authority_value);
 
   /**
    * @brief return if the 1xx should be handled by the [encode|decode]1xx calls.
@@ -189,28 +169,12 @@ public:
    */
   static bool rewriteAuthorityForConnectUdp(RequestHeaderMap& headers);
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  /**
-   * @brief Returns true if the Capsule-Protocol header field (RFC 9297) is set to true. If the
-   * header field is included multiple times, returns false as per RFC 9297.
-   */
-  static bool isCapsuleProtocol(const RequestOrResponseHeaderMap& headers);
-#endif
-
   static bool requestShouldHaveNoBody(const RequestHeaderMap& headers);
 
   /**
    * @brief a helper function to determine if the headers represent an envoy internal request
    */
   static bool isEnvoyInternalRequest(const RequestHeaderMap& headers);
-
-  /**
-   * Determines if request headers pass Envoy validity checks.
-   * @param headers to validate
-   * @return details of the error if an error is present, otherwise absl::nullopt
-   */
-  static absl::optional<std::reference_wrapper<const absl::string_view>>
-  requestHeadersValid(const RequestHeaderMap& headers);
 
   /**
    * Determines if the response should be framed by Connection: Close based on protocol
@@ -262,14 +226,6 @@ public:
    * missing.
    */
   static Http::Status checkRequiredResponseHeaders(const Http::ResponseHeaderMap& headers);
-
-  /* Does a common header check ensuring that header keys and values are valid and do not contain
-   * forbidden characters (e.g. valid HTTP header keys/values should never contain embedded NULLs
-   * or new lines.)
-   * @return Status containing the result. If failed, message includes details on which header key
-   * or value was invalid.
-   */
-  static Http::Status checkValidRequestHeaders(const Http::RequestHeaderMap& headers);
 
   /**
    * Returns true if a header may be safely removed without causing additional

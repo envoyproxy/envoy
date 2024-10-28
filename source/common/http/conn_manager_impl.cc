@@ -38,6 +38,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http2/codec_impl.h"
@@ -1280,7 +1281,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   // Apply header sanity checks.
   absl::optional<std::reference_wrapper<const absl::string_view>> error =
-      HeaderUtility::requestHeadersValid(*request_headers_);
+      HeaderValidation::requestHeadersValid(*request_headers_);
   if (error != absl::nullopt) {
     sendLocalReply(Code::BadRequest, "", nullptr, absl::nullopt, error.value().get());
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {

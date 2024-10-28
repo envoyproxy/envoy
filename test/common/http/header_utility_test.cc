@@ -1130,48 +1130,6 @@ treat_missing_header_as_empty: true
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
 }
 
-TEST(HeaderIsValidTest, InvalidHeaderValuesAreRejected) {
-  // ASCII values 1-31 are control characters (with the exception of ASCII
-  // values 9, 10, and 13 which are a horizontal tab, line feed, and carriage
-  // return, respectively), and are not valid in an HTTP header, per
-  // RFC 7230, section 3.2
-  for (int i = 0; i < 32; i++) {
-    if (i == 9) {
-      continue;
-    }
-
-    EXPECT_FALSE(HeaderUtility::headerValueIsValid(std::string(1, i)));
-  }
-}
-
-TEST(HeaderIsValidTest, ValidHeaderValuesAreAccepted) {
-  EXPECT_TRUE(HeaderUtility::headerValueIsValid("some-value"));
-  EXPECT_TRUE(HeaderUtility::headerValueIsValid("Some Other Value"));
-}
-
-TEST(HeaderIsValidTest, AuthorityIsValid) {
-  EXPECT_TRUE(HeaderUtility::authorityIsValid("strangebutlegal$-%&'"));
-  EXPECT_FALSE(HeaderUtility::authorityIsValid("illegal{}"));
-  // Validate that the "@" character is allowed.
-  // TODO(adisuissa): Once the envoy.reloadable_features.internal_authority_header_validator
-  // runtime flag is deprecated, this test should only validate the assignment
-  // to "true".
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.internal_authority_header_validator", "true"}});
-    EXPECT_TRUE(HeaderUtility::authorityIsValid("username@example.com'"));
-  }
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.internal_authority_header_validator", "false"}});
-    // When the above is false, Envoy should use oghttp2's validator which will
-    // reject the "@" character.
-    EXPECT_FALSE(HeaderUtility::authorityIsValid("username@example.com'"));
-  }
-}
-
 TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_TRUE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{{":method", "GET"}}));
@@ -1241,23 +1199,6 @@ TEST(HeaderIsValidTest, RewriteAuthorityForConnectUdp) {
   EXPECT_FALSE(HeaderUtility::rewriteAuthorityForConnectUdp(connect_udp_empty_port));
 }
 
-#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-TEST(HeaderIsValidTest, IsCapsuleProtocol) {
-  EXPECT_TRUE(
-      HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1"}}));
-  EXPECT_TRUE(HeaderUtility::isCapsuleProtocol(
-      TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1;a=1;b=2;c;d=?0"}}));
-  EXPECT_FALSE(
-      HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{"Capsule-Protocol", "?0"}}));
-  EXPECT_FALSE(HeaderUtility::isCapsuleProtocol(
-      TestRequestHeaderMapImpl{{"Capsule-Protocol", "?1"}, {"Capsule-Protocol", "?1"}}));
-  EXPECT_FALSE(HeaderUtility::isCapsuleProtocol(TestRequestHeaderMapImpl{{":method", "CONNECT"}}));
-  EXPECT_TRUE(HeaderUtility::isCapsuleProtocol(
-      TestResponseHeaderMapImpl{{":status", "200"}, {"Capsule-Protocol", "?1"}}));
-  EXPECT_FALSE(HeaderUtility::isCapsuleProtocol(TestResponseHeaderMapImpl{{":status", "200"}}));
-}
-#endif
-
 TEST(HeaderIsValidTest, ShouldHaveNoBody) {
   const std::vector<std::string> methods{{"CONNECT"}, {"GET"}, {"DELETE"}, {"TRACE"}, {"HEAD"}};
 
@@ -1281,28 +1222,6 @@ TEST(HeaderAddTest, HeaderAdd) {
     EXPECT_EQ(entry.value().getStringView(), headers.get(lower_key)[0]->value().getStringView());
     return Http::HeaderMap::Iterate::Continue;
   });
-}
-
-void headerNameIsValid() {
-  // Isn't valid but passes legacy checks.
-  EXPECT_FALSE(HeaderUtility::headerNameIsValid(":"));
-  EXPECT_FALSE(HeaderUtility::headerNameIsValid("::"));
-  EXPECT_FALSE(HeaderUtility::headerNameIsValid("\n"));
-  EXPECT_FALSE(HeaderUtility::headerNameIsValid(":\n"));
-  EXPECT_FALSE(HeaderUtility::headerNameIsValid("asd\n"));
-
-  EXPECT_TRUE(HeaderUtility::headerNameIsValid("asd"));
-  // Not actually valid but passes legacy Envoy checks.
-  EXPECT_TRUE(HeaderUtility::headerNameIsValid(":asd"));
-}
-
-TEST(HeaderIsValidTest, HeaderNameIsValid) { headerNameIsValid(); }
-
-TEST(HeaderIsValidTest, HeaderNameIsValidLegacy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.sanitize_http2_headers_without_nghttp2", "false"}});
-  headerNameIsValid();
 }
 
 TEST(HeaderIsValidTest, HeaderNameContainsUnderscore) {
@@ -1429,43 +1348,6 @@ TEST(ValidateHeaders, ContentLength) {
       HeaderUtility::validateContentLength("-1", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
 }
-
-#ifdef NDEBUG
-// These tests send invalid request and response header names which violate ASSERT while creating
-// such request/response headers. So they can only be run in NDEBUG mode.
-TEST(ValidateHeaders, ForbiddenCharacters) {
-  {
-    // Valid headers
-    TestRequestHeaderMapImpl headers{
-        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {"x-foo", "hello world"}};
-    EXPECT_EQ(Http::okStatus(), HeaderUtility::checkValidRequestHeaders(headers));
-  }
-
-  {
-    // Mixed case header key is ok
-    TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", "foo.com:80"}};
-    Http::HeaderString invalid_key(absl::string_view("x-MiXeD-CaSe"));
-    headers.addViaMove(std::move(invalid_key),
-                       Http::HeaderString(absl::string_view("hello world")));
-    EXPECT_TRUE(HeaderUtility::checkValidRequestHeaders(headers).ok());
-  }
-
-  {
-    // Invalid key
-    TestRequestHeaderMapImpl headers{
-        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {"x-foo\r\n", "hello world"}};
-    EXPECT_NE(Http::okStatus(), HeaderUtility::checkValidRequestHeaders(headers));
-  }
-
-  {
-    // Invalid value
-    TestRequestHeaderMapImpl headers{{":method", "CONNECT"},
-                                     {":authority", "foo.com:80"},
-                                     {"x-foo", "hello\r\n\r\nGET /evil HTTP/1.1"}};
-    EXPECT_NE(Http::okStatus(), HeaderUtility::checkValidRequestHeaders(headers));
-  }
-}
-#endif
 
 TEST(ValidateHeaders, ParseCommaDelimitedHeader) {
   // Basic case

@@ -19,6 +19,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/http:protocol_options_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:settings_lib",
         "//source/common/protobuf:utility_lib",

@@ -35,6 +35,7 @@ envoy_cc_library(
         ":cel_state_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/http:header_validation_lib",
         "//source/common/http:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/common/stream_info:utility_lib",

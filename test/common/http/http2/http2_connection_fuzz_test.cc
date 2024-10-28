@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/protocol_options.h"
 
 #include "test/common/http/http2/http2_connection.pb.h"
 #include "test/common/http/http2/http2_frame.h"
@@ -164,7 +165,7 @@ Http2Frame pbToH2Frame(nghttp2_hd_deflater* deflater,
 
 envoy::config::core::v3::Http2ProtocolOptions http2Settings() {
   envoy::config::core::v3::Http2ProtocolOptions options(
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+      ::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
           envoy::config::core::v3::Http2ProtocolOptions())
           .value());
 

@@ -105,7 +105,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/common:macros",
-        "//source/common/http:utility_lib",
+        "//source/common/http:protocol_options_lib",
         "//source/common/http/http2:codec_lib",
         "//test/common/http:common_lib",
         "//test/mocks:common_lib",
@@ -230,6 +230,7 @@ envoy_cc_fuzz_test(
     rbe_pool = "6gig",
     deps = [
         ":http2_connection_proto_cc_proto",
+        "//source/common/http:protocol_options_lib",
         "//source/common/http/http2:codec_lib",
         "//test/common/http/http2:http2_frame",
         "//test/mocks/http:http_mocks",

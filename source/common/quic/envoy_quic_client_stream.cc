@@ -6,6 +6,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation.h"
 #include "source/common/http/utility.h"
 #include "source/common/quic/envoy_quic_client_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -46,7 +47,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   // downstream codecs decode.
   RETURN_IF_ERROR(Http::HeaderUtility::checkRequiredRequestHeaders(headers));
   // Verify that a filter hasn't added an invalid header key or value.
-  RETURN_IF_ERROR(Http::HeaderUtility::checkValidRequestHeaders(headers));
+  RETURN_IF_ERROR(Http::HeaderValidation::checkValidRequestHeaders(headers));
 #endif
 
   if (write_side_closed()) {
@@ -91,7 +92,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 #endif
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
-  if (Http::HeaderUtility::isCapsuleProtocol(headers) ||
+  if (Http::HeaderValidation::isCapsuleProtocol(headers) ||
       Http::HeaderUtility::isConnectUdpRequest(headers)) {
     useCapsuleProtocol();
     if (Http::HeaderUtility::isConnectUdpRequest(headers)) {

@@ -8,7 +8,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/metadata.h"
-#include "source/common/http/utility.h"
+#include "source/common/http/protocol_options.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -42,7 +42,7 @@ MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
 }
 
 MockClusterInfo::MockClusterInfo()
-    : http2_options_(::Envoy::Http2::Utility::initializeAndValidateOptions(
+    : http2_options_(::Envoy::Http2::ProtocolOptions::initializeAndValidateOptions(
                          envoy::config::core::v3::Http2ProtocolOptions())
                          .value()),
       traffic_stat_names_(stats_store_.symbolTable()),

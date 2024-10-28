@@ -92,7 +92,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//envoy/http:header_map_interface",
         "//envoy/stats:stats_interface",
-        "//source/common/http:header_utility_lib",
+        "//source/common/http:header_validation_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "@com_google_absl//absl/status",
