@@ -209,7 +209,7 @@ bool NotHealthCheckFilter::evaluate(const Formatter::HttpFormatterContext&,
 
 HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config,
                            Server::Configuration::CommonFactoryContext& context)
-    : header_data_(std::make_unique<Http::HeaderUtility::HeaderData>(config.header(), context)) {}
+    : header_data_(Http::HeaderUtility::createHeaderData(config.header(), context)) {}
 
 bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
                             const StreamInfo::StreamInfo&) const {
