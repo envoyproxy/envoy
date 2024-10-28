@@ -18,9 +18,6 @@ namespace Envoy {
 namespace Network {
 namespace Address {
 
-// Add an address-specific version for easier searching.
-#define TRY_NEEDS_AUDIT_ADDRESS TRY_NEEDS_AUDIT
-
 /**
  * Check whether we are a) on Android or an Apple platform and b) configured via runtime to always
  * use v6 sockets.

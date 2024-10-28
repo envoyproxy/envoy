@@ -779,40 +779,21 @@ void HostSetImpl::rebuildLocalityScheduler(
   locality_scheduler = nullptr;
   if (all_hosts_per_locality != nullptr && locality_weights != nullptr &&
       !locality_weights->empty() && !eligible_hosts.empty()) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.edf_lb_locality_scheduler_init_fix")) {
-      locality_entries.clear();
-      for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
-        const double effective_weight = effectiveLocalityWeight(
-            i, eligible_hosts_per_locality, *excluded_hosts_per_locality, *all_hosts_per_locality,
-            *locality_weights, overprovisioning_factor);
-        if (effective_weight > 0) {
-          locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
-        }
+    locality_entries.clear();
+    for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
+      const double effective_weight = effectiveLocalityWeight(
+          i, eligible_hosts_per_locality, *excluded_hosts_per_locality, *all_hosts_per_locality,
+          *locality_weights, overprovisioning_factor);
+      if (effective_weight > 0) {
+        locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
       }
-      // If not all effective weights were zero, create the scheduler.
-      if (!locality_entries.empty()) {
-        locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>(
-            EdfScheduler<LocalityEntry>::createWithPicks(
-                locality_entries,
-                [](const LocalityEntry& entry) { return entry.effective_weight_; }, seed));
-      }
-    } else {
-      locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>();
-      locality_entries.clear();
-      for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
-        const double effective_weight = effectiveLocalityWeight(
-            i, eligible_hosts_per_locality, *excluded_hosts_per_locality, *all_hosts_per_locality,
-            *locality_weights, overprovisioning_factor);
-        if (effective_weight > 0) {
-          locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
-          locality_scheduler->add(effective_weight, locality_entries.back());
-        }
-      }
-      // If all effective weights were zero, reset the scheduler.
-      if (locality_scheduler->empty()) {
-        locality_scheduler = nullptr;
-      }
+    }
+    // If not all effective weights were zero, create the scheduler.
+    if (!locality_entries.empty()) {
+      locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>(
+          EdfScheduler<LocalityEntry>::createWithPicks(
+              locality_entries, [](const LocalityEntry& entry) { return entry.effective_weight_; },
+              seed));
     }
   }
 }

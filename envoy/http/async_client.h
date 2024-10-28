@@ -368,6 +368,11 @@ public:
       return *this;
     }
 
+    StreamOptions& setSidestreamWatermarkCallbacks(SidestreamWatermarkCallbacks* callbacks) {
+      sidestream_watermark_callbacks = callbacks;
+      return *this;
+    }
+
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
@@ -425,6 +430,8 @@ public:
     std::string child_span_name_{""};
     // Sampling decision for the tracing span. The span is sampled by default.
     absl::optional<bool> sampled_{true};
+    // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
+    Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
   };
 
   /**
