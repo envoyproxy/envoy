@@ -14,7 +14,7 @@ namespace Quic {
 namespace ConnectionDebugVisitors {
 namespace QuicStats {
 
-// Variant of QuicStatsVisitor for testing that has it's own stats, isntead of requiring mocks
+// Variant of QuicStatsVisitor for testing that has it's own stats, instead of requiring mocks
 // for several quiche objects.
 class TestQuicStatsVisitor : public QuicStatsVisitor {
 public:
