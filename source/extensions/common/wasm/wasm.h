@@ -105,7 +105,6 @@ protected:
   const Stats::StatName custom_stat_namespace_;
   Upstream::ClusterManager& cluster_manager_;
   Event::Dispatcher& dispatcher_;
-  Event::PostCb server_shutdown_post_cb_;
   Envoy::Server::ServerLifecycleNotifier::HandlePtr shutdown_handler_;
   absl::flat_hash_map<uint32_t, Event::TimerPtr> timer_; // per root_id.
   TimeSource& time_source_;

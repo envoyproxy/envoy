@@ -72,7 +72,7 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
       Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this, weak](Event::PostCb post_cb) {
         auto lock = weak.lock();
         if (lock) { // See if we are still alive.
-          server_shutdown_post_cb_ = std::move(post_cb);
+          dispatcher_.post(std::move(post_cb));
         }
       });
 }
@@ -151,9 +151,6 @@ void Wasm::tickHandler(uint32_t root_context_id) {
 Wasm::~Wasm() {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmShutDown);
   ENVOY_LOG(debug, "~Wasm {} remaining active", lifecycle_stats_handler_.getActiveVmCount());
-  if (server_shutdown_post_cb_) {
-    dispatcher_.post(std::move(server_shutdown_post_cb_));
-  }
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
