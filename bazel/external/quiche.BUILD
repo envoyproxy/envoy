@@ -2352,21 +2352,32 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
-    name = "quic_core_connection_lib",
+    name = "quic_core_connection_alarms_lib",
     srcs = [
-        "quiche/quic/core/quic_connection.cc",
         "quiche/quic/core/quic_connection_alarms.cc",
     ],
     hdrs = [
-        "quiche/quic/core/quic_connection.h",
         "quiche/quic/core/quic_connection_alarms.h",
     ],
     deps = [
         ":quic_core_alarm_factory_lib",
         ":quic_core_alarm_lib",
+    ],
+)
+
+envoy_quic_cc_library(
+    name = "quic_core_connection_lib",
+    srcs = [
+        "quiche/quic/core/quic_connection.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_connection.h",
+    ],
+    deps = [
         ":quic_core_bandwidth_lib",
         ":quic_core_blocked_writer_interface_lib",
         ":quic_core_config_lib",
+        ":quic_core_connection_alarms_lib",
         ":quic_core_connection_context_lib",
         ":quic_core_connection_id_manager",
         ":quic_core_connection_stats_lib",
@@ -3252,8 +3263,7 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/quic_idle_network_detector.cc"],
     hdrs = ["quiche/quic/core/quic_idle_network_detector.h"],
     deps = [
-        ":quic_core_alarm_factory_lib",
-        ":quic_core_alarm_lib",
+        ":quic_core_connection_alarms_lib",
         ":quic_core_constants_lib",
         ":quic_core_one_block_arena_lib",
         ":quic_core_time_lib",
@@ -3463,8 +3473,7 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/quic_network_blackhole_detector.cc"],
     hdrs = ["quiche/quic/core/quic_network_blackhole_detector.h"],
     deps = [
-        ":quic_core_alarm_factory_lib",
-        ":quic_core_alarm_lib",
+        ":quic_core_connection_alarms_lib",
         ":quic_core_constants_lib",
         ":quic_core_one_block_arena_lib",
         ":quic_core_time_lib",
@@ -3576,8 +3585,7 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/quic_ping_manager.cc"],
     hdrs = ["quiche/quic/core/quic_ping_manager.h"],
     deps = [
-        ":quic_core_alarm_factory_lib",
-        ":quic_core_alarm_lib",
+        ":quic_core_connection_alarms_lib",
         ":quic_core_constants_lib",
         ":quic_core_one_block_arena_lib",
         ":quic_core_time_lib",
