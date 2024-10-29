@@ -52,6 +52,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
+        "//envoy/network:proxy_protocol_options_lib",
         "//envoy/registry",
         "//envoy/router:router_interface",
         "//envoy/server:filter_config_interface",

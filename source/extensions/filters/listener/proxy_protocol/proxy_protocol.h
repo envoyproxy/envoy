@@ -3,6 +3,7 @@
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -14,6 +15,7 @@
 
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_UNIX;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_HEADER_LEN;
+using ProxyProtocolVersion = Envoy::Network::ProxyProtocolVersion;
 
 namespace Envoy {
 namespace Extensions {
@@ -22,8 +24,6 @@ namespace ProxyProtocol {
 
 using KeyValuePair =
     envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair;
-
-enum class ProxyProtocolVersion { NotFound = 0, V1 = 1, V2 = 2 };
 
 enum class ReadOrParseState { Done, TryAgainLater, Error, Denied };
 

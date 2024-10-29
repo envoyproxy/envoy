@@ -62,7 +62,8 @@ TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
                             Network::Address::InstanceConstSharedPtr(
                                 new Network::Address::Ipv4Instance("202.168.0.13", 52000)),
                             Network::Address::InstanceConstSharedPtr(
-                                new Network::Address::Ipv4Instance("174.2.2.222", 80))}),
+                                new Network::Address::Ipv4Instance("174.2.2.222", 80)),
+                            Network::ProxyProtocolVersion::NotFound}),
                         StreamInfo::FilterState::StateType::ReadOnly,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
   auto transport_socket_options = TransportSocketOptionsUtility::fromFilterState(filter_state_);
@@ -70,6 +71,8 @@ TEST_F(TransportSocketOptionsImplTest, UpstreamServer) {
             transport_socket_options->serverNameOverride());
   EXPECT_EQ("202.168.0.13:52000",
             transport_socket_options->proxyProtocolOptions()->src_addr_->asStringView());
+  EXPECT_EQ(Network::ProxyProtocolVersion::NotFound,
+            transport_socket_options->proxyProtocolOptions()->version_);
   EXPECT_TRUE(transport_socket_options->applicationProtocolListOverride().empty());
 }
 

@@ -255,7 +255,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           Network::ProxyProtocolFilterState::key(),
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
               socket.connectionInfoProvider().remoteAddress(),
-              socket.connectionInfoProvider().localAddress(), parsed_tlvs_}),
+              socket.connectionInfoProvider().localAddress(), header_version_, parsed_tlvs_}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     } else {
@@ -272,7 +272,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           Network::ProxyProtocolFilterState::key(),
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
               proxy_protocol_header_.value().remote_address_,
-              proxy_protocol_header_.value().local_address_, parsed_tlvs_}),
+              proxy_protocol_header_.value().local_address_, header_version_, parsed_tlvs_}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
