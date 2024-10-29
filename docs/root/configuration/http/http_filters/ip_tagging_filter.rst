@@ -5,7 +5,16 @@ IP Tagging
 
 The HTTP IP Tagging filter sets the header *x-envoy-ip-tags* if the alternate :ref: `ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
 is not provided with the string tags for the trusted address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
-If there are no tags for an address, the header is not set.
+
+If the :ref: `ip_tag_header_action <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header_action>`
+is set to *SANITIZE* (the default), the header mentioned in :ref: `ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+will be replaced with the new tags, and clearing it if there are no tags.
+If it is instead set to *APPEND_FORWARD*, the header will only be appended to, retaining any existing values.
+
+Due to backwards compatibility, if the :ref: `ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+is empty, the tags will be appended to the *x-envoy-ip-tags* header.
+This header is cleared at the start of the filter chain, so this is in effect the same as sanitize.
+When applying this filter multiple times in the same filter chain, this retains the old behaviour which combines the tags from each invocation.
 
 The implementation for IP Tagging provides a scalable way to compare an IP address to a large list of CIDR
 ranges efficiently. The underlying algorithm for storing tags and IP address subnets is a Level-Compressed trie
