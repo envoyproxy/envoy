@@ -14,7 +14,7 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(Grpc::AsyncClientManage
 ExternalProcessorStreamPtr ExternalProcessorClientImpl::start(
     ExternalProcessorCallbacks& callbacks,
     const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-    const Http::AsyncClient::StreamOptions& options,
+    Http::AsyncClient::StreamOptions& options,
     Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) {
   auto client_or_error =
       client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
@@ -33,15 +33,16 @@ void ExternalProcessorClientImpl::sendRequest(
 
 ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options,
+    ExternalProcessorCallbacks& callbacks, Http::AsyncClient::StreamOptions& options,
     Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) {
   auto stream =
       std::unique_ptr<ExternalProcessorStreamImpl>(new ExternalProcessorStreamImpl(callbacks));
 
+  if (stream->grpcSidestreamFlowControl()) {
+    options.setSidestreamWatermarkCallbacks(&sidestream_watermark_callbacks);
+  }
+
   if (stream->startStream(std::move(client), options)) {
-    if (stream->grpcSidestreamFlowControl()) {
-      stream->stream_->setWatermarkCallbacks(sidestream_watermark_callbacks);
-    }
     return stream;
   }
   // Return nullptr on the start failure.

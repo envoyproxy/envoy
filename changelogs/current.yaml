@@ -34,6 +34,10 @@ minor_behavior_changes:
     :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
     is now enabled by default. This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.oauth2_use_refresh_token`` to false.
+- area: quic
+  change: |
+    Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -50,6 +54,9 @@ removed_config_or_runtime:
 - area: load balancing
   change: |
     Removed runtime guard ``envoy.reloadable_features.edf_lb_host_scheduler_init_fix`` and legacy code paths.
+- area: load balancing
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.edf_lb_locality_scheduler_init_fix`` and legacy code paths.
 - area: grpc
   change: |
     Removed runtime guard ``envoy.reloadable_features.validate_grpc_header_before_log_grpc_status``.
