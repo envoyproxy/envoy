@@ -66,17 +66,6 @@ inline Wasm* getWasm(WasmHandleSharedPtr& base_wasm_handle) {
 
 } // namespace
 
-void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifier) {
-  auto weak = std::weak_ptr<Wasm>(std::static_pointer_cast<Wasm>(shared_from_this()));
-  shutdown_handler_ = lifecycle_notifier.registerCallback(
-      Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this, weak](Event::PostCb post_cb) {
-        auto lock = weak.lock();
-        if (lock) { // See if we are still alive.
-          dispatcher_.post(std::move(post_cb));
-        }
-      });
-}
-
 Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
            Api::Api& api, Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
     : WasmBase(
@@ -257,12 +246,11 @@ void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d) {
 static proxy_wasm::WasmHandleFactory
 getWasmHandleFactory(WasmConfig& wasm_config, const Stats::ScopeSharedPtr& scope, Api::Api& api,
                      Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
-                     Server::ServerLifecycleNotifier& lifecycle_notifier) {
-  return [&wasm_config, &scope, &api, &cluster_manager, &dispatcher,
-          &lifecycle_notifier](std::string_view vm_key) -> WasmHandleBaseSharedPtr {
+                     Server::ServerLifecycleNotifier&) {
+  return [&wasm_config, &scope, &api, &cluster_manager,
+          &dispatcher](std::string_view vm_key) -> WasmHandleBaseSharedPtr {
     auto wasm = std::make_shared<Wasm>(wasm_config, toAbslStringView(vm_key), scope, api,
                                        cluster_manager, dispatcher);
-    wasm->initializeLifecycle(lifecycle_notifier);
     return std::static_pointer_cast<WasmHandleBase>(std::make_shared<WasmHandle>(std::move(wasm)));
   };
 }
