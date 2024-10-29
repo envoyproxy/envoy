@@ -893,22 +893,20 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::clearRouteCache() {
+CAPIStatus Filter::clearRouteCache(bool refresh) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
   if (isThreadSafe()) {
-    ENVOY_LOG(debug, "golang filter clearing route cache");
-    decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+    clearRouteCacheInternal(refresh);
   } else {
     ENVOY_LOG(debug, "golang filter posting clear route cache callback");
     auto weak_ptr = weak_from_this();
-    getDispatcher().post([this, weak_ptr] {
+    getDispatcher().post([this, weak_ptr, refresh] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        ENVOY_LOG(debug, "golang filter clearing route cache");
-        decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+        clearRouteCacheInternal(refresh);
       } else {
         ENVOY_LOG(info, "golang filter has gone or destroyed in clearRouteCache");
       }
@@ -917,35 +915,14 @@ CAPIStatus Filter::clearRouteCache() {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::refreshRouteCache() {
-  Thread::LockGuard lock(mutex_);
-  if (has_destroyed_) {
-    ENVOY_LOG(debug, "golang filter has been destroyed");
-    return CAPIStatus::CAPIFilterIsDestroy;
-  }
-  if (isThreadSafe()) {
-    ENVOY_LOG(debug, "golang filter refreshing route cache");
-    refreshRouteCacheInternal();
-  } else {
-    ENVOY_LOG(debug, "golang filter posting refresh route cache callback");
-    auto weak_ptr = weak_from_this();
-    getDispatcher().post([this, weak_ptr] {
-      if (!weak_ptr.expired() && !hasDestroyed()) {
-        ENVOY_LOG(debug, "golang filter refreshing route cache");
-        refreshRouteCacheInternal();
-      } else {
-        ENVOY_LOG(info, "golang filter has gone or destroyed in refreshRouteCache");
-      }
-    });
-  }
-  return CAPIStatus::CAPIOK;
-}
-
-void Filter::refreshRouteCacheInternal() {
+void Filter::clearRouteCacheInternal(bool refresh) {
+  ENVOY_LOG(debug, "golang filter clearing route cache, refresh: {}", refresh);
   decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
-  // When the route cache is clear, the next call to route() will refresh the cache and return the
-  // pointer to the latest matched route. We don't need the returned pointer.
-  decoding_state_.getFilterCallbacks()->route();
+  if (refresh) {
+    // When the route cache is clear, the next call to route() will refresh the cache and return the
+    // pointer to the latest matched route. We don't need the returned pointer.
+    decoding_state_.getFilterCallbacks()->route();
+  }
 }
 
 CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
