@@ -32,8 +32,10 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
-- area: stats ads
+- area: stats ads grpc
   change: |
-    Fixed metric for ADS disconnection counters, extracting the tag from ``grpc.ads_cluster.*`` counter stats.
+    Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
+    in the :ref:`Google GRPC <config.core.v3.GrpcService.GoogleGrpc>` resource used for ADS, and adds that as a tag 
+    ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
 
 deprecated:

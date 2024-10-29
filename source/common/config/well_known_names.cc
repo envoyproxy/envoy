@@ -237,7 +237,7 @@ TagNameValues::TagNameValues() {
          R"(^proxy_proto\.((?:<TAG_VALUE>\.)?versions\.v(<PROXY_PROTOCOL_VERSION>)\.)\w+$)");
 
   // grpc.(<stat_prefix>).**
-  addTokenized(ADS_CLUSTER_PREFIX, "grpc.$.**");
+  addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
