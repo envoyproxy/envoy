@@ -1623,7 +1623,7 @@ envoy_cc_test(
     name = "overload_integration_test",
     size = "large",
     srcs = ["overload_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -2481,7 +2481,7 @@ envoy_cc_test(
         "//conditions:default": ["quic_protocol_integration_test.cc"],
     }),
     data = ["//test/config/integration/certs"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 16,
     tags = [
         "cpu:4",
