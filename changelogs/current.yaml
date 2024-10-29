@@ -45,6 +45,11 @@ bug_fixes:
   change: |
     Support operations on IP SANs when the IP version is not supported by the host operating system, for example
     an IPv6 SAN can now be used on a host not supporting IPv6 addresses.
+- area: stats ads grpc
+  change: |
+    Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
+    in the :ref:`google_grpc <config.core.v3.GrpcService.GoogleGrpc>` resource used for ADS, and adds that as a tag
+    ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -104,10 +109,5 @@ new_features:
 - area: tracers
   change: |
     Set resource ``telemetry.sdk.*`` and scope ``otel.scope.name|version`` attributes for the OpenTelemetry tracer.
-- area: stats ads grpc
-  change: |
-    Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
-    in the :ref:`Google GRPC <config.core.v3.GrpcService.GoogleGrpc>` resource used for ADS, and adds that as a tag 
-    ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
 
 deprecated:
