@@ -1137,23 +1137,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bytecodealliance/wasmtime/blob/v{version}/LICENSE",
     ),
-    com_github_wasm_c_api = dict(
-        project_name = "wasm-c-api",
-        project_desc = "WebAssembly C and C++ API",
-        project_url = "https://github.com/WebAssembly/wasm-c-api",
-        # this is the submodule's specific commit used by wasmtime
-        # https://github.com/bytecodealliance/wasmtime/tree/v0.25.0/crates/c-api
-        version = "c9d31284651b975f05ac27cee0bab1377560b87e",
-        sha256 = "c774044f51431429e878bd1b9e2a4e38932f861f9211df72f75e9427eb6b8d32",
-        strip_prefix = "wasm-c-api-{version}",
-        urls = ["https://github.com/WebAssembly/wasm-c-api/archive/{version}.tar.gz"],
-        release_date = "2021-01-11",
-        use_category = ["dataplane_ext"],
-        extensions = ["envoy.wasm.runtime.wasmtime"],
-        cpe = "N/A",
-        license = "Apache-2.0",
-        license_url = "https://github.com/WebAssembly/wasm-c-api/blob/{version}/LICENSE",
-    ),
     io_opencensus_cpp = dict(
         project_name = "OpenCensus C++",
         project_desc = "OpenCensus tracing library",
