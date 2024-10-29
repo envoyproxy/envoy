@@ -63,6 +63,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.
+- area: http2
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.defer_processing_backedup_streams`` and legacy code paths.
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_reresolve_on_eai_again`` and legacy code paths.
