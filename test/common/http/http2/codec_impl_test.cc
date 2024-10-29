@@ -230,6 +230,10 @@ public:
     }
   }
 
+  static Status onConnBeginHeaders(ConnectionImpl* conn, int stream_id) {
+    return conn->onBeginHeaders(stream_id);
+  }
+
   virtual void initialize() {
     setupHttp2Overrides();
     scoped_runtime_.mergeValues({{std::string(Runtime::defer_processing_backedup_streams),
@@ -596,6 +600,14 @@ TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
     EXPECT_EQ(0, getClientDataSourcesSize());
     EXPECT_EQ(0, getServerDataSourcesSize());
   }
+}
+
+TEST_P(Http2CodecImplTest, ClientUnexpectedHeaders) {
+  initialize();
+
+  Http::Status status = Http2CodecImplTestFixture::onConnBeginHeaders(client_.get(), 3);
+  EXPECT_FALSE(status.ok());
+  EXPECT_THAT(status.message(), testing::HasSubstr("stream 3 is already gone"));
 }
 
 TEST_P(Http2CodecImplTest, SimpleRequestResponseOldApi) {
