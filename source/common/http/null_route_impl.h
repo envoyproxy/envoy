@@ -35,7 +35,7 @@ struct NullRateLimitPolicy : public Router::RateLimitPolicy {
 };
 
 struct NullCommonConfig : public Router::CommonConfig {
-  const std::list<LowerCaseString>& internalOnlyHeaders() const override {
+  const std::vector<LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
   }
 
@@ -50,7 +50,7 @@ struct NullCommonConfig : public Router::CommonConfig {
     return Router::DefaultRouteMetadataPack::get().typed_metadata_;
   }
 
-  static const std::list<LowerCaseString> internal_only_headers_;
+  static const std::vector<LowerCaseString> internal_only_headers_;
 };
 
 struct NullVirtualHost : public Router::VirtualHost {
