@@ -90,6 +90,7 @@ envoy_extension_cc_benchmark_binary(
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/subset:config",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:load_balancer_mocks",
         "@com_github_google_benchmark//:benchmark",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
