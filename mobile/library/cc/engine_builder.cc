@@ -227,18 +227,8 @@ EngineBuilder& EngineBuilder::setNumTimeoutsToTriggerPortMigration(int num_timeo
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
-  always_use_v6_ = value;
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) {
   enable_interface_binding_ = interface_binding_on;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool use_gro_if_available) {
-  use_gro_if_available_ = use_gro_if_available;
   return *this;
 }
 
@@ -270,6 +260,12 @@ EngineBuilder& EngineBuilder::setUpstreamTlsSni(std::string sni) {
 EngineBuilder&
 EngineBuilder::setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds) {
   quic_connection_idle_timeout_seconds_ = quic_connection_idle_timeout_seconds;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setKeepAliveInitialIntervalMilliseconds(int keepalive_initial_interval_ms) {
+  keepalive_initial_interval_ms_ = keepalive_initial_interval_ms;
   return *this;
 }
 
@@ -646,6 +642,8 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   h2_options->mutable_connection_keepalive()->mutable_timeout()->set_seconds(
       h2_connection_keepalive_timeout_seconds_);
   h2_options->mutable_max_concurrent_streams()->set_value(100);
+  h2_options->mutable_initial_stream_window_size()->set_value(initial_stream_window_size_);
+  h2_options->mutable_initial_connection_window_size()->set_value(initial_connection_window_size_);
 
   envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig
       preserve_case_config;
@@ -718,6 +716,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->mutable_http3_protocol_options()
         ->mutable_quic_protocol_options()
         ->set_client_connection_options(http3_client_connection_options_);
+    alpn_options.mutable_auto_config()
+        ->mutable_http3_protocol_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_initial_stream_window_size()
+        ->set_value(initial_stream_window_size_);
+    alpn_options.mutable_auto_config()
+        ->mutable_http3_protocol_options()
+        ->mutable_quic_protocol_options()
+        ->mutable_initial_connection_window_size()
+        ->set_value(initial_connection_window_size_);
     alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
     for (const auto& [host, port] : quic_hints_) {
@@ -746,6 +754,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->mutable_quic_protocol_options()
         ->mutable_idle_network_timeout()
         ->set_seconds(quic_connection_idle_timeout_seconds_);
+
+    auto* quic_protocol_options = alpn_options.mutable_auto_config()
+                                      ->mutable_http3_protocol_options()
+                                      ->mutable_quic_protocol_options();
+    if (keepalive_initial_interval_ms_ > 0) {
+      quic_protocol_options->mutable_connection_keepalive()->mutable_initial_interval()->set_nanos(
+          keepalive_initial_interval_ms_ * 1000 * 1000);
+    }
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())
@@ -836,20 +852,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  (*reloadable_features.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
-  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(
-      use_gro_if_available_);
+  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(true);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
-  // TODO(abeyad): This runtime flag is set because https://github.com/envoyproxy/envoy/pull/32370
-  // needed to be merged with the default off due to unresolved test issues. Once those are fixed,
-  // and the default for `allow_client_socket_creation_failure` is true, we can remove this.
-  (*restart_features.mutable_fields())["allow_client_socket_creation_failure"].set_bool_value(true);
   for (auto& guard_and_value : restart_runtime_guards_) {
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =

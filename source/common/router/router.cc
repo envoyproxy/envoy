@@ -924,22 +924,17 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // this stack for whether `data` is the same buffer as already buffered data.
     callbacks_->addDecodedData(data, true);
   } else {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request")) {
+    if (!upstream_requests_.empty()) {
       upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
     } else {
-      if (!upstream_requests_.empty()) {
-        upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
-      } else {
-        // not buffering any data for retry, shadow, and internal redirect, and there will be
-        // no more upstream request, abort the request and clean up.
-        cleanup();
-        callbacks_->sendLocalReply(
-            Http::Code::ServiceUnavailable,
-            "upstream is closed prematurely during decoding data from downstream", modify_headers_,
-            absl::nullopt, StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset);
-        return Http::FilterDataStatus::StopIterationNoBuffer;
-      }
+      // not buffering any data for retry, shadow, and internal redirect, and there will be
+      // no more upstream request, abort the request and clean up.
+      cleanup();
+      callbacks_->sendLocalReply(
+          Http::Code::ServiceUnavailable,
+          "upstream is closed prematurely during decoding data from downstream", modify_headers_,
+          absl::nullopt, StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset);
+      return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
 
