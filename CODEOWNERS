@@ -356,6 +356,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
+/*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov

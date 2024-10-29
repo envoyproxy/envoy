@@ -157,7 +157,8 @@ private:
 };
 
 FilterDataStatus InvalidGrpcStatusReplyContext::onRequestBody(size_t size, bool) {
-  sendLocalResponse(200, "ok", "body", {}, size == 0 ? GrpcStatus::InvalidCode : GrpcStatus::PermissionDenied);
+  sendLocalResponse(200, "ok", "body", {},
+                    size == 0 ? GrpcStatus::InvalidCode : GrpcStatus::PermissionDenied);
   return FilterDataStatus::Continue;
 }
 
@@ -174,9 +175,8 @@ static RegisterContextFactory register_PanicInResponseContext(CONTEXT_FACTORY(Pa
                                                          ROOT_FACTORY(EnvoyRootContext),
                                                          "panic during response processing");
 
-static RegisterContextFactory register_InvalidGrpcStatusReplyContext(CONTEXT_FACTORY(InvalidGrpcStatusReplyContext),
-                                                         ROOT_FACTORY(EnvoyRootContext),
-                                                         "send local reply grpc");
-
+static RegisterContextFactory
+    register_InvalidGrpcStatusReplyContext(CONTEXT_FACTORY(InvalidGrpcStatusReplyContext),
+                                           ROOT_FACTORY(EnvoyRootContext), "send local reply grpc");
 
 END_WASM_PLUGIN

@@ -14,6 +14,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
+        "//source/common/version:version_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
         "//test/mocks/server:tracer_factory_context_mocks",
         "//test/test_common:registry_lib",

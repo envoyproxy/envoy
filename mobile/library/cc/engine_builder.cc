@@ -227,18 +227,8 @@ EngineBuilder& EngineBuilder::setNumTimeoutsToTriggerPortMigration(int num_timeo
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
-  always_use_v6_ = value;
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) {
   enable_interface_binding_ = interface_binding_on;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool use_gro_if_available) {
-  use_gro_if_available_ = use_gro_if_available;
   return *this;
 }
 
@@ -862,16 +852,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  (*reloadable_features.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
-  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(
-      use_gro_if_available_);
+  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(true);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
   for (auto& guard_and_value : restart_runtime_guards_) {
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =

@@ -41,8 +41,6 @@ open class EngineBuilder() {
   internal var enableHttp3 = true
   internal var useCares = false
   internal var caresFallbackResolvers = mutableListOf<Pair<String, Int>>()
-  internal var forceV6 = true
-  private var useGro = false
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
   private var quicHints = mutableMapOf<String, Int>()
@@ -231,29 +229,6 @@ open class EngineBuilder() {
    */
   fun addCaresFallbackResolver(host: String, port: Int): EngineBuilder {
     this.caresFallbackResolvers.add(Pair(host, port))
-    return this
-  }
-
-  /**
-   * Specify whether local ipv4 addresses should be mapped to ipv6. Defaults to true.
-   *
-   * @param forceV6 whether or not to translate v4 to v6.
-   * @return This builder.
-   */
-  fun forceV6(forceV6: Boolean): EngineBuilder {
-    this.forceV6 = forceV6
-    return this
-  }
-
-  /**
-   * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
-   * system.
-   *
-   * @param useGro whether or not to use UDP GRO
-   * @return This builder.
-   */
-  fun useGro(useGro: Boolean): EngineBuilder {
-    this.useGro = useGro
     return this
   }
 
@@ -577,8 +552,6 @@ open class EngineBuilder() {
         enableDrainPostDnsRefresh,
         enableHttp3,
         useCares,
-        forceV6,
-        useGro,
         http3ConnectionOptions,
         http3ClientConnectionOptions,
         quicHints,

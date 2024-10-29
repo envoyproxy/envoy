@@ -66,8 +66,6 @@ public:
   EngineBuilder& setNumTimeoutsToTriggerPortMigration(int num_timeouts);
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
-  // Sets whether to use GRO for upstream UDP sockets (QUIC/HTTP3).
-  EngineBuilder& setUseGroIfAvailable(bool use_gro_if_available);
   EngineBuilder& setUdpSocketReceiveBufferSize(int32_t size);
   EngineBuilder& setUdpSocketSendBufferSize(int32_t size);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
@@ -75,7 +73,6 @@ public:
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
-  EngineBuilder& setForceAlwaysUsev6(bool value);
   // Adds the hostnames that should be pre-resolved by DNS prior to the first request issued for
   // that host. When invoked, any previous preresolve hostname entries get cleared and only the ones
   // provided in the hostnames argument get set.
@@ -184,7 +181,6 @@ private:
   std::vector<std::pair<std::string, int>> quic_hints_;
   std::vector<std::string> quic_suffixes_;
   int num_timeouts_to_trigger_port_migration_ = 0;
-  bool always_use_v6_ = false;
 #if defined(__APPLE__)
   // TODO(abeyad): once stable, consider setting the default to true.
   bool respect_system_proxy_settings_ = false;
@@ -199,7 +195,6 @@ private:
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
-  bool use_gro_if_available_ = false;
 
   // This is the same value Cronet uses for QUIC:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87
