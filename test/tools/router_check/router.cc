@@ -530,8 +530,9 @@ bool RouterCheckTool::matchHeaderField(
     const HeaderMap& header_map, const envoy::config::route::v3::HeaderMatcher& header,
     const std::string test_type,
     envoy::RouterCheckToolSchema::HeaderMatchFailure& header_match_failure) {
-  Envoy::Http::HeaderUtility::HeaderData expected_header_data{header, *factory_context_};
-  if (Envoy::Http::HeaderUtility::matchHeaders(header_map, expected_header_data)) {
+  Envoy::Http::HeaderUtility::HeaderDataPtr expected_header_data{
+      Http::HeaderUtility::createHeaderData(header, *factory_context_)};
+  if (expected_header_data->matchesHeaders(header_map)) {
     return true;
   }
 
