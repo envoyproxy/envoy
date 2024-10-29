@@ -375,17 +375,17 @@ message StreamedBodyResponse {
 
 // This message specifies the body mutation Envoy will apply and send out.
 message BodyMutation {
-  // Sending this response for any body mode except BIDIRECTIONAL_STREAMED.
   oneof mutation {
-    // The entire body to replace
+    // The entire body to replace.
+    // Do not send this response for BIDIRECTIONAL_STREAMED body mode.
     bytes body = 1;
 
-    // Clear the corresponding body chunk
+    // Clear the corresponding body chunk.
+    // Do not send this response for BIDIRECTIONAL_STREAMED body mode.
     bool clear_body = 2;
-  }
 
-  // [#not-implemented-hide:]
-  // Sending this response for BIDIRECTIONAL_STREAMED body mode.
-  // Only one of ``streamed_resp`` or above ``mutation`` should be set.
-  StreamedBodyResponse streamed_resp = 3;
+    // [#not-implemented-hide:]
+    // Sending this response for BIDIRECTIONAL_STREAMED body mode.
+    StreamedBodyResponse streamed_resp = 3;
+  }
 }

@@ -2815,7 +2815,8 @@ TEST_F(HttpFilterTest, HttpServiceBodyProcessingModeNotNone) {
             factory_context_);
       },
       EnvoyException,
-      "If http_service is configured, processing modes can not send any body or trailer.");
+      "If the ext_proc filter is configured with http_service instead of gRPC service, "
+      "then the processing modes of this filter can not be configured to send body or trailer.");
 }
 
 TEST_F(HttpFilterTest, HttpServiceTrailerProcessingModeNotSKIP) {
@@ -2845,7 +2846,8 @@ TEST_F(HttpFilterTest, HttpServiceTrailerProcessingModeNotSKIP) {
             factory_context_);
       },
       EnvoyException,
-      "If http_service is configured, processing modes can not send any body or trailer.");
+      "If the ext_proc filter is configured with http_service instead of gRPC service, "
+      "then the processing modes of this filter can not be configured to send body or trailer.");
 }
 
 TEST_F(HttpFilterTest, RequestBodyModeMXNTrailerModeSKIP) {
@@ -2869,7 +2871,8 @@ TEST_F(HttpFilterTest, RequestBodyModeMXNTrailerModeSKIP) {
             factory_context_);
       },
       EnvoyException,
-      "If request_body_mode is BIDIRECTIONAL_STREAMED, then request_trailer_mode has to be SEND");
+      "If the ext_proc filter has the request_body_mode set to BIDIRECTIONAL_STREAMED, "
+      "then the request_trailer_mode has to be set to SEND");
 }
 
 TEST_F(HttpFilterTest, ResponseBodyModeMXNTrailerModeSKIP) {
@@ -2893,7 +2896,8 @@ TEST_F(HttpFilterTest, ResponseBodyModeMXNTrailerModeSKIP) {
             factory_context_);
       },
       EnvoyException,
-      "If response_body_mode is BIDIRECTIONAL_STREAMED, then response_trailer_mode has to be SEND");
+      "If the ext_proc filter has the response_body_mode set to BIDIRECTIONAL_STREAMED, "
+      "then the response_trailer_mode has to be set to SEND");
 }
 
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate

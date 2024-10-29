@@ -81,19 +81,22 @@ void verifyProcessingModeConfig(const ExternalProcessor& config) {
         processing_mode.request_trailer_mode() == ProcessingMode::SEND ||
         processing_mode.response_trailer_mode() == ProcessingMode::SEND) {
       throw EnvoyException(
-          "If http_service is configured, processing modes can not send any body or trailer.");
+          "If the ext_proc filter is configured with http_service instead of gRPC service, "
+          "then the processing modes of this filter can not be configured to send body or trailer.");
     }
   }
 
   if ((processing_mode.request_body_mode() == ProcessingMode::BIDIRECTIONAL_STREAMED) &&
       (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
     throw EnvoyException(
-        "If request_body_mode is BIDIRECTIONAL_STREAMED, then request_trailer_mode has to be SEND");
+        "If the ext_proc filter has the request_body_mode set to BIDIRECTIONAL_STREAMED, "
+        "then the request_trailer_mode has to be set to SEND");
   }
   if ((processing_mode.response_body_mode() == ProcessingMode::BIDIRECTIONAL_STREAMED) &&
       (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
-    throw EnvoyException("If response_body_mode is BIDIRECTIONAL_STREAMED, then "
-                         "response_trailer_mode has to be SEND");
+    throw EnvoyException(
+        "If the ext_proc filter has the response_body_mode set to BIDIRECTIONAL_STREAMED, "
+        "then the response_trailer_mode has to be set to SEND");
   }
 }
 

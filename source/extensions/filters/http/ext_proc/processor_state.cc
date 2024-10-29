@@ -24,7 +24,7 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
   callback_state_ = callback_state;
 
   if (bodyMode() != ProcessingMode::BIDIRECTIONAL_STREAMED) {
-    if (!message_timer_) {
+    if (message_timer_ == nullptr) {
       message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
     }
     message_timer_->enableTimer(timeout);
