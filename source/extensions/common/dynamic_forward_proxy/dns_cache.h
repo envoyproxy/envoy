@@ -148,9 +148,10 @@ public:
      * Called when a host has been added or has had its address updated.
      * @param host supplies the added/updated host.
      * @param host_info supplies the associated host info.
+     * @param return supplies if the host was successfully added
      */
-    virtual void onDnsHostAddOrUpdate(const std::string& host,
-                                      const DnsHostInfoSharedPtr& host_info) PURE;
+    virtual absl::Status onDnsHostAddOrUpdate(const std::string& host,
+                                              const DnsHostInfoSharedPtr& host_info) PURE;
 
     /**
      * Called when a host has been removed.
