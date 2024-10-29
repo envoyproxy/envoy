@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // IP tagging :ref:`configuration overview <config_http_filters_ip_tagging>`.
 // [#extension: envoy.filters.http.ip_tagging]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message IPTagging {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ip_tagging.v2.IPTagging";
@@ -40,6 +40,20 @@ message IPTagging {
     EXTERNAL = 2;
   }
 
+  // Describes how to apply the tags to the headers.
+  enum HeaderAction {
+    // (DEFAULT) The header specified in :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+    // will be dropped, before the tags are applied.
+    SANITIZE = 0;
+
+    // Tags will be appended to the header specified in
+    // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`,
+    // leaving original values in place.
+    //
+    // Please note that this could cause the header to retain values set by the http client.
+    APPEND_FORWARD = 1;
+  }
+
   // Supplies the IP tag name and the IP address subnets.
   message IPTag {
     option (udpa.annotations.versioning).previous_message_type =
@@ -57,6 +71,12 @@ message IPTagging {
   // default header ``x-envoy-ip-tags``.
   string ip_tag_header = 5
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // Control if the header in :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+  // will be sanitized, or be appended to.
+  //
+  // This is ignored if :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>` is empty.
+  HeaderAction ip_tag_header_action = 6;
 
   // The type of request the filter should apply to.
   RequestType request_type = 1 [(validate.rules).enum = {defined_only: true}];

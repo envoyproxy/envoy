@@ -31,6 +31,8 @@ enum class FilterRequestType { INTERNAL, EXTERNAL, BOTH };
  */
 class IpTaggingFilterConfig {
 public:
+  using HeaderAction = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::HeaderAction;
+
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
                         const std::string& stat_prefix, Stats::Scope& scope,
                         Runtime::Loader& runtime);
@@ -41,6 +43,7 @@ public:
 
   // No ip_tag_header is set in case of an empty string.
   const Http::LowerCaseString& ip_tag_header() const { return ip_tag_header_; }
+  HeaderAction ip_tag_header_action() const { return ip_tag_header_action_; }
 
   void incHit(absl::string_view tag) {
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
@@ -75,6 +78,7 @@ private:
   const Stats::StatName unknown_tag_;
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
   const Http::LowerCaseString ip_tag_header_;
+  const HeaderAction ip_tag_header_action_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;
@@ -99,6 +103,8 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
+  void applyTags(Http::RequestHeaderMap& headers, const std::vector<std::string>& tags);
+
   IpTaggingFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
