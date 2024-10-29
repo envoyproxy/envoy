@@ -5,6 +5,16 @@ licenses(["notice"])  # Apache 2
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "wasmtime_lib",
+    hdrs = [
+        "crates/c-api/include/wasm.h",
+    ],
+    deps = [
+        ":rust_c_api",
+    ],
+)
+
+cc_library(
     name = "helpers_lib",
     srcs = [
         "crates/wasmtime/src/runtime/vm/helpers.c",
