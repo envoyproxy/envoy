@@ -1,6 +1,17 @@
-date: October 29, 2024
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
 
 bug_fixes:
-- area: tracing
-  change: |
-    Fixed a bug where the OpenTelemetry tracer exports the OTLP request even when no spans are present.
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+new_features:
+
+deprecated:
