@@ -104,5 +104,8 @@ new_features:
 - area: tracers
   change: |
     Set resource ``telemetry.sdk.*`` and scope ``otel.scope.name|version`` attributes for the OpenTelemetry tracer.
+- area: lua
+  change: |
+    Added ssl :ref:`parsedSubjectPeerCertificate() <config_http_filters_lua_parsed_name>` API.
 
 deprecated:
