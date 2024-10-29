@@ -3,8 +3,8 @@
 IP Tagging
 ==========
 
-The HTTP IP Tagging filter sets the header *x-envoy-ip-tags* if the alternate :ref: `ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
-is not provided with the string tags for the trusted address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
+The HTTP IP Tagging filter sets the *x-envoy-ip-tags* header or the provided :ref: `ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+with the string tags for the trusted address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`.
 
 If the :ref: `ip_tag_header_action <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header_action>`
 is set to *SANITIZE* (the default), the header mentioned in :ref: `ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
