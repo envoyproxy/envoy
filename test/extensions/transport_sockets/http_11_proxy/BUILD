@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "connect_test",
     srcs = ["connect_test.cc"],
     extension_names = ["envoy.transport_sockets.http_11_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/transport_sockets/http_11_proxy:connect",
         "//test/mocks/buffer:buffer_mocks",

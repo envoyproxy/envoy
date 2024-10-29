@@ -1653,18 +1653,18 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
-  HostImpl host(cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-                std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
-                locality,
-                envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-                envoy::config::core::v3::UNKNOWN, simTime());
-  EXPECT_EQ(cluster.info_.get(), &host.cluster());
-  EXPECT_EQ("lyft.com", host.hostname());
-  EXPECT_TRUE(host.canary());
-  EXPECT_EQ("oceania", host.locality().region());
-  EXPECT_EQ("hello", host.locality().zone());
-  EXPECT_EQ("world", host.locality().sub_zone());
-  EXPECT_EQ(1, host.priority());
+  std::unique_ptr<HostImpl> host = *HostImpl::create(
+      cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN, simTime());
+  EXPECT_EQ(cluster.info_.get(), &host->cluster());
+  EXPECT_EQ("lyft.com", host->hostname());
+  EXPECT_TRUE(host->canary());
+  EXPECT_EQ("oceania", host->locality().region());
+  EXPECT_EQ("hello", host->locality().zone());
+  EXPECT_EQ("world", host->locality().sub_zone());
+  EXPECT_EQ(1, host->priority());
 }
 
 TEST_F(HostImplTest, CreateConnection) {
@@ -1679,11 +1679,11 @@ TEST_F(HostImplTest, CreateConnection) {
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime());
+      envoy::config::core::v3::UNKNOWN, simTime()));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1717,11 +1717,11 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1764,11 +1764,11 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   auto proxy_info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
@@ -1822,11 +1822,11 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1875,11 +1875,11 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, simTime(), address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -2018,16 +2018,15 @@ TEST_F(HostImplTest, SkipActiveHealthCheckFlag) {
 // This is a regression test for oss-fuzz issue
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=11095
 TEST_F(HostImplTest, HealthPipeAddress) {
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
-        config.set_port_value(8000);
-        HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr,
-                                  nullptr, envoy::config::core::v3::Locality().default_instance(),
-                                  config, 1, simTime());
-      },
-      EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
+  config.set_port_value(8000);
+  EXPECT_EQ(HostDescriptionImpl::create(
+                info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr, nullptr,
+                envoy::config::core::v3::Locality().default_instance(), config, 1, simTime())
+                .status()
+                .message(),
+            "Invalid host configuration: non-zero port for non-IP address");
 }
 
 TEST_F(HostImplTest, HostAddressList) {
@@ -2042,10 +2041,10 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
   config.set_hostname("foo");
-  HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
-                            nullptr, envoy::config::core::v3::Locality().default_instance(), config,
-                            1, simTime());
-  EXPECT_EQ("foo", descr.hostnameForHealthChecks());
+  std::unique_ptr<HostDescriptionImpl> descr = *HostDescriptionImpl::create(
+      info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr, nullptr,
+      envoy::config::core::v3::Locality().default_instance(), config, 1, simTime());
+  EXPECT_EQ("foo", descr->hostnameForHealthChecks());
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
@@ -5948,11 +5947,6 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
 // Validates that with weighted initialization all localities are chosen
 // proportionally to their weight.
 TEST_F(HostSetImplLocalityTest, WeightedAllChosen) {
-  // This test should remain when envoy.reloadable_features.edf_lb_locality_scheduler_init_fix
-  // is deprecated.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.edf_lb_locality_scheduler_init_fix", "true"}});
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -5985,35 +5979,6 @@ TEST_F(HostSetImplLocalityTest, WeightedAllChosen) {
   EXPECT_EQ(locality_picked_count[0], 1);
   EXPECT_EQ(locality_picked_count[1], 6);
   EXPECT_EQ(locality_picked_count[2], 3);
-}
-
-// Validates that the non-randomized initialization works. This test should be
-// removed when envoy.reloadable_features.edf_lb_locality_scheduler_init_fix
-// is deprecated.
-TEST_F(HostSetImplLocalityTest, WeightedNoRandomization) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.edf_lb_locality_scheduler_init_fix", "false"}});
-  envoy::config::core::v3::Locality zone_a;
-  zone_a.set_zone("A");
-  envoy::config::core::v3::Locality zone_b;
-  zone_b.set_zone("B");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)};
-
-  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts[0]}, {hosts[1]}});
-  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
-  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
-  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
-                                          std::make_shared<const HealthyHostVector>(hosts),
-                                          hosts_per_locality),
-                        locality_weights, {}, {}, 0, absl::nullopt);
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
 }
 
 // Gentle failover between localities as health diminishes.

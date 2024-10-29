@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -21,11 +22,10 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/rust:no_program_init",
         "//test/extensions/dynamic_modules/test_data/rust:program_init_fail",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
+        ":util",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
-        "//test/test_common:environment_lib",
-        "//test/test_common:utility_lib",
     ],
 )
 
@@ -35,11 +35,21 @@ envoy_cc_test(
     data = [
         "//source/extensions/dynamic_modules:abi.h",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
         "//source/extensions/dynamic_modules:abi_version_lib",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "util",
+    srcs = ["util.cc"],
+    hdrs = ["util.h"],
+    deps = [
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],

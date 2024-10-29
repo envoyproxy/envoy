@@ -52,8 +52,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
   private boolean mUseCares = false;
   private final List<Pair<String, Integer>> mCaresFallbackResolvers = new ArrayList<>();
-  private boolean mForceV6 = true;
-  private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
@@ -69,6 +67,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
+  private int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
 
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
@@ -108,27 +107,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl addCaresFallbackResolver(String host, int port) {
     mCaresFallbackResolvers.add(new Pair<String, Integer>(host, port));
-    return this;
-  }
-
-  /**
-   * Set whether to map v4 address to v6.
-   *
-   * @param enable If true, map v4 address to v6.
-   */
-  public NativeCronvoyEngineBuilderImpl setForceV6(boolean enable) {
-    mForceV6 = enable;
-    return this;
-  }
-
-  /**
-   * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
-   * system.
-   *
-   * @param enable If true, use UDP GRO.
-   */
-  public NativeCronvoyEngineBuilderImpl setUseGro(boolean enable) {
-    mUseGro = enable;
     return this;
   }
 
@@ -234,6 +212,12 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return this;
   }
 
+  public NativeCronvoyEngineBuilderImpl
+  setH3ConnectionKeepaliveInitialIntervalMilliseconds(int interval) {
+    mH3ConnectionKeepaliveInitialIntervalMilliseconds = interval;
+    return this;
+  }
+
   public NativeCronvoyEngineBuilderImpl setConnectTimeoutSeconds(int connectTimeout) {
     mConnectTimeoutSeconds = connectTimeout;
     return this;
@@ -294,14 +278,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
         mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
         mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
         mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mForceV6,
-        mUseGro, quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
+        mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares,
+        quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
         quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(),
         numTimeoutsToTriggerPortMigration(), mEnableSocketTag, mEnableInterfaceBinding,
         mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
         mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
         mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
         keyValueStores, mRuntimeGuards, mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
-        mCaresFallbackResolvers);
+        mCaresFallbackResolvers, mH3ConnectionKeepaliveInitialIntervalMilliseconds);
   }
 }

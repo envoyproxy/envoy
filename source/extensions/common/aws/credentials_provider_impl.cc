@@ -99,7 +99,8 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
 }
 
 // Logic for async metadata refresh is as follows:
-// Per subclass (instance profile, container credentials, web identity)
+// Once server has initialized (init target) and per inherited class (instance profile, container
+// credentials, web identity)
 // 1. Create a single cluster for async handling
 // 2. Create tls slot to hold cluster name and a refresh timer pointer. tls slot instantiation of
 // ThreadLocalCredentialsCache will register the subclass as a callback handler
@@ -111,14 +112,14 @@ void CachedCredentialsProviderBase::refreshIfNeeded() {
 // 5. Initial credential refresh occurs in main thread and continues in main thread periodically
 // refreshing based on expiration time
 //
-// The logic above occurs after init has completed, by using an init target
 
-// TODO(suniltheta): The field context is of type ServerFactoryContextOptRef so that an
-// optional empty value can be set. Especially in aws iam plugin the cluster manager
+// TODO(suniltheta): The field context is of type ServerFactoryContextOptRef so
+// that an optional empty value can be set. Especially in aws iam plugin the cluster manager
 // obtained from server factory context object is not fully initialized due to the
 // reasons explained in https://github.com/envoyproxy/envoy/issues/27586 which cannot
 // utilize http async client here to fetch AWS credentials. For time being if context
 // is empty then will use libcurl to fetch the credentials.
+
 MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     Api::Api& api, ServerFactoryContextOptRef context,
     const CurlMetadataFetcher& fetch_metadata_using_curl,
@@ -132,10 +133,9 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       cache_duration_(getCacheDuration()), refresh_state_(refresh_state),
       initialization_timer_(initialization_timer), debug_name_(cluster_name) {
   // Async provider cluster setup
-  if (context_ && useHttpAsyncClient()) {
-
+  if (useHttpAsyncClient() && context_) {
     // Set up metadata credentials statistics
-    scope_ = context_->api().rootScope().createScope(
+    scope_ = api.rootScope().createScope(
         fmt::format("aws.metadata_credentials_provider.{}.", cluster_name_));
     stats_ = std::make_shared<MetadataCredentialsProviderStats>(MetadataCredentialsProviderStats{
         ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))});
@@ -165,6 +165,7 @@ MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::~ThreadLocalCreden
 }
 
 void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
+
   auto cluster = Utility::createInternalClusterStatic(cluster_name_, cluster_type_, uri_);
   // Async credential refresh timer. Only create this if it is the first time we're creating a
   // cluster
@@ -190,11 +191,7 @@ void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
                    cluster_type_str, cluster_name_, host_port);
   }
 
-  // TODO(suniltheta): use random number generator here for cluster version.
-  // While adding multiple clusters make sure that change in random version number across
-  // multiple clusters won't make Envoy delete/replace previously registered internal
-  // cluster.
-  context_->clusterManager().addOrUpdateCluster(cluster, "12345");
+  context_->clusterManager().addOrUpdateCluster(cluster, "");
 }
 
 // A thread local callback that occurs on every worker thread during cluster initialization.
@@ -562,12 +559,10 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
     stats_->credential_refreshes_succeeded_.inc();
-    if (refresh_state_ == MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh) {
-      ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
-      refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
-      // Set receiver state in statistics
-      stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
-    }
+    ENVOY_LOG(debug, "Metadata receiver moving to Ready state");
+    refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+    // Set receiver state in statistics
+    stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
   } else {
     cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
   }
@@ -936,14 +931,27 @@ std::string sessionName(Api::Api& api) {
   return actual_session_name;
 }
 
+// Edge case handling for cluster naming.
+//
+// Region is appended to the cluster name, to differentiate between multiple web identity
+// credential providers configured with different regions.
+//
+// UUID is also appended, to differentiate two identically configured web identity credential
+// providers, as we cannot make these singletons
+//
+// TODO: @nbaws: Modify cluster creation logic for web identity credential providers
+// to allow these also to be created as singletons
+
 std::string stsClusterName(absl::string_view region) {
   return absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
 }
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
-    Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
+    Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+    absl::string_view region,
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
     const CredentialsProviderChainFactories& factories) {
+
   ENVOY_LOG(debug, "Using environment credentials provider");
   add(factories.createEnvironmentCredentialsProvider());
 
@@ -963,7 +971,9 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     if (!web_token_path.empty() && !role_arn.empty()) {
       const auto session_name = sessionName(api);
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-      const auto cluster_name = stsClusterName(region);
+      const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
+
+      const auto cluster_name = stsClusterName(region_uuid);
 
       ENVOY_LOG(
           debug,
@@ -987,7 +997,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
     ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
     add(factories.createContainerCredentialsProvider(
-        api, context, fetch_metadata_using_curl, MetadataFetcher::create,
+        api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
         CONTAINER_METADATA_CLUSTER, uri, refresh_state, initialization_timer));
   } else if (!full_uri.empty()) {
     auto authorization_token =
@@ -998,21 +1008,61 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
                 "{} and authorization token",
                 full_uri);
       add(factories.createContainerCredentialsProvider(
-          api, context, fetch_metadata_using_curl, MetadataFetcher::create,
+          api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
           CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer,
           authorization_token));
     } else {
       ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
       add(factories.createContainerCredentialsProvider(
-          api, context, fetch_metadata_using_curl, MetadataFetcher::create,
+          api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
           CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer));
     }
   } else if (metadata_disabled != TRUE) {
     ENVOY_LOG(debug, "Using instance profile credentials provider");
     add(factories.createInstanceProfileCredentialsProvider(
-        api, context, fetch_metadata_using_curl, MetadataFetcher::create, refresh_state,
-        initialization_timer, EC2_METADATA_CLUSTER));
+        api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
+        refresh_state, initialization_timer, EC2_METADATA_CLUSTER));
   }
+}
+
+// Container credentials and instance profile credentials are both singletons, as they exist only
+// once on the underlying host and can be shared across all invocations of request signing consumer
+// extensions
+SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
+SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
+
+CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCredentialsProvider(
+    Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+    const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
+    absl::string_view credential_uri, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    std::chrono::seconds initialization_timer, absl::string_view authorization_token = {}) const {
+
+  return singleton_manager.getTyped<ContainerCredentialsProvider>(
+      SINGLETON_MANAGER_REGISTERED_NAME(container_credentials_provider),
+      [&context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
+       refresh_state, initialization_timer, authorization_token, cluster_name, &api] {
+        return std::make_shared<ContainerCredentialsProvider>(
+            api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
+            refresh_state, initialization_timer, authorization_token, cluster_name);
+      });
+}
+
+CredentialsProviderSharedPtr
+DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
+    Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+    const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    std::chrono::seconds initialization_timer, absl::string_view cluster_name) const {
+  return singleton_manager.getTyped<InstanceProfileCredentialsProvider>(
+      SINGLETON_MANAGER_REGISTERED_NAME(instance_profile_credentials_provider),
+      [&context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
+       initialization_timer, cluster_name, &api] {
+        return std::make_shared<InstanceProfileCredentialsProvider>(
+            api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
+            initialization_timer, cluster_name);
+      });
 }
 
 absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
@@ -1029,7 +1079,8 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     const std::string& role_arn = web_identity.role_arn();
     const std::string& token = web_identity.web_identity_token();
     const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-    const std::string cluster_name = stsClusterName(region);
+    const auto region_uuid = absl::StrCat(region, "_", context.api().randomGenerator().uuid());
+    const std::string cluster_name = stsClusterName(region_uuid);
     const std::string role_session_name = sessionName(context.api());
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     // This "two seconds" is a bit arbitrary, but matches the other places in the codebase.
