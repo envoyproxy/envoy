@@ -34,7 +34,7 @@ public:
         lb_config, cluster_info, priority_set, runtime, random, time_source);
   }
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext& context,
+  Upstream::LoadBalancerConfigPtr loadConfig(Server::Configuration::ServerFactoryContext& context,
                                              const Protobuf::Message& config) override {
     const auto& lb_config = dynamic_cast<const ClientSideWeightedRoundRobinLbProto&>(config);
     return Upstream::LoadBalancerConfigPtr{new Upstream::ClientSideWeightedRoundRobinLbConfig(

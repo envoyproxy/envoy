@@ -18,8 +18,7 @@ TEST(ClientSideWeightedRoundRobinConfigTest, ValidateFail) {
   NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
   NiceMock<Upstream::MockPrioritySet> thread_local_priority_set;
   NiceMock<Event::MockDispatcher> mock_thread_dispatcher;
-  ON_CALL(lb_factory_context, mainThreadDispatcher())
-      .WillByDefault(ReturnRef(mock_thread_dispatcher));
+  ON_CALL(context, mainThreadDispatcher()).WillByDefault(ReturnRef(mock_thread_dispatcher));
 
   envoy::config::core::v3::TypedExtensionConfig config;
   config.set_name("envoy.load_balancing_policies.client_side_weighted_round_robin");

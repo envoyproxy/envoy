@@ -15,6 +15,7 @@
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
 #include "test/extensions/load_balancing_policies/common/benchmark_base_tester.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/test_common/simulated_time_system.h"
@@ -43,10 +44,10 @@ public:
     child_lb->mutable_typed_extension_config()->set_name("envoy.load_balancing_policies.random");
     envoy::extensions::load_balancing_policies::random::v3::Random random_lb_config;
     child_lb->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(random_lb_config);
-    NiceMock<Upstream::MockLoadBalancerFactoryContext> lb_factory_context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
 
-    subset_config_ = std::make_unique<Upstream::SubsetLoadBalancerConfig>(
-        lb_factory_context, subset_config_proto, ProtobufMessage::getStrictValidationVisitor());
+    subset_config_ =
+        std::make_unique<Upstream::SubsetLoadBalancerConfig>(factory_context, subset_config_proto);
 
     lb_ = std::make_unique<Upstream::SubsetLoadBalancer>(*subset_config_, *info_, priority_set_,
                                                          &local_priority_set_, stats_, stats_scope_,

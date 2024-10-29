@@ -43,7 +43,7 @@ class Factory : public Common::FactoryBase<RandomLbProto, RandomCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.random") {}
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
+  Upstream::LoadBalancerConfigPtr loadConfig(Server::Configuration::ServerFactoryContext&,
                                              const Protobuf::Message& config) override {
     auto typed_config = dynamic_cast<const RandomLbProto*>(&config);
     if (typed_config == nullptr) {

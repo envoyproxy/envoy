@@ -25,7 +25,7 @@ public:
                                               TimeSource& time_source) override;
 
   Upstream::LoadBalancerConfigPtr
-  loadConfig(Upstream::LoadBalancerFactoryContext& lb_factory_context,
+  loadConfig(Server::Configuration::ServerFactoryContext& factory_context,
              const Protobuf::Message& config) override;
 };
 

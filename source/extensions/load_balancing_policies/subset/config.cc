@@ -71,7 +71,7 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
 }
 
 Upstream::LoadBalancerConfigPtr
-SubsetLbFactory::loadConfig(Upstream::LoadBalancerFactoryContext& lb_factory_context,
+SubsetLbFactory::loadConfig(Server::Configuration::ServerFactoryContext& factory_context,
                             const Protobuf::Message& config) {
   auto active_or_legacy = Common::ActiveOrLegacy<SubsetLbProto, ClusterProto>::get(&config);
   ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
@@ -84,13 +84,13 @@ SubsetLbFactory::loadConfig(Upstream::LoadBalancerFactoryContext& lb_factory_con
                       envoy::config::cluster::v3::Cluster::LbPolicy_Name(
                           active_or_legacy.legacy()->lb_policy())));
     }
-    return std::make_unique<Upstream::SubsetLoadBalancerConfig>(lb_factory_context,
+    return std::make_unique<Upstream::SubsetLoadBalancerConfig>(factory_context,
                                                                 *active_or_legacy.legacy());
   }
 
   // Load the subset load balancer configuration. This will contains child load balancer
   // config and child load balancer factory.
-  return std::make_unique<Upstream::SubsetLoadBalancerConfig>(lb_factory_context,
+  return std::make_unique<Upstream::SubsetLoadBalancerConfig>(factory_context,
                                                               *active_or_legacy.active());
 }
 

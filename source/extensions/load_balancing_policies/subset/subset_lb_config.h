@@ -209,9 +209,9 @@ using DefaultLoadBalancerSubsetInfo = ConstSingleton<LoadBalancerSubsetInfoImpl>
 
 class SubsetLoadBalancerConfig : public Upstream::LoadBalancerConfig {
 public:
-  SubsetLoadBalancerConfig(Upstream::LoadBalancerFactoryContext& lb_factory_context,
+  SubsetLoadBalancerConfig(Server::Configuration::ServerFactoryContext& factory_context,
                            const SubsetLbConfigProto& subset_config);
-  SubsetLoadBalancerConfig(Upstream::LoadBalancerFactoryContext& lb_factory_context,
+  SubsetLoadBalancerConfig(Server::Configuration::ServerFactoryContext& factory_context,
                            const ClusterProto& cluster);
   SubsetLoadBalancerConfig(LoadBalancerSubsetInfoPtr subset_info,
                            TypedLoadBalancerFactory* child_factory,

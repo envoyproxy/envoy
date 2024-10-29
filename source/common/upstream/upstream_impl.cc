@@ -1081,7 +1081,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
-    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster) {
+    Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster) {
   LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
 
@@ -1124,12 +1124,12 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
                     ClusterProto::LbPolicy_Name(cluster.lb_policy())));
   }
 
-  return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster)};
+  return Result{lb_factory, lb_factory->loadConfig(factory_context, cluster)};
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster) {
+    Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster) {
   // Handle the lb subset config case first.
   // Note it is possible to have a lb_subset_config without actually having any subset selectors.
   // In this case the subset load balancer should not be used.
@@ -1137,12 +1137,12 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
     auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.subset");
     if (lb_factory != nullptr) {
-      return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster)};
+      return Result{lb_factory, lb_factory->loadConfig(factory_context, cluster)};
     }
     return absl::InvalidArgumentError("No subset load balancer factory found");
   }
 
-  return getTypedLbConfigFromLegacyProtoWithoutSubset(lb_factory_context, cluster);
+  return getTypedLbConfigFromLegacyProtoWithoutSubset(factory_context, cluster);
 }
 
 using ProtocolOptionsHashMap =

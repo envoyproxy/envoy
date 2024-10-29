@@ -274,11 +274,6 @@ public:
 using LoadBalancerConfigPtr = std::unique_ptr<LoadBalancerConfig>;
 
 /**
- * Context information passed to a load balancer factory to use when creating a load balancer.
- */
-using LoadBalancerFactoryContext = Server::Configuration::ServerFactoryContext;
-
-/**
  * Factory config for load balancers. To support a load balancing policy of
  * LOAD_BALANCING_POLICY_CONFIG, at least one load balancer factory corresponding to a policy in
  * load_balancing_policy must be registered with Envoy. Envoy will use the first policy for which
@@ -308,12 +303,13 @@ public:
    *
    * @return LoadBalancerConfigPtr a new load balancer config.
    *
-   * @param lb_factory_context supplies the load balancer factory context.
+   * @param factory_context supplies the load balancer factory context.
    * @param config supplies the typed proto config of the load balancer. A dynamic_cast could
    *        be performed on the config to the expected proto type.
    */
-  virtual LoadBalancerConfigPtr loadConfig(LoadBalancerFactoryContext& lb_factory_context,
-                                           const Protobuf::Message& config) PURE;
+  virtual LoadBalancerConfigPtr
+  loadConfig(Server::Configuration::ServerFactoryContext& factory_context,
+             const Protobuf::Message& config) PURE;
 
   std::string category() const override { return "envoy.load_balancing_policies"; }
 };

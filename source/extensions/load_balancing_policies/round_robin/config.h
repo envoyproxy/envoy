@@ -57,7 +57,7 @@ class Factory : public Common::FactoryBase<RoundRobinLbProto, RoundRobinCreator>
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.round_robin") {}
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
+  Upstream::LoadBalancerConfigPtr loadConfig(Server::Configuration::ServerFactoryContext&,
                                              const Protobuf::Message& config) override {
     auto active_or_legacy = Common::ActiveOrLegacy<RoundRobinLbProto, ClusterProto>::get(&config);
     ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
