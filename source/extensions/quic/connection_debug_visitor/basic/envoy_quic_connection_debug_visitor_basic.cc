@@ -1,4 +1,4 @@
-#include "source/extensions/quic/connection_debug_visitor/envoy_quic_connection_debug_visitor_basic.h"
+#include "source/extensions/quic/connection_debug_visitor/basic/envoy_quic_connection_debug_visitor_basic.h"
 
 #include <memory>
 
@@ -17,18 +17,18 @@ namespace Quic {
 void EnvoyQuicConnectionDebugVisitorBasic::OnConnectionClosed(
     const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source) {
   ENVOY_LOG(info, "Quic connection from {} with id {} closed {} with details: {}",
-            session_->peer_address().ToString(), session_->connection_id().ToString(),
+            session_.peer_address().ToString(), session_.connection_id().ToString(),
             quic::ConnectionCloseSourceToString(source), frame.error_details);
 }
 
 std::unique_ptr<quic::QuicConnectionDebugVisitor>
 EnvoyQuicConnectionDebugVisitorFactoryBasic::createQuicConnectionDebugVisitor(
-    quic::QuicSession* session, const StreamInfo::StreamInfo& stream_info) {
+    Event::Dispatcher&, quic::QuicSession& session, const StreamInfo::StreamInfo& stream_info) {
   return std::make_unique<EnvoyQuicConnectionDebugVisitorBasic>(session, stream_info);
 }
 
-REGISTER_FACTORY(EnvoyQuicConnectionDebugVisitorFactoryBasic,
-                 EnvoyQuicConnectionDebugVisitorFactoryInterface);
+REGISTER_FACTORY(EnvoyQuicConnectionDebugVisitorFactoryFactoryBasic,
+                 EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface);
 
 } // namespace Quic
 } // namespace Envoy

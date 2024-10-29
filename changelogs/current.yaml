@@ -34,6 +34,10 @@ minor_behavior_changes:
     :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
     is now enabled by default. This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.oauth2_use_refresh_token`` to false.
+- area: quic
+  change: |
+    Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -59,6 +63,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.
+- area: http2
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.defer_processing_backedup_streams`` and legacy code paths.
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_reresolve_on_eai_again`` and legacy code paths.
@@ -87,6 +94,10 @@ new_features:
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
     %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
+- area: quic
+  change: |
+    Added :ref:`QUIC stats debug visitor <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>` to
+    get more stats from the QUIC transport.
 - area: http_inspector
   change: |
     Added default-false ``envoy.reloadable_features.http_inspector_use_balsa_parser`` for HttpInspector to use BalsaParser.
