@@ -2579,6 +2579,58 @@ TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeaders) {
 }
 
 // Set allow_mode_override in filter config to be true.
+// Set request_body_mode: BIDIRECTIONAL_STREAMED
+// In such case, the mode_override in the response will be ignored.
+TEST_F(HttpFilterTest, DisableResponseModeOverrideByMxnBodyMode) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "BIDIRECTIONAL_STREAMED"
+    response_body_mode: "BIDIRECTIONAL_STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  allow_mode_override: true
+  )EOF");
+
+  EXPECT_EQ(filter_->config().allowModeOverride(), true);
+  EXPECT_EQ(filter_->config().sendBodyWithoutWaitingForHeaderResponse(), false);
+  EXPECT_EQ(filter_->config().processingMode().response_header_mode(), ProcessingMode::SEND);
+  EXPECT_EQ(filter_->config().processingMode().response_body_mode(),
+            ProcessingMode::BIDIRECTIONAL_STREAMED);
+  EXPECT_EQ(filter_->config().processingMode().request_body_mode(),
+            ProcessingMode::BIDIRECTIONAL_STREAMED);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+
+  // When ext_proc server sends back the request header response, it contains the
+  // mode_override for the response_header_mode to be SKIP.
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse& response, HeadersResponse&) {
+        response.mutable_mode_override()->set_response_header_mode(ProcessingMode::SKIP);
+      });
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, true));
+
+  // Verify such mode_override is ignored. The response header is still sent to the ext_proc server.
+  processResponseHeaders(false, [](const HttpHeaders& header_resp, ProcessingResponse&,
+                                   HeadersResponse&) {
+    EXPECT_TRUE(header_resp.end_of_stream());
+    TestRequestHeaderMapImpl expected_response{{":status", "200"}, {"content-type", "text/plain"}};
+    EXPECT_THAT(header_resp.headers(), HeaderProtosEqual(expected_response));
+  });
+
+  TestRequestHeaderMapImpl final_expected_response{{":status", "200"},
+                                                   {"content-type", "text/plain"}};
+  EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
+  filter_->onDestroy();
+}
+
+// Set allow_mode_override in filter config to be true.
 // Set send_body_without_waiting_for_header_response to be true
 // In such case, the mode_override in the response will be ignored.
 TEST_F(HttpFilterTest, DisableResponseModeOverrideBySendBodyFlag) {
@@ -4598,6 +4650,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  // Server sending headers response without waiting for body.
   processResponseHeaders(false, absl::nullopt);
 
   Buffer::OwnedImpl want_response_body;
@@ -4659,7 +4712,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
-  // Envoy sends header, body and trailer.
+  // Server buffer header, body and trailer before sending header response.
   bool encoding_watermarked = false;
   setUpEncodingWatermarking(encoding_watermarked);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
@@ -4784,7 +4837,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithFilterConfigNotMxn) {
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, SendBodyMutationTestWithFilterConfigMxn) {
+TEST_F(HttpFilterTest, Send1x1BodyMutationTestWithFilterConfigMxn) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
