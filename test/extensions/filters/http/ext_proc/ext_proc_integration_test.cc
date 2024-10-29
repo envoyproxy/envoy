@@ -708,7 +708,8 @@ protected:
     verifyDownstreamResponse(*response, 200);
   }
 
-  IntegrationStreamDecoderPtr initAndSendDataMxnMode(absl::string_view body_sent, bool end_of_stream) {
+  IntegrationStreamDecoderPtr initAndSendDataMxnMode(absl::string_view body_sent,
+                                                     bool end_of_stream) {
     config_helper_.setBufferLimits(1024, 1024);
     proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
     proto_config_.mutable_processing_mode()->set_request_body_mode(

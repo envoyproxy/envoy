@@ -82,7 +82,8 @@ void verifyProcessingModeConfig(const ExternalProcessor& config) {
         processing_mode.response_trailer_mode() == ProcessingMode::SEND) {
       throw EnvoyException(
           "If the ext_proc filter is configured with http_service instead of gRPC service, "
-          "then the processing modes of this filter can not be configured to send body or trailer.");
+          "then the processing modes of this filter can not be configured to send body or "
+          "trailer.");
     }
   }
 
