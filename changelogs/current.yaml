@@ -48,8 +48,8 @@ bug_fixes:
 - area: stats ads grpc
   change: |
     Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
-    in the :ref:`google_grpc <config.core.v3.GrpcService.GoogleGrpc>` resource used for ADS, and adds that as a tag
-    ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
+    in the :ref:`google_grpc <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>` resource used for ADS, and adds
+    that as a tag ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
