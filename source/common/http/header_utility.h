@@ -87,7 +87,8 @@ public:
       // If the header does not have value and the result is not returned in the
       // code above, it means treat_missing_as_empty_ is set to true and we should
       // treat the header value as empty.
-      const auto value = header_value.result().has_value() ? header_value.result().value() : "";
+      absl::string_view value =
+          header_value.result().has_value() ? header_value.result().value() : EMPTY_STRING;
       // Execute the specific matcher's code and invert if invert_match_ is set.
       return specificMatchesHeaders(value) != invert_match_;
     };
