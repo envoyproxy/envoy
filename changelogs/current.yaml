@@ -4,6 +4,10 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: wasm
   change: |
+    The route cache will not be cleared by default if the wasm extension modified the request headers and
+    the ABI version of wasm extension is larger then 0.2.1.
+- area: wasm
+  change: |
     Remove previously deprecated xDS attributes from ``get_property``, use ``xds`` attributes instead.
 
 minor_behavior_changes:
@@ -90,6 +94,9 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: wasm
+  change: |
+    added ``clear_route_cache`` foreign function to clear the route cache.
 - area: access_log
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
