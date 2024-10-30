@@ -386,6 +386,6 @@ message BodyMutation {
 
     // [#not-implemented-hide:]
     // Sending this response for BIDIRECTIONAL_STREAMED body mode.
-    StreamedBodyResponse streamed_resp = 3;
+    StreamedBodyResponse streamed_response = 3;
   }
 }

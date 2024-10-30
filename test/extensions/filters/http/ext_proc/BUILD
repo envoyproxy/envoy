@@ -29,7 +29,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "filter_test",
-    size = "large",
+    size = "small",
     srcs = ["filter_test.cc"],
     copts = select({
         "//bazel:windows_x86_64": [],

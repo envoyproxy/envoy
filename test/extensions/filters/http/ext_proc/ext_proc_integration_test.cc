@@ -725,7 +725,7 @@ protected:
 
     auto encoder_decoder = codec_client_->startRequest(default_headers);
     request_encoder_ = &encoder_decoder.first;
-    auto response = std::move(encoder_decoder.second);
+    IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
     codec_client_->sendData(*request_encoder_, body_sent, end_of_stream);
     return response;
   }
@@ -741,19 +741,19 @@ protected:
     processor_stream_->startGrpcStream();
     ProcessingResponse response_header;
     auto* header_resp = response_header.mutable_request_headers();
-    auto header_mutation = header_resp->mutable_response()->mutable_header_mutation();
-    auto* mut = header_mutation->add_set_headers();
-    mut->mutable_header()->set_key("x-new-header");
-    mut->mutable_header()->set_raw_value("new");
+    auto* header_mutation = header_resp->mutable_response()->mutable_header_mutation();
+    auto* header = header_mutation->add_set_headers()->mutable_header();
+    header->set_key("x-new-header");
+    header->set_raw_value("new");
     processor_stream_->sendGrpcMessage(response_header);
   }
 
   void serverSendTrailerRespMxn() {
     ProcessingResponse response_trailer;
     auto* trailer_resp = response_trailer.mutable_request_trailers()->mutable_header_mutation();
-    auto* mut_trailer = trailer_resp->add_set_headers();
-    mut_trailer->mutable_header()->set_key("x-new-trailer");
-    mut_trailer->mutable_header()->set_raw_value("new");
+    auto* header = trailer_resp->add_set_headers()->mutable_header();
+    header->set_key("x-new-trailer");
+    header->set_raw_value("new");
     processor_stream_->sendGrpcMessage(response_trailer);
   }
 
@@ -4930,7 +4930,7 @@ TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
 
 TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
   const std::string body_sent(64 * 1024, 's');
-  auto response = initAndSendDataMxnMode(body_sent, true);
+  IntegrationStreamDecoderPtr response = initAndSendDataMxnMode(body_sent, true);
 
   // The ext_proc server receives the headers.
   ProcessingRequest header_request;
@@ -4960,10 +4960,10 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
     ProcessingResponse response_body;
     auto* body_resp = response_body.mutable_request_body();
     auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
-    auto* streamed_resp = body_mut->mutable_streamed_resp();
-    streamed_resp->set_body("r");
+    auto* streamed_response = body_mut->mutable_streamed_response();
+    streamed_response->set_body("r");
     const bool end_of_stream = (i == total_resp_body_msg - 1) ? true : false;
-    streamed_resp->set_end_of_stream(end_of_stream);
+    streamed_response->set_end_of_stream(end_of_stream);
     processor_stream_->sendGrpcMessage(response_body);
   }
 
@@ -4976,7 +4976,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
 // Buffer the whole message including header, body and trailer before sending response.
 TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespMxnSmallBody) {
   const std::string body_sent(128 * 1024, 's');
-  auto response = initAndSendDataMxnMode(body_sent, false);
+  IntegrationStreamDecoderPtr response = initAndSendDataMxnMode(body_sent, false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
@@ -5011,11 +5011,11 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   const std::string body_upstream(total_resp_body_msg, 'r');
   for (uint32_t i = 0; i < total_resp_body_msg; i++) {
     ProcessingResponse response_body;
-    auto* streamed_resp = response_body.mutable_request_body()
+    auto* streamed_response = response_body.mutable_request_body()
                               ->mutable_response()
                               ->mutable_body_mutation()
-                              ->mutable_streamed_resp();
-    streamed_resp->set_body("r");
+                              ->mutable_streamed_response();
+    streamed_response->set_body("r");
     processor_stream_->sendGrpcMessage(response_body);
   }
 
@@ -5032,7 +5032,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
 // The server continuously does so until the entire body processing is done.
 TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
   const std::string body_sent(256 * 1024, 's');
-  auto response = initAndSendDataMxnMode(body_sent, false);
+  IntegrationStreamDecoderPtr response = initAndSendDataMxnMode(body_sent, false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
@@ -5071,11 +5071,11 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
         ProcessingResponse response_body;
         for (uint32_t i = 0; i < 3; i++) {
           body_upstream += std::to_string(i);
-          auto* streamed_resp = response_body.mutable_request_body()
+          auto* streamed_response = response_body.mutable_request_body()
                                     ->mutable_response()
                                     ->mutable_body_mutation()
-                                    ->mutable_streamed_resp();
-          streamed_resp->set_body(std::to_string(i));
+                                    ->mutable_streamed_response();
+          streamed_response->set_body(std::to_string(i));
           processor_stream_->sendGrpcMessage(response_body);
         }
       }
@@ -5091,11 +5091,11 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
 
   // Send one more body response at the end.
   ProcessingResponse response_body;
-  auto* streamed_resp = response_body.mutable_request_body()
+  auto* streamed_response = response_body.mutable_request_body()
                             ->mutable_response()
                             ->mutable_body_mutation()
-                            ->mutable_streamed_resp();
-  streamed_resp->set_body("END");
+                            ->mutable_streamed_response();
+  streamed_response->set_body("END");
   processor_stream_->sendGrpcMessage(response_body);
   body_upstream += "END";
 

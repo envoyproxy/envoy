@@ -598,7 +598,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     if ((state.bodyMode() == ProcessingMode::STREAMED &&
          config_->sendBodyWithoutWaitingForHeaderResponse()) ||
         state.bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
-      ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
+      ENVOY_LOG(trace, "Sending body data even though header processing is still in progress as body mode "
                        "is BIDIRECTIONAL_STREAMED or STREAMED and "
                        "send_body_without_waiting_for_header_response is enabled");
     } else {
@@ -865,7 +865,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 
   if (state.callbackState() != ProcessorState::CallbackState::Idle) {
     if (state.bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
-      ENVOY_LOG(trace, "Body mode is BIDIRECTIONAL_STREAMED, sending trailers even Envoy is "
+      ENVOY_LOG(trace, "Body mode is BIDIRECTIONAL_STREAMED, sending trailers even though Envoy is "
                        "waiting for header or body response");
     } else {
       ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");

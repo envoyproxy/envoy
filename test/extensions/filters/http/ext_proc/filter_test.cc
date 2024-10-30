@@ -4526,25 +4526,25 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
 
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_resp =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-        streamed_resp->set_body(" AAAAA ");
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" AAAAA ");
         want_response_body.add(" AAAAA ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_resp =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-        streamed_resp->set_body(" BBBB ");
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" BBBB ");
         want_response_body.add(" BBBB ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_resp =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-        streamed_resp->set_body(" CCC ");
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" CCC ");
         want_response_body.add(" CCC ");
       },
       false);
@@ -4560,9 +4560,9 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
     processResponseBody(
         [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
-          auto* streamed_resp =
-              resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-          streamed_resp->set_body(body.body());
+          auto* streamed_response =
+              resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+          streamed_response->set_body(body.body());
           want_response_body.add(body.body());
         },
         false);
@@ -4586,35 +4586,35 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
   // Now sends the body response back also confirms the received chunks.
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_resp =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-        streamed_resp->set_body(" EEEEEEE ");
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" EEEEEEE ");
         want_response_body.add(" EEEEEEE ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_resp =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-        streamed_resp->set_body(" F ");
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" F ");
         want_response_body.add(" F ");
       },
       false);
 
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_resp =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-        streamed_resp->set_body(" GGGGGGGGG ");
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" GGGGGGGGG ");
         want_response_body.add(" GGGGGGGGG ");
       },
       false);
   processResponseBody(
       [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_resp =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-        streamed_resp->set_end_of_stream(true);
-        streamed_resp->set_body(" HH ");
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_end_of_stream(true);
+        streamed_response->set_body(" HH ");
         want_response_body.add(" HH ");
       },
       true);
@@ -4670,14 +4670,14 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
 
   processResponseBodyMxnAfterTrailer([&want_response_body](ProcessingResponse&,
                                                            BodyResponse& resp) {
-    auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-    streamed_resp->set_body(" AAAAA ");
+    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+    streamed_response->set_body(" AAAAA ");
     want_response_body.add(" AAAAA ");
   });
   processResponseBodyMxnAfterTrailer([&want_response_body](ProcessingResponse&,
                                                            BodyResponse& resp) {
-    auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-    streamed_resp->set_body(" BBBB ");
+    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+    streamed_response->set_body(" BBBB ");
     want_response_body.add(" BBBB ");
   });
   processResponseTrailers(absl::nullopt, true);
@@ -4736,14 +4736,14 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
   processResponseHeadersAfterTrailer(absl::nullopt);
   processResponseBodyMxnAfterTrailer([&want_response_body](ProcessingResponse&,
                                                            BodyResponse& resp) {
-    auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-    streamed_resp->set_body(" AAAAA ");
+    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+    streamed_response->set_body(" AAAAA ");
     want_response_body.add(" AAAAA ");
   });
   processResponseBodyMxnAfterTrailer([&want_response_body](ProcessingResponse&,
                                                            BodyResponse& resp) {
-    auto* streamed_resp = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-    streamed_resp->set_body(" BBBB ");
+    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+    streamed_response->set_body(" BBBB ");
     want_response_body.add(" BBBB ");
   });
   processResponseTrailers(absl::nullopt, true);
@@ -4826,9 +4826,9 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithFilterConfigNotMxn) {
 
   processResponseBody(
       [](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_resp =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_resp();
-        streamed_resp->set_body("AAA");
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body("AAA");
       },
       false);
 
