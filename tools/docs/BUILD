@@ -1,7 +1,7 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_pytool_binary")
+load("//tools/base:envoy_python.bzl", "envoy_pytool_binary", "ENVOY_PYTOOL_NAMESPACE")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
@@ -42,6 +42,7 @@ py_console_script_binary(
     name = "sphinx_runner",
     pkg = "@base_pip3//envoy_docs_sphinx_runner",
     script = "envoy.docs.sphinx_runner",
+    data = ENVOY_PYTOOL_NAMESPACE,
     visibility = ["//visibility:public"],
 )
 
