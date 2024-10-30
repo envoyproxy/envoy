@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.transport_sockets.tls]
 // The TLS contexts below provide the transport socket configuration for upstream/downstream TLS.
 
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message UpstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.UpstreamTlsContext";
