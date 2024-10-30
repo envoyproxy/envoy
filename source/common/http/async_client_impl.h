@@ -227,7 +227,7 @@ private:
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
-  void sendGoAwayandClose() override {}
+  void sendGoAwayAndClose() override {}
   void setDecoderBufferLimit(uint32_t) override {
     IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
   }

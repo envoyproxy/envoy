@@ -645,9 +645,9 @@ public:
                               absl::string_view details) PURE;
 
   /**
-   * Attempt to send GOAWAY and close the connection.
+   * Attempt to send GOAWAY and close the connection, and no filter chain will move forward.
    */
-  virtual void sendGoAwayandClose() PURE;
+  virtual void sendGoAwayAndClose() PURE;
 
   /**
    * Adds decoded metadata. This function can only be called in

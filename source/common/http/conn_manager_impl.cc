@@ -756,11 +756,8 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose(false);
 }
 
-void ConnectionManagerImpl::sendGoAwayandClose() {
-  if (!codec_ || codec_->protocol() != Protocol::Http2) {
-    return;
-  }
-  ENVOY_CONN_LOG(trace, "http2 connection manager sendGoAwayandClose",
+void ConnectionManagerImpl::sendGoAwayAndClose() {
+  ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
                  read_callbacks_->connection());
   codec_->goAway();
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,

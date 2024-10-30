@@ -21,13 +21,15 @@ public:
       go_away_skiped_ = true;
       return Http::FilterHeadersStatus::Continue;
     }
-    decoder_callbacks_->sendGoAwayandClose();
+    decoder_callbacks_->sendGoAwayAndClose();
+    result = request_headers.get(Http::LowerCaseString("continue-filter-chain"));
+    if (!result.empty() && result[0]->value() == "true") {
+      return Http::FilterHeadersStatus::Continue;
+    }
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Due to the above local reply, this method should never be invoked in tests.
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    ASSERT(go_away_skiped_);
     return Http::FilterDataStatus::Continue;
   }
 
