@@ -213,7 +213,7 @@ HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& con
 
 bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
                             const StreamInfo::StreamInfo&) const {
-  return Http::HeaderUtility::matchHeaders(context.requestHeaders(), *header_data_);
+  return header_data_->matchesHeaders(context.requestHeaders());
 }
 
 ResponseFlagFilter::ResponseFlagFilter(

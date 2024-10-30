@@ -237,7 +237,7 @@ public:
     const Matchers::StringMatcherPtr string_match_;
   };
 
-  using HeaderDataPtr = std::unique_ptr<HeaderDataBaseImpl>;
+  using HeaderDataPtr = std::unique_ptr<HeaderMatcher>;
 
   /**
    * Creates a Header Data matcher data structure according to the given HeaderMatcher config.
