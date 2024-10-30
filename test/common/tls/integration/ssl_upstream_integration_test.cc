@@ -63,15 +63,12 @@ public:
   }
 
   void expectCertValidationFailure() {
+    autonomous_upstream_ = true;
     initialize();
 
     codec_client_ = makeHttpConnection((lookupPort("http")));
     default_request_headers_.setHost(sni_header_);
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-    EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    std::string sni = fake_upstream_connection_->connection().ssl()->sni();
-    EXPECT_TRUE(fake_upstream_connection_->close(Network::ConnectionCloseType::FlushWrite));
     EXPECT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
     codec_client_->close();
