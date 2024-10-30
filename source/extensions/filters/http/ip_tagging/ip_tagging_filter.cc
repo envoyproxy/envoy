@@ -20,8 +20,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
       no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
-      unknown_tag_(stat_name_set_->add("unknown_tag.hit")),
-      ip_tag_header_(ipTagHeaderAsOptional(config.ip_tag_header())),
+      unknown_tag_(stat_name_set_->add("unknown_tag.hit")), ip_tag_header_(config.ip_tag_header()),
       ip_tag_header_action_(config.ip_tag_header_action()) {
 
   // Once loading IP tags from a file system is supported, the restriction on the size
@@ -113,7 +112,7 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
                                 const std::vector<std::string>& tags) {
   using HeaderAction = IpTaggingFilterConfig::HeaderAction;
 
-  const absl::optional<Http::LowerCaseString>& header_name = config_->ip_tag_header();
+  OptRef<const Http::LowerCaseString> header_name = config_->ip_tag_header();
 
   if (tags.empty()) {
     bool mustSanitize =
