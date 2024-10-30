@@ -723,16 +723,50 @@ UDP
   .. note::
 
     This may not be the physical remote address of the peer if the address has been inferred from
-    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>` or :ref:`x-forwarded-for
-    <config_http_conn_man_headers_x-forwarded-for>`.
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
+%DOWNSTREAM_DIRECT_LOCAL_ADDRESS%
+  Direct local address of the downstream connection.
+
+  .. note::
+
+    This is always the physical local address even if the downstream remote address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
 
 %DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%
   Local address of the downstream connection, without any port component.
   IP addresses are the only address type with a port component.
 
+  .. note::
+
+    This may not be the physical local address if the downstream local address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
+%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT%
+  Direct local address of the downstream connection, without any port component.
+
+  .. note::
+
+    This is always the physical local address even if the downstream local address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
 %DOWNSTREAM_LOCAL_PORT%
   Local port of the downstream connection.
   IP addresses are the only address type with a port component.
+
+  .. note::
+
+    This may not be the physical port if the downstream local address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
+
+%DOWNSTREAM_DIRECT_LOCAL_PORT%
+  Direct local port of the downstream connection.
+  IP addresses are the only address type with a port component.
+
+  .. note::
+
+    This is always the listener port even if the downstream local address has been inferred from
+    :ref:`Proxy Protocol filter <config_listener_filters_proxy_protocol>`.
 
 .. _config_access_log_format_connection_id:
 

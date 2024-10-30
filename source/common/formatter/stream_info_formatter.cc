@@ -1251,6 +1251,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.downstreamAddressProvider().localAddress();
                   });
             }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::withPort(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1259,12 +1267,28 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.downstreamAddressProvider().localAddress();
                   });
             }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::withoutPort(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
                   [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                     return stream_info.downstreamAddressProvider().localAddress();
+                  });
+            }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::justPort(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
                   });
             }}},
           {"DOWNSTREAM_REMOTE_ADDRESS",
