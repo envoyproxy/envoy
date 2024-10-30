@@ -25,7 +25,12 @@ void RouteConfigProviderManager::eraseStaticProvider(RouteConfigProvider* provid
 }
 
 void RouteConfigProviderManager::eraseDynamicProvider(uint64_t manager_identifier) {
+  auto it = dynamic_route_config_providers_.find(manager_identifier);
+  if(std::get<0>(it->second) == 1) {
   dynamic_route_config_providers_.erase(manager_identifier);
+  } else {
+  std::get<0>(it->second)--;
+  }
 }
 
 std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
@@ -33,7 +38,7 @@ RouteConfigProviderManager::dumpRouteConfigs(const Matchers::StringMatcher& name
   auto config_dump = std::make_unique<envoy::admin::v3::RoutesConfigDump>();
 
   for (const auto& element : dynamic_route_config_providers_) {
-    const auto provider = element.second.first.lock();
+    const auto provider = std::get<1>(element.second).lock();
     // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
     // in the RdsRouteConfigSubscription destructor, and the single threaded nature
     // of this code, locking the weak_ptr will not fail.
@@ -81,6 +86,8 @@ RouteConfigProviderSharedPtr RouteConfigProviderManager::addDynamicProvider(
         std::pair<RouteConfigProviderSharedPtr, const Init::Target*>(uint64_t manager_identifier)>
         create_dynamic_provider) {
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
+  // make a copy of rds proto.
+  
   const uint64_t manager_identifier = MessageUtil::hash(rds);
   auto existing_provider =
       reuseDynamicProvider(manager_identifier, init_manager, route_config_name);
@@ -90,7 +97,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderManager::addDynamicProvider(
   }
   auto new_provider = create_dynamic_provider(manager_identifier);
   init_manager.add(*new_provider.second);
-  dynamic_route_config_providers_.insert({manager_identifier, new_provider});
+  dynamic_route_config_providers_.insert({manager_identifier, std::make_tuple(1UL/*std::move(std::atomic<uint32_t>(1))*/, new_provider.first, new_provider.second)});
   return new_provider.first;
 }
 
@@ -98,6 +105,7 @@ RouteConfigProviderSharedPtr
 RouteConfigProviderManager::reuseDynamicProvider(uint64_t manager_identifier,
                                                  Init::Manager& init_manager,
                                                  const std::string& route_config_name) {
+//  manager_identifier = 100;
   auto it = dynamic_route_config_providers_.find(manager_identifier);
   if (it == dynamic_route_config_providers_.end()) {
     return nullptr;
@@ -105,10 +113,13 @@ RouteConfigProviderManager::reuseDynamicProvider(uint64_t manager_identifier,
   // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
   // in the RdsRouteConfigSubscription destructor, and the single threaded nature
   // of this code, locking the weak_ptr will not fail.
-  auto existing_provider = it->second.first.lock();
+  auto existing_provider = std::get<1>(it->second).lock();
   RELEASE_ASSERT(existing_provider != nullptr,
                  absl::StrCat("cannot find subscribed rds resource ", route_config_name));
-  init_manager.add(*it->second.second);
+  ASSERT(std::get<0>(it->second) >= 1);
+  // bump the use counter.
+  std::get<0>(it->second)++; 
+  init_manager.add(*std::get<2>(it->second));
   return existing_provider;
 }
 
