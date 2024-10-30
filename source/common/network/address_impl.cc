@@ -48,11 +48,8 @@ InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
 } // namespace
 
 bool forceV6() {
-  // It turns out Android doesn't handle v4 addresses over v6 networks
-  // gracefully in all situations but does handle mapped v4 addresses
-  // gracefully, so always use mapped addresses to work around this.
-#if defined(__ANDROID_API__)
-  return true;
+#if defined(__APPLE__) || defined(__ANDROID_API__)
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_use_v6");
 #else
   return false;
 #endif
