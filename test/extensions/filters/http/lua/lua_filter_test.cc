@@ -2306,6 +2306,8 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():serialNumberPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():issuerPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():parsedSubjectPeerCertificate():commonName())
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():parsedSubjectPeerCertificate():organizationName(), ","))
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():ciphersuiteString())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():tlsVersion())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificate())
@@ -2389,6 +2391,16 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   const std::string peer_cert_subject = "peer-cert-subject";
   EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillOnce(ReturnRef(peer_cert_subject));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_subject)));
+
+  Ssl::ParsedX509Name parsed_subject;
+  parsed_subject.commonName_ = "Test CN";
+  parsed_subject.organizationName_.push_back("Test O1");
+  parsed_subject.organizationName_.push_back("Test O2");
+  Ssl::ParsedX509NameOptConstRef const_parsed_subject(parsed_subject);
+  EXPECT_CALL(*connection_info, parsedSubjectPeerCertificate())
+      .WillRepeatedly(Return(const_parsed_subject));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Test CN")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Test O1,Test O2")));
 
   const std::string cipher_suite = "cipher-suite";
   EXPECT_CALL(*connection_info, ciphersuiteString()).WillOnce(Return(cipher_suite));

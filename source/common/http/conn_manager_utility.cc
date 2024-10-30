@@ -322,7 +322,7 @@ void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_header
 
 void ConnectionManagerUtility::cleanInternalHeaders(
     RequestHeaderMap& request_headers, bool edge_request,
-    const std::list<Http::LowerCaseString>& internal_only_headers) {
+    const std::vector<Http::LowerCaseString>& internal_only_headers) {
   if (edge_request) {
     // Headers to be stripped from edge requests, i.e. to sanitize so
     // clients can't inject values.
