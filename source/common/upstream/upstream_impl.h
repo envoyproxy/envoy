@@ -89,15 +89,12 @@ public:
     LoadBalancerConfigPtr config;
   };
 
-  static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProtoWithoutSubset(LoadBalancerFactoryContext& lb_factory_context,
-                                               const ClusterProto& cluster,
-                                               ProtobufMessage::ValidationVisitor& visitor);
+  static absl::StatusOr<Result> getTypedLbConfigFromLegacyProtoWithoutSubset(
+      Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster);
 
   static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProto(LoadBalancerFactoryContext& lb_factory_context,
-                                  const ClusterProto& cluster,
-                                  ProtobufMessage::ValidationVisitor& visitor);
+  getTypedLbConfigFromLegacyProto(Server::Configuration::ServerFactoryContext& factory_context,
+                                  const ClusterProto& cluster);
 };
 
 /**
@@ -159,14 +156,6 @@ private:
 class HostDescriptionImplBase : virtual public HostDescription,
                                 protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  HostDescriptionImplBase(
-      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-      Network::Address::InstanceConstSharedPtr dest_address,
-      MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-      const envoy::config::core::v3::Locality& locality,
-      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source);
-
   Network::UpstreamTransportSocketFactory& transportSocketFactory() const override {
     absl::ReaderMutexLock lock(&metadata_mutex_);
     return socket_factory_;
@@ -250,6 +239,14 @@ public:
   }
 
 protected:
+  HostDescriptionImplBase(
+      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+      Network::Address::InstanceConstSharedPtr dest_address,
+      MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
+      const envoy::config::core::v3::Locality& locality,
+      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+      uint32_t priority, TimeSource& time_source, absl::Status& creation_status);
+
   /**
    * @return nullptr if address_list is empty, otherwise a shared_ptr copy of address_list.
    */
@@ -288,13 +285,13 @@ private:
  */
 class HostDescriptionImpl : public HostDescriptionImplBase {
 public:
-  HostDescriptionImpl(
-      ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-      Network::Address::InstanceConstSharedPtr dest_address,
-      MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
-      const envoy::config::core::v3::Locality& locality,
-      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
+  static absl::StatusOr<std::unique_ptr<HostDescriptionImpl>>
+  create(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+         Network::Address::InstanceConstSharedPtr dest_address,
+         MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
+         const envoy::config::core::v3::Locality& locality,
+         const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+         uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
 
   // HostDescription
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
@@ -302,6 +299,15 @@ public:
     return health_check_address_;
   }
   SharedConstAddressVector addressListOrNull() const override { return address_list_or_null_; }
+
+protected:
+  HostDescriptionImpl(
+      absl::Status& creation_status, ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+      Network::Address::InstanceConstSharedPtr dest_address,
+      MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
+      const envoy::config::core::v3::Locality& locality,
+      const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+      uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
 
 private:
   // No locks are required in this implementation: all address-related member
@@ -470,16 +476,27 @@ private:
 
 class HostImpl : public HostImplBase, public HostDescriptionImpl {
 public:
-  HostImpl(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
-           Network::Address::InstanceConstSharedPtr address,
+  static absl::StatusOr<std::unique_ptr<HostImpl>>
+  create(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
+         Network::Address::InstanceConstSharedPtr address, MetadataConstSharedPtr endpoint_metadata,
+         MetadataConstSharedPtr locality_metadata, uint32_t initial_weight,
+         const envoy::config::core::v3::Locality& locality,
+         const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
+         uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
+         TimeSource& time_source, const AddressVector& address_list = {});
+
+protected:
+  HostImpl(absl::Status& creation_status, ClusterInfoConstSharedPtr cluster,
+           const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
            MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
            uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
            TimeSource& time_source, const AddressVector& address_list = {})
       : HostImplBase(initial_weight, health_check_config, health_status),
-        HostDescriptionImpl(cluster, hostname, address, endpoint_metadata, locality_metadata,
-                            locality, health_check_config, priority, time_source, address_list) {}
+        HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
+                            locality_metadata, locality, health_check_config, priority, time_source,
+                            address_list) {}
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
@@ -812,12 +829,13 @@ public:
   using HttpProtocolOptionsConfigImpl =
       Envoy::Extensions::Upstreams::Http::ProtocolOptionsConfigImpl;
   using TcpProtocolOptionsConfigImpl = Envoy::Extensions::Upstreams::Tcp::ProtocolOptionsConfigImpl;
-  ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
-                  const envoy::config::cluster::v3::Cluster& config,
-                  const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
-                  Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
-                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
-                  Server::Configuration::TransportSocketFactoryContext&);
+  static absl::StatusOr<std::unique_ptr<ClusterInfoImpl>>
+  create(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
+         const envoy::config::cluster::v3::Cluster& config,
+         const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
+         Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
+         Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
+         Server::Configuration::TransportSocketFactoryContext&);
 
   static DeferredCreationCompatibleClusterTrafficStats
   generateStats(Stats::ScopeSharedPtr scope, const ClusterTrafficStatNames& cluster_stat_names,
@@ -1038,6 +1056,14 @@ public:
   }
 
 protected:
+  ClusterInfoImpl(Init::Manager& info, Server::Configuration::ServerFactoryContext& server_context,
+                  const envoy::config::cluster::v3::Cluster& config,
+                  const absl::optional<envoy::config::core::v3::BindConfig>& bind_config,
+                  Runtime::Loader& runtime, TransportSocketMatcherPtr&& socket_matcher,
+                  Stats::ScopeSharedPtr&& stats_scope, bool added_via_api,
+                  Server::Configuration::TransportSocketFactoryContext& context,
+                  absl::Status& creation_status);
+
   // Gets the retry budget percent/concurrency from the circuit breaker thresholds. If the retry
   // budget message is specified, defaults will be filled in if either params are unspecified.
   static std::pair<absl::optional<double>, absl::optional<uint32_t>>

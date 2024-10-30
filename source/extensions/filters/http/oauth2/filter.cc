@@ -214,7 +214,7 @@ FilterConfig::FilterConfig(
           PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
-      use_refresh_token_(proto_config.use_refresh_token().value()),
+      use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
       disable_id_token_set_cookie_(proto_config.disable_id_token_set_cookie()),
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
       disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()) {
@@ -238,6 +238,15 @@ FilterConfig::FilterConfig(
 
 FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+}
+
+bool FilterConfig::shouldUseRefreshToken(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_use_refresh_token")) {
+    return PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, use_refresh_token, true);
+  }
+
+  return proto_config.use_refresh_token().value();
 }
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
@@ -422,9 +431,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   original_request_url_ = result.original_request_url_;
   auth_code_ = result.auth_code_;
-  Formatter::FormatterImpl formatter(config_->redirectUri());
+  Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
+      Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri =
-      formatter.formatWithContext({&headers}, decoder_callbacks_->streamInfo());
+      formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
                                      redirect_uri, config_->authType());
 
@@ -519,9 +529,10 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
       absl::StrCat(stateParamsUrl, "=", escaped_url, "&", stateParamsNonce, "=", nonce);
   const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
 
-  Formatter::FormatterImpl formatter(config_->redirectUri());
+  Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
+      Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri =
-      formatter.formatWithContext({&headers}, decoder_callbacks_->streamInfo());
+      formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
   const std::string escaped_redirect_uri =
       Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri);
 

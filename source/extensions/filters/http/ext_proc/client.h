@@ -10,13 +10,14 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/http/sidestream_watermark.h"
+#include "source/extensions/filters/http/ext_proc/client_base.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-class ExternalProcessorStream {
+class ExternalProcessorStream : public StreamBase {
 public:
   virtual ~ExternalProcessorStream() = default;
   virtual void send(envoy::service::ext_proc::v3::ProcessingRequest&& request,
@@ -30,7 +31,7 @@ public:
 
 using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
 
-class ExternalProcessorCallbacks {
+class ExternalProcessorCallbacks : public RequestCallbacks {
 public:
   virtual ~ExternalProcessorCallbacks() = default;
   virtual void onReceiveMessage(
@@ -40,16 +41,14 @@ public:
   virtual void logGrpcStreamInfo() PURE;
 };
 
-class ExternalProcessorClient {
+class ExternalProcessorClient : public ClientBase {
 public:
   virtual ~ExternalProcessorClient() = default;
   virtual ExternalProcessorStreamPtr
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-        const Http::AsyncClient::StreamOptions& options,
+        Http::AsyncClient::StreamOptions& options,
         Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) PURE;
-  virtual ExternalProcessorStream* stream() PURE;
-  virtual void setStream(ExternalProcessorStream* stream) PURE;
 };
 
 using ExternalProcessorClientPtr = std::unique_ptr<ExternalProcessorClient>;

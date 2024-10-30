@@ -93,7 +93,9 @@ Cluster::~Cluster() {
     auto cluster_name = it->first;
     ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
     cluster_map_.erase(it++);
-    cm_.removeCluster(cluster_name);
+    cm_.removeCluster(cluster_name,
+                      Runtime::runtimeFeatureEnabled(
+                          "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"));
   }
 }
 
@@ -102,7 +104,10 @@ void Cluster::startPreInit() {
   std::unique_ptr<Upstream::HostVector> hosts_added;
   dns_cache_->iterateHostMap(
       [&](absl::string_view host, const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) {
-        addOrUpdateHost(host, info, hosts_added);
+        absl::Status status = addOrUpdateHost(host, info, hosts_added);
+        if (!status.ok()) {
+          ENVOY_LOG(warn, "Failed to add host from cache: {}", status.message());
+        }
       });
   if (hosts_added) {
     updatePriorityState(*hosts_added, {});
@@ -131,7 +136,9 @@ void Cluster::checkIdleSubCluster() {
         auto cluster_name = it->first;
         ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
         cluster_map_.erase(it++);
-        cm_.removeCluster(cluster_name);
+        cm_.removeCluster(cluster_name,
+                          Runtime::runtimeFeatureEnabled(
+                              "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"));
       } else {
         ++it;
       }
@@ -238,7 +245,7 @@ bool Cluster::ClusterInfo::checkIdle() {
   return false;
 }
 
-void Cluster::addOrUpdateHost(
+absl::Status Cluster::addOrUpdateHost(
     absl::string_view host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
     std::unique_ptr<Upstream::HostVector>& hosts_added) {
@@ -276,18 +283,20 @@ void Cluster::addOrUpdateHost(
       ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
       host_map_it->second.logical_host_->setNewAddresses(
           host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
-      return;
+      return absl::OkStatus();
     }
 
     ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
+    auto host_or_error = Upstream::LogicalHost::create(
+        info(), std::string{host}, host_info->address(), host_info->addressList(),
+        dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr, time_source_);
+    RETURN_IF_NOT_OK_REF(host_or_error.status());
 
-    emplaced_host = host_map_
-                        .try_emplace(host, host_info,
-                                     std::make_shared<Upstream::LogicalHost>(
-                                         info(), std::string{host}, host_info->address(),
-                                         host_info->addressList(), dummy_locality_lb_endpoint_,
-                                         dummy_lb_endpoint_, nullptr, time_source_))
-                        .first->second.logical_host_;
+    emplaced_host =
+        host_map_
+            .try_emplace(host, host_info,
+                         std::shared_ptr<Upstream::LogicalHost>(host_or_error->release()))
+            .first->second.logical_host_;
   }
 
   ASSERT(emplaced_host);
@@ -295,19 +304,21 @@ void Cluster::addOrUpdateHost(
     hosts_added = std::make_unique<Upstream::HostVector>();
   }
   hosts_added->emplace_back(emplaced_host);
+  return absl::OkStatus();
 }
 
-void Cluster::onDnsHostAddOrUpdate(
+absl::Status Cluster::onDnsHostAddOrUpdate(
     const std::string& host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_LOG(debug, "Adding host info for {}", host);
 
   std::unique_ptr<Upstream::HostVector> hosts_added;
-  addOrUpdateHost(host, host_info, hosts_added);
+  RETURN_IF_NOT_OK(addOrUpdateHost(host, host_info, hosts_added));
   if (hosts_added != nullptr) {
     ASSERT(!hosts_added->empty());
     updatePriorityState(*hosts_added, {});
   }
+  return absl::OkStatus();
 }
 
 void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
@@ -381,12 +392,11 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     }
   }
 
-  std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
-
-  if (host.empty()) {
+  if (raw_host.empty()) {
     ENVOY_LOG(debug, "host empty");
     return nullptr;
   }
+  std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
   if (cluster_.enableSubCluster()) {
     return cluster_.chooseHost(host, context);

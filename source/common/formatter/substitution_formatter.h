@@ -16,6 +16,7 @@
 #include "source/common/formatter/http_formatter_context.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/json/json_streamer.h"
+#include "source/common/json/json_utility.h"
 
 #include "absl/types/optional.h"
 #include "re2/re2.h"
@@ -100,7 +101,7 @@ protected:
 class SubstitutionFormatParser {
 public:
   template <class FormatterContext = HttpFormatterContext>
-  static std::vector<FormatterProviderBasePtr<FormatterContext>>
+  static absl::StatusOr<std::vector<FormatterProviderBasePtr<FormatterContext>>>
   parse(absl::string_view format,
         const std::vector<CommandParserBasePtr<FormatterContext>>& command_parsers = {}) {
     std::string current_token;
@@ -137,7 +138,7 @@ public:
 
       if (!re2::RE2::Consume(&sub_format, commandWithArgsRegex(), &command, &command_arg,
                              &max_len)) {
-        throwEnvoyExceptionOrPanic(
+        return absl::InvalidArgumentError(
             fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
                         format, pos));
       }
@@ -184,7 +185,8 @@ public:
       }
 
       if (!added) {
-        throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
+        return absl::InvalidArgumentError(
+            fmt::format("Not supported field in StreamInfo: {}", command));
       }
 
       pos += (sub_format_size - sub_format.size());
@@ -213,16 +215,14 @@ template <class FormatterContext> class FormatterBaseImpl : public FormatterBase
 public:
   using CommandParsers = std::vector<CommandParserBasePtr<FormatterContext>>;
 
-  FormatterBaseImpl(absl::string_view format, bool omit_empty_values = false)
-      : empty_value_string_(omit_empty_values ? absl::string_view{}
-                                              : DefaultUnspecifiedValueStringView) {
-    providers_ = SubstitutionFormatParser::parse<FormatterContext>(format);
-  }
-  FormatterBaseImpl(absl::string_view format, bool omit_empty_values,
-                    const CommandParsers& command_parsers)
-      : empty_value_string_(omit_empty_values ? absl::string_view{}
-                                              : DefaultUnspecifiedValueStringView) {
-    providers_ = SubstitutionFormatParser::parse<FormatterContext>(format, command_parsers);
+  static absl::StatusOr<std::unique_ptr<FormatterBaseImpl>>
+  create(absl::string_view format, bool omit_empty_values = false,
+         const CommandParsers& command_parsers = {}) {
+    absl::Status creation_status = absl::OkStatus();
+    auto ret = std::unique_ptr<FormatterBaseImpl>(
+        new FormatterBaseImpl(creation_status, format, omit_empty_values, command_parsers));
+    RETURN_IF_NOT_OK_REF(creation_status);
+    return ret;
   }
 
   // FormatterBase
@@ -239,13 +239,32 @@ public:
     return log_line;
   }
 
+protected:
+  FormatterBaseImpl(absl::Status& creation_status, absl::string_view format,
+                    bool omit_empty_values = false)
+      : empty_value_string_(omit_empty_values ? absl::string_view{}
+                                              : DefaultUnspecifiedValueStringView) {
+    auto providers_or_error = SubstitutionFormatParser::parse<FormatterContext>(format);
+    SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
+    providers_ = std::move(*providers_or_error);
+  }
+  FormatterBaseImpl(absl::Status& creation_status, absl::string_view format, bool omit_empty_values,
+                    const CommandParsers& command_parsers = {})
+      : empty_value_string_(omit_empty_values ? absl::string_view{}
+                                              : DefaultUnspecifiedValueStringView) {
+    auto providers_or_error =
+        SubstitutionFormatParser::parse<FormatterContext>(format, command_parsers);
+    SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
+    providers_ = std::move(*providers_or_error);
+  }
+
 private:
   const std::string empty_value_string_;
   std::vector<FormatterProviderBasePtr<FormatterContext>> providers_;
 };
 
 // Helper class to write value to output buffer in JSON style.
-// NOTE: This helper class has duplicated logic with the Json::Streamer class but
+// NOTE: This helper class has duplicated logic with the Json::BufferStreamer class but
 // provides lower level of APIs to operate on the output buffer (like control the
 // delimiters). This is designed for special scenario of substitution formatter and
 // is not intended to be used by other parts of the code.
@@ -387,8 +406,9 @@ public:
     for (JsonFormatBuilder::FormatElement& element :
          JsonFormatBuilder().fromStruct(struct_format)) {
       if (element.is_template_) {
-        parsed_elements_.emplace_back(
-            SubstitutionFormatParser::parse<FormatterContext>(element.value_, commands));
+        parsed_elements_.emplace_back(THROW_OR_RETURN_VALUE(
+            SubstitutionFormatParser::parse<FormatterContext>(element.value_, commands),
+            std::vector<FormatterProviderBasePtr<FormatterContext>>));
       } else {
         parsed_elements_.emplace_back(std::move(element.value_));
       }
@@ -420,7 +440,8 @@ public:
       } else {
         // 3. Handle the formatter element with a single provider and value
         //    type needs to be kept.
-        typedValueToLogLine(formatters, context, info, serializer);
+        auto value = formatters[0]->formatValueWithContext(context, info);
+        Json::Utility::appendValueToString(value, log_line);
       }
     }
 
@@ -448,48 +469,6 @@ private:
     serializer.addRawString(Json::Constants::DoubleQuote); // End the JSON string.
   }
 
-  void typedValueToLogLine(const Formatters& formatters, const FormatterContext& context,
-                           const StreamInfo::StreamInfo& info,
-                           JsonStringSerializer& serializer) const {
-
-    const ProtobufWkt::Value value = formatters[0]->formatValueWithContext(context, info);
-
-    switch (value.kind_case()) {
-    case ProtobufWkt::Value::KIND_NOT_SET:
-    case ProtobufWkt::Value::kNullValue:
-      serializer.addNull();
-      break;
-    case ProtobufWkt::Value::kNumberValue:
-      serializer.addNumber(value.number_value());
-      break;
-    case ProtobufWkt::Value::kStringValue:
-      serializer.addString(value.string_value());
-      break;
-    case ProtobufWkt::Value::kBoolValue:
-      serializer.addBool(value.bool_value());
-      break;
-    case ProtobufWkt::Value::kStructValue:
-    case ProtobufWkt::Value::kListValue:
-      // Convert the struct or list to string. This may result in a performance
-      // degradation. But We rarely hit this case.
-      // Basically only metadata or filter state formatter may hit this case.
-#ifdef ENVOY_ENABLE_YAML
-      absl::StatusOr<std::string> json_or =
-          MessageUtil::getJsonStringFromMessage(value, false, true);
-      if (json_or.ok()) {
-        // We assume the output of getJsonStringFromMessage is a valid JSON string piece.
-        serializer.addRawString(json_or.value());
-      } else {
-        serializer.addString(json_or.status().ToString());
-      }
-#else
-      IS_ENVOY_BUG("Json support compiled out");
-      serializer.addRawString(R"EOF("Json support compiled out")EOF");
-#endif
-      break;
-    }
-  }
-
   const std::string empty_value_;
 
   using ParsedFormatElement = absl::variant<std::string, Formatters>;
@@ -502,6 +481,7 @@ using JsonFormatterImpl = JsonFormatterImplBase<HttpFormatterContext>;
 template <class... Ts> struct StructFormatMapVisitorHelper : Ts... { using Ts::operator()...; };
 template <class... Ts> StructFormatMapVisitorHelper(Ts...) -> StructFormatMapVisitorHelper<Ts...>;
 
+#ifndef ENVOY_DISABLE_EXCEPTIONS
 /**
  * An formatter for structured log formats, which returns a Struct proto that
  * can be converted easily into multiple formats.
@@ -565,7 +545,7 @@ private:
   class FormatBuilder {
   public:
     explicit FormatBuilder(const CommandParsers& commands) : commands_(commands) {}
-    std::vector<FormatterProviderBasePtr<FormatterContext>>
+    absl::StatusOr<std::vector<FormatterProviderBasePtr<FormatterContext>>>
     toFormatStringValue(const std::string& string_format) const {
       return SubstitutionFormatParser::parse<FormatterContext>(string_format, commands_);
     }
@@ -580,7 +560,9 @@ private:
       for (const auto& pair : struct_format.fields()) {
         switch (pair.second.kind_case()) {
         case ProtobufWkt::Value::kStringValue:
-          output->emplace(pair.first, toFormatStringValue(pair.second.string_value()));
+          output->emplace(pair.first, THROW_OR_RETURN_VALUE(
+                                          toFormatStringValue(pair.second.string_value()),
+                                          std::vector<FormatterProviderBasePtr<FormatterContext>>));
           break;
 
         case ProtobufWkt::Value::kStructValue:
@@ -595,7 +577,7 @@ private:
           output->emplace(pair.first, toFormatNumberValue(pair.second.number_value()));
           break;
         default:
-          throwEnvoyExceptionOrPanic(
+          throw EnvoyException(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }
@@ -608,7 +590,9 @@ private:
       for (const auto& value : list_value_format.values()) {
         switch (value.kind_case()) {
         case ProtobufWkt::Value::kStringValue:
-          output->emplace_back(toFormatStringValue(value.string_value()));
+          output->emplace_back(
+              THROW_OR_RETURN_VALUE(toFormatStringValue(value.string_value()),
+                                    std::vector<FormatterProviderBasePtr<FormatterContext>>));
           break;
 
         case ProtobufWkt::Value::kStructValue:
@@ -624,7 +608,7 @@ private:
           break;
 
         default:
-          throwEnvoyExceptionOrPanic(
+          throw EnvoyException(
               "Only string values, nested structs, list values and number values are "
               "supported in structured access log format.");
         }
@@ -741,10 +725,11 @@ private:
 
 using StructFormatter = StructFormatterBase<HttpFormatterContext>;
 using StructFormatterPtr = std::unique_ptr<StructFormatter>;
+using LegacyJsonFormatterImpl = LegacyJsonFormatterBaseImpl<HttpFormatterContext>;
+#endif // ENVOY_DISABLE_EXCEPTIONS
 
 // Aliases for backwards compatibility.
 using FormatterImpl = FormatterBaseImpl<HttpFormatterContext>;
-using LegacyJsonFormatterImpl = LegacyJsonFormatterBaseImpl<HttpFormatterContext>;
 
 } // namespace Formatter
 } // namespace Envoy

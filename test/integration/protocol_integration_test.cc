@@ -462,7 +462,7 @@ TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
   waitForNextUpstreamRequest();
   EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::DownstreamPeriodic),
-            waitForAccessLog(access_log_name_));
+            waitForAccessLog(access_log_name_, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -4770,8 +4770,6 @@ private:
 };
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.allow_client_socket_creation_failure",
-                                    "true");
   AllowForceFail fail_socket_n_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
 
@@ -4975,10 +4973,10 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
 
-  std::string error_message =
-      upstreamProtocol() == Http::CodecType::HTTP3
-          ? "upstream_reset_before_response_started{protocol_error|QUIC_BAD_APPLICATION_PAYLOAD}"
-          : "upstream_reset_before_response_started{protocol_error}";
+  std::string error_message = upstreamProtocol() == Http::CodecType::HTTP3
+                                  ? "upstream_reset_before_response_started{protocol_error|QUIC_"
+                                    "BAD_APPLICATION_PAYLOAD|FROM_SELF}"
+                                  : "upstream_reset_before_response_started{protocol_error}";
 
   EXPECT_EQ(waitForAccessLog(access_log_name_), error_message);
   // Upstream connection should stay up

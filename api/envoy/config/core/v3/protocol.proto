@@ -39,19 +39,16 @@ message QuicKeepAliveSettings {
   //
   // If zero, disable keepalive probing.
   // If absent, use the QUICHE default interval to probe.
-  google.protobuf.Duration max_interval = 1 [(validate.rules).duration = {
-    lte {}
-    gte {seconds: 1}
-  }];
+  google.protobuf.Duration max_interval = 1;
 
   // The interval to send the first few keep-alive probing packets to prevent connection from hitting the idle timeout. Subsequent probes will be sent, each one with an interval exponentially longer than previous one, till it reaches :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`. And the probes afterwards will always use :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`.
   //
   // The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to prevent idle timeout and smaller than max_interval to take effect.
   //
-  // If absent or zero, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`  is also zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
+  // If absent, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>` is zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
   google.protobuf.Duration initial_interval = 2 [(validate.rules).duration = {
     lte {}
-    gte {seconds: 1}
+    gte {nanos: 1000000}
   }];
 }
 
@@ -262,6 +259,8 @@ message HttpProtocolOptions {
   // The maximum number of headers (request headers if configured on HttpConnectionManager,
   // response headers when configured on a cluster).
   // If unconfigured, the default maximum number of headers allowed is 100.
+  // The default value for requests can be overridden by setting runtime key ``envoy.reloadable_features.max_request_headers_count``.
+  // The default value for responses can be overridden by setting runtime key ``envoy.reloadable_features.max_response_headers_count``.
   // Downstream requests that exceed this limit will receive a 431 response for HTTP/1.x and cause a stream
   // reset for HTTP/2.
   // Upstream responses that exceed this limit will result in a 503 response.
@@ -270,6 +269,7 @@ message HttpProtocolOptions {
   // The maximum size of response headers.
   // If unconfigured, the default is 60 KiB, except for HTTP/1 response headers which have a default
   // of 80KiB.
+  // The default value can be overridden by setting runtime key ``envoy.reloadable_features.max_response_headers_size_kb``.
   // Responses that exceed this limit will result in a 503 response.
   // In Envoy, this setting is only valid when configured on an upstream cluster, not on the
   // :ref:`HTTP Connection Manager

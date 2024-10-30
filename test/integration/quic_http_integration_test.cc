@@ -241,7 +241,7 @@ public:
         quic::QuicServerId{
             (host.empty() ? transport_socket_factory_->clientContextConfig()->serverNameIndication()
                           : host),
-            static_cast<uint16_t>(port), false},
+            static_cast<uint16_t>(port)},
         transport_socket_factory_->getCryptoConfig(), *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
@@ -810,12 +810,6 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   codec_client_->close();
 }
 
-TEST_P(QuicHttpIntegrationTest, LegacyCertLoadingAndSelection) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.quic_handle_certs_with_shared_tls_code",
-                                    "false");
-  testMultipleQuicConnections();
-}
-
 // Not only test multiple quic connections, but disconnect and reconnect to
 // trigger resumption.
 TEST_P(QuicHttpIntegrationTest, MultipleUpstreamQuicConnections) {
@@ -1089,7 +1083,8 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   std::string failure_reason = "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
                                "(ENCRYPTION_HANDSHAKE) 46: "
                                "certificate unknown. SSLErrorStack:";
-  EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
+  EXPECT_THAT(codec_client_->connection()->transportFailureReason(),
+              testing::HasSubstr(failure_reason));
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {

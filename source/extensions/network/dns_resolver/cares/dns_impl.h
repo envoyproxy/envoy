@@ -68,6 +68,7 @@ private:
   friend class DnsResolverImplPeer;
   class PendingResolution : public ActiveDnsQuery {
   public:
+    // Network::ActiveDnsQuery
     void cancel(CancelReason reason) override {
       // c-ares only supports channel-wide cancellation, so we just allow the
       // network events to continue but don't invoke the callback on completion.
@@ -75,6 +76,9 @@ private:
       cancelled_ = true;
       cancel_reason_ = reason;
     }
+    void addTrace(uint8_t) override {}
+    std::string getTraces() override { return {}; }
+
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.
     bool owned_ = false;

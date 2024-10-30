@@ -76,7 +76,7 @@ protected:
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
         factory_context_);
-    filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
+    filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
@@ -492,13 +492,7 @@ TEST_F(OrderingTest, ResponseSomeDataComesFast) {
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
-  // Some of the data might come back but we should watermark so that we
-  // don't fill the buffer.
-  EXPECT_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
   EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_body_1, false));
-
-  // When the response does comes back, we should lift the watermark
-  EXPECT_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   sendResponseHeadersReply();
 
   EXPECT_CALL(stream_delegate_, send(_, false));
@@ -922,11 +916,7 @@ TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestBodyBufferedPartial) {
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
 }
 
-TEST_F(FastFailOrderingTest,
-       GrpcErrorOnTransitionAboveQueueLimitWhenSendingStreamChunkWithDeferredProcessing) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{std::string(Runtime::defer_processing_backedup_streams), "true"}});
-
+TEST_F(FastFailOrderingTest, GrpcErrorOnTransitionAboveQueueLimitWhenSendingStreamChunk) {
   initialize([](ExternalProcessor& cfg) {
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_header_mode(ProcessingMode::SKIP);

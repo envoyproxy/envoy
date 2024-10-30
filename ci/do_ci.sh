@@ -57,7 +57,6 @@ FETCH_PROTO_TARGETS=(
     @com_github_bufbuild_buf//:bin/buf
     //tools/proto_format/...)
 
-GCS_REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
 
 retry () {
     local n wait iterations
@@ -1027,6 +1026,7 @@ case $CI_TARGET in
         ;;
 
     refresh_compdb)
+        setup_clang_toolchain
         # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
         # So the compdb headers won't be overwritten by another bazel run.
         for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do

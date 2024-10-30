@@ -1427,6 +1427,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     traceRequest();
   }
 
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   if (!connection_manager_.shouldDeferRequestProxyingToNextIoCycle()) {
     filter_manager_.decodeHeaders(*request_headers_, end_stream);
   } else {
@@ -1498,6 +1499,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   maybeRecordLastByteReceived(end_stream);
   filter_manager_.streamInfo().addBytesReceived(data.length());
   if (!state_.deferred_to_next_io_iteration_) {
@@ -1515,6 +1517,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
   ENVOY_STREAM_LOG(debug, "request trailers complete:\n{}", *this, *trailers);
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   resetIdleTimer();
 
   ASSERT(!request_trailers_);
@@ -1535,6 +1538,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metadata_map) {
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   resetIdleTimer();
   if (!state_.deferred_to_next_io_iteration_) {
     // After going through filters, the ownership of metadata_map will be passed to terminal filter.
@@ -1739,6 +1743,7 @@ void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
 }
 
 void ConnectionManagerImpl::ActiveStream::encode1xxHeaders(ResponseHeaderMap& response_headers) {
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(
@@ -1757,6 +1762,7 @@ void ConnectionManagerImpl::ActiveStream::encode1xxHeaders(ResponseHeaderMap& re
 
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& headers,
                                                         bool end_stream) {
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   // Base headers.
 
   // We want to preserve the original date header, but we add a date header if it is absent
@@ -1902,6 +1908,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
 
@@ -1910,12 +1917,14 @@ void ConnectionManagerImpl::ActiveStream::encodeData(Buffer::Instance& data, boo
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeTrailers(ResponseTrailerMap& trailers) {
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
 
   response_encoder_->encodeTrailers(trailers);
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeMetadata(MetadataMapPtr&& metadata) {
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   MetadataMapVector metadata_map_vector;
   metadata_map_vector.emplace_back(std::move(metadata));
   ENVOY_STREAM_LOG(debug, "encoding metadata via codec:\n{}", *this, metadata_map_vector);
@@ -2193,6 +2202,7 @@ void ConnectionManagerImpl::ActiveStream::onRequestDataTooLarge() {
 
 void ConnectionManagerImpl::ActiveStream::recreateStream(
     StreamInfo::FilterStateSharedPtr filter_state) {
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   ResponseEncoder* response_encoder = response_encoder_;
   response_encoder_ = nullptr;
 
@@ -2264,6 +2274,7 @@ bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
   if (!state_.deferred_to_next_io_iteration_) {
     return false;
   }
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   state_.deferred_to_next_io_iteration_ = false;
   bool end_stream = state_.deferred_end_stream_ && deferred_data_ == nullptr &&
                     deferred_request_trailers_ == nullptr && deferred_metadata_.empty();

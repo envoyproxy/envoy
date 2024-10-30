@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions/wasm/v3/wasm.pb.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/lifecycle_notifier.h"
@@ -35,6 +36,7 @@ namespace Wasm {
 
 using CreateContextFn =
     std::function<ContextBase*(Wasm* wasm, const std::shared_ptr<Plugin>& plugin)>;
+using FailurePolicy = envoy::extensions::wasm::v3::FailurePolicy;
 
 class WasmHandle;
 
@@ -154,11 +156,12 @@ using PluginHandleSharedPtr = std::shared_ptr<PluginHandle>;
 
 class PluginHandleSharedPtrThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr handle) : handle_(handle){};
-  PluginHandleSharedPtr& handle() { return handle_; }
+  PluginHandleSharedPtr handle{};
+  MonotonicTime last_load{};
 
-private:
-  PluginHandleSharedPtr handle_;
+  PluginHandleSharedPtrThreadLocal(PluginHandleSharedPtr h, MonotonicTime t = {})
+      : handle(std::move(h)), last_load(t) {}
+  PluginHandleSharedPtrThreadLocal() = default;
 };
 
 using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
@@ -182,6 +185,53 @@ getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginS
 void clearCodeCacheForTesting();
 void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d);
 WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm);
+
+class PluginConfig : Logger::Loggable<Logger::Id::wasm> {
+public:
+  // TODO(wbpcode): the code of PluginConfig will be shared cross all Wasm extensions (loggers,
+  // http filters, etc.), we may extend the constructor to takes a static string view to tell
+  // the type of the plugin if needed.
+  PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
+               Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+               Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
+               const envoy::config::core::v3::Metadata* metadata, bool singleton);
+
+  std::shared_ptr<Context> createContext();
+  Wasm* wasm();
+  const PluginSharedPtr& plugin() { return plugin_; }
+  WasmStats& wasmStats() { return stats_handler_->wasmStats(); }
+
+  using SinglePluginHandle = PluginHandleSharedPtrThreadLocal;
+  using ThreadLocalPluginHandle = ThreadLocal::TypedSlotPtr<SinglePluginHandle>;
+
+private:
+  /**
+   * Get the latest wasm and plugin handle wrapper. The plugin handle may be reloaded if
+   * the wasm is failed and the policy allows it.
+   */
+  std::pair<OptRef<SinglePluginHandle>, Wasm*> getPluginHandleAndWasm();
+
+  /**
+   * May reload the handle if the wasm if failed. The input handle will be updated if the
+   * handle is reloaded.
+   * @return the wasm pointer of the latest handle.
+   */
+  Wasm* maybeReloadHandleIfNeeded(SinglePluginHandle& handle_wrapper);
+
+  StatsHandlerSharedPtr stats_handler_;
+  FailurePolicy failure_policy_;
+  // This backoff strategy implementation is thread-safe and could be shared across multiple
+  // workers.
+  std::unique_ptr<JitteredLowerBoundBackOffStrategy> reload_backoff_;
+  PluginSharedPtr plugin_;
+  RemoteAsyncDataProviderPtr remote_data_provider_;
+  const bool is_singleton_handle_{};
+  WasmHandleSharedPtr base_wasm_{};
+  absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;
+};
+
+using PluginConfigPtr = std::unique_ptr<PluginConfig>;
+using PluginConfigSharedPtr = std::shared_ptr<PluginConfig>;
 
 } // namespace Wasm
 } // namespace Common

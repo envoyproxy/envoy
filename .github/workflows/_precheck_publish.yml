@@ -5,6 +5,9 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      gcp-key:
+        required: true
     inputs:
       request:
         type: string
@@ -20,6 +23,8 @@ concurrency:
 
 jobs:
   publish:
+    secrets:
+      gcp-key: ${{ secrets.gcp-key }}
     permissions:
       contents: read
       packages: read
@@ -30,6 +35,7 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
+      gcs-only: "true"
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
@@ -38,7 +44,9 @@ jobs:
         ERROR
         error:
         Error:
+      steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
+      target-suffix: ${{ matrix.target-suffix }}
       trusted: ${{ inputs.trusted }}
     strategy:
       fail-fast: false
@@ -46,10 +54,12 @@ jobs:
         include:
         - target: release.test_only
           name: Release (x64)
+          target-suffix: x64
           arch: x64
           rbe: true
         - target: release.test_only
           name: Release (arm64)
+          target-suffix: arm64
           arch: arm64
           bazel-extra: >-
             --config=common-envoy-engflow
@@ -64,3 +74,9 @@ jobs:
             --config=remote-envoy-engflow
             --config=docs-ci
           rbe: true
+          steps-post: |
+            - run: ci/run_envoy_docker.sh 'ci/do_ci.sh docs-upload'
+              shell: bash
+              env:
+                GCS_ARTIFACT_BUCKET: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
+                GCS_REDIRECT_PATH: ${{ fromJSON(inputs.request).request.pr || fromJSON(inputs.request).request.target-branch }}

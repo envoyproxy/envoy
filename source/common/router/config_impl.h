@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cstdint>
 #include <iterator>
-#include <list>
 #include <map>
 #include <memory>
 #include <regex>
@@ -478,7 +477,6 @@ private:
   // that should be used when with this policy.
   std::vector<std::pair<Upstream::RetryHostPredicateFactory&, ProtobufTypes::MessagePtr>>
       retry_host_predicate_configs_;
-  Upstream::RetryPrioritySharedPtr retry_priority_;
   // Name and config proto to use to create the RetryPriority to use with this policy. Default
   // initialized when no RetryPriority should be used.
   std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
@@ -998,8 +996,8 @@ public:
            ProtobufMessage::ValidationVisitor& validator,
            const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
 
-    uint64_t clusterWeight() const {
-      return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
+    uint64_t clusterWeight(Runtime::Loader& loader) const {
+      return loader.snapshot().getInteger(runtime_key_, cluster_weight_);
     }
 
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -1068,7 +1066,6 @@ public:
                          const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
 
     const std::string runtime_key_;
-    Runtime::Loader& loader_;
     const uint64_t cluster_weight_;
     MetadataMatchCriteriaConstPtr cluster_metadata_match_criteria_;
     HeaderParserPtr request_headers_parser_;
@@ -1613,7 +1610,7 @@ public:
   }
 
   // Router::CommonConfig
-  const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
+  const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
   }
   const std::string& name() const override { return name_; }
@@ -1637,7 +1634,7 @@ private:
   CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
-  std::list<Http::LowerCaseString> internal_only_headers_;
+  std::vector<Http::LowerCaseString> internal_only_headers_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   const std::string name_;
@@ -1677,7 +1674,7 @@ public:
   RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info,
                             uint64_t random_value) const override;
-  const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
+  const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return shared_config_->internalOnlyHeaders();
   }
   const std::string& name() const override { return shared_config_->name(); }
@@ -1728,7 +1725,7 @@ public:
     return nullptr;
   }
 
-  const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
+  const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
   }
 
@@ -1740,7 +1737,7 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
 
 private:
-  std::list<Http::LowerCaseString> internal_only_headers_;
+  std::vector<Http::LowerCaseString> internal_only_headers_;
   const std::string name_;
 };
 

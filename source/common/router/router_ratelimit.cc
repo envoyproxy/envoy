@@ -12,8 +12,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
-#include "source/common/http/matching/data_impl.h"
-#include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -39,44 +37,24 @@ bool populateDescriptor(const std::vector<RateLimit::DescriptorProducerPtr>& act
   return result;
 }
 
-class RateLimitDescriptorValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
-public:
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
-                                          absl::string_view) override {
-    return absl::OkStatus();
-  }
-};
-
-class MatchInputRateLimitDescriptor : public RateLimit::DescriptorProducer {
-public:
-  MatchInputRateLimitDescriptor(const std::string& descriptor_key,
-                                Matcher::DataInputPtr<Http::HttpMatchingData>&& data_input)
-      : descriptor_key_(descriptor_key), data_input_(std::move(data_input)) {}
-
-  // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
-                          const Http::RequestHeaderMap& headers,
-                          const StreamInfo::StreamInfo& info) const override {
-    Http::Matching::HttpMatchingDataImpl data(info);
-    data.onRequestHeaders(headers);
-    auto result = data_input_->get(data);
-    if (absl::holds_alternative<absl::monostate>(result.data_)) {
-      return false;
-    }
-    const std::string& str = absl::get<std::string>(result.data_);
-    if (!str.empty()) {
-      descriptor_entry = {descriptor_key_, str};
-    }
-    return true;
-  }
-
-private:
-  const std::string descriptor_key_;
-  Matcher::DataInputPtr<Http::HttpMatchingData> data_input_;
-};
-
 } // namespace
+
+// Ratelimit::DescriptorProducer
+bool MatchInputRateLimitDescriptor::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                                       const std::string&,
+                                                       const Http::RequestHeaderMap& headers,
+                                                       const StreamInfo::StreamInfo& info) const {
+  Http::Matching::HttpMatchingDataImpl data(info);
+  data.onRequestHeaders(headers);
+  auto result = data_input_->get(data);
+  if (!absl::holds_alternative<std::string>(result.data_)) {
+    return false;
+  }
+  if (absl::string_view str = absl::get<std::string>(result.data_); !str.empty()) {
+    descriptor_entry = {descriptor_key_, std::string(str)};
+  }
+  return true;
+}
 
 const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
 
@@ -256,7 +234,8 @@ QueryParameterValueMatchAction::QueryParameterValueMatchAction(
     : descriptor_value_(action.descriptor_value()),
       descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
-      action_query_parameters_(buildQueryParameterMatcherVector(action, context)) {}
+      action_query_parameters_(
+          buildQueryParameterMatcherVector(action.query_parameters(), context)) {}
 
 bool QueryParameterValueMatchAction::populateDescriptor(
     RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
@@ -274,10 +253,11 @@ bool QueryParameterValueMatchAction::populateDescriptor(
 
 std::vector<ConfigUtility::QueryParameterMatcherPtr>
 QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
-    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+    const Protobuf::RepeatedPtrField<envoy::config::route::v3::QueryParameterMatcher>&
+        query_parameters,
     Server::Configuration::CommonFactoryContext& context) {
   std::vector<ConfigUtility::QueryParameterMatcherPtr> ret;
-  for (const auto& query_parameter : action.query_parameters()) {
+  for (const auto& query_parameter : query_parameters) {
     ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, context));
   }
   return ret;

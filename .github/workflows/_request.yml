@@ -40,14 +40,14 @@ jobs:
       env: ${{ steps.data.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.35
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.37
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.35
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.37
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -60,7 +60,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/gh-actions/envoy/ci/request@actions-v0.2.35
+      uses: envoyproxy/toolshed/gh-actions/envoy/ci/request@actions-v0.2.37
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -71,7 +71,7 @@ jobs:
         vars: ${{ toJSON(vars) }}
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/gh-actions/github/env/summary@actions-v0.2.35
+      uses: envoyproxy/toolshed/gh-actions/github/env/summary@actions-v0.2.37
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -87,7 +87,7 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - name: Environment data
-      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.35
+      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.2.37
       id: data
       with:
         input: |
