@@ -76,6 +76,8 @@ message IPTagging {
   // will be sanitized, or be appended to.
   //
   // This is ignored if :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>` is empty.
+  //
+  // Default: *SANITIZED*.
   HeaderAction ip_tag_header_action = 6;
 
   // The type of request the filter should apply to.

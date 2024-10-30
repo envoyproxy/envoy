@@ -112,13 +112,13 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
                                 const std::vector<std::string>& tags) {
   using HeaderAction = IpTaggingFilterConfig::HeaderAction;
 
-  const Http::LowerCaseString& headerName = config_->ip_tag_header();
+  const Http::LowerCaseString& header_name = config_->ip_tag_header();
 
   if (tags.empty()) {
     bool mustSanitize =
         config_->ip_tag_header_action() == HeaderAction::IPTagging_HeaderAction_SANITIZE;
-    if (!headerName.get().empty() && mustSanitize) {
-      if (headers.remove(headerName) != 0) {
+    if (!header_name.get().empty() && mustSanitize) {
+      if (headers.remove(header_name) != 0) {
         // We must clear the route cache in case it held a decision based on the now-removed header.
         callbacks_->downstreamCallbacks()->clearRouteCache();
       }
@@ -127,7 +127,7 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
   }
 
   const std::string tags_join = absl::StrJoin(tags, ",");
-  if (headerName.get().empty()) {
+  if (header_name.get().empty()) {
     // The x-envoy-ip-tags header was cleared at the start of the filter chain.
     // We only do append here, so that if multiple ip-tagging filters are run sequentially,
     // the behaviour will be backwards compatible.

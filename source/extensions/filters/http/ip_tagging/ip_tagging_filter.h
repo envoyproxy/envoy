@@ -41,7 +41,7 @@ public:
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
 
-  // No ip_tag_header is set in case of an empty string.
+  // An empty string indicates that no ip_tag_header is set.
   const Http::LowerCaseString& ip_tag_header() const { return ip_tag_header_; }
   HeaderAction ip_tag_header_action() const { return ip_tag_header_action_; }
 
