@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.extensions.quic.connection_debug_visitor.quic_stats.v3;
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.quic.connection_debug_visitor.quic_stats.v3";
+option java_outer_classname = "QuicStatsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/quic/connection_debug_visitor/quic_stats/v3;quic_statsv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: QUIC stats config]
+// [#extension: envoy.quic.connection_debug_visitor.quic_stats]
+
+// Configuration for a QUIC debug visitor which emits stats from the underlying QUIC transport.
+message Config {
+  // Period to update stats while the connection is open. If unset, updates only happen when the
+  // connection is closed. Stats are always updated one final time when the connection is closed.
+  google.protobuf.Duration update_period = 2 [(validate.rules).duration = {gte {nanos: 1000000}}];
+}
