@@ -90,6 +90,18 @@ CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf) {
       });
 }
 
+CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len, void* value_data,
+                                            int value_len, headerAction act) {
+  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
+      s,
+      [key_data, key_len, value_data, value_len, act](std::shared_ptr<TcpUpstream>& filter,
+                                                      ProcessorState& state) -> CAPIStatus {
+        auto key_str = stringViewFromGoPointer(key_data, key_len);
+        auto value_str = stringViewFromGoPointer(value_data, value_len);
+        return filter->setRespHeader(state, key_str, value_str, act);
+      });
+}
+
 CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer_ptr, void* data) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s, [buffer_ptr, data](std::shared_ptr<TcpUpstream>& filter, ProcessorState& state) -> CAPIStatus {

@@ -15,6 +15,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/router/upstream_request.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
 #include "processor_state.h"
@@ -69,7 +70,7 @@ private:
 
   Dso::TcpUpstreamDsoPtr dso_lib_;
   uint64_t config_id_{0};
-  // TODO(StarryVae): use rwlock.
+  // TODO(duxin40): use rwlock.
   Thread::MutexBasicLockable mutex_{};
   // filter level config is created in C++ side, and freed by Golang GC finalizer.
   HttpConfigInternal* config_{nullptr};
@@ -184,6 +185,11 @@ enum class EnvoyValue {
   ClusterName,
 };
 
+enum class HttpStatusCode : uint64_t {
+  Success = 200,
+  UpstreamProtocolError = 500,
+};
+
 class TcpUpstream : public Router::GenericUpstream,
                     public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
                     public std::enable_shared_from_this<TcpUpstream>,
@@ -193,8 +199,6 @@ public:
               Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream, Dso::TcpUpstreamDsoPtr dynamic_lib,
               FilterConfigSharedPtr config);
   ~TcpUpstream() override;            
-
-  void doHeadersGo(ProcessorState& state, const Envoy::Http::RequestOrResponseHeaderMap& headers, bool end_stream);
 
   // GenericUpstream
   void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -215,6 +219,7 @@ public:
 
   CAPIStatus getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data, int* value_len);
   CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
+  CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
   CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
   CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
   CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
@@ -233,12 +238,17 @@ public:
 private:
   // return true when it is first inited.
   bool initRequest();
+  bool initResponse();
 
 private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   Buffer::OwnedImpl response_buffer_{};
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+  // mark if already write data to upstream in encodeHeader
+  bool write_upstream_data_;
+  // store response header for http
+  std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
 
   Dso::TcpUpstreamDsoPtr dynamic_lib_;
 

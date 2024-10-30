@@ -344,23 +344,24 @@ type HistogramMetric interface {
 }
 
 type TcpUpstreamFilter interface {
-	EncodeHeaders(headerMap RequestHeaderMap, endOfStream bool)
+	EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) (EndStream bool)
 	// Invoked when data is delivered from the upstream connection.
 	EncodeData(buffer BufferInstance, endOfStream bool) (EndStream bool)
 	// Called when data is read on from tcp upstream.
-	OnUpstreamData(buffer BufferInstance, endOfStream bool) UpstreamDataStatus
+	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) UpstreamDataStatus
 	// destroy filter
 	OnDestroy(DestroyReason)
 }
 
-func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, endOfStream bool) {
+func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) bool {
+	return endOfStream
 }
 
 func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) bool {
-	return true
+	return endOfStream
 }
 
-func (*EmptyTcpUpstreamFilter) OnUpstreamData(buffer BufferInstance, endOfStream bool) UpstreamDataStatus {
+func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) UpstreamDataStatus {
 	return UpstreamDataFinish
 }
 

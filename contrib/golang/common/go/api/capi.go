@@ -98,18 +98,21 @@ type NetworkCAPI interface {
 	UpstreamInfo(f unsafe.Pointer, infoType int) string
 }
 
- type TcpUpstreamCAPI interface {
+type TcpUpstreamCAPI interface {
 	// UpstreamConnEnableHalfClose upstream conn EnableHalfClose
 	UpstreamConnEnableHalfClose(f unsafe.Pointer, enableHalfClose int)
-
-	HttpGetHeader(s unsafe.Pointer, key string) string
-	HttpCopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
+	// Header related
+	GetHeader(s unsafe.Pointer, key string) string
+	CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
+	SetRespHeader(s unsafe.Pointer, key string, value string, add bool)
+	// Buffer related
 	GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte
 	DrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64)
 	SetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
 	SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
+	// Get the specified value by key
 	GetStringValue(r unsafe.Pointer, id int) (string, bool)
-
+	// clean up the resource of upstream request
 	Finalize(r unsafe.Pointer, reason int)
 
 	// /* These APIs are related to config, use the pointer of config. */
@@ -118,8 +121,8 @@ type NetworkCAPI interface {
 	/* These APIs have nothing to do with request */
 	Log(level LogType, message string)
 	LogLevel() LogType
- }
- 
+}
+
 type CommonCAPI interface {
 	Log(level LogType, message string)
 	LogLevel() LogType

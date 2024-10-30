@@ -101,7 +101,7 @@ func (c *cgoApiImpl) UpstreamConnEnableHalfClose(r unsafe.Pointer, enableHalfClo
 	C.envoyGoTcpUpstreamConnEnableHalfClose(unsafe.Pointer(req.req), C.int(enableHalfClose))
 }
 
-func (c *cgoApiImpl) HttpGetHeader(s unsafe.Pointer, key string) string {
+func (c *cgoApiImpl) GetHeader(s unsafe.Pointer, key string) string {
 	state := (*processState)(s)
 	var valueData C.uint64_t
 	var valueLen C.int
@@ -110,7 +110,7 @@ func (c *cgoApiImpl) HttpGetHeader(s unsafe.Pointer, key string) string {
 	return unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
 }
 
-func (c *cgoApiImpl) HttpCopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
+func (c *cgoApiImpl) CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	state := (*processState)(s)
 	var strs []string
 	if num <= maxStackAllocedHeaderSize {
@@ -142,6 +142,19 @@ func (c *cgoApiImpl) HttpCopyHeaders(s unsafe.Pointer, num uint64, bytes uint64)
 	}
 	runtime.KeepAlive(buf)
 	return m
+}
+
+func (c *cgoApiImpl) SetRespHeader(s unsafe.Pointer, key string, value string, add bool) {
+	state := (*processState)(s)
+	var act C.headerAction
+	if add {
+		act = C.HeaderAdd
+	} else {
+		act = C.HeaderSet
+	}
+	res := C.envoyGoTcpUpstreamSetRespHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
+		unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), act)
+	handleCApiStatus(res)
 }
 
 func (c *cgoApiImpl) GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte {

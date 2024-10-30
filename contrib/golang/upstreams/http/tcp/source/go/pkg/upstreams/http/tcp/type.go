@@ -49,13 +49,13 @@ type requestOrResponseHeaderMapImpl struct {
 
 func (h *requestOrResponseHeaderMapImpl) initHeaders() {
 	if h.headers == nil {
-		h.headers = cAPI.HttpCopyHeaders(unsafe.Pointer(h.state), h.headerNum, h.headerBytes)
+		h.headers = cAPI.CopyHeaders(unsafe.Pointer(h.state), h.headerNum, h.headerBytes)
 	}
 }
 
 func (h *requestOrResponseHeaderMapImpl) GetRaw(key string) string {
 	// GetRaw is case-sensitive
-	return cAPI.HttpGetHeader(unsafe.Pointer(h.state), key)
+	return cAPI.GetHeader(unsafe.Pointer(h.state), key)
 }
 
 func (h *requestOrResponseHeaderMapImpl) Get(key string) (string, bool) {
@@ -177,6 +177,48 @@ func (h *requestHeaderMapImpl) SetHost(host string) {
 	panic("do not support this action")
 }
 
+// api.ResponseHeaderMap
+type responseHeaderMapImpl struct {
+	requestOrResponseHeaderMapImpl
+}
+
+var _ api.ResponseHeaderMap = (*responseHeaderMapImpl)(nil)
+
+func (h *responseHeaderMapImpl) Status() (int, bool) {
+	if str, ok := h.Get(":status"); ok {
+		v, _ := strconv.Atoi(str)
+		return v, true
+	}
+	return 0, false
+}
+
+func (h *responseHeaderMapImpl) Set(key, value string) {
+	key = strings.ToLower(key)
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	if h.headers == nil {
+		h.headers = make(map[string][]string, 0)
+	}
+	h.headers[key] = []string{value}
+
+	cAPI.SetRespHeader(unsafe.Pointer(h.state), key, value, false)
+}
+
+func (h *responseHeaderMapImpl) Add(key, value string) {
+	key = strings.ToLower(key)
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	if h.headers == nil {
+		h.headers = make(map[string][]string, 0)
+	}
+	if hdrs, found := h.headers[key]; found {
+		h.headers[key] = append(hdrs, value)
+	} else {
+		h.headers[key] = []string{value}
+	}
+
+	cAPI.SetRespHeader(unsafe.Pointer(h.state), key, value, true)
+}
 
 // api.BufferInstance
 type httpBuffer struct {

@@ -49,6 +49,8 @@ private:
 
 // This describes the processor state.
 enum class FilterState {
+  // Processing header in Go
+  ProcessingHeader,
   // Processing data in Go
   ProcessingData,
   // All done
@@ -66,7 +68,7 @@ public:
   FilterState filterState() const { return static_cast<FilterState>(state); }
   void setFilterState(FilterState st) { state = static_cast<int>(st); }
   bool isProcessingInGo() {
-    return filterState() == FilterState::ProcessingData;
+    return filterState() == FilterState::ProcessingHeader || filterState() == FilterState::ProcessingData;
   }
 
   /* data buffer */
@@ -90,6 +92,8 @@ public:
   explicit DecodingProcessorState(TcpUpstream& filter, httpRequest* r) : ProcessorState(filter, r) {
     is_encoding = 0;
   }
+  // store response header for http
+  Envoy::Http::RequestOrResponseHeaderMap* resp_headers{nullptr};
 };
 
 class EncodingProcessorState : public ProcessorState {
