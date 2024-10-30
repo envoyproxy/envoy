@@ -1,7 +1,6 @@
 #include <chrono>
 #include <cstdint>
 #include <fstream>
-#include <list>
 #include <map>
 #include <memory>
 #include <string>
@@ -2022,7 +2021,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
     }
   }
 
-  EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
+  EXPECT_THAT(std::vector<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
               ContainerEq(config.internalOnlyHeaders()));
 }
 
