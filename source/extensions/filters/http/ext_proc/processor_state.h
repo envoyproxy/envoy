@@ -184,14 +184,14 @@ public:
     // 1) STREAMED BodySendMode
     // 2) BUFFERED_PARTIAL BodySendMode
     // 3) BUFFERED BodySendMode + SKIP HeaderSendMode
-    // 4) BIDIRECTIONAL_STREAMED BodySendMode
+    // 4) FULL_DUPLEX_STREAMED BodySendMode
     // In these modes, ext_proc filter can not guarantee to set the content length correctly if
     // body is mutated by external processor later.
     // In http1 codec, removing content length will enable chunked encoding whenever feasible.
     return (
         body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED ||
         body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::
-                          BIDIRECTIONAL_STREAMED ||
+                          FULL_DUPLEX_STREAMED ||
         body_mode_ ==
             envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED_PARTIAL ||
         (body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED &&
@@ -282,7 +282,7 @@ private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
   bool
   handleStreamedBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
-  bool handleMxnBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  bool handleDuplexStreamedBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);

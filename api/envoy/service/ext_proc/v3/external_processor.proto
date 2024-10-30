@@ -362,7 +362,7 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
-// The body response message corresponding to BIDIRECTIONAL_STREAMED body mode.
+// The body response message corresponding to FULL_DUPLEX_STREAMED body mode.
 message StreamedBodyResponse {
   // Envoy sends this body mutation out as it is.
   bytes body = 1;
@@ -377,15 +377,15 @@ message StreamedBodyResponse {
 message BodyMutation {
   oneof mutation {
     // The entire body to replace.
-    // Do not send this response for BIDIRECTIONAL_STREAMED body mode.
+    // Do not send this response for FULL_DUPLEX_STREAMED body mode.
     bytes body = 1;
 
     // Clear the corresponding body chunk.
-    // Do not send this response for BIDIRECTIONAL_STREAMED body mode.
+    // Do not send this response for FULL_DUPLEX_STREAMED body mode.
     bool clear_body = 2;
 
     // [#not-implemented-hide:]
-    // Sending this response for BIDIRECTIONAL_STREAMED body mode.
+    // Sending this response for FULL_DUPLEX_STREAMED body mode.
     StreamedBodyResponse streamed_response = 3;
   }
 }

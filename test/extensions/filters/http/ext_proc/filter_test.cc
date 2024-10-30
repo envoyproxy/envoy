@@ -373,7 +373,7 @@ protected:
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
-  void processResponseBodyMxnAfterTrailer(
+  void processResponseBodyStreamedAfterTrailer(
       absl::optional<std::function<void(ProcessingResponse&, BodyResponse&)>> cb) {
     auto response = std::make_unique<ProcessingResponse>();
     auto* body_response = response->mutable_response_body();
@@ -2579,9 +2579,9 @@ TEST_F(HttpFilterTest, ProcessingModeOverrideResponseHeaders) {
 }
 
 // Set allow_mode_override in filter config to be true.
-// Set request_body_mode: BIDIRECTIONAL_STREAMED
+// Set request_body_mode: FULL_DUPLEX_STREAMED
 // In such case, the mode_override in the response will be ignored.
-TEST_F(HttpFilterTest, DisableResponseModeOverrideByMxnBodyMode) {
+TEST_F(HttpFilterTest, DisableResponseModeOverrideByStreamedBodyMode) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -2589,8 +2589,8 @@ TEST_F(HttpFilterTest, DisableResponseModeOverrideByMxnBodyMode) {
   processing_mode:
     request_header_mode: "SEND"
     response_header_mode: "SEND"
-    request_body_mode: "BIDIRECTIONAL_STREAMED"
-    response_body_mode: "BIDIRECTIONAL_STREAMED"
+    request_body_mode: "FULL_DUPLEX_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
     request_trailer_mode: "SEND"
     response_trailer_mode: "SEND"
   allow_mode_override: true
@@ -2600,9 +2600,9 @@ TEST_F(HttpFilterTest, DisableResponseModeOverrideByMxnBodyMode) {
   EXPECT_EQ(filter_->config().sendBodyWithoutWaitingForHeaderResponse(), false);
   EXPECT_EQ(filter_->config().processingMode().response_header_mode(), ProcessingMode::SEND);
   EXPECT_EQ(filter_->config().processingMode().response_body_mode(),
-            ProcessingMode::BIDIRECTIONAL_STREAMED);
+            ProcessingMode::FULL_DUPLEX_STREAMED);
   EXPECT_EQ(filter_->config().processingMode().request_body_mode(),
-            ProcessingMode::BIDIRECTIONAL_STREAMED);
+            ProcessingMode::FULL_DUPLEX_STREAMED);
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
 
   // When ext_proc server sends back the request header response, it contains the
@@ -2902,13 +2902,13 @@ TEST_F(HttpFilterTest, HttpServiceTrailerProcessingModeNotSKIP) {
       "then the processing modes of this filter can not be configured to send body or trailer.");
 }
 
-TEST_F(HttpFilterTest, RequestBodyModeMXNTrailerModeSKIP) {
+TEST_F(HttpFilterTest, RequestBodyModeStreamedTrailerModeSKIP) {
   std::string yaml = R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    request_body_mode: "BIDIRECTIONAL_STREAMED"
+    request_body_mode: "FULL_DUPLEX_STREAMED"
     request_trailer_mode: "SKIP"
   )EOF";
 
@@ -2923,17 +2923,17 @@ TEST_F(HttpFilterTest, RequestBodyModeMXNTrailerModeSKIP) {
             factory_context_);
       },
       EnvoyException,
-      "If the ext_proc filter has the request_body_mode set to BIDIRECTIONAL_STREAMED, "
+      "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
       "then the request_trailer_mode has to be set to SEND");
 }
 
-TEST_F(HttpFilterTest, ResponseBodyModeMXNTrailerModeSKIP) {
+TEST_F(HttpFilterTest, ResponseBodyModeStreamedTrailerModeSKIP) {
   std::string yaml = R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    response_body_mode: "BIDIRECTIONAL_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
     response_trailer_mode: "SKIP"
   )EOF";
 
@@ -2948,7 +2948,7 @@ TEST_F(HttpFilterTest, ResponseBodyModeMXNTrailerModeSKIP) {
             factory_context_);
       },
       EnvoyException,
-      "If the ext_proc filter has the response_body_mode set to BIDIRECTIONAL_STREAMED, "
+      "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
       "then the response_trailer_mode has to be set to SEND");
 }
 
@@ -4484,13 +4484,13 @@ TEST_F(HttpFilterTest, StreamedTestInBothDirection) {
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
+TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    response_body_mode: "BIDIRECTIONAL_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
     response_trailer_mode: "SEND"
   )EOF");
 
@@ -4626,13 +4626,13 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestNormal) {
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
+TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    response_body_mode: "BIDIRECTIONAL_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
     response_trailer_mode: "SEND"
   )EOF");
 
@@ -4668,13 +4668,13 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
 
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
 
-  processResponseBodyMxnAfterTrailer([&want_response_body](ProcessingResponse&,
+  processResponseBodyStreamedAfterTrailer([&want_response_body](ProcessingResponse&,
                                                            BodyResponse& resp) {
     auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
     streamed_response->set_body(" AAAAA ");
     want_response_body.add(" AAAAA ");
   });
-  processResponseBodyMxnAfterTrailer([&want_response_body](ProcessingResponse&,
+  processResponseBodyStreamedAfterTrailer([&want_response_body](ProcessingResponse&,
                                                            BodyResponse& resp) {
     auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
     streamed_response->set_body(" BBBB ");
@@ -4690,14 +4690,14 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithTrailer) {
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
+TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
     response_header_mode: "SEND"
-    response_body_mode: "BIDIRECTIONAL_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
     response_trailer_mode: "SEND"
   )EOF");
 
@@ -4734,13 +4734,13 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
 
   // Server now sends back response.
   processResponseHeadersAfterTrailer(absl::nullopt);
-  processResponseBodyMxnAfterTrailer([&want_response_body](ProcessingResponse&,
+  processResponseBodyStreamedAfterTrailer([&want_response_body](ProcessingResponse&,
                                                            BodyResponse& resp) {
     auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
     streamed_response->set_body(" AAAAA ");
     want_response_body.add(" AAAAA ");
   });
-  processResponseBodyMxnAfterTrailer([&want_response_body](ProcessingResponse&,
+  processResponseBodyStreamedAfterTrailer([&want_response_body](ProcessingResponse&,
                                                            BodyResponse& resp) {
     auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
     streamed_response->set_body(" BBBB ");
@@ -4756,14 +4756,14 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailer) {
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailerNoBody) {
+TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailerNoBody) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
     response_header_mode: "SEND"
-    response_body_mode: "BIDIRECTIONAL_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
     response_trailer_mode: "SEND"
   )EOF");
 
@@ -4792,7 +4792,7 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithHeaderAndTrailerNoBody) {
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, MXNBodyProcessingTestWithFilterConfigNotMxn) {
+TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithFilterConfigMissing) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -4837,13 +4837,13 @@ TEST_F(HttpFilterTest, MXNBodyProcessingTestWithFilterConfigNotMxn) {
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, Send1x1BodyMutationTestWithFilterConfigMxn) {
+TEST_F(HttpFilterTest, SendNormalBodyMutationTestWithFilterConfigFullDuplexStreamed) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_mode:
-    response_body_mode: "BIDIRECTIONAL_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
     response_trailer_mode: "SEND"
   )EOF");
 

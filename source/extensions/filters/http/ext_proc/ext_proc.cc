@@ -87,16 +87,16 @@ void verifyProcessingModeConfig(const ExternalProcessor& config) {
     }
   }
 
-  if ((processing_mode.request_body_mode() == ProcessingMode::BIDIRECTIONAL_STREAMED) &&
+  if ((processing_mode.request_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
       (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
     throw EnvoyException(
-        "If the ext_proc filter has the request_body_mode set to BIDIRECTIONAL_STREAMED, "
+        "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
         "then the request_trailer_mode has to be set to SEND");
   }
-  if ((processing_mode.response_body_mode() == ProcessingMode::BIDIRECTIONAL_STREAMED) &&
+  if ((processing_mode.response_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
       (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
     throw EnvoyException(
-        "If the ext_proc filter has the response_body_mode set to BIDIRECTIONAL_STREAMED, "
+        "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
         "then the response_trailer_mode has to be set to SEND");
   }
 }
@@ -597,9 +597,9 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
     if ((state.bodyMode() == ProcessingMode::STREAMED &&
          config_->sendBodyWithoutWaitingForHeaderResponse()) ||
-        state.bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
+        state.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
       ENVOY_LOG(trace, "Sending body data even though header processing is still in progress as body mode "
-                       "is BIDIRECTIONAL_STREAMED or STREAMED and "
+                       "is FULL_DUPLEX_STREAMED or STREAMED and "
                        "send_body_without_waiting_for_header_response is enabled");
     } else {
       ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
@@ -643,8 +643,8 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
   case ProcessingMode::STREAMED:
-  case ProcessingMode::BIDIRECTIONAL_STREAMED: {
-    // STREAMED or BIDIRECTIONAL_STREAMED body mode works as follows:
+  case ProcessingMode::FULL_DUPLEX_STREAMED: {
+    // STREAMED or FULL_DUPLEX_STREAMED body mode works as follows:
     //
     // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it
     // dispatches via gRPC message to the external processor, and then keeps in a queue. It
@@ -671,7 +671,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     }
 
     auto req = setupBodyChunk(state, data, end_stream);
-    if (state.bodyMode() != ProcessingMode::BIDIRECTIONAL_STREAMED) {
+    if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
       state.enqueueStreamingChunk(data, end_stream);
     } else {
       data.drain(data.length());
@@ -864,8 +864,8 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   state.setTrailers(&trailers);
 
   if (state.callbackState() != ProcessorState::CallbackState::Idle) {
-    if (state.bodyMode() == ProcessingMode::BIDIRECTIONAL_STREAMED) {
-      ENVOY_LOG(trace, "Body mode is BIDIRECTIONAL_STREAMED, sending trailers even though Envoy is "
+    if (state.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
+      ENVOY_LOG(trace, "Body mode is FULL_DUPLEX_STREAMED, sending trailers even though Envoy is "
                        "waiting for header or body response");
     } else {
       ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
@@ -1206,8 +1206,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // and filter is waiting for header processing response.
   // Otherwise, the response mode_override proto field is ignored.
   if (config_->allowModeOverride() && !config_->sendBodyWithoutWaitingForHeaderResponse() &&
-      (config_->processingMode().request_body_mode() != ProcessingMode::BIDIRECTIONAL_STREAMED) &&
-      (config_->processingMode().response_body_mode() != ProcessingMode::BIDIRECTIONAL_STREAMED) &&
+      (config_->processingMode().request_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
+      (config_->processingMode().response_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
       inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
     const auto& mode_overide = response->mode_override();

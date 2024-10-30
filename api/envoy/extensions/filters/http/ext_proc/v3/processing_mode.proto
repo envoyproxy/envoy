@@ -41,7 +41,7 @@ message ProcessingMode {
   // 1) STREAMED BodySendMode: header processing completes before body mutation comes back.
   // 2) BUFFERED_PARTIAL BodySendMode: body is buffered and could be injected in different phases.
   // 3) BUFFERED BodySendMode + SKIP HeaderSendMode: header processing (e.g., update content-length) is skipped.
-  // 4) BIDIRECTIONAL_STREAMED BodySendMode: header processing completes before body mutation comes back.
+  // 4) FULL_DUPLEX_STREAMED BodySendMode: header processing completes before body mutation comes back.
   //
   // In Envoy's http1 codec implementation, removing content length will enable chunked transfer
   // encoding whenever feasible. The recipient (either client or server) must be able
@@ -96,7 +96,7 @@ message ProcessingMode {
     //   :ref:`StreamedBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.StreamedBodyResponse>`
     //   to Envoy in the body response.
     // * Envoy will stream the body from the server to the backends as they arrive.
-    BIDIRECTIONAL_STREAMED = 4;
+    FULL_DUPLEX_STREAMED = 4;
   }
 
   // How to handle the request header. Default is "SEND".

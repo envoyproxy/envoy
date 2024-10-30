@@ -708,12 +708,12 @@ protected:
     verifyDownstreamResponse(*response, 200);
   }
 
-  IntegrationStreamDecoderPtr initAndSendDataMxnMode(absl::string_view body_sent,
+  IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
                                                      bool end_of_stream) {
     config_helper_.setBufferLimits(1024, 1024);
     proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
     proto_config_.mutable_processing_mode()->set_request_body_mode(
-        ProcessingMode::BIDIRECTIONAL_STREAMED);
+        ProcessingMode::FULL_DUPLEX_STREAMED);
     proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
     proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
@@ -730,14 +730,14 @@ protected:
     return response;
   }
 
-  void serverReceiveHeaderMxn(ProcessingRequest& header_request) {
+  void serverReceiveHeaderDuplexStreamed(ProcessingRequest& header_request) {
     ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
     ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
     ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
     ASSERT_TRUE(header_request.has_request_headers());
   }
 
-  void serverSendHeaderRespMxn() {
+  void serverSendHeaderRespDuplexStreamed() {
     processor_stream_->startGrpcStream();
     ProcessingResponse response_header;
     auto* header_resp = response_header.mutable_request_headers();
@@ -748,7 +748,7 @@ protected:
     processor_stream_->sendGrpcMessage(response_header);
   }
 
-  void serverSendTrailerRespMxn() {
+  void serverSendTrailerRespDuplexStreamed() {
     ProcessingResponse response_trailer;
     auto* trailer_resp = response_trailer.mutable_request_trailers()->mutable_header_mutation();
     auto* header = trailer_resp->add_set_headers()->mutable_header();
@@ -4928,13 +4928,13 @@ TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
   verifyDownstreamResponse(*response, 200);
 }
 
-TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
+TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespDuplexStreamed) {
   const std::string body_sent(64 * 1024, 's');
-  IntegrationStreamDecoderPtr response = initAndSendDataMxnMode(body_sent, true);
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
 
   // The ext_proc server receives the headers.
   ProcessingRequest header_request;
-  serverReceiveHeaderMxn(header_request);
+  serverReceiveHeaderDuplexStreamed(header_request);
 
   std::string body_received;
   bool end_stream = false;
@@ -4951,7 +4951,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
   EXPECT_EQ(body_received, body_sent);
 
   // The ext_proc server sends back the header response.
-  serverSendHeaderRespMxn();
+  serverSendHeaderRespDuplexStreamed();
 
   // The ext_proc server sends back the body response.
   uint32_t total_resp_body_msg = 2 * total_req_body_msg;
@@ -4974,15 +4974,15 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespMxn) {
 }
 
 // Buffer the whole message including header, body and trailer before sending response.
-TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespMxnSmallBody) {
+TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespDuplexStreamedSmallBody) {
   const std::string body_sent(128 * 1024, 's');
-  IntegrationStreamDecoderPtr response = initAndSendDataMxnMode(body_sent, false);
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   // The ext_proc server receives the headers.
   ProcessingRequest header_request;
-  serverReceiveHeaderMxn(header_request);
+  serverReceiveHeaderDuplexStreamed(header_request);
 
   std::string body_received;
   bool end_stream = false;
@@ -5004,7 +5004,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   EXPECT_EQ(body_received, body_sent);
 
   // The ext_proc server sends back the header response.
-  serverSendHeaderRespMxn();
+  serverSendHeaderRespDuplexStreamed();
 
   // The ext_proc server sends back the body response.
   uint32_t total_resp_body_msg = total_req_body_msg / 2;
@@ -5020,7 +5020,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
   }
 
   // The ext_proc server sends back the trailer response.
-  serverSendTrailerRespMxn();
+  serverSendTrailerRespDuplexStreamed();
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
@@ -5030,15 +5030,15 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespM
 
 // The body is large. The server sends some body responses after buffering some amount of data.
 // The server continuously does so until the entire body processing is done.
-TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
+TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyDuplexStreamed) {
   const std::string body_sent(256 * 1024, 's');
-  IntegrationStreamDecoderPtr response = initAndSendDataMxnMode(body_sent, false);
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
   // The ext_proc server receives the headers.
   ProcessingRequest header_request;
-  serverReceiveHeaderMxn(header_request);
+  serverReceiveHeaderDuplexStreamed(header_request);
   Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
                                                           {":method", "GET"},
                                                           {"host", "host"},
@@ -5065,7 +5065,7 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
       if (total_req_body_msg % 7 == 0) {
         if (!header_resp_sent) {
           // Before sending the 1st body response, sends a header response.
-          serverSendHeaderRespMxn();
+          serverSendHeaderRespDuplexStreamed();
           header_resp_sent = true;
         }
         ProcessingResponse response_body;
@@ -5100,7 +5100,7 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyMxn) {
   body_upstream += "END";
 
   // The ext_proc server sends back the trailer response.
-  serverSendTrailerRespMxn();
+  serverSendTrailerRespDuplexStreamed();
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
