@@ -709,7 +709,7 @@ protected:
   }
 
   IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
-                                                     bool end_of_stream) {
+                                                                bool end_of_stream) {
     config_helper_.setBufferLimits(1024, 1024);
     proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
     proto_config_.mutable_processing_mode()->set_request_body_mode(
@@ -4974,7 +4974,8 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespDuplexStrea
 }
 
 // Buffer the whole message including header, body and trailer before sending response.
-TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespDuplexStreamedSmallBody) {
+TEST_P(ExtProcIntegrationTest,
+       ServerWaitForBodyAndTrailerBeforeSendsHeaderRespDuplexStreamedSmallBody) {
   const std::string body_sent(128 * 1024, 's');
   IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-trailer-foo", "yes"}};
@@ -5012,9 +5013,9 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyAndTrailerBeforeSendsHeaderRespD
   for (uint32_t i = 0; i < total_resp_body_msg; i++) {
     ProcessingResponse response_body;
     auto* streamed_response = response_body.mutable_request_body()
-                              ->mutable_response()
-                              ->mutable_body_mutation()
-                              ->mutable_streamed_response();
+                                  ->mutable_response()
+                                  ->mutable_body_mutation()
+                                  ->mutable_streamed_response();
     streamed_response->set_body("r");
     processor_stream_->sendGrpcMessage(response_body);
   }
@@ -5072,9 +5073,9 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyDuplexStrea
         for (uint32_t i = 0; i < 3; i++) {
           body_upstream += std::to_string(i);
           auto* streamed_response = response_body.mutable_request_body()
-                                    ->mutable_response()
-                                    ->mutable_body_mutation()
-                                    ->mutable_streamed_response();
+                                        ->mutable_response()
+                                        ->mutable_body_mutation()
+                                        ->mutable_streamed_response();
           streamed_response->set_body(std::to_string(i));
           processor_stream_->sendGrpcMessage(response_body);
         }
@@ -5092,9 +5093,9 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyDuplexStrea
   // Send one more body response at the end.
   ProcessingResponse response_body;
   auto* streamed_response = response_body.mutable_request_body()
-                            ->mutable_response()
-                            ->mutable_body_mutation()
-                            ->mutable_streamed_response();
+                                ->mutable_response()
+                                ->mutable_body_mutation()
+                                ->mutable_streamed_response();
   streamed_response->set_body("END");
   processor_stream_->sendGrpcMessage(response_body);
   body_upstream += "END";

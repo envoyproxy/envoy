@@ -4668,18 +4668,20 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
 
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
 
-  processResponseBodyStreamedAfterTrailer([&want_response_body](ProcessingResponse&,
-                                                           BodyResponse& resp) {
-    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-    streamed_response->set_body(" AAAAA ");
-    want_response_body.add(" AAAAA ");
-  });
-  processResponseBodyStreamedAfterTrailer([&want_response_body](ProcessingResponse&,
-                                                           BodyResponse& resp) {
-    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-    streamed_response->set_body(" BBBB ");
-    want_response_body.add(" BBBB ");
-  });
+  processResponseBodyStreamedAfterTrailer(
+      [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" AAAAA ");
+        want_response_body.add(" AAAAA ");
+      });
+  processResponseBodyStreamedAfterTrailer(
+      [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" BBBB ");
+        want_response_body.add(" BBBB ");
+      });
   processResponseTrailers(absl::nullopt, true);
 
   // The two buffers should match.
@@ -4734,18 +4736,20 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
 
   // Server now sends back response.
   processResponseHeadersAfterTrailer(absl::nullopt);
-  processResponseBodyStreamedAfterTrailer([&want_response_body](ProcessingResponse&,
-                                                           BodyResponse& resp) {
-    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-    streamed_response->set_body(" AAAAA ");
-    want_response_body.add(" AAAAA ");
-  });
-  processResponseBodyStreamedAfterTrailer([&want_response_body](ProcessingResponse&,
-                                                           BodyResponse& resp) {
-    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-    streamed_response->set_body(" BBBB ");
-    want_response_body.add(" BBBB ");
-  });
+  processResponseBodyStreamedAfterTrailer(
+      [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" AAAAA ");
+        want_response_body.add(" AAAAA ");
+      });
+  processResponseBodyStreamedAfterTrailer(
+      [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(" BBBB ");
+        want_response_body.add(" BBBB ");
+      });
   processResponseTrailers(absl::nullopt, true);
 
   // The two buffers should match.

@@ -598,9 +598,10 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     if ((state.bodyMode() == ProcessingMode::STREAMED &&
          config_->sendBodyWithoutWaitingForHeaderResponse()) ||
         state.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
-      ENVOY_LOG(trace, "Sending body data even though header processing is still in progress as body mode "
-                       "is FULL_DUPLEX_STREAMED or STREAMED and "
-                       "send_body_without_waiting_for_header_response is enabled");
+      ENVOY_LOG(trace,
+                "Sending body data even though header processing is still in progress as body mode "
+                "is FULL_DUPLEX_STREAMED or STREAMED and "
+                "send_body_without_waiting_for_header_response is enabled");
     } else {
       ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
       // We don't know what to do with the body until the response comes back.

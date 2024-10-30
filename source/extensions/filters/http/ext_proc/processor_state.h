@@ -190,8 +190,8 @@ public:
     // In http1 codec, removing content length will enable chunked encoding whenever feasible.
     return (
         body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::STREAMED ||
-        body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::
-                          FULL_DUPLEX_STREAMED ||
+        body_mode_ ==
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED ||
         body_mode_ ==
             envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED_PARTIAL ||
         (body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::BUFFERED &&
@@ -282,7 +282,8 @@ private:
   virtual void clearRouteCache(const envoy::service::ext_proc::v3::CommonResponse&) {}
   bool
   handleStreamedBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
-  bool handleDuplexStreamedBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  bool handleDuplexStreamedBodyResponse(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
