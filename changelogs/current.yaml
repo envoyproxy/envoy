@@ -49,6 +49,9 @@ bug_fixes:
   change: |
     Support operations on IP SANs when the IP version is not supported by the host operating system, for example
     an IPv6 SAN can now be used on a host not supporting IPv6 addresses.
+- area: scoped_rds
+  change: |
+    Fixes scope key leak and spurious scope key conflicts when an update to an SRDS resource changes the key.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
