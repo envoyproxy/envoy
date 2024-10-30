@@ -283,6 +283,7 @@ def envoy_py_data(
         name = name_entry_point,
         pkg = "@base_pip3//envoy_base_utils",
         script = "envoy.data_env",
+        data = init_data,
     )
 
     native.genrule(
