@@ -792,8 +792,10 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
             [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return !new_connections_.empty(); },
             client_dispatcher, timeout)) {
       if (timeout == TestUtility::DefaultTimeout) {
-        ADD_FAILURE()
-            << "Please don't waitForHttpConnection with a 5s timeout if failure is expected\n";
+          ADD_FAILURE() << absl::StrFormat(
+          "Please don't waitForHttpConnection with a %is timeout if failure is "
+          "expected\n",
+          std::chrono::duration_cast<std::chrono::seconds>(timeout).count());
       }
       return AssertionFailure() << "Timed out waiting for new connection.";
     }
