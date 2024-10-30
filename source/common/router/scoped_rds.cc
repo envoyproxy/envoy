@@ -276,6 +276,20 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
     const std::string scope_name = scoped_route_config.name();
+    if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
+        scope_info_iter != scoped_route_map_.end()) {
+      if (scope_info_iter->second->configHash() == MessageUtil::hash(scoped_route_config)) {
+        continue;
+      }
+      // Remove the old key from scope_names_by_hash_ in case the scope key has changed. (If it
+      // hasn't, we'll just add it back anyway.)
+      if (scope_name_by_hash_.find(scope_info_iter->second->scopeKey().hash()) !=
+          scope_name_by_hash_.end()) {
+        scope_name_by_hash_.erase(scope_info_iter->second->scopeKey().hash());
+      }
+    }
+    rds.set_route_config_name(scoped_route_config.route_configuration_name());
+    std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
     if (scoped_route_config.has_route_configuration()) {
       RouteConfigProviderPtr route_config_provider =

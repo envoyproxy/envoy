@@ -239,7 +239,7 @@ absl::Span<const std::string> ConnectionInfoImplBase::ipSansPeerCertificate() co
         if (!cert) {
           return std::vector<std::string>{};
         }
-        return Utility::getSubjectAltNames(*cert, GEN_IPADD, true);
+        return Utility::getSubjectAltNames(*cert, GEN_IPADD);
       });
 }
 
@@ -378,6 +378,22 @@ const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {
     }
     return Utility::getSubjectFromCertificate(*cert);
   });
+}
+
+Ssl::ParsedX509NameOptConstRef ConnectionInfoImplBase::parsedSubjectPeerCertificate() const {
+  const auto& parsedName = getCachedValueOrCreate<Ssl::ParsedX509NamePtr>(
+      CachedValueTag::ParsedSubjectPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return Ssl::ParsedX509NamePtr();
+        }
+        return Utility::parseSubjectFromCertificate(*cert);
+      });
+
+  if (parsedName) {
+    return Ssl::ParsedX509NameOptConstRef(*parsedName);
+  }
+  return absl::nullopt;
 }
 
 const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
