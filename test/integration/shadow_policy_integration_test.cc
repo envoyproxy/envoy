@@ -515,11 +515,9 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = true;
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // With deferred processing, a local reply is triggered so the upstream
-    // stream will be incomplete.
-    autonomous_allow_incomplete_streams_ = true;
-  }
+  // A local reply is triggered so the upstream stream will be incomplete.
+  autonomous_allow_incomplete_streams_ = true;
+
   cluster_with_custom_filter_ = 0;
   filter_name_ = "encoder-decoder-buffer-filter";
   initialConfigSetup("cluster_1", "");
@@ -547,13 +545,8 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // With deferred processing, the encoder-decoder-buffer-filter will
-    // buffer too much data triggering a local reply.
-    test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
-  } else {
-    test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
-  }
+  // The encoder-decoder-buffer-filter will buffer too much data triggering a local reply.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
 }
 
 TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
@@ -663,7 +656,6 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
             ->mutable_match()
             ->set_prefix("/main");
       });
-  config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams, "true");
   initialize();
 
   write_matcher_->setDestinationPort(fake_upstreams_[1]->localAddress()->ip()->port());

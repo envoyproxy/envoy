@@ -224,6 +224,7 @@ def envoy_dependencies(skip_targets = []):
 
     _com_github_maxmind_libmaxminddb()
 
+    external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
     external_http_archive(

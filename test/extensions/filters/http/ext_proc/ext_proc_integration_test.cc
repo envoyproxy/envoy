@@ -67,7 +67,7 @@ struct ConfigOptions {
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
 class ExtProcIntegrationTest : public HttpIntegrationTest,
-                               public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
+                               public Grpc::GrpcClientIntegrationParamTest {
 protected:
   ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
@@ -194,8 +194,6 @@ protected:
 
       // Parameterize with defer processing to prevent bit rot as filter made
       // assumptions of data flow, prior relying on eager processing.
-      config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                        deferredProcessing() ? "true" : "false");
     });
 
     if (config_option.http1_codec) {
@@ -207,9 +205,7 @@ protected:
     }
   }
 
-  bool IsEnvoyGrpc() {
-    return std::get<1>(std::get<0>(GetParam())) == Envoy::Grpc::ClientType::EnvoyGrpc;
-  }
+  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
   void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg) {
     Any cfg_any;
@@ -722,10 +718,8 @@ protected:
   int grpc_upstream_count_ = 2;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
-    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
-    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
@@ -1020,7 +1014,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 }
 
 TEST_P(ExtProcIntegrationTest, ResponseFromExtProcServerTooLarge) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     GTEST_SKIP() << "max_receive_message_length is only supported on Envoy gRPC";
   }
   config_helper_.setBufferLimits(1024, 1024);
@@ -1677,12 +1671,8 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetTrailersIncorrectlyOnResponse) 
         return true;
       });
 
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // We get a reset since we've received some of the response already.
-    ASSERT_TRUE(response->waitForReset());
-  } else {
-    verifyDownstreamResponse(*response, 500);
-  }
+  // We get a reset since we've received some of the response already.
+  ASSERT_TRUE(response->waitForReset());
 }
 
 // Test the filter configured to only send the response trailers message
@@ -4584,7 +4574,7 @@ TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4592,7 +4582,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4601,7 +4591,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4612,7 +4602,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4660,7 +4650,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
