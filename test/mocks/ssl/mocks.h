@@ -110,6 +110,8 @@ public:
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
 
   MOCK_METHOD(const std::string&, serverNameIndication, (), (const));
+  MOCK_METHOD(bool, autoHostServerNameIndication, (), (const));
+  MOCK_METHOD(bool, autoSniSanMatch, (), (const));
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
   MOCK_METHOD(bool, enforceRsaKeyUsage, (), (const));
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
@@ -209,6 +211,7 @@ public:
               trustChainVerification, (), (const));
   MOCK_METHOD(bool, onlyVerifyLeafCertificateCrl, (), (const));
   MOCK_METHOD(absl::optional<uint32_t>, maxVerifyDepth, (), (const));
+  MOCK_METHOD(bool, autoSniSanMatch, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {
