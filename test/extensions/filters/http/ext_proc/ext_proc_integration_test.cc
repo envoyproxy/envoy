@@ -711,11 +711,11 @@ protected:
   IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
                                                                 bool end_of_stream) {
     config_helper_.setBufferLimits(1024, 1024);
-    proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-    proto_config_.mutable_processing_mode()->set_request_body_mode(
-        ProcessingMode::FULL_DUPLEX_STREAMED);
-    proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
-    proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    processing_mode->set_request_trailer_mode(ProcessingMode::SEND);
+    processing_mode->set_response_header_mode(ProcessingMode::SKIP);
 
     initializeConfig();
     HttpIntegrationTest::initialize();
@@ -723,7 +723,8 @@ protected:
     Http::TestRequestHeaderMapImpl default_headers;
     HttpTestUtility::addDefaultHeaders(default_headers);
 
-    auto encoder_decoder = codec_client_->startRequest(default_headers);
+    std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+        codec_client_->startRequest(default_headers);
     request_encoder_ = &encoder_decoder.first;
     IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
     codec_client_->sendData(*request_encoder_, body_sent, end_of_stream);
