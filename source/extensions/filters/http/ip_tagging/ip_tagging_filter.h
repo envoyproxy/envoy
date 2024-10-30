@@ -16,6 +16,8 @@
 #include "source/common/network/lc_trie.h"
 #include "source/common/stats/symbol_table.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -41,8 +43,7 @@ public:
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
 
-  // An empty string indicates that no ip_tag_header is set.
-  const Http::LowerCaseString& ip_tag_header() const { return ip_tag_header_; }
+  const absl::optional<Http::LowerCaseString>& ip_tag_header() const { return ip_tag_header_; }
   HeaderAction ip_tag_header_action() const { return ip_tag_header_action_; }
 
   void incHit(absl::string_view tag) {
@@ -66,6 +67,14 @@ private:
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
+  static absl::optional<Http::LowerCaseString>
+  ipTagHeaderAsOptional(absl::string_view ipTagHeader) {
+    if (ipTagHeader.empty()) {
+      return absl::nullopt;
+    }
+    return Http::LowerCaseString(ipTagHeader);
+  }
+
   void incCounter(Stats::StatName name);
 
   const FilterRequestType request_type_;
@@ -77,7 +86,7 @@ private:
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
-  const Http::LowerCaseString ip_tag_header_;
+  const absl::optional<Http::LowerCaseString> ip_tag_header_;
   const HeaderAction ip_tag_header_action_;
 };
 
