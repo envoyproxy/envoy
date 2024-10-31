@@ -873,7 +873,7 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
                      metadata_map);
     if (state_.decoder_filter_chain_aborted_) {
       // If the decoder filter chain has been aborted, then either:
-      // 1. This filter has sent a local reply from decode metadata.
+      // 1. This filter has sent a local reply or GoAway from decode metadata.
       // 2. This filter is the terminal http filter, and an upstream HTTP filter has sent a local
       // reply.
       ASSERT((status == FilterMetadataStatus::StopIterationForLocalReply) ||
