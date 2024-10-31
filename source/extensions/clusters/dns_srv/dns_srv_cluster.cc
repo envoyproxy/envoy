@@ -146,6 +146,8 @@ void DnsSrvCluster::allTargetsResolved() {
 
       priority_state_manager.registerHostForPriority(new_hosts.back(), locality_lb_endpoints);
     }
+
+    info_->configUpdateStats().update_success_.inc();
   }
 
   if (some_targets_resolved) {
