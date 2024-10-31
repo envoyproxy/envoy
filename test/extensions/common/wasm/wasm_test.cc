@@ -1534,8 +1534,8 @@ TEST_P(WasmLocalReplyTest, DuplicateLocalReply) {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(absl::StrCat(
         "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_context_cpp.wasm")));
   } else {
-    // Skip the Null plugin
-    return;
+    // The name of the Null VM plugin.
+    code = "CommonWasmTestContextCpp";
   }
   EXPECT_FALSE(code.empty());
 
