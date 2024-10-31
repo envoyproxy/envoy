@@ -90,5 +90,9 @@ new_features:
 - area: tracers
   change: |
     Set resource ``telemetry.sdk.*`` and scope ``otel.scope.name|version`` attributes for the OpenTelemetry tracer.
+- area: udp_proxy
+  change: |
+    Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
+    by setting a per-session state object under the key ``envoy.udp_proxy.cluster``.
 
 deprecated:

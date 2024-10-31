@@ -72,6 +72,7 @@ envoy_cc_test_library(
         ":psc_setter_filter_proto_cc_proto",
         "//envoy/registry",
         "//source/common/router:string_accessor_lib",
+        "//source/extensions/filters/udp/udp_proxy:udp_proxy_filter_lib",
         "//test/test_common:utility_lib",
     ],
     alwayslink = 1,
