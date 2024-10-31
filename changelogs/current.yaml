@@ -4,7 +4,20 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: wasm
   change: |
+    The route cache will not be cleared by default if the wasm extension modified the request headers and
+    the ABI version of wasm extension is larger then 0.2.1.
+- area: wasm
+  change: |
     Remove previously deprecated xDS attributes from ``get_property``, use ``xds`` attributes instead.
+- area: http
+  change: |
+    RFC1918 addresses are no longer considered to be internal addresses by default. This addresses a security
+    issue for Envoy's in multi-tenant mesh environments. Please explicit set
+    :ref:`internal_address_config
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
+    to retain the prior behavior.
+    This change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.explicit_internal_address_config`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -38,6 +51,10 @@ minor_behavior_changes:
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
     the runtime guard ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to false.
+- area: scoped_rds
+  change: |
+    The :ref:`route_configuration <envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>` field
+    is supported when the ``ScopedRouteConfiguration`` resource is delivered via SRDS.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -45,6 +62,9 @@ bug_fixes:
   change: |
     Support operations on IP SANs when the IP version is not supported by the host operating system, for example
     an IPv6 SAN can now be used on a host not supporting IPv6 addresses.
+- area: scoped_rds
+  change: |
+    Fixes scope key leak and spurious scope key conflicts when an update to an SRDS resource changes the key.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -63,6 +83,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime flag ``envoy.reloadable_features.http_route_connect_proxy_by_default`` and legacy code paths.
+- area: http2
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.defer_processing_backedup_streams`` and legacy code paths.
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_reresolve_on_eai_again`` and legacy code paths.
@@ -87,15 +110,34 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: wasm
+  change: |
+    added ``clear_route_cache`` foreign function to clear the route cache.
 - area: access_log
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
     %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
+- area: quic
+  change: |
+    Added :ref:`QUIC stats debug visitor <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>` to
+    get more stats from the QUIC transport.
 - area: http_inspector
   change: |
     Added default-false ``envoy.reloadable_features.http_inspector_use_balsa_parser`` for HttpInspector to use BalsaParser.
+- area: overload
+  change: |
+    Added support for scaling :ref:`max connection duration
+    <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_MAX>`.
+    This can be used to reduce the max connection duration in response to overload.
 - area: tracers
   change: |
     Set resource ``telemetry.sdk.*`` and scope ``otel.scope.name|version`` attributes for the OpenTelemetry tracer.
+- area: lua
+  change: |
+    Added ssl :ref:`parsedSubjectPeerCertificate() <config_http_filters_lua_parsed_name>` API.
+- area: udp_proxy
+  change: |
+    Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
+    by setting a per-session state object under the key ``envoy.udp_proxy.cluster``.
 
 deprecated:

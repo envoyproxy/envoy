@@ -65,7 +65,7 @@ public:
       Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
       quic::ConnectionIdGeneratorInterface& generator,
-      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef&& debug_visitor_factory);
+      EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory);
 
   // quic::QuicDispatcher
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
