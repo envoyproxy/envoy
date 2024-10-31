@@ -31,6 +31,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cancel_wrapper_lib",
+    hdrs = ["cancel_wrapper.h"],
+    deps = [
+        "@com_google_absl//absl/functional:any_invocable",
+    ],
+)
+
+envoy_cc_library(
     name = "containers_lib",
     hdrs = ["containers.h"],
     deps = [
