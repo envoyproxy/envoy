@@ -9,6 +9,15 @@ behavior_changes:
 - area: wasm
   change: |
     Remove previously deprecated xDS attributes from ``get_property``, use ``xds`` attributes instead.
+- area: http
+  change: |
+    RFC1918 addresses are no longer considered to be internal addresses by default. This addresses a security
+    issue for Envoy's in multi-tenant mesh environments. Please explicit set
+    :ref:`internal_address_config
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
+    to retain the prior behavior.
+    This change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.explicit_internal_address_config`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
