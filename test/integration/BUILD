@@ -1483,7 +1483,7 @@ envoy_cc_test(
     name = "websocket_integration_test",
     size = "large",
     srcs = ["websocket_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],

@@ -308,12 +308,12 @@ public:
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     }

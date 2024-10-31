@@ -42,9 +42,11 @@ public:
          envoy::config::core::v3::TrafficDirection direction,
          const LocalInfo::LocalInfo& local_info,
          const envoy::config::core::v3::Metadata* listener_metadata)
-      : PluginBase(config.name(), config.root_id(), config.vm_config().vm_id(),
-                   config.vm_config().runtime(), MessageUtil::anyToBytes(config.configuration()),
-                   config.fail_open(), createPluginKey(config, direction, listener_metadata)),
+      : PluginBase(
+            config.name(), config.root_id(), config.vm_config().vm_id(),
+            config.vm_config().runtime(),
+            THROW_OR_RETURN_VALUE(MessageUtil::anyToBytes(config.configuration()), std::string),
+            config.fail_open(), createPluginKey(config, direction, listener_metadata)),
         direction_(direction), local_info_(local_info), listener_metadata_(listener_metadata),
         wasm_config_(std::make_unique<WasmConfig>(config)) {}
 

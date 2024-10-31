@@ -1392,9 +1392,9 @@ six==1.16.0 \
     #   pyu2f
     #   sphinxcontrib-httpdomain
     #   thrift
-slack-sdk==3.33.2 \
-    --hash=sha256:34c51cfb9c254553219a0bba7a741c913f5d4d372d6278c3e7e10fe7bb667724 \
-    --hash=sha256:8107912488028f5a3f04ee9c58524418d3a2763a843db25530375b7733e6ec0a
+slack-sdk==3.33.3 \
+    --hash=sha256:0515fb93cd03b18de61f876a8304c4c3cef4dd3c2a3bad62d7394d2eb5a3c8e6 \
+    --hash=sha256:4cc44c9ffe4bb28a01fbe3264c2f466c783b893a4eca62026ab845ec7c176ff1
     # via -r requirements.in
 smmap==5.0.1 \
     --hash=sha256:dceeb6c0028fdb6734471eb07c0cd2aae706ccaecab45965ee83f11c8d3b1f62 \
@@ -1860,7 +1860,7 @@ zstandard==0.23.0 \
     # via envoy-base-utils
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==75.2.0 \
-    --hash=sha256:753bb6ebf1f465a1912e19ed1d41f403a79173a9acf66a42e7e6aec45c3c16ec \
-    --hash=sha256:a7fcb66f68b4d9e8e66b42f9876150a3371558f98fa32222ffaa5bced76406f8
+setuptools==75.3.0 \
+    --hash=sha256:f2504966861356aa38616760c0f66568e535562374995367b4e69c7143cf6bcd \
+    --hash=sha256:fba5dd4d766e97be1b1681d98712680ae8f2f26d7881245f2ce9e40714f1a686
     # via -r requirements.in
