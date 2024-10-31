@@ -71,7 +71,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
                Envoy::Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()) {
       RETURN_IF_NOT_OK(Utility::checkApiConfigSourceSubscriptionBackingCluster(
           cm_.primaryClusters(), api_config_source));
-    };
+    }
     RETURN_IF_NOT_OK(Utility::checkTransportVersion(api_config_source));
     switch (api_config_source.api_type()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;

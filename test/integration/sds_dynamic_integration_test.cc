@@ -1130,8 +1130,6 @@ public:
       static_cluster->MergeFrom(bootstrap.static_resources().clusters(0));
       // Make a copy of the static cluster to create and set up the dynamic cluster.
       dynamic_cluster_ = *static_cluster;
-      // Make a copy of the static cluster to create and set up the dynamic SDS cluster.
-      sds_cluster_ = *static_cluster;
 
       // Set up the first cluster, the CDS cluster.
       auto* cds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -1139,12 +1137,41 @@ public:
       cds_cluster->mutable_load_assignment()->set_cluster_name("cds_cluster");
       ConfigHelper::setHttp2(*cds_cluster);
 
-      // Set up the second cluster, the SDS cluster.
-      sds_cluster_.set_name(sds_cluster_name_);
-      auto* lb_endpoint =
-          sds_cluster_.mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
-      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
-          sdsUpstream()->localAddress()->ip()->port());
+      if (use_bootstrap_eds_) {
+        // Add a bootstrap EDS cluster as SDS cluster.
+        auto* sds_bootstrap_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        sds_bootstrap_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
+        sds_bootstrap_cluster->set_name("sds_bootstrap_cluster");
+        auto* eds_cluster_config = sds_bootstrap_cluster->mutable_eds_cluster_config();
+        eds_cluster_config->mutable_eds_config()->set_resource_api_version(
+            envoy::config::core::v3::ApiVersion::V3);
+        eds_cluster_config->mutable_eds_config()->mutable_path_config_source()->set_path(
+            eds_helper_.edsPath());
+        envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+        cluster_load_assignment.set_cluster_name("sds_bootstrap_cluster");
+
+        auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+        auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+        auto* socket_address =
+            endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+        socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+        socket_address->set_port_value(sdsUpstream()->localAddress()->ip()->port());
+        eds_helper_.setEds({cluster_load_assignment});
+        ConfigHelper::setHttp2(*sds_bootstrap_cluster);
+      } else {
+        // Make a copy of the static cluster to create and set up the dynamic SDS cluster.
+        sds_cluster_ = *static_cluster;
+
+        // Set up the second cluster, the SDS cluster.
+        sds_cluster_.set_name(sds_cluster_name_);
+
+        auto* lb_endpoint =
+            sds_cluster_.mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+        lb_endpoint->mutable_endpoint()
+            ->mutable_address()
+            ->mutable_socket_address()
+            ->set_port_value(sdsUpstream()->localAddress()->ip()->port());
+      }
       ConfigHelper::setHttp2(sds_cluster_);
 
       // Set up the dynamic cluster to use SDS.
@@ -1229,9 +1256,11 @@ public:
   envoy::config::cluster::v3::Cluster dynamic_cluster_;
   envoy::config::cluster::v3::Cluster sds_cluster_;
   bool valid_sds_cluster_{true};
+  bool use_bootstrap_eds_{false};
   std::string sds_cluster_name_;
   FakeHttpConnectionPtr sds_connection_;
   FakeStreamPtr sds_stream_;
+  EdsHelper eds_helper_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicClusterIntegrationTest,
@@ -1278,6 +1307,50 @@ TEST_P(SdsDynamicClusterIntegrationTest, BasicSuccess) {
                                                              {}, "42");
   // Successfully removed the dynamic cluster.
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
+}
+
+// Validate that Envoy accepts bootstrap EDS cluster in SDS ApiConfigSource.
+TEST_P(SdsDynamicClusterIntegrationTest, EdsBootStrapCluster) {
+  on_server_init_function_ = [this]() {
+    {
+      // Send CDS response.
+      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+      sendCdsResponse(true);
+    }
+  };
+  sds_cluster_name_ = "sds_bootstrap_cluster";
+  use_bootstrap_eds_ = true;
+  initialize();
+
+  {
+    // Send SDS response.
+    AssertionResult result = sdsUpstream()->waitForHttpConnection(*dispatcher_, sds_connection_);
+    RELEASE_ASSERT(result, result.message());
+
+    result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    sds_stream_->startGrpcStream();
+    sendSdsResponse2(getClientSecret(), *sds_stream_);
+  }
+
+  // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
+  test_server_->waitForGaugeGe("server.state", 0);
+  test_server_->waitForGaugeGe("server.live", 1);
+
+  // Validate that the sds update was successful.
+  test_server_->waitForCounterGe("sds.client_cert.update_success", 1);
+
+  // The 4 clusters are CDS,SDS,static and dynamic cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {}, "42");
+  // Successfully removed the dynamic cluster.
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 }
 
 // Validate that Envoy rejects dynamic cluster in SDS ApiConfigSource when runtime feature is
