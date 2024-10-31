@@ -53,7 +53,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     # TODO(envoyproxy/windows-dev): Diagnose failure shown on clang-cl build, see:
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     tags = ["fails_on_clang_cl"],
