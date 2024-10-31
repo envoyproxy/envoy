@@ -1547,7 +1547,7 @@ TEST_P(WasmLocalReplyTest, DuplicateLocalReply) {
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());
   filter_manager_->decodeHeaders(*request_headers_, false);
-  filter_manager_->decodeData(request_data_, false);
+  filter_manager_->decodeData(request_data_, true);
   filter_manager_->destroyFilters();
 }
 
@@ -1567,7 +1567,7 @@ TEST_P(WasmLocalReplyTest, LocalReplyInRequestAndResponse) {
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());
   filter_manager_->decodeHeaders(*request_headers_, false);
-  filter_manager_->decodeData(request_data_, false);
+  filter_manager_->decodeData(request_data_, true);
   filter_manager_->destroyFilters();
 }
 
@@ -1589,7 +1589,7 @@ TEST_P(WasmLocalReplyTest, PanicDuringResponse) {
   EXPECT_CALL(filter_manager_callbacks_, endStream());
 
   filter_manager_->decodeHeaders(*request_headers_, false);
-  filter_manager_->decodeData(request_data_, false);
+  filter_manager_->decodeData(request_data_, true);
   filter_manager_->destroyFilters();
 }
 
