@@ -38,7 +38,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 8,
     tags = ["skip_on_windows"],
     deps = [
