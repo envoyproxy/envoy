@@ -123,11 +123,6 @@ HeaderUtility::createHeaderData(const envoy::config::route::v3::HeaderMatcher& c
   }
 }
 
-bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
-                                 const HeaderDataBaseImpl& header_data) {
-  return header_data.matchesHeaders(request_headers);
-}
-
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
   return http2::adapter::HeaderValidator::IsValidHeaderValue(header_value,
                                                              http2::adapter::ObsTextOption::kAllow);

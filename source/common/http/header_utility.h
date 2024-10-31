@@ -295,9 +295,6 @@ public:
   static bool matchHeaders(const HeaderMap& request_headers,
                            const std::vector<HeaderDataPtr>& config_headers);
 
-  static bool matchHeaders(const HeaderMap& request_headers,
-                           const HeaderDataBaseImpl& config_header);
-
   /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
    * http://tools.ietf.org/html/rfc7230#section-3.2
