@@ -7,7 +7,7 @@ namespace CancelWrapper {
 
 TEST(CancelWrapper, WrappedCallbackIsExecutable) {
   int x = 0;
-  absl::AnyInvocable<void()> cancel;
+  CancelFunction cancel;
   absl::AnyInvocable<void()> cb = [&x]() { x = 1; };
   auto wrapped = cancelWrapped(std::move(cb), &cancel);
   EXPECT_EQ(0, x);
@@ -17,7 +17,7 @@ TEST(CancelWrapper, WrappedCallbackIsExecutable) {
 
 TEST(CancelWrapper, WrappedCallbackBareLambdaIsExecutable) {
   int x = 0;
-  absl::AnyInvocable<void()> cancel;
+  CancelFunction cancel;
   auto wrapped = cancelWrapped([&x]() { x = 1; }, &cancel);
   EXPECT_EQ(0, x);
   wrapped();
@@ -27,7 +27,7 @@ TEST(CancelWrapper, WrappedCallbackBareLambdaIsExecutable) {
 TEST(CancelWrapper, CancelledCallbackIsExecutableButDoesNothing) {
   int x = 0;
   absl::AnyInvocable<void()> cb = [&x]() { x = 1; };
-  absl::AnyInvocable<void()> cancel;
+  CancelFunction cancel;
   auto wrapped = cancelWrapped(std::move(cb), &cancel);
   cancel();
   EXPECT_EQ(0, x);
@@ -38,7 +38,7 @@ TEST(CancelWrapper, CancelledCallbackIsExecutableButDoesNothing) {
 TEST(CancelWrapper, WrappedCallbackWithArgsIsExecutable) {
   int x = 0;
   absl::AnyInvocable<void(int)> cb = [&x](int new_val) { x = new_val; };
-  absl::AnyInvocable<void()> cancel;
+  CancelFunction cancel;
   auto wrapped = cancelWrapped(std::move(cb), &cancel);
   EXPECT_EQ(0, x);
   wrapped(3);
@@ -51,7 +51,7 @@ TEST(CancelWrapper, WrappedCallbackWithNonCopyableArgsAndCapturesIsExecutable) {
                                                        &x](std::unique_ptr<int> added_val) mutable {
     x = *y + *added_val;
   };
-  absl::AnyInvocable<void()> cancel;
+  CancelFunction cancel;
   auto wrapped = cancelWrapped(std::move(cb), &cancel);
   EXPECT_EQ(0, x);
   wrapped(std::make_unique<int>(3));
@@ -60,7 +60,7 @@ TEST(CancelWrapper, WrappedCallbackWithNonCopyableArgsAndCapturesIsExecutable) {
 
 TEST(CancelWrapper, WrappedCallbackLambdaWithNonCopyableArgsAndCapturesIsExecutable) {
   int x = 0;
-  absl::AnyInvocable<void()> cancel;
+  CancelFunction cancel;
   auto wrapped = cancelWrapped([y = std::make_unique<int>(5), &x](
                                    std::unique_ptr<int> added_val) mutable { x = *y + *added_val; },
                                &cancel);

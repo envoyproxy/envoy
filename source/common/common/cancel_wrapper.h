@@ -8,6 +8,8 @@
 namespace Envoy {
 namespace CancelWrapper {
 
+using CancelFunction = absl::AnyInvocable<void()>;
+
 // Wraps a callback with a cancellation function. The cancellation function is saved
 // in an 'out' pointer argument to facilitate simple chaining in place, e.g. typical
 // usage would be of the form
@@ -23,8 +25,7 @@ namespace CancelWrapper {
 // This cancellation is not safe to be called between threads - it is intended to be used in
 // conjunction with dispatchers for events that will be occurring on a single thread but
 // whose order may be unpredictable due to outside triggers.
-template <typename Callback>
-auto cancelWrapped(Callback&& callback, absl::AnyInvocable<void()>* cancel_out) {
+template <typename Callback> auto cancelWrapped(Callback&& callback, CancelFunction* cancel_out) {
   auto cancelled_flag = std::make_shared<bool>(false);
   *cancel_out = [cancelled_flag]() { *cancelled_flag = true; };
   return [cb = std::move(callback),
