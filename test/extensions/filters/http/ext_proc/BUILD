@@ -32,7 +32,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":mock_server_lib",
         ":utils_lib",
