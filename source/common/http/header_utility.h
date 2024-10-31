@@ -67,6 +67,38 @@ public:
                                                              const Http::LowerCaseString& key,
                                                              absl::string_view separator = ",");
 
+  // Corresponds to the present_match from the HeaderMatchSpecifier proto in the RDS API.
+  class HeaderDataPresentMatch : public HeaderMatcher {
+  public:
+    HeaderDataPresentMatch(const envoy::config::route::v3::HeaderMatcher& config)
+        : HeaderDataPresentMatch(config, config.present_match()) {}
+
+    // Creates a new present-matcher with an explicit setting of the present field.
+    HeaderDataPresentMatch(const envoy::config::route::v3::HeaderMatcher& config,
+                           bool explicit_present)
+        : name_(config.name()), invert_match_(config.invert_match()),
+          treat_missing_as_empty_(config.treat_missing_header_as_empty()),
+          present_(explicit_present) {}
+
+    bool matchesHeaders(const HeaderMap& request_headers) const override {
+      const auto header_value = getAllOfHeaderAsString(request_headers, name_);
+
+      // If treat_missing_as_empty is false, and the header_value is empty,
+      // return true iff invert_match is the same as present_.
+      if (!header_value.result().has_value() && !treat_missing_as_empty_) {
+        return invert_match_ == present_;
+      }
+
+      return present_ != invert_match_;
+    };
+
+  private:
+    const LowerCaseString name_;
+    const bool invert_match_;
+    const bool treat_missing_as_empty_;
+    const bool present_;
+  };
+
   // A shared behavior for HeaderDataMatcher types (exact, regex, etc.) that
   // correspond to the HeaderMatchSpecifier proto in RDS API.
   class HeaderDataBaseImpl : public HeaderMatcher {
@@ -148,37 +180,6 @@ public:
 
     // TODO(adisuissa): convert from protobuf to two ints.
     envoy::type::v3::Int64Range range_;
-  };
-
-  // Corresponds to the present_match from the HeaderMatchSpecifier proto in the RDS API.
-  class HeaderDataPresentMatch : public HeaderDataBaseImpl {
-  public:
-    HeaderDataPresentMatch(const envoy::config::route::v3::HeaderMatcher& config)
-        : HeaderDataBaseImpl(config), present_(config.present_match()) {}
-
-    // Creates a new present-matcher with an explicit setting of the present field.
-    HeaderDataPresentMatch(const envoy::config::route::v3::HeaderMatcher& config,
-                           bool explicit_present)
-        : HeaderDataBaseImpl(config), present_(explicit_present) {}
-
-  private:
-    bool matchesHeaders(const HeaderMap& request_headers) const override {
-      const auto header_value = getAllOfHeaderAsString(request_headers, name_);
-
-      // If treat_missing_as_empty is false, and the header_value is empty,
-      // return true iff invert_match is the same as present_.
-      if (!header_value.result().has_value() && !treat_missing_as_empty_) {
-        return invert_match_ == present_;
-      }
-
-      return present_ != invert_match_;
-    };
-    bool specificMatchesHeaders(absl::string_view) const override {
-      // The parent class will not invoke this method for HeaderDataPresentMatch.
-      PANIC("not implemented");
-    }
-
-    const bool present_;
   };
 
   // Corresponds to the prefix_match from the HeaderMatchSpecifier proto in the RDS API.
