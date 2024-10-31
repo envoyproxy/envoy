@@ -1108,6 +1108,8 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"skip-goaway", "false"}});
+
+  ASSERT_TRUE(response->waitForReset());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
@@ -1123,6 +1125,8 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilterContinue) {
                                      {":authority", "host"},
                                      {"continue-filter-chain", "true"},
                                      {"skip-goaway", "false"}});
+
+  ASSERT_TRUE(response->waitForReset());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
