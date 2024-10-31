@@ -166,13 +166,22 @@ enum class EndStreamType {
 	EndStream,
 };
 
-enum class UpstreamDataStatus {
+enum class SendDataStatus {
+  // Send data with upstream conn not half close.
+	SendDataWithTunneling,
+	// Send data with upstream conn half close.
+	SendDataWithNotTunneling,
+	// Not Send data.
+	NotSendData,
+};
+
+enum class ReceiveDataStatus {
 	// Continue to deal with further data.
-	UpstreamDataContinue,
+	ReceiveDataContinue,
 	// Finish dealing with data.
-	UpstreamDataFinish,
+	ReceiveDataFinish,
 	// Failure when dealing with data.
-	UpstreamDataFailure,
+	ReceiveDataFailure,
 };
 
 enum class DestroyReason {
@@ -201,9 +210,9 @@ public:
   ~TcpUpstream() override;            
 
   // GenericUpstream
+  Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers, bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
-  Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
   void enableTcpTunneling() override {upstream_conn_data_->connection().enableHalfClose(true);};
   void readDisable(bool disable) override;
@@ -245,8 +254,7 @@ private:
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   Buffer::OwnedImpl response_buffer_{};
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
-  // mark if already write data to upstream in encodeHeader
-  bool write_upstream_data_;
+
   // store response header for http
   std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
 

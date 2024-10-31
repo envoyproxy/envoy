@@ -344,25 +344,26 @@ type HistogramMetric interface {
 }
 
 type TcpUpstreamFilter interface {
-	EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) (EndStream bool)
-	// Invoked when data is delivered from the upstream connection.
-	EncodeData(buffer BufferInstance, endOfStream bool) (EndStream bool)
-	// Called when data is read on from tcp upstream.
-	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) UpstreamDataStatus
+	// Invoked when header is delivered from the downstream.
+	EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) SendDataStatus
+	// Streaming, Invoked when data is delivered from the downstream.
+	EncodeData(buffer BufferInstance, endOfStream bool) SendDataStatus
+	// Streaming, Called when data is read on from tcp upstream.
+	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) ReceiveDataStatus
 	// destroy filter
 	OnDestroy(DestroyReason)
 }
 
-func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) bool {
-	return endOfStream
+func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) SendDataStatus {
+	return SendDataWithTunneling
 }
 
-func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) bool {
-	return endOfStream
+func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) SendDataStatus {
+	return SendDataWithTunneling
 }
 
-func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) UpstreamDataStatus {
-	return UpstreamDataFinish
+func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) ReceiveDataStatus {
+	return ReceiveDataFinish
 }
 
 func (*EmptyTcpUpstreamFilter) OnDestroy(DestroyReason) {

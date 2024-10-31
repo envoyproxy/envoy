@@ -135,27 +135,44 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
 
   initRequest();
 
-  // prepare for invoking go
   ProcessorState& state = encoding_state_;
   state.headers = &headers;
+  Buffer::OwnedImpl buf;
+  Buffer::Instance& buffer = state.doDataList.push(buf);
   auto s = dynamic_cast<processState*>(&state);
   state.setFilterState(FilterState::ProcessingHeader);
 
-  Buffer::OwnedImpl buf;
-  Buffer::Instance& buffer = state.doDataList.push(buf);
-
-  // invoking go
-  GoUint64 if_end_stream = dynamic_lib_->envoyGoEncodeHeader(
+  GoUint64 go_tatus = dynamic_lib_->envoyGoEncodeHeader(
     s, end_stream ? 1 : 0, headers.size(), headers.byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
-  end_stream = (if_end_stream != static_cast<GoUint64>(EndStreamType::NotEndStream));
-
-  if (buffer.length() != 0) {
-    upstream_conn_data_->connection().write(buffer, end_stream);
-    write_upstream_data_ = true;
-  }
   state.setFilterState(FilterState::Done);
-  state.doDataList.clearLatest();
-  
+  state.doDataList.moveOut(buf);
+
+  bool upstream_conn_half_close;
+  switch (go_tatus) {
+  case static_cast<GoUint64>(SendDataStatus::SendDataWithTunneling):
+    // send data to upstream with conn not half close
+    upstream_conn_half_close = false;
+    upstream_conn_data_->connection().write(buf, upstream_conn_half_close);
+    break;
+
+  case static_cast<GoUint64>(SendDataStatus::SendDataWithNotTunneling):
+    // send data to upstream with conn half close
+    upstream_conn_half_close = true;
+    upstream_conn_data_->connection().write(buf, upstream_conn_half_close);
+    break;
+
+  case static_cast<GoUint64>(SendDataStatus::NotSendData):
+    // not send data to upstream
+    break;
+
+  default:
+    // send data to upstream
+    ENVOY_LOG(error, "encodeData unexpected go_tatus: {}", go_tatus);
+    upstream_conn_data_->connection().write(buf, end_stream);
+    break;
+  }
+
+
   // Headers should only happen once, so use this opportunity to add the proxy header, if configured.
   ASSERT(route_entry_ != nullptr);
   if (route_entry_->connectConfig().has_value()) {
@@ -168,35 +185,53 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
     }
 
     if (data.length() != 0 || end_stream) {
-      upstream_conn_data_->connection().write(data, end_stream);
+      ENVOY_LOG(error, "encodeData send proxy : {}", data.toString());
+      upstream_conn_data_->connection().write(data, upstream_conn_half_close);
     }
+  }
+
+  if (buf.length() != 0) {
+    upstream_conn_data_->connection().write(buf, false);
   }
 
   return Envoy::Http::okStatus();
 }
 
 void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (write_upstream_data_) {
-    ENVOY_LOG(debug, "tcp upstream encodeData: already write data to upstream, so ignore encodeData");
-    return;
-  }
   ENVOY_LOG(debug, "tcp upstream encodeData, data length: {}, end_stream: {}", data.length(), end_stream);
 
-  // prepare for invoking go
   ProcessorState& state = encoding_state_;
   Buffer::Instance& buffer = state.doDataList.push(data);
   auto s = dynamic_cast<processState*>(&state);
   state.setFilterState(FilterState::ProcessingData);
-
-  // invoking go
-  GoUint64 if_end_stream = dynamic_lib_->envoyGoEncodeData(
+  
+  GoUint64 go_tatus = dynamic_lib_->envoyGoEncodeData(
     s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
-  end_stream = (if_end_stream != static_cast<GoUint64>(EndStreamType::NotEndStream));
-
   state.setFilterState(FilterState::Done);
   state.doDataList.moveOut(data);
 
-  upstream_conn_data_->connection().write(data, end_stream);
+  switch (go_tatus) {
+  case static_cast<GoUint64>(SendDataStatus::SendDataWithTunneling):
+    // send data to upstream with conn not half close
+    upstream_conn_data_->connection().write(data, false);
+    break;
+
+  case static_cast<GoUint64>(SendDataStatus::SendDataWithNotTunneling):
+    // send data to upstream with conn half close
+    upstream_conn_data_->connection().write(data, true);
+    break;
+
+  case static_cast<GoUint64>(SendDataStatus::NotSendData):
+    // not send data to upstream
+    break;
+
+  default:
+    // send data to upstream
+    ENVOY_LOG(error, "encodeData unexpected go_tatus: {}", go_tatus);
+    upstream_conn_data_->connection().write(data, end_stream);
+    break;
+  }
+
 }
 
 // TODO(duxin40): use golang to convert trailers to data buffer.
@@ -240,48 +275,51 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
   initResponse();
 
-  // prepare for invoking go
   DecodingProcessorState& state = decoding_state_;
   state.resp_headers = static_cast<Envoy::Http::RequestOrResponseHeaderMap*>(resp_headers_.get());
   Buffer::Instance& buffer = state.doDataList.push(data);
   auto s = dynamic_cast<processState*>(&state);
   state.setFilterState(FilterState::ProcessingData);
 
-  // invoking go
   GoUint64 go_tatus = dynamic_lib_->envoyGoOnUpstreamData(
     s, end_stream ? 1 : 0, (*resp_headers_).size(), (*resp_headers_).byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
   state.setFilterState(FilterState::Done);
   state.doDataList.moveOut(data);
 
-  if (go_tatus == static_cast<GoUint64>(UpstreamDataStatus::UpstreamDataFinish)) {
-    // UpstreamDataFinish, will send data to downstream
+  switch (go_tatus) {
+  case static_cast<GoUint64>(ReceiveDataStatus::ReceiveDataFinish):
+    // send data to downstream
     end_stream = true;
-
     // if go side not set status, c++ side set default status
     if (!resp_headers_->Status()) {
       resp_headers_->setStatus(static_cast<uint64_t>(HttpStatusCode::Success));
     }
-
     upstream_request_->decodeHeaders(std::move(resp_headers_), false);
     upstream_request_->decodeData(data, end_stream);
-    return;
-  } else if (go_tatus == static_cast<GoUint64>(UpstreamDataStatus::UpstreamDataContinue)) {
-    // UpstreamDataContinue, will wait for further data by next onUpstreamData
-    return;
-  } else {
-    // UpstreamDataFailure, will send data to downstream
-    end_stream = true;
+    break;
 
+  case static_cast<GoUint64>(ReceiveDataStatus::ReceiveDataContinue):
+    // wait for further data by next onUpstreamData
+    break;
+
+  case static_cast<GoUint64>(ReceiveDataStatus::ReceiveDataFailure):
+    // send data to downstream
+    end_stream = true;
     // if go side not set status, c++ side set default status
     if (!resp_headers_->Status()) {
       resp_headers_->setStatus(static_cast<uint64_t>(HttpStatusCode::UpstreamProtocolError));
     }
-
     upstream_request_->decodeHeaders(std::move(resp_headers_), false);
     upstream_request_->decodeData(data, end_stream);
-    return;
-  } 
+    break;
+
+  default:
+    // send data to downstream
+    ENVOY_LOG(error, "onUpstreamData unexpected go_tatus: {}", go_tatus);
+    end_stream = true;
+    break;
+  }
 }
 
 void TcpUpstream::onEvent(Network::ConnectionEvent event) {

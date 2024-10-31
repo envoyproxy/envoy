@@ -451,62 +451,85 @@ var (
 
 // *************** errors end **************//
 
- // Status codes returned by tcp upstream that can deal with data.
- type UpstreamDataStatus int
- 
- const (
-	 // Continue to deal with further data.
-	 UpstreamDataContinue UpstreamDataStatus = 0
-	 // Finish dealing with data.
-	 UpstreamDataFinish UpstreamDataStatus = 1
-	 // Failure when dealing with data.
-	 UpstreamDataFailure UpstreamDataStatus = 2
- )
- 
- func (s UpstreamDataStatus) String() string {
-	 switch s {
-	 case UpstreamDataContinue:
-		 return "Continue"
-	 case UpstreamDataFinish:
-		 return "Finish"
-	 case UpstreamDataFailure:
-		 return "Failure"
-	 }
-	 return "unknown"
- }
- 
- // Info types called by tcp upstream that can get the corresponding info from c++ side.
- type TcpUpstreamInfoType int
- 
- const (
-	 TcpUpstreamInfoRouterName  TcpUpstreamInfoType = 0
-	 TcpUpstreamInfoClusterName TcpUpstreamInfoType = 1
- )
- 
- func (t TcpUpstreamInfoType) String() string {
-	 switch t {
-	 case TcpUpstreamInfoRouterName:
-		 return "TcpUpstreamInfoRouterName"
-	 case TcpUpstreamInfoClusterName:
-		 return "TcpUpstreamInfoClusterName"
-	 }
-	 return "unknown"
- }
- 
- type EndStreamType int
- 
- const (
-	 NotEndStream EndStreamType = 0
-	 EndStream    EndStreamType = 1
- )
- 
- func (t EndStreamType) String() string {
-	 switch t {
-	 case NotEndStream:
-		 return "NotEndStream"
-	 case EndStream:
-		 return "EndStream"
-	 }
-	 return "unknown"
- }
- 
+// Info types called by tcp upstream that can get the corresponding info from c++ side.
+type TcpUpstreamInfoType int
+
+const (
+	TcpUpstreamInfoRouterName  TcpUpstreamInfoType = 0
+	TcpUpstreamInfoClusterName TcpUpstreamInfoType = 1
+)
+
+func (t TcpUpstreamInfoType) String() string {
+	switch t {
+	case TcpUpstreamInfoRouterName:
+		return "TcpUpstreamInfoRouterName"
+	case TcpUpstreamInfoClusterName:
+		return "TcpUpstreamInfoClusterName"
+	}
+	return "unknown"
+}
+
+type EndStreamType int
+
+const (
+	NotEndStream EndStreamType = 0
+	EndStream    EndStreamType = 1
+)
+
+func (t EndStreamType) String() string {
+	switch t {
+	case NotEndStream:
+		return "NotEndStream"
+	case EndStream:
+		return "EndStream"
+	}
+	return "unknown"
+}
+
+// Status codes returned in EncodeData by go side.
+type SendDataStatus int
+
+const (
+	// Send data with upstream conn not half close.
+	SendDataWithTunneling SendDataStatus = 0
+	// Send data with upstream conn half close.
+	SendDataWithNotTunneling SendDataStatus = 1
+	// Not Send data.
+	NotSendData SendDataStatus = 2
+)
+
+func (s SendDataStatus) String() string {
+	switch s {
+	case SendDataWithTunneling:
+		return "SendDataWithTunneling"
+	case SendDataWithNotTunneling:
+		return "SendDataWithNotTunneling"
+	case NotSendData:
+		return "NotSendData"
+	}
+	return "unknown"
+}
+
+// Status codes returned in OnUpstreamData by go side.
+type ReceiveDataStatus int
+
+const (
+	// Continue to deal with further data.
+	ReceiveDataContinue ReceiveDataStatus = 0
+	// Finish dealing with data.
+	ReceiveDataFinish ReceiveDataStatus = 1
+	// Failure when dealing with data.
+	ReceiveDataFailure ReceiveDataStatus = 2
+)
+
+func (s ReceiveDataStatus) String() string {
+	switch s {
+	case ReceiveDataContinue:
+		return "ReceiveDataContinue"
+	case ReceiveDataFinish:
+		return "ReceiveDataFinish"
+	case ReceiveDataFailure:
+		return "ReceiveDataFailure"
+	}
+	return "unknown"
+}

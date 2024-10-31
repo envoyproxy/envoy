@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -11,23 +12,22 @@ import (
 	"github.com/envoyproxy/envoy/contrib/golang/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp"
 )
 
-const Name = "simple-tcp-upstream"
+const Name = "http2dubbo-by-golang-extension"
 
 func init() {
 	tcp.RegisterTcpUpstreamFactoryAndConfigParser(Name, filterFactory, &parser{})
 }
 
 type config struct {
-	routerNameForEnableRemoteHalfClose string
-	clusterNameForGrayTraffic          string
-	envoySelfEnableHalfClose           bool
+	routerNameForGrayTraffic            string
+	clusterNameForEnableRemoteHalfClose string
+	envoySelfEnableHalfClose            bool
 }
 
 type parser struct {
 }
 
-// Parse the filter configuration. We can call the ConfigCallbackHandler to control the filter's
-// behavior
+// Parse the filter configuration. We can call the ConfigCallbackHandler to control the filter's behavior
 func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
 	configStruct := &xds.TypedStruct{}
 	if err := any.UnmarshalTo(configStruct); err != nil {
@@ -36,24 +36,25 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 
 	v := configStruct.Value
 	conf := &config{}
-	clusterName, ok := v.AsMap()["cluster_for_mock"]
-	if !ok {
-		return nil, errors.New("missing cluster_for_mock")
-	}
-	if clusterNameStr, ok := clusterName.(string); ok {
-		conf.clusterNameForGrayTraffic = clusterNameStr
-	} else {
-		return nil, fmt.Errorf("cluster_for_mock: expect string while got %T", clusterName)
-	}
 
-	routerName, ok := v.AsMap()["router_for_enable_remote_half_close"]
+	routerName, ok := v.AsMap()["router_for_gray_traffic"]
 	if !ok {
-		return nil, errors.New("missing router_for_enable_remote_half_close")
+		return nil, errors.New("missing router_for_gray_traffic")
 	}
 	if routerNameStr, ok := routerName.(string); ok {
-		conf.routerNameForEnableRemoteHalfClose = routerNameStr
+		conf.routerNameForGrayTraffic = routerNameStr
 	} else {
-		return nil, fmt.Errorf("router_for_enable_remote_half_close: expect string while got %T", routerName)
+		return nil, fmt.Errorf("router_for_gray_traffic: expect string while got %T", routerName)
+	}
+
+	clusterName, ok := v.AsMap()["cluster_for_enable_remote_half_close"]
+	if !ok {
+		return nil, errors.New("missing cluster_for_enable_remote_half_close")
+	}
+	if clusterNameStr, ok := clusterName.(string); ok {
+		conf.clusterNameForEnableRemoteHalfClose = clusterNameStr
+	} else {
+		return nil, fmt.Errorf("cluster_for_enable_remote_half_close: expect string while got %T", clusterName)
 	}
 
 	envoySelfHalfClose, ok := v.AsMap()["envoy_self_enable_half_close"]
@@ -69,7 +70,7 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 	return conf, nil
 }
 
-// Merge implements api.StreamFilterConfigParser.
+// Merge configuration from the inherited parent configuration
 func (p *parser) Merge(parentConfig interface{}, childConfig interface{}) interface{} {
 	return childConfig
 }
@@ -79,11 +80,11 @@ func filterFactory(c interface{}, callbacks api.TcpUpstreamCallbackHandler) api.
 	if !ok {
 		panic("unexpected config type")
 	}
+	buf := make([]byte, 0)
 	return &tcpUpstreamFilter{
 		callbacks:      callbacks,
 		config:         conf,
-		dubboMethod:    "method-default",
-		dubboInterface: "interface-default",
+		httpReqBodyBuf: bytes.NewBuffer(buf),
 	}
 }
 

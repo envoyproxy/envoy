@@ -144,7 +144,7 @@ func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, b
 		length:              length,
 	}
 	if req.pInfo.paniced {
-		return uint64(api.EndStream)
+		return uint64(api.SendDataWithTunneling)
 	}
 	defer state.RecoverPanic()
 
@@ -158,12 +158,7 @@ func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, b
 			},
 		},
 	}
-	if filter.EncodeHeaders(header, buf, endStream == uint64(api.EndStream)) {
-		return uint64(api.EndStream)
-	} else {
-		return uint64(api.NotEndStream)
-	}
-
+	return uint64(filter.EncodeHeaders(header, buf, endStream == uint64(api.EndStream)))
 }
 
 //export envoyGoEncodeData
@@ -178,16 +173,13 @@ func envoyGoEncodeData(s *C.processState, endStream, buffer, length uint64) uint
 	}
 	if req.pInfo.paniced {
 		buf.SetString(req.pInfo.details)
-		return uint64(api.EndStream)
+		return uint64(api.SendDataWithTunneling)
 	}
 	defer state.RecoverPanic()
 
 	filter := req.tcpUpstreamFilter
-	if filter.EncodeData(buf, endStream == uint64(api.EndStream)) {
-		return uint64(api.EndStream)
-	} else {
-		return uint64(api.NotEndStream)
-	}
+
+	return uint64(filter.EncodeData(buf, endStream == uint64(api.EndStream)))
 }
 
 //export envoyGoOnUpstreamData
@@ -203,7 +195,7 @@ func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes,
 	}
 	if req.pInfo.paniced {
 		buf.SetString(req.pInfo.details)
-		return uint64(api.UpstreamDataFailure)
+		return uint64(api.ReceiveDataFailure)
 	}
 	defer state.RecoverPanic()
 
@@ -218,7 +210,7 @@ func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes,
 		},
 	}
 
-	return uint64(filter.OnUpstreamData(header, buf, endStream == 1))
+	return uint64(filter.OnUpstreamData(header, buf, endStream == uint64(api.EndStream)))
 }
 
 //export envoyGoOnTcpUpstreamDestroy

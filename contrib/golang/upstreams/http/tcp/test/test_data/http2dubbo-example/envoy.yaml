@@ -43,14 +43,14 @@ static_resources:
       name: envoy.upstreams.http.tcp.golang
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.tcp.golang.v3alpha.Config
-        library_id: simple-tcp-upstream
-        library_path: /Users/duxin/cpp/src/envoy/examples/golang-tcp-upstream/simple/envoy/libgolang.so
-        plugin_name: simple-tcp-upstream
+        library_id: http2dubbo-by-golang-extension
+        library_path: /Users/duxin/cpp/src/envoy/contrib/golang/upstreams/http/tcp/test/test_data/http2dubbo-example/envoy/libgolang.so
+        plugin_name: http2dubbo-by-golang-extension
         plugin_config:
           "@type": type.googleapis.com/xds.type.v3.TypedStruct
           value:
-            router_for_enable_remote_half_close: "local_service"
-            cluster_for_mock: "local_route"
+            router_for_gray_traffic: "local_route"
+            cluster_for_enable_remote_half_close: "local_service"
             envoy_self_enable_half_close: false
 
       ## =========== Here is config for golang tcp upstream extension =========== END ##      
