@@ -51,7 +51,7 @@ message APIKeyAuth {
 // Extra settings that may be added to per-route configuration for
 // a virtual host or a cluster.
 message APIKeyAuthPerRoute {
-  // keys used to authenticate the client for this route.
-  config.core.v3.DataSource keys = 1
-      [(validate.rules).message = {required: true}, (udpa.annotations.sensitive) = true];
+  // The API key auth configuration to use for this route.
+  // Leave this empty to disable API key auth for this route.
+  APIKeyAuth api_key_auth = 1
 }
