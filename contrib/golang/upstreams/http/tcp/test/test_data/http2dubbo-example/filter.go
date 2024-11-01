@@ -158,9 +158,9 @@ const (
   - @param buffer supplies data to be set for sending to downstream.
   - @param endOfStream if end of stream.
   - @return api.ReceiveDataStatus tell c++ side next action:
-    1.UpstreamDataContinue: need more data from upstream;
-    2.UpstreamDataFinish: aggregate data success, return to downstream;
-    3.UpstreamDataFailure: protocol error, directly return to downstream.
+    1.ReceiveDataContinue: need more data from upstream;
+    2.ReceiveDataFinish: aggregate data success, return to downstream;
+    3.ReceiveDataFailure: protocol error, directly return to downstream.
 
 *
 */
