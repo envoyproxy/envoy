@@ -373,13 +373,27 @@ protected:
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
 
-  void processResponseBodyStreamedAfterTrailer(
-      absl::optional<std::function<void(ProcessingResponse&, BodyResponse&)>> cb) {
+  void processResponseBodyHelper(absl::string_view data, Buffer::OwnedImpl& want_response_body,
+                                 bool end_of_stream = false, bool should_continue = false) {
+    processResponseBody(
+        [&](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
+          auto* streamed_response =
+              resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+          streamed_response->set_end_of_stream(end_of_stream);
+          streamed_response->set_body(data);
+          want_response_body.add(data);
+        },
+        should_continue);
+  }
+
+  void processResponseBodyStreamedAfterTrailer(absl::string_view data,
+                                               Buffer::OwnedImpl& want_response_body) {
     auto response = std::make_unique<ProcessingResponse>();
     auto* body_response = response->mutable_response_body();
-    if (cb) {
-      (*cb)(*response, *body_response);
-    }
+    auto* streamed_response =
+        body_response->mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+    streamed_response->set_body(data);
+    want_response_body.add(data);
     test_time_->advanceTimeWait(std::chrono::microseconds(10));
     stream_callbacks_->onReceiveMessage(std::move(response));
   }
@@ -4524,30 +4538,9 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
   }
 
-  processResponseBody(
-      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" AAAAA ");
-        want_response_body.add(" AAAAA ");
-      },
-      false);
-  processResponseBody(
-      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" BBBB ");
-        want_response_body.add(" BBBB ");
-      },
-      false);
-  processResponseBody(
-      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" CCC ");
-        want_response_body.add(" CCC ");
-      },
-      false);
+  processResponseBodyHelper(" AAAAA ", want_response_body);
+  processResponseBodyHelper(" BBBB ", want_response_body);
+  processResponseBodyHelper(" CCC ", want_response_body);
 
   // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
@@ -4558,14 +4551,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
     Buffer::OwnedImpl resp_chunk;
     TestUtility::feedBufferWithRandomCharacters(resp_chunk, 100);
     EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_chunk, false));
-    processResponseBody(
-        [&want_response_body](const HttpBody& body, ProcessingResponse&, BodyResponse& resp) {
-          auto* streamed_response =
-              resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-          streamed_response->set_body(body.body());
-          want_response_body.add(body.body());
-        },
-        false);
+    processResponseBodyHelper(std::to_string(i), want_response_body);
   }
 
   // The two buffers should match.
@@ -4583,41 +4569,10 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestNormal) {
   TestUtility::feedBufferWithRandomCharacters(last_resp_chunk, 10);
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
 
-  // Now sends the body response back also confirms the received chunks.
-  processResponseBody(
-      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" EEEEEEE ");
-        want_response_body.add(" EEEEEEE ");
-      },
-      false);
-  processResponseBody(
-      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" F ");
-        want_response_body.add(" F ");
-      },
-      false);
-
-  processResponseBody(
-      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" GGGGGGGGG ");
-        want_response_body.add(" GGGGGGGGG ");
-      },
-      false);
-  processResponseBody(
-      [&want_response_body](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_end_of_stream(true);
-        streamed_response->set_body(" HH ");
-        want_response_body.add(" HH ");
-      },
-      true);
+  processResponseBodyHelper(" EEEEEEE ", want_response_body);
+  processResponseBodyHelper(" F ", want_response_body);
+  processResponseBodyHelper(" GGGGGGGGG ", want_response_body);
+  processResponseBodyHelper(" HH ", want_response_body, true, true);
 
   // The two buffers should match.
   EXPECT_EQ(want_response_body.toString(), got_response_body.toString());
@@ -4668,20 +4623,8 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithTrailer) {
 
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
 
-  processResponseBodyStreamedAfterTrailer(
-      [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" AAAAA ");
-        want_response_body.add(" AAAAA ");
-      });
-  processResponseBodyStreamedAfterTrailer(
-      [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" BBBB ");
-        want_response_body.add(" BBBB ");
-      });
+  processResponseBodyStreamedAfterTrailer(" AAAAA ", want_response_body);
+  processResponseBodyStreamedAfterTrailer(" BBBB ", want_response_body);
   processResponseTrailers(absl::nullopt, true);
 
   // The two buffers should match.
@@ -4736,20 +4679,8 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithHeaderAndTrailer) {
 
   // Server now sends back response.
   processResponseHeadersAfterTrailer(absl::nullopt);
-  processResponseBodyStreamedAfterTrailer(
-      [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" AAAAA ");
-        want_response_body.add(" AAAAA ");
-      });
-  processResponseBodyStreamedAfterTrailer(
-      [&want_response_body](ProcessingResponse&, BodyResponse& resp) {
-        auto* streamed_response =
-            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-        streamed_response->set_body(" BBBB ");
-        want_response_body.add(" BBBB ");
-      });
+  processResponseBodyStreamedAfterTrailer(" AAAAA ", want_response_body);
+  processResponseBodyStreamedAfterTrailer(" BBBB ", want_response_body);
   processResponseTrailers(absl::nullopt, true);
 
   // The two buffers should match.
@@ -4841,7 +4772,7 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithFilterConfigMissing) 
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, SendNormalBodyMutationTestWithFilterConfigFullDuplexStreamed) {
+TEST_F(HttpFilterTest, SendNormalBodyMutationTestWithFilterConfigDuplexStreamed) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:

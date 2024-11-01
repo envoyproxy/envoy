@@ -574,6 +574,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   return status;
 }
 
+// TODO: Restructure the code. Adding methods like handleDataBuffered(), handleDataStreamed(),
+// handleDataBufferedPartial() to handle each case.
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
   state.setBodyReceived(true);
 
@@ -617,6 +619,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   FilterDataStatus result;
   switch (state.bodyMode()) {
   case ProcessingMode::BUFFERED:
+    // TODO: Moving this code into a method handleDataBuffered().
     if (end_stream) {
       switch (openStream()) {
       case StreamOpenState::Error:
@@ -644,8 +647,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::StopIterationAndBuffer;
     break;
   case ProcessingMode::STREAMED:
-  case ProcessingMode::FULL_DUPLEX_STREAMED: {
-    // STREAMED or FULL_DUPLEX_STREAMED body mode works as follows:
+    // STREAMED body mode works as follows:
     //
     // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it
     // dispatches via gRPC message to the external processor, and then keeps in a queue. It
@@ -661,6 +663,11 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     // the ability to modify each chunk, in order. Doing this any other way would have required
     // substantial changes to the filter manager. See
     // https://github.com/envoyproxy/envoy/issues/16760 for a discussion.
+
+  case ProcessingMode::FULL_DUPLEX_STREAMED: {
+    // FULL_DUPLEX_STREAMED body mode works similar to STREAMED except it does not put the data
+    // into the internal queue. And there is no internal queue based flow control. A copy of the
+    // data is dispatched to the external processor and the original data is drained.
     switch (openStream()) {
     case StreamOpenState::Error:
       return FilterDataStatus::StopIterationNoBuffer;

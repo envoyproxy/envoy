@@ -254,6 +254,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
           // Trailers came in while we were waiting for this response, and the server
           // is not interested in the body, so send them now.
+          // Skip doing this for FULL_DUPLEX_STREAMED body mode, as the trailers are already
+          // sent in this case.
           filter_.sendTrailers(*this, *trailers_);
         }
         clearWatermark();
@@ -379,6 +381,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     headers_ = nullptr;
 
     // Send trailers if they are available and no data pending for processing.
+    // Skip doing this for FULL_DUPLEX_STREAMED mode as the trailers are already sent in this case.
     if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
       if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
         filter_.sendTrailers(*this, *trailers_);
@@ -499,9 +502,8 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
     // The function to handle trailers response needs to consider this.
     onFinishProcessorCall(Grpc::Status::Ok, CallbackState::StreamedBodyCallback);
   }
-
-  const bool should_continue = end_of_stream;
-  return should_continue;
+  // If end_of_stream is true, Envoy should continue the filter chain operations.
+  return end_of_stream;
 }
 
 void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
