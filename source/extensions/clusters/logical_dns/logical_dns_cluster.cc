@@ -152,7 +152,14 @@ void LogicalDnsCluster::startResolve() {
             final_refresh_rate = addrinfo.ttl_;
           }
           if (dns_jitter_ms_.count() != 0) {
-            final_refresh_rate += std::chrono::milliseconds(random_.random()) % dns_jitter_ms_;
+            // We need to wrap with std::chrono::abs because
+            // random() returns an unsigned long that is interpreted as a long by
+            // std::chrono::milliseconds. If the random() return value is large enough, then
+            // it will be interpreted as a negative long, potentially causing final_refresh_rate to
+            // be negative. This causes Envoy to crash.
+            // TODO add abs.
+            final_refresh_rate +=
+                std::chrono::abs(std::chrono::milliseconds(random_.random()) % dns_jitter_ms_);
           }
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());
