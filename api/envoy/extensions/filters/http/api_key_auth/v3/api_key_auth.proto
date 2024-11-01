@@ -15,6 +15,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: APIKey Auth]
+// [#not-implemented-hide:]
 // APIKey Auth :ref:`configuration overview <config_http_filters_api_key_auth>`.
 // [#extension: envoy.filters.http.api_key_auth]
 
@@ -48,12 +49,4 @@ message APIKeyAuth {
   // The cookie name to fetch the key.
   // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
   string authentication_cookie = 4;
-}
-
-// Extra settings that may be added to per-route configuration for
-// a virtual host or a cluster.
-message APIKeyAuthPerRoute {
-  // The API key auth configuration to use for this route.
-  // Leave this empty to disable API key auth for this route.
-  APIKeyAuth api_key_auth = 1;
 }
