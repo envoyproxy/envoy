@@ -139,5 +139,12 @@ new_features:
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
     by setting a per-session state object under the key ``envoy.udp_proxy.cluster``.
+- area: cares
+  change: |
+    added two new options to c-ares resolver for configuring custom timeouts and tries while resolving DNS
+    queries. Custom timeouts could be configured by specifying :ref:`query_timeout_seconds
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.query_timeout_seconds>` and
+    custom tries could be configured by specifying :ref:`query_tries
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.query_tries>`.
 
 deprecated:

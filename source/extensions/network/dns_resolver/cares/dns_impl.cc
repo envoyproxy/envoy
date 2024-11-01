@@ -36,6 +36,9 @@ DnsResolverImpl::DnsResolverImpl(
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
       udp_max_queries_(
           static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, udp_max_queries, 0))),
+      query_timeout_seconds_(
+          static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, query_timeout_seconds, 5))),
+      query_tries_(static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, query_tries, 4))),
       resolvers_csv_(resolvers_csv),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
@@ -102,9 +105,9 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
 
   // This block reinstates cares defaults before https://github.com/c-ares/c-ares/pull/542
   options.optmask_ |= ARES_OPT_TIMEOUT;
-  options.options_.timeout = 5;
+  options.options_.timeout = query_timeout_seconds_;
   options.optmask_ |= ARES_OPT_TRIES;
-  options.options_.tries = 4;
+  options.options_.tries = query_tries_;
 
   return options;
 }

@@ -723,6 +723,8 @@ public:
 
     cares.set_filter_unroutable_families(filterUnroutableFamilies());
     cares.set_allocated_udp_max_queries(udpMaxQueries());
+    cares.set_allocated_query_timeout_seconds(queryTimeoutSeconds());
+    cares.set_allocated_query_tries(queryTries());
 
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
@@ -963,6 +965,8 @@ protected:
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
   virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return 0; }
+  virtual ProtobufWkt::UInt64Value* queryTimeoutSeconds() const { return 0; }
+  virtual ProtobufWkt::UInt32Value* queryTries() const { return 0; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
@@ -2103,6 +2107,40 @@ TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
                                              {"201.134.56.7"}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(peer_->isChannelDirty());
+}
+
+class DnsImplAresTimeoutAndTriesTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  ProtobufWkt::UInt64Value* queryTimeoutSeconds() const override {
+    auto query_timeout_seconds = std::make_unique<ProtobufWkt::UInt64Value>();
+    query_timeout_seconds->set_value(10);
+    return dynamic_cast<ProtobufWkt::UInt64Value*>(query_timeout_seconds.release());
+  }
+  ProtobufWkt::UInt32Value* queryTries() const override {
+    auto query_tries = std::make_unique<ProtobufWkt::UInt32Value>();
+    query_tries->set_value(10);
+    return dynamic_cast<ProtobufWkt::UInt32Value*>(query_tries.release());
+  }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresTimeoutAndTriesTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that c_ares timeout and tries are set when custom values are provided.
+TEST_P(DnsImplAresTimeoutAndTriesTest, VerifyCustomTimeoutAndTries) {
+  server_->addCName("root.cname.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE(opts.timeout == 10000);
+  EXPECT_TRUE(opts.tries == 10);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
 }
 
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
