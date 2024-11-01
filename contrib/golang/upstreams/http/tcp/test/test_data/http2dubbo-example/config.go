@@ -21,7 +21,7 @@ func init() {
 type config struct {
 	routerNameForGrayTraffic            string
 	clusterNameForEnableRemoteHalfClose string
-	envoySelfEnableHalfClose            bool
+	enableTunneling                     bool
 }
 
 type parser struct {
@@ -57,14 +57,14 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 		return nil, fmt.Errorf("cluster_for_enable_remote_half_close: expect string while got %T", clusterName)
 	}
 
-	envoySelfHalfClose, ok := v.AsMap()["envoy_self_enable_half_close"]
+	enableTunneling, ok := v.AsMap()["enable_tunneling"]
 	if !ok {
-		return nil, errors.New("missing envoy_self_enable_half_close")
+		return nil, errors.New("missing enable_tunneling")
 	}
-	if envoySelfHalfCloseBool, ok := envoySelfHalfClose.(bool); ok {
-		conf.envoySelfEnableHalfClose = envoySelfHalfCloseBool
+	if enableTunnelingBool, ok := enableTunneling.(bool); ok {
+		conf.enableTunneling = enableTunnelingBool
 	} else {
-		return nil, fmt.Errorf("envoy_self_enable_half_close: expect bool while got %T", envoySelfHalfCloseBool)
+		return nil, fmt.Errorf("envoy_self_enable_half_close: expect bool while got %T", enableTunnelingBool)
 	}
 
 	return conf, nil

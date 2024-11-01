@@ -59,7 +59,8 @@ if we pass <u>name</u> param in dubbo req body, it will return <u>Hello {name} !
 
 
 #### demo-2
-> Second demo is a request with body (contain <u>name</u> param for dubbo) and header (container dubbo interface and method).
+> Second demo is a request with body (contain <u>name</u> param for dubbo) and header (container dubbo interface and method). \
+> when you req with body which contains key: <u>name</u>, value: <u>jack</u>, the response will be: <u>Hello jack ! </u>.
 
     curl 127.0.0.1:10001/mytest.service/sayHello -X POST -d '{"name": "jack"}' -H 'dubbo_method: sayName' -H 'dubbo_interface: com.alibaba.nacos.example.dubbo.service.DemoService' -v
 

@@ -122,8 +122,8 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 		f.callbacks.EnableHalfClose(true)
 	}
 
-	// =========== step 6: set envoy-self half close conn =========== //
-	if f.config.envoySelfEnableHalfClose {
+	// =========== step 6: set upstream conn tunneling =========== //
+	if !f.config.enableTunneling {
 		return api.SendDataWithNotTunneling
 	}
 

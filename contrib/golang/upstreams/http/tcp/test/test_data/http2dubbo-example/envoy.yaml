@@ -51,7 +51,7 @@ static_resources:
           value:
             router_for_gray_traffic: "local_route"
             cluster_for_enable_remote_half_close: "local_service"
-            envoy_self_enable_half_close: false
+            enable_tunneling: true
 
       ## =========== Here is config for golang tcp upstream extension =========== END ##      
 
