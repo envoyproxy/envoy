@@ -362,18 +362,19 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
+// [#not-implemented-hide:]
 // The body response message corresponding to FULL_DUPLEX_STREAMED body mode.
 message StreamedBodyResponse {
-  // Envoy sends this body mutation out as it is.
+  // After receiving this body response, Envoy sends this body mutation out as it is.
   bytes body = 1;
 
-  // Set this flag to true if the server has received a body request with
+  // The server sets this flag to true if it has received a body request with
   // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.HttpBody.end_of_stream>` set to true,
   // and this is the last chunk of body responses.
   bool end_of_stream = 2;
 }
 
-// This message specifies the body mutation Envoy will apply and send out.
+// This message specifies the body mutation the server sends to Envoy.
 message BodyMutation {
   oneof mutation {
     // The entire body to replace.

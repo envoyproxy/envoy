@@ -73,7 +73,7 @@ initGrpcService(const ExtProcPerRoute& config) {
 }
 
 void verifyProcessingModeConfig(const ExternalProcessor& config) {
-  const auto& processing_mode = config.processing_mode();
+  const ProcessingMode& processing_mode = config.processing_mode();
   if (config.has_http_service()) {
     // In case http_service configured, the processing mode can only support sending headers.
     if (processing_mode.request_body_mode() != ProcessingMode::NONE ||
@@ -574,8 +574,8 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   return status;
 }
 
-// TODO: Restructure the code. Adding methods like handleDataBuffered(), handleDataStreamed(),
-// handleDataBufferedPartial() to handle each case.
+// TODO(yanjunxiang-google): Restructure the code. Adding methods like handleDataBuffered(),
+// handleDataStreamed(), handleDataBufferedPartial() to handle each case.
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
   state.setBodyReceived(true);
 
@@ -619,7 +619,6 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   FilterDataStatus result;
   switch (state.bodyMode()) {
   case ProcessingMode::BUFFERED:
-    // TODO: Moving this code into a method handleDataBuffered().
     if (end_stream) {
       switch (openStream()) {
       case StreamOpenState::Error:
