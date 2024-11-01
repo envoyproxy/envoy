@@ -45,7 +45,10 @@ type tcpUpstreamFilter struct {
   - @param headerMap supplies req header for read only.
   - @param bufferForUpstreamData supplies data to be set for sending to upstream.
   - @param endOfStream if end of stream.
-  - @return EndStream tell c++ side whether to end the stream for half closing the conn.
+  - @return api.SendDataStatus tell c++ side next action:
+    1.SendDataWithTunneling: Send data with upstream conn tunneling;
+    2.SendDataWithNotTunneling: aSend data with upstream conn not tunneling;
+    3.NotSendData: Not Send data to upstream.
 
 *
 */
@@ -88,7 +91,10 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, buffer
     *
   - @param bufferForUpstreamData supplies data to be set for sending to upstream.
   - @param endOfStream if end of stream.
-  - @return EndStream tell c++ side whether to end the stream for half closing the conn.
+  - @return api.SendDataStatus tell c++ side next action:
+    1.SendDataWithTunneling: Send data with upstream conn tunneling;
+    2.SendDataWithNotTunneling: aSend data with upstream conn not tunneling;
+    3.NotSendData: Not Send data to upstream.
 
 *
 */
@@ -151,14 +157,14 @@ const (
   - @param responseHeaderForSet to construct & set http response header.
   - @param buffer supplies data to be set for sending to downstream.
   - @param endOfStream if end of stream.
-  - @return status tell c++ side next action:
+  - @return api.ReceiveDataStatus tell c++ side next action:
     1.UpstreamDataContinue: need more data from upstream;
     2.UpstreamDataFinish: aggregate data success, return to downstream;
     3.UpstreamDataFailure: protocol error, directly return to downstream.
 
 *
 */
-func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHeaderMap, buffer api.BufferInstance, endOfStream bool) (status api.ReceiveDataStatus) {
+func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHeaderMap, buffer api.BufferInstance, endOfStream bool) api.ReceiveDataStatus {
 
 	// =========== step 1: verify dubbo frame format =========== //
 	if buffer.Len() < DUBBO_MAGIC_SIZE || binary.BigEndian.Uint16(buffer.Bytes()) != hessian.MAGIC {
