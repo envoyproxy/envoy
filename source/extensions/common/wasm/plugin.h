@@ -47,12 +47,9 @@ public:
             config.vm_config().runtime(),
             THROW_OR_RETURN_VALUE(MessageUtil::anyToBytes(config.configuration()), std::string),
             config.fail_open(), createPluginKey(config, direction, listener_metadata)),
-        direction_(direction), local_info_(local_info), listener_metadata_(listener_metadata),
-        wasm_config_(std::make_unique<WasmConfig>(config)) {}
+        local_info_(local_info), wasm_config_(std::make_unique<WasmConfig>(config)) {}
 
-  envoy::config::core::v3::TrafficDirection& direction() { return direction_; }
   const LocalInfo::LocalInfo& localInfo() { return local_info_; }
-  const envoy::config::core::v3::Metadata* listenerMetadata() { return listener_metadata_; }
   WasmConfig& wasmConfig() { return *wasm_config_; }
 
 private:
@@ -64,9 +61,7 @@ private:
   }
 
 private:
-  envoy::config::core::v3::TrafficDirection direction_;
   const LocalInfo::LocalInfo& local_info_;
-  const envoy::config::core::v3::Metadata* listener_metadata_;
   WasmConfigPtr wasm_config_;
 };
 
