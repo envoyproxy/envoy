@@ -166,20 +166,18 @@ public:
   class HeaderDataRangeMatch : public HeaderDataBaseImpl {
   public:
     HeaderDataRangeMatch(const envoy::config::route::v3::HeaderMatcher& config)
-        : HeaderDataBaseImpl(config) {
-      range_.set_start(config.range_match().start());
-      range_.set_end(config.range_match().end());
-    }
+        : HeaderDataBaseImpl(config), range_start_(config.range_match().start()),
+          range_end_(config.range_match().end()) {}
 
   private:
     bool specificMatchesHeaders(absl::string_view header_value) const override {
       int64_t header_int_value = 0;
       return absl::SimpleAtoi(header_value, &header_int_value) &&
-             header_int_value >= range_.start() && header_int_value < range_.end();
+             header_int_value >= range_start_ && header_int_value < range_end_;
     };
 
-    // TODO(adisuissa): convert from protobuf to two ints.
-    envoy::type::v3::Int64Range range_;
+    const int64_t range_start_;
+    const int64_t range_end_;
   };
 
   // Corresponds to the prefix_match from the HeaderMatchSpecifier proto in the RDS API.
