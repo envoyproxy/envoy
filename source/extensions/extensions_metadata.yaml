@@ -1688,7 +1688,7 @@ envoy.http.early_header_mutation.header_mutation:
   status: alpha
   type_urls:
   - envoy.extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation
-envoy.filters.http.basic_auth:
+envoy.filters.http.api_key_auth:
   categories:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
