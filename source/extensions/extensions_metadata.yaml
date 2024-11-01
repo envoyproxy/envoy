@@ -1688,13 +1688,6 @@ envoy.http.early_header_mutation.header_mutation:
   status: alpha
   type_urls:
   - envoy.extensions.http.early_header_mutation.header_mutation.v3.HeaderMutation
-envoy.filters.http.api_key_auth:
-  categories:
-  - envoy.filters.http
-  security_posture: robust_to_untrusted_downstream
-  status: alpha
-  type_urls:
-  - envoy.extensions.filters.http.api_key_auth.v3.APIKeyAuth
 envoy.filters.http.custom_response:
   categories:
   - envoy.filters.http
