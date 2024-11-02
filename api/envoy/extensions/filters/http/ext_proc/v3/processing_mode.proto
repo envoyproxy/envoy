@@ -89,13 +89,13 @@ message ProcessingMode {
     // * The corresponding trailer mode has to be set to ``SEND``.
     // * Envoy will send body and trailers (if present) to the server as they arrive.
     //   Sending the trailers (if present) is to inform the server the complete body arrives.
-    //   In case of no trailers, then
+    //   In case there are no trailers, then Envoy will set
     //   :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.HttpBody.end_of_stream>`
-    //   serves for that purpose.
+    //   to true as part of the last body chunk request to notify the server that no other data is to be sent.
     // * The server needs to send
     //   :ref:`StreamedBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.StreamedBodyResponse>`
     //   to Envoy in the body response.
-    // * Envoy will stream the body from the server to the backends as they arrive.
+    // * Envoy will stream the body chunks in the responses from the server to the upstream/downstream as they arrive.
     FULL_DUPLEX_STREAMED = 4;
   }
 
