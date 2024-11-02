@@ -30,25 +30,58 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //    authentication_header: "X-API-KEY"
 //    keys:
 //      inline_string: |-
-//        clientID1:apiKey1
-//        clientID2:apiKey2
+//        <client_id>:<key>
+//        <client_id>:<key>
 //
 message APIKeyAuth {
-  // keys used to authenticate the client.
-  // It should be a map of clientID to apiKey.
+  // Keys used to authenticate the clients.
+  // It should be a list of pair of client id and unique key. The client id is used to identify
+  // the client.
   // The clientID serves solely for identification purposes and isn't used for authentication.
   config.core.v3.DataSource keys = 1 [(udpa.annotations.sensitive) = true];
 
   // The header name to fetch the key.
   // If multiple values are present in the given header, the filter rejects the request.
   // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
-  string authentication_header = 2;
+  string authentication_header = 2 [(validate.rules).string = {
+    min_bytes: 0
+    max_bytes: 1024
+    well_known_regex: HTTP_HEADER_NAME
+    strict: false
+    ignore_empty: true
+  }];
 
   // The query parameter name to fetch the key.
   // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
-  string authentication_query = 3;
+  string authentication_query = 3 [(validate.rules).string = {min_bytes: 0 max_bytes: 1024}];
 
   // The cookie name to fetch the key.
   // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
-  string authentication_cookie = 4;
+  string authentication_cookie = 4 [(validate.rules).string = {
+    min_bytes: 0
+    max_bytes: 1024
+    well_known_regex: HTTP_HEADER_NAME
+    strict: false
+    ignore_empty: true
+  }];
+}
+
+// API key auth configuration of per route or per virtual host or per route configuration.
+message APIKeyAuthPerScope {
+  // Route specific APIKeyAuth configuration. This is optional and could be used to override the
+  // filter level APIKeyAuth configuration **partly**.
+  //
+  // For example, if route specific ``authentication_header`` is set, then the filter will fetch
+  // the key from route specific ``authentication_header``. But the filter level ``keys`` will
+  // still be used. If route specific ``keys`` is set, then the filter will use the route specific
+  // ``keys`` to authenticate the client but the filter level ``authentication_header`` will still
+  // be used. If both ``authentication_header`` and ``keys`` are set, then the filter will use the
+  // route specific ``authentication_header`` and ``keys`` to authenticate the client.
+  APIKeyAuth override_config = 1;
+
+  // A list of client ids that are allowed to access the routes of the scope. If the list is empty,
+  // then all authenticated clients are allowed. This provides very limited but simple authorization.
+  // If more complex authorization is required, then use the :ref:`HTTP RBAC filter
+  // <config_http_filters_rbac>` instead.
+  repeated string allowed_clients = 2;
 }
