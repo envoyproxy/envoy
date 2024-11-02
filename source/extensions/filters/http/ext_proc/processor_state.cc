@@ -87,7 +87,7 @@ bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
   }
 }
 
-// Send buffered data in STREAMED or FULL_DUPLEX_STREAMED body mode.
+// Send buffered data in STREAMED body mode.
 void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
   // Process the data being buffered in streaming mode.
   // Move the current buffer into the queue for remote processing and clear the buffered data.
@@ -97,12 +97,10 @@ void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
     ENVOY_LOG(debug, "Sending a chunk of buffered data ({})", buffered_chunk.length());
     // Need to first enqueue the data into the chunk queue before sending.
     auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-    if (bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
-      enqueueStreamingChunk(buffered_chunk, end_stream);
-    }
+    enqueueStreamingChunk(buffered_chunk, end_stream);
     filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
   }
-  if ((bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) && queueBelowLowLimit()) {
+  if (queueBelowLowLimit()) {
     clearWatermark();
   }
 }
@@ -216,9 +214,12 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         // let the doData callback handle body chunks until the end is reached.
         clearWatermark();
         return absl::OkStatus();
-      } else if (body_mode_ == ProcessingMode::STREAMED ||
-                 body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
+      } else if (body_mode_ == ProcessingMode::STREAMED) {
         sendBufferedDataInStreamedMode(false);
+        continueIfNecessary();
+        return absl::OkStatus();
+      } else if (body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
+        // There is no buffered data in this mode.
         continueIfNecessary();
         return absl::OkStatus();
       } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
