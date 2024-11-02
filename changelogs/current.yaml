@@ -275,6 +275,11 @@ new_features:
   change: |
     Added a new ``setUpstreamOverrideHost()`` which could be used to set the given host as the upstream host for the
     current request.
+- area: tls_inspector filter
+  change: |
+    added :ref:`enable_ja4_fingerprinting
+    <envoy_v3_api_field_extensions.filters.listener.tls_inspector.v3.TlsInspector.enable_ja4_fingerprinting>` to create
+    JA4 fingerprint hash from Client Hello message.
 
 deprecated:
 - area: rbac

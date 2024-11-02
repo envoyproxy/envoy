@@ -623,6 +623,9 @@ public:
   absl::string_view ja3Hash() const override {
     return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
   }
+  absl::string_view ja4Hash() const override {
+    return StreamInfoImpl::downstreamAddressProvider().ja4Hash();
+  }
   const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
     return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
   }

@@ -77,6 +77,7 @@ public:
   absl::string_view detectedTransportProtocol() const override { return transport_protocol_; }
   absl::string_view requestedServerName() const override { return server_name_; }
   absl::string_view ja3Hash() const override { return ja3_hash_; }
+  absl::string_view ja4Hash() const override { return ja4_hash_; }
   const std::vector<std::string>& requestedApplicationProtocols() const override {
     return application_protocols_;
   }
@@ -112,6 +113,7 @@ public:
   const OptionsSharedPtr& options() const override { return options_; }
   void setRequestedServerName(absl::string_view) override {}
   void setJA3Hash(absl::string_view) override {}
+  void setJA4Hash(absl::string_view) override {}
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override { return {0, 0}; }
   Api::SysCallIntResult listen(int) override { return {0, 0}; }
   Api::SysCallIntResult connect(const Network::Address::InstanceConstSharedPtr) override {
@@ -138,6 +140,7 @@ private:
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
   std::string server_name_;
   std::string ja3_hash_;
+  std::string ja4_hash_;
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
 };
