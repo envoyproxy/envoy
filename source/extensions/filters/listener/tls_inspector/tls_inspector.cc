@@ -54,6 +54,8 @@ Config::Config(
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       enable_ja3_fingerprinting_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja3_fingerprinting, false)),
+      enable_ja4_fingerprinting_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja4_fingerprinting, false)),
       max_client_hello_size_(max_client_hello_size),
       initial_read_buffer_size_(
           std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
@@ -72,6 +74,7 @@ Config::Config(
       ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
         Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
         filter->createJA3Hash(client_hello);
+        filter->createJA4Hash(client_hello);
 
         const uint8_t* data;
         size_t len;
@@ -330,6 +333,255 @@ void writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello,
   }
 }
 
+std::string getJA4TlsVersion(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  // Check for supported_versions extension first
+  const uint8_t* data;
+  size_t size;
+  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_versions, &data,
+                                           &size)) {
+    CBS cbs;
+    CBS_init(&cbs, data, size);
+    uint8_t versions_len;
+    if (!CBS_get_u8(&cbs, &versions_len)) {
+      return "00";
+    }
+
+    uint16_t highest_version = 0;
+    while (CBS_len(&cbs) >= 2) {
+      uint16_t version;
+      if (!CBS_get_u16(&cbs, &version)) {
+        break;
+      }
+      if (isNotGrease(version) && version > highest_version) {
+        highest_version = version;
+      }
+    }
+
+    std::string version;
+    switch (highest_version) {
+    case TLS1_3_VERSION:
+      version = "13";
+      break;
+    case TLS1_2_VERSION:
+      version = "12";
+      break;
+    case TLS1_1_VERSION:
+      version = "11";
+      break;
+    case TLS1_VERSION:
+      version = "10";
+      break;
+    default:
+      version = "00";
+      break;
+    }
+    return version;
+  }
+
+  // Fall back to protocol version if supported_versions extension is not present
+  switch (ssl_client_hello->version) {
+  case TLS1_3_VERSION:
+    return "13";
+  case TLS1_2_VERSION:
+    return "12";
+  case TLS1_1_VERSION:
+    return "11";
+  case TLS1_VERSION:
+    return "10";
+  default:
+    return "00";
+  }
+}
+
+bool hasSNI(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  const uint8_t* data;
+  size_t size;
+  return SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_server_name, &data,
+                                              &size);
+}
+
+int countCiphers(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  CBS cipher_suites;
+  CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
+
+  int count = 0;
+  while (CBS_len(&cipher_suites) > 0) {
+    uint16_t cipher;
+    if (!CBS_get_u16(&cipher_suites, &cipher)) {
+      break;
+    }
+    if (isNotGrease(cipher)) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+int countExtensions(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  CBS extensions;
+  CBS_init(&extensions, ssl_client_hello->extensions, ssl_client_hello->extensions_len);
+
+  int count = 0;
+  while (CBS_len(&extensions) > 0) {
+    uint16_t type;
+    CBS extension;
+    if (!CBS_get_u16(&extensions, &type) || !CBS_get_u16_length_prefixed(&extensions, &extension)) {
+      break;
+    }
+    if (isNotGrease(type)) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+std::string formatTwoDigits(int value) { return absl::StrFormat("%02d", std::min(value, 99)); }
+
+std::string getJA4AlpnChars(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  const uint8_t* data;
+  size_t size;
+  if (!SSL_early_callback_ctx_extension_get(
+          ssl_client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &size)) {
+    return "00";
+  }
+
+  CBS cbs;
+  CBS_init(&cbs, data, size);
+  uint16_t list_length;
+  if (!CBS_get_u16(&cbs, &list_length) || CBS_len(&cbs) < 1) {
+    return "00";
+  }
+
+  uint8_t proto_length;
+  if (!CBS_get_u8(&cbs, &proto_length) || CBS_len(&cbs) < proto_length) {
+    return "00";
+  }
+
+  const uint8_t* proto_data = CBS_data(&cbs);
+  std::string proto(reinterpret_cast<const char*>(proto_data), proto_length);
+
+  if (proto.empty()) {
+    return "00";
+  }
+
+  auto isAlphaNum = [](char c) {
+    return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+  };
+
+  char first = proto[0];
+  char last = proto[proto.length() - 1];
+
+  if (!isAlphaNum(first) || !isAlphaNum(last)) {
+    // Convert to hex if non-alphanumeric
+    return absl::StrFormat("%02x%02x", static_cast<uint8_t>(first), static_cast<uint8_t>(last));
+  }
+
+  return absl::StrFormat("%c%c", first, last);
+}
+
+std::string getJA4CipherHash(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  CBS cipher_suites;
+  CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
+
+  std::vector<uint16_t> ciphers;
+  while (CBS_len(&cipher_suites) > 0) {
+    uint16_t cipher;
+    if (!CBS_get_u16(&cipher_suites, &cipher)) {
+      break;
+    }
+    if (isNotGrease(cipher)) {
+      ciphers.push_back(cipher);
+    }
+  }
+
+  if (ciphers.empty()) {
+    return std::string(12, '0');
+  }
+
+  std::sort(ciphers.begin(), ciphers.end());
+
+  std::string cipher_list;
+  for (size_t i = 0; i < ciphers.size(); ++i) {
+    if (i > 0) {
+      absl::StrAppend(&cipher_list, ",");
+    }
+    absl::StrAppendFormat(&cipher_list, "%04x", ciphers[i]);
+  }
+
+  std::array<uint8_t, SHA256_DIGEST_LENGTH> hash;
+  EVP_Digest(cipher_list.data(), cipher_list.length(), hash.data(), nullptr, EVP_sha256(), nullptr);
+
+  return Hex::encode(hash.data(), 6); // First 12 characters (6 bytes)
+}
+
+std::string getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  std::vector<uint16_t> extensions;
+  std::vector<uint16_t> sig_algs;
+  CBS exts;
+  CBS_init(&exts, ssl_client_hello->extensions, ssl_client_hello->extensions_len);
+
+  while (CBS_len(&exts) > 0) {
+    uint16_t type;
+    CBS extension;
+    if (!CBS_get_u16(&exts, &type) || !CBS_get_u16_length_prefixed(&exts, &extension)) {
+      break;
+    }
+
+    if (isNotGrease(type) && type != TLSEXT_TYPE_server_name &&
+        type != TLSEXT_TYPE_application_layer_protocol_negotiation) {
+      extensions.push_back(type);
+
+      // Collect signature algorithms
+      if (type == TLSEXT_TYPE_signature_algorithms) {
+        CBS sig_alg_data;
+        CBS_init(&sig_alg_data, CBS_data(&extension), CBS_len(&extension));
+        uint16_t sig_alg_len;
+        if (CBS_get_u16(&sig_alg_data, &sig_alg_len)) {
+          while (CBS_len(&sig_alg_data) >= 2) {
+            uint16_t sig_alg;
+            if (!CBS_get_u16(&sig_alg_data, &sig_alg)) {
+              break;
+            }
+            sig_algs.push_back(sig_alg);
+          }
+        }
+      }
+    }
+  }
+
+  if (extensions.empty()) {
+    return std::string(12, '0');
+  }
+
+  std::sort(extensions.begin(), extensions.end());
+
+  std::string extension_list;
+  for (size_t i = 0; i < extensions.size(); ++i) {
+    if (i > 0) {
+      absl::StrAppend(&extension_list, ",");
+    }
+    absl::StrAppendFormat(&extension_list, "%04x", extensions[i]);
+  }
+
+  if (!sig_algs.empty()) {
+    absl::StrAppend(&extension_list, "_");
+    for (size_t i = 0; i < sig_algs.size(); ++i) {
+      if (i > 0) {
+        absl::StrAppend(&extension_list, ",");
+      }
+      absl::StrAppendFormat(&extension_list, "%04x", sig_algs[i]);
+    }
+  }
+
+  std::array<uint8_t, SHA256_DIGEST_LENGTH> hash;
+  EVP_Digest(extension_list.data(), extension_list.length(), hash.data(), nullptr, EVP_sha256(),
+             nullptr);
+
+  return Hex::encode(hash.data(), 6); // First 12 characters (6 bytes)
+}
+
 void Filter::createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
   if (config_->enableJA3Fingerprinting()) {
     std::string fingerprint;
@@ -352,6 +604,48 @@ void Filter::createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
 
     cb_->socket().setJA3Hash(md5);
   }
+}
+
+void Filter::createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  if (!config_->enableJA4Fingerprinting()) {
+    return;
+  }
+
+  std::string fingerprint;
+
+  // Protocol type (t for TLS, q for QUIC, d for `DTLS`)
+  // In this implementation we only handle TLS
+  absl::StrAppend(&fingerprint, "t");
+
+  // TLS Version
+  absl::StrAppend(&fingerprint, getJA4TlsVersion(ssl_client_hello));
+
+  // SNI presence
+  absl::StrAppend(&fingerprint, hasSNI(ssl_client_hello) ? "d" : "i");
+
+  // Cipher count
+  absl::StrAppend(&fingerprint, formatTwoDigits(countCiphers(ssl_client_hello)));
+
+  // Extension count
+  absl::StrAppend(&fingerprint, formatTwoDigits(countExtensions(ssl_client_hello)));
+
+  // ALPN first/last chars
+  absl::StrAppend(&fingerprint, getJA4AlpnChars(ssl_client_hello));
+
+  // Separator
+  absl::StrAppend(&fingerprint, "_");
+
+  // Cipher hash
+  absl::StrAppend(&fingerprint, getJA4CipherHash(ssl_client_hello));
+
+  // Separator
+  absl::StrAppend(&fingerprint, "_");
+
+  // Extension and signature algorithm hash
+  absl::StrAppend(&fingerprint, getJA4ExtensionHash(ssl_client_hello));
+
+  ENVOY_LOG(trace, "tls:createJA4Hash(), fingerprint: {}", fingerprint);
+  cb_->socket().setJA4Hash(fingerprint);
 }
 
 } // namespace TlsInspector

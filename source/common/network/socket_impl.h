@@ -68,6 +68,8 @@ public:
   }
   absl::string_view ja3Hash() const override { return ja3_hash_; }
   void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
+  absl::string_view ja4Hash() const override { return ja4_hash_; }
+  void setJA4Hash(const absl::string_view ja4_hash) override { ja4_hash_ = std::string(ja4_hash); }
   const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
     return round_trip_time_;
   }
@@ -98,6 +100,7 @@ private:
   absl::optional<std::string> interface_name_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
   std::string ja3_hash_;
+  std::string ja4_hash_;
   absl::optional<std::chrono::milliseconds> round_trip_time_;
   FilterChainInfoConstSharedPtr filter_chain_info_;
   ListenerInfoConstSharedPtr listener_info_;

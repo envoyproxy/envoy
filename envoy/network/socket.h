@@ -278,6 +278,11 @@ public:
   virtual absl::string_view ja3Hash() const PURE;
 
   /**
+   * @return ja4 fingerprint hash of the downstream connection, if any.
+   */
+  virtual absl::string_view ja4Hash() const PURE;
+
+  /**
    * @return roundTripTime of the connection
    */
   virtual const absl::optional<std::chrono::milliseconds>& roundTripTime() const PURE;
@@ -352,6 +357,11 @@ public:
    * @param JA3 fingerprint.
    */
   virtual void setJA3Hash(const absl::string_view ja3_hash) PURE;
+
+  /**
+   * @param JA4 fingerprint.
+   */
+  virtual void setJA4Hash(const absl::string_view ja4_hash) PURE;
 
   /**
    * @param  milliseconds of round trip time of previous connection
