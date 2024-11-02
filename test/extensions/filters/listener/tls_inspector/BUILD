@@ -35,6 +35,25 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "tls_inspector_ja4_test",
+    srcs = ["tls_inspector_ja4_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":tls_utility_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/network:default_socket_interface_lib",
+        "//source/common/network:listener_filter_buffer_lib",
+        "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "tls_inspector_fuzz_test_proto",
     srcs = ["tls_inspector_fuzz_test.proto"],
