@@ -1020,7 +1020,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 }
 
 TEST_P(ExtProcIntegrationTest, ResponseFromExtProcServerTooLarge) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     GTEST_SKIP() << "max_receive_message_length is only supported on Envoy gRPC";
   }
   config_helper_.setBufferLimits(1024, 1024);
@@ -4584,7 +4584,7 @@ TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4592,7 +4592,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4601,7 +4601,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4612,7 +4612,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4660,7 +4660,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
