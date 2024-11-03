@@ -5,6 +5,7 @@
 #include <fstream>
 #include <memory>
 
+#include "credentials_provider.h"
 #include "envoy/common/exception.h"
 
 #include "source/common/common/lock_guard.h"
@@ -371,6 +372,27 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   }
   last_updated_ = api_.timeSource().systemTime();
 }
+
+  IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                     CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                     std::chrono::seconds initialization_timer,
+                                     absl::string_view cluster_name, absl::string_view uri):
+                                     MetadataCredentialsProviderBase(api, context, nullptr,
+                                      create_metadata_fetcher_cb, cluster_name,
+                                      envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/,
+                                      uri, refresh_state, initialization_timer) {}
+
+  // Following functions are for MetadataFetcher::MetadataReceiver interface
+  void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& body)  {};
+  void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure reason)  {}
+
+  bool IAMRolesAnywhereCredentialsProvider::needsRefresh()  { return false; }
+  void IAMRolesAnywhereCredentialsProvider::refresh()  {}
+  void IAMRolesAnywhereCredentialsProvider::fetchCredentialFromRolesAnywhere(const std::string&& instance_role, const std::string&& token) {}
+  void IAMRolesAnywhereCredentialsProvider::extractCredentials(const std::string&& credential_document_value) {}
+
+
 
 InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
@@ -1064,6 +1086,17 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
             initialization_timer, cluster_name);
       });
 }
+
+CredentialsProviderSharedPtr
+DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                     CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                     std::chrono::seconds initialization_timer,
+                                     absl::string_view cluster_name, absl::string_view uri) const {
+  return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+            api, context, create_metadata_fetcher_cb, refresh_state,
+            initialization_timer, cluster_name, uri);
+      };
 
 absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,

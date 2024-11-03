@@ -285,6 +285,28 @@ private:
   }
 };
 
+class IAMRolesAnywhereCredentialsProvider : public MetadataCredentialsProviderBase,
+                                           public Envoy::Singleton::Instance,
+                                           public MetadataFetcher::MetadataReceiver {
+public:
+  IAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                     CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                     std::chrono::seconds initialization_timer,
+                                     absl::string_view cluster_name, absl::string_view uri);
+
+  // Following functions are for MetadataFetcher::MetadataReceiver interface
+  void onMetadataSuccess(const std::string&& body) override;
+  void onMetadataError(Failure reason) override;
+
+private:
+  bool needsRefresh() override;
+  void refresh() override;
+  void fetchCredentialFromRolesAnywhere(const std::string&& instance_role, const std::string&& token);
+  void extractCredentials(const std::string&& credential_document_value);
+
+};
+
 /**
  * Retrieve AWS credentials from the task metadata.
  *
@@ -401,6 +423,12 @@ public:
       std::chrono::seconds initialization_timer,
       absl::string_view authorization_token = {}) const PURE;
 
+  virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                     CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                     std::chrono::seconds initialization_timer,
+                                     absl::string_view cluster_name, absl::string_view uri) const PURE;
+
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
@@ -449,6 +477,12 @@ private:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
       absl::string_view authorization_token) const override;
+
+CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                     CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                     std::chrono::seconds initialization_timer,
+                                     absl::string_view cluster_name, absl::string_view uri) const override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,

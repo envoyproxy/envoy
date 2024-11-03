@@ -282,6 +282,10 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
   });
 }
 
+std::string Utility::getRolesAnywhereEndpoint(absl::string_view region) {
+  return fmt::format("rolesanywhere.{}.amazonaws.com", region);
+}
+
 /**
  * This function generates an STS Endpoint from a region string.
  * If a SigV4A region set has been provided, it will use the first region in region set, and if

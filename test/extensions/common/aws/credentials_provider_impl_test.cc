@@ -2498,6 +2498,11 @@ public:
                  CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                  std::chrono::seconds, absl::string_view),
                 (const));
+    MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider, (Api::Api& api, ServerFactoryContextOptRef context,
+                                     CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                     std::chrono::seconds initialization_timer,
+                                     absl::string_view cluster_name, absl::string_view uri), (const));
   };
 
   TestScopedRuntime scoped_runtime_;
