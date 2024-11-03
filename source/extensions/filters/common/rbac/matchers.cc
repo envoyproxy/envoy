@@ -33,7 +33,12 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(
-        Matchers::MetadataMatcher(permission.metadata(), context));
+        Matchers::MetadataMatcher(permission.metadata(), context),
+        envoy::config::rbac::v3::MetadataSource::DYNAMIC);
+  case envoy::config::rbac::v3::Permission::RuleCase::kSourcedMetadata:
+    return std::make_shared<const MetadataMatcher>(
+        Matchers::MetadataMatcher(permission.sourced_metadata().metadata_matcher(), context),
+        permission.sourced_metadata().metadata_source());
   case envoy::config::rbac::v3::Permission::RuleCase::kNotRule:
     return std::make_shared<const NotMatcher>(permission.not_rule(), validation_visitor, context);
   case envoy::config::rbac::v3::Permission::RuleCase::kRequestedServerName:
@@ -83,7 +88,12 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v3::Principal::IdentifierCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(
-        Matchers::MetadataMatcher(principal.metadata(), context));
+        Matchers::MetadataMatcher(principal.metadata(), context),
+        envoy::config::rbac::v3::MetadataSource::DYNAMIC);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kSourcedMetadata:
+    return std::make_shared<const MetadataMatcher>(
+        Matchers::MetadataMatcher(principal.sourced_metadata().metadata_matcher(), context),
+        principal.sourced_metadata().metadata_source());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kNotId:
     return std::make_shared<const NotMatcher>(principal.not_id(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kUrlPath:
@@ -248,7 +258,11 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                               const StreamInfo::StreamInfo& info) const {
-  return matcher_.match(info.dynamicMetadata());
+  if (metadata_source_ == envoy::config::rbac::v3::MetadataSource::DYNAMIC) {
+    return matcher_.match(info.dynamicMetadata());
+  }
+
+  return matcher_.match(info.route()->metadata());
 }
 
 bool FilterStateMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,

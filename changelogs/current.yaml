@@ -176,5 +176,9 @@ new_features:
     Adds support for specifying an alternate header
     :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
     for appending IP tags via ip-tagging filter instead of using the default header ``x-envoy-ip-tags``.
+- area: rbac
+  change: |
+    added :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` which allows
+    specifying an optional source for the metadata to be matched in addition to the metadata matcher.
 
 deprecated:

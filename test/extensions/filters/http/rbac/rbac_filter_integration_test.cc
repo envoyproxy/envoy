@@ -41,6 +41,111 @@ typed_config:
           - any: true
 )EOF";
 
+const std::string SET_METADATA_FILTER_CONFIG = R"EOF(
+name: envoy.filters.http.header_to_metadata
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.header_to_metadata.v3.Config
+  request_rules:
+    - header: ":path"
+      remove: false
+      on_header_present:
+        metadata_namespace: my.ns
+        key: foo
+        value: baz
+        type: STRING
+)EOF";
+
+const std::string RBAC_CONFIG_WITH_SOURCED_METADATA_DYNAMIC = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    action: DENY
+    policies:
+      "deny policy":
+        permissions:
+          - sourced_metadata:
+              metadata_matcher:
+                filter: "my.ns"
+                path:
+                  - key: "foo"
+                value:
+                  string_match:
+                    exact: "baz"
+        principals:
+          - sourced_metadata:
+              metadata_matcher:
+                filter: "envoy.filters.http.lua"
+                path:
+                  - key: "hello.world"
+                  - key: "foo"
+                value:
+                  string_match:
+                    exact: "baz"
+              metadata_source: "ROUTE_ENTRY"
+)EOF";
+
+const std::string RBAC_CONFIG_WITH_DYNAMIC_METADATA = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    action: ALLOW
+    policies:
+      "allow policy":
+        permissions:
+          - metadata:
+              filter: "my.ns"
+              path:
+                - key: "foo"
+              value:
+                string_match:
+                  exact: "baz"
+        principals:
+          - sourced_metadata:
+              metadata_matcher:
+                filter: "envoy.filters.http.lua"
+                path:
+                  - key: "foo.bar"
+                  - key: "baz"
+                value:
+                  string_match:
+                    exact: "bat"
+              metadata_source: "ROUTE_ENTRY"
+)EOF";
+
+const std::string RBAC_CONFIG_WITH_SOURCED_METADATA_ROUTE = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    action: DENY
+    policies:
+      "deny policy":
+        permissions:
+          - sourced_metadata:
+              metadata_matcher:
+                filter: "envoy.filters.http.lua"
+                path:
+                  - key: "hello.world"
+                  - key: "foo"
+                value:
+                  string_match:
+                    exact: "baz"
+              metadata_source: "ROUTE_ENTRY"
+        principals:
+          - sourced_metadata:
+              metadata_matcher:
+                filter: "envoy.filters.http.lua"
+                path:
+                  - key: "foo.bar"
+                  - key: "baz"
+                value:
+                  string_match:
+                    exact: "bat"
+              metadata_source: "ROUTE_ENTRY"
+)EOF";
+
 const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
 name: rbac
 typed_config:
@@ -541,6 +646,177 @@ TEST_P(RBACIntegrationTest, Denied) {
 TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter(RBAC_CONFIG_WITH_DENY_ACTION);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "sni.lyft.com"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));
+}
+
+TEST_P(RBACIntegrationTest, RouteMetadataMatcherAllow) {
+  config_helper_.prependFilter(RBAC_CONFIG_WITH_SOURCED_METADATA_ROUTE);
+  // Set route metadata
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        const std::string key = "envoy.filters.http.lua";
+        const std::string yaml =
+            R"EOF(
+            foo.bar:
+              baz: bat
+          )EOF";
+
+        ProtobufWkt::Struct value;
+        TestUtility::loadFromYaml(yaml, value);
+        auto default_route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        default_route->mutable_metadata()->mutable_filter_metadata()->insert(
+            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/foo/../bar"},
+          {":scheme", "http"},
+          {":authority", "sni.lyft.com"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(RBACIntegrationTest, RouteMetadataMatcherDeny) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(RBAC_CONFIG_WITH_SOURCED_METADATA_ROUTE);
+  // Set route metadata
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        const std::string key = "envoy.filters.http.lua";
+        const std::string yaml =
+            R"EOF(
+            foo.bar:
+              baz: bat
+            hello.world:
+              foo: baz
+          )EOF";
+
+        ProtobufWkt::Struct value;
+        TestUtility::loadFromYaml(yaml, value);
+        auto default_route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        default_route->mutable_metadata()->mutable_filter_metadata()->insert(
+            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "sni.lyft.com"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));
+}
+
+TEST_P(RBACIntegrationTest, DynamicMetadataMatcherAllow) {
+  config_helper_.prependFilter(RBAC_CONFIG_WITH_DYNAMIC_METADATA);
+  config_helper_.prependFilter(SET_METADATA_FILTER_CONFIG);
+  // Set route metadata
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        const std::string key = "envoy.filters.http.lua";
+        const std::string yaml =
+            R"EOF(
+            foo.bar:
+              baz: bat
+          )EOF";
+
+        ProtobufWkt::Struct value;
+        TestUtility::loadFromYaml(yaml, value);
+        auto default_route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        default_route->mutable_metadata()->mutable_filter_metadata()->insert(
+            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/foo/../bar"},
+          {":scheme", "http"},
+          {":authority", "sni.lyft.com"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(RBACIntegrationTest, DynamicMetadataMatcherDeny) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.prependFilter(RBAC_CONFIG_WITH_SOURCED_METADATA_DYNAMIC);
+  config_helper_.prependFilter(SET_METADATA_FILTER_CONFIG);
+
+  // Set route metadata
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        const std::string key = "envoy.filters.http.lua";
+        const std::string yaml =
+            R"EOF(
+            hello.world:
+              foo: baz
+          )EOF";
+
+        ProtobufWkt::Struct value;
+        TestUtility::loadFromYaml(yaml, value);
+        auto default_route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        default_route->mutable_metadata()->mutable_filter_metadata()->insert(
+            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+      });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

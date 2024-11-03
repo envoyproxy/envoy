@@ -430,11 +430,13 @@ TEST(MetadataMatcher, MetadataMatcher) {
   matcher.add_path()->set_key("label");
 
   matcher.mutable_value()->mutable_string_match()->set_exact("test");
-  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context)), false, conn, header,
-               info);
+  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context),
+                               envoy::config::rbac::v3::MetadataSource::DYNAMIC),
+               false, conn, header, info);
   matcher.mutable_value()->mutable_string_match()->set_exact("prod");
-  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context)), true, conn, header,
-               info);
+  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context),
+                               envoy::config::rbac::v3::MetadataSource::DYNAMIC),
+               true, conn, header, info);
 }
 
 TEST(PolicyMatcher, PolicyMatcher) {
