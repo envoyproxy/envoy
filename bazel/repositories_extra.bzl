@@ -15,7 +15,7 @@ PYTHON_MINOR_VERSION = _python_minor_version(PYTHON_VERSION)
 # Envoy deps that rely on a first stage of dependency loading in envoy_dependencies().
 def envoy_dependencies_extra(
         python_version = PYTHON_VERSION,
-        ignore_root_user_error = False):
+        ignore_root_user_error = True):
     bazel_features_deps()
     emsdk_deps()
     raze_fetch_remote_crates()

@@ -2,12 +2,11 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.api_key_auth.v3;
 
-import "envoy/config/core/v3/base.proto";
-
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.api_key_auth.v3";
 option java_outer_classname = "ApiKeyAuthProto";
@@ -17,7 +16,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: APIKey Auth]
-// [#not-implemented-hide:]
 // APIKey Auth :ref:`configuration overview <config_http_filters_api_key_auth>`.
 // [#extension: envoy.filters.http.api_key_auth]
 
@@ -28,56 +26,62 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // .. code-block:: yaml
 //
 //    authentication_header: "X-API-KEY"
-//    keys:
-//      inline_string: |-
-//        <client_id>:<key>
-//        <client_id>:<key>
+//    credentials:
+//      entries:
+//      - api_key: 09876abcdefg
+//        client_id: user
 //
-message APIKeyAuth {
-  // Keys used to authenticate the clients.
-  // It should be a list of pair of client id and unique key. The client id is used to identify
-  // the client.
-  // The clientID serves solely for identification purposes and isn't used for authentication.
-  config.core.v3.DataSource keys = 1 [(udpa.annotations.sensitive) = true];
+// If multiple fields of ``authentication_header``, ``authentication_query``, and ``authentication_cookie``
+// are set. Then filter will try to fetch the API key from the following fields in order:
+//
+// 1. ``authentication_header``
+// 2. ``authentication_query``
+// 3. ``authentication_cookie``
+//
+// If none of the fields are set, then the filter will reject the request.
+message ApiKeyAuth {
+  message Credential {
+    // The value of the unique API key.
+    string api_key = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The unique id or identity that used to identify the client or consumer.
+    string client_id = 2 [(validate.rules).string = {min_len: 1}];
+  }
+
+  message Credentials {
+    repeated Credential entries = 1;
+  }
+
+  // Api credentials used to authenticate the clients.
+  Credentials credentials = 1 [(udpa.annotations.sensitive) = true];
 
   // The header name to fetch the key.
   // If multiple values are present in the given header, the filter rejects the request.
-  // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
-  string authentication_header = 2 [(validate.rules).string = {
-    min_bytes: 0
-    max_bytes: 1024
-    well_known_regex: HTTP_HEADER_NAME
-    strict: false
-    ignore_empty: true
-  }];
+  string authentication_header = 2
+      [(validate.rules).string =
+           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
 
   // The query parameter name to fetch the key.
-  // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
-  string authentication_query = 3 [(validate.rules).string = {min_bytes: 0 max_bytes: 1024}];
+  string authentication_query = 3 [(validate.rules).string = {max_len: 1024}];
 
   // The cookie name to fetch the key.
-  // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
-  string authentication_cookie = 4 [(validate.rules).string = {
-    min_bytes: 0
-    max_bytes: 1024
-    well_known_regex: HTTP_HEADER_NAME
-    strict: false
-    ignore_empty: true
-  }];
+  string authentication_cookie = 4
+      [(validate.rules).string =
+           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
 }
 
 // API key auth configuration of per route or per virtual host or per route configuration.
-message APIKeyAuthPerScope {
+message ApiKeyAuthPerScope {
   // Route specific APIKeyAuth configuration. This is optional and could be used to override the
-  // filter level APIKeyAuth configuration **partly**.
+  // filter level ApiKeyAuth configuration **partly**.
   //
   // For example, if route specific ``authentication_header`` is set, then the filter will fetch
   // the key from route specific ``authentication_header``. But the filter level ``keys`` will
-  // still be used. If route specific ``keys`` is set, then the filter will use the route specific
-  // ``keys`` to authenticate the client but the filter level ``authentication_header`` will still
-  // be used. If both ``authentication_header`` and ``keys`` are set, then the filter will use the
-  // route specific ``authentication_header`` and ``keys`` to authenticate the client.
-  APIKeyAuth override_config = 1;
+  // still be used. If route specific non-empty ``keys`` is set, then the filter will use the
+  // route specific ``keys`` to authenticate the client but the filter level ``authentication_header``
+  // will still be used. If both ``authentication_header`` and ``keys`` are set, then the filter
+  // will use the route specific ``authentication_header`` and ``keys`` to authenticate the client.
+  ApiKeyAuth override_config = 1;
 
   // A list of client ids that are allowed to access the routes of the scope. If the list is empty,
   // then all authenticated clients are allowed. This provides very limited but simple authorization.
