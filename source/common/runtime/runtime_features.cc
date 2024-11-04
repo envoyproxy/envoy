@@ -122,6 +122,12 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
+// TODO(alyssawilk, renjietang) figure out what to do with this for optimal defaults
+#if defined(__ANDROID_API__)
+ABSL_FLAG(bool, envoy_reloadable_features_always_use_v6, true, "");
+#else
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
+#endif
 // TODO(vikaschoudhary16) flip this to true only after all the
 // TcpProxy::Filter::HttpStreamDecoderFilterCallbacks are implemented or commented as unnecessary
 FALSE_RUNTIME_GUARD(envoy_restart_features_upstream_http_filters_with_tcp_proxy);
