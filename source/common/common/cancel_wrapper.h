@@ -33,7 +33,7 @@ template <typename Callback> auto cancelWrapped(Callback&& callback, CancelFunct
     if (*cancelled_flag) {
       return;
     }
-    return std::move(cb)(std::forward<decltype(args)>(args)...);
+    return cb(std::forward<decltype(args)>(args)...);
   };
 }
 
