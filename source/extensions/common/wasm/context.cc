@@ -1598,12 +1598,6 @@ void Context::failStream(WasmStreamType stream_type) {
 WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view body_text,
                                       Pairs additional_headers, uint32_t grpc_status,
                                       std::string_view details) {
-  // This flag is used to avoid calling sendLocalReply() twice, even if wasm code has this
-  // logic. We can't reuse "local_reply_sent_" here because it can't avoid calling nested
-  // sendLocalReply() during encodeHeaders().
-  if (local_reply_hold_) {
-    return WasmResult::BadArgument;
-  }
   // "additional_headers" is a collection of string_views. These will no longer
   // be valid when "modify_headers" is finally called below, so we must
   // make copies of all the headers.
@@ -1628,11 +1622,6 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
                                   modify_headers = std::move(modify_headers), grpc_status,
                                   details = StringUtil::replaceAllEmptySpace(
                                       absl::string_view(details.data(), details.size()))] {
-      // When the wasm vm fails, failStream() is called if the plugin is fail-closed, we need
-      // this flag to avoid calling sendLocalReply() twice.
-      if (local_reply_sent_) {
-        return;
-      }
       // C++, Rust and other SDKs use -1 (InvalidCode) as the default value if gRPC code is not set,
       // which should be mapped to nullopt in Envoy to prevent it from sending a grpc-status trailer
       // at all.
@@ -1643,10 +1632,8 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
       }
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
                                          modify_headers, grpc_status_code, details);
-      local_reply_sent_ = true;
     });
   }
-  local_reply_hold_ = true;
   return WasmResult::Ok;
 }
 

@@ -72,8 +72,10 @@ std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePt
   MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
   *config_update = std::move(owned_message);
   const auto decoded_resources =
-      DecodedResourcesWrapper(*resource_decoder_, message.resources(), message.version_info());
-  THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources.refvec_, message.version_info()));
+      THROW_OR_RETURN_VALUE(DecodedResourcesWrapper::create(*resource_decoder_, message.resources(),
+                                                            message.version_info()),
+                            std::unique_ptr<DecodedResourcesWrapper>);
+  THROW_IF_NOT_OK(callbacks_.onConfigUpdate(decoded_resources->refvec_, message.version_info()));
   return message.version_info();
 }
 
