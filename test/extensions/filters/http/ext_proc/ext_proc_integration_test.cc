@@ -4752,6 +4752,7 @@ TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstream) {
                           "paused_reading_total")
                 ->value(),
             1);
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedBasicTest) {
