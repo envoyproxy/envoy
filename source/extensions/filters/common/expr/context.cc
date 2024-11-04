@@ -259,7 +259,7 @@ absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
     return CelValue::CreateStringView(
         info_.upstreamInfo().value().get().upstreamTransportFailureReason());
   } else if (value == UpstreamRequestAttemptCount) {
-    return CelValue::CreateInt64(info_.attemptCount().value_or(0));
+    return CelValue::CreateUint64(info_.attemptCount().value_or(0));
   }
 
   auto ssl_info = info_.upstreamInfo().value().get().upstreamSslConnection();
