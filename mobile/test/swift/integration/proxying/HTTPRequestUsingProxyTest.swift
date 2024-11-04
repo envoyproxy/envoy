@@ -85,7 +85,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   }
 
   // https://github.com/envoyproxy/envoy/issues/33014
-  func skipped_testHTTPSRequestUsingProxy() throws
+  func skipped_testHTTPSRequestUsingProxy() throws {
     EnvoyTestServer.startHttpsProxyServer()
     EnvoyTestServer.startHttps1Server()
     let proxyPort = EnvoyTestServer.getProxyPort()
