@@ -112,11 +112,11 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
                                 const std::vector<std::string>& tags) {
   using HeaderAction = IpTaggingFilterConfig::HeaderAction;
 
-  OptRef<const Http::LowerCaseString> header_name = config_->ip_tag_header();
+  OptRef<const Http::LowerCaseString> header_name = config_->ipTagHeader();
 
   if (tags.empty()) {
     bool maybe_sanitize =
-        config_->ip_tag_header_action() == HeaderAction::IPTagging_HeaderAction_SANITIZE;
+        config_->ipTagHeaderAction() == HeaderAction::IPTagging_HeaderAction_SANITIZE;
     if (header_name.has_value() && maybe_sanitize) {
       if (headers.remove(header_name.value()) != 0) {
         // We must clear the route cache in case it held a decision based on the now-removed header.
@@ -133,7 +133,7 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
     // the behaviour will be backwards compatible.
     headers.appendEnvoyIpTags(tags_join, ",");
   } else {
-    switch (config_->ip_tag_header_action()) {
+    switch (config_->ipTagHeaderAction()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case HeaderAction::IPTagging_HeaderAction_SANITIZE:
       headers.setCopy(header_name.value(), tags_join);

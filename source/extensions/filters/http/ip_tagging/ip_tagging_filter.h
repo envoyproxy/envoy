@@ -42,13 +42,13 @@ public:
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const { return *trie_; }
 
-  OptRef<const Http::LowerCaseString> ip_tag_header() const {
+  OptRef<const Http::LowerCaseString> ipTagHeader() const {
     if (ip_tag_header_.get().empty()) {
       return absl::nullopt;
     }
     return ip_tag_header_;
   }
-  HeaderAction ip_tag_header_action() const { return ip_tag_header_action_; }
+  HeaderAction ipTagHeaderAction() const { return ip_tag_header_action_; }
 
   void incHit(absl::string_view tag) {
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
