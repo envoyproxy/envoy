@@ -74,7 +74,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
 
     if let respBody = executeRequest(engine: engine, scheme: "http",
-                                     authority: "localhost:" + String(EnvoyTestServer.getHttpPort())) {
+                                     authority: "localhost:" +
+                                                String(EnvoyTestServer.getHttpPort())) {
       XCTAssertGreaterThanOrEqual(respBody.utf8.count, 3900)
     }
 
@@ -86,6 +87,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   func testHTTPSRequestUsingProxy() throws {
     EnvoyTestServer.startHttpsProxyServer()
     EnvoyTestServer.startHttps1Server()
+    let proxyPort = EnvoyTestServer.getProxyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
     let responseHeadersExpectation =
@@ -104,12 +106,14 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .respectSystemProxySettings(true)
       .build()
 
-    EnvoyTestApi.registerTestProxyResolver("localhost", port: EnvoyTestServer.getProxyPort(), usePacResolver: false)
+    EnvoyTestApi.registerTestProxyResolver("localhost", port: proxyPort, usePacResolver: false)
 
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
-                                               authority: "localhost" + String(EnvoyTestServer.getHttpPort()), path: "/")
+                                               authority: "localhost" +
+                                                          String(EnvoyTestServer.getHttpPort()),
+                                               path: "/")
       .build()
 
     var responseBuffer = Data()
@@ -145,6 +149,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   func testTwoHTTPRequestsUsingProxy() throws {
     EnvoyTestServer.startHttpProxyServer()
     EnvoyTestServer.startHttp1Server()
+    let proxyPort = EnvoyTestServer.getProxyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
 
@@ -159,16 +164,18 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .respectSystemProxySettings(true)
       .build()
 
-    EnvoyTestApi.registerTestProxyResolver("localhost", port: EnvoyTestServer.getProxyPort(), usePacResolver: false)
+    EnvoyTestApi.registerTestProxyResolver("localhost", port: proxyPort, usePacResolver: false)
 
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
 
     if let resp1 = executeRequest(engine: engine, scheme: "http",
-                                  authority: "localhost:" + String(EnvoyTestServer.getHttpPort())) {
+                                  authority: "localhost:" +
+                                             String(EnvoyTestServer.getHttpPort())) {
       XCTAssertGreaterThanOrEqual(resp1.utf8.count, 3900)
     }
     if let resp2 = executeRequest(engine: engine, scheme: "http",
-                                  authority: "localhost:" + String(EnvoyTestServer.getHttpPort())) {
+                                  authority: "localhost:" +
+                                             String(EnvoyTestServer.getHttpPort())) {
       XCTAssertGreaterThanOrEqual(resp2.utf8.count, 3900)
     }
 
@@ -180,6 +187,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   func testHTTPRequestUsingProxyCancelStream() throws {
     EnvoyTestServer.startHttpProxyServer()
     EnvoyTestServer.startHttp1Server()
+    let proxyPort = EnvoyTestServer.getProxyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
 
@@ -194,12 +202,13 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .respectSystemProxySettings(true)
       .build()
 
-    EnvoyTestApi.registerTestProxyResolver("localhost", port: EnvoyTestServer.getProxyPort(), usePacResolver: false)
+    EnvoyTestApi.registerTestProxyResolver("localhost", port: proxyPort, usePacResolver: false)
 
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
-                                               authority: "localhost:" + String(EnvoyTestServer.getHttpPort()))
+                                               authority: "localhost:" +
+                                                          String(EnvoyTestServer.getHttpPort()))
       .build()
 
     let cancelExpectation = self.expectation(description: "Stream run with expected cancellation")
