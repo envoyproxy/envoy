@@ -376,21 +376,42 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-                                     std::chrono::seconds initialization_timer,
+                                     std::chrono::seconds initialization_timer,       
+                                     absl::string_view role_arn, absl::string_view role_session_name,
                                      absl::string_view cluster_name, absl::string_view uri):
                                      MetadataCredentialsProviderBase(api, context, nullptr,
                                       create_metadata_fetcher_cb, cluster_name,
                                       envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/,
-                                      uri, refresh_state, initialization_timer) {}
+                                      uri, refresh_state, initialization_timer), role_arn_(role_arn), role_session_name_(role_session_name) {}
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
-  void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& body)  {};
-  void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure reason)  {}
+  // void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& ABSL_ATTRIBUTE_UNUSED body)  {};
+  // void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure ABSL_ATTRIBUTE_UNUSED reason)  {}
+
+void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& body) {
+  ENVOY_LOG(debug, "AWS IAM Roles Anywhere fetch success, calling callback func");
+  on_async_fetch_cb_(std::move(body));
+}
+
+void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure reason) {
+  stats_->credential_refreshes_failed_.inc();
+  if (continue_on_async_fetch_failure_) {
+    ENVOY_LOG(warn, "{}. Reason: {}", continue_on_async_fetch_failure_reason_,
+              metadata_fetcher_->failureToString(reason));
+    continue_on_async_fetch_failure_ = false;
+    continue_on_async_fetch_failure_reason_ = "";
+    on_async_fetch_cb_(std::move(""));
+  } else {
+    ENVOY_LOG(error, "AWS IAM Roles Anywhere  fetch failure: {}",
+              metadata_fetcher_->failureToString(reason));
+    handleFetchDone();
+  }
+}
 
   bool IAMRolesAnywhereCredentialsProvider::needsRefresh()  { return false; }
   void IAMRolesAnywhereCredentialsProvider::refresh()  {}
-  void IAMRolesAnywhereCredentialsProvider::fetchCredentialFromRolesAnywhere(const std::string&& instance_role, const std::string&& token) {}
-  void IAMRolesAnywhereCredentialsProvider::extractCredentials(const std::string&& credential_document_value) {}
+  void IAMRolesAnywhereCredentialsProvider::fetchCredentialFromRolesAnywhere(const std::string&& ABSL_ATTRIBUTE_UNUSED instance_role, const std::string&& ABSL_ATTRIBUTE_UNUSED token) {}
+  void IAMRolesAnywhereCredentialsProvider::extractCredentials(const std::string&& ABSL_ATTRIBUTE_UNUSED credential_document_value) {}
 
 
 
@@ -1092,10 +1113,12 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(Api::
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
+                                    absl::string_view role_arn, absl::string_view role_session_name,
                                      absl::string_view cluster_name, absl::string_view uri) const {
   return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
             api, context, create_metadata_fetcher_cb, refresh_state,
-            initialization_timer, cluster_name, uri);
+            initialization_timer, role_arn,  role_session_name,
+            cluster_name, uri);
       };
 
 absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
@@ -1122,7 +1145,30 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
         context.api(), context, Extensions::Common::Aws::Utility::fetchMetadata,
         MetadataFetcher::create, "", token, sts_endpoint, role_arn, role_session_name,
         refresh_state, initialization_timer, cluster_name);
-  } else {
+  } else if (config.has_iam_roles_anywhere()){
+    const auto& roles_anywhere = config.iam_roles_anywhere();
+    const std::string iam_roles_anywhere_endpoint = Utility::getRolesAnywhereEndpoint(region);
+    const std::string& role_arn = roles_anywhere.role_arn();
+    const std::string role_session_name = sessionName(context.api());
+
+    const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+    const auto initialization_timer = std::chrono::seconds(2);
+      // IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+      //                                CreateMetadataFetcherCb create_metadata_fetcher_cb,
+      //                                MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      //                                std::chrono::seconds initialization_timer,
+      //                                absl::string_view cluster_name, absl::string_view uri):
+      //                                MetadataCredentialsProviderBase(api, context, nullptr,
+      //                                 create_metadata_fetcher_cb, cluster_name,
+      //                                 envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/,
+      //                                 uri, refresh_state, initialization_timer) {}
+
+    return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+        context.api(), context,
+        MetadataFetcher::create, refresh_state, initialization_timer, role_arn, role_session_name,
+         iam_roles_anywhere_endpoint, iam_roles_anywhere_endpoint);
+  }
+  else {
     return absl::InvalidArgumentError("No AWS credential provider specified");
   }
 }

@@ -293,6 +293,7 @@ public:
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
+                                     absl::string_view role_arn, absl::string_view role_session_name,
                                      absl::string_view cluster_name, absl::string_view uri);
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
@@ -304,6 +305,9 @@ private:
   void refresh() override;
   void fetchCredentialFromRolesAnywhere(const std::string&& instance_role, const std::string&& token);
   void extractCredentials(const std::string&& credential_document_value);
+
+  const std::string role_arn_;
+  const std::string role_session_name_;
 
 };
 
@@ -427,6 +431,7 @@ public:
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
+                                    absl::string_view role_arn, absl::string_view role_session_name,
                                      absl::string_view cluster_name, absl::string_view uri) const PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
@@ -482,6 +487,7 @@ CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(Api::Api&
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
+                                    absl::string_view role_arn, absl::string_view role_session_name,
                                      absl::string_view cluster_name, absl::string_view uri) const override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
