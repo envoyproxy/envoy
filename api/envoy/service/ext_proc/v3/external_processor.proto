@@ -365,7 +365,7 @@ message HeaderMutation {
 // [#not-implemented-hide:]
 // The body response message corresponding to FULL_DUPLEX_STREAMED body mode.
 message StreamedBodyResponse {
-  // After receiving this body response, Envoy sends this body mutation out as it is.
+  // The body response chunk that will be passed to the upstream/downstream by Envoy.
   bytes body = 1;
 
   // The server sets this flag to true if it has received a body request with
@@ -378,15 +378,21 @@ message StreamedBodyResponse {
 message BodyMutation {
   oneof mutation {
     // The entire body to replace.
-    // Do not send this response for FULL_DUPLEX_STREAMED body mode.
+    // Should only be used when the corresponding ``BodySendMode`` in the
+    // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    // is not set to ``FULL_DUPLEX_STREAMED``.
     bytes body = 1;
 
     // Clear the corresponding body chunk.
-    // Do not send this response for FULL_DUPLEX_STREAMED body mode.
+    // Should only be used when the corresponding ``BodySendMode`` in the
+    // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    // is not set to ``FULL_DUPLEX_STREAMED``.
     bool clear_body = 2;
 
     // [#not-implemented-hide:]
-    // Sending this response for FULL_DUPLEX_STREAMED body mode.
+    // Must be used when the corresponding ``BodySendMode`` in the
+    // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    // is set to ``FULL_DUPLEX_STREAMED``.
     StreamedBodyResponse streamed_response = 3;
   }
 }

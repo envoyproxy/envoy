@@ -81,7 +81,7 @@ message ProcessingMode {
     // :ref:`max_receive_message_length <envoy_v3_api_field_config.core.v3.GrpcService.EnvoyGrpc.max_receive_message_length>`
     // if EnvoyGrpc is used.
     //
-    // The server may also choose to buffer the entire message, including the headers (if header mode is
+    // Note that the server may also choose to buffer the entire message, including the headers (if header mode is
     // ``SEND``), the entire body, and the trailers (if present), before sending back any response.
     // The server response has to maintain the headers-body-trailers ordering.
     //
