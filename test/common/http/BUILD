@@ -411,6 +411,26 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "header_matcher_speed_test",
+    srcs = ["header_matcher_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http:header_utility_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "header_matcher_benchmark_test",
+    benchmark_binary = "header_matcher_speed_test",
+)
+
 envoy_cc_test(
     name = "user_agent_test",
     srcs = ["user_agent_test.cc"],
