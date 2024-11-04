@@ -231,8 +231,7 @@ ScopedResume GrpcMuxImpl<S, F, RQ, RS>::pause(const std::vector<std::string> typ
 template <class S, class F, class RQ, class RS>
 absl::Status GrpcMuxImpl<S, F, RQ, RS>::updateMuxSource(
     Grpc::RawAsyncClientPtr&& primary_async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
-    CustomConfigValidatorsPtr&& custom_config_validators, Stats::Scope& scope,
-    BackOffStrategyPtr&& backoff_strategy,
+    Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
     const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
@@ -248,9 +247,9 @@ absl::Status GrpcMuxImpl<S, F, RQ, RS>::updateMuxSource(
   grpc_stream_ = createGrpcStreamObject(std::move(primary_async_client),
                                         std::move(failover_async_client), service_method, scope,
                                         std::move(backoff_strategy), *rate_limit_settings_or_error);
+  // No need to update the config_validators_ as they may contain some state
+  // that needs to be kept across different GrpcMux objects.
 
-  // Update the config validators.
-  config_validators_ = std::move(custom_config_validators);
   // Update the watch map's config validators.
   for (auto& [type_url, watch_map] : watch_maps_) {
     watch_map->setConfigValidators(config_validators_.get());

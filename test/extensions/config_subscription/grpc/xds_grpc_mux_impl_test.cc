@@ -1313,7 +1313,6 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
       /*failover_async_client=*/nullptr,
-      /*custom_config_validators=*/nullptr,
       /*scope=*/*stats_.rootScope(),
       /*backoff_strategy=*/
       std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -1371,7 +1370,6 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
       /*failover_async_client=*/nullptr,
-      /*custom_config_validators=*/std::make_unique<NiceMock<MockCustomConfigValidators>>(),
       /*scope=*/*stats_.rootScope(),
       /*backoff_strategy=*/
       std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -1433,7 +1431,6 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                        /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(
                            replaced_async_client_),
                        /*failover_async_client=*/nullptr,
-                       /*custom_config_validators=*/nullptr,
                        /*scope=*/*stats_.rootScope(),
                        /*backoff_strategy=*/
                        std::make_unique<JitteredExponentialBackOffStrategy>(
