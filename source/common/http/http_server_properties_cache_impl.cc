@@ -297,7 +297,7 @@ HttpServerPropertiesCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origi
   return *it->second.h3_status_tracker;
 }
 
-bool HttpServerPropertiesCache::isHttp3Broken(const Origin& origin) {
+bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
   absl::optional<Origin> canonical = getCanonicalOrigin(origin.hostname_);
 
   if (!Runtime::runtimeFeatureEnabled(
@@ -307,7 +307,7 @@ bool HttpServerPropertiesCache::isHttp3Broken(const Origin& origin) {
   }
 
   // Note that we don't create a new tracker for the origin if there's already a corresponding one
-  // for the canonical suffix.
+  // for the canonical origin.
   auto entry_it = protocols_.find(origin);
   if (entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
     return entry_it->second.h3_status_tracker->isHttp3Broken();
