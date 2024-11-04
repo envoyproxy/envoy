@@ -45,7 +45,7 @@ message IPTagging {
     // (DEFAULT) The header specified in :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
     // will be dropped, before the tags are applied. Sanitize will be run regardless of if the source is a trusted IP or not.
     //
-    // Note that the header will be visible unsanitized to any filters downstream of the ip-tag-header filter.
+    // Note that the header will be visible unsanitized to any filters downstream of the ip-tag-header filter, unless it has an *x-envoy* prefix.
     SANITIZE = 0;
 
     // Tags will be appended to the header specified in
