@@ -49,9 +49,14 @@ public:
   virtual void onSidestreamBelowLowWatermark() PURE;
 
   /**
-    Sidestream subscribes to downstream watermark events.
+    Sidestream subscribes to downstream watermark events on the downstream stream and downstream
+    connection.
   */
   virtual void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
+  /**
+    Sidestream stop subscribing to watermark events on the downstream stream and downstream
+    connection.
+   */
   virtual void
   removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
 };

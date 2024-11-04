@@ -454,7 +454,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   const Buffer::OwnedImpl data_copy(data.toString());
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-      .WillRepeatedly(Invoke(
+      .WillOnce(Invoke(
           [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
               const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
             callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,

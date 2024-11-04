@@ -55,7 +55,7 @@ TEST_P(EnvoyGrpcFlowControlTest, BasicStreamFlowControlWithStreamOption) {
   std::string large_request = std::string(64 * 1024, 'a');
 
   // Set watermark_callbacks_ so that sidestream watermark callback will be registered with stream
-  // options. option.
+  // options.
   testing::NiceMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
   watermark_callbacks_ = &watermark_callbacks;
 
