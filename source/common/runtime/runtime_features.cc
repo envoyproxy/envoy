@@ -41,6 +41,7 @@ RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 RUNTIME_GUARD(envoy_reloadable_features_exclude_host_in_eds_status_draining);
+RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_timeout_error);
 RUNTIME_GUARD(envoy_reloadable_features_extend_h3_accept_untrusted);
 RUNTIME_GUARD(envoy_reloadable_features_filter_access_loggers_first);
@@ -107,6 +108,7 @@ RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
 RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
+RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
@@ -121,6 +123,12 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
+// TODO(alyssawilk, renjietang) figure out what to do with this for optimal defaults
+#if defined(__ANDROID_API__)
+ABSL_FLAG(bool, envoy_reloadable_features_always_use_v6, true, "");
+#else
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_always_use_v6);
+#endif
 // TODO(vikaschoudhary16) flip this to true only after all the
 // TcpProxy::Filter::HttpStreamDecoderFilterCallbacks are implemented or commented as unnecessary
 FALSE_RUNTIME_GUARD(envoy_restart_features_upstream_http_filters_with_tcp_proxy);
@@ -142,8 +150,6 @@ FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove);
 // TODO(alyssawilk): evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change);
-// TODO(botengyao): this will be default true in the next release after this warning release.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 // Adding runtime flag to use balsa_parser for http_inspector.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 

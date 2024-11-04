@@ -231,7 +231,7 @@ Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) 
   if (absl::EndsWith(file_path, ".yaml")) {
     contents = MessageUtil::getJsonStringFromMessageOrError(ValueUtil::loadFromYaml(contents));
   }
-  return Json::Factory::loadFromString(contents);
+  return Json::Factory::loadFromString(contents).value();
 }
 
 std::vector<envoy::RouterCheckToolSchema::ValidationItemResult>

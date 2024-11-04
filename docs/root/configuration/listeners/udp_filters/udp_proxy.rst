@@ -74,6 +74,16 @@ remaining datagrams to different clusters according to their source ports.
    :lines: 14-53
    :caption: :download:`udp-proxy-router.yaml <_include/udp-proxy-router.yaml>`
 
+.. _config_udp_listener_filters_udp_proxy_dynamic_cluster:
+
+Dynamic cluster selection
+-------------------------
+
+The upstream cluster used by the UDP proxy can be dynamically set by
+one of the session filters on a per-session basis by setting a per-session
+state object under the key ``envoy.udp_proxy.cluster``. See the
+implementation for the details.
+
 .. _config_udp_listener_filters_udp_proxy_session_filters:
 
 Session filters
