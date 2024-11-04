@@ -50,7 +50,8 @@ jobs:
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12
+      # revert this to non-large once updated
+      runs-on: macos-12-large
       source: |
         source ./ci/mac_ci_setup.sh
       # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
