@@ -962,6 +962,14 @@ virtual_hosts:
                   ->onConfigUpdate(decoded_resources.refvec_, "1")
                   .ok());
 
+  envoy::extensions::filters::network::http_connection_manager::v3::Rds rds2;
+  rds2 = rds_;
+  // Modify parameters which should not affect the provider. In other words, the same provider
+  // should be picked, regardless of the fact that initial_fetch_timeout is different for both
+  // configs.
+  rds2.mutable_config_source()->mutable_initial_fetch_timeout()->set_seconds(
+      rds_.config_source().initial_fetch_timeout().seconds() + 1);
+
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
           rds_, server_factory_context_, "foo_prefix", outer_init_manager_);
@@ -976,7 +984,6 @@ virtual_hosts:
             &dynamic_cast<RdsRouteConfigProviderImpl&>(*provider2).subscription());
   EXPECT_EQ(&provider_->configInfo().value().config_, &provider2->configInfo().value().config_);
 
-  envoy::extensions::filters::network::http_connection_manager::v3::Rds rds2;
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderSharedPtr provider3 =
@@ -991,7 +998,13 @@ virtual_hosts:
                      ->dynamic_route_configs()
                      .size());
 
+  // provider_ and provider2 point to the same provider via shared_ptr. Deleting the first
+  // pointer should not erase the provider in route_config_provider_manager.
   provider_.reset();
+  EXPECT_EQ(2UL, route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
+                     ->dynamic_route_configs()
+                     .size());
+
   provider2.reset();
 
   // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so

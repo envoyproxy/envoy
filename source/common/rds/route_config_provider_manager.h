@@ -45,7 +45,7 @@ private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
   // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
   // Then the lifetime management stuff is centralized and opaque.
-  absl::node_hash_map<uint64_t, std::tuple<uint32_t/*std::atomic<uint32_t>*/, std::weak_ptr<RouteConfigProvider>, const Init::Target*>>
+  absl::node_hash_map<uint64_t, std::pair<std::weak_ptr<RouteConfigProvider>, const Init::Target*>>
       dynamic_route_config_providers_;
   absl::node_hash_set<RouteConfigProvider*> static_route_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
