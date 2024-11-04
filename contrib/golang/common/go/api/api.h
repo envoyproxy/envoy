@@ -12,7 +12,8 @@ extern "C" {
 #include <stdatomic.h> // NOLINT(modernize-deprecated-headers)
 #endif
 
-#include <stdint.h> // NOLINT(modernize-deprecated-headers)
+#include <stdbool.h> // NOLINT(modernize-deprecated-headers)
+#include <stdint.h>  // NOLINT(modernize-deprecated-headers)
 
 typedef struct { // NOLINT(modernize-use-using)
   const char* data;
@@ -96,7 +97,7 @@ CAPIStatus envoyGoFilterHttpSetTrailer(void* s, void* key_data, int key_len, voi
 CAPIStatus envoyGoFilterHttpRemoveTrailer(void* s, void* key_data, int key_len);
 
 /* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
-CAPIStatus envoyGoFilterHttpClearRouteCache(void* r);
+CAPIStatus envoyGoFilterHttpClearRouteCache(void* r, bool refresh);
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, uint64_t* value);
 
