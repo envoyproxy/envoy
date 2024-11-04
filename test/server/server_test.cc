@@ -1724,7 +1724,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
-    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
     EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
     EXPECT_EQ(log.logger_name, "misc");
   }));

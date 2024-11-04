@@ -834,7 +834,7 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   }
 
   EXPECT_EQ("200", response->headers().getStatusValue());
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
 
   std::vector<std::string> stat_prefixes;
   Json::ObjectCallback find_stat_prefix = [&](const std::string& name,
@@ -843,14 +843,14 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
     // config. If there are other names used for a similar purpose, this check could be expanded
     // to add them also.
     if (name == "stat_prefix") {
-      auto prefix = root.asString();
+      auto prefix = root.asString().value();
       if (!prefix.empty()) {
         stat_prefixes.push_back(prefix);
       }
     } else if (root.isObject()) {
-      root.iterate(find_stat_prefix);
+      THROW_IF_NOT_OK(root.iterate(find_stat_prefix));
     } else if (root.isArray()) {
-      std::vector<Json::ObjectSharedPtr> elements = root.asObjectArray();
+      std::vector<Json::ObjectSharedPtr> elements = root.asObjectArray().value();
       for (const auto& element : elements) {
         find_stat_prefix("", *element);
       }
