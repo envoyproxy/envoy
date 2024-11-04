@@ -26,6 +26,15 @@
 namespace Envoy {
 namespace Network {
 
+// In late 2023, c-ares modified its default DNS timeout and retry behavior during a major refactor.
+// See: https://github.com/c-ares/c-ares/pull/542/files
+//
+// After user reports of increased DNS resolution times in v1.31.0, these defaults were restored
+// to their original values: 5 second timeout and 4 retry attempts.
+// Ref: https://github.com/envoyproxy/envoy/issues/35117
+constexpr uint32_t DEFAULT_QUERY_TIMEOUT_SECONDS = 5;
+constexpr uint32_t DEFAULT_QUERY_TRIES = 4;
+
 DnsResolverImpl::DnsResolverImpl(
     const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
     Event::Dispatcher& dispatcher, absl::optional<std::string> resolvers_csv,
@@ -36,9 +45,10 @@ DnsResolverImpl::DnsResolverImpl(
       use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
       udp_max_queries_(
           static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, udp_max_queries, 0))),
-      query_timeout_seconds_(
-          static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, query_timeout_seconds, 5))),
-      query_tries_(static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, query_tries, 4))),
+      query_timeout_seconds_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, query_timeout_seconds, DEFAULT_QUERY_TIMEOUT_SECONDS))),
+      query_tries_(static_cast<uint32_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, query_tries, DEFAULT_QUERY_TRIES))),
       resolvers_csv_(resolvers_csv),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
@@ -103,7 +113,6 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
     options.options_.udp_max_queries = udp_max_queries_;
   }
 
-  // This block reinstates cares defaults before https://github.com/c-ares/c-ares/pull/542
   options.optmask_ |= ARES_OPT_TIMEOUT;
   options.options_.timeout = query_timeout_seconds_;
   options.optmask_ |= ARES_OPT_TRIES;

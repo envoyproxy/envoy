@@ -723,8 +723,6 @@ public:
 
     cares.set_filter_unroutable_families(filterUnroutableFamilies());
     cares.set_allocated_udp_max_queries(udpMaxQueries());
-    cares.set_allocated_query_timeout_seconds(queryTimeoutSeconds());
-    cares.set_allocated_query_tries(queryTries());
 
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
@@ -904,9 +902,8 @@ public:
             }));
       } else {
         EXPECT_CALL(os_sys_calls, getifaddrs(_))
-            .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
-              return {-1, 1};
-            }));
+            .WillOnce(Invoke(
+                [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
       }
     }
 
@@ -961,12 +958,10 @@ protected:
   // Should the TestDnsServer cause c-ares queries to timeout, by not responding?
   virtual bool queryTimeout() const { return false; }
   virtual bool tcpOnly() const { return true; }
-  virtual void updateDnsResolverOptions(){};
+  virtual void updateDnsResolverOptions() {};
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
   virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return 0; }
-  virtual ProtobufWkt::UInt64Value* queryTimeoutSeconds() const { return 0; }
-  virtual ProtobufWkt::UInt32Value* queryTries() const { return 0; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
@@ -2109,38 +2104,110 @@ TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
   EXPECT_FALSE(peer_->isChannelDirty());
 }
 
-class DnsImplAresTimeoutAndTriesTest : public DnsImplTest {
-protected:
-  bool tcpOnly() const override { return false; }
-  ProtobufWkt::UInt64Value* queryTimeoutSeconds() const override {
-    auto query_timeout_seconds = std::make_unique<ProtobufWkt::UInt64Value>();
-    query_timeout_seconds->set_value(10);
-    return dynamic_cast<ProtobufWkt::UInt64Value*>(query_timeout_seconds.release());
-  }
-  ProtobufWkt::UInt32Value* queryTries() const override {
-    auto query_tries = std::make_unique<ProtobufWkt::UInt32Value>();
-    query_tries->set_value(10);
-    return dynamic_cast<ProtobufWkt::UInt32Value*>(query_tries.release());
-  }
-};
+TEST_F(DnsImplConstructor, VerifyDefaultTimeoutAndTries) {
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
 
-// Parameterize the DNS test server socket address.
-INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresTimeoutAndTriesTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
 
-// Validate that c_ares timeout and tries are set when custom values are provided.
-TEST_P(DnsImplAresTimeoutAndTriesTest, VerifyCustomTimeoutAndTries) {
-  server_->addCName("root.cname.domain", "result.cname.domain");
-  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  EXPECT_EQ(resolvers->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::1");
   ares_options opts{};
   int optmask = 0;
-  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer->channel(), &opts, &optmask));
+  EXPECT_TRUE(opts.timeout == 5000);
+  EXPECT_TRUE(opts.tries == 4);
+  ares_free_data(resolvers);
+}
+
+TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  auto query_timeout_seconds = std::make_unique<ProtobufWkt::UInt64Value>();
+  query_timeout_seconds->set_value(10);
+  cares.set_allocated_query_timeout_seconds(query_timeout_seconds.release());
+  auto query_tries = std::make_unique<ProtobufWkt::UInt32Value>();
+  query_tries->set_value(10);
+  cares.set_allocated_query_tries(query_tries.release());
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  EXPECT_EQ(resolvers->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::1");
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer->channel(), &opts, &optmask));
   EXPECT_TRUE(opts.timeout == 10000);
   EXPECT_TRUE(opts.tries == 10);
-  EXPECT_NE(nullptr,
-            resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
-  ares_destroy_options(&opts);
+  ares_free_data(resolvers);
 }
 
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {

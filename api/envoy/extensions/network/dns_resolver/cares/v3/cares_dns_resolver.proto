@@ -49,11 +49,19 @@ message CaresDnsResolverConfig {
   // is only applicable to c-ares DNS resolver currently.
   google.protobuf.UInt32Value udp_max_queries = 5;
 
-  // The initial response timeout given to a name server to reply to a query on the first attempt.
-  // After the initial attempt, the timeout algorithm becomes more intricate, but remains proportionate to this value.
-  // The default is 5 seconds.
+  // The initial response timeout for DNS queries on the first attempt. This timeout value is used
+  // as the base for c-ares' exponential backoff algorithm on retries. Subsequent timeouts are
+  // scaled by factors of 2^(n-1) where n is the attempt number.
+  // See: https://github.com/c-ares/c-ares/blob/d73dd5181d7f8df36003225324cabcd551a6d9b4/src/lib/ares_query.c#L287
+  //
+  // Note: While c-ares defaults to 2 seconds, Envoy overrides this to 5 seconds to preserve the old behavior after
+  // getting some user reports of increased DNS resolution times.
   google.protobuf.UInt64Value query_timeout_seconds = 6 [(validate.rules).uint64 = {gte: 1}];
 
-  // The number of attempts the resolver will make to contact the name server before giving up. The default is 4 tries.
+  // The maximum number of query attempts the resolver will make before giving up.
+  // Each attempt may use a different name server.
+  //
+  // Note: While c-ares defaults to 3 tries, Envoy overrides this to 4 tries to preserve the old behavior after
+  // getting some user reports of increased DNS resolution times.
   google.protobuf.UInt32Value query_tries = 7 [(validate.rules).uint32 = {gte: 1}];
 }
