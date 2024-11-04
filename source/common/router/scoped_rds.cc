@@ -312,11 +312,6 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
       if (scoped_route_config.route_configuration_name().empty()) {
         return absl::InvalidArgumentError("route_configuration_name is empty.");
       }
-      if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
-          scope_info_iter != scoped_route_map_.end() &&
-          scope_info_iter->second->configHash() == MessageUtil::hash(scoped_route_config)) {
-        continue;
-      }
       rds.set_route_config_name(scoped_route_config.route_configuration_name());
       std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
       if (scoped_route_config.on_demand() == false) {
