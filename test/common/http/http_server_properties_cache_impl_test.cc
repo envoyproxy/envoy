@@ -412,6 +412,8 @@ TEST_P(HttpServerPropertiesCacheImplTest, ClearBrokenness) {
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_canonical_suffix_for_quic_broken",
+                                true);
   std::string suffix = ".example.com";
   std::string host1 = "first.example.com";
   std::string host2 = "www.second.example.com";
@@ -421,6 +423,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
   suffixes_.push_back(suffix);
   initialize();
   protocols_->setAlternatives(origin1, protocols1_);
+
+  protocols_->getOrCreateHttp3StatusTracker(origin1).markHttp3Broken();
+  EXPECT_TRUE(protocols_->isH3Broken(origin2));
 
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin2);

@@ -91,6 +91,7 @@ public:
   size_t size() const override;
   HttpServerPropertiesCache::Http3StatusTracker&
   getOrCreateHttp3StatusTracker(const Origin& origin) override;
+  bool isHttp3Broken(const Origin& origin) override;
   void resetBrokenness() override;
 
 private:

@@ -4,6 +4,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/http/http3_status_tracker_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "quiche/http2/core/spdy_alt_svc_wire_format.h"
 #include "re2/re2.h"
@@ -294,6 +295,30 @@ HttpServerPropertiesCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origi
   data.h3_status_tracker = std::make_unique<Http3StatusTrackerImpl>(dispatcher_);
   auto it = setPropertiesImpl(origin, data);
   return *it->second.h3_status_tracker;
+}
+
+bool HttpServerPropertiesCache::isHttp3Broken(const Origin& origin) {
+  absl::optional<Origin> canonical = getCanonicalOrigin(origin.hostname_);
+
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_canonical_suffix_for_quic_broken") ||
+      !canonical.has_value()) {
+    return getOrCreateHttp3StatusTracker(origin).isHttp3Broken();
+  }
+
+  // Note that we don't create a new tracker for the origin if there's already a corresponding one
+  // for the canonical suffix.
+  auto entry_it = protocols_.find(origin);
+  if (entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
+    return entry_it->second.h3_status_tracker->isHttp3Broken();
+  }
+
+  entry_it = protocols_.find(*canonical);
+  if (entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
+    return entry_it->second.h3_status_tracker->isHttp3Broken();
+  }
+
+  return false;
 }
 
 void HttpServerPropertiesCacheImpl::resetBrokenness() {
