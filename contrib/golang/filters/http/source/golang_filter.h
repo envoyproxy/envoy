@@ -266,6 +266,9 @@ public:
 
   CAPIStatus sendPanicReply(ProcessorState& state, absl::string_view details);
 
+  CAPIStatus addData(ProcessorState& state, absl::string_view data, bool is_streaming);
+  void addDataInternal(ProcessorState& state, absl::string_view data, bool is_streaming);
+
   CAPIStatus getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
                        int* value_len);
   CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
