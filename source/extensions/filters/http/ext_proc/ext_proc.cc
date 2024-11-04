@@ -574,7 +574,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   return status;
 }
 
-// TODO(yanjunxiang-google): Restructure the code. Adding methods like handleDataBuffered(),
+// TODO(#36970): Restructure the code. Adding methods like handleDataBuffered(),
 // handleDataStreamed(), handleDataBufferedPartial() to handle each case.
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
   state.setBodyReceived(true);
@@ -1010,6 +1010,12 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
                           bool observability_mode) {
+  // Skip if the trailsers is already sent to the server.
+  if (state.trailersSentToServer()) {
+    return;
+  }
+  state.setTrailersSentToServer(true);
+
   ProcessingRequest req;
   req.set_observability_mode(observability_mode);
   addAttributes(state, req);

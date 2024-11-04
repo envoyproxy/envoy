@@ -81,7 +81,8 @@ public:
                           const std::vector<std::string>& typed_forwarding_namespaces,
                           const std::vector<std::string>& untyped_receiving_namespaces)
       : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
-        complete_body_available_(false), trailers_available_(false), body_replaced_(false),
+        complete_body_available_(false), trailers_available_(false),
+        trailers_sent_to_server_(false), body_replaced_(false),
         body_received_(false), partial_body_processed_(false),
         traffic_direction_(traffic_direction),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
@@ -136,6 +137,9 @@ public:
 
   bool sendHeaders() const { return send_headers_; }
   bool sendTrailers() const { return send_trailers_; }
+  bool trailersSentToServer() const { return trailers_sent_to_server_; }
+  void setTrailersSentToServer(bool b) { trailers_sent_to_server_ = b; }
+
   envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode bodyMode() const {
     return body_mode_;
   }
@@ -241,6 +245,8 @@ protected:
   bool complete_body_available_ : 1;
   // If true, then the filter received the trailers
   bool trailers_available_ : 1;
+  // If true, the trailers is already sent to the server.
+  bool trailers_sent_to_server_ : 1;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1;
   // If true, some body data is received.
