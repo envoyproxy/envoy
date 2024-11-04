@@ -346,20 +346,6 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
-    name = "encode_backpressure_filter_config_lib",
-    srcs = [
-        "encode_backpressure_filter.cc",
-    ],
-    deps = [
-        "//envoy/http:filter_interface",
-        "//envoy/registry",
-        "//envoy/server:filter_config_interface",
-        "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-    ],
-)
-
-envoy_cc_test_library(
     name = "eds_ready_filter_config_lib",
     srcs = [
         "eds_ready_filter.cc",
