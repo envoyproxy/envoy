@@ -205,7 +205,11 @@ ip_tags:
   initializeFilter(internal_request_yaml);
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {"x-envoy-internal", "true"}, {"x-envoy-optional-header", "foo"}}; // foo will be removed
+      {"x-envoy-internal", "true"},
+      {"x-envoy-optional-header", "foo"}, // foo will be removed
+      {"x-envoy-optional-header", "bar"}, // bar will be removed
+      {"x-envoy-optional-header", "baz"}, // baz will be removed
+  };
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
