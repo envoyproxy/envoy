@@ -10,6 +10,9 @@ envoy_mobile_swift_test(
     srcs = [
         "HTTPRequestUsingProxyTest.swift",
     ],
+    exec_properties = {
+        "sandboxNetwork": "standard",
+    },
     visibility = ["//visibility:public"],
     deps = [
         "//library/objective-c:envoy_engine_objc_lib",
