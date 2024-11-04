@@ -412,8 +412,8 @@ TEST_P(HttpServerPropertiesCacheImplTest, ClearBrokenness) {
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_canonical_suffix_for_quic_broken",
-                                true);
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
   std::string suffix = ".example.com";
   std::string host1 = "first.example.com";
   std::string host2 = "www.second.example.com";
@@ -425,7 +425,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
   protocols_->setAlternatives(origin1, protocols1_);
 
   protocols_->getOrCreateHttp3StatusTracker(origin1).markHttp3Broken();
-  EXPECT_TRUE(protocols_->isH3Broken(origin2));
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin2));
 
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin2);
@@ -434,6 +434,8 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
   std::string suffix = ".example.com";
   std::string host1 = "www.example.com";
   std::string host2 = "www.other.com";
@@ -443,6 +445,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
   suffixes_.push_back(suffix);
   initialize();
   protocols_->setAlternatives(origin1, protocols1_);
+
+  protocols_->getOrCreateHttp3StatusTracker(origin1).markHttp3Broken();
+  EXPECT_FALSE(protocols_->isHttp3Broken(origin2));
 
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin2);

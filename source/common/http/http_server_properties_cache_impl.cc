@@ -301,20 +301,20 @@ bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
   absl::optional<Origin> canonical = getCanonicalOrigin(origin.hostname_);
 
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.use_canonical_suffix_for_quic_broken") ||
+          "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness") ||
       !canonical.has_value()) {
     return getOrCreateHttp3StatusTracker(origin).isHttp3Broken();
   }
 
   // Note that we don't create a new tracker for the origin if there's already a corresponding one
   // for the canonical origin.
-  auto entry_it = protocols_.find(origin);
-  if (entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
+  if (auto entry_it = protocols_.find(origin);
+      entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
     return entry_it->second.h3_status_tracker->isHttp3Broken();
   }
 
-  entry_it = protocols_.find(*canonical);
-  if (entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
+  if (auto entry_it = protocols_.find(*canonical);
+      entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
     return entry_it->second.h3_status_tracker->isHttp3Broken();
   }
 

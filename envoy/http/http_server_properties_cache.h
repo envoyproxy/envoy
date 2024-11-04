@@ -177,7 +177,7 @@ public:
 
   /**
    * @param origin The origin to check h3 brokenness for.
-   * @return if it's broken.
+   * @return true if it's broken.
    */
   virtual bool isHttp3Broken(const Origin& origin) PURE;
 
