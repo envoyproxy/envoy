@@ -301,9 +301,9 @@ func (c *httpCApiImpl) HttpRemoveTrailer(s unsafe.Pointer, key string) {
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer) {
+func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer, refresh bool) {
 	req := (*httpRequest)(r)
-	res := C.envoyGoFilterHttpClearRouteCache(unsafe.Pointer(req.req))
+	res := C.envoyGoFilterHttpClearRouteCache(unsafe.Pointer(req.req), C.bool(refresh))
 	handleCApiStatus(res)
 }
 

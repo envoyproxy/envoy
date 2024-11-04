@@ -69,14 +69,15 @@ TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
 }
 
 TEST(OsSyscallsTest, SupportsIpTransparent) {
-  bool supported = Api::OsSysCallsSingleton::get().supportsIpTransparent(
-      TestEnvironment::getIpVersionsForTest()[0]);
-  EXPECT_FALSE(supported);
+  // Some environments support this and some don't; just call the function to make sure nothing
+  // dire (like a crash) happens, without validating the return value.
+  Api::OsSysCallsSingleton::get().supportsIpTransparent(TestEnvironment::getIpVersionsForTest()[0]);
 }
 
 TEST(OsSyscallsTest, SupportsMptcp) {
-  bool supported = Api::OsSysCallsSingleton::get().supportsMptcp();
-  EXPECT_TRUE(supported);
+  // Some environments support this and some don't; just call the function to make sure nothing
+  // dire (like a crash) happens, without validating the return value.
+  Api::OsSysCallsSingleton::get().supportsMptcp();
 }
 
 TEST(OsSyscallsTest, IoCtlInvalidFd) {
