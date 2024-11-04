@@ -43,14 +43,16 @@ message IPTagging {
   // Describes how to apply the tags to the headers.
   enum HeaderAction {
     // (DEFAULT) The header specified in :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
-    // will be dropped, before the tags are applied.
+    // will be dropped, before the tags are applied. Sanitize will be run regardless of if the source is a trusted IP or not.
+    //
+    // Note that the header will be visible unsanitized to any filters downstream of the ip-tag-header filter.
     SANITIZE = 0;
 
     // Tags will be appended to the header specified in
     // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`,
     // leaving original values in place.
     //
-    // Please note that this could cause the header to retain values set by the http client.
+    // Please note that this could cause the header to retain values set by the http client even if the client is from an untrusted IP.
     APPEND_FORWARD = 1;
   }
 
@@ -69,6 +71,10 @@ message IPTagging {
 
   // Optional header to use for ip-tagging instead of using
   // default header ``x-envoy-ip-tags``.
+  //
+  // This header will be sanitized based on the config in
+  // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header_action>`
+  // rather than the defaults for x-envoy prefixed headers.
   string ip_tag_header = 5
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
