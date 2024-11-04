@@ -4698,7 +4698,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// Downstream pushback sidestream and upstream
+// Downstream push back sidestream and upstream
 TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstream) {
   if (!IsEnvoyGrpc()) {
     return;
