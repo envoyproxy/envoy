@@ -1010,7 +1010,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
                           bool observability_mode) {
-  // Skip if the trailsers is already sent to the server.
+  // Skip if the trailers is already sent to the server.
   if (state.trailersSentToServer()) {
     return;
   }
