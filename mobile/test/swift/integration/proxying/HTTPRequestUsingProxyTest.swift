@@ -111,7 +111,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [engineExpectation], timeout: 5), .completed)
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "https",
-                                               authority: "localhost" +
+                                               authority: "localhost:" +
                                                           String(EnvoyTestServer.getHttpPort()),
                                                path: "/")
       .build()
