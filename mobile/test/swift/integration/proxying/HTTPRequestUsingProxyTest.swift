@@ -208,7 +208,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
                                                authority: "localhost:" +
-                                                          String(EnvoyTestServer.getHttpPort()))
+                                                          String(EnvoyTestServer.getHttpPort()),
+                                               path: "/")
       .build()
 
     let cancelExpectation = self.expectation(description: "Stream run with expected cancellation")
