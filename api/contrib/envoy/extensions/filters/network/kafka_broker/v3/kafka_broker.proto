@@ -39,6 +39,17 @@ message KafkaBroker {
     // Broker address rewrite rules that match by broker ID.
     IdBasedBrokerRewriteSpec id_based_broker_address_rewrite_spec = 3;
   }
+
+  // Optional list of allowed Kafka API keys. Only requests with provided API keys will be
+  // routed, otherwise the connection will be closed. No effect if empty.
+  repeated uint32 api_keys_allowed = 4 [(validate.rules).repeated = {
+    items {uint32 {gte: 0, lte: 32767}}
+  }];
+  // Optional list of denied Kafka API keys. Requests with API keys matching this list will have
+  // the connection closed. No effect if empty.
+  repeated uint32 api_keys_denied = 5 [(validate.rules).repeated = {
+    items {uint32 {gte: 0, lte: 32767}}
+  }];
 }
 
 // Collection of rules matching by broker ID.
