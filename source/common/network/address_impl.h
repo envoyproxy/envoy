@@ -36,8 +36,6 @@ bool forceV6();
  */
 StatusOr<InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
                                                      bool v6only = true);
-InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss, socklen_t len,
-                                                  bool v6only = true);
 
 /**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into

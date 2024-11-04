@@ -36,7 +36,7 @@ protected:
   TcpListenerCallbacks& cb_;
 
 private:
-  void onSocketEvent(short flags);
+  absl::Status onSocketEvent(short flags);
 
   // Returns true if global connection limit has been reached and the accepted socket should be
   // rejected/closed. If the accepted socket is to be admitted, false is returned.

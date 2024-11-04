@@ -110,6 +110,9 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: xds
+  change: |
+    Added support for ADS replacement by invoking ``xdsManager().setAdsConfigSource()`` with a new config source.
 - area: wasm
   change: |
     added ``clear_route_cache`` foreign function to clear the route cache.
