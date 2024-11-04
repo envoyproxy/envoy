@@ -2362,6 +2362,7 @@ envoy_quic_cc_library(
     deps = [
         ":quic_core_alarm_factory_lib",
         ":quic_core_alarm_lib",
+        ":quic_core_clock_lib",
     ],
 )
 
@@ -5505,6 +5506,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quiche_common_platform",
         ":quiche_common_platform_export",
         ":quiche_common_text_utils_lib",
         "@com_google_absl//absl/container:flat_hash_set",
