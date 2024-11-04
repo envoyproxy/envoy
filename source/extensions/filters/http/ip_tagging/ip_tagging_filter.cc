@@ -115,9 +115,9 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
   OptRef<const Http::LowerCaseString> header_name = config_->ip_tag_header();
 
   if (tags.empty()) {
-    bool mustSanitize =
+    bool maybe_sanitize =
         config_->ip_tag_header_action() == HeaderAction::IPTagging_HeaderAction_SANITIZE;
-    if (header_name.has_value() && mustSanitize) {
+    if (header_name.has_value() && maybe_sanitize) {
       if (headers.remove(header_name.value()) != 0) {
         // We must clear the route cache in case it held a decision based on the now-removed header.
         callbacks_->downstreamCallbacks()->clearRouteCache();
