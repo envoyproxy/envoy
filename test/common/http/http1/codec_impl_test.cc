@@ -2431,6 +2431,39 @@ TEST_P(Http1ServerConnectionImplTest, LoadShedPointCanCloseConnectionOnDispatchO
   EXPECT_TRUE(isEnvoyOverloadError(status));
 }
 
+TEST_P(Http1ServerConnectionImplTest, LoadShedPointForAlreadyResetStream) {
+  InSequence sequence;
+
+  Server::MockLoadShedPoint mock_abort_dispatch;
+  EXPECT_CALL(overload_manager_, getLoadShedPoint(_)).WillOnce(Return(&mock_abort_dispatch));
+  initialize();
+
+  EXPECT_CALL(mock_abort_dispatch, shouldShedLoad()).WillOnce(Return(false));
+
+  NiceMock<MockRequestDecoder> decoder;
+  Http::ResponseEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl request_line_buffer("GET / HTTP/1.1\r\n");
+  auto status = codec_->dispatch(request_line_buffer);
+  EXPECT_EQ(0, request_line_buffer.length());
+
+  EXPECT_CALL(mock_abort_dispatch, shouldShedLoad()).WillRepeatedly(Return(true));
+  Buffer::OwnedImpl headers_buffer("final-header: value\r\n\r\n");
+
+  // The reset stream can be triggered in the middle of dispatching.
+  connection_.dispatcher_.post(
+      [&] { response_encoder->getStream().resetStream(StreamResetReason::LocalReset); });
+
+  status = codec_->dispatch(headers_buffer);
+  EXPECT_FALSE(status.ok());
+  EXPECT_TRUE(isEnvoyOverloadError(status));
+}
+
 TEST_P(Http1ServerConnectionImplTest, LoadShedPointCanCloseConnectionOnDispatchOfContinuingStream) {
   Server::MockLoadShedPoint mock_abort_dispatch;
   EXPECT_CALL(overload_manager_, getLoadShedPoint(_)).WillOnce(Return(&mock_abort_dispatch));
