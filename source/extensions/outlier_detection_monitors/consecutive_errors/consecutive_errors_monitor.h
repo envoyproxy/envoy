@@ -9,8 +9,8 @@ namespace Outlier {
 class ConsecutiveErrorsMonitor : public ExtMonitorBase {
 public:
   ConsecutiveErrorsMonitor() = delete;
-  ConsecutiveErrorsMonitor(std::string name, uint32_t enforce, uint32_t max)
-      : ExtMonitorBase(name, enforce), max_(max) {}
+  ConsecutiveErrorsMonitor(ExtMonitorConfigSharedPtr config, uint32_t max)
+      : ExtMonitorBase(std::move(config)), max_(max) {}
   virtual ~ConsecutiveErrorsMonitor() {}
   virtual bool onError() override;
   virtual void onSuccess() override;

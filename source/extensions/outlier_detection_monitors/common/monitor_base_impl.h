@@ -54,9 +54,31 @@ public:
   bool match(const ExtResult&) const override;
 };
 
+/*
+    Base config for all types of monitors.
+*/
+class ExtMonitorConfig {
+public:
+  ExtMonitorConfig(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
+  void processBucketsConfig(
+      const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config);
+  void addErrorBucket(ErrorsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
+
+  uint32_t enforce() const { return enforce_; }
+  const std::string& name() const { return name_; }
+  const std::vector<ErrorsBucketPtr>& buckets() const { return buckets_; }
+
+private:
+  std::string name_;
+  uint32_t enforce_{100};
+  std::vector<ErrorsBucketPtr> buckets_;
+};
+
+using ExtMonitorConfigSharedPtr = std::shared_ptr<ExtMonitorConfig>;
+
 class ExtMonitorBase : public ExtMonitor {
 public:
-  ExtMonitorBase(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
+  ExtMonitorBase(ExtMonitorConfigSharedPtr config) : config_(std::move(config)) {}
   ExtMonitorBase() = delete;
   virtual ~ExtMonitorBase() {}
   void putResult(const ExtResult&) override;
@@ -64,11 +86,8 @@ public:
   void setExtMonitorCallback(ExtMonitorCallback callback) override { callback_ = callback; }
 
   void reset() override { onReset(); }
-  std::string name() const { return name_; }
 
-  void processBucketsConfig(
-      const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config);
-  void addErrorBucket(ErrorsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
+  const ExtMonitorConfigSharedPtr& config() const { return config_; }
 
 protected:
   virtual bool onError() PURE;
@@ -76,17 +95,16 @@ protected:
   virtual void onReset() PURE;
   virtual std::string getFailedExtraInfo() { return ""; }
 
-  std::string name_;
-  uint32_t enforce_{100};
   ExtMonitor::ExtMonitorCallback callback_;
-  std::vector<ErrorsBucketPtr> buckets_;
+  ExtMonitorConfigSharedPtr config_;
 };
 
 template <class ConfigProto>
 class ExtMonitorFactoryBase : public Upstream::Outlier::ExtMonitorFactory {
 public:
-  ExtMonitorCreateFn createMonitor(const std::string& monitor_name, const Protobuf::Message& config,
-                                   ExtMonitorFactoryContext& context) override {
+  ExtMonitorCreateFn getCreateMonitorCallback(const std::string& monitor_name,
+                                              const Protobuf::Message& config,
+                                              ExtMonitorFactoryContext& context) override {
     // This should throw exception if config is wrong.
     return createMonitorFromProtoTyped(monitor_name,
                                        Envoy::MessageUtil::downcastAndValidate<const ConfigProto&>(

@@ -309,7 +309,8 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
     auto& factory = Config::Utility::getAndCheckFactory<ExtMonitorFactory>(monitor_config);
     auto config =
         Config::Utility::translateToFactoryConfig(monitor_config, validation_visitor, factory);
-    auto extension_create_fn = factory.createMonitor(monitor_config.name(), *config, context);
+    auto extension_create_fn =
+        factory.getCreateMonitorCallback(monitor_config.name(), *config, context);
     monitor_create_fns_.push_back(extension_create_fn);
   }
 }

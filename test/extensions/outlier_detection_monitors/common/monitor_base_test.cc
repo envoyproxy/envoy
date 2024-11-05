@@ -59,7 +59,7 @@ TEST(MonitorBaseTest, LocalOriginErrorBucket) {
 // Test monitor's logic of matching error types and calling appropriate methods.
 class MockMonitor : public ExtMonitorBase {
 public:
-  MockMonitor(const std::string& name, uint32_t enforce) : ExtMonitorBase(name, enforce) {}
+  MockMonitor(ExtMonitorConfigSharedPtr config) : ExtMonitorBase(config) {}
   MOCK_METHOD(bool, onError, ());
   MOCK_METHOD(void, onSuccess, ());
   MOCK_METHOD(void, onReset, ());
@@ -79,7 +79,8 @@ public:
 class MonitorTest : public testing::Test {
 protected:
   void SetUp() override {
-    monitor_ = std::make_unique<MockMonitor>(std::string(monitor_name_), enforcing_);
+    config_ = std::make_shared<ExtMonitorConfig>(std::string(monitor_name_), enforcing_);
+    monitor_ = std::make_unique<MockMonitor>(config_);
   }
 
   MockBucket* addBucket() {
@@ -88,7 +89,7 @@ protected:
     auto bucket_raw_ptr = bucket.get();
 
     // Add bucket to the monitor.
-    monitor_->addErrorBucket(std::move(bucket));
+    config_->addErrorBucket(std::move(bucket));
     return bucket_raw_ptr;
   }
 
@@ -100,6 +101,7 @@ protected:
   static constexpr uint32_t enforcing_ = 43;
   MockBucket* bucket1_;
   MockBucket* bucket2_;
+  ExtMonitorConfigSharedPtr config_;
   std::unique_ptr<MockMonitor> monitor_;
 };
 
