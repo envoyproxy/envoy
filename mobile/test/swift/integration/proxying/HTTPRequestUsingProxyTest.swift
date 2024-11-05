@@ -86,10 +86,11 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     EnvoyTestServer.shutdownTestHttpServer()
   }
 
-  // https://github.com/envoyproxy/envoy/issues/33014
-  func skipped_testHTTPSRequestUsingProxy() throws {
+  func testHTTPSRequestUsingProxy() throws {
     EnvoyTestServer.startHttpsProxyServer()
     EnvoyTestServer.startHttps1Server()
+    EnvoyTestServer.setHeadersAndData(
+      "x-test-response", header_value: "test", response_body: "hello world")
     let proxyPort = EnvoyTestServer.getProxyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
@@ -97,6 +98,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
         self.expectation(description: "Successful response headers received")
     let responseBodyExpectation =
         self.expectation(description: "Successful response trailers received")
+    let onCompleteExpectation =
+        self.expectation(description: "On complete callback called")
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
@@ -129,19 +132,20 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .setOnResponseData { data, endStream, _ in
         responseBuffer.append(contentsOf: data)
         if endStream {
-        responseBodyExpectation.fulfill()
+          responseBodyExpectation.fulfill()
         }
       }
-      .setOnResponseTrailers { _, _ in
+      .setOnComplete { _ in
+        onCompleteExpectation.fulfill()
       }
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    let expectations = [responseHeadersExpectation, responseBodyExpectation]
+    let expectations = [responseHeadersExpectation, responseBodyExpectation, onCompleteExpectation]
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     if let responseBody = String(data: responseBuffer, encoding: .utf8) {
-      XCTAssertGreaterThanOrEqual(responseBody.utf8.count, 3900)
+      XCTAssertEqual(responseBody.utf8.count, 11) // hello world
     }
 
     engine.terminate()
