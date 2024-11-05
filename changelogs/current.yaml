@@ -144,6 +144,9 @@ new_features:
 - area: lua
   change: |
     Added ssl :ref:`parsedSubjectPeerCertificate() <config_http_filters_lua_parsed_name>` API.
+- area: lua cluster specifier
+  change: |
+    Added ability for a Lua script to query clusters for current requests and connections.
 - area: udp_proxy
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
