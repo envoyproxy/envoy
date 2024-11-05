@@ -32,7 +32,8 @@ enum class FilterRequestType { INTERNAL, EXTERNAL, BOTH };
  */
 class IpTaggingFilterConfig {
 public:
-  using HeaderAction = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::HeaderAction;
+  using HeaderAction =
+      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IpTagHeader::HeaderAction;
 
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
                         const std::string& stat_prefix, Stats::Scope& scope,
