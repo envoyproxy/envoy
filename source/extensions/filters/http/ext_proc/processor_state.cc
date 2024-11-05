@@ -416,6 +416,11 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
 }
 
 void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream) {
+  // If the body mode is FULL_DUPLEX_STREAMED, just drain the data.
+  if (bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
+    data.drain(data.length());
+    return;
+  }
   chunk_queue_.push(data, end_stream);
   if (queueOverHighLimit()) {
     requestWatermark();
@@ -423,6 +428,9 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 }
 
 QueuedChunkPtr ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
+  if (bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
+    return nullptr;
+  }
   return chunk_queue_.pop(out_data);
 }
 
@@ -474,8 +482,9 @@ bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_res
 }
 
 bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& common_response) {
-  const auto& streamed_response = common_response.body_mutation().streamed_response();
-  const auto& body = streamed_response.body();
+  const envoy::service::ext_proc::v3::StreamedBodyResponse& streamed_response =
+      common_response.body_mutation().streamed_response();
+  const std::string& body = streamed_response.body();
   const bool end_of_stream = streamed_response.end_of_stream();
 
   if (body.size() > 0) {
