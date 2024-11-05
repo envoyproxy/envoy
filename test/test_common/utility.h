@@ -807,7 +807,8 @@ public:
   }
 
   static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
-    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
+    THROW_IF_NOT_OK(MessageUtil::loadFromFile(path, message,
+                                              ProtobufMessage::getStrictValidationVisitor(), api));
   }
 
   static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
