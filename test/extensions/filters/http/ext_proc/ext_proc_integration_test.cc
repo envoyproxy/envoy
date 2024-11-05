@@ -732,10 +732,10 @@ protected:
   }
 
   void serverReceiveHeaderDuplexStreamed(ProcessingRequest& header_request) {
-    ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
-    ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
-    ASSERT_TRUE(header_request.has_request_headers());
+    EXPECT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+    EXPECT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
+    EXPECT_TRUE(header_request.has_request_headers());
   }
 
   void serverSendHeaderRespDuplexStreamed() {
@@ -4942,8 +4942,8 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespDuplexStrea
   uint32_t total_req_body_msg = 0;
   while (!end_stream) {
     ProcessingRequest body_request;
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
-    ASSERT_TRUE(body_request.has_request_body());
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+    EXPECT_TRUE(body_request.has_request_body());
     body_received = absl::StrCat(body_received, body_request.request_body().body());
     end_stream = body_request.request_body().end_of_stream();
     total_req_body_msg++;
@@ -4991,8 +4991,8 @@ TEST_P(ExtProcIntegrationTest,
   uint32_t total_req_body_msg = 0;
   while (!end_stream) {
     ProcessingRequest request;
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_request_body() || request.has_request_trailers());
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_TRUE(request.has_request_body() || request.has_request_trailers());
     if (!request.has_request_trailers()) {
       // request_body is received
       body_received = absl::StrCat(body_received, request.request_body().body());
@@ -5057,8 +5057,8 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyDuplexStrea
 
   while (!end_stream) {
     ProcessingRequest request;
-    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
-    ASSERT_TRUE(request.has_request_body() || request.has_request_trailers());
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+    EXPECT_TRUE(request.has_request_body() || request.has_request_trailers());
     if (!request.has_request_trailers()) {
       // Buffer the entire body.
       body_received = absl::StrCat(body_received, request.request_body().body());
