@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: access_log
+  change: |
+    Relaxed the restriction on SNI logging to allow the ``_`` character, even if
+    ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
