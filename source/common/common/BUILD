@@ -31,6 +31,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cancel_wrapper_lib",
+    hdrs = ["cancel_wrapper.h"],
+    deps = [
+        "@com_google_absl//absl/functional:any_invocable",
+    ],
+)
+
+envoy_cc_library(
     name = "containers_lib",
     hdrs = ["containers.h"],
     deps = [
@@ -613,5 +621,16 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "@com_google_absl//absl/container:node_hash_set",
+    ],
+)
+
+envoy_cc_library(
+    name = "xds_manager_lib",
+    srcs = ["xds_manager_impl.cc"],
+    hdrs = ["xds_manager_impl.h"],
+    deps = [
+        "//envoy/config:xds_manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:thread_lib",
     ],
 )

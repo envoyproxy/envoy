@@ -42,14 +42,16 @@ absl::Status validateDurationUnifiedNoThrow(const ProtobufWkt::Duration& duratio
 
   if (duration.seconds() < 0 || duration.nanos() < 0) {
     return absl::OutOfRangeError(
-        fmt::format("Expected positive duration: {}", duration.DebugString()));
+        fmt::format("Invalid duration: Expected positive duration: {}", duration.DebugString()));
   }
   if (!Protobuf::util::TimeUtil::IsDurationValid(duration)) {
     return absl::OutOfRangeError(
-        fmt::format("Duration out-of-range according to Protobuf: {}", duration.DebugString()));
+        fmt::format("Invalid duration: Duration out-of-range according to Protobuf: {}",
+                    duration.DebugString()));
   }
   if (duration.nanos() > 999999999 || duration.seconds() > kMaxSecondsValue) {
-    return absl::OutOfRangeError(fmt::format("Duration out-of-range: {}", duration.DebugString()));
+    return absl::OutOfRangeError(
+        fmt::format("Invalid duration: Duration out-of-range: {}", duration.DebugString()));
   }
   return absl::OkStatus();
 }
@@ -314,8 +316,8 @@ public:
     }
   }
 
-  void onMessage(const Protobuf::Message& message,
-                 absl::Span<const Protobuf::Message* const> parents, bool) override {
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const> parents, bool) override {
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     if (reflectable_message->GetDescriptor()
             ->options()
@@ -346,7 +348,7 @@ public:
         absl::StrAppend(&error_msg, n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
       if (!error_msg.empty()) {
-        THROW_IF_NOT_OK(validation_visitor_.onUnknownField(
+        RETURN_IF_NOT_OK(validation_visitor_.onUnknownField(
             fmt::format("type {}({}) with unknown field set {{{}}}", message.GetTypeName(),
                         !parents.empty()
                             ? absl::StrJoin(parents, "::",
@@ -357,6 +359,7 @@ public:
                         error_msg)));
       }
     }
+    return absl::OkStatus();
   }
 
 private:
@@ -385,8 +388,8 @@ class DurationFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
   void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
 
-  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
-                 bool) override {
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const>, bool) override {
     const Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     if (reflectable_message->GetDescriptor()->full_name() == "google.protobuf.Duration") {
       ProtobufWkt::Duration duration_message;
@@ -396,11 +399,9 @@ public:
       duration_message.MergeFromCord(message.SerializeAsCord());
 #endif
       // Validate the value of the duration.
-      absl::Status status = validateDurationUnifiedNoThrow(duration_message);
-      if (!status.ok()) {
-        throwEnvoyExceptionOrPanic(fmt::format("Invalid duration: {}", status.message()));
-      }
+      RETURN_IF_NOT_OK(validateDurationUnifiedNoThrow(duration_message));
     }
+    return absl::OkStatus();
   }
 };
 
@@ -418,8 +419,9 @@ namespace {
 
 class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
-  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
-                 bool was_any_or_top_level) override {
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const>,
+                         bool was_any_or_top_level) override {
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     std::string err;
     // PGV verification is itself recursive up to the point at which it hits an Any message. As
@@ -427,8 +429,11 @@ public:
     // at which PGV would have stopped because it does not itself check within Any messages.
     if (was_any_or_top_level &&
         !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
-      ProtoExceptionUtil::throwProtoValidationException(err, *reflectable_message);
+      std::string error = fmt::format("Proto constraint validation failed ({}): {}", err,
+                                      reflectable_message->DebugString());
+      return absl::InvalidArgumentError(error);
     }
+    return absl::OkStatus();
   }
 
   void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
@@ -448,20 +453,6 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
   any_message.set_type_url(message.GetTypeName());
   any_message.set_value(message.SerializeAsString());
 #endif
-}
-
-void MessageUtil::unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-#if defined(ENVOY_ENABLE_FULL_PROTOS)
-  if (!any_message.UnpackTo(&message)) {
-    throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}",
-                                           message.GetDescriptor()->full_name(),
-                                           any_message.DebugString()));
-#else
-  if (!message.ParseFromString(any_message.value())) {
-    throwEnvoyExceptionOrPanic(
-        fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
-#endif
-  }
 }
 
 absl::Status MessageUtil::unpackTo(const ProtobufWkt::Any& any_message,

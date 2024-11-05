@@ -237,7 +237,11 @@ func (r *httpRequest) recoverPanic() {
 }
 
 func (r *httpRequest) ClearRouteCache() {
-	cAPI.ClearRouteCache(unsafe.Pointer(r))
+	cAPI.ClearRouteCache(unsafe.Pointer(r), false)
+}
+
+func (r *httpRequest) RefreshRouteCache() {
+	cAPI.ClearRouteCache(unsafe.Pointer(r), true)
 }
 
 func (r *httpRequest) Continue(status api.StatusType) {

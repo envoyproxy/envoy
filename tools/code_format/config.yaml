@@ -62,7 +62,6 @@ paths:
   build_fixer:
     exclude:
     - BUILD
-    - tools/BUILD
     - bazel/BUILD
     - bazel/external/
     - bazel/toolchains/
@@ -96,8 +95,10 @@ paths:
     - envoy/common/exception.h
     - source/common/upstream/upstream_impl.h
     - source/common/config/context_provider_impl.h
+    - source/common/protobuf/utility.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
+    - source/common/config/utility.cc
     - source/common/router/route_config_update_receiver_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc

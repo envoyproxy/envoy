@@ -43,7 +43,7 @@ type HttpCAPI interface {
 	HttpRemoveTrailer(s unsafe.Pointer, key string)
 
 	/* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
-	ClearRouteCache(r unsafe.Pointer)
+	ClearRouteCache(r unsafe.Pointer, refresh bool)
 
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)

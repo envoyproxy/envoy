@@ -102,6 +102,12 @@ public:
   AbstractRequest(const RequestHeader& request_header) : request_header_{request_header} {};
 
   /**
+   * Returns request API key.
+   * @return request API key
+   */
+  int16_t apiKey() const { return request_header_.api_key_; }
+
+  /**
    * Computes the size of this request, if it were to be serialized.
    * @return serialized size of request
    */
