@@ -2152,6 +2152,7 @@ TEST_F(DnsImplConstructor, VerifyDefaultTimeoutAndTries) {
   EXPECT_TRUE(opts.timeout == 5000);
   EXPECT_TRUE(opts.tries == 4);
   ares_free_data(resolvers);
+  ares_destroy_options(&opts);
 }
 
 TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
@@ -2208,6 +2209,7 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
   EXPECT_TRUE(opts.timeout == 10000);
   EXPECT_TRUE(opts.tries == 10);
   ares_free_data(resolvers);
+  ares_destroy_options(&opts);
 }
 
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
