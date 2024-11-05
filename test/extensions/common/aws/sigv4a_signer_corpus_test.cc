@@ -217,7 +217,7 @@ public:
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) {
     return signer_->createAuthorizationHeader(access_key_id, credential_scope, canonical_headers,
-                                              signature);
+                                              signature, false);
   }
 
   std::string createAuthorizationCredential(absl::string_view access_key_id,

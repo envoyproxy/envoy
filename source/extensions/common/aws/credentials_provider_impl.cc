@@ -8,6 +8,7 @@
 #include "credentials_provider.h"
 #include "envoy/common/exception.h"
 
+#include "sigv4_signer_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -66,6 +67,8 @@ constexpr char SECURITY_CREDENTIALS_PATH[] = "/latest/meta-data/iam/security-cre
 constexpr char EC2_METADATA_CLUSTER[] = "ec2_instance_metadata_server_internal";
 constexpr char CONTAINER_METADATA_CLUSTER[] = "ecs_task_metadata_server_internal";
 constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";
+
+constexpr char ROLESANYWHERE_SERVICE[] = "rolesanywhere";
 
 } // namespace
 
@@ -377,17 +380,17 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,       
-                                     absl::string_view role_arn, absl::string_view role_session_name,
+                                     absl::string_view role_arn, absl::string_view role_session_name, absl::string_view region,
                                      absl::string_view cluster_name, absl::string_view uri):
                                      MetadataCredentialsProviderBase(api, context, nullptr,
                                       create_metadata_fetcher_cb, cluster_name,
-                                      envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/,
-                                      uri, refresh_state, initialization_timer), role_arn_(role_arn), role_session_name_(role_session_name) {}
+                                      envoy::config::cluster::v3::Cluster::LOGICAL_DNS,
+                                      uri, refresh_state, initialization_timer), role_arn_(role_arn), role_session_name_(role_session_name), region_(region), server_factory_context_(context) {
 
-  // Following functions are for MetadataFetcher::MetadataReceiver interface
-  // void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& ABSL_ATTRIBUTE_UNUSED body)  {};
-  // void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure ABSL_ATTRIBUTE_UNUSED reason)  {}
-
+                                        // Create our own signer just for Roles Anywhere, to avoid catch-22 of Signer dependency on credentials handler
+                                        roles_anywhere_signer_ = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+        absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view(region_), CredentialsProviderSharedPtr{this}, context_->mainThreadDispatcher().timeSource());
+                                      }
 void IAMRolesAnywhereCredentialsProvider::onMetadataSuccess(const std::string&& body) {
   ENVOY_LOG(debug, "AWS IAM Roles Anywhere fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
@@ -408,12 +411,102 @@ void IAMRolesAnywhereCredentialsProvider::onMetadataError(Failure reason) {
   }
 }
 
-  bool IAMRolesAnywhereCredentialsProvider::needsRefresh()  { return false; }
-  void IAMRolesAnywhereCredentialsProvider::refresh()  {}
-  void IAMRolesAnywhereCredentialsProvider::fetchCredentialFromRolesAnywhere(const std::string&& ABSL_ATTRIBUTE_UNUSED instance_role, const std::string&& ABSL_ATTRIBUTE_UNUSED token) {}
-  void IAMRolesAnywhereCredentialsProvider::extractCredentials(const std::string&& ABSL_ATTRIBUTE_UNUSED credential_document_value) {}
+bool IAMRolesAnywhereCredentialsProvider::needsRefresh() {
+  const auto now = api_.timeSource().systemTime();
+  auto expired = (now - last_updated_ > REFRESH_INTERVAL);
 
+  if (expiration_time_.has_value()) {
+    return expired || (expiration_time_.value() - now < REFRESH_GRACE_PERIOD);
+  } else {
+    return expired;
+  }
+}
 
+void IAMRolesAnywhereCredentialsProvider::refresh() {
+
+  ENVOY_LOG(debug, "Getting AWS credentials from the rolesanywhere service at URI: {}", uri_);
+
+  // absl::string_view host;
+  // absl::string_view path;
+  // Http::Utility::extractHostPathFromUri(uri_, host, path);
+
+  Http::RequestMessageImpl message;
+  message.headers().setScheme(Http::Headers::get().SchemeValues.Http);
+  message.headers().setMethod(Http::Headers::get().MethodValues.Post);
+  message.headers().setHost(uri_);
+  message.headers().setPath("/sessions");
+  // message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
+  auto status = roles_anywhere_signer_->signEmptyPayload(message.headers());
+
+  // Stop any existing timer.
+  if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
+    cache_duration_timer_->disableTimer();
+  }
+  // Using Http async client to fetch the AWS credentials.
+  if (!metadata_fetcher_) {
+    metadata_fetcher_ = create_metadata_fetcher_cb_(context_->clusterManager(), clusterName());
+  } else {
+    metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
+  }
+  on_async_fetch_cb_ = [this](const std::string&& arg) {
+    return this->extractCredentials(std::move(arg));
+  };
+  metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
+  
+}
+
+void IAMRolesAnywhereCredentialsProvider::extractCredentials(
+    const std::string&& credential_document_value) {
+  if (credential_document_value.empty()) {
+    handleFetchDone();
+    return;
+  }
+  absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
+
+  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  if (!document_json_or_error.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
+              document_json_or_error.status().message());
+    handleFetchDone();
+    return;
+  }
+
+  const auto access_key_id =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), ACCESS_KEY_ID, "");
+  const auto secret_access_key =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), SECRET_ACCESS_KEY, "");
+  const auto session_token =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), TOKEN, "");
+
+  ENVOY_LOG(debug, "Found following AWS credentials from rolesanywhere service: {}={}, {}={}, {}={}",
+            AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
+            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
+            session_token.empty() ? "" : "*****");
+
+  const auto expiration_str =
+      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), EXPIRATION, "");
+
+  if (!expiration_str.empty()) {
+    absl::Time expiration_time;
+    if (absl::ParseTime(EXPIRATION_FORMAT, expiration_str, &expiration_time, nullptr)) {
+      ENVOY_LOG(debug, "Rolesanywhere role AWS credentials expiration time: {}", expiration_str);
+      expiration_time_ = absl::ToChronoTime(expiration_time);
+    }
+  }
+
+  last_updated_ = api_.timeSource().systemTime();
+  if (useHttpAsyncClient() && context_) {
+    setCredentialsToAllThreads(
+        std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
+    ENVOY_LOG(debug, "Metadata receiver {} moving to Ready state", cluster_name_);
+    refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+    // Set receiver state in statistics
+    stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
+  } else {
+    cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
+  }
+  handleFetchDone();
+}
 
 InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
@@ -1113,11 +1206,11 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(Api::
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
-                                    absl::string_view role_arn, absl::string_view role_session_name,
+                                    absl::string_view role_arn, absl::string_view role_session_name, absl::string_view region,
                                      absl::string_view cluster_name, absl::string_view uri) const {
   return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
             api, context, create_metadata_fetcher_cb, refresh_state,
-            initialization_timer, role_arn,  role_session_name,
+            initialization_timer, role_arn,  role_session_name, region,
             cluster_name, uri);
       };
 
@@ -1153,19 +1246,10 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
 
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
-      // IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
-      //                                CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      //                                MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      //                                std::chrono::seconds initialization_timer,
-      //                                absl::string_view cluster_name, absl::string_view uri):
-      //                                MetadataCredentialsProviderBase(api, context, nullptr,
-      //                                 create_metadata_fetcher_cb, cluster_name,
-      //                                 envoy::config::cluster::v3::Cluster::STATIC /*cluster_type*/,
-      //                                 uri, refresh_state, initialization_timer) {}
 
     return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
         context.api(), context,
-        MetadataFetcher::create, refresh_state, initialization_timer, role_arn, role_session_name,
+        MetadataFetcher::create, refresh_state, initialization_timer, role_arn, role_session_name, region,
          iam_roles_anywhere_endpoint, iam_roles_anywhere_endpoint);
   }
   else {

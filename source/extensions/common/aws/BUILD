@@ -117,6 +117,7 @@ envoy_cc_library(
         ":credentials_provider_interface",
         ":metadata_fetcher_lib",
         ":utility_lib",
+        "sigv4_signer_impl_lib",
         "//envoy/api:api_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",

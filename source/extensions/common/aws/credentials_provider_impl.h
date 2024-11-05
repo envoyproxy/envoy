@@ -12,6 +12,7 @@
 #include "envoy/http/message.h"
 #include "envoy/server/factory_context.h"
 
+#include "signer.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
@@ -293,7 +294,7 @@ public:
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
-                                     absl::string_view role_arn, absl::string_view role_session_name,
+                                     absl::string_view role_arn, absl::string_view role_session_name, absl::string_view region,
                                      absl::string_view cluster_name, absl::string_view uri);
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
@@ -308,7 +309,10 @@ private:
 
   const std::string role_arn_;
   const std::string role_session_name_;
-
+  const std::string region_;
+  ServerFactoryContextOptRef server_factory_context_;
+  Extensions::Common::Aws::SignerPtr roles_anywhere_signer_;
+  
 };
 
 /**
@@ -431,7 +435,7 @@ public:
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
-                                    absl::string_view role_arn, absl::string_view role_session_name,
+                                    absl::string_view role_arn, absl::string_view role_session_name, absl::string_view region,
                                      absl::string_view cluster_name, absl::string_view uri) const PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
@@ -487,7 +491,7 @@ CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(Api::Api&
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                      std::chrono::seconds initialization_timer,
-                                    absl::string_view role_arn, absl::string_view role_session_name,
+                                    absl::string_view role_arn, absl::string_view role_session_name, absl::string_view region,
                                      absl::string_view cluster_name, absl::string_view uri) const override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(

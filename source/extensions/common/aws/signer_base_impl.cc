@@ -133,7 +133,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
 
   } else {
     const auto authorization_header = createAuthorizationHeader(
-        credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
+        credentials.accessKeyId().value(), credential_scope, canonical_headers, signature, iam_roles_anywhere_signing_);
 
     headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 
