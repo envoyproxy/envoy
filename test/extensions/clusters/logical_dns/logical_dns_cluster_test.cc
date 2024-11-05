@@ -48,9 +48,11 @@ protected:
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
-  void setupFromV3Yaml(const std::string& yaml) {
+  void setupFromV3Yaml(const std::string& yaml, bool expect_success = true) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
-    resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+    if (expect_success) {
+      resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+    }
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
@@ -646,6 +648,26 @@ TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
   dns_callback_(
       Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
+}
+
+TEST_F(LogicalDnsClusterTest, NegativeDnsJitter) {
+  const std::string yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_jitter: -1s
+  lb_policy: ROUND_ROBIN
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(yaml, false), EnvoyException,
+                            "Invalid duration: Expected positive duration: seconds: -1\n");
 }
 
 TEST_F(LogicalDnsClusterTest, ExtremeJitter) {

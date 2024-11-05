@@ -197,13 +197,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                    final_refresh_rate.count() > 0);
           }
           if (parent_.dns_jitter_ms_.count() > 0) {
-            // We need to wrap with std::chrono::abs because
-            // random() returns an uint64 that is interpreted as a long by
-            // std::chrono::milliseconds. If the random() return value has a leading 1 in its binary
-            // representation, then it will be interpreted as a negative long, potentially causing
-            // final_refresh_rate to be negative. This causes Envoy to crash.
-            final_refresh_rate += std::chrono::abs(
-                std::chrono::milliseconds(parent_.random_.random()) % parent_.dns_jitter_ms_);
+            // Note that `parent_.random_.random()` returns a uint64 while
+            // `parent_.dns_jitter_ms_.count()` returns a signed long that gets cast into a uint64.
+            // Thus, the modulo of the two will be a positive as long as
+            // `parent_dns_jitter_ms_.count()` is positive.
+            // It is important that this be positive, otherwise `final_refresh_rate` could be
+            // negative causing Envoy to crash.
+            final_refresh_rate += std::chrono::milliseconds(parent_.random_.random() %
+                                                            parent_.dns_jitter_ms_.count());
           }
 
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
