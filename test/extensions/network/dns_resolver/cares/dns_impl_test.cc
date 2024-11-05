@@ -902,8 +902,9 @@ public:
             }));
       } else {
         EXPECT_CALL(os_sys_calls, getifaddrs(_))
-            .WillOnce(Invoke(
-                [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
+            .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
+              return {-1, 1};
+            }));
       }
     }
 
