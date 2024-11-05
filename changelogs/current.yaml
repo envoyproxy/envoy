@@ -155,6 +155,10 @@ new_features:
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
     by setting a per-session state object under the key ``envoy.udp_proxy.cluster``.
+- area: CEL-attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``upstream.request_attempt_count``
+    to get the number of times a request is attempted upstream.
 - area: cares
   change: |
     added two new options to c-ares resolver for configuring custom timeouts and tries while resolving DNS
