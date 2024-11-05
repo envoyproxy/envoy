@@ -159,6 +159,11 @@ jobs:
     uses: ./.github/workflows/_run.yml
     with:
       target: release.signed
+      bazel-extra: >-
+        --//distribution:x64-packages=//distribution:custom/x64/packages.x64.tar.gz
+        --//distribution:arm64-packages=//distribution:custom/arm64/packages.arm64.tar.gz
+        --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
+        --//distribution:arm64-release=//distribution:custom/arm64/bin/release.tar.zst
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       downloads: |
         packages.arm64: envoy/arm64/
