@@ -163,6 +163,9 @@ bug_fixes:
 - area: csrf
   change: |
     Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
+- area: http/1
+  change: |
+    Fixes sending overload crashes when HTTP/1 request is reset.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
