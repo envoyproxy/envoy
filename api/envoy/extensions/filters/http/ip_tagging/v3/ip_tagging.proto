@@ -96,5 +96,5 @@ message IPTagging {
   // Specify to which header the tags will be written.
   //
   // If left unspecified, the tags will be appended to the ``x-envoy-ip-tags`` header.
-  optional IpTagHeader ip_tag_header = 5;
+  IpTagHeader ip_tag_header = 5;
 }
