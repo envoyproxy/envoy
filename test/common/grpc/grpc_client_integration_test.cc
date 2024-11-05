@@ -27,7 +27,7 @@ TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
   initialize();
   auto stream = createStream(empty_metadata_);
 
-  testing::StrictMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  testing::NiceMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
 
   // Registering the new watermark callback.
   stream->grpc_stream_->setWatermarkCallbacks(watermark_callbacks);
@@ -56,7 +56,7 @@ TEST_P(EnvoyGrpcFlowControlTest, BasicStreamFlowControlWithStreamOption) {
 
   // Set watermark_callbacks_ so that sidestream watermark callback will be registered with stream
   // options.
-  testing::StrictMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  testing::NiceMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
   watermark_callbacks_ = &watermark_callbacks;
 
   initialize();

@@ -16,7 +16,12 @@ on:
     - completed
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  group: >-
+    ${{ ((github.event.workflow_run.head_branch == 'main'
+          || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+          && github.event.repository.full_name == github.repository)
+        && github.run_id
+        || github.event.workflow_run.head_branch }}-${{ github.event.repository.full_name }}-${{ github.workflow }}
   cancel-in-progress: true
 
 env:
