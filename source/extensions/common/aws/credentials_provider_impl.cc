@@ -376,6 +376,11 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   last_updated_ = api_.timeSource().systemTime();
 }
 
+ IAMRolesAnywhereCertificateCredentialsProvider::IAMRolesAnywhereCertificateCredentialsProvider(Api::Api& api, envoy::config::core::v3::DataSource datasource)
+      : api_(api), data_source_(datasource) {
+        api_->
+      }
+
   IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,

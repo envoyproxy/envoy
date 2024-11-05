@@ -116,8 +116,7 @@ private:
  */
 class IAMRolesAnywhereCertificateCredentialsProvider : public CachedCredentialsProviderBase {
 public:
-  IAMRolesAnywhereCertificateCredentialsProvider(Api::Api& api, envoy::config::core::v3::DataSource datasource)
-      : api_(api), data_source_(datasource) {}
+  IAMRolesAnywhereCertificateCredentialsProvider(Api::Api& api, envoy::config::core::v3::DataSource datasource);
 
 private:
   Api::Api& api_;
@@ -125,7 +124,6 @@ private:
 
   bool needsRefresh() override;
   void refresh() override;
-  void extractCredentials(const std::string& credentials_file, const std::string& profile);
 };
 
 class LoadClusterEntryHandle {
