@@ -92,12 +92,7 @@ private:
     void bufferTrace(const std::shared_ptr<envoy::data::tap::v3::TraceWrapper>& trace);
 
     // Returns true if the trace buffer is full (reached max_buf_size_) false otherwise
-    bool full() const {
-      if (!buffer_) {
-        return false;
-      }
-      return (buffer_->size() == max_buf_size_);
-    }
+    bool full() const { return (buffer_ && buffer_->size() == max_buf_size_); }
 
     // Return true if the buffer has already been flushed, false otherwise.
     bool flushed() const { return !buffer_; }

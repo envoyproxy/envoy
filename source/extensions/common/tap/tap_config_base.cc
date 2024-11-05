@@ -137,7 +137,11 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     // Fallback to use the deprecated match_config field and upgrade (wire cast) it to the new
     // MatchPredicate which is backward compatible with the old MatchPredicate originally
     // introduced in the Tap filter.
-    MessageUtil::wireCast(proto_config.match_config(), match);
+    if (!match.ParseFromString(proto_config.match_config().SerializeAsString())) {
+      // This should should generally succeed, but if there are malformed UTF-8 strings in a
+      // message, this can fail.
+      throw EnvoyException("Unable to deserialize during wireCast()");
+    }
   } else {
     throw EnvoyException(fmt::format("Neither match nor match_config is set in TapConfig: {}",
                                      proto_config.DebugString()));
