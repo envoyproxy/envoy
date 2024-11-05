@@ -73,7 +73,7 @@ message IPTagging {
     // Header to use for ip-tagging.
     //
     // This header will be sanitized based on the config in
-    // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.ip_tag_header_action>`
+    // :ref:`action <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.action>`
     // rather than the defaults for x-envoy prefixed headers.
     string header = 1
         [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
