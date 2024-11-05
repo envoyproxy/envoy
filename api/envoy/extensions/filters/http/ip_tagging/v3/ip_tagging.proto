@@ -55,14 +55,6 @@ message IPTagging {
 
   // Specify to which header the tags will be written.
   message IpTagHeader {
-    // Header to use for ip-tagging.
-    //
-    // This header will be sanitized based on the config in
-    // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.ip_tag_header_action>`
-    // rather than the defaults for x-envoy prefixed headers.
-    string header = 1
-        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
-
     // Describes how to apply the tags to the headers.
     enum HeaderAction {
       // (DEFAULT) The header specified in :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
@@ -77,6 +69,14 @@ message IPTagging {
       // Please note that this could cause the header to retain values set by the http client regardless of whether the request is internal or external.
       APPEND_IF_EXISTS_OR_ADD = 1;
     }
+
+    // Header to use for ip-tagging.
+    //
+    // This header will be sanitized based on the config in
+    // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.ip_tag_header_action>`
+    // rather than the defaults for x-envoy prefixed headers.
+    string header = 1
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
     // Control if the :ref:`header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.header>`
     // will be sanitized, or be appended to.
