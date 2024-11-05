@@ -22,8 +22,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   private func executeRequest(engine: Engine, scheme: String, authority: String) -> String? {
     let responseHeadersExpectation =
         self.expectation(description: "Successful response headers received")
-    let responseTrailersExpectation =
-        self.expectation(description: "Successful response trailers received")
+    let onCompleteExpectation =
+        self.expectation(description: "On complete callback called")
 
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: scheme,
                                                authority: authority, path: "/")
@@ -39,13 +39,13 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
       .setOnResponseData { data, _, _ in
         responseBuffer.append(contentsOf: data)
       }
-      .setOnResponseTrailers { _, _ in
-        responseTrailersExpectation.fulfill()
+      .setOnComplete { _ in
+        onCompleteExpectation.fulfill()
       }
       .start()
       .sendHeaders(requestHeaders, endStream: true)
 
-    let expectations = [responseHeadersExpectation, responseTrailersExpectation]
+    let expectations = [responseHeadersExpectation, onCompleteExpectation]
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     return String(data: responseBuffer, encoding: .utf8)
@@ -54,6 +54,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   func testHTTPRequestUsingProxy() throws {
     EnvoyTestServer.startHttpProxyServer()
     EnvoyTestServer.startHttp1Server()
+    EnvoyTestServer.setHeadersAndData(
+      "x-test-response", header_value: "test", response_body: "hello world")
     let proxyPort = EnvoyTestServer.getProxyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
@@ -76,7 +78,7 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     if let respBody = executeRequest(engine: engine, scheme: "http",
                                      authority: "127.0.0.1:" +
                                                 String(EnvoyTestServer.getHttpPort())) {
-      XCTAssertGreaterThanOrEqual(respBody.utf8.count, 3900)
+      XCTAssertEqual(respBody.utf8.count, 11) // hello world
     }
 
     engine.terminate()
@@ -150,6 +152,8 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
   func testTwoHTTPRequestsUsingProxy() throws {
     EnvoyTestServer.startHttpProxyServer()
     EnvoyTestServer.startHttp1Server()
+    EnvoyTestServer.setHeadersAndData(
+      "x-test-response", header_value: "test", response_body: "hello world")
     let proxyPort = EnvoyTestServer.getProxyPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")
@@ -172,12 +176,12 @@ final class HTTPRequestUsingProxyTest: XCTestCase {
     if let resp1 = executeRequest(engine: engine, scheme: "http",
                                   authority: "127.0.0.1:" +
                                              String(EnvoyTestServer.getHttpPort())) {
-      XCTAssertGreaterThanOrEqual(resp1.utf8.count, 3900)
+      XCTAssertEqual(resp1.utf8.count, 11) // hello world
     }
     if let resp2 = executeRequest(engine: engine, scheme: "http",
                                   authority: "127.0.0.1:" +
                                              String(EnvoyTestServer.getHttpPort())) {
-      XCTAssertGreaterThanOrEqual(resp2.utf8.count, 3900)
+      XCTAssertEqual(resp2.utf8.count, 11) // hello world
     }
 
     engine.terminate()
