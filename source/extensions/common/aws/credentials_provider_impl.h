@@ -7,6 +7,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/http/message.h"
@@ -85,6 +86,7 @@ protected:
   virtual void refresh() PURE;
 };
 
+
 /**
  * Retrieve AWS credentials from the credentials file.
  *
@@ -101,6 +103,25 @@ public:
 private:
   Api::Api& api_;
   const std::string profile_;
+
+  bool needsRefresh() override;
+  void refresh() override;
+  void extractCredentials(const std::string& credentials_file, const std::string& profile);
+};
+
+
+/**
+ * Retrieve IAM Roles Certificate for use in signing.
+ *
+ */
+class IAMRolesAnywhereCertificateCredentialsProvider : public CachedCredentialsProviderBase {
+public:
+  IAMRolesAnywhereCertificateCredentialsProvider(Api::Api& api, envoy::config::core::v3::DataSource datasource)
+      : api_(api), data_source_(datasource) {}
+
+private:
+  Api::Api& api_;
+  envoy::config::core::v3::DataSource data_source_;
 
   bool needsRefresh() override;
   void refresh() override;
