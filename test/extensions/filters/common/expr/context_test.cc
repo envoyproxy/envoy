@@ -708,7 +708,7 @@ TEST(Context, ConnectionAttributes) {
     auto value = upstream[CelValue::CreateStringView(UpstreamRequestAttemptCount)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsUint64());
-    EXPECT_EQ(upstream_request_attempt_count, value.value().Int64OrDie());
+    EXPECT_EQ(upstream_request_attempt_count, value.value().Uint64OrDie());
   }
 
   {
