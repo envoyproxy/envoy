@@ -52,7 +52,7 @@ message IPTagging {
     // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`.
     //
     // Please note that this could cause the header to retain values set by the http client regardless of whether the request is internal or external.
-    APPEND_FORWARD = 1;
+    APPEND_IF_EXISTS_OR_ADD = 1;
   }
 
   // Supplies the IP tag name and the IP address subnets.

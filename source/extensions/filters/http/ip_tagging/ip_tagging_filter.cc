@@ -138,7 +138,7 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
     case HeaderAction::IPTagging_HeaderAction_SANITIZE:
       headers.setCopy(header_name.value(), tags_join);
       break;
-    case HeaderAction::IPTagging_HeaderAction_APPEND_FORWARD:
+    case HeaderAction::IPTagging_HeaderAction_APPEND_IF_EXISTS_OR_ADD:
       headers.appendCopy(header_name.value(), tags_join);
       break;
     }

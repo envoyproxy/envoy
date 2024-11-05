@@ -285,7 +285,7 @@ TEST_F(IpTaggingFilterTest, AppendForwardAlternateHeader) {
   const std::string internal_request_yaml = R"EOF(
 request_type: internal
 ip_tag_header: x-envoy-optional-header
-ip_tag_header_action: APPEND_FORWARD
+ip_tag_header_action: APPEND_IF_EXISTS_OR_ADD
 ip_tags:
   - ip_tag_name: internal_request_with_optional_header
     ip_list:
@@ -314,7 +314,7 @@ TEST_F(IpTaggingFilterTest, RetainAlternateHeaderWhenUnmatchedAndAppendForwarded
   const std::string internal_request_yaml = R"EOF(
 request_type: internal
 ip_tag_header: x-envoy-optional-header
-ip_tag_header_action: APPEND_FORWARD
+ip_tag_header_action: APPEND_IF_EXISTS_OR_ADD
 ip_tags:
   - ip_tag_name: internal_request_with_optional_header
     ip_list:
