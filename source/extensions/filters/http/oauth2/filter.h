@@ -125,10 +125,10 @@ public:
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
   bool preserveAuthorizationHeader() const { return preserve_authorization_header_; }
-  const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
-  const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& denyRedirectMatchers() const {
     return deny_redirect_header_matchers_;
   }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
@@ -179,8 +179,8 @@ private:
   FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
-  const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
-  const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const std::string cookie_domain_;
   const AuthType auth_type_;
