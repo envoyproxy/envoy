@@ -855,6 +855,15 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
+    std::string requested_server_name = "outbound_.8080_._.example.com";
+    stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+    EXPECT_EQ("outbound_.8080_._.example.com", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("outbound_.8080_._.example.com")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name = "stub-server";
     stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
     EXPECT_EQ("stub-server", upstream_format.formatWithContext({}, stream_info));
