@@ -676,12 +676,12 @@ TEST_F(LogicalDnsClusterTest, ExtremeJitter) {
   const std::string jitter_yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
-  dns_refresh_rate: 4s
+  dns_refresh_rate: 1s
   dns_failure_refresh_rate:
     base_interval: 7s
     max_interval: 10s
   connect_timeout: 0.25s
-  dns_jitter: 1s
+  dns_jitter: 1000s
   lb_policy: ROUND_ROBIN
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
   # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.

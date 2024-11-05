@@ -1566,8 +1566,8 @@ TEST_F(StrictDnsClusterImplTest, ExtremeJitter) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    dns_refresh_rate: 4s
-    dns_jitter: 1s
+    dns_refresh_rate: 1s
+    dns_jitter: 1000s
     respect_dns_ttl: true
     load_assignment:
         endpoints:
