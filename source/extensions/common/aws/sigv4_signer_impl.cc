@@ -56,20 +56,17 @@ std::string SigV4SignerImpl::createSignature(
 
 std::string SigV4SignerImpl::createAuthorizationHeader(
     const absl::string_view access_key_id, const absl::string_view credential_scope,
-    const std::map<std::string, std::string>& canonical_headers,
-    absl::string_view signature, bool iam_roles_anywhere_signing) const {
+    const std::map<std::string, std::string>& canonical_headers, absl::string_view signature,
+    bool iam_roles_anywhere_signing) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
-  if (iam_roles_anywhere_signing)
-  {
+  if (iam_roles_anywhere_signing) {
     return "true";
+  } else {
+    return fmt::format(SigV4SignatureConstants::SigV4AuthorizationHeaderFormat,
+                       SigV4SignatureConstants::SigV4Algorithm,
+                       createAuthorizationCredential(access_key_id, credential_scope),
+                       signed_headers, signature);
   }
-  else {
-  return fmt::format(SigV4SignatureConstants::SigV4AuthorizationHeaderFormat,
-                     SigV4SignatureConstants::SigV4Algorithm,
-                     createAuthorizationCredential(access_key_id, credential_scope), signed_headers,
-                     signature);
-                       }
-
 }
 
 absl::string_view SigV4SignerImpl::getAlgorithmString() const {

@@ -27,8 +27,8 @@ public:
   static constexpr absl::string_view SigV4SignatureVersion{"AWS4"};
   static constexpr absl::string_view SigV4StringToSignFormat{"{}\n{}\n{}\n{}"};
   static constexpr absl::string_view SigV4Algorithm{"AWS4-HMAC-SHA256"};
-  static constexpr absl::string_view SigV4RolesAnywhereRSA{ "AWS4-X509-RSA-SHA256"};
-  static constexpr absl::string_view SigV4RolesAnywhereECSA{ "AWS4-X509-ECDSA-SHA256"};
+  static constexpr absl::string_view SigV4RolesAnywhereRSA{"AWS4-X509-RSA-SHA256"};
+  static constexpr absl::string_view SigV4RolesAnywhereECSA{"AWS4-X509-ECDSA-SHA256"};
 };
 
 using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
@@ -58,10 +58,10 @@ public:
   // Constructor for IAMRolesAnywhere
   SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
                   const CredentialsProviderSharedPtr& credentials_provider,
-                  Envoy::TimeSource &timesource)
+                  Envoy::TimeSource& timesource)
       : SignerBaseImpl(service_name, region, credentials_provider, timesource) {
-        iam_roles_anywhere_signing_ = true;
-      }
+    iam_roles_anywhere_signing_ = true;
+  }
 
 private:
   std::string createCredentialScope(const absl::string_view short_date,
@@ -80,7 +80,8 @@ private:
   std::string createAuthorizationHeader(const absl::string_view access_key_id,
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
-                                        const absl::string_view signature, bool iam_roles_anywhere_signing) const override;
+                                        const absl::string_view signature,
+                                        bool iam_roles_anywhere_signing) const override;
 
   absl::string_view getAlgorithmString() const override;
 };

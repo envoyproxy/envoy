@@ -68,34 +68,31 @@ public:
                  const AwsSigningHeaderExclusionVector& matcher_config,
                  const bool query_string = false,
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
-      : service_name_(service_name), region_(region),
-        credentials_provider_(credentials_provider), query_string_(query_string),
-        expiration_time_(expiration_time), time_source_(context.timeSource()),
+      : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
+        query_string_(query_string), expiration_time_(expiration_time),
+        time_source_(context.timeSource()),
         long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
 
-      excluded_header_matchers_ = defaultMatchers(context);
-      for (const auto& matcher : matcher_config) {
-        excluded_header_matchers_.emplace_back(
-            std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-                matcher, context));
-
+    excluded_header_matchers_ = defaultMatchers(context);
+    for (const auto& matcher : matcher_config) {
+      excluded_header_matchers_.emplace_back(
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              matcher, context));
     }
   }
 
   // Constructor for IAM Roles Anywhere
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
                  const CredentialsProviderSharedPtr& credentials_provider,
-                 Envoy::TimeSource &timesource,
+                 Envoy::TimeSource& timesource,
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
-      : service_name_(service_name), region_(region),
-        credentials_provider_(credentials_provider),
+      : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
         query_string_(false), expiration_time_(expiration_time), time_source_(timesource),
         long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
-          excluded_header_matchers_.clear();
-        }
-
+    excluded_header_matchers_.clear();
+  }
 
   absl::Status sign(Http::RequestMessage& message, bool sign_body = false,
                     const absl::string_view override_region = "") override;
@@ -131,11 +128,10 @@ protected:
                                       const absl::string_view string_to_sign,
                                       const absl::string_view override_region) const PURE;
 
-  virtual std::string
-  createAuthorizationHeader(const absl::string_view access_key_id,
-                            const absl::string_view credential_scope,
-                            const std::map<std::string, std::string>& canonical_headers,
-                            const absl::string_view signature, bool iam_roles_anywhere_signing) const PURE;
+  virtual std::string createAuthorizationHeader(
+      const absl::string_view access_key_id, const absl::string_view credential_scope,
+      const std::map<std::string, std::string>& canonical_headers,
+      const absl::string_view signature, bool iam_roles_anywhere_signing) const PURE;
 
   std::string createAuthorizationCredential(absl::string_view access_key_id,
                                             absl::string_view credential_scope) const;
@@ -174,7 +170,8 @@ protected:
   const bool query_string_;
   const uint16_t expiration_time_;
   TimeSource& time_source_;
-  DateFormatter long_date_formatter_;;
+  DateFormatter long_date_formatter_;
+  ;
   DateFormatter short_date_formatter_;
   const std::string blank_str_;
   // Used when launching a signer from IAMRolesAnywhere Credential Provider

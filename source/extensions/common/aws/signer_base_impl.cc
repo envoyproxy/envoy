@@ -132,8 +132,9 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     ENVOY_LOG(debug, "Query string signing - New path (sanitised): {}", sanitised_query_string);
 
   } else {
-    const auto authorization_header = createAuthorizationHeader(
-        credentials.accessKeyId().value(), credential_scope, canonical_headers, signature, iam_roles_anywhere_signing_);
+    const auto authorization_header =
+        createAuthorizationHeader(credentials.accessKeyId().value(), credential_scope,
+                                  canonical_headers, signature, iam_roles_anywhere_signing_);
 
     headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 

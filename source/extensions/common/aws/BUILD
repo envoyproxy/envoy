@@ -114,10 +114,10 @@ envoy_cc_library(
     srcs = ["credentials_provider_impl.cc"],
     hdrs = ["credentials_provider_impl.h"],
     deps = [
+        "sigv4_signer_impl_lib",
         ":credentials_provider_interface",
         ":metadata_fetcher_lib",
         ":utility_lib",
-        "sigv4_signer_impl_lib",
         "//envoy/api:api_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
@@ -127,6 +127,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/tracing:http_tracer_lib",
         "@com_google_absl//absl/time",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
