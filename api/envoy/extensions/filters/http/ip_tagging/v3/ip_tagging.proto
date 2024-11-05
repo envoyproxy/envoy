@@ -43,16 +43,15 @@ message IPTagging {
   // Describes how to apply the tags to the headers.
   enum HeaderAction {
     // (DEFAULT) The header specified in :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
-    // will be dropped, before the tags are applied. Sanitize will be run regardless of if the source is a trusted IP or not.
+    // will be dropped, before the tags are applied. The incoming header will be "sanitized" regardless of whether the request is internal or external.
     //
-    // Note that the header will be visible unsanitized to any filters downstream of the ip-tag-header filter, unless it has an *x-envoy* prefix.
+    // Note that the header will be visible unsanitized to any filters that are invoked before the ip-tag-header filter, unless it has an *x-envoy* prefix.
     SANITIZE = 0;
 
     // Tags will be appended to the header specified in
-    // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`,
-    // leaving original values in place.
+    // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`.
     //
-    // Please note that this could cause the header to retain values set by the http client even if the client is from an untrusted IP.
+    // Please note that this could cause the header to retain values set by the http client regardless of whether the request is internal or external.
     APPEND_FORWARD = 1;
   }
 
