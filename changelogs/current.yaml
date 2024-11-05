@@ -83,6 +83,10 @@ bug_fixes:
     Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
     in the :ref:`google_grpc <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>` resource used for ADS, and adds
     that as a tag ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
+- area: access_log
+  change: |
+    Relaxed the restriction on SNI logging to allow the ``_`` character, even if
+    ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
