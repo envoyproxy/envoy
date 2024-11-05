@@ -504,7 +504,8 @@ std::string StringUtil::sanitizeInvalidHostname(const absl::string_view source) 
   std::string ret_str = std::string(source);
   bool sanitized = false;
   for (size_t i = 0; i < ret_str.size(); ++i) {
-    if (absl::ascii_isalnum(ret_str[i]) || ret_str[i] == '.' || ret_str[i] == '-') {
+    if (absl::ascii_isalnum(ret_str[i]) || ret_str[i] == '.' || ret_str[i] == '-' ||
+        ret_str[i] == '_') {
       continue;
     }
     sanitized = true;
