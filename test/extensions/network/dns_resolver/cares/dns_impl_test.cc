@@ -959,7 +959,7 @@ protected:
   // Should the TestDnsServer cause c-ares queries to timeout, by not responding?
   virtual bool queryTimeout() const { return false; }
   virtual bool tcpOnly() const { return true; }
-  virtual void updateDnsResolverOptions() {};
+  virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
   virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return 0; }
