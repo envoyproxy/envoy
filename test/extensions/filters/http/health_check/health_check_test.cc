@@ -50,8 +50,7 @@ public:
     envoy::config::route::v3::HeaderMatcher matcher;
     matcher.set_name(":path");
     matcher.mutable_string_match()->set_exact("/healthcheck");
-    header_data_->emplace_back(
-        std::make_unique<Http::HeaderUtility::HeaderData>(matcher, context_));
+    header_data_->emplace_back(Http::HeaderUtility::createHeaderData(matcher, context_));
     filter_ = std::make_unique<HealthCheckFilter>(context_, pass_through, cache_manager_,
                                                   header_data_, cluster_min_healthy_percentages);
     filter_->setDecoderFilterCallbacks(callbacks_);

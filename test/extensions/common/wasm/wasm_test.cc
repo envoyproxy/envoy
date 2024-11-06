@@ -36,26 +36,6 @@ using testing::Eq;
 using testing::Return;
 
 namespace Envoy {
-
-namespace Server {
-class MockServerLifecycleNotifier2 : public ServerLifecycleNotifier {
-public:
-  MockServerLifecycleNotifier2() = default;
-  ~MockServerLifecycleNotifier2() override = default;
-
-  using ServerLifecycleNotifier::registerCallback;
-
-  ServerLifecycleNotifier::HandlePtr
-  registerCallback(Stage stage, StageCallbackWithCompletion callback) override {
-    return registerCallback2(stage, callback);
-  }
-
-  MOCK_METHOD(ServerLifecycleNotifier::HandlePtr, registerCallback, (Stage, StageCallback));
-  MOCK_METHOD(ServerLifecycleNotifier::HandlePtr, registerCallback2,
-              (Stage stage, StageCallbackWithCompletion callback));
-};
-} // namespace Server
-
 namespace Extensions {
 namespace Common {
 namespace Wasm {
@@ -643,7 +623,7 @@ TEST_P(WasmCommonTest, VmCache) {
   Api::ApiPtr api = Api::createApiForTest(stats_store);
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Init::MockManager> init_manager;
-  NiceMock<Server::MockServerLifecycleNotifier2> lifecycle_notifier;
+  NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier;
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
   RemoteAsyncDataProviderPtr remote_data_provider;
   auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
@@ -656,15 +636,6 @@ TEST_P(WasmCommonTest, VmCache) {
       absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
   plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration);
   plugin_config.mutable_configuration()->set_value(plugin_configuration);
-
-  ServerLifecycleNotifier::StageCallbackWithCompletion lifecycle_callback;
-  EXPECT_CALL(lifecycle_notifier, registerCallback2(_, _))
-      .WillRepeatedly(
-          Invoke([&](ServerLifecycleNotifier::Stage,
-                     StageCallbackWithCompletion callback) -> ServerLifecycleNotifier::HandlePtr {
-            lifecycle_callback = callback;
-            return nullptr;
-          }));
 
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
@@ -689,7 +660,6 @@ TEST_P(WasmCommonTest, VmCache) {
              remote_data_provider,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
   EXPECT_NE(wasm_handle, nullptr);
-  lifecycle_callback([] {});
 
   WasmHandleSharedPtr wasm_handle2;
   createWasm(plugin, scope, cluster_manager, init_manager, *dispatcher, *api, lifecycle_notifier,

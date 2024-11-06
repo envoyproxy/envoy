@@ -62,7 +62,6 @@ paths:
   build_fixer:
     exclude:
     - BUILD
-    - tools/BUILD
     - bazel/BUILD
     - bazel/external/
     - bazel/toolchains/

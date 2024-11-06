@@ -531,7 +531,7 @@ void InstanceProfileCredentialsProvider::extractCredentials(
   }
 
   absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
-  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  document_json_or_error = Json::Factory::loadFromString(credential_document_value);
   if (!document_json_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document: {}",
               document_json_or_error.status().message());
@@ -676,7 +676,7 @@ void ContainerCredentialsProvider::extractCredentials(
   }
   absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
 
-  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  document_json_or_error = Json::Factory::loadFromString(credential_document_value);
   if (!document_json_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from the container role: {}",
               document_json_or_error.status().message());
@@ -821,7 +821,7 @@ void WebIdentityCredentialsProvider::extractCredentials(
   }
 
   absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
-  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  document_json_or_error = Json::Factory::loadFromString(credential_document_value);
   if (!document_json_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from STS: {}",
               document_json_or_error.status().message());
@@ -830,21 +830,20 @@ void WebIdentityCredentialsProvider::extractCredentials(
   }
 
   absl::StatusOr<Json::ObjectSharedPtr> root_node =
-      document_json_or_error.value()->getObjectNoThrow(WEB_IDENTITY_RESPONSE_ELEMENT);
+      document_json_or_error.value()->getObject(WEB_IDENTITY_RESPONSE_ELEMENT);
   if (!root_node.ok()) {
     ENVOY_LOG(error, "AWS STS credentials document is empty");
     handleFetchDone();
     return;
   }
   absl::StatusOr<Json::ObjectSharedPtr> result_node =
-      root_node.value()->getObjectNoThrow(WEB_IDENTITY_RESULT_ELEMENT);
+      root_node.value()->getObject(WEB_IDENTITY_RESULT_ELEMENT);
   if (!result_node.ok()) {
     ENVOY_LOG(error, "AWS STS returned an unexpected result");
     handleFetchDone();
     return;
   }
-  absl::StatusOr<Json::ObjectSharedPtr> credentials =
-      result_node.value()->getObjectNoThrow(CREDENTIALS);
+  absl::StatusOr<Json::ObjectSharedPtr> credentials = result_node.value()->getObject(CREDENTIALS);
   if (!credentials.ok()) {
     ENVOY_LOG(error, "AWS STS credentials document does not contain any credentials");
     handleFetchDone();

@@ -309,6 +309,7 @@ public:
   }
 
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
+  absl::Status replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) override;
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const absl::optional<std::string>& localClusterName() const override {
