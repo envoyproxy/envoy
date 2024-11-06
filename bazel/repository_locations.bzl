@@ -133,13 +133,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 1. Open https://chromiumdash.appspot.com/releases?platform=Linux and find the latest Stable release.
         # 2. In the info for that release, open the "Branch Base Commit" link, then open DEPS, and use the <boringssl_revision>.
         #
-        # chromium-126.0.6478.55 (linux/stable)
-        version = "2db0eb3f96a5756298dcd7f9319e56a98585bd10",
-        sha256 = "cd240bf27450f75cd5f41c512a06297c00646cdbac9f87b604e9312771db15a6",
+        # chromium-130.0.6723.69 (linux/stable)
+        version = "58f3bc83230d2958bb9710bc910972c4f5d382dc",
+        sha256 = "50db81f25e3ee0f90b95182fc244ceb58aefbac59456bf3f55f1c519c5584d71",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-04-29",
+        release_date = "2024-09-13",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
@@ -412,12 +412,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "gRPC",
         project_desc = "gRPC C core library",
         project_url = "https://grpc.io",
-        version = "1.62.1",
-        sha256 = "c9f9ae6e4d6f40464ee9958be4068087881ed6aa37e30d0e64d40ed7be39dd01",
+        version = "1.63.2",
+        sha256 = "5b5b9c6507ec166ec0e9e82f58280c36544540ecdd818eaab7b8601596b74c9e",
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-03-08",
+        release_date = "2024-08-02",
         cpe = "cpe:2.3:a:grpc:grpc:*",
         license = "Apache-2.0",
         license_url = "https://github.com/grpc/grpc/blob/v{version}/LICENSE",
