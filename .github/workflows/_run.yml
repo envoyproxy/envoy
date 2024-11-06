@@ -117,7 +117,7 @@ on:
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.2.35
+          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.3.1
             with:
               context: %{{ inputs.context }}
       steps-pre:
@@ -210,7 +210,7 @@ jobs:
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
       uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.1
       with:
-        image_tag: ${{ inputs.cache-build-image }}
+        image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
     - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.1
