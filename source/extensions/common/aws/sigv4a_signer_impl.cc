@@ -24,8 +24,8 @@ namespace Aws {
 
 std::string SigV4ASignerImpl::createAuthorizationHeader(
     const absl::string_view access_key_id, const absl::string_view credential_scope,
-    const std::map<std::string, std::string>& canonical_headers, absl::string_view signature,
-    bool) const {
+    const std::map<std::string, std::string>& canonical_headers,
+    absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
   return fmt::format(SigV4ASignatureConstants::SigV4AAuthorizationHeaderFormat,
                      createAuthorizationCredential(access_key_id, credential_scope), signed_headers,

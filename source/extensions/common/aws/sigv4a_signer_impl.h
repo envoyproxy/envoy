@@ -87,7 +87,7 @@ private:
   std::string createAuthorizationHeader(const absl::string_view access_key_id,
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
-                                        const absl::string_view signature, bool) const override;
+                                        const absl::string_view signature) const override;
 
   absl::string_view getAlgorithmString() const override;
 };

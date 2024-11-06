@@ -77,11 +77,23 @@ private:
                               const absl::string_view string_to_sign,
                               const absl::string_view override_region) const override;
 
+  std::string
+  createIamRolesAnywhereSignature(const std::vector<uint8_t> cert_private_key,
+                                  const absl::string_view string_to_sign) const override;
+
+  std::string createIamRolesAnywhereStringToSign(absl::string_view canonical_request,
+                                                 absl::string_view long_date,
+                                                 absl::string_view credential_scope) const override;
+
   std::string createAuthorizationHeader(const absl::string_view access_key_id,
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
-                                        const absl::string_view signature,
-                                        bool iam_roles_anywhere_signing) const override;
+                                        const absl::string_view signature) const override;
+
+  std::string createIamRolesAnywhereAuthorizationHeader(
+      const absl::string_view cert_serial, const absl::string_view credential_scope,
+      const std::map<std::string, std::string>& canonical_headers,
+      absl::string_view signature) const override;
 
   absl::string_view getAlgorithmString() const override;
 };

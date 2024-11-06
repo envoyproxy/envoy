@@ -2,11 +2,13 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <memory>
 
 #include "envoy/common/exception.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -376,17 +378,18 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
   last_updated_ = api_.timeSource().systemTime();
 }
 
-void IAMRolesAnywhereCertificateCredentialsProvider::createFileWatcher(Event::Dispatcher& dispatcher, envoy::config::core::v3::DataSource& source, Filesystem::WatcherPtr& watcher)
-{
-  if(source.has_filename())
-  {
-   watcher = dispatcher.createFilesystemWatcher();
-  auto status = watcher->addWatch(
-      source.filename(), Filesystem::Watcher::Events::Modified, [this, source](uint32_t) {
-        ENVOY_LOG(debug, fmt::format("IAM Roles Anywhere file changed, refreshing: {}", source.filename()));
-        refresh();
-        return absl::OkStatus();
-      });
+void IAMRolesAnywhereCertificateCredentialsProvider::createFileWatcher(
+    Event::Dispatcher& dispatcher, envoy::config::core::v3::DataSource& source,
+    Filesystem::WatcherPtr& watcher) {
+  if (source.has_filename()) {
+    watcher = dispatcher.createFilesystemWatcher();
+    auto status = watcher->addWatch(
+        source.filename(), Filesystem::Watcher::Events::Modified, [this, source](uint32_t) {
+          ENVOY_LOG(debug, fmt::format("IAM Roles Anywhere file changed, refreshing: {}",
+                                       source.filename()));
+          refresh();
+          return absl::OkStatus();
+        });
   }
 }
 
@@ -397,12 +400,11 @@ IAMRolesAnywhereCertificateCredentialsProvider::IAMRolesAnywhereCertificateCrede
     envoy::config::core::v3::DataSource certificate_chain_data_source)
     : api_(api), certificate_data_source_(certificate_data_source),
       private_key_data_source_(private_key_data_source),
-      certificate_chain_data_source_(certificate_chain_data_source), dispatcher_(dispatcher){
+      certificate_chain_data_source_(certificate_chain_data_source), dispatcher_(dispatcher) {
 
   createFileWatcher(dispatcher, certificate_data_source_, certificate_file_watcher_);
   createFileWatcher(dispatcher, private_key_data_source_, private_key_file_watcher_);
   createFileWatcher(dispatcher, certificate_chain_data_source_, certificate_chain_file_watcher_);
-
 }
 
 bool IAMRolesAnywhereCertificateCredentialsProvider::needsRefresh() {
@@ -416,91 +418,149 @@ bool IAMRolesAnywhereCertificateCredentialsProvider::needsRefresh() {
   }
 }
 
-absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemFileToDer(std::string filename, std::vector<uint8_t>& output, bool privatekey=false) {
+absl::Status
+IAMRolesAnywhereCertificateCredentialsProvider::pemFileToDer(std::string filename,
+                                                             std::vector<uint8_t>& output) {
   auto file_read_or_error = api_.fileSystem().fileReadToEnd(filename);
 
-  if(file_read_or_error.ok())
-  {
+  if (file_read_or_error.ok()) {
     BIO* bio = BIO_new(BIO_s_mem());
-    if(bio == nullptr)
-    {
+    if (bio == nullptr) {
       return absl::InvalidArgumentError("SSL internal error");
     }
     if (BIO_puts(bio, file_read_or_error.value().c_str()) >= 0) {
-      if(privatekey)
-      {
-        RSA* pkey = nullptr;
-        unsigned char* pkey_in_der = nullptr;
-        pkey = PEM_read_bio_RSAPrivateKey(bio, nullptr, nullptr, nullptr);
-        int der_length = i2d_RSAPrivateKey(pkey, &pkey_in_der);
-        if(!(der_length > 0 && pkey_in_der != nullptr))
-        {
-              return absl::InvalidArgumentError("PEM file could not be parsed");
-        }
-        output.clear();
-        output.insert(output.end(), &pkey_in_der[0], &pkey_in_der[der_length]);
-        OPENSSL_free(pkey_in_der);
-        return absl::OkStatus();
-
+      RSA* pkey = nullptr;
+      unsigned char* pkey_in_der = nullptr;
+      pkey = PEM_read_bio_RSAPrivateKey(bio, nullptr, nullptr, nullptr);
+      int der_length = i2d_RSAPrivateKey(pkey, &pkey_in_der);
+      if (!(der_length > 0 && pkey_in_der != nullptr)) {
+        return absl::InvalidArgumentError("PEM file could not be parsed");
       }
-      else {
-        X509* cert = nullptr;
-        cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
-
-        unsigned char* cert_in_der = nullptr;
-        int der_length = i2d_X509(cert, &cert_in_der);
-        if(!(der_length > 0 && cert_in_der != nullptr))
-        {
-              return absl::InvalidArgumentError("PEM file could not be parsed");
-        }
-        output.clear();
-        output.insert(output.end(), &cert_in_der[0], &cert_in_der[der_length]);
-        OPENSSL_free(cert_in_der);
-        return absl::OkStatus();
-      }
-    }
-    else {
+      output.clear();
+      output.insert(output.end(), &pkey_in_der[0], &pkey_in_der[der_length]);
+      OPENSSL_free(pkey_in_der);
+      return absl::OkStatus();
+    } else {
       return absl::InvalidArgumentError("PEM file could not be parsed");
     }
+  } else {
+    return file_read_or_error.status();
   }
-  else {
-      return file_read_or_error.status();
+}
+
+absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemFileToAlgorithmSerial(
+    std::string filename, Credentials::CertificateAlgorithm& algorithm, std::string& serial) {
+  auto file_read_or_error = api_.fileSystem().fileReadToEnd(filename);
+  if (file_read_or_error.ok()) {
+    BIO* bio = BIO_new(BIO_s_mem());
+    if (bio == nullptr) {
+      return absl::InvalidArgumentError("SSL internal error");
+    }
+    if (BIO_puts(bio, file_read_or_error.value().c_str()) >= 0) {
+
+      X509* cert = nullptr;
+      cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
+      int nid = X509_get_signature_nid(cert);
+      if (nid == NID_sha256WithRSAEncryption) {
+        algorithm = Credentials::CertificateAlgorithm::RSA;
+      } else if (nid == NID_ecdsa_with_SHA256) {
+        algorithm = Credentials::CertificateAlgorithm::ECDSA;
+      } else {
+        return absl::InvalidArgumentError("Invalid certificate signing algorithm");
+      }
+      ASN1_INTEGER* ser = nullptr;
+      ser = X509_get_serialNumber(cert);
+      if (ser == nullptr) {
+        return absl::InvalidArgumentError("Couldn't retrieve serial number from certificate");
+      }
+      BIGNUM* bnser = ASN1_INTEGER_to_BN(ser, nullptr);
+      char* bndec = BN_bn2dec(bnser);
+      serial.append(bndec);
+      OPENSSL_free(bndec);
+      OPENSSL_free(cert);
+      OPENSSL_free(ser);
+      OPENSSL_free(bnser);
+      return absl::OkStatus();
+    } else {
+      return absl::InvalidArgumentError("PEM file could not be parsed");
+    }
+  } else {
+    return file_read_or_error.status();
+  }
+}
+
+absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemFileToB64(std::string filename,
+                                                                          std::string& output) {
+  auto file_read_or_error = api_.fileSystem().fileReadToEnd(filename);
+
+  if (file_read_or_error.ok()) {
+    BIO* bio = BIO_new(BIO_s_mem());
+    if (bio == nullptr) {
+      return absl::InvalidArgumentError("SSL internal error");
+    }
+    if (BIO_puts(bio, file_read_or_error.value().c_str()) >= 0) {
+
+      X509* cert = nullptr;
+      cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
+
+      unsigned char* cert_in_der = nullptr;
+      int der_length = i2d_X509(cert, &cert_in_der);
+      if (!(der_length > 0 && cert_in_der != nullptr)) {
+        return absl::InvalidArgumentError("PEM file could not be parsed");
+      }
+
+      output = Base64::encode(reinterpret_cast<const char*>(cert_in_der), der_length);
+
+      OPENSSL_free(cert_in_der);
+      OPENSSL_free(cert);
+      return absl::OkStatus();
+    } else {
+      return absl::InvalidArgumentError("PEM file could not be parsed");
+    }
+  } else {
+    return file_read_or_error.status();
   }
 }
 
 void IAMRolesAnywhereCertificateCredentialsProvider::refresh() {
 
-  std::vector<uint8_t> cert_der;
-  std::vector<uint8_t> cert_chain_der;
+  std::string cert_der_b64;
+  std::string cert_chain_der_b64;
+  std::string cert_serial;
   std::vector<uint8_t> priv_key_der;
+  Credentials::CertificateAlgorithm cert_algorithm;
 
-  auto status = pemFileToDer(certificate_data_source_.filename(), cert_der);
-  if(!status.ok())
-  {
-    ENVOY_LOG(debug, fmt::format("{}: {}", certificate_data_source_.filename(),status.message()));
+  auto status = pemFileToB64(certificate_data_source_.filename(), cert_der_b64);
+  if (!status.ok()) {
+    ENVOY_LOG(debug, fmt::format("{}: {}", certificate_data_source_.filename(), status.message()));
   }
-  status = pemFileToDer(certificate_chain_data_source_.filename(), cert_chain_der);
-  if(!status.ok())
-  {
-    ENVOY_LOG(debug, fmt::format("{}: {}", certificate_chain_data_source_.filename(),status.message()));
+  status =
+      pemFileToAlgorithmSerial(certificate_data_source_.filename(), cert_algorithm, cert_serial);
+  if (!status.ok()) {
+    ENVOY_LOG(debug, fmt::format("{}: {}", certificate_data_source_.filename(), status.message()));
   }
-  status = pemFileToDer(private_key_data_source_.filename(), priv_key_der,true);
-  if(!status.ok())
-  {
-    ENVOY_LOG(debug, fmt::format("{}: {}", private_key_data_source_.filename(),status.message()));
+
+  status = pemFileToB64(certificate_chain_data_source_.filename(), cert_chain_der_b64);
+  if (!status.ok()) {
+    ENVOY_LOG(debug,
+              fmt::format("{}: {}", certificate_chain_data_source_.filename(), status.message()));
   }
-  
+  status = pemFileToDer(private_key_data_source_.filename(), priv_key_der);
+  if (!status.ok()) {
+    ENVOY_LOG(debug, fmt::format("{}: {}", private_key_data_source_.filename(), status.message()));
+  }
+
   // We may have a cert chain or not, but we must always have a private key and certificate
-  if(!cert_der.empty()&&!priv_key_der.empty())
-  {
-    if(!cert_chain_der.empty())
-    {
-      ENVOY_LOG(debug, "Setting certificate credentials with cert, private key and cert chain");
-      cached_credentials_ = Credentials(cert_der, cert_chain_der, priv_key_der);
-    }
-    else {
-        ENVOY_LOG(debug, "Setting certificate credentials with cert and private key");
-        cached_credentials_ = Credentials(cert_der, absl::nullopt, priv_key_der);
+  if (!cert_der_b64.empty() && !priv_key_der.empty()) {
+    if (!cert_chain_der_b64.empty()) {
+      ENVOY_LOG(debug,
+                "Setting certificate credentials with cert, serial, private key and cert chain");
+      cached_credentials_ =
+          Credentials(cert_der_b64, cert_algorithm, cert_serial, cert_chain_der_b64, priv_key_der);
+    } else {
+      ENVOY_LOG(debug, "Setting certificate credentials with cert, serial and private key");
+      cached_credentials_ =
+          Credentials(cert_der_b64, cert_algorithm, cert_serial, absl::nullopt, priv_key_der);
     }
   }
 }
@@ -1349,8 +1409,8 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
 //     CreateMetadataFetcherCb create_metadata_fetcher_cb,
 //     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
 //     std::chrono::seconds initialization_timer, absl::string_view role_arn,
-//     absl::string_view role_session_name, absl::string_view region, absl::string_view cluster_name,
-//     absl::string_view uri) const {
+//     absl::string_view role_session_name, absl::string_view region, absl::string_view
+//     cluster_name, absl::string_view uri) const {
 //   return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
 //       api, context, create_metadata_fetcher_cb, refresh_state, initialization_timer, role_arn,
 //       role_session_name, region, cluster_name, uri);
@@ -1392,7 +1452,8 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
         context.api(), context, MetadataFetcher::create, refresh_state, initialization_timer,
         role_arn, role_session_name, region, iam_roles_anywhere_endpoint,
-        iam_roles_anywhere_endpoint, roles_anywhere.certificate(), roles_anywhere.private_key(), roles_anywhere.certificate_chain());
+        iam_roles_anywhere_endpoint, roles_anywhere.certificate(), roles_anywhere.private_key(),
+        roles_anywhere.certificate_chain());
   } else {
     return absl::InvalidArgumentError("No AWS credential provider specified");
   }

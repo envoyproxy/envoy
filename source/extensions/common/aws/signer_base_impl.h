@@ -20,6 +20,8 @@ public:
   const Http::LowerCaseString ContentSha256{"x-amz-content-sha256"};
   const Http::LowerCaseString Date{"x-amz-date"};
   const Http::LowerCaseString SecurityToken{"x-amz-security-token"};
+  const Http::LowerCaseString X509{"x-amz-x509"};
+  const Http::LowerCaseString X509Chain{"x-amz-x509-chain"};
 };
 
 using SignatureHeaders = ConstSingleton<SignatureHeaderValues>;
@@ -128,10 +130,33 @@ protected:
                                       const absl::string_view string_to_sign,
                                       const absl::string_view override_region) const PURE;
 
-  virtual std::string createAuthorizationHeader(
-      const absl::string_view access_key_id, const absl::string_view credential_scope,
-      const std::map<std::string, std::string>& canonical_headers,
-      const absl::string_view signature, bool iam_roles_anywhere_signing) const PURE;
+  virtual std::string
+  createAuthorizationHeader(const absl::string_view access_key_id,
+                            const absl::string_view credential_scope,
+                            const std::map<std::string, std::string>& canonical_headers,
+                            const absl::string_view signature) const PURE;
+
+  // RolesAnywhere does not support SigV4A, so we stub this for non SigV4 use cases
+  virtual std::string createIamRolesAnywhereAuthorizationHeader(
+      ABSL_ATTRIBUTE_UNUSED const absl::string_view cert_serial,
+      ABSL_ATTRIBUTE_UNUSED const absl::string_view credential_scope,
+      ABSL_ATTRIBUTE_UNUSED const std::map<std::string, std::string>& canonical_headers,
+      ABSL_ATTRIBUTE_UNUSED const absl::string_view signature) const {
+    return "";
+  }
+
+  virtual std::string createIamRolesAnywhereSignature(
+      ABSL_ATTRIBUTE_UNUSED const std::vector<uint8_t> cert_private_key,
+      ABSL_ATTRIBUTE_UNUSED const absl::string_view string_to_sign) const {
+    return "";
+  }
+
+  virtual std::string createIamRolesAnywhereStringToSign(
+      ABSL_ATTRIBUTE_UNUSED absl::string_view canonical_request,
+      ABSL_ATTRIBUTE_UNUSED absl::string_view long_date,
+      ABSL_ATTRIBUTE_UNUSED absl::string_view credential_scope) const {
+    return "";
+  }
 
   std::string createAuthorizationCredential(absl::string_view access_key_id,
                                             absl::string_view credential_scope) const;
@@ -146,6 +171,9 @@ protected:
   void addRequiredHeaders(Http::RequestHeaderMap& headers, const std::string long_date,
                           const absl::optional<std::string> session_token,
                           const absl::string_view override_region);
+
+  void addRequiredCertHeaders(Http::RequestHeaderMap& headers, const std::string cert,
+                              const absl::optional<std::string> cert_chain);
 
   std::vector<Matchers::StringMatcherPtr>
   defaultMatchers(Server::Configuration::CommonFactoryContext& context) const {

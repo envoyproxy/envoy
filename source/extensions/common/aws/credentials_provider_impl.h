@@ -130,13 +130,18 @@ private:
   Filesystem::WatcherPtr certificate_chain_file_watcher_;
   Event::Dispatcher& dispatcher_;
   absl::optional<SystemTime> expiration_time_;
-  
+
   bool needsRefresh() override;
   void refresh() override;
 
-  absl::Status pemFileToDer(std::string filename, std::vector<uint8_t>& output, bool privatekey);
-  void createFileWatcher(Event::Dispatcher& dispatcher, envoy::config::core::v3::DataSource& source, Filesystem::WatcherPtr& watcher);
+  absl::Status pemFileToB64(std::string filename, std::string& output);
+  absl::Status pemFileToDer(std::string filename, std::vector<uint8_t>& output);
+  absl::Status pemFileToAlgorithmSerial(std::string filename,
+                                        Credentials::CertificateAlgorithm& algorithm,
+                                        std::string& serial);
 
+  void createFileWatcher(Event::Dispatcher& dispatcher, envoy::config::core::v3::DataSource& source,
+                         Filesystem::WatcherPtr& watcher);
 };
 
 class LoadClusterEntryHandle {
@@ -474,8 +479,8 @@ public:
   //     CreateMetadataFetcherCb create_metadata_fetcher_cb,
   //     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
   //     std::chrono::seconds initialization_timer, absl::string_view role_arn,
-  //     absl::string_view role_session_name, absl::string_view region, absl::string_view cluster_name,
-  //     absl::string_view uri) const PURE;
+  //     absl::string_view role_session_name, absl::string_view region, absl::string_view
+  //     cluster_name, absl::string_view uri) const PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
@@ -531,8 +536,8 @@ private:
   //     CreateMetadataFetcherCb create_metadata_fetcher_cb,
   //     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
   //     std::chrono::seconds initialization_timer, absl::string_view role_arn,
-  //     absl::string_view role_session_name, absl::string_view region, absl::string_view cluster_name,
-  //     absl::string_view uri) const override;
+  //     absl::string_view role_session_name, absl::string_view region, absl::string_view
+  //     cluster_name, absl::string_view uri) const override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,

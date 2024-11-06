@@ -35,11 +35,21 @@ public:
       }
     }
   }
-  Credentials(std::vector<uint8_t> certificate_der, absl::optional<std::vector<uint8_t>> certificate_chain_der, std::vector<uint8_t> certificate_private_key_der)
-  {
-    certificate_der_ = certificate_der;
-    certificate_chain_der_ = certificate_chain_der;
-    certificate_private_key_der_ = certificate_private_key_der;
+
+  enum class CertificateAlgorithm {
+    RSA,
+    ECDSA,
+  };
+
+  Credentials(std::string certificate_b64, CertificateAlgorithm certificate_algorithm,
+              std::string certificate_serial, absl::optional<std::string> certificate_chain_b64,
+              std::vector<uint8_t> certificate_private_key_der)
+      : certificate_b64_(certificate_b64),
+        certificate_private_key_der_(certificate_private_key_der),
+        certificate_serial_(certificate_serial), certificate_algorithm_(certificate_algorithm) {
+    if (certificate_chain_b64.has_value()) {
+      certificate_chain_b64_ = certificate_chain_b64.value();
+    }
   }
 
   const absl::optional<std::string>& accessKeyId() const { return access_key_id_; }
@@ -48,11 +58,19 @@ public:
 
   const absl::optional<std::string>& sessionToken() const { return session_token_; }
 
-  const absl::optional<std::vector<uint8_t>>& certificate() const { return certificate_der_; }
+  const absl::optional<std::string>& certificate() const { return certificate_b64_; }
 
-  const absl::optional<std::vector<uint8_t>>& certificateChain() const { return certificate_chain_der_; }
+  const absl::optional<std::string>& certificateSerial() const { return certificate_serial_; }
 
-  const absl::optional<std::vector<uint8_t>>& certificatePrivateKey() const { return certificate_private_key_der_; }
+  const absl::optional<std::string>& certificateChain() const { return certificate_chain_b64_; }
+
+  const absl::optional<CertificateAlgorithm>& certificateAlgorithm() const {
+    return certificate_algorithm_;
+  }
+
+  const absl::optional<std::vector<uint8_t>>& certificatePrivateKey() const {
+    return certificate_private_key_der_;
+  }
 
   bool operator==(const Credentials& other) const {
     return access_key_id_ == other.access_key_id_ &&
@@ -63,11 +81,13 @@ private:
   absl::optional<std::string> access_key_id_;
   absl::optional<std::string> secret_access_key_;
   absl::optional<std::string> session_token_;
-  // RolesAnywhere certificate based credentials
-  absl::optional<std::vector<uint8_t>> certificate_der_;
-  absl::optional<std::vector<uint8_t>> certificate_chain_der_;
-  absl::optional<std::vector<uint8_t>> certificate_private_key_der_;
 
+  // RolesAnywhere certificate based credentials
+  absl::optional<std::string> certificate_b64_;
+  absl::optional<std::string> certificate_chain_b64_;
+  absl::optional<std::vector<uint8_t>> certificate_private_key_der_;
+  absl::optional<std::string> certificate_serial_;
+  absl::optional<CertificateAlgorithm> certificate_algorithm_;
 };
 
 /**
