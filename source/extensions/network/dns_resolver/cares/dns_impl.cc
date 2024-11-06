@@ -138,8 +138,6 @@ bool DnsResolverImpl::isCaresDefaultTheOnlyNameserver() {
 }
 
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
-  dirty_channel_ = false;
-
   options->sock_state_cb = [](void* arg, os_fd_t fd, int read, int write) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
@@ -213,17 +211,10 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
     completed_ = true;
 
     // If c-ares returns ARES_ECONNREFUSED and there is no fallback we assume that the channel_ is
-    // broken. Mark the channel dirty so that it is destroyed and reinitialized on a subsequent call
-    // to DnsResolver::resolve(). The optimal solution would be for c-ares to reinitialize the
-    // channel, and not have Envoy track side effects.
-    // context: https://github.com/envoyproxy/envoy/issues/4543 and
-    // https://github.com/c-ares/c-ares/issues/301.
-    //
-    // The channel cannot be destroyed and reinitialized here because that leads to a c-ares
-    // segfault.
+    // broken and hence we reinitialize it here.
     if (status == ARES_ECONNREFUSED || status == ARES_EREFUSED || status == ARES_ESERVFAIL ||
         status == ARES_ENOTIMP) {
-      parent_.dirty_channel_ = true;
+      parent_.reinitializeChannel();
     }
   }
 
@@ -399,6 +390,35 @@ void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
                           (write ? Event::FileReadyType::Write : 0));
 }
 
+void DnsResolverImpl::reinitializeChannel() {
+  AresOptions options = defaultAresOptions();
+
+  // Set up the options for re-initialization
+  options.options_.sock_state_cb = [](void* arg, os_fd_t fd, int read, int write) {
+    static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
+  };
+  options.options_.sock_state_cb_data = this;
+  options.optmask_ |= ARES_OPT_SOCK_STATE_CB;
+
+  // Reinitialize the channel with the new options
+  int result = ares_reinit(channel_);
+  RELEASE_ASSERT(result == ARES_SUCCESS, "c-ares channel re-initialization failed");
+
+  if (resolvers_csv_.has_value()) {
+    bool use_resolvers = true;
+    // If the only name server available is c-ares' default then fallback to the user defined
+    // resolvers. Otherwise, use the resolvers provided by c-ares.
+    if (use_resolvers_as_fallback_ && !isCaresDefaultTheOnlyNameserver()) {
+      use_resolvers = false;
+    }
+
+    if (use_resolvers) {
+      result = ares_set_servers_ports_csv(channel_, resolvers_csv_->c_str());
+      RELEASE_ASSERT(result == ARES_SUCCESS, "c-ares set servers failed during re-initialization");
+    }
+  }
+}
+
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
   ENVOY_LOG_EVENT(debug, "cares_dns_resolution_start", "dns resolution for {} started", dns_name);
@@ -406,13 +426,6 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getAddrInfo followed by a synchronous IPv4
   // resolution.
-
-  // @see DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback for why this is done.
-  if (dirty_channel_) {
-    ares_destroy(channel_);
-    AresOptions options = defaultAresOptions();
-    initializeChannel(&options.options_, options.optmask_);
-  }
 
   auto pending_resolution = std::make_unique<AddrInfoPendingResolution>(
       *this, callback, dispatcher_, channel_, dns_name, dns_lookup_family);
