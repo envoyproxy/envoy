@@ -35,12 +35,24 @@ public:
       }
     }
   }
+  Credentials(std::vector<uint8_t> certificate_der, absl::optional<std::vector<uint8_t>> certificate_chain_der, std::vector<uint8_t> certificate_private_key_der)
+  {
+    certificate_der_ = certificate_der;
+    certificate_chain_der_ = certificate_chain_der;
+    certificate_private_key_der_ = certificate_private_key_der;
+  }
 
   const absl::optional<std::string>& accessKeyId() const { return access_key_id_; }
 
   const absl::optional<std::string>& secretAccessKey() const { return secret_access_key_; }
 
   const absl::optional<std::string>& sessionToken() const { return session_token_; }
+
+  const absl::optional<std::vector<uint8_t>>& certificate() const { return certificate_der_; }
+
+  const absl::optional<std::vector<uint8_t>>& certificateChain() const { return certificate_chain_der_; }
+
+  const absl::optional<std::vector<uint8_t>>& certificatePrivateKey() const { return certificate_private_key_der_; }
 
   bool operator==(const Credentials& other) const {
     return access_key_id_ == other.access_key_id_ &&
@@ -51,6 +63,11 @@ private:
   absl::optional<std::string> access_key_id_;
   absl::optional<std::string> secret_access_key_;
   absl::optional<std::string> session_token_;
+  // RolesAnywhere certificate based credentials
+  absl::optional<std::vector<uint8_t>> certificate_der_;
+  absl::optional<std::vector<uint8_t>> certificate_chain_der_;
+  absl::optional<std::vector<uint8_t>> certificate_private_key_der_;
+
 };
 
 /**

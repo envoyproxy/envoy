@@ -118,7 +118,7 @@ public:
       Api::Api& api, Event::Dispatcher& dispatcher,
       envoy::config::core::v3::DataSource certificate_data_source,
       envoy::config::core::v3::DataSource private_key_data_source,
-      envoy::config::core::v3::DataSource cert_chain_data_source);
+      envoy::config::core::v3::DataSource certificate_chain_data_source);
 
 private:
   Api::Api& api_;
@@ -126,13 +126,17 @@ private:
   Filesystem::WatcherPtr certificate_file_watcher_;
   envoy::config::core::v3::DataSource private_key_data_source_;
   Filesystem::WatcherPtr private_key_file_watcher_;
-  envoy::config::core::v3::DataSource cert_chain_data_source_;
-  Filesystem::WatcherPtr cert_chain_file_watcher_;
+  envoy::config::core::v3::DataSource certificate_chain_data_source_;
+  Filesystem::WatcherPtr certificate_chain_file_watcher_;
   Event::Dispatcher& dispatcher_;
   absl::optional<SystemTime> expiration_time_;
   
   bool needsRefresh() override;
   void refresh() override;
+
+  absl::Status pemFileToDer(std::string filename, std::vector<uint8_t>& output, bool privatekey);
+  void createFileWatcher(Event::Dispatcher& dispatcher, envoy::config::core::v3::DataSource& source, Filesystem::WatcherPtr& watcher);
+
 };
 
 class LoadClusterEntryHandle {
@@ -465,13 +469,13 @@ public:
       std::chrono::seconds initialization_timer,
       absl::string_view authorization_token = {}) const PURE;
 
-  virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer, absl::string_view role_arn,
-      absl::string_view role_session_name, absl::string_view region, absl::string_view cluster_name,
-      absl::string_view uri) const PURE;
+  // virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
+  //     Api::Api& api, ServerFactoryContextOptRef context,
+  //     CreateMetadataFetcherCb create_metadata_fetcher_cb,
+  //     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+  //     std::chrono::seconds initialization_timer, absl::string_view role_arn,
+  //     absl::string_view role_session_name, absl::string_view region, absl::string_view cluster_name,
+  //     absl::string_view uri) const PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
