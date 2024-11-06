@@ -60,7 +60,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(
         ["ads_integration_test.cc"],
     ),
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     tags = [
         "cpu:3",
     ],
