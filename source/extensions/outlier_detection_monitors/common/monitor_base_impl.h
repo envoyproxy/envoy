@@ -86,6 +86,8 @@ public:
   void setExtMonitorCallback(ExtMonitorCallback callback) override { callback_ = callback; }
 
   void reset() override { onReset(); }
+  uint32_t enforce() const override { return config_->enforce(); }
+  absl::string_view name() const override { return config_->name(); }
 
   const ExtMonitorConfigSharedPtr& config() const { return config_; }
 
@@ -93,7 +95,6 @@ protected:
   virtual bool onError() PURE;
   virtual void onSuccess() PURE;
   virtual void onReset() PURE;
-  virtual std::string getFailedExtraInfo() { return ""; }
 
   ExtMonitor::ExtMonitorCallback callback_;
   ExtMonitorConfigSharedPtr config_;

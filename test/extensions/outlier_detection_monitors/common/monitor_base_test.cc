@@ -132,7 +132,7 @@ TEST_F(MonitorTest, SingleBucketNotMatchingResult) {
   // monitor's counters.
   bool callback_called = false;
   monitor_->setExtMonitorCallback(
-      [&callback_called](uint32_t, std::string) { callback_called = true; });
+      [&callback_called](const ExtMonitor*) { callback_called = true; });
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(false));
   EXPECT_CALL(*monitor_, onSuccess);
 
@@ -150,7 +150,7 @@ TEST_F(MonitorTest, SingleBucketMatchingResultNotTripped) {
   // monitor's counters and "trip" the monitor.
   bool callback_called = false;
   monitor_->setExtMonitorCallback(
-      [&callback_called](uint32_t, std::string) { callback_called = true; });
+      [&callback_called](const ExtMonitor*) { callback_called = true; });
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(true));
   // Return that the monitor has not been tripped.
   EXPECT_CALL(*monitor_, onError).WillOnce(Return(false));
@@ -170,10 +170,10 @@ TEST_F(MonitorTest, SingleBucketMatchingResultTripped) {
   // implementation of the monitor, it may increase internal
   // monitor's counters and "trip" the monitor.
   bool callback_called = false;
-  monitor_->setExtMonitorCallback([&callback_called](uint32_t enforcing, std::string name) {
+  monitor_->setExtMonitorCallback([&callback_called](const ExtMonitor* monitor) {
     callback_called = true;
-    ASSERT_EQ(name, monitor_name_);
-    ASSERT_EQ(enforcing, enforcing_);
+    ASSERT_EQ(monitor->name(), monitor_name_);
+    ASSERT_EQ(monitor->enforce(), enforcing_);
   });
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(true));
   // Return that the monitor has been tripped.
@@ -216,10 +216,10 @@ TEST_F(MonitorTest, TwoBucketsSecondMatching) {
   addBucket2();
 
   bool callback_called = false;
-  monitor_->setExtMonitorCallback([&callback_called](uint32_t enforcing, std::string name) {
+  monitor_->setExtMonitorCallback([&callback_called](const ExtMonitor* monitor) {
     callback_called = true;
-    ASSERT_EQ(name, monitor_name_);
-    ASSERT_EQ(enforcing, enforcing_);
+    ASSERT_EQ(monitor->name(), monitor_name_);
+    ASSERT_EQ(monitor->enforce(), enforcing_);
   });
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(false));
   EXPECT_CALL(*bucket2_, match(_)).WillOnce(Return(true));

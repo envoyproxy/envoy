@@ -52,7 +52,7 @@ void ExtMonitorBase::putResult(const ExtResult& result) {
   if (matched_error) {
     // Count as error.
     if (onError()) {
-      callback_(config_->enforce(), config_->name());
+      callback_(this);
       // Reaching error was reported via callback.
       // but the host may or may not be ejected based on enforce_ parameter.
       // Reset the monitor's state, so a single new error does not

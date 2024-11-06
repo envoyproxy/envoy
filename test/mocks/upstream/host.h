@@ -48,8 +48,8 @@ public:
 
   MOCK_METHOD(void, logEject,
               (const HostDescriptionConstSharedPtr& host, Detector& detector,
-               envoy::data::cluster::v3::OutlierEjectionType type, bool enforced,
-               absl::optional<std::string>));
+               envoy::data::cluster::v3::OutlierEjectionType type, bool,
+               absl::optional<const ExtMonitor*>));
   MOCK_METHOD(void, logUneject, (const HostDescriptionConstSharedPtr& host));
 };
 
