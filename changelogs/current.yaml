@@ -171,5 +171,10 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.request_attempt_count``
     to get the number of times a request is attempted upstream.
+- area: ip-tagging
+  change: |
+    Adds support for specifying an alternate header
+    :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+    for appending IP tags via ip-tagging filter instead of using the default header ``x-envoy-ip-tags``.
 
 deprecated:
