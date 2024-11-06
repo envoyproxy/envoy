@@ -283,7 +283,7 @@ jobs:
         if [[ "${{ inputs.gcs-only }}" != "" ]]; then
             exit 0
         fi
-        BAZEL_BUILD_EXTRA_OPTIONS="--google_credentials=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE} --config=remote-ci --config=rbe-google"
+        BAZEL_BUILD_EXTRA_OPTIONS="--google_credentials=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE} --config=rbe-google"
         echo "BAZEL_BUILD_EXTRA_OPTIONS=${BAZEL_BUILD_EXTRA_OPTIONS}" >> "$GITHUB_ENV"
 
     - run: |
