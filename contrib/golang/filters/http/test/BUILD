@@ -54,6 +54,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data/access_log:filter.so",
         "//contrib/golang/filters/http/test/test_data/action:filter.so",
+        "//contrib/golang/filters/http/test/test_data/add_data:filter.so",
         "//contrib/golang/filters/http/test/test_data/basic:filter.so",
         "//contrib/golang/filters/http/test/test_data/buffer:filter.so",
         "//contrib/golang/filters/http/test/test_data/echo:filter.so",

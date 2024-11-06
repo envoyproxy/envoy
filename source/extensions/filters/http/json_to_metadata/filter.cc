@@ -338,8 +338,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     return;
   }
 
-  absl::StatusOr<Json::ObjectSharedPtr> result =
-      Json::Factory::loadFromStringNoThrow(body->toString());
+  absl::StatusOr<Json::ObjectSharedPtr> result = Json::Factory::loadFromString(body->toString());
   if (!result.ok()) {
     ENVOY_LOG(debug, result.status().message());
     stats.invalid_json_body_.inc();
@@ -367,7 +366,7 @@ void Filter::processBody(const Buffer::Instance* body, const Rules& rules,
     Json::ObjectSharedPtr node = body_json;
     bool on_missing = false;
     for (unsigned long i = 0; i < keys.size() - 1; i++) {
-      absl::StatusOr<Json::ObjectSharedPtr> next_node_result = node->getObjectNoThrow(keys[i]);
+      absl::StatusOr<Json::ObjectSharedPtr> next_node_result = node->getObject(keys[i]);
       if (!next_node_result.ok()) {
         ENVOY_LOG(warn, result.status().message());
         handleOnMissing(rule, struct_map, filter_callback);
