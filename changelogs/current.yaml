@@ -139,5 +139,9 @@ new_features:
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
     by setting a per-session state object under the key ``envoy.udp_proxy.cluster``.
+- area: filters
+  change: |
+    Added :ref:`the Api Key Auth filter <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.ApiKeyAuth>`, which
+    can be used to authenticate requests using an API key.
 
 deprecated:
