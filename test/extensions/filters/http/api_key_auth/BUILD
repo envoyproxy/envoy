@@ -12,8 +12,8 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "filter_test",
-    srcs = ["filter_test.cc"],
+    name = "api_key_auth_test",
+    srcs = ["api_key_auth_test.cc"],
     extension_names = ["envoy.filters.http.api_key_auth"],
     rbe_pool = "6gig",
     deps = [

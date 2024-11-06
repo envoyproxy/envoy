@@ -36,29 +36,40 @@ using ApiKeyAuthPerScopeProto =
 
 using ApiKeyMap = absl::flat_hash_map<std::string, std::string>;
 
+class KeyResult {
+public:
+  absl::string_view key_string_view;
+  bool multiple_keys_error{false};
+};
+
 class KeySource {
 public:
-  Http::LowerCaseString header_key{""};
-  std::string query_key;
-  std::string cookie_key;
+  KeySource(absl::string_view header, absl::string_view query, absl::string_view cookie);
+
+  KeyResult getApiKey(const Http::RequestHeaderMap& headers, std::string& key_buffer) const;
+  bool valid() const { return !header_.get().empty() || !query_.empty() || !cookie_.empty(); }
+
+private:
+  const Http::LowerCaseString header_{""};
+  const std::string query_;
+  const std::string cookie_;
 };
 
 struct ApiKeyAuthConfig {
 public:
   ApiKeyAuthConfig(const ApiKeyAuthProto& proto_config);
 
+  OptRef<const KeySource> keySource() const {
+    return key_source_.valid() ? makeOptRef(key_source_) : OptRef<const KeySource>{};
+  }
   OptRef<const ApiKeyMap> apiKeyMap() const {
     return api_key_map_.has_value() ? makeOptRef<const ApiKeyMap>(api_key_map_.value())
                                     : OptRef<const ApiKeyMap>{};
   }
-  OptRef<const KeySource> keySource() const {
-    return key_source_.has_value() ? makeOptRef<const KeySource>(key_source_.value())
-                                   : OptRef<const KeySource>{};
-  }
 
 private:
+  const KeySource key_source_;
   absl::optional<ApiKeyMap> api_key_map_;
-  absl::optional<KeySource> key_source_;
 };
 
 class ScopeConfig : public Router::RouteSpecificFilterConfig {
