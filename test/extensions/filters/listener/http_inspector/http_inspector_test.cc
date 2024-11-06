@@ -36,7 +36,8 @@ std::string testParamToString(const ::testing::TestParamInfo<Http1ParserImpl>& i
 class HttpInspectorTest : public testing::TestWithParam<Http1ParserImpl> {
 public:
   HttpInspectorTest()
-      : cfg_(std::make_shared<Config>(*store_.rootScope())),
+      : cfg_(std::make_shared<Config>(*store_.rootScope(),
+                                      envoy::extensions::filters::listener::http_inspector::v3::HttpInspector())),
         io_handle_(
             Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt, {})),
         parser_impl_(GetParam()) {}
@@ -559,7 +560,7 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
   // multiple recv calls.
   init();
   absl::string_view method = "GET", http = "/index HTTP/1.0\r\n";
-  std::string spaces(Config::MAX_INSPECT_SIZE - method.size() - http.size(), ' ');
+  std::string spaces(Config::DEFAULT_INITIAL_BUFFER_SIZE - method.size() - http.size(), ' ');
   const std::string data = absl::StrCat(method, spaces, http);
   {
     InSequence s;
@@ -572,7 +573,7 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
     }));
 #endif
 
-    uint64_t num_loops = Config::MAX_INSPECT_SIZE;
+    uint64_t num_loops = Config::DEFAULT_INITIAL_BUFFER_SIZE;
 #if defined(__has_feature) &&                                                                      \
     ((__has_feature(thread_sanitizer)) || (__has_feature(address_sanitizer)))
     num_loops = 2;
@@ -599,7 +600,7 @@ TEST_P(HttpInspectorTest, Http1WithLargeRequestLine) {
           size_t len = (*ctr);
           if (num_loops == 2) {
             ASSERT(*ctr != 3);
-            len = size_t(Config::MAX_INSPECT_SIZE / (3 - (*ctr)));
+            len = size_t(Config::DEFAULT_INITIAL_BUFFER_SIZE / (3 - (*ctr)));
           }
           ASSERT(length >= len);
           memcpy(buffer, data.data(), len);
@@ -628,7 +629,7 @@ TEST_P(HttpInspectorTest, Http1WithLargeHeader) {
   init();
   absl::string_view request = "GET /index HTTP/1.0\r\nfield: ";
   //                           0                    21
-  std::string value(Config::MAX_INSPECT_SIZE - request.size(), 'a');
+  std::string value(Config::DEFAULT_INITIAL_BUFFER_SIZE - request.size(), 'a');
   const std::string data = absl::StrCat(request, value);
 
   {
