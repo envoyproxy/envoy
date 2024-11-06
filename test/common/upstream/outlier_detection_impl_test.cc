@@ -2853,7 +2853,7 @@ TEST_F(OutlierDetectorImplTest, BasicCall) {
                            event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
           .value());
 
-  ON_CALL(runtime_.snapshot_, featureEnabled(std::string(EnforcingExtensionRuntime) + ".5xx", 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_extension.5xx", 100))
       .WillByDefault(Return(true));
   EXPECT_CALL(checker_, check(hosts_[0]));
 
@@ -2912,7 +2912,7 @@ TEST_F(OutlierDetectorImplTest, TwoExtensions) {
           .value());
 
   ON_CALL(runtime_.snapshot_,
-          featureEnabled(std::string(EnforcingExtensionRuntime) + ".local_origin_monitor", 100))
+          featureEnabled("outlier_detection.enforcing_extension.local_origin_monitor", 100))
       .WillByDefault(Return(true));
   EXPECT_CALL(checker_, check(hosts_[0]));
 
@@ -3062,7 +3062,7 @@ TEST_F(OutlierDetectorImplTest, TwoExtensionsOnePreferred) {
                            event_logger_, random_, ProtobufMessage::getStrictValidationVisitor())
           .value());
 
-  ON_CALL(runtime_.snapshot_, featureEnabled(std::string(EnforcingExtensionRuntime) + ".5xx", 100))
+  ON_CALL(runtime_.snapshot_, featureEnabled("outlier_detection.enforcing_extension.5xx", 100))
       .WillByDefault(Return(true));
   EXPECT_CALL(checker_, check(hosts_[0]));
 

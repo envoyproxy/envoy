@@ -492,8 +492,7 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType
                                               config_.enforcingFailurePercentageLocalOrigin());
   case envoy::data::cluster::v3::EXTENSION:
     ASSERT(failed_monitor.has_value());
-    return runtime_.snapshot().featureEnabled(std::string(EnforcingExtensionRuntime) + "." +
-                                                  std::string(failed_monitor.value()->name()),
+    return runtime_.snapshot().featureEnabled(failed_monitor.value()->enforceRuntimeKey(),
                                               failed_monitor.value()->enforce());
   }
 

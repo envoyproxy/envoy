@@ -92,6 +92,7 @@ public:
 
   virtual uint32_t enforce() const PURE;
   virtual absl::string_view name() const PURE;
+  virtual absl::string_view enforceRuntimeKey() const PURE;
 };
 
 using ExtMonitorPtr = std::unique_ptr<ExtMonitor>;

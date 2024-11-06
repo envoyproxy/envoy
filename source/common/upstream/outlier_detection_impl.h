@@ -285,7 +285,6 @@ constexpr absl::string_view FailurePercentageThresholdRuntime =
     "outlier_detection.failure_percentage_threshold";
 constexpr absl::string_view MaxEjectionTimeJitterMsRuntime =
     "outlier_detection.max_ejection_time_jitter_ms";
-constexpr absl::string_view EnforcingExtensionRuntime = "outlier_detection.enforcing_extension";
 
 /**
  * Configuration for the outlier detection.

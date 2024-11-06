@@ -78,7 +78,9 @@ using ExtMonitorConfigSharedPtr = std::shared_ptr<ExtMonitorConfig>;
 
 class ExtMonitorBase : public ExtMonitor {
 public:
-  ExtMonitorBase(ExtMonitorConfigSharedPtr config) : config_(std::move(config)) {}
+  ExtMonitorBase(ExtMonitorConfigSharedPtr config)
+      : config_(std::move(config)),
+        enforce_runtime_key_("outlier_detection.enforcing_extension." + config_->name()) {}
   ExtMonitorBase() = delete;
   virtual ~ExtMonitorBase() {}
   void putResult(const ExtResult&) override;
@@ -88,6 +90,7 @@ public:
   void reset() override { onReset(); }
   uint32_t enforce() const override { return config_->enforce(); }
   absl::string_view name() const override { return config_->name(); }
+  absl::string_view enforceRuntimeKey() const override { return enforce_runtime_key_; }
 
   const ExtMonitorConfigSharedPtr& config() const { return config_; }
 
@@ -98,6 +101,7 @@ protected:
 
   ExtMonitor::ExtMonitorCallback callback_;
   ExtMonitorConfigSharedPtr config_;
+  std::string enforce_runtime_key_;
 };
 
 template <class ConfigProto>
