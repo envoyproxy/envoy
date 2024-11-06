@@ -242,8 +242,8 @@ envoy.filters.http.api_key_auth:
   security_posture: robust_to_untrusted_downstream
   status: alpha
   type_urls:
-  - envoy.extensions.filters.http.basic_auth.v3.ApiKeyAuth
-  - envoy.extensions.filters.http.basic_auth.v3.ApiKeyAuthPerScope
+  - envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth
+  - envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerScope
 envoy.filters.http.buffer:
   categories:
   - envoy.filters.http
