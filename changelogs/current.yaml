@@ -170,6 +170,6 @@ new_features:
     to get the number of times a request is attempted upstream.
 - area: dependency
   change: |
-    update c-ares -> v1.22.0 so that we could implement ``ares_reinit()`` to reinitialize the library.
+    Update c-ares -> v1.22.0 which allows implementation of ``ares_reinit()`` to reinitialize the library.
 
 deprecated:
