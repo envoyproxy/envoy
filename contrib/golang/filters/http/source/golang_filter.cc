@@ -547,25 +547,24 @@ CAPIStatus Filter::addData(ProcessorState& state, absl::string_view data, bool i
   }
 
   if (state.isThreadSafe()) {
-    addDataInternal(state, data, is_streaming);
+    Buffer::OwnedImpl buffer;
+    buffer.add(data);
+    state.addData(buffer, is_streaming);
     return CAPIStatus::CAPIOK;
   }
 
   auto weak_ptr = weak_from_this();
-  state.getDispatcher().post([this, weak_ptr, &state, data, is_streaming] {
+  auto data_str = std::string(data);
+  state.getDispatcher().post([this, weak_ptr, &state, data_str, is_streaming] {
     if (!weak_ptr.expired() && !hasDestroyed()) {
-      addDataInternal(state, data, is_streaming);
+      Buffer::OwnedImpl buffer;
+      buffer.add(data_str);
+      state.addData(buffer, is_streaming);
     } else {
       ENVOY_LOG(debug, "golang filter has gone or destroyed in addData");
     }
   });
   return CAPIStatus::CAPIYield;
-}
-
-void Filter::addDataInternal(ProcessorState& state, absl::string_view data, bool is_streaming) {
-  Buffer::OwnedImpl buffer;
-  buffer.add(data);
-  state.addData(buffer, is_streaming);
 }
 
 CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
