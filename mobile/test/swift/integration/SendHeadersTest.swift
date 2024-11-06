@@ -19,7 +19,7 @@ final class SendHeadersTests: XCTestCase {
   }
 
   func testSendHeaders() {
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let headersExpectation = self.expectation(
       description: "Run called with expected http headers status")

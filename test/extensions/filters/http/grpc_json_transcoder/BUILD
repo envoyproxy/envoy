@@ -66,7 +66,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.grpc_json_transcoder"],
-    rbe_pool = "6gig",
+    rbe_pool = "4core",
     tags = [
         "cpu:3",
     ],

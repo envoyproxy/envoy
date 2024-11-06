@@ -256,7 +256,8 @@ public:
   void log(const Formatter::HttpFormatterContext& log_context,
            const StreamInfo::StreamInfo& info) override;
 
-  CAPIStatus clearRouteCache();
+  CAPIStatus clearRouteCache(bool refresh);
+  void clearRouteCacheInternal(bool refresh);
   CAPIStatus continueStatus(ProcessorState& state, GolangStatus status);
 
   CAPIStatus sendLocalReply(ProcessorState& state, Http::Code response_code, std::string body_text,
@@ -264,6 +265,8 @@ public:
                             Grpc::Status::GrpcStatus grpc_status, std::string details);
 
   CAPIStatus sendPanicReply(ProcessorState& state, absl::string_view details);
+
+  CAPIStatus addData(ProcessorState& state, absl::string_view data, bool is_streaming);
 
   CAPIStatus getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
                        int* value_len);

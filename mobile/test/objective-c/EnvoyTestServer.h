@@ -14,8 +14,12 @@
 + (NSInteger)getHttpPort;
 // Get the port of the upstream proxy server.
 + (NSInteger)getProxyPort;
-// Starts a server with HTTP1 and no TLS.
-+ (void)startHttp1PlaintextServer;
+// Starts a server with HTTP 1.
++ (void)startHttp1Server;
+// Starts a server with HTTPS 1.
++ (void)startHttps1Server;
+// Starts a server with HTTPS 2.
++ (void)startHttps2Server;
 // Starts a server as a HTTP proxy.
 + (void)startHttpProxyServer;
 // Starts a server as a HTTPS proxy.

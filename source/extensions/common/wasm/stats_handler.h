@@ -57,6 +57,9 @@ enum class WasmEvent : int {
   RuntimeError,
   VmCreated,
   VmShutDown,
+  VmReloadBackoff,
+  VmReloadSuccess,
+  VmReloadFailure,
 };
 
 class CreateStatsHandler : Logger::Loggable<Logger::Id::wasm> {
@@ -101,6 +104,30 @@ public:
 protected:
   LifecycleStats lifecycle_stats_;
 };
+
+// TODO(wbpcode): refactor all these stats handlers into a single one.
+#define WASM_STATS(COUNTER)                                                                        \
+  COUNTER(vm_reload)                                                                               \
+  COUNTER(vm_reload_backoff)                                                                       \
+  COUNTER(vm_reload_success)                                                                       \
+  COUNTER(vm_reload_failure)
+
+struct WasmStats {
+  WASM_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+class StatsHandler {
+public:
+  StatsHandler(Stats::Scope& parent_scope, const std::string& prefix);
+  void onEvent(WasmEvent event) const;
+  WasmStats& wasmStats() const { return wasm_stats_; }
+
+private:
+  Stats::ScopeSharedPtr scope_;
+  mutable WasmStats wasm_stats_;
+};
+
+using StatsHandlerSharedPtr = std::shared_ptr<StatsHandler>;
 
 } // namespace Wasm
 } // namespace Common

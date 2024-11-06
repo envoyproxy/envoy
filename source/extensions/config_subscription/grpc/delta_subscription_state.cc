@@ -145,7 +145,7 @@ void DeltaSubscriptionState::markStreamFresh(bool should_send_initial_resource_v
 }
 
 UpdateAck DeltaSubscriptionState::handleResponse(
-    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
+    envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
   UpdateAck ack(message.nonce(), type_url_);
@@ -188,8 +188,10 @@ bool DeltaSubscriptionState::isHeartbeatResponse(
 }
 
 void DeltaSubscriptionState::handleGoodResponse(
-    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
+    envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   absl::flat_hash_set<std::string> names_added_removed;
+  // TODO(adisuissa): remove the non_heartbeat_resources structure once
+  // "envoy.reloadable_features.xds_prevent_resource_copy" is deprecated.
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> non_heartbeat_resources;
   for (const auto& resource : message.resources()) {
     if (!names_added_removed.insert(resource.name()).second) {
@@ -199,7 +201,9 @@ void DeltaSubscriptionState::handleGoodResponse(
     if (isHeartbeatResponse(resource)) {
       continue;
     }
-    non_heartbeat_resources.Add()->CopyFrom(resource);
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_prevent_resource_copy")) {
+      non_heartbeat_resources.Add()->CopyFrom(resource);
+    }
     // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
     if (!resource.has_resource() && resource.aliases_size() > 0) {
       continue;
@@ -218,8 +222,24 @@ void DeltaSubscriptionState::handleGoodResponse(
     }
   }
 
-  absl::Span<const envoy::service::discovery::v3::Resource* const> non_heartbeat_resources_span =
-      absl::MakeConstSpan(non_heartbeat_resources.data(), non_heartbeat_resources.size());
+  absl::Span<const envoy::service::discovery::v3::Resource* const> non_heartbeat_resources_span;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_prevent_resource_copy")) {
+    // Reorder the resources in the response, having all the non-heartbeat
+    // resources at the front of the list. Note that although there's no
+    // requirement to keep stable ordering, we do so to process the resources in
+    // the order they were sent.
+    auto last_non_heartbeat = std::stable_partition(
+        message.mutable_resources()->begin(), message.mutable_resources()->end(),
+        [&](const envoy::service::discovery::v3::Resource& resource) {
+          return !isHeartbeatResponse(resource);
+        });
+
+    non_heartbeat_resources_span = absl::MakeConstSpan(
+        message.resources().data(), last_non_heartbeat - message.resources().begin());
+  } else {
+    non_heartbeat_resources_span =
+        absl::MakeConstSpan(non_heartbeat_resources.data(), non_heartbeat_resources.size());
+  }
   watch_map_.onConfigUpdate(non_heartbeat_resources_span, message.removed_resources(),
                             message.system_version_info());
 
