@@ -5,6 +5,27 @@
 namespace Envoy {
 namespace CancelWrapper {
 
+class CancelWrapperDeathTest : public testing::Test {
+public:
+  void SetUp() override {
+#ifdef NDEBUG
+    GTEST_SKIP() << "no asserts in non-debug";
+#endif
+    std::thread thread([&]() { wrapped_ = cancelWrapped([]() {}, &cancel_); });
+    thread.join();
+  }
+  absl::AnyInvocable<void()> wrapped_;
+  CancelFunction cancel_;
+};
+
+TEST_F(CancelWrapperDeathTest, AssertsIfCancelCalledFromDifferentThread) {
+  EXPECT_DEATH(cancel_(), "cancel function must be called from the originating thread");
+}
+
+TEST_F(CancelWrapperDeathTest, AssertsIfCallbackCalledFromDifferentThread) {
+  EXPECT_DEATH(wrapped_(), "wrapped callback must be called from the originating thread");
+}
+
 TEST(CancelWrapper, WrappedCallbackIsExecutable) {
   int x = 0;
   CancelFunction cancel;
