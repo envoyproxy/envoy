@@ -2,6 +2,7 @@
 
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/listener/http_inspector/v3/http_inspector.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
@@ -50,13 +51,19 @@ enum class ParseState {
  */
 class Config {
 public:
-  Config(Stats::Scope& scope);
+  Config(Stats::Scope& scope,
+         const envoy::extensions::filters::listener::http_inspector::v3::HttpInspector& proto_config);
 
   const HttpInspectorStats& stats() const { return stats_; }
 
-  static constexpr uint32_t MAX_INSPECT_SIZE = 8192;
+  static constexpr uint32_t DEFAULT_INITIAL_BUFFER_SIZE = 8 * 1024;
+  static constexpr uint32_t MAX_INSPECT_SIZE = 64 * 1024;
+
+  size_t initialReadBufferSize() const { return initial_read_buffer_size_; }
+  size_t maxReadBufferSize() const { return MAX_INSPECT_SIZE; }
 
 private:
+  const uint32_t initial_read_buffer_size_;
   HttpInspectorStats stats_;
 };
 
@@ -108,7 +115,7 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
 
-  size_t maxReadBytes() const override { return Config::MAX_INSPECT_SIZE; }
+  size_t maxReadBytes() const override { return requested_read_bytes_; }
 
 private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;
@@ -126,7 +133,9 @@ private:
   std::unique_ptr<Http::Http1::Parser> parser_;
   NoOpParserCallbacks no_op_callbacks_;
   ssize_t nread_ = 0;
+  size_t requested_read_bytes_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
+  size_t maxConfigReadBytes() const { return config_->maxReadBufferSize(); }
 };
 
 } // namespace HttpInspector
