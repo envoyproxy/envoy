@@ -1955,7 +1955,7 @@ TEST_P(DnsImplZeroTimeoutTest, Timeout) {
                                     DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
-             0 /*get_addr_failure*/, 1 /*timeouts*/);
+             0 /*get_addr_failure*/, 3 /*timeouts*/);
 }
 
 class DnsImplAresFlagsForTcpTest : public DnsImplTest {
