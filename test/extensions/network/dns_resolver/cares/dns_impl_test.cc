@@ -2172,10 +2172,10 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(dns_resolvers);
   auto query_timeout_seconds = std::make_unique<ProtobufWkt::UInt64Value>();
-  query_timeout_seconds->set_value(10);
+  query_timeout_seconds->set_value(9);
   cares.set_allocated_query_timeout_seconds(query_timeout_seconds.release());
   auto query_tries = std::make_unique<ProtobufWkt::UInt32Value>();
-  query_tries->set_value(10);
+  query_tries->set_value(7);
   cares.set_allocated_query_tries(query_tries.release());
   Network::Utility::addressToProtobufAddress(
       Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
@@ -2207,8 +2207,8 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
   ares_options opts{};
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer->channel(), &opts, &optmask));
-  EXPECT_TRUE(opts.timeout == 10000);
-  EXPECT_TRUE(opts.tries == 10);
+  EXPECT_TRUE(opts.timeout == 9000);
+  EXPECT_TRUE(opts.tries == 7);
   ares_free_data(resolvers);
   ares_destroy_options(&opts);
 }

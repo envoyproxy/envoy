@@ -25,7 +25,7 @@
 
 namespace Envoy {
 namespace Network {
-
+namespace {
 // In late 2023, c-ares modified its default DNS timeout and retry behavior during a major refactor.
 // See: https://github.com/c-ares/c-ares/pull/542/files
 //
@@ -34,6 +34,7 @@ namespace Network {
 // Ref: https://github.com/envoyproxy/envoy/issues/35117
 constexpr uint32_t DEFAULT_QUERY_TIMEOUT_SECONDS = 5;
 constexpr uint32_t DEFAULT_QUERY_TRIES = 4;
+} // namespace
 
 DnsResolverImpl::DnsResolverImpl(
     const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,

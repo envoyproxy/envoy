@@ -171,7 +171,7 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.request_attempt_count``
     to get the number of times a request is attempted upstream.
-- area: cares
+- area: c-ares
   change: |
     added two new options to c-ares resolver for configuring custom timeouts and tries while resolving DNS
     queries. Custom timeouts could be configured by specifying :ref:`query_timeout_seconds
