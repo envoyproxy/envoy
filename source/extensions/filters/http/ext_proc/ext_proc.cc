@@ -569,7 +569,7 @@ FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::I
     // The body has been buffered and we need to send the buffer
     ENVOY_LOG(debug, "Sending request body message");
     state.addBufferedData(data);
-    auto req = setupBodyChunk(state, *state.bufferedData(), end_stream);
+    ProcessingRequest req = setupBodyChunk(state, *state.bufferedData(), end_stream);
     sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, req);
     // Since we just just moved the data into the buffer, return NoBuffer
     // so that we do not buffer this chunk twice.
@@ -610,7 +610,7 @@ FilterDataStatus Filter::handleDataStreamedMode(ProcessorState& state, Buffer::I
   }
 
   // Need to first enqueue the data into the chunk queue before sending.
-  auto req = setupBodyChunk(state, data, end_stream);
+  ProcessingRequest req = setupBodyChunk(state, data, end_stream);
   state.enqueueStreamingChunk(data, end_stream);
   // If the current state is HeadersCallback, stays in that state.
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
@@ -718,6 +718,7 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = handleDataBufferedPartialMode(state, data, end_stream);
     break;
   case ProcessingMode::NONE:
+    ABSL_FALLTHROUGH_INTENDED;
   default:
     result = FilterDataStatus::Continue;
     break;
