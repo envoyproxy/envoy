@@ -1229,4 +1229,76 @@ TEST_P(GolangIntegrationTest, EncodeHeadersWithoutData_StopAndBufferWatermark_As
   testActionWithoutData("encodeHeadersRet=StopAndBufferWatermark&aysnc=1");
 }
 
+TEST_P(GolangIntegrationTest, RefreshRouteCache) {
+  const std::string& so_id = BASIC;
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        const std::string key = "golang";
+        const auto yaml_fmt =
+            R"EOF(
+              "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.ConfigsPerRoute
+              plugins_config:
+                %s:
+                  config:
+                    "@type": type.googleapis.com/xds.type.v3.TypedStruct
+                    type_url: map
+                    value:
+              )EOF";
+        auto yaml = absl::StrFormat(yaml_fmt, so_id);
+        ProtobufWkt::Any value;
+        TestUtility::loadFromYaml(yaml, value);
+
+        auto* route_first_matched =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+        route_first_matched->mutable_match()->set_prefix("/disney/api");
+        route_first_matched->mutable_typed_per_filter_config()->insert(
+            Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value));
+        auto* resp_header = route_first_matched->add_response_headers_to_add();
+        auto* header = resp_header->mutable_header();
+        header->set_key("add-header-from");
+        header->set_value("first_matched");
+        route_first_matched->mutable_route()->set_cluster("cluster_0");
+
+        auto* route_second_matched =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+        route_second_matched->mutable_match()->set_prefix("/user/api");
+        resp_header = route_second_matched->add_response_headers_to_add();
+        header = resp_header->mutable_header();
+        header->set_key("add-header-from");
+        header->set_value("second_matched");
+        route_second_matched->mutable_route()->set_cluster("cluster_0");
+
+        auto* route_should_not_matched =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+        route_should_not_matched->mutable_match()->set_prefix("/api");
+        resp_header = route_should_not_matched->add_response_headers_to_add();
+        header = resp_header->mutable_header();
+        header->set_key("add-header-from");
+        header->set_value("should_not_matched");
+        route_should_not_matched->mutable_route()->set_cluster("cluster_0");
+      });
+
+  initializeBasicFilter(so_id, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/disney/api/xx?refreshRoute=1"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("second_matched", getHeader(response->headers(), "add-header-from"));
+
+  cleanup();
+}
+
 } // namespace Envoy

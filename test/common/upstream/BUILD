@@ -90,6 +90,7 @@ envoy_cc_test(
     rbe_pool = "4core",
     deps = [
         ":test_cluster_manager",
+        "//envoy/config:config_validator_interface",
         "//source/common/router:context_lib",
         "//source/common/upstream:load_balancer_factory_base_lib",
         "//source/extensions/clusters/eds:eds_lib",
@@ -123,6 +124,7 @@ envoy_cc_test(
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:od_cds_api_mocks",
         "//test/mocks/upstream:thread_aware_load_balancer_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

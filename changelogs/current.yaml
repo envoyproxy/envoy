@@ -4,7 +4,20 @@ behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: wasm
   change: |
+    The route cache will not be cleared by default if the wasm extension modified the request headers and
+    the ABI version of wasm extension is larger then 0.2.1.
+- area: wasm
+  change: |
     Remove previously deprecated xDS attributes from ``get_property``, use ``xds`` attributes instead.
+- area: http
+  change: |
+    RFC1918 addresses are no longer considered to be internal addresses by default. This addresses a security
+    issue for Envoy's in multi-tenant mesh environments. Please explicit set
+    :ref:`internal_address_config
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.internal_address_config>`
+    to retain the prior behavior.
+    This change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.explicit_internal_address_config`` to ``false``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -17,10 +30,23 @@ minor_behavior_changes:
     instead of a string.
     This behavior change could be disabled temporarily by setting the runtime
     ``envoy.reloadable_features.logging_with_fast_json_formatter`` to false.
+- area: xds
+  change: |
+    A minor delta-xDS optimization that avoids copying resources when ingesting them was introduced.
+    No impact to the behavior is expected, but a runtime flag was added as this may impact config-ingestion
+    related extensions (e.g., custom-config-validators, config-tracker), as the order of the elements passed
+    to the callback functions may be different. This change can be temporarily reverted
+    by setting ``envoy.reloadable_features.xds_prevent_resource_copy`` to ``false``.
 - area: formatter
   change: |
     The NaN and Infinity values of float will be serialized to ``null`` and ``"inf"`` respectively in the
     metadata (``DYNAMIC_METADATA``, ``CLUSTER_METADATA``, etc.) formatter.
+- area: sds
+  change: |
+    Relaxed the backing cluster validation for Secret Discovery Service(SDS). Currently, the cluster that supports SDS,
+    needs to be a primary cluster i.e. a non-EDS cluster defined in bootstrap configuration. This change relaxes that
+    restriction i.e. SDS cluster can be a dynamic cluster. This change is enabled by default, and can be reverted by setting
+    the runtime flag ``envoy.restart_features.skip_backing_cluster_check_for_sds`` to ``false``.
 - area: http
   change: |
     If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
@@ -38,6 +64,10 @@ minor_behavior_changes:
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
     the runtime guard ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to false.
+- area: scoped_rds
+  change: |
+    The :ref:`route_configuration <envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>` field
+    is supported when the ``ScopedRouteConfiguration`` resource is delivered via SRDS.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -45,6 +75,18 @@ bug_fixes:
   change: |
     Support operations on IP SANs when the IP version is not supported by the host operating system, for example
     an IPv6 SAN can now be used on a host not supporting IPv6 addresses.
+- area: scoped_rds
+  change: |
+    Fixes scope key leak and spurious scope key conflicts when an update to an SRDS resource changes the key.
+- area: stats ads grpc
+  change: |
+    Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
+    in the :ref:`google_grpc <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>` resource used for ADS, and adds
+    that as a tag ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
+- area: access_log
+  change: |
+    Relaxed the restriction on SNI logging to allow the ``_`` character, even if
+    ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -90,6 +132,12 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: xds
+  change: |
+    Added support for ADS replacement by invoking ``xdsManager().setAdsConfigSource()`` with a new config source.
+- area: wasm
+  change: |
+    added ``clear_route_cache`` foreign function to clear the route cache.
 - area: access_log
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
@@ -101,8 +149,24 @@ new_features:
 - area: http_inspector
   change: |
     Added default-false ``envoy.reloadable_features.http_inspector_use_balsa_parser`` for HttpInspector to use BalsaParser.
+- area: overload
+  change: |
+    Added support for scaling :ref:`max connection duration
+    <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_CONNECTION_MAX>`.
+    This can be used to reduce the max connection duration in response to overload.
 - area: tracers
   change: |
     Set resource ``telemetry.sdk.*`` and scope ``otel.scope.name|version`` attributes for the OpenTelemetry tracer.
+- area: lua
+  change: |
+    Added ssl :ref:`parsedSubjectPeerCertificate() <config_http_filters_lua_parsed_name>` API.
+- area: udp_proxy
+  change: |
+    Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
+    by setting a per-session state object under the key ``envoy.udp_proxy.cluster``.
+- area: CEL-attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``upstream.request_attempt_count``
+    to get the number of times a request is attempted upstream.
 
 deprecated:

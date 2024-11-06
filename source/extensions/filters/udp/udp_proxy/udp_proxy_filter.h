@@ -477,6 +477,20 @@ using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
 using WriteFilterStatus = Network::UdpSessionWriteFilterStatus;
 using FilterChainFactoryCallbacks = Network::UdpSessionFilterChainFactoryCallbacks;
 
+/**
+ * Per-session UDP Proxy Cluster configuration.
+ */
+class PerSessionCluster : public StreamInfo::FilterState::Object {
+public:
+  PerSessionCluster(absl::string_view cluster) : cluster_(cluster) {}
+  const std::string& value() const { return cluster_; }
+  absl::optional<std::string> serializeAsString() const override { return cluster_; }
+  static const std::string& key();
+
+private:
+  const std::string cluster_;
+};
+
 class UdpProxyFilter : public Network::UdpListenerReadFilter,
                        public Upstream::ClusterUpdateCallbacks,
                        protected Logger::Loggable<Logger::Id::filter> {
@@ -503,6 +517,7 @@ protected:
   virtual Network::FilterStatus onDataInternal(Network::UdpRecvData& data) PURE;
 
   ClusterInfo* getClusterInfo(const Network::UdpRecvData::LocalPeerAddresses& addresses);
+  ClusterInfo* getClusterInfo(const std::string& cluster);
   ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                const Upstream::HostConstSharedPtr& optional_host,
                                bool defer_socket_creation);
@@ -879,6 +894,7 @@ private:
   }
 
   void fillProxyStreamInfo();
+  bool addOrUpdateCluster(const std::string& cluster_name);
 
   // Upstream::ClusterUpdateCallbacks
   void onClusterAddOrUpdate(absl::string_view cluster_name,
