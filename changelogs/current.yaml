@@ -168,7 +168,7 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.request_attempt_count``
     to get the number of times a request is attempted upstream.
-- area: dependency
+- area: dns
   change: |
     Update c-ares -> v1.22.0 which allows implementation of ``ares_reinit()`` to reinitialize the library.
 
