@@ -4,6 +4,7 @@
 
 #include <cstddef>
 
+#include "credentials_provider.h"
 #include "envoy/common/exception.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -39,12 +40,21 @@ std::string SigV4SignerImpl::createStringToSign(absl::string_view canonical_requ
 std::string
 SigV4SignerImpl::createIamRolesAnywhereStringToSign(absl::string_view canonical_request,
                                                     absl::string_view long_date,
-                                                    absl::string_view credential_scope) const {
+                                                    absl::string_view credential_scope, Credentials::CertificateAlgorithm cert_algorithm) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  return fmt::format(
+  if(cert_algorithm == Credentials::CertificateAlgorithm::RSA)
+  {
+      return fmt::format(
       SigV4SignatureConstants::SigV4StringToSignFormat,
       SigV4SignatureConstants::SigV4RolesAnywhereRSA, long_date, credential_scope,
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
+  }
+  else {
+      return fmt::format(
+      SigV4SignatureConstants::SigV4StringToSignFormat,
+      SigV4SignatureConstants::SigV4RolesAnywhereECDSA, long_date, credential_scope,
+      Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
+  }
 }
 
 std::string SigV4SignerImpl::createSignature(

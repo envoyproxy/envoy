@@ -154,7 +154,7 @@ protected:
   virtual std::string createIamRolesAnywhereStringToSign(
       ABSL_ATTRIBUTE_UNUSED absl::string_view canonical_request,
       ABSL_ATTRIBUTE_UNUSED absl::string_view long_date,
-      ABSL_ATTRIBUTE_UNUSED absl::string_view credential_scope) const {
+      ABSL_ATTRIBUTE_UNUSED absl::string_view credential_scope, ABSL_ATTRIBUTE_UNUSED Credentials::CertificateAlgorithm cert_algorithm) const {
     return "";
   }
 

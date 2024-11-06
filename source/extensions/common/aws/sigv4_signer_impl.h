@@ -28,7 +28,7 @@ public:
   static constexpr absl::string_view SigV4StringToSignFormat{"{}\n{}\n{}\n{}"};
   static constexpr absl::string_view SigV4Algorithm{"AWS4-HMAC-SHA256"};
   static constexpr absl::string_view SigV4RolesAnywhereRSA{"AWS4-X509-RSA-SHA256"};
-  static constexpr absl::string_view SigV4RolesAnywhereECSA{"AWS4-X509-ECDSA-SHA256"};
+  static constexpr absl::string_view SigV4RolesAnywhereECDSA{"AWS4-X509-ECDSA-SHA256"};
 };
 
 using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
@@ -83,7 +83,7 @@ private:
 
   std::string createIamRolesAnywhereStringToSign(absl::string_view canonical_request,
                                                  absl::string_view long_date,
-                                                 absl::string_view credential_scope) const override;
+                                                 absl::string_view credential_scope, Credentials::CertificateAlgorithm cert_algorithm) const override;
 
   std::string createAuthorizationHeader(const absl::string_view access_key_id,
                                         const absl::string_view credential_scope,

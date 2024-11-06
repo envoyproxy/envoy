@@ -457,7 +457,6 @@ absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemFileToAlgorithmS
       return absl::InvalidArgumentError("SSL internal error");
     }
     if (BIO_puts(bio, file_read_or_error.value().c_str()) >= 0) {
-
       X509* cert = nullptr;
       cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
       int nid = X509_get_signature_nid(cert);
@@ -499,18 +498,14 @@ absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemFileToB64(std::s
       return absl::InvalidArgumentError("SSL internal error");
     }
     if (BIO_puts(bio, file_read_or_error.value().c_str()) >= 0) {
-
       X509* cert = nullptr;
       cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
-
       unsigned char* cert_in_der = nullptr;
       int der_length = i2d_X509(cert, &cert_in_der);
       if (!(der_length > 0 && cert_in_der != nullptr)) {
         return absl::InvalidArgumentError("PEM file could not be parsed");
       }
-
       output = Base64::encode(reinterpret_cast<const char*>(cert_in_der), der_length);
-
       OPENSSL_free(cert_in_der);
       OPENSSL_free(cert);
       return absl::OkStatus();

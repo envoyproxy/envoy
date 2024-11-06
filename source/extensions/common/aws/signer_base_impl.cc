@@ -73,9 +73,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     }
   } else {
     // IAM Roles Anywhere signing
-    if (!credentials.certificate() || !credentials.certificatePrivateKey()) {
-      // Empty or "anonymous" credentials are a valid use-case for non-production environments.
-      // This behavior matches what the AWS SDK would do.
+    if (!credentials.certificate() || !credentials.certificatePrivateKey() || !credentials.certificateAlgorithm()) {
       ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
       return absl::OkStatus();
     }
@@ -132,7 +130,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     string_to_sign = createStringToSign(canonical_request, long_date, credential_scope);
   } else {
     string_to_sign =
-        createIamRolesAnywhereStringToSign(canonical_request, long_date, credential_scope);
+        createIamRolesAnywhereStringToSign(canonical_request, long_date, credential_scope, credentials.certificateAlgorithm().value());
   }
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
 
