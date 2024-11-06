@@ -78,6 +78,7 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* bod
                                            long long int grpc_status, void* details_data,
                                            int details_len);
 CAPIStatus envoyGoFilterHttpSendPanicReply(void* s, void* details_data, int details_len);
+CAPIStatus envoyGoFilterHttpAddData(void* s, void* data, int data_len, bool is_streaming);
 
 CAPIStatus envoyGoFilterHttpGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data,
                                       int* value_len);

@@ -286,9 +286,11 @@ genrule(
         "//tools/docs:sphinx_runner",
         "@envoy_api//:v3_proto_set",
     ],
+    visibility = ["//visibility:public"],
 )
 
 alias(
     name = "docs",
     actual = ":html_release",
+    visibility = ["//visibility:public"],
 )
