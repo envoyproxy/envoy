@@ -148,6 +148,12 @@ func (c *httpCApiImpl) HttpSendPanicReply(s unsafe.Pointer, details string) {
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) HttpAddData(s unsafe.Pointer, data []byte, isStreaming bool) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpAddData(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(data)), C.int(len(data)), C.bool(isStreaming))
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpGetHeader(s unsafe.Pointer, key string) string {
 	state := (*processState)(s)
 	var valueData C.uint64_t
