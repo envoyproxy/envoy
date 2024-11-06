@@ -362,7 +362,7 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+    RETURN_IF_NOT_OK(MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api));
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
