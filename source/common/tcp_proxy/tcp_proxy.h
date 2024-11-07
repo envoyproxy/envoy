@@ -34,6 +34,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tcp_proxy/upstream.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/od_cds_api_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -190,8 +191,8 @@ public:
                      on_demand_message,
                  Server::Configuration::FactoryContext& context, Stats::Scope& scope)
       : odcds_(context.serverFactoryContext().clusterManager().allocateOdCdsApi(
-            on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
-            context.messageValidationVisitor())),
+            &Upstream::OdCdsApiImpl::create, on_demand_message.odcds_config(),
+            OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor())),
         lookup_timeout_(std::chrono::milliseconds(
             PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
         stats_(generateStats(scope)) {}
