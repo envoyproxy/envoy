@@ -624,14 +624,3 @@ envoy_cc_library(
         "@com_google_absl//absl/container:node_hash_set",
     ],
 )
-
-envoy_cc_library(
-    name = "xds_manager_lib",
-    srcs = ["xds_manager_impl.cc"],
-    hdrs = ["xds_manager_impl.h"],
-    deps = [
-        "//envoy/config:xds_manager_interface",
-        "//envoy/upstream:cluster_manager_interface",
-        "//source/common/common:thread_lib",
-    ],
-)
