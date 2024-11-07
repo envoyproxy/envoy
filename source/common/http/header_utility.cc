@@ -35,74 +35,12 @@ struct SharedResponseCodeDetailsValues {
 
 using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
 
-// HeaderMatcher will consist of:
-//   header_match_specifier which can be any one of exact_match, regex_match, range_match,
-//   present_match, prefix_match or suffix_match.
-//   Each of these also can be inverted with the invert_match option.
-//   Absence of these options implies empty header value match based on header presence.
-//   a.exact_match: value will be used for exact string matching.
-//   b.regex_match: Match will succeed if header value matches the value specified here.
-//   c.range_match: Match will succeed if header value lies within the range specified
-//     here, using half open interval semantics [start,end).
-//   d.present_match: Match will succeed if the header is present.
-//   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
-//   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
-HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config,
-                                      Server::Configuration::CommonFactoryContext& factory_context)
-    : name_(config.name()), invert_match_(config.invert_match()),
-      treat_missing_as_empty_(config.treat_missing_header_as_empty()) {
-  switch (config.header_match_specifier_case()) {
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
-    header_match_type_ = HeaderMatchType::Value;
-    value_ = config.exact_match();
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
-    header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseRegex(config.safe_regex_match(), factory_context.regexEngine());
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
-    header_match_type_ = HeaderMatchType::Range;
-    range_.set_start(config.range_match().start());
-    range_.set_end(config.range_match().end());
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
-    header_match_type_ = HeaderMatchType::Present;
-    present_ = config.present_match();
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPrefixMatch:
-    header_match_type_ = HeaderMatchType::Prefix;
-    value_ = config.prefix_match();
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSuffixMatch:
-    header_match_type_ = HeaderMatchType::Suffix;
-    value_ = config.suffix_match();
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
-    header_match_type_ = HeaderMatchType::Contains;
-    value_ = config.contains_match();
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
-    header_match_type_ = HeaderMatchType::StringMatch;
-    string_match_ =
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config.string_match(), factory_context);
-    break;
-  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
-      HEADER_MATCH_SPECIFIER_NOT_SET:
-    FALLTHRU;
-  default:
-    header_match_type_ = HeaderMatchType::Present;
-    present_ = true;
-    break;
-  }
-}
-
 bool HeaderUtility::matchHeaders(const HeaderMap& request_headers,
                                  const std::vector<HeaderDataPtr>& config_headers) {
   // No headers to match is considered a match.
   if (!config_headers.empty()) {
     for (const HeaderDataPtr& cfg_header_data : config_headers) {
-      if (!matchHeaders(request_headers, *cfg_header_data)) {
+      if (!cfg_header_data->matchesHeaders(request_headers)) {
         return false;
       }
     }
@@ -148,54 +86,41 @@ HeaderUtility::getAllOfHeaderAsString(const HeaderMap& headers, const Http::Lowe
   return result;
 }
 
-bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderData& header_data) {
-  const auto header_value = getAllOfHeaderAsString(request_headers, header_data.name_);
-
-  if (!header_value.result().has_value() && !header_data.treat_missing_as_empty_) {
-    if (header_data.invert_match_) {
-      return header_data.header_match_type_ == HeaderMatchType::Present && header_data.present_;
-    } else {
-      return header_data.header_match_type_ == HeaderMatchType::Present && !header_data.present_;
-    }
-  }
-
-  // If the header does not have value and the result is not returned in the
-  // code above, it means treat_missing_as_empty_ is set to true and we should
-  // treat the header value as empty.
-  const auto value = header_value.result().has_value() ? header_value.result().value() : "";
-  bool match;
-  switch (header_data.header_match_type_) {
-  case HeaderMatchType::Value:
-    match = header_data.value_.empty() || value == header_data.value_;
+HeaderUtility::HeaderDataPtr
+HeaderUtility::createHeaderData(const envoy::config::route::v3::HeaderMatcher& config,
+                                Server::Configuration::CommonFactoryContext& factory_context) {
+  switch (config.header_match_specifier_case()) {
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
+    return std::make_unique<HeaderDataExactMatch>(config);
     break;
-  case HeaderMatchType::Regex:
-    match = header_data.regex_->match(value);
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
+    return std::make_unique<HeaderDataRegexMatch>(config, factory_context);
     break;
-  case HeaderMatchType::Range: {
-    int64_t header_int_value = 0;
-    match = absl::SimpleAtoi(value, &header_int_value) &&
-            header_int_value >= header_data.range_.start() &&
-            header_int_value < header_data.range_.end();
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
+    return std::make_unique<HeaderDataRangeMatch>(config);
     break;
-  }
-  case HeaderMatchType::Present:
-    match = header_data.present_;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
+    return std::make_unique<HeaderDataPresentMatch>(config);
     break;
-  case HeaderMatchType::Prefix:
-    match = absl::StartsWith(value, header_data.value_);
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPrefixMatch:
+    return std::make_unique<HeaderDataPrefixMatch>(config);
     break;
-  case HeaderMatchType::Suffix:
-    match = absl::EndsWith(value, header_data.value_);
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSuffixMatch:
+    return std::make_unique<HeaderDataSuffixMatch>(config);
     break;
-  case HeaderMatchType::Contains:
-    match = absl::StrContains(value, header_data.value_);
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kContainsMatch:
+    return std::make_unique<HeaderDataContainsMatch>(config);
     break;
-  case HeaderMatchType::StringMatch:
-    match = header_data.string_match_->match(value);
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
+    return std::make_unique<HeaderDataStringMatch>(config, factory_context);
+    break;
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
+      HEADER_MATCH_SPECIFIER_NOT_SET:
+    FALLTHRU;
+  default:
+    return std::make_unique<HeaderDataPresentMatch>(config, true);
     break;
   }
-
-  return match != header_data.invert_match_;
 }
 
 bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {

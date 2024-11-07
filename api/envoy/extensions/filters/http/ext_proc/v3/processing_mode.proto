@@ -73,7 +73,7 @@ message ProcessingMode {
     // [#not-implemented-hide:]
     // Envoy streams the body to the server in pieces as they arrive.
     //
-    // The server may choose to buffer any number chunks of data before processing them.
+    // 1) The server may choose to buffer any number chunks of data before processing them.
     // After it finishes buffering, the server processes the buffered data. Then it splits the processed
     // data into any number of chunks, and streams them back to Envoy one by one.
     // The server may continuously do so until the complete body is processed.
@@ -81,9 +81,12 @@ message ProcessingMode {
     // :ref:`max_receive_message_length <envoy_v3_api_field_config.core.v3.GrpcService.EnvoyGrpc.max_receive_message_length>`
     // if EnvoyGrpc is used.
     //
-    // Note that the server may also choose to buffer the entire message, including the headers (if header mode is
+    // 2) The server may also choose to buffer the entire message, including the headers (if header mode is
     // ``SEND``), the entire body, and the trailers (if present), before sending back any response.
     // The server response has to maintain the headers-body-trailers ordering.
+    //
+    // 3) Note that the server may also choose not to buffer. i.e, once it receives a body request,
+    // it processes the data, and sends back a body response right away.
     //
     // In this body mode:
     // * The corresponding trailer mode has to be set to ``SEND``.

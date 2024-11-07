@@ -574,8 +574,137 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   return status;
 }
 
-// TODO(#36970): Restructure the code. Adding methods like handleDataBuffered(),
-// handleDataStreamed(), handleDataBufferedPartial() to handle each case.
+FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::Instance& data,
+                                                bool end_stream) {
+  if (end_stream) {
+    switch (openStream()) {
+    case StreamOpenState::Error:
+      return FilterDataStatus::StopIterationNoBuffer;
+    case StreamOpenState::IgnoreError:
+      return FilterDataStatus::Continue;
+    case StreamOpenState::Ok:
+      break;
+    }
+
+    // The body has been buffered and we need to send the buffer
+    ENVOY_LOG(debug, "Sending request body message");
+    state.addBufferedData(data);
+    ProcessingRequest req = setupBodyChunk(state, *state.bufferedData(), end_stream);
+    sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, req);
+    // Since we just just moved the data into the buffer, return NoBuffer
+    // so that we do not buffer this chunk twice.
+    state.setPaused(true);
+    return FilterDataStatus::StopIterationNoBuffer;
+  }
+  ENVOY_LOG(trace, "onData: Buffering");
+  state.setPaused(true);
+  return FilterDataStatus::StopIterationAndBuffer;
+}
+
+FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
+                                                    bool end_stream) {
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterDataStatus::StopIterationNoBuffer;
+  case StreamOpenState::IgnoreError:
+    return FilterDataStatus::Continue;
+  case StreamOpenState::Ok:
+    break;
+  }
+
+  ProcessingRequest req = setupBodyChunk(state, data, end_stream);
+  // For STREAMED mode, insert the data into the internal queue.
+  // For FULL_DUPLEX_STREAMED mode, just drain the data.
+  state.enqueueStreamingChunk(data, end_stream);
+
+  // If the current state is HeadersCallback, stays in that state.
+  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+    sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
+  } else {
+    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
+  }
+  if (end_stream || state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+    state.setPaused(true);
+    return FilterDataStatus::StopIterationNoBuffer;
+  } else {
+    return FilterDataStatus::Continue;
+  }
+}
+
+FilterDataStatus Filter::handleDataStreamedMode(ProcessorState& state, Buffer::Instance& data,
+                                                bool end_stream) {
+  // STREAMED body mode works as follows:
+  //
+  // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it
+  // dispatches via gRPC message to the external processor, and then keeps in a queue. It
+  // may request a watermark if the queue is higher than the buffer limit to prevent running
+  // out of memory.
+  // 2) As a result, filters farther down the chain see empty buffers in some data callbacks.
+  // 3) When a response comes back from the external processor, it injects the processor's result
+  // into the filter chain using "inject**codedData". (The processor may respond indicating that
+  // there is no change, which means that the original buffer stored in the queue is what gets
+  // injected.)
+  //
+  // This way, we pipeline data from the proxy to the external processor, and give the processor
+  // the ability to modify each chunk, in order. Doing this any other way would have required
+  // substantial changes to the filter manager. See
+  // https://github.com/envoyproxy/envoy/issues/16760 for a discussion.
+  return handleDataStreamedModeBase(state, data, end_stream);
+}
+
+FilterDataStatus Filter::handleDataFullDuplexStreamedMode(ProcessorState& state,
+                                                          Buffer::Instance& data, bool end_stream) {
+  // FULL_DUPLEX_STREAMED body mode works similar to STREAMED except it does not put the data
+  // into the internal queue. And there is no internal queue based flow control. A copy of the
+  // data is dispatched to the external processor and the original data is drained.
+  return handleDataStreamedModeBase(state, data, end_stream);
+}
+
+FilterDataStatus Filter::handleDataBufferedPartialMode(ProcessorState& state,
+                                                       Buffer::Instance& data, bool end_stream) {
+  // BUFFERED_PARTIAL mode works as follows:
+  //
+  // 1) As data chunks arrive, we move the data into a new buffer, which we store
+  // in the buffer queue, and continue the filter stream with an empty buffer. This
+  // is the same thing that we do in STREAMING mode.
+  // 2) If end of stream is reached before the queue reaches the buffer limit, we
+  // send the buffered data to the server and essentially behave as if we are in
+  // buffered mode.
+  // 3) If instead the buffer limit is reached before end of stream, then we also
+  // send the buffered data to the server, and raise the watermark to prevent Envoy
+  // from running out of memory while we wait.
+  // 4) It is possible that Envoy will keep sending us data even in that case, so
+  // we must continue to queue data and prepare to re-inject it later.
+  if (state.partialBodyProcessed()) {
+    // We already sent and received the buffer, so everything else just falls through.
+    ENVOY_LOG(trace, "Partial buffer limit reached");
+    // Make sure that we do not accidentally try to modify the headers before
+    // we continue, which will result in them possibly being sent.
+    state.setHeaders(nullptr);
+    return FilterDataStatus::Continue;
+  } else if (state.callbackState() == ProcessorState::CallbackState::BufferedPartialBodyCallback) {
+    // More data came in while we were waiting for a callback result. We need
+    // to queue it and deliver it later in case the callback changes the data.
+    state.enqueueStreamingChunk(data, end_stream);
+    ENVOY_LOG(trace, "Call in progress for partial mode");
+    state.setPaused(true);
+    return FilterDataStatus::StopIterationNoBuffer;
+  } else {
+    state.enqueueStreamingChunk(data, end_stream);
+    if (end_stream || state.queueOverHighLimit()) {
+      // At either end of stream or when the buffer is full, it's time to send what we have
+      // to the processor.
+      bool terminate;
+      FilterDataStatus chunk_result;
+      std::tie(terminate, chunk_result) = sendStreamChunk(state);
+      if (terminate) {
+        return chunk_result;
+      }
+    }
+    return FilterDataStatus::StopIterationNoBuffer;
+  }
+}
+
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
   state.setBodyReceived(true);
 
@@ -619,130 +748,23 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   FilterDataStatus result;
   switch (state.bodyMode()) {
   case ProcessingMode::BUFFERED:
-    if (end_stream) {
-      switch (openStream()) {
-      case StreamOpenState::Error:
-        return FilterDataStatus::StopIterationNoBuffer;
-      case StreamOpenState::IgnoreError:
-        return FilterDataStatus::Continue;
-      case StreamOpenState::Ok:
-        // Fall through
-        break;
-      }
-
-      // The body has been buffered and we need to send the buffer
-      ENVOY_LOG(debug, "Sending request body message");
-      state.addBufferedData(data);
-      auto req = setupBodyChunk(state, *state.bufferedData(), end_stream);
-      sendBodyChunk(state, ProcessorState::CallbackState::BufferedBodyCallback, req);
-      // Since we just just moved the data into the buffer, return NoBuffer
-      // so that we do not buffer this chunk twice.
-      state.setPaused(true);
-      result = FilterDataStatus::StopIterationNoBuffer;
-      break;
-    }
-    ENVOY_LOG(trace, "onData: Buffering");
-    state.setPaused(true);
-    result = FilterDataStatus::StopIterationAndBuffer;
+    result = handleDataBufferedMode(state, data, end_stream);
+    break;
+  case ProcessingMode::STREAMED:
+    result = handleDataStreamedMode(state, data, end_stream);
     break;
   case ProcessingMode::FULL_DUPLEX_STREAMED:
-    // FULL_DUPLEX_STREAMED body mode works similar to STREAMED except it does not put the data
-    // into the internal queue. And there is no internal queue based flow control. A copy of the
-    // data is dispatched to the external processor and the original data is drained.
-    ABSL_FALLTHROUGH_INTENDED;
-  case ProcessingMode::STREAMED: {
-    // STREAMED body mode works as follows:
-    //
-    // 1) As data callbacks come in to the filter, it "moves" the data into a new buffer, which it
-    // dispatches via gRPC message to the external processor, and then keeps in a queue. It
-    // may request a watermark if the queue is higher than the buffer limit to prevent running
-    // out of memory.
-    // 2) As a result, filters farther down the chain see empty buffers in some data callbacks.
-    // 3) When a response comes back from the external processor, it injects the processor's result
-    // into the filter chain using "inject**codedData". (The processor may respond indicating that
-    // there is no change, which means that the original buffer stored in the queue is what gets
-    // injected.)
-    //
-    // This way, we pipeline data from the proxy to the external processor, and give the processor
-    // the ability to modify each chunk, in order. Doing this any other way would have required
-    // substantial changes to the filter manager. See
-    // https://github.com/envoyproxy/envoy/issues/16760 for a discussion.
-    switch (openStream()) {
-    case StreamOpenState::Error:
-      return FilterDataStatus::StopIterationNoBuffer;
-    case StreamOpenState::IgnoreError:
-      return FilterDataStatus::Continue;
-    case StreamOpenState::Ok:
-      // Fall through
-      break;
-    }
-
-    auto req = setupBodyChunk(state, data, end_stream);
-    state.enqueueStreamingChunk(data, end_stream);
-    // If the current state is HeadersCallback, stays in that state.
-    if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-      sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
-    } else {
-      sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
-    }
-    if (end_stream || state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-      state.setPaused(true);
-      result = FilterDataStatus::StopIterationNoBuffer;
-    } else {
-      result = FilterDataStatus::Continue;
-    }
+    result = handleDataFullDuplexStreamedMode(state, data, end_stream);
     break;
-  }
   case ProcessingMode::BUFFERED_PARTIAL:
-    // BUFFERED_PARTIAL mode works as follows:
-    //
-    // 1) As data chunks arrive, we move the data into a new buffer, which we store
-    // in the buffer queue, and continue the filter stream with an empty buffer. This
-    // is the same thing that we do in STREAMING mode.
-    // 2) If end of stream is reached before the queue reaches the buffer limit, we
-    // send the buffered data to the server and essentially behave as if we are in
-    // buffered mode.
-    // 3) If instead the buffer limit is reached before end of stream, then we also
-    // send the buffered data to the server, and raise the watermark to prevent Envoy
-    // from running out of memory while we wait.
-    // 4) It is possible that Envoy will keep sending us data even in that case, so
-    // we must continue to queue data and prepare to re-inject it later.
-    if (state.partialBodyProcessed()) {
-      // We already sent and received the buffer, so everything else just falls through.
-      ENVOY_LOG(trace, "Partial buffer limit reached");
-      // Make sure that we do not accidentally try to modify the headers before
-      // we continue, which will result in them possibly being sent.
-      state.setHeaders(nullptr);
-      result = FilterDataStatus::Continue;
-    } else if (state.callbackState() ==
-               ProcessorState::CallbackState::BufferedPartialBodyCallback) {
-      // More data came in while we were waiting for a callback result. We need
-      // to queue it and deliver it later in case the callback changes the data.
-      state.enqueueStreamingChunk(data, end_stream);
-      ENVOY_LOG(trace, "Call in progress for partial mode");
-      state.setPaused(true);
-      result = FilterDataStatus::StopIterationNoBuffer;
-    } else {
-      state.enqueueStreamingChunk(data, end_stream);
-      if (end_stream || state.queueOverHighLimit()) {
-        // At either end of stream or when the buffer is full, it's time to send what we have
-        // to the processor.
-        bool terminate;
-        FilterDataStatus chunk_result;
-        std::tie(terminate, chunk_result) = sendStreamChunk(state);
-        if (terminate) {
-          return chunk_result;
-        }
-      }
-      result = FilterDataStatus::StopIterationNoBuffer;
-    }
+    result = handleDataBufferedPartialMode(state, data, end_stream);
     break;
   case ProcessingMode::NONE:
+    ABSL_FALLTHROUGH_INTENDED;
   default:
     result = FilterDataStatus::Continue;
     break;
   }
-
   return result;
 }
 

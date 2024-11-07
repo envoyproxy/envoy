@@ -62,13 +62,13 @@ constexpr absl::string_view DEFAULT_AUTH_SCOPE = "user";
 constexpr absl::string_view HmacPayloadSeparator = "\n";
 
 template <class T>
-std::vector<Http::HeaderUtility::HeaderData>
+std::vector<Http::HeaderUtility::HeaderDataPtr>
 headerMatchers(const T& matcher_protos, Server::Configuration::CommonFactoryContext& context) {
-  std::vector<Http::HeaderUtility::HeaderData> matchers;
+  std::vector<Http::HeaderUtility::HeaderDataPtr> matchers;
   matchers.reserve(matcher_protos.size());
 
   for (const auto& proto : matcher_protos) {
-    matchers.emplace_back(proto, context);
+    matchers.emplace_back(Http::HeaderUtility::createHeaderData(proto, context));
   }
 
   return matchers;
@@ -315,7 +315,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // Must be done before the sanitation of the authorization header,
   // otherwise the authorization header might be altered or removed
   for (const auto& matcher : config_->passThroughMatchers()) {
-    if (matcher.matchesHeaders(headers)) {
+    if (matcher->matchesHeaders(headers)) {
       config_->stats().oauth_passthrough_.inc();
       return Http::FilterHeadersStatus::Continue;
     }
@@ -471,7 +471,7 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
 
 bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const {
   for (const auto& matcher : config_->denyRedirectMatchers()) {
-    if (matcher.matchesHeaders(headers)) {
+    if (matcher->matchesHeaders(headers)) {
       ENVOY_LOG(debug, "redirect is denied for this request");
       return false;
     }
