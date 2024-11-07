@@ -64,16 +64,20 @@ void ExtMonitorBase::putResult(const ExtResult result) {
   }
 }
 
-void ExtMonitorConfig::processBucketsConfig(
-    const envoy::extensions::outlier_detection_monitors::common::v3::ResultBuckets& config) {
-  for (const auto& http_bucket : config.http_codes()) {
+ExtMonitorConfig::ExtMonitorConfig(
+    const std::string& name,
+    const envoy::extensions::outlier_detection_monitors::common::v3::MonitorBaseConfig& config)
+    : name_(name), enforce_(config.enforcing().value()),
+      enforce_runtime_key_("outlier_detection.enforcing_extension." + name) {
+  for (const auto& http_bucket : config.match().http_codes()) {
     addResultBucket(
         std::make_unique<HTTPCodesBucket>(http_bucket.range().start(), http_bucket.range().end()));
   }
-  for (auto i = 0; i < config.local_origin_events().size(); i++) {
+  for (auto i = 0; i < config.match().local_origin_events().size(); i++) {
     addResultBucket(std::make_unique<LocalOriginEventsBucket>());
   }
 }
+
 } // namespace Outlier
 } // namespace Extensions
 } // namespace Envoy

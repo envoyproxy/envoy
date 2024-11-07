@@ -41,9 +41,7 @@ private:
                               const envoy::extensions::outlier_detection_monitors::
                                   consecutive_errors::v3::ConsecutiveErrors& config,
                               ExtMonitorFactoryContext&) override {
-    auto ext_config =
-        std::make_shared<ExtMonitorConfig>(monitor_name, config.errors().enforcing().value());
-    ext_config->processBucketsConfig(config.errors().match());
+    auto ext_config = std::make_shared<ExtMonitorConfig>(monitor_name, config.errors());
     uint32_t max = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, threshold, 3);
     return [ext_config, max]() {
       auto monitor = std::make_unique<ConsecutiveErrorsMonitor>(ext_config, max);

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/outlier_detection_monitors/common/v3/monitor_base.pb.h"
+#include "envoy/extensions/outlier_detection_monitors/common/v3/monitor_base.pb.validate.h"
 #include "envoy/extensions/outlier_detection_monitors/common/v3/result_types.pb.h"
 #include "envoy/extensions/outlier_detection_monitors/common/v3/result_types.pb.validate.h"
 #include "envoy/protobuf/message_validator.h"
@@ -59,11 +61,9 @@ public:
 */
 class ExtMonitorConfig {
 public:
-  ExtMonitorConfig(const std::string& name, uint32_t enforce)
-      : name_(name), enforce_(enforce),
-        enforce_runtime_key_("outlier_detection.enforcing_extension." + name) {}
-  void processBucketsConfig(
-      const envoy::extensions::outlier_detection_monitors::common::v3::ResultBuckets& config);
+  ExtMonitorConfig(
+      const std::string& name,
+      const envoy::extensions::outlier_detection_monitors::common::v3::MonitorBaseConfig& config);
   void addResultBucket(ResultsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
 
   uint32_t enforce() const { return enforce_; }
