@@ -15,8 +15,7 @@ If the API key is valid but the related client is not allowed, the request will 
 Configuration
 -------------
 
-* This filter should be configured with the type URL
-``type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth``.
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.ApiKeyAuth>`
 
 An example configuration of the filter may look like the following:
