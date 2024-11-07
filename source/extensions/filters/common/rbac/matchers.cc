@@ -258,11 +258,11 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                               const StreamInfo::StreamInfo& info) const {
-  if (metadata_source_ == envoy::config::rbac::v3::MetadataSource::DYNAMIC) {
-    return matcher_.match(info.dynamicMetadata());
+  if (metadata_source_ == envoy::config::rbac::v3::MetadataSource::ROUTE) {
+    // Return false if there's no route since we can't match its metadata
+    return info.route() ? matcher_.match(info.route()->metadata()) : false;
   }
-
-  return matcher_.match(info.route()->metadata());
+  return matcher_.match(info.dynamicMetadata());
 }
 
 bool FilterStateMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,

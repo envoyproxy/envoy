@@ -32,8 +32,8 @@ enum MetadataSource {
   // Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
   DYNAMIC = 0;
 
-  // Query :ref:`route entry metadata <envoy_v3_api_field_config.route.v3.Route.metadata>`
-  ROUTE_ENTRY = 1;
+  // Query :ref:`route metadata <envoy_v3_api_field_config.route.v3.Route.metadata>`
+  ROUTE = 1;
 }
 
 // Role Based Access Control (RBAC) provides service-level and method-level access control for a
@@ -214,7 +214,7 @@ message SourcedMetadata {
   type.matcher.v3.MetadataMatcher metadata_matcher = 1;
 
   // Specifies which metadata source should be used for matching. If not set,
-  // defaults to DYNAMIC (dynamic metadata). Set to ROUTE_ENTRY to match against
+  // defaults to DYNAMIC (dynamic metadata). Set to ROUTE to match against
   // static metadata configured on the route entry.
   MetadataSource metadata_source = 2 [(validate.rules).enum = {defined_only: true}];
 }
