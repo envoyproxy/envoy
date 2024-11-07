@@ -224,6 +224,7 @@ def envoy_dependencies(skip_targets = []):
 
     _com_github_maxmind_libmaxminddb()
 
+    external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
     external_http_archive(
@@ -489,8 +490,6 @@ def _com_github_facebook_zstd():
 def _com_google_cel_cpp():
     external_http_archive(
         "com_google_cel_cpp",
-        patches = ["@envoy//bazel:cel-cpp.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_google_perfetto():

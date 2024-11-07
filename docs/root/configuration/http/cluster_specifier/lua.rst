@@ -71,6 +71,15 @@ Returns the stream's headers. The headers can be used to select a specific clust
 
 Returns a :ref:`header object <config_lua_cluster_specifier_header_wrapper>`.
 
+``getCluster()``
+++++++++++++++++
+
+.. code-block:: lua
+
+  local cluster = route_header:getCluster('my_cluster')
+
+Returns a :ref:`handle <config_lua_cluster_specifier_cluster>` to the specified cluster, or nil if it isn't found.
+
 .. _config_lua_cluster_specifier_header_wrapper:
 
 Header object API
@@ -90,3 +99,36 @@ This method gets a header.
 Returns either a string containing the header value, or ``nil`` if the header does not exist.
 
 If there are multiple headers in the same case-insensitive key, their values will be concatenated to a string separated by ``,``.
+
+.. _config_lua_cluster_specifier_cluster:
+
+Cluster API
+-----------
+
+``numConnections()``
+++++++++++++++++++++
+
+.. code-block:: lua
+
+  cluster:numConnections()
+
+This method gets the current number of connections for this cluster.
+
+``numRequests()``
++++++++++++++++++
+
+.. code-block:: lua
+
+  cluster:numRequests()
+
+This method gets the current number of requests for this cluster.
+
+``numPendingRequests()``
+++++++++++++++++++++++++
+
+.. code-block:: lua
+
+  cluster:numPendingRequests()
+
+This method gets the current number of pending requests for this cluster.
+

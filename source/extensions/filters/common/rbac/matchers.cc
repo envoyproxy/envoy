@@ -159,7 +159,7 @@ bool NotMatcher::matches(const Network::Connection& connection,
 bool HeaderMatcher::matches(const Network::Connection&,
                             const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo&) const {
-  return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
+  return header_->matchesHeaders(headers);
 }
 
 bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,

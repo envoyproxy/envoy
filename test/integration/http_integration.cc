@@ -361,6 +361,14 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecType downstream_protocol,
         range->set_address_prefix("::1");
         range->mutable_prefix_len()->set_value(128);
       });
+
+#ifdef ENVOY_ENABLE_QUIC
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    // Needed to config QUIC transport socket factory, and needs to be added before base class calls
+    // initialize().
+    config_helper_.addQuicDownstreamTransportSocketConfig();
+  }
+#endif
 }
 
 void HttpIntegrationTest::useAccessLog(
@@ -389,10 +397,6 @@ void HttpIntegrationTest::initialize() {
   // according to the config.
   quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
       *api_, stats_store_, context_manager_, thread_local_, san_to_match_);
-
-  // Needed to config QUIC transport socket factory, and needs to be added before base class calls
-  // initialize().
-  config_helper_.addQuicDownstreamTransportSocketConfig(enable_quic_early_data_, custom_alpns_);
 
   BaseIntegrationTest::initialize();
   registerTestServerPorts({"http"}, test_server_);

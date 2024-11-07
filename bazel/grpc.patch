@@ -24,15 +24,16 @@ index 1bb970e049..81265483e9 100644
      ],
  )
  
-diff --git a/src/core/lib/promise/detail/promise_like.h b/src/core/lib/promise/detail/promise_like.h
---- a/src/core/lib/promise/detail/promise_like.h	2024-04-18 19:47:19.524155042 +0000
-+++ b/src/core/lib/promise/detail/promise_like.h	2024-04-18 23:40:29.050761807 +0000
-@@ -71,7 +71,7 @@
+diff --git a/bazel/generate_cc.bzl b/bazel/generate_cc.bzl
+index a2c7f3a1bb..cd023ebb06 100644
+--- a/bazel/generate_cc.bzl
++++ b/bazel/generate_cc.bzl
+@@ -134,7 +134,7 @@ def generate_cc_impl(ctx):
  
- template <typename F>
- class PromiseLike<F, absl::enable_if_t<!std::is_void<
--                         typename std::result_of<F()>::type>::value>> {
-+                         typename std::invoke_result<F>::type>::value>> {
-  private:
-   GPR_NO_UNIQUE_ADDRESS F f_;
+     # Include the output directory so that protoc puts the generated code in the
+     # right directory.
+-    arguments.append("--proto_path={0}{1}".format(dir_out, proto_root))
++    arguments.append("--proto_path={0}".format(dir_out))
+     arguments += [_get_srcs_file_path(proto) for proto in protos]
  
+     # create a list of well known proto files if the argument is non-None

@@ -1820,6 +1820,13 @@ envoy.quic.connection_debug_visitor.basic:
   status: alpha
   type_urls:
   - envoy.extensions.quic.connection_debug_visitor.v3.BasicConfig
+envoy.quic.connection_debug_visitor.quic_stats:
+  categories:
+  - envoy.quic.connection_debug_visitor
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.connection_debug_visitor.quic_stats.v3.Config
 envoy.filters.network.generic_proxy:
   categories:
   - envoy.filters.network
