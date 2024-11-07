@@ -184,7 +184,6 @@ configure_make(
     configure_options = [
         "--enable-option-checking",
         "--enable-static",
-        "--enable-tools",
         "--disable-draft",
         "--disable-dyload",
         "--disable-extras",
@@ -193,6 +192,7 @@ configure_make(
         "--disable-samples",
         "--disable-shared",
         "--disable-tests",
+        "--disable-tools",
         "--with-data-packaging=static",
     ],
     data = ["@com_github_unicode_org_icu//:all"],
