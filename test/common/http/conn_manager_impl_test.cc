@@ -499,7 +499,7 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
                                          Network::ProxyProtocolFilterState::key())
                                      ->value();
 
-  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::NotFound);
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::NotUsed);
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }

@@ -222,6 +222,16 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
       return read_header_state;
     }
     if (header_version_ == ProxyProtocolVersion::NotFound) {
+      if (!cb_->filterState().hasData<Network::ProxyProtocolFilterState>(
+              Network::ProxyProtocolFilterState::key())) {
+        cb_->filterState().setData(
+            Network::ProxyProtocolFilterState::key(),
+            std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
+                socket.connectionInfoProvider().remoteAddress(),
+                socket.connectionInfoProvider().localAddress(), header_version_}),
+            StreamInfo::FilterState::StateType::Mutable,
+            StreamInfo::FilterState::LifeSpan::Connection);
+      }
       // Filter is skipped and request is allowed through.
       return ReadOrParseState::Done;
     }

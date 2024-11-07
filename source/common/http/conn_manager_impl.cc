@@ -173,7 +173,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
         std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             read_callbacks_->connection().connectionInfoProvider().remoteAddress(),
             read_callbacks_->connection().connectionInfoProvider().localAddress(),
-            Envoy::Network::ProxyProtocolVersion::NotFound}),
+            Envoy::Network::ProxyProtocolVersion::NotUsed}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }

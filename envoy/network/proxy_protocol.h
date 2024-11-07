@@ -16,7 +16,15 @@ struct ProxyProtocolTLV {
 
 using ProxyProtocolTLVVector = std::vector<ProxyProtocolTLV>;
 
-enum class ProxyProtocolVersion { NotFound = 0, V1 = 1, V2 = 2 };
+enum class ProxyProtocolVersion {
+  // The proxy-protocol filter is not present in the filter chain and another filter has set
+  // the proxy-protocol version.
+  NotUsed = 0,
+  // The proxy-protocol filter did not find any proxy-protocol header and was skipped.
+  NotFound = 1,
+  V1 = 2,
+  V2 = 3
+};
 
 struct ProxyProtocolData {
   const Network::Address::InstanceConstSharedPtr src_addr_;

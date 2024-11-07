@@ -492,7 +492,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             downstream_connection.connectionInfoProvider().remoteAddress(),
             downstream_connection.connectionInfoProvider().localAddress(),
-            Envoy::Network::ProxyProtocolVersion::NotFound}),
+            Envoy::Network::ProxyProtocolVersion::NotUsed}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
