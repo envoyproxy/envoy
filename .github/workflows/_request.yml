@@ -113,7 +113,7 @@ jobs:
   checks:
     if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
     needs: incoming
-    uses: ./.github/workflows/_start.yml
+    uses: ./.github/workflows/_request_checks.yml
     secrets:
       app-id: ${{ secrets.app-id }}
       app-key: ${{ secrets.app-key }}
