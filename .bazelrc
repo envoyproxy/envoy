@@ -43,10 +43,6 @@ build:windows --action_env=PATH --host_action_env=PATH
 # Requires setting `BAZEL_VOLATILE_DIRTY` in the env.
 build --action_env=BAZEL_VOLATILE_DIRTY --host_action_env=BAZEL_VOLATILE_DIRTY
 
-# Prevent stamped caches from busting (eg in PRs)
-# Requires setting `BAZEL_FAKE_SCM_REVISION` in the env.
-build --action_env=BAZEL_FAKE_SCM_REVISION --host_action_env=BAZEL_FAKE_SCM_REVISION
-
 build --test_summary=terse
 
 build:docs-ci --action_env=DOCS_RST_CHECK=1 --host_action_env=DOCS_RST_CHECK=1
@@ -95,7 +91,7 @@ build:clang-pch --spawn_strategy=local
 build:clang-pch --define=ENVOY_CLANG_PCH=1
 
 # Use gold linker for gcc compiler.
-build:gcc --linkopt=-fuse-ld=gold
+build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --test_env=HEAPCHECK=
 build:gcc --action_env=BAZEL_COMPILER=gcc
 build:gcc --action_env=CC=gcc --action_env=CXX=g++
@@ -509,25 +505,34 @@ build:rbe-engflow --remote_executor=grpcs://envoy.cluster.engflow.com
 build:rbe-engflow --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:rbe-engflow --bes_results_url=https://envoy.cluster.engflow.com/invocation/
 build:rbe-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:rbe-engflow --grpc_keepalive_time=30s
+build:rbe-engflow --grpc_keepalive_time=60s
+build:rbe-engflow --grpc_keepalive_timeout=30s
 build:rbe-engflow --remote_timeout=3600s
 build:rbe-engflow --bes_timeout=3600s
 build:rbe-engflow --bes_upload_mode=fully_async
 build:rbe-engflow --nolegacy_important_outputs
 
-build:cache-envoy-engflow --google_default_credentials=false
-build:cache-envoy-engflow --remote_cache=grpcs://morganite.cluster.engflow.com
+# RBE (Engflow Envoy)
+build:common-envoy-engflow --google_default_credentials=false
+build:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
+build:common-envoy-engflow --grpc_keepalive_time=60s
+build:common-envoy-engflow --grpc_keepalive_timeout=30s
+
+build:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
 build:cache-envoy-engflow --remote_timeout=3600s
-build:cache-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:cache-envoy-engflow --grpc_keepalive_time=30s
-build:bes-envoy-engflow --bes_backend=grpcs://morganite.cluster.engflow.com/
-build:bes-envoy-engflow --bes_results_url=https://morganite.cluster.engflow.com/invocation/
+build:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
+build:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
 build:bes-envoy-engflow --bes_timeout=3600s
 build:bes-envoy-engflow --bes_upload_mode=fully_async
-build:rbe-envoy-engflow --config=cache-envoy-engflow
-build:rbe-envoy-engflow --config=bes-envoy-engflow
-build:rbe-envoy-engflow --remote_executor=grpcs://morganite.cluster.engflow.com
+build:bes-envoy-engflow --nolegacy_important_outputs
+build:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
 build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:7adc40c09508f957624c4d2e0f5aeecb73a59207ee6ded53b107eac828c091b2
+build:rbe-envoy-engflow --jobs=200
+build:rbe-envoy-engflow --define=engflow_rbe=true
+
+build:remote-envoy-engflow --config=common-envoy-engflow
+build:remote-envoy-engflow --config=cache-envoy-engflow
+build:remote-envoy-engflow --config=rbe-envoy-engflow
 
 #############################################################################
 # debug: Various Bazel debugging flags
@@ -551,6 +556,7 @@ common:debug --config=debug-sandbox
 common:debug --config=debug-coverage
 common:debug --config=debug-tests
 
+try-import %workspace%/repo.bazelrc
 try-import %workspace%/clang.bazelrc
 try-import %workspace%/user.bazelrc
 try-import %workspace%/local_tsan.bazelrc

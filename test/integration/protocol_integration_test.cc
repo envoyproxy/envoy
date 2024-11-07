@@ -462,7 +462,7 @@ TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
   waitForNextUpstreamRequest();
   EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::DownstreamPeriodic),
-            waitForAccessLog(access_log_name_));
+            waitForAccessLog(access_log_name_, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -2380,9 +2380,50 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
   testLargeRequestHeaders(100, 1, 8192, 100);
 }
 
-TEST_P(DownstreamProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
+TEST_P(ProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
   // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
   testLargeRequestHeaders(100, 70, 8192, 100, TestUtility::DefaultTimeout);
+}
+
+namespace {
+uint32_t adjustMaxSingleHeaderSizeForCodecLimits(uint32_t size,
+                                                 const HttpProtocolTestParams& params) {
+  if (params.http2_implementation == Http2Impl::Nghttp2 &&
+      (params.downstream_protocol == Http::CodecType::HTTP2 ||
+       params.upstream_protocol == Http::CodecType::HTTP2)) {
+    // nghttp2 has a hard-coded, unconfigurable limit of 64k for a header in it's header
+    // decompressor, so this test will always fail when using that codec.
+    // Reduce the size so that it can pass and receive some test coverage.
+    return 100;
+  } else if (params.downstream_protocol == Http::CodecType::HTTP3 ||
+             params.upstream_protocol == Http::CodecType::HTTP3) {
+    // QUICHE has a hard-coded limit of 1024KiB in it's QPACK decoder.
+    // Reduce the size so that it can pass and receive some test coverage.
+    return 1023;
+  }
+
+  return size;
+}
+} // namespace
+
+// Test a single header of the maximum allowed size.
+TEST_P(ProtocolIntegrationTest, VeryLargeRequestHeadersAccepted) {
+  uint32_t size = adjustMaxSingleHeaderSizeForCodecLimits(8191, GetParam());
+
+  testLargeRequestHeaders(size, 1, 8192, 100, TestUtility::DefaultTimeout);
+}
+
+// Test a single header of the maximum allowed size.
+TEST_P(ProtocolIntegrationTest, ManyLargeResponseHeadersAccepted) {
+  // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
+  testLargeResponseHeaders(100, 70, 8192, 100, TestUtility::DefaultTimeout);
+}
+
+// Test a single header of the maximum allowed size.
+TEST_P(ProtocolIntegrationTest, VeryLargeResponseHeadersAccepted) {
+  uint32_t size = adjustMaxSingleHeaderSizeForCodecLimits(8191, GetParam());
+
+  testLargeResponseHeaders(size, 1, 8192, 100, TestUtility::DefaultTimeout);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersRejected) {
@@ -4729,8 +4770,6 @@ private:
 };
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.allow_client_socket_creation_failure",
-                                    "true");
   AllowForceFail fail_socket_n_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
 
@@ -4934,10 +4973,10 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
   EXPECT_EQ("502", response->headers().getStatusValue());
   test_server_->waitForCounterGe("http.config_test.downstream_rq_5xx", 1);
 
-  std::string error_message =
-      upstreamProtocol() == Http::CodecType::HTTP3
-          ? "upstream_reset_before_response_started{protocol_error|QUIC_BAD_APPLICATION_PAYLOAD}"
-          : "upstream_reset_before_response_started{protocol_error}";
+  std::string error_message = upstreamProtocol() == Http::CodecType::HTTP3
+                                  ? "upstream_reset_before_response_started{protocol_error|QUIC_"
+                                    "BAD_APPLICATION_PAYLOAD|FROM_SELF}"
+                                  : "upstream_reset_before_response_started{protocol_error}";
 
   EXPECT_EQ(waitForAccessLog(access_log_name_), error_message);
   // Upstream connection should stay up

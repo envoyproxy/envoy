@@ -917,58 +917,30 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // case EDF creation is skipped. When all original weights are equal and no hosts are in slow
     // start mode we can rely on unweighted host pick to do optimal round robin and least-loaded
     // host selection with lower memory and CPU overhead.
-    if (hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
+    if (!alwaysUseEdfScheduler() && hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
       // Skip edf creation.
       return;
     }
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.edf_lb_host_scheduler_init_fix")) {
-      // If there are no hosts or a single one, there is no need for an EDF scheduler
-      // (thus lowering memory and CPU overhead), as the (possibly) single host
-      // will be the one always selected by the scheduler.
-      if (hosts.size() <= 1) {
-        return;
-      }
+    // If there are no hosts or a single one, there is no need for an EDF scheduler
+    // (thus lowering memory and CPU overhead), as the (possibly) single host
+    // will be the one always selected by the scheduler.
+    if (hosts.size() <= 1) {
+      return;
+    }
 
-      // Populate the scheduler with the host list with a randomized starting point.
-      // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
-      // weighted 1. This is because currently we don't refresh host sets if only weights change.
-      // We should probably change this to refresh at all times. See the comment in
-      // BaseDynamicClusterImpl::updateDynamicHostList about this.
-      scheduler.edf_ = std::make_unique<EdfScheduler<Host>>(EdfScheduler<Host>::createWithPicks(
-          hosts,
-          // We use a fixed weight here. While the weight may change without
-          // notification, this will only be stale until this host is next picked,
-          // at which point it is reinserted into the EdfScheduler with its new
-          // weight in chooseHost().
-          [this](const Host& host) { return hostWeight(host); }, seed_));
-    } else {
-      scheduler.edf_ = std::make_unique<EdfScheduler<Host>>();
-
-      // Populate scheduler with host list.
-      // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
-      // weighted 1. This is because currently we don't refresh host sets if only weights change.
-      // We should probably change this to refresh at all times. See the comment in
-      // BaseDynamicClusterImpl::updateDynamicHostList about this.
-      for (const auto& host : hosts) {
+    // Populate the scheduler with the host list with a randomized starting point.
+    // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
+    // weighted 1. This is because currently we don't refresh host sets if only weights change.
+    // We should probably change this to refresh at all times. See the comment in
+    // BaseDynamicClusterImpl::updateDynamicHostList about this.
+    scheduler.edf_ = std::make_unique<EdfScheduler<Host>>(EdfScheduler<Host>::createWithPicks(
+        hosts,
         // We use a fixed weight here. While the weight may change without
         // notification, this will only be stale until this host is next picked,
         // at which point it is reinserted into the EdfScheduler with its new
         // weight in chooseHost().
-        scheduler.edf_->add(hostWeight(*host), host);
-      }
-
-      // Cycle through hosts to achieve the intended offset behavior.
-      // TODO(htuch): Consider how we can avoid biasing towards earlier hosts in the schedule across
-      // refreshes for the weighted case.
-      if (!hosts.empty()) {
-        for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
-          auto host =
-              scheduler.edf_->pickAndAdd([this](const Host& host) { return hostWeight(host); });
-        }
-      }
-    }
+        [this](const Host& host) { return hostWeight(host); }, seed_));
   };
   // Populate EdfSchedulers for each valid HostsSource value for the host set at this priority.
   const auto& host_set = priority_set_.hostSetsPerPriority()[priority];
@@ -990,6 +962,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
         host_set->degradedHostsPerLocality().get()[locality_index]);
   }
 }
+
+bool EdfLoadBalancerBase::alwaysUseEdfScheduler() const { return false; }
 
 bool EdfLoadBalancerBase::isSlowStartEnabled() const {
   return slow_start_window_ > std::chrono::milliseconds(0);

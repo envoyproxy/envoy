@@ -53,7 +53,7 @@ final class CancelGRPCStreamTests: XCTestCase {
     let onCancelCallbackExpectation = self.expectation(description: "onCancel callback called")
     let filterExpectation = self.expectation(description: "Filter called with cancellation")
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
@@ -70,7 +70,7 @@ final class CancelGRPCStreamTests: XCTestCase {
 
     let requestHeaders = GRPCRequestHeadersBuilder(
         scheme: "http",
-        authority: "localhost:" + String(EnvoyTestServer.getEnvoyPort()),
+        authority: "localhost:" + String(EnvoyTestServer.getHttpPort()),
         path: "/")
       .build()
 
@@ -87,6 +87,6 @@ final class CancelGRPCStreamTests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

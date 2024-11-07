@@ -60,14 +60,18 @@ std::string convertToWildcard(const std::string& resource_name) {
 } // namespace
 
 GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_node)
-    : grpc_stream_(createGrpcStreamObject(grpc_mux_context)),
+    : dispatcher_(grpc_mux_context.dispatcher_),
+      grpc_stream_(createGrpcStreamObject(std::move(grpc_mux_context.async_client_),
+                                          std::move(grpc_mux_context.failover_async_client_),
+                                          grpc_mux_context.service_method_, grpc_mux_context.scope_,
+                                          std::move(grpc_mux_context.backoff_strategy_),
+                                          grpc_mux_context.rate_limit_settings_)),
       local_info_(grpc_mux_context.local_info_), skip_subsequent_node_(skip_subsequent_node),
       config_validators_(std::move(grpc_mux_context.config_validators_)),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       xds_resources_delegate_(grpc_mux_context.xds_resources_delegate_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
       target_xds_authority_(grpc_mux_context.target_xds_authority_),
-      dispatcher_(grpc_mux_context.dispatcher_),
       dynamic_update_callback_handle_(
           grpc_mux_context.local_info_.contextProvider().addDynamicContextUpdateCallback(
               [this](absl::string_view resource_type_url) {
@@ -80,29 +84,33 @@ GrpcMuxImpl::GrpcMuxImpl(GrpcMuxContext& grpc_mux_context, bool skip_subsequent_
 
 std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DiscoveryRequest,
                                     envoy::service::discovery::v3::DiscoveryResponse>>
-GrpcMuxImpl::createGrpcStreamObject(GrpcMuxContext& grpc_mux_context) {
+GrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
+                                    Grpc::RawAsyncClientPtr&& failover_async_client,
+                                    const Protobuf::MethodDescriptor& service_method,
+                                    Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
+                                    const RateLimitSettings& rate_limit_settings) {
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
     return std::make_unique<GrpcMuxFailover<envoy::service::discovery::v3::DiscoveryRequest,
                                             envoy::service::discovery::v3::DiscoveryResponse>>(
         /*primary_stream_creator=*/
-        [&grpc_mux_context](
+        [&async_client, &service_method, &dispatcher = dispatcher_, &scope, &backoff_strategy,
+         &rate_limit_settings](
             GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>* callbacks)
             -> GrpcStreamInterfacePtr<envoy::service::discovery::v3::DiscoveryRequest,
                                       envoy::service::discovery::v3::DiscoveryResponse> {
           return std::make_unique<GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                                              envoy::service::discovery::v3::DiscoveryResponse>>(
-              callbacks, std::move(grpc_mux_context.async_client_),
-              grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
-              grpc_mux_context.scope_, std::move(grpc_mux_context.backoff_strategy_),
-              grpc_mux_context.rate_limit_settings_,
+              callbacks, std::move(async_client), service_method, dispatcher, scope,
+              std::move(backoff_strategy), rate_limit_settings,
               GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                          envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::
                   FIRST_ENTRY);
         },
         /*failover_stream_creator=*/
-        grpc_mux_context.failover_async_client_
+        failover_async_client
             ? absl::make_optional(
-                  [&grpc_mux_context](
+                  [&failover_async_client, &service_method, &dispatcher = dispatcher_, &scope,
+                   &rate_limit_settings](
                       GrpcStreamCallbacks<envoy::service::discovery::v3::DiscoveryResponse>*
                           callbacks)
                       -> GrpcStreamInterfacePtr<envoy::service::discovery::v3::DiscoveryRequest,
@@ -110,29 +118,27 @@ GrpcMuxImpl::createGrpcStreamObject(GrpcMuxContext& grpc_mux_context) {
                     return std::make_unique<
                         GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                                    envoy::service::discovery::v3::DiscoveryResponse>>(
-                        callbacks, std::move(grpc_mux_context.failover_async_client_),
-                        grpc_mux_context.service_method_, grpc_mux_context.dispatcher_,
-                        grpc_mux_context.scope_,
+                        callbacks, std::move(failover_async_client), service_method, dispatcher,
+                        scope,
                         // TODO(adisuissa): the backoff strategy for the failover should
                         // be the same as the primary source.
                         std::make_unique<FixedBackOffStrategy>(
                             GrpcMuxFailover<envoy::service::discovery::v3::DiscoveryRequest,
                                             envoy::service::discovery::v3::DiscoveryResponse>::
                                 DefaultFailoverBackoffMilliseconds),
-                        grpc_mux_context.rate_limit_settings_,
+                        rate_limit_settings,
                         GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                                    envoy::service::discovery::v3::DiscoveryResponse>::
                             ConnectedStateValue::SECOND_ENTRY);
                   })
             : absl::nullopt,
         /*grpc_mux_callbacks=*/*this,
-        /*dispatch=*/grpc_mux_context.dispatcher_);
+        /*dispatch=*/dispatcher_);
   }
   return std::make_unique<GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
                                      envoy::service::discovery::v3::DiscoveryResponse>>(
-      this, std::move(grpc_mux_context.async_client_), grpc_mux_context.service_method_,
-      grpc_mux_context.dispatcher_, grpc_mux_context.scope_,
-      std::move(grpc_mux_context.backoff_strategy_), grpc_mux_context.rate_limit_settings_,
+      this, std::move(async_client), service_method, dispatcher_, scope,
+      std::move(backoff_strategy), rate_limit_settings,
       GrpcStream<
           envoy::service::discovery::v3::DiscoveryRequest,
           envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::FIRST_ENTRY);
@@ -292,6 +298,35 @@ GrpcMuxWatchPtr GrpcMuxImpl::addWatch(const std::string& type_url,
   return watch;
 }
 
+absl::Status
+GrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                             Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+                             BackOffStrategyPtr&& backoff_strategy,
+                             const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
+  // Process the rate limit settings.
+  absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
+      Utility::parseRateLimitSettings(ads_config_source);
+  RETURN_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
+
+  const Protobuf::MethodDescriptor& service_method =
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources");
+
+  // Disconnect from current xDS servers.
+  ENVOY_LOG_MISC(info, "Replacing xDS gRPC mux source");
+  grpc_stream_->closeStream();
+  grpc_stream_ = createGrpcStreamObject(std::move(primary_async_client),
+                                        std::move(failover_async_client), service_method, scope,
+                                        std::move(backoff_strategy), *rate_limit_settings_or_error);
+  // No need to update the config_validators_ as they may contain some state
+  // that needs to be kept across different GrpcMux objects.
+
+  // Start the subscriptions over the grpc_stream.
+  grpc_stream_->establishNewStream();
+
+  return absl::OkStatus();
+}
+
 ScopedResume GrpcMuxImpl::pause(const std::string& type_url) {
   return pause(std::vector<std::string>{type_url});
 }
@@ -382,8 +417,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
                         resource.type_url(), type_url, message->DebugString()));
       }
 
-      auto decoded_resource =
-          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info());
+      auto decoded_resource = THROW_OR_RETURN_VALUE(
+          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info()),
+          DecodedResourceImplPtr);
 
       if (!isHeartbeatResource(type_url, *decoded_resource)) {
         resources.emplace_back(std::move(decoded_resource));

@@ -11,7 +11,12 @@ on:
     - completed
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  group: >-
+    ${{ ((github.event.workflow_run.head_branch == 'main'
+          || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+          && github.event.repository.full_name == github.repository)
+        && github.run_id
+        || github.event.workflow_run.head_branch }}-${{ github.event.repository.full_name }}-${{ github.workflow }}
   cancel-in-progress: true
 
 
@@ -45,13 +50,15 @@ jobs:
     with:
       command:
       container-command:
+      docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       runs-on: macos-14-xlarge
       source: ${{ matrix.source }}
       steps-post:
       steps-pre: ${{ matrix.steps-pre }}
       target: ${{ matrix.target }}
-      timeout-minutes: 90
+      target-name: ${{ matrix.target-name }}
+      timeout-minutes: 120
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
     strategy:
       fail-fast: false
@@ -59,6 +66,7 @@ jobs:
         include:
         - target: ci/mac_ci_steps.sh
           name: macOS
+          target-name: mac_ci_steps
           source: |
             source ./ci/mac_ci_setup.sh
             _BAZEL_BUILD_EXTRA_OPTIONS=(
@@ -66,6 +74,7 @@ jobs:
               --flaky_test_attempts=2
               --config=bes-envoy-engflow
               --config=cache-envoy-engflow
+              --config=common-envoy-engflow
               --config=ci)
             export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
 

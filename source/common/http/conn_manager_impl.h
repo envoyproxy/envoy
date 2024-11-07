@@ -45,7 +45,6 @@
 #include "source/common/http/user_agent.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
-#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -218,10 +217,9 @@ private:
     }
 
     // ScopeTrackedObject
-    ExecutionContext* executionContext() const override {
-      return getConnectionExecutionContext(connection_manager_.read_callbacks_->connection());
+    OptRef<const StreamInfo::StreamInfo> trackedStream() const override {
+      return filter_manager_.trackedStream();
     }
-
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_);
@@ -340,7 +338,8 @@ private:
           : codec_saw_local_complete_(false), codec_encode_complete_(false),
             on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
             is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true), deferred_to_next_io_iteration_(false) {}
+            decorated_propagate_(true), deferred_to_next_io_iteration_(false),
+            deferred_end_stream_(false) {}
 
       // It's possibly for the codec to see the completed response but not fully
       // encode it.

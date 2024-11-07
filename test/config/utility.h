@@ -58,6 +58,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setEcdsaCertName(const std::string& ecdsa_cert_name) {
+      ecdsa_cert_name_ = ecdsa_cert_name;
+      return *this;
+    }
+
     ServerSslOptions& setEcdsaCertOcspStaple(bool ecdsa_cert_ocsp_staple) {
       ecdsa_cert_ocsp_staple_ = ecdsa_cert_ocsp_staple;
       return *this;
@@ -144,6 +149,7 @@ public:
     bool rsa_cert_{true};
     bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};
+    std::string ecdsa_cert_name_{"server_ecdsa"};
     bool ecdsa_cert_ocsp_staple_{false};
     bool prefer_client_ciphers_{false};
     bool ocsp_staple_required_{false};
@@ -359,8 +365,7 @@ public:
   void addSslConfig() { addSslConfig({}); }
 
   // Add the default SSL configuration for QUIC downstream.
-  void addQuicDownstreamTransportSocketConfig(bool enable_early_data,
-                                              std::vector<absl::string_view> custom_alpns);
+  void addQuicDownstreamTransportSocketConfig();
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.

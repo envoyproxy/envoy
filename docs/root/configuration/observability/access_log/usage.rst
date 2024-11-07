@@ -1067,6 +1067,30 @@ UDP
   UDP
     Not implemented ("-").
 
+%DOWNSTREAM_LOCAL_EMAIL_SAN%
+  HTTP/TCP/THRIFT
+    The emails present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_EMAIL_SAN%
+  HTTP/TCP/THRIFT
+    The emails present in the SAN of the peer certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_LOCAL_OTHERNAME_SAN%
+  HTTP/TCP/THRIFT
+    The OtherNames present in the SAN of the local certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
+%DOWNSTREAM_PEER_OTHERNAME_SAN%
+  HTTP/TCP/THRIFT
+    The OtherNames present in the SAN of the peer certificate used to establish the downstream TLS connection.
+  UDP
+    Not implemented ("-").
+
 %DOWNSTREAM_LOCAL_SUBJECT%
   HTTP/TCP/THRIFT
     The subject present in the local certificate used to establish the downstream TLS connection.

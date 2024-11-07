@@ -121,8 +121,8 @@ final class FilterResetIdleTests: XCTestCase {
       description: "Stream cancellation triggered incorrectly")
     cancelExpectation.isInverted = true
 
-    EnvoyTestServer.startHttp1PlaintextServer()
-    let port = String(EnvoyTestServer.getEnvoyPort())
+    EnvoyTestServer.startHttp1Server()
+    let port = String(EnvoyTestServer.getHttpPort())
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
@@ -166,6 +166,6 @@ final class FilterResetIdleTests: XCTestCase {
     )
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

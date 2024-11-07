@@ -23,6 +23,12 @@
 #define PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, field_name, default_value)                        \
   ((message).has_##field_name() ? (message).field_name().value() : (default_value))
 
+// Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
+// absl::nullopt.
+#define PROTOBUF_GET_OPTIONAL_WRAPPED(message, field_name)                                         \
+  ((message).has_##field_name() ? absl::make_optional((message).field_name().value())              \
+                                : absl::nullopt)
+
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
 // a EnvoyException.
 
@@ -249,7 +255,7 @@ public:
   static std::size_t hash(const Protobuf::Message& message);
 
 #ifdef ENVOY_ENABLE_YAML
-  static void loadFromJson(const std::string& json, Protobuf::Message& message,
+  static void loadFromJson(absl::string_view json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   /**
    * Return ok only when strict conversion(don't ignore unknown field) succeeds.
@@ -258,9 +264,9 @@ public:
    * Return error status for relaxed conversion and set has_unknown_field to false if relaxed
    * conversion(ignore unknown field) fails.
    */
-  static absl::Status loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
+  static absl::Status loadFromJsonNoThrow(absl::string_view json, Protobuf::Message& message,
                                           bool& has_unknown_fileld);
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
+  static void loadFromJson(absl::string_view json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
 #endif
@@ -272,8 +278,9 @@ public:
   // It has somewhat inconsistent handling of invalid file contents,
   // occasionally failing over to try another type of parsing, or silently
   // failing instead of throwing an exception.
-  static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  static absl::Status loadFromFile(const std::string& path, Protobuf::Message& message,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                                   Api::Api& api);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -390,17 +397,6 @@ public:
    * @param any_message source google.protobuf.Any message.
    * @param message destination to unpack to.
    *
-   * @throw EnvoyException if the message does not unpack.
-   */
-  static void unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
-
-  /**
-   * Convert from google.protobuf.Any to a typed message. This should be used
-   * instead of the inbuilt UnpackTo as it performs validation of results.
-   *
-   * @param any_message source google.protobuf.Any message.
-   * @param message destination to unpack to.
-   *
    * @return absl::Status
    */
   static absl::Status unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
@@ -409,17 +405,17 @@ public:
    * Convert from google.protobuf.Any to bytes as std::string
    * @param any source google.protobuf.Any message.
    *
-   * @return std::string consists of bytes in the input message.
+   * @return std::string consists of bytes in the input message or error status.
    */
-  static std::string anyToBytes(const ProtobufWkt::Any& any) {
+  static absl::StatusOr<std::string> anyToBytes(const ProtobufWkt::Any& any) {
     if (any.Is<ProtobufWkt::StringValue>()) {
       ProtobufWkt::StringValue s;
-      MessageUtil::unpackToOrThrow(any, s);
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, s));
       return s.value();
     }
     if (any.Is<ProtobufWkt::BytesValue>()) {
       Protobuf::BytesValue b;
-      MessageUtil::unpackToOrThrow(any, b);
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, b));
       return b.value();
     }
     return any.value();
@@ -433,7 +429,7 @@ public:
    */
   template <class MessageType>
   static inline void anyConvert(const ProtobufWkt::Any& message, MessageType& typed_message) {
-    unpackToOrThrow(message, typed_message);
+    THROW_IF_NOT_OK(unpackTo(message, typed_message));
   };
 
   template <class MessageType>
@@ -772,10 +768,7 @@ public:
 
 } // namespace Envoy
 
-namespace std {
-// Inject an implementation of std::hash for Envoy::HashedValue into the std namespace.
-template <> struct hash<Envoy::HashedValue> {
+// Specialize std::hash on Envoy::HashedValue.
+template <> struct std::hash<Envoy::HashedValue> {
   std::size_t operator()(Envoy::HashedValue const& v) const { return v.hash(); }
 };
-
-} // namespace std

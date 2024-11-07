@@ -308,12 +308,12 @@ public:
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     }
@@ -424,19 +424,7 @@ public:
                                               const std::string& filter_type,
                                               const std::string& filter_chain_type,
                                               bool is_terminal_filter,
-                                              bool last_filter_in_current_config) {
-    if (is_terminal_filter && !last_filter_in_current_config) {
-      return absl::InvalidArgumentError(
-          fmt::format("Error: terminal filter named {} of type {} must be the "
-                      "last filter in a {} filter chain.",
-                      name, filter_type, filter_chain_type));
-    } else if (!is_terminal_filter && last_filter_in_current_config) {
-      return absl::InvalidArgumentError(fmt::format(
-          "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
-          name, filter_type, filter_chain_type));
-    }
-    return absl::OkStatus();
-  }
+                                              bool last_filter_in_current_config);
 
   /**
    * Prepares the DNS failure refresh backoff strategy given the cluster configuration.

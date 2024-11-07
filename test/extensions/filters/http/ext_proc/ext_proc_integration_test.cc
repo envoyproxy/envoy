@@ -67,7 +67,7 @@ struct ConfigOptions {
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
 class ExtProcIntegrationTest : public HttpIntegrationTest,
-                               public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
+                               public Grpc::GrpcClientIntegrationParamTest {
 protected:
   ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
 
@@ -194,8 +194,6 @@ protected:
 
       // Parameterize with defer processing to prevent bit rot as filter made
       // assumptions of data flow, prior relying on eager processing.
-      config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                        deferredProcessing() ? "true" : "false");
     });
 
     if (config_option.http1_codec) {
@@ -207,9 +205,7 @@ protected:
     }
   }
 
-  bool IsEnvoyGrpc() {
-    return std::get<1>(std::get<0>(GetParam())) == Envoy::Grpc::ClientType::EnvoyGrpc;
-  }
+  bool IsEnvoyGrpc() { return std::get<1>(GetParam()) == Envoy::Grpc::ClientType::EnvoyGrpc; }
 
   void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg) {
     Any cfg_any;
@@ -722,10 +718,8 @@ protected:
   int grpc_upstream_count_ = 2;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
-    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
-    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
@@ -736,7 +730,14 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
+  // Turn on debug to troubleshoot possible flaky test.
+  // TODO(cainelli): Remove this and the debug logs in the tracer test filter after a test failure
+  // occurs.
+  LogLevelSetter save_levels(spdlog::level::trace);
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing Initializing config");
   initializeConfig();
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing configuring test tracer");
   config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
     test::integration::filters::ExpectSpan ext_proc_span;
     ext_proc_span.set_operation_name(
@@ -759,19 +760,31 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
     tracing->mutable_provider()->mutable_typed_config()->PackFrom(test_config);
   });
 
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing initializing http integration test");
   HttpIntegrationTest::initialize();
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing sending downstream request");
   auto response = sendDownstreamRequest(absl::nullopt);
 
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing waiting for first message");
   ProcessingRequest request_headers_msg;
   waitForFirstMessage(*grpc_upstreams_[0], request_headers_msg);
 
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing starting gRPC stream");
   processor_stream_->startGrpcStream();
   EXPECT_FALSE(processor_stream_->headers().get(LowerCaseString("traceparent")).empty())
       << "expected traceparent header";
 
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing finishing gRPC stream");
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing handling upstream request");
   handleUpstreamRequest();
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing verifying downstream response");
   verifyDownstreamResponse(*response, 200);
+
+  ENVOY_LOG(trace, "GetAndCloseStreamWithTracing done");
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithLogging) {
@@ -1001,7 +1014,7 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
 }
 
 TEST_P(ExtProcIntegrationTest, ResponseFromExtProcServerTooLarge) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     GTEST_SKIP() << "max_receive_message_length is only supported on Envoy gRPC";
   }
   config_helper_.setBufferLimits(1024, 1024);
@@ -1658,12 +1671,8 @@ TEST_P(ExtProcIntegrationTest, DISABLED_GetAndSetTrailersIncorrectlyOnResponse) 
         return true;
       });
 
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // We get a reset since we've received some of the response already.
-    ASSERT_TRUE(response->waitForReset());
-  } else {
-    verifyDownstreamResponse(*response, 500);
-  }
+  // We get a reset since we've received some of the response already.
+  ASSERT_TRUE(response->waitForReset());
 }
 
 // Test the filter configured to only send the response trailers message
@@ -4334,6 +4343,43 @@ TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullResponse) {
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms));
 }
 
+TEST_P(ExtProcIntegrationTest, ObservabilityModeWithFullRequestAndTimeout) {
+  proto_config_.set_observability_mode(true);
+  uint32_t deferred_close_timeout_ms = 2000;
+  proto_config_.mutable_deferred_close_timeout()->set_seconds(deferred_close_timeout_ms / 1000);
+
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBodyAndTrailer("Hello");
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Advance 400 ms. Default timeout is 200ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [this](const HttpBody&, BodyResponse&) {
+    // Advance 400 ms. Default timeout is 200ms
+    timeSystem().advanceTimeWaitImpl(400ms);
+    return false;
+  });
+  processRequestTrailersMessage(*grpc_upstreams_[0], false,
+                                [this](const HttpTrailers&, TrailersResponse&) {
+                                  // Advance 400 ms. Default timeout is 200ms
+                                  timeSystem().advanceTimeWaitImpl(400ms);
+                                  return false;
+                                });
+
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(deferred_close_timeout_ms - 1200));
+}
+
 TEST_P(ExtProcIntegrationTest, ObservabilityModeWithLogging) {
   proto_config_.set_observability_mode(true);
 
@@ -4528,7 +4574,7 @@ TEST_P(ExtProcIntegrationTest, InvalidServerOnResponseInObservabilityMode) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4536,7 +4582,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstream) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4545,7 +4591,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4556,7 +4602,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4604,7 +4650,7 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
 }
 
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
-  if (std::get<1>(std::get<0>(GetParam())) != Envoy::Grpc::ClientType::EnvoyGrpc) {
+  if (!IsEnvoyGrpc()) {
     return;
   }
 
@@ -4652,6 +4698,231 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
   verifyDownstreamResponse(*response, 200);
 }
 
+// Downstream push back sidestream and upstream
+TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstream) {
+  if (!IsEnvoyGrpc()) {
+    return;
+  }
+
+  config_helper_.setBufferLimits(1024, 1024);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("hello world", absl::nullopt);
+
+  // Response from upstream server.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  Http::TestResponseHeaderMapImpl response_headers =
+      Http::TestResponseHeaderMapImpl{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(64 * 1024, true);
+  std::string body_str = std::string(64 * 1024, 'a');
+
+  bool end_stream = false;
+  int count = 0;
+  while (!end_stream) {
+    processResponseBodyMessage(
+        *grpc_upstreams_[0], count == 0 ? true : false,
+        [&end_stream, &body_str](const HttpBody& body, BodyResponse& body_resp) {
+          end_stream = body.end_of_stream();
+          auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+          body_mut->set_body(body_str);
+          return true;
+        });
+    count++;
+  }
+
+  // Read disable on upstream, triggered by downstream.
+  EXPECT_GE(test_server_
+                ->counter("cluster.cluster_0.upstream_flow_control_"
+                          "paused_reading_total")
+                ->value(),
+            1);
+
+  // Read disable on sidestream(cluster ext_proc_server_0), triggered by
+  // downstream.
+  EXPECT_GE(test_server_
+                ->counter("cluster.ext_proc_server_0.upstream_flow_control_"
+                          "paused_reading_total")
+                ->value(),
+            1);
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedBasicTest) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.set_send_body_without_waiting_for_header_response(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("hello world", [](Http::HeaderMap& headers) {
+    headers.addCopy(LowerCaseString("x-remove-this"), "yes");
+  });
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"}, {":method", "POST"},      {"host", "host"},
+            {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        response_header_mutation->add_remove_headers("x-remove-this");
+        return true;
+      });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& body_resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        EXPECT_EQ(body.body(), "hello world");
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("replaced body");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), "replaced body");
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SendBodyAndTrailerBeforeHeaderRespStreamedMoreDataTest) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+  proto_config_.set_send_body_without_waiting_for_header_response(true);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(*request_encoder_, "hello world", false);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  codec_client_->sendData(*request_encoder_, "foo-bar", true);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  handleUpstreamRequestWithTrailer();
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespStreamedTest) {
+  config_helper_.setBufferLimits(1024, 1024);
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_send_body_without_waiting_for_header_response(true);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  // Downstream client sending 16k data.
+  const std::string body_sent(16 * 1024, 's');
+  codec_client_->sendData(*request_encoder_, body_sent, true);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
+  ASSERT_TRUE(header_request.has_request_headers());
+
+  // The ext_proc server receives 16 chunks of body, each chunk size is 1k.
+  std::string body_received;
+  bool end_stream = false;
+  uint32_t total_body_msg_count = 0;
+  while (!end_stream) {
+    ProcessingRequest body_request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+    ASSERT_TRUE(body_request.has_request_body());
+    body_received = absl::StrCat(body_received, body_request.request_body().body());
+    end_stream = body_request.request_body().end_of_stream();
+    total_body_msg_count++;
+  }
+  EXPECT_TRUE(end_stream);
+  EXPECT_EQ(body_received, body_sent);
+
+  // The ext_proc server sends back the header response.
+  processor_stream_->startGrpcStream();
+  ProcessingResponse response_header;
+  auto* header_resp = response_header.mutable_request_headers();
+  auto header_mutation = header_resp->mutable_response()->mutable_header_mutation();
+  auto* mut = header_mutation->add_set_headers();
+  mut->mutable_header()->set_key("x-new-header");
+  mut->mutable_header()->set_raw_value("new");
+  processor_stream_->sendGrpcMessage(response_header);
+
+  // The ext_proc server sends back the body response.
+  const std::string body_upstream(total_body_msg_count, 'r');
+  while (total_body_msg_count) {
+    ProcessingResponse response_body;
+    auto* body_resp = response_body.mutable_request_body();
+    auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
+    body_mut->set_body("r");
+    processor_stream_->sendGrpcMessage(response_body);
+    total_body_msg_count--;
+  }
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedNotSendTrailerTest) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
+  proto_config_.set_send_body_without_waiting_for_header_response(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBodyAndTrailer("hello world");
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  handleUpstreamRequest(100);
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
@@ -4662,6 +4933,73 @@ TEST_P(ExtProcIntegrationTest, SendHeaderBodyNotSendTrailerTest) {
   processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
   processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
   handleUpstreamRequest(100);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  // Configure mode override allow list.
+  auto* added_mode = proto_config_.add_allowed_override_modes();
+  added_mode->set_request_body_mode(ProcessingMode::NONE);
+  added_mode = proto_config_.add_allowed_override_modes();
+  added_mode->set_request_body_mode(ProcessingMode::STREAMED);
+  added_mode->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = std::string(10, 'a');
+  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+
+  // Process request header message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest&, ProcessingResponse& resp) {
+        resp.mutable_request_headers();
+        resp.mutable_mode_override()->set_response_header_mode(ProcessingMode::SKIP);
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::STREAMED);
+        return true;
+      });
+
+  // ext_proc server will receive the body message since the processing body mode has been
+  // overridden from `ProcessingMode::NONE` to `ProcessingMode::STREAMED`
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    return true;
+  });
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, ModeOverrideDisallowed) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  // Configure mode override allow list.
+  auto* added_mode = proto_config_.add_allowed_override_modes();
+  added_mode->set_request_body_mode(ProcessingMode::BUFFERED);
+  added_mode->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = std::string(10, 'a');
+  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+
+  // Process request header message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest&, ProcessingResponse& resp) {
+        resp.mutable_request_headers();
+        resp.mutable_mode_override()->set_response_header_mode(ProcessingMode::SKIP);
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::NONE);
+        return true;
+      });
+
+  // ext_proc server still receive the body message even though body mode override was set to
+  // ProcessingMode::NONE. It is because that ProcessingMode::NONE was not in allow list.
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    return true;
+  });
+  handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }
 

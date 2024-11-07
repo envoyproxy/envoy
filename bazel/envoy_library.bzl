@@ -98,6 +98,8 @@ def envoy_cc_library(
         hdrs = [],
         copts = [],
         visibility = None,
+        rbe_pool = None,
+        exec_properties = {},
         external_deps = [],
         tcmalloc_dep = None,
         repository = "",
@@ -112,6 +114,10 @@ def envoy_cc_library(
         linkopts = []):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+    exec_properties = exec_properties | select({
+        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        "//conditions:default": {},
+    })
 
     # If alwayslink is not specified, allow turning it off via --define=library_autolink=disabled
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
@@ -132,6 +138,7 @@ def envoy_cc_library(
         textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] +
                envoy_pch_deps(repository, "//source/common/common:common_pch"),
+        exec_properties = exec_properties,
         alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
@@ -216,12 +223,12 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
     )
 
 # Envoy proto targets should be specified with this function.
-def envoy_proto_library(name, **kwargs):
+def envoy_proto_library(name, visibility = ["//visibility:public"], **kwargs):
     api_cc_py_proto_library(
         name,
         # Avoid generating .so, we don't need it, can interfere with builds
         # such as OSS-Fuzz.
         linkstatic = 1,
-        visibility = ["//visibility:public"],
+        visibility = visibility,
         **kwargs
     )

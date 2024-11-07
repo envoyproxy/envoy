@@ -69,6 +69,7 @@ envoy_cc_test(
         "postgres_test_config.yaml-template",
         "//test/config/integration/certs",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":postgres_integration_proto_cc_proto",
         ":postgres_test_utils_lib",

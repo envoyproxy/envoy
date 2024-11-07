@@ -210,6 +210,24 @@ public:
     codec_client_.reset();
   }
 
+  void configureEarlyData(bool enabled, ConfigHelper* config_helper = nullptr) {
+    if (config_helper == nullptr) {
+      config_helper = &config_helper_;
+    }
+    config_helper->addConfigModifier([enabled](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ts = bootstrap.mutable_static_resources()
+                     ->mutable_listeners(0)
+                     ->mutable_filter_chains(0)
+                     ->mutable_transport_socket();
+
+      auto quic_transport_socket_config = MessageUtil::anyConvert<
+          envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
+          *ts->mutable_typed_config());
+      quic_transport_socket_config.mutable_enable_early_data()->set_value(enabled);
+      ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+    });
+  }
+
   Network::ClientConnectionPtr makeClientConnectionWithOptions(
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
     // Setting socket options is not supported.
@@ -241,7 +259,7 @@ public:
         quic::QuicServerId{
             (host.empty() ? transport_socket_factory_->clientContextConfig()->serverNameIndication()
                           : host),
-            static_cast<uint16_t>(port), false},
+            static_cast<uint16_t>(port)},
         transport_socket_factory_->getCryptoConfig(), *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
@@ -251,12 +269,15 @@ public:
     return session;
   }
 
-  IntegrationCodecClientPtr
-  makeRawHttpConnection(Network::ClientConnectionPtr&& conn,
-                        absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
-                        bool wait_till_connected = true) override {
+  IntegrationCodecClientPtr makeRawHttpConnection(
+      Network::ClientConnectionPtr&& conn,
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      absl::optional<envoy::config::core::v3::HttpProtocolOptions> common_http_options =
+          absl::nullopt,
+      bool wait_till_connected = true) override {
     ENVOY_LOG(debug, "Creating a new client {}",
               conn->connectionInfoProvider().localAddress()->asStringView());
+    ASSERT(!common_http_options.has_value(), "Not implemented");
     return makeRawHttp3Connection(std::move(conn), http2_options, wait_till_connected);
   }
 
@@ -777,7 +798,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
 TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
-  enable_quic_early_data_ = false;
+  configureEarlyData(false);
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -805,12 +826,6 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   EXPECT_FALSE(quic_session->EarlyDataAccepted());
   // Close the second connection.
   codec_client_->close();
-}
-
-TEST_P(QuicHttpIntegrationTest, LegacyCertLoadingAndSelection) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.quic_handle_certs_with_shared_tls_code",
-                                    "false");
-  testMultipleQuicConnections();
 }
 
 // Not only test multiple quic connections, but disconnect and reconnect to
@@ -1086,7 +1101,8 @@ TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   std::string failure_reason = "QUIC_TLS_CERTIFICATE_UNKNOWN with details: TLS handshake failure "
                                "(ENCRYPTION_HANDSHAKE) 46: "
                                "certificate unknown. SSLErrorStack:";
-  EXPECT_EQ(failure_reason, codec_client_->connection()->transportFailureReason());
+  EXPECT_THAT(codec_client_->connection()->transportFailureReason(),
+              testing::HasSubstr(failure_reason));
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
@@ -1736,7 +1752,22 @@ TEST_P(QuicHttpIntegrationTest, AlpnProtocolMismatch) {
 
 TEST_P(QuicHttpIntegrationTest, ConfigureAlpnProtocols) {
   client_alpn_ = "h3-special";
-  custom_alpns_ = {"h3", "h3-special"};
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* ts = bootstrap.mutable_static_resources()
+                   ->mutable_listeners(0)
+                   ->mutable_filter_chains(0)
+                   ->mutable_transport_socket();
+
+    auto quic_transport_socket_config = MessageUtil::anyConvert<
+        envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
+        *ts->mutable_typed_config());
+    auto* common_tls_context =
+        quic_transport_socket_config.mutable_downstream_tls_context()->mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols("h3");
+    common_tls_context->add_alpn_protocols("h3-special");
+    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+  });
   initialize();
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
   EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
@@ -1927,7 +1958,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
 }
 
 TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
-  enable_quic_early_data_ = true;
+  configureEarlyData(true);
   inplaceInitialize(/*add_default_filter_chain=*/false);
 
   auto codec_client_0 = makeRawHttp3Connection(
@@ -1938,7 +1969,7 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
 
   // Modify 1st transport socket factory to disable early data.
   ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
-  new_config_helper.addQuicDownstreamTransportSocketConfig(/*enable_early_data=*/false, {});
+  configureEarlyData(false, &new_config_helper);
 
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
@@ -1959,7 +1990,6 @@ TEST_P(QuicInplaceLdsIntegrationTest, EnableAndDisableEarlyData) {
 }
 
 TEST_P(QuicInplaceLdsIntegrationTest, StatelessResetOldConnection) {
-  enable_quic_early_data_ = true;
   inplaceInitialize(/*add_default_filter_chain=*/false);
 
   auto codec_client0 =

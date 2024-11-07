@@ -12,6 +12,7 @@ envoy_cc_mock(
     name = "stream_info_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/http:request_id_extension_interface",
         "//envoy/stream_info:stream_info_interface",

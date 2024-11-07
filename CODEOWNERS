@@ -29,7 +29,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia @yanavlasov
@@ -103,17 +103,17 @@ extensions/filters/common/original_src @klarose @mattklein123
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @tyxia
 # webassembly access logger extensions
-/*/extensions/access_loggers/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/access_loggers/wasm @mpwarres @kyessenov @lizan
 # webassembly bootstrap extensions
-/*/extensions/bootstrap/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/bootstrap/wasm @mpwarres @kyessenov @lizan
 # webassembly http extensions
-/*/extensions/filters/http/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/filters/http/wasm @mpwarres @kyessenov @lizan
 # webassembly network extensions
-/*/extensions/filters/network/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/filters/network/wasm @mpwarres @kyessenov @lizan
 # webassembly common extension
-/*/extensions/common/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/common/wasm @mpwarres @kyessenov @lizan
 # webassembly runtimes
-/*/extensions/wasm_runtime/ @mpwarres @lizan @UNOWNED
+/*/extensions/wasm_runtime/ @mpwarres @kyessenov @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
@@ -137,7 +137,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
 /*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
 # webassembly stat-sink extensions
-/*/extensions/stat_sinks/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/stat_sinks/wasm @mpwarres @kyessenov @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @yanavlasov
 /*/extensions/resource_monitors/common @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/fixed_heap @eziskind @yanavlasov @nezdolik
@@ -329,6 +329,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/load_balancing_policies/maglev @wbpcode @nezdolik
 /*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
+/*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
@@ -355,6 +356,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
+/*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov

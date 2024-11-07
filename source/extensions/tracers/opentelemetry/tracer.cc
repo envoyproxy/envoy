@@ -9,6 +9,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/trace_context_impl.h"
+#include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
@@ -122,8 +123,43 @@ void Span::setAttribute(absl::string_view name, const OTelAttribute& attribute_v
   *span_.add_attributes() = key_value;
 }
 
+::opentelemetry::proto::trace::v1::Status_StatusCode
+convertGrpcStatusToTraceStatusCode(::opentelemetry::proto::trace::v1::Span_SpanKind kind,
+                                   absl::string_view value) {
+  uint64_t grpc_status_code;
+  if (!absl::SimpleAtoi(value, &grpc_status_code)) {
+    // If the value is not a number, we can't map it to a status code.
+    // In this case, we should leave the status code unset.
+    return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_UNSET;
+  }
+
+  Grpc::Status::GrpcStatus grpc_status = static_cast<Grpc::Status::GrpcStatus>(grpc_status_code);
+  // Check mapping https://opentelemetry.io/docs/specs/semconv/rpc/grpc/#grpc-status
+  if (kind == ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT) {
+    if (grpc_status == Grpc::Status::WellKnownGrpcStatus::Ok) {
+      return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_UNSET;
+    }
+    return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_ERROR;
+  }
+
+  // SPAN_KIND_SERVER
+  switch (grpc_status) {
+  case Grpc::Status::WellKnownGrpcStatus::Unknown:
+  case Grpc::Status::WellKnownGrpcStatus::DeadlineExceeded:
+  case Grpc::Status::WellKnownGrpcStatus::Unimplemented:
+  case Grpc::Status::WellKnownGrpcStatus::Internal:
+  case Grpc::Status::WellKnownGrpcStatus::Unavailable:
+  case Grpc::Status::WellKnownGrpcStatus::DataLoss:
+    return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_ERROR;
+  default:
+    return ::opentelemetry::proto::trace::v1::Status::STATUS_CODE_UNSET;
+  }
+}
+
 void Span::setTag(absl::string_view name, absl::string_view value) {
-  if (name == Tracing::Tags::get().HttpStatusCode) {
+  if (name == Tracing::Tags::get().GrpcStatusCode) {
+    span_.mutable_status()->set_code(convertGrpcStatusToTraceStatusCode(span_.kind(), value));
+  } else if (name == Tracing::Tags::get().HttpStatusCode) {
     uint64_t status_code;
     // For HTTP status codes in the 5xx range, as well as any other code the client failed to
     // interpret, span status MUST be set to Error.
@@ -163,6 +199,10 @@ void Tracer::enableTimer() {
 }
 
 void Tracer::flushSpans() {
+  if (span_buffer_.empty()) {
+    return;
+  }
+
   ExportTraceServiceRequest request;
   // A request consists of ResourceSpans.
   ::opentelemetry::proto::trace::v1::ResourceSpans* resource_span = request.add_resource_spans();
@@ -181,6 +221,11 @@ void Tracer::flushSpans() {
   }
 
   ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
+
+  // set the instrumentation scope name and version
+  *scope_span->mutable_scope()->mutable_name() = "envoy";
+  *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
+
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;
   }

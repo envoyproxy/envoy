@@ -56,11 +56,10 @@ public:
   MOCK_METHOD(void, onConfigUpdate,
               (const std::vector<DecodedResourcePtr>& resources, const std::string& version_info));
 
-  MOCK_METHOD(
-      void, onConfigUpdate,
-      (const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-       const std::string& system_version_info));
+  MOCK_METHOD(void, onConfigUpdate,
+              (absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+               const std::string& system_version_info));
   MOCK_METHOD(void, onConfigUpdateFailed,
               (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
 };
@@ -131,6 +130,12 @@ public:
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
 
   MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
+
+  MOCK_METHOD(absl::Status, updateMuxSource,
+              (Grpc::RawAsyncClientPtr && primary_async_client,
+               Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+               BackOffStrategyPtr&& backoff_strategy,
+               const envoy::config::core::v3::ApiConfigSource& ads_config_source));
 };
 
 class MockGrpcStreamCallbacks

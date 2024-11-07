@@ -1320,8 +1320,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig(
-    bool enable_early_data, std::vector<absl::string_view> custom_alpns) {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1334,11 +1333,8 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(
       [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
                       true);
-        for (absl::string_view alpn : custom_alpns) {
-          common_tls_context.add_alpn_protocols(alpn);
-        }
       },
-      enable_early_data);
+      true);
 }
 
 bool ConfigHelper::setAccessLog(
@@ -1523,13 +1519,13 @@ void ConfigHelper::initializeTls(
   }
   if (options.ecdsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
-    tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsacert.pem"));
-    tls_certificate->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsakey.pem"));
+    tls_certificate->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(
+        "test/config/integration/certs/" + options.ecdsa_cert_name_ + "cert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
+        "test/config/integration/certs/" + options.ecdsa_cert_name_ + "key.pem"));
     if (options.ecdsa_cert_ocsp_staple_) {
       tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
-          "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
+          "test/config/integration/certs/" + options.ecdsa_cert_name_ + "_ocsp_resp.der"));
     }
   }
 

@@ -11,7 +11,12 @@ on:
     - completed
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  group: >-
+    ${{ ((github.event.workflow_run.head_branch == 'main'
+          || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+          && github.event.repository.full_name == github.repository)
+        && github.run_id
+        || github.event.workflow_run.head_branch }}-${{ github.event.repository.full_name }}-${{ github.workflow }}
   cancel-in-progress: true
 
 
@@ -53,6 +58,7 @@ jobs:
         path: mobile-docs
         fetch-depth: 0
         branch: master
+      docker-ipv6: false
       source: |
         echo "ENVOY_DOCKER_SOURCE_DIR=/source/mobile" >> $GITHUB_ENV
         # Path relative to ./mobile directory

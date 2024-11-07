@@ -378,25 +378,23 @@ public:
           dispatcher = &context_.client_connection_.dispatcher_;
         }
 
-        // With this feature enabled for http2 the codec may end up creating a
+        // As part of deferred processing for http2 the codec may end up creating a
         // schedulable callback the first time it re-enables reading as it's used
         // to process the backed up data if there's any to process.
-        if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-          const bool might_schedulable_callback_creation =
-              http_protocol_ == Protocol::Http2 && state.read_disable_count_ == 0 && !disable &&
-              !state.created_schedulable_callback_;
+        const bool might_schedulable_callback_creation =
+            http_protocol_ == Protocol::Http2 && state.read_disable_count_ == 0 && !disable &&
+            !state.created_schedulable_callback_;
 
-          if (might_schedulable_callback_creation) {
-            ASSERT(dispatcher != nullptr);
-            state.created_schedulable_callback_ = true;
-            ON_CALL(*dispatcher, createSchedulableCallback_(_))
-                .WillByDefault(testing::Invoke([dispatcher](std::function<void()> cb) {
-                  // The unique pointer of this object will be returned in
-                  // createSchedulableCallback_ of dispatcher, so there is no risk of this object
-                  // leaking.
-                  return new Event::MockSchedulableCallback(dispatcher, cb);
-                }));
-          }
+        if (might_schedulable_callback_creation) {
+          ASSERT(dispatcher != nullptr);
+          state.created_schedulable_callback_ = true;
+          ON_CALL(*dispatcher, createSchedulableCallback_(_))
+              .WillByDefault(testing::Invoke([dispatcher](std::function<void()> cb) {
+                // The unique pointer of this object will be returned in
+                // createSchedulableCallback_ of dispatcher, so there is no risk of this object
+                // leaking.
+                return new Event::MockSchedulableCallback(dispatcher, cb);
+              }));
         }
 
         encoder->getStream().readDisable(disable);
@@ -616,7 +614,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   } else {
     client = std::make_unique<Http1::ClientConnectionImpl>(
         client_connection, Http1::CodecStats::atomicGet(http1_stats, scope), client_callbacks,
-        client_http1settings, max_response_headers_count);
+        client_http1settings, max_request_headers_kb, max_response_headers_count);
   }
 
   if (http2) {

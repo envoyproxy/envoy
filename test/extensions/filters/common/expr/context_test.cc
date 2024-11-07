@@ -412,6 +412,14 @@ TEST(Context, ResponseAttributes) {
   }
 
   {
+    info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+    StreamInfo::UpstreamTiming& upstream_timing = info.upstreamInfo()->upstreamTiming();
+    upstream_timing.onFirstUpstreamTxByteSent(info.timeSource());
+    upstream_timing.onLastUpstreamRxByteReceived(info.timeSource());
+    EXPECT_TRUE(response[CelValue::CreateStringView(BackendLatency)].has_value());
+  }
+
+  {
     Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}, {grpc_status, "7"}};
     Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
     Protobuf::Arena arena;
@@ -505,6 +513,8 @@ TEST(Context, ConnectionAttributes) {
       .WillRepeatedly(ReturnRef(connection_termination_details));
   const std::string downstream_transport_failure_reason = "TlsError";
   info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
+  const uint32_t upstream_request_attempt_count = 3;
+  info.setAttemptCount(upstream_request_attempt_count);
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
@@ -695,6 +705,13 @@ TEST(Context, ConnectionAttributes) {
   }
 
   {
+    auto value = upstream[CelValue::CreateStringView(UpstreamRequestAttemptCount)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(upstream_request_attempt_count, value.value().Uint64OrDie());
+  }
+
+  {
     auto value = upstream[CelValue::CreateStringView(TLSVersion)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
@@ -769,6 +786,8 @@ TEST(Context, FilterStateAttributes) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   ProtobufWkt::Arena arena;
   FilterStateWrapper wrapper(arena, filter_state);
+  auto status_or = wrapper.ListKeys(&arena);
+  EXPECT_EQ(status_or.status().message(), "ListKeys() is not implemented");
 
   const std::string key = "filter_state_key";
   const std::string serialized = "filter_state_value";
@@ -930,6 +949,21 @@ TEST(Context, XDSAttributes) {
     const auto value = wrapper[CelValue::CreateStringView(Node)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
+  }
+}
+
+TEST(Context, EmptyXdsWrapper) {
+  Protobuf::Arena arena;
+  XDSWrapper wrapper(arena, nullptr, nullptr);
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(Node)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ClusterName)];
+    EXPECT_FALSE(value.has_value());
   }
 }
 

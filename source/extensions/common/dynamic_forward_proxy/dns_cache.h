@@ -28,9 +28,6 @@ public:
   // This normalizes hostnames, respecting the port if it exists, and adding the default port
   // if there is no port.
   static std::string normalizeHostForDfp(absl::string_view host, uint16_t default_port) {
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_mixed_scheme")) {
-      return std::string(host);
-    }
     if (Envoy::Http::HeaderUtility::hostHasPort(host)) {
       return std::string(host);
     }
@@ -151,9 +148,10 @@ public:
      * Called when a host has been added or has had its address updated.
      * @param host supplies the added/updated host.
      * @param host_info supplies the associated host info.
+     * @param return supplies if the host was successfully added
      */
-    virtual void onDnsHostAddOrUpdate(const std::string& host,
-                                      const DnsHostInfoSharedPtr& host_info) PURE;
+    virtual absl::Status onDnsHostAddOrUpdate(const std::string& host,
+                                              const DnsHostInfoSharedPtr& host_info) PURE;
 
     /**
      * Called when a host has been removed.

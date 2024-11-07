@@ -9,4 +9,7 @@ repository = "https://github.com/envoyproxy/envoy"
 
 [dependencies]
 
+[build-dependencies]
+bindgen = "0.70.1"
+
 [lib]

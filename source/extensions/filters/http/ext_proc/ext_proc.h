@@ -24,6 +24,7 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
+#include "source/extensions/filters/http/ext_proc/client_base.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
@@ -47,7 +48,8 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_ignored)                                                               \
   COUNTER(clear_route_cache_disabled)                                                              \
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
-  COUNTER(send_immediate_resp_upstream_ignored)
+  COUNTER(send_immediate_resp_upstream_ignored)                                                    \
+  COUNTER(http_not_ok_resp_received)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -216,6 +218,10 @@ public:
 
   uint32_t maxMessageTimeout() const { return max_message_timeout_ms_; }
 
+  bool sendBodyWithoutWaitingForHeaderResponse() const {
+    return send_body_without_waiting_for_header_response_;
+  }
+
   const ExtProcFilterStats& stats() const { return stats_; }
 
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& processingMode() const {
@@ -261,8 +267,17 @@ public:
     return immediate_mutation_checker_;
   }
 
+  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
+  allowedOverrideModes() const {
+    return allowed_override_modes_;
+  }
+
   ThreadLocalStreamManager& threadLocalStreamManager() {
     return thread_local_stream_manager_slot_->getTyped<ThreadLocalStreamManager>();
+  }
+
+  const absl::optional<const envoy::config::core::v3::GrpcService> grpcService() const {
+    return grpc_service_;
   }
 
 private:
@@ -278,6 +293,8 @@ private:
   const std::chrono::milliseconds deferred_close_timeout_;
   const std::chrono::milliseconds message_timeout_;
   const uint32_t max_message_timeout_ms_;
+  const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const bool send_body_without_waiting_for_header_response_;
 
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
@@ -297,6 +314,8 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const std::vector<std::string> untyped_receiving_namespaces_;
+  const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
+      allowed_override_modes_;
   const ExpressionManager expression_manager_;
 
   const ImmediateMutationChecker immediate_mutation_checker_;
@@ -367,10 +386,11 @@ class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
   };
 
 public:
-  Filter(const FilterConfigSharedPtr& config, ExternalProcessorClientPtr&& client,
-         const envoy::config::core::v3::GrpcService& grpc_service)
+  Filter(const FilterConfigSharedPtr& config, ClientBasePtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()),
-        grpc_service_(grpc_service), config_with_hash_key_(grpc_service),
+        grpc_service_(config->grpcService().has_value() ? config->grpcService().value()
+                                                        : envoy::config::core::v3::GrpcService()),
+        config_with_hash_key_(grpc_service_),
         decoding_state_(*this, config->processingMode(),
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
@@ -432,6 +452,8 @@ public:
 
   const ProcessorState& encodingState() { return encoding_state_; }
   const ProcessorState& decodingState() { return decoding_state_; }
+  void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) override;
+  void onError() override;
 
 private:
   void mergePerRouteConfig();
@@ -447,7 +469,15 @@ private:
 
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
+
+  Http::FilterDataStatus handleDataBufferedMode(ProcessorState& state, Buffer::Instance& data,
+                                                bool end_stream);
+  Http::FilterDataStatus handleDataStreamedMode(ProcessorState& state, Buffer::Instance& data,
+                                                bool end_stream);
+  Http::FilterDataStatus handleDataBufferedPartialMode(ProcessorState& state,
+                                                       Buffer::Instance& data, bool end_stream);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
+
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
   void setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                           const envoy::service::ext_proc::v3::ProcessingResponse& response);
@@ -468,8 +498,10 @@ private:
   buildHeaderRequest(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
                      bool end_stream, bool observability_mode);
 
+  void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream);
+
   const FilterConfigSharedPtr config_;
-  const ExternalProcessorClientPtr client_;
+  const ClientBasePtr client_;
   ExtProcFilterStats stats_;
   ExtProcLoggingInfo* logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;

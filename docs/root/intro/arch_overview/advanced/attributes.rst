@@ -93,6 +93,7 @@ Response attributes are only available after the request completes.
    response.trailers, "map<string, string>", All response trailers indexed by the lower-cased trailer name
    response.size, int, Size of the response body
    response.total_size, int, Total size of the response including the approximate uncompressed size of the headers and the trailers
+   response.backend_latency, duration, Duration between the first byte sent to and the last byte received from the upstream backend
 
 Connection attributes
 ---------------------
@@ -151,6 +152,7 @@ The following attributes are available once the upstream connection is establish
    upstream.sha256_peer_certificate_digest, string, SHA256 digest of the peer certificate in the upstream TLS connection if present
    upstream.local_address, string, The local address of the upstream connection
    upstream.transport_failure_reason, string, The upstream transport failure reason e.g. certificate validation failed
+   upstream.request_attempt_count, uint, The count of upstream request attempts. A value of ‘0’ indicates that the request was never attempted upstream
 
 Metadata and filter state
 -------------------------
@@ -210,14 +212,6 @@ In addition to all above, the following extra attributes are available to Wasm e
    plugin_name, string, Plugin name
    plugin_root_id, string, Plugin root ID
    plugin_vm_id, string, Plugin VM ID
-   node, :ref:`Node<envoy_v3_api_msg_config.core.v3.node>`, Local node description. DEPRECATED: please use `xds` attributes.
-   cluster_name, string, Upstream cluster name. DEPRECATED: please use `xds` attributes.
-   cluster_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream cluster metadata. DEPRECATED: please use `xds` attributes.
-   listener_direction, int, Enumeration value of the :ref:`listener traffic direction<envoy_v3_api_field_config.listener.v3.Listener.traffic_direction>`. DEPRECATED: please use `xds` attributes.
-   listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata. DEPRECATED: please use `xds` attributes.
-   route_name, string, Route name. DEPRECATED: please use `xds` attributes.
-   route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata. DEPRECATED: please use `xds` attributes.
-   upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata. DEPRECATED: please use `xds` attributes.
 
 Path expressions
 ----------------

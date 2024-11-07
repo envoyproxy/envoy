@@ -40,7 +40,7 @@ public class CronetHttp3Test {
 
   // If true, dump envoy logs on test completion.
   // Ideally we could override this from the command line but that's TBD.
-  private boolean printEnvoyLogs = true;
+  private boolean printEnvoyLogs = false;
   // The HTTP/2 server, set up to alt-svc to the HTTP/3 server
   private HttpTestServerFactory.HttpTestServer http2TestServer;
   // The HTTP/3 server
@@ -144,86 +144,86 @@ public class CronetHttp3Test {
     assertEquals("h2", callback.mResponseInfo.getNegotiatedProtocol());
   }
 
-  //  @Test
-  //  @SmallTest
-  //  @Feature({"Cronet"})
-  //  public void basicHttp3Get() throws Exception {
-  //    // Ideally we could override this from the command line but that's TBD.
-  //    setUp(printEnvoyLogs);
-  //
-  //    // Do the initial HTTP/2 request to get the alt-svc response.
-  //    doInitialHttp2Request();
-  //
-  //    // Set up a second request, which will hopefully go out over HTTP/3 due to alt-svc
-  //    // advertisement.
-  //    TestUrlRequestCallback callback = doBasicGetRequest();
-  //
-  //    // Verify the second request used HTTP/3
-  //    assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
-  //    assertEquals("h3", callback.mResponseInfo.getNegotiatedProtocol());
-  //  }
+  @Test
+  @SmallTest
+  @Feature({"Cronet"})
+  public void basicHttp3Get() throws Exception {
+    // Ideally we could override this from the command line but that's TBD.
+    setUp(printEnvoyLogs);
 
-  //  @Test
-  //  @SmallTest
-  //  @Feature({"Cronet"})
-  //  public void failToHttp2() throws Exception {
-  //    // Ideally we could override this from the command line but that's TBD.
-  //    setUp(printEnvoyLogs);
-  //
-  //    // Do the initial HTTP/2 request to get the alt-svc response.
-  //    doInitialHttp2Request();
-  //
-  //    // Set up a second request, which will hopefully go out over HTTP/3 due to alt-svc
-  //    // advertisement.
-  //    TestUrlRequestCallback getCallback = doBasicGetRequest();
-  //
-  //    // Verify the second request used HTTP/3
-  //    assertEquals(200, getCallback.mResponseInfo.getHttpStatusCode());
-  //    assertEquals("h3", getCallback.mResponseInfo.getNegotiatedProtocol());
-  //
-  //    // Now stop the HTTP/3 server.
-  //    http3TestServer.shutdown();
-  //    http3TestServer = null;
-  //
-  //    // The next request will fail on HTTP2 but should succeed on HTTP/2 despite having a body.
-  //    TestUrlRequestCallback postCallback = doBasicPostRequest();
-  //    assertEquals(200, postCallback.mResponseInfo.getHttpStatusCode());
-  //    assertEquals("h2", postCallback.mResponseInfo.getNegotiatedProtocol());
-  //  }
+    // Do the initial HTTP/2 request to get the alt-svc response.
+    doInitialHttp2Request();
 
-  //  @Test
-  //  @SmallTest
-  //  @Feature({"Cronet"})
-  //  public void testNoRetryPostAfterHandshake() throws Exception {
-  //    setUp(printEnvoyLogs);
-  //
-  //    // Do the initial HTTP/2 request to get the alt-svc response.
-  //    doInitialHttp2Request();
-  //
-  //    // Set up a second request, which will hopefully go out over HTTP/3 due to alt-svc
-  //    // advertisement.
-  //    TestUrlRequestCallback callback = new TestUrlRequestCallback();
-  //    UrlRequest.Builder urlRequestBuilder =
-  //        cronvoyEngine.newUrlRequestBuilder(testServerUrl, callback, callback.getExecutor());
-  //    // Set the upstream to reset after the request.
-  //    urlRequestBuilder.addHeader("reset_after_request", "yes");
-  //    urlRequestBuilder.addHeader("content-type", "text");
-  //    urlRequestBuilder.setHttpMethod("POST");
-  //    TestUploadDataProvider dataProvider = new TestUploadDataProvider(
-  //        TestUploadDataProvider.SuccessCallbackMode.SYNC, callback.getExecutor());
-  //    dataProvider.addRead("test".getBytes());
-  //    urlRequestBuilder.setUploadDataProvider(dataProvider, callback.getExecutor());
-  //
-  //    urlRequestBuilder.build().start();
-  //    callback.blockForDone();
-  //
-  //    // Both HTTP/3 and HTTP/2 servers will reset after the request.
-  //    assertTrue(callback.mOnErrorCalled);
-  //    // There are 2 requests - the initial HTTP/2 alt-svc request and the HTTP/3 request.
-  //    // By default, POST requests will not retry.
-  //    String stats = cronvoyEngine.getEnvoyEngine().dumpStats();
-  //    assertTrue(stats.contains("cluster.base.upstream_rq_total: 2"));
-  //  }
+    // Set up a second request, which will hopefully go out over HTTP/3 due to alt-svc
+    // advertisement.
+    TestUrlRequestCallback callback = doBasicGetRequest();
+
+    // Verify the second request used HTTP/3
+    assertEquals(200, callback.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", callback.mResponseInfo.getNegotiatedProtocol());
+  }
+
+  @Test
+  @SmallTest
+  @Feature({"Cronet"})
+  public void failToHttp2() throws Exception {
+    // Ideally we could override this from the command line but that's TBD.
+    setUp(printEnvoyLogs);
+
+    // Do the initial HTTP/2 request to get the alt-svc response.
+    doInitialHttp2Request();
+
+    // Set up a second request, which will hopefully go out over HTTP/3 due to alt-svc
+    // advertisement.
+    TestUrlRequestCallback getCallback = doBasicGetRequest();
+
+    // Verify the second request used HTTP/3
+    assertEquals(200, getCallback.mResponseInfo.getHttpStatusCode());
+    assertEquals("h3", getCallback.mResponseInfo.getNegotiatedProtocol());
+
+    // Now stop the HTTP/3 server.
+    http3TestServer.shutdown();
+    http3TestServer = null;
+
+    // The next request will fail on HTTP2 but should succeed on HTTP/2 despite having a body.
+    TestUrlRequestCallback postCallback = doBasicPostRequest();
+    assertEquals(200, postCallback.mResponseInfo.getHttpStatusCode());
+    assertEquals("h2", postCallback.mResponseInfo.getNegotiatedProtocol());
+  }
+
+  @Test
+  @SmallTest
+  @Feature({"Cronet"})
+  public void testRetryPostAfterHandshake() throws Exception {
+    setUp(printEnvoyLogs);
+
+    // Do the initial HTTP/2 request to get the alt-svc response.
+    doInitialHttp2Request();
+
+    // Set up a second request, which will hopefully go out over HTTP/3 due to alt-svc
+    // advertisement.
+    TestUrlRequestCallback callback = new TestUrlRequestCallback();
+    UrlRequest.Builder urlRequestBuilder =
+        cronvoyEngine.newUrlRequestBuilder(testServerUrl, callback, callback.getExecutor());
+    // Set the upstream to reset after the request.
+    urlRequestBuilder.addHeader("reset_after_request", "yes");
+    urlRequestBuilder.addHeader("content-type", "text");
+    urlRequestBuilder.setHttpMethod("POST");
+    TestUploadDataProvider dataProvider = new TestUploadDataProvider(
+        TestUploadDataProvider.SuccessCallbackMode.SYNC, callback.getExecutor());
+    dataProvider.addRead("test".getBytes());
+    urlRequestBuilder.setUploadDataProvider(dataProvider, callback.getExecutor());
+
+    urlRequestBuilder.build().start();
+    callback.blockForDone();
+
+    // Both HTTP/3 and HTTP/2 servers will reset after the request.
+    assertTrue(callback.mOnErrorCalled);
+    // There are 3 requests - the initial HTTP/2 alt-svc request and the HTTP/3 request.
+    // By default, POST requests will now retry.
+    String stats = cronvoyEngine.getEnvoyEngine().dumpStats();
+    assertTrue(stats.contains("cluster.base.upstream_rq_total: 3"));
+  }
 
   // Set up to use HTTP/3, then force HTTP/3 to fail post-handshake. The request should
   // be retried on HTTP/2 and HTTP/3 will be marked broken.
@@ -261,14 +261,14 @@ public class CronetHttp3Test {
     assertTrue(stats.contains("cluster.base.upstream_http3_broken: 1"));
   }
 
-  //  @Test
-  //  @SmallTest
-  //  @Feature({"Cronet"})
-  //  public void testRetryPostHandshake() throws Exception {
-  //    setUp(printEnvoyLogs);
-  //
-  //    retryPostHandshake();
-  //  }
+  @Test
+  @SmallTest
+  @Feature({"Cronet"})
+  public void testRetryPostHandshake() throws Exception {
+    setUp(printEnvoyLogs);
+
+    retryPostHandshake();
+  }
 
   @Test
   @SmallTest

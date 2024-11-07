@@ -8,9 +8,11 @@ on:
     paths:
     - include/**
     - source/common/**
-    branches-ignore:
-    - dependabot/**
+    branches:
+    - main
   pull_request:
+    branches:
+    - main
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
@@ -32,7 +34,7 @@ jobs:
     if: github.repository == 'envoyproxy/envoy'
     steps:
     - name: Checkout repository
-      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332  # v4.1.7
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
       with:
         fetch-depth: 2
 
@@ -61,13 +63,14 @@ jobs:
 
     - name: Free disk space
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.35
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.1
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/init@294a9d92911152fe08befb9ec03e240add280cb3  # codeql-bundle-v3.26.8
+      uses: github/codeql-action/init@662472033e021d55d94146f66f6058822b0b39fd  # codeql-bundle-v3.27.0
       with:
         languages: cpp
+        trap-caching: false
 
     - name: Install deps
       if: ${{ env.BUILD_TARGETS != '' }}
@@ -96,6 +99,7 @@ jobs:
            --spawn_strategy=local \
            --discard_analysis_cache \
            --nouse_action_cache \
+           --features="-layering_check" \
            --config=clang-libc++ \
            --config=ci \
            $BUILD_TARGETS
@@ -108,4 +112,6 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/analyze@294a9d92911152fe08befb9ec03e240add280cb3  # codeql-bundle-v3.26.8
+      uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd  # codeql-bundle-v3.27.0
+      with:
+        trap-caching: false

@@ -62,7 +62,6 @@ paths:
   build_fixer:
     exclude:
     - BUILD
-    - tools/BUILD
     - bazel/BUILD
     - bazel/external/
     - bazel/toolchains/
@@ -91,16 +90,16 @@ paths:
     - envoy/common/exception.h
     - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
-    - source/common/matcher/map_matcher.h
     - source/common/matcher/matcher.h
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
     - source/common/upstream/upstream_impl.h
     - source/common/config/context_provider_impl.h
+    - source/common/protobuf/utility.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
+    - source/common/config/utility.cc
     - source/common/router/route_config_update_receiver_impl.cc
-    - source/common/listener_manager/listener_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/network/listen_socket_impl.cc
@@ -221,7 +220,6 @@ paths:
     - source/extensions/http/custom_response
     - source/extensions/http/early_header_mutation
     - source/extensions/http/injected_credentials
-    - source/extensions/http/original_ip_detection
     - source/extensions/http/stateful_session
     - source/extensions/io_socket/user_space
     - source/extensions/key_value

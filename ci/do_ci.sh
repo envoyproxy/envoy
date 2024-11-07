@@ -57,7 +57,6 @@ FETCH_PROTO_TARGETS=(
     @com_github_bufbuild_buf//:bin/buf
     //tools/proto_format/...)
 
-GCS_REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
 
 retry () {
     local n wait iterations
@@ -377,7 +376,7 @@ case $CI_TARGET in
         # fi
         ;;
 
-    check_and_fix_proto_format)
+    format-api|check_and_fix_proto_format)
         setup_clang_toolchain
         echo "Check and fix proto format ..."
         "${ENVOY_SRCDIR}/ci/check_and_fix_format.sh"
@@ -491,7 +490,9 @@ case $CI_TARGET in
             TARGET=coverage
         fi
         GCS_LOCATION=$(
-            bazel run //tools/gcs:upload \
+            bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
+                  "${BAZEL_BUILD_OPTIONS[@]}" \
+                  //tools/gcs:upload \
                   "${GCS_ARTIFACT_BUCKET}" \
                   "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
                   "/source/generated/${TARGET}" \
@@ -661,7 +662,9 @@ case $CI_TARGET in
 
     docker-upload)
         setup_clang_toolchain
-        bazel run //tools/gcs:upload \
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/gcs:upload \
               "${GCS_ARTIFACT_BUCKET}" \
               "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
               "${BUILD_DIR}/build_images" \
@@ -708,7 +711,9 @@ case $CI_TARGET in
 
     docs-upload)
         setup_clang_toolchain
-        bazel run //tools/gcs:upload \
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/gcs:upload \
               "${GCS_ARTIFACT_BUCKET}" \
               "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
               /source/generated/docs \
@@ -936,7 +941,9 @@ case $CI_TARGET in
     release.signed)
         echo "Signing binary packages..."
         setup_clang_toolchain
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
+        bazel build \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
         ;;
 
@@ -1027,6 +1034,7 @@ case $CI_TARGET in
         ;;
 
     refresh_compdb)
+        setup_clang_toolchain
         # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
         # So the compdb headers won't be overwritten by another bazel run.
         for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do

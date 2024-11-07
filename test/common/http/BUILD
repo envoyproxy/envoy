@@ -17,6 +17,7 @@ envoy_package()
 envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":common_lib",
         "//source/common/buffer:buffer_lib",
@@ -43,6 +44,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "async_client_utility_test",
     srcs = ["async_client_utility_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:async_client_utility_lib",
         "//test/mocks/http:http_mocks",
@@ -52,6 +54,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "character_set_validation_test",
     srcs = ["character_set_validation_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:character_set_validation_lib",
         "//test/test_common:utility_lib",
@@ -61,6 +64,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_client_test",
     srcs = ["codec_client_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":common_lib",
         "//source/common/buffer:buffer_lib",
@@ -102,6 +106,7 @@ envoy_proto_library(
         srcs = ["codec_impl_fuzz_test.cc"],
         corpus = "codec_impl_corpus",
         defines = ["FUZZ_PROTOCOL_%s" % http_protocol],
+        rbe_pool = "6gig",
         deps = [
             ":codec_impl_fuzz_proto_cc_proto",
             "//source/common/http:conn_manager_lib",
@@ -127,6 +132,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "filter_manager_test",
     srcs = ["filter_manager_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:filter_manager_lib",
         "//test/mocks/event:event_mocks",
@@ -139,8 +145,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hash_policy_test",
+    srcs = ["hash_policy_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/http:hash_policy_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "codec_wrappers_test",
     srcs = ["codec_wrappers_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:codec_wrappers_lib",
         "//test/mocks/http:http_mocks",
@@ -151,6 +169,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codes_test",
     srcs = ["codes_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:empty_string",
         "//source/common/http:codes_lib",
@@ -164,6 +183,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "codes_speed_test",
     srcs = ["codes_speed_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:codes_lib",
         "//source/common/stats:isolated_store_lib",
@@ -204,6 +224,7 @@ envoy_cc_fuzz_test(
     name = "conn_manager_impl_fuzz_test",
     srcs = ["conn_manager_impl_fuzz_test.cc"],
     corpus = "conn_manager_impl_corpus",
+    rbe_pool = "6gig",
     deps = [
         ":conn_manager_impl_fuzz_proto_cc_proto",
         "//source/common/common:empty_string",
@@ -236,6 +257,7 @@ envoy_cc_test_library(
     name = "conn_manager_impl_test_base_lib",
     srcs = ["conn_manager_impl_test_base.cc"],
     hdrs = ["conn_manager_impl_test_base.h"],
+    rbe_pool = "6gig",
     deps = [
         ":xff_extension_lib",
         "//source/common/formatter:formatter_extension_lib",
@@ -271,6 +293,7 @@ envoy_cc_test(
         "conn_manager_impl_test.cc",
         "conn_manager_impl_test_2.cc",
     ],
+    rbe_pool = "2core",
     deps = [
         ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",
@@ -280,6 +303,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":custom_header_extension_lib",
         ":xff_extension_lib",
@@ -308,6 +332,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "date_provider_impl_test",
     srcs = ["date_provider_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:date_provider_lib",
         "//source/common/http:header_map_lib",
@@ -319,6 +344,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "header_map_impl_test",
     srcs = ["header_map_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_list_view_lib",
         "//source/common/http:header_map_lib",
@@ -331,6 +357,7 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "header_map_impl_speed_test",
     srcs = ["header_map_impl_speed_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "@com_github_google_benchmark//:benchmark",
@@ -351,6 +378,7 @@ envoy_cc_fuzz_test(
     name = "header_map_impl_fuzz_test",
     srcs = ["header_map_impl_fuzz_test.cc"],
     corpus = "header_map_impl_corpus",
+    rbe_pool = "6gig",
     deps = [
         ":header_map_impl_fuzz_proto_cc_proto",
         "//source/common/http:header_map_lib",
@@ -362,6 +390,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "inline_cookie_test",
     srcs = ["inline_cookie_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "//test/mocks/runtime:runtime_mocks",
@@ -371,6 +400,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "header_utility_test",
     srcs = ["header_utility_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_utility_lib",
         "//test/mocks/http:header_validator_mocks",
@@ -384,6 +414,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "user_agent_test",
     srcs = ["user_agent_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:user_agent_lib",
@@ -403,6 +434,7 @@ envoy_cc_fuzz_test(
     name = "utility_fuzz_test",
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
+    rbe_pool = "6gig",
     deps = [
         ":utility_fuzz_proto_cc_proto",
         "//source/common/http:utility_lib",
@@ -414,6 +446,7 @@ envoy_cc_fuzz_test(
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
@@ -430,6 +463,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "metadata_interface_test",
     srcs = ["metadata_interface_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/http:metadata_interface",
         "//source/common/http:utility_lib",
@@ -439,6 +473,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "path_utility_test",
     srcs = ["path_utility_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:path_utility_lib",
@@ -448,6 +483,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "status_test",
     srcs = ["status_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:status_lib",
     ],
@@ -456,6 +492,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "mixed_conn_pool_test",
     srcs = ["mixed_conn_pool_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":common_lib",
         "//source/common/http:mixed_conn_pool",
@@ -476,6 +513,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_pool_grid_test",
     srcs = envoy_select_enable_http3(["conn_pool_grid_test.cc"]),
+    rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
         ":common_lib",
         "//source/common/http:conn_pool_grid",
@@ -501,6 +539,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "http3_status_tracker_impl_test",
     srcs = ["http3_status_tracker_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":common_lib",
         "//source/common/http:http3_status_tracker_impl_lib",
@@ -511,6 +550,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "http_server_properties_cache_impl_test",
     srcs = ["http_server_properties_cache_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":common_lib",
         "//source/common/http:http_server_properties_cache",
@@ -522,6 +562,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "http_server_properties_cache_manager_test",
     srcs = ["http_server_properties_cache_manager_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":common_lib",
         "//source/common/http:http_server_properties_cache",
@@ -545,6 +586,7 @@ envoy_cc_fuzz_test(
     name = "path_utility_fuzz_test",
     srcs = ["path_utility_fuzz_test.cc"],
     corpus = "path_utility_corpus",
+    rbe_pool = "6gig",
     deps = [
         ":path_utility_fuzz_proto_cc_proto",
         "//source/common/http:header_map_lib",
@@ -574,6 +616,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "dependency_manager_test",
     srcs = ["dependency_manager_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:dependency_manager",
     ],
@@ -582,6 +625,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "header_mutation_test",
     srcs = ["header_mutation_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_mutation_lib",
@@ -593,6 +637,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_chain_helper_test",
     srcs = ["filter_chain_helper_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:filter_chain_helper_lib",
         "//test/mocks:common_lib",
@@ -615,6 +660,7 @@ envoy_cc_fuzz_test(
     name = "hcm_router_fuzz_test",
     srcs = ["hcm_router_fuzz_test.cc"],
     corpus = "hcm_router_fuzz_corpus",
+    rbe_pool = "6gig",
     deps = [
         ":conn_manager_impl_test_base_lib",
         ":hcm_router_fuzz_proto_cc_proto",

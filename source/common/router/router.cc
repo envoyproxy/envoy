@@ -924,22 +924,17 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     // this stack for whether `data` is the same buffer as already buffered data.
     callbacks_->addDecodedData(data, true);
   } else {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request")) {
+    if (!upstream_requests_.empty()) {
       upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
     } else {
-      if (!upstream_requests_.empty()) {
-        upstream_requests_.front()->acceptDataFromRouter(data, end_stream);
-      } else {
-        // not buffering any data for retry, shadow, and internal redirect, and there will be
-        // no more upstream request, abort the request and clean up.
-        cleanup();
-        callbacks_->sendLocalReply(
-            Http::Code::ServiceUnavailable,
-            "upstream is closed prematurely during decoding data from downstream", modify_headers_,
-            absl::nullopt, StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset);
-        return Http::FilterDataStatus::StopIterationNoBuffer;
-      }
+      // not buffering any data for retry, shadow, and internal redirect, and there will be
+      // no more upstream request, abort the request and clean up.
+      cleanup();
+      callbacks_->sendLocalReply(
+          Http::Code::ServiceUnavailable,
+          "upstream is closed prematurely during decoding data from downstream", modify_headers_,
+          absl::nullopt, StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset);
+      return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
 
@@ -2123,7 +2118,7 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   auto host = upstream_request.upstreamHost();
   const bool need_to_send_load_report =
       (host != nullptr) && cluster_->lrsReportMetricNames().has_value();
-  if (!need_to_send_load_report && !orca_load_report_callbacks_.has_value()) {
+  if (!need_to_send_load_report && orca_load_report_callbacks_.expired()) {
     return;
   }
 
@@ -2144,8 +2139,8 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
                                                     orca_load_report.value(),
                                                     host->loadMetricStats());
   }
-  if (orca_load_report_callbacks_.has_value()) {
-    const absl::Status status = orca_load_report_callbacks_->onOrcaLoadReport(*orca_load_report);
+  if (auto callbacks = orca_load_report_callbacks_.lock(); callbacks != nullptr) {
+    const absl::Status status = callbacks->onOrcaLoadReport(*orca_load_report, *host);
     if (!status.ok()) {
       ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
                        status.message());

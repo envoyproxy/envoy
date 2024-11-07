@@ -1251,6 +1251,9 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _))
       .Times(0);
   // The reset will be converted into a local reply.
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, testing::Eq(""), _, _,
+                                         "upstream_reset_before_response_started{remote_reset}"))
+      .WillOnce(InvokeWithoutArgs([] {}));
   router_->decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -2751,10 +2754,6 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
 // Test when the upstream request gets reset while the client is sending the body
 // with more data arriving but not buffering any data.
 TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request", "true"}});
-
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
@@ -2776,39 +2775,6 @@ TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) 
 
   EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started");
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-}
-
-// Test the original branch when local_reply_when_no_buffer_and_upstream_request runtime is false.
-TEST_F(RouterTest, NormalPathUpstreamResetDuringBodyDataTransferNotBuffering) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request",
-        "false"}});
-
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"}, {"myheader", "present"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, false);
-
-  const std::string body1("body1");
-  Buffer::OwnedImpl buf1(body1);
-  router_->decodeData(buf1, true);
-  EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
 // Test retrying a request, when the first attempt fails while the client
@@ -6795,7 +6761,9 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
 class TestOrcaLoadReportCallbacks : public Filter::OrcaLoadReportCallbacks {
 public:
   MOCK_METHOD(absl::Status, onOrcaLoadReport,
-              (const xds::data::orca::v3::OrcaLoadReport& orca_load_report), (override));
+              (const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+               const Upstream::HostDescription&),
+              (override));
 };
 
 TEST_F(RouterTest, OrcaLoadReportCallbacks) {
@@ -6812,10 +6780,11 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   router_->decodeHeaders(headers, true);
 
   // Configure ORCA callbacks to receive the report.
-  TestOrcaLoadReportCallbacks callbacks;
+  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(callbacks, onOrcaLoadReport(_))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                           const Upstream::HostDescription&) {
         received_orca_load_report = orca_load_report;
         return absl::OkStatus();
       }));
@@ -6863,10 +6832,11 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   router_->decodeHeaders(headers, true);
 
   // Configure ORCA callbacks to receive the report.
-  TestOrcaLoadReportCallbacks callbacks;
+  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(callbacks, onOrcaLoadReport(_))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                           const Upstream::HostDescription&) {
         received_orca_load_report = orca_load_report;
         // Return an error that gets logged by router filter.
         return absl::InvalidArgumentError("Unexpected ORCA load Report");
@@ -6901,8 +6871,8 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
 
   // Configure ORCA callbacks to receive the report, but don't expect it to be
   // called for invalid orca header.
-  TestOrcaLoadReportCallbacks callbacks;
-  EXPECT_CALL(callbacks, onOrcaLoadReport(_)).Times(0);
+  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
+  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _)).Times(0);
   router_->setOrcaLoadReportCallbacks(callbacks);
 
   // Send report with invalid ORCA proto.

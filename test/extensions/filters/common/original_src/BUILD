@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "original_src_socket_option_test",
     srcs = ["original_src_socket_option_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/network:address_lib",
         "//source/extensions/filters/common/original_src:original_src_socket_option_lib",

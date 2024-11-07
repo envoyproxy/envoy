@@ -373,10 +373,11 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
       // Initialize an endpoint host object.
       auto address_or_error = Network::Address::resolveProtoAddress(host.endpoint().address());
       THROW_IF_NOT_OK_REF(address_or_error.status());
-      HostSharedPtr endpoint = std::make_shared<HostImpl>(
-          info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
-          locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
-          envoy::config::core::v3::UNKNOWN, time_source_);
+      HostSharedPtr endpoint = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
+          HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
+                           locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
+                           envoy::config::core::v3::UNKNOWN, time_source_),
+          std::unique_ptr<HostImpl>));
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
       // Add this host/endpoint pointer to our structured list by locality so results can be
@@ -488,10 +489,11 @@ void HdsCluster::updateHosts(
         auto address_or_error =
             Network::Address::resolveProtoAddress(endpoint.endpoint().address());
         THROW_IF_NOT_OK_REF(address_or_error.status());
-        host = std::make_shared<HostImpl>(info_, "", std::move(address_or_error.value()), nullptr,
-                                          nullptr, 1, endpoints.locality(),
-                                          endpoint.endpoint().health_check_config(), 0,
-                                          envoy::config::core::v3::UNKNOWN, time_source_);
+        host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
+            HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
+                             endpoints.locality(), endpoint.endpoint().health_check_config(), 0,
+                             envoy::config::core::v3::UNKNOWN, time_source_),
+            std::unique_ptr<HostImpl>));
 
         // Set the initial health status as in HdsCluster::initialize.
         host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -550,10 +552,12 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
                                          factory_context, socket_factory, *scope),
       std::unique_ptr<TransportSocketMatcherImpl>);
 
-  return std::make_unique<ClusterInfoImpl>(
-      params.server_context_.initManager(), params.server_context_, params.cluster_,
-      params.bind_config_, params.server_context_.runtime(), std::move(socket_matcher),
-      std::move(scope), params.added_via_api_, factory_context);
+  return THROW_OR_RETURN_VALUE(
+      ClusterInfoImpl::create(params.server_context_.initManager(), params.server_context_,
+                              params.cluster_, params.bind_config_,
+                              params.server_context_.runtime(), std::move(socket_matcher),
+                              std::move(scope), params.added_via_api_, factory_context),
+      std::unique_ptr<ClusterInfoImpl>);
 }
 
 void HdsCluster::initHealthchecks() {

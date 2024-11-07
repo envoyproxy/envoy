@@ -1674,6 +1674,13 @@ envoy.load_balancing_policies.cluster_provided:
   status: stable
   type_urls:
   - envoy.extensions.load_balancing_policies.cluster_provided.v3.ClusterProvided
+envoy.load_balancing_policies.client_side_weighted_round_robin:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin
 envoy.http.early_header_mutation.header_mutation:
   categories:
   - envoy.http.early_header_mutation
@@ -1806,6 +1813,13 @@ envoy.quic.connection_debug_visitor.basic:
   status: alpha
   type_urls:
   - envoy.extensions.quic.connection_debug_visitor.v3.BasicConfig
+envoy.quic.connection_debug_visitor.quic_stats:
+  categories:
+  - envoy.quic.connection_debug_visitor
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.connection_debug_visitor.quic_stats.v3.Config
 envoy.filters.network.generic_proxy:
   categories:
   - envoy.filters.network

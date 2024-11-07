@@ -10,6 +10,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/notification.h"
+#include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
@@ -34,11 +35,6 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
   ExtensionRegistry::registerFactories();
 
   Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker_);
-  // Envoy Mobile always requires dfp_mixed_scheme for the TLS and cleartext DFP clusters.
-  // While dfp_mixed_scheme defaults to true, some environments force it to false (e.g. within
-  // Google), so we force it back to true in Envoy Mobile.
-  // TODO(abeyad): Remove once this is no longer needed.
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.dfp_mixed_scheme", true);
 }
 
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
@@ -135,6 +131,14 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
       main_common = std::make_unique<EngineCommon>(options);
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
+
+      // If proxy resolution APIs are configured on the Engine, set the main thread's dispatcher
+      // on the proxy resolver for handling callbacks.
+      auto* proxy_resolver = static_cast<Network::ProxyResolverApi*>(
+          Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
+      if (proxy_resolver != nullptr) {
+        proxy_resolver->resolver->setDispatcher(event_dispatcher_);
+      }
 
       cv_.notifyAll();
     }

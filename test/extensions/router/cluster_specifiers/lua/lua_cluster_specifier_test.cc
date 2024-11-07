@@ -15,6 +15,7 @@ namespace Lua {
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 class LuaClusterSpecifierPluginTest : public testing::Test {
 public:
@@ -170,6 +171,100 @@ TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfigDisableRu
   TestUtility::loadFromYaml(normal_lua_config_yaml_, proto_config);
   config_ = std::make_shared<LuaClusterSpecifierConfig>(proto_config, server_factory_context_);
   config_.reset();
+}
+
+TEST_F(LuaClusterSpecifierPluginTest, GetClustersBadArg) {
+  const std::string config = R"EOF(
+  source_code:
+    inline_string: |
+      function envoy_on_route(route_handle)
+        local wrong_type = true
+        route_handle:getCluster(wrong_type)
+        return "completed"
+      end
+  default_cluster: default_service
+  )EOF";
+  setUpTest(config);
+
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
+  auto route = plugin_->route(mock_route, headers);
+  EXPECT_EQ("default_service", route->routeEntry()->clusterName());
+}
+
+TEST_F(LuaClusterSpecifierPluginTest, GetClustersMissing) {
+  const std::string config = R"EOF(
+  source_code:
+    inline_string: |
+      function envoy_on_route(route_handle)
+        local result = route_handle:getCluster("not found cluster name")
+        if result == nil then
+          return "nil"
+        end
+        return "not-nil"
+      end
+  default_cluster: default_service
+  )EOF";
+  setUpTest(config);
+
+  EXPECT_CALL(server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(absl::string_view("not found cluster name")))
+      .WillOnce(Return(nullptr));
+
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
+  auto route = plugin_->route(mock_route, headers);
+  EXPECT_EQ("nil", route->routeEntry()->clusterName());
+}
+
+TEST_F(LuaClusterSpecifierPluginTest, ClusterMethods) {
+  const std::string config = R"EOF(
+  source_code:
+    inline_string: |
+      function envoy_on_route(route_handle)
+        local result = route_handle:getCluster("my_cluster")
+        if result == nil then
+          return "fail: nil cluster"
+        end
+        if result:numConnections() ~= 2 then
+          return "fail: wrong num connections"
+        end
+        if result:numRequests() ~= 4 then
+          return "fail: wrong num requests"
+        end
+        if result:numPendingRequests() ~= 6 then
+          return "fail: wrong num pending requests"
+        end
+        return "pass"
+      end
+  default_cluster: default_service
+  )EOF";
+  setUpTest(config);
+
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  EXPECT_CALL(server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(absl::string_view("my_cluster")))
+      .WillOnce(Return(&cluster));
+
+  // The mock object returns the same resource manager for both the default and high priority,
+  // so the counts in this test seen by lua are all doubled.
+
+  // 1 connection.
+  cluster.cluster_.info_->resource_manager_->connections().inc();
+
+  // 2 requests.
+  cluster.cluster_.info_->resource_manager_->requests().inc();
+  cluster.cluster_.info_->resource_manager_->requests().inc();
+
+  // 3 pending requests.
+  cluster.cluster_.info_->resource_manager_->pendingRequests().inc();
+  cluster.cluster_.info_->resource_manager_->pendingRequests().inc();
+  cluster.cluster_.info_->resource_manager_->pendingRequests().inc();
+
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
+  auto route = plugin_->route(mock_route, headers);
+  EXPECT_EQ("pass", route->routeEntry()->clusterName());
 }
 
 } // namespace Lua

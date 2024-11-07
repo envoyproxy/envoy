@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "local_reply_test",
     srcs = ["local_reply_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/local_reply:local_reply_lib",

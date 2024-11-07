@@ -205,7 +205,7 @@ public:
                              Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
                              EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory)
       : EnvoyQuicClientSession(config, supported_versions, std::move(connection),
-                               quic::QuicServerId("example.com", 443, false),
+                               quic::QuicServerId("example.com", 443),
                                std::make_shared<quic::QuicCryptoClientConfig>(
                                    quic::test::crypto_test_utils::ProofVerifierForTesting()),
                                dispatcher, send_buffer_limit, crypto_stream_factory,
@@ -330,7 +330,7 @@ public:
 
 class MockQuicConnectionDebugVisitor : public quic::QuicConnectionDebugVisitor {
 public:
-  MockQuicConnectionDebugVisitor(quic::QuicSession* session,
+  MockQuicConnectionDebugVisitor(quic::QuicSession& session,
                                  const StreamInfo::StreamInfo& stream_info)
       : session_(session), stream_info_(stream_info) {}
 
@@ -338,35 +338,43 @@ public:
               (const quic::QuicConnectionCloseFrame&, quic::ConnectionCloseSource), ());
   MOCK_METHOD(void, OnConnectionCloseFrame, (const quic::QuicConnectionCloseFrame&), ());
 
-  quic::QuicSession* session_;
+  quic::QuicSession& session_;
   const StreamInfo::StreamInfo& stream_info_;
 };
 
 class TestEnvoyQuicConnectionDebugVisitorFactory
     : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
 public:
-  std::string name() const override { return "envoy.quic.connection_debug_visitor.mock"; }
-
-  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<::test::common::config::DummyConfig>();
-  }
   std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(quic::QuicSession* session,
+  createQuicConnectionDebugVisitor(Event::Dispatcher&, quic::QuicSession& session,
                                    const StreamInfo::StreamInfo& stream_info) override {
     auto debug_visitor = std::make_unique<MockQuicConnectionDebugVisitor>(session, stream_info);
     mock_debug_visitor_ = debug_visitor.get();
     return debug_visitor;
   }
 
-  Envoy::ProcessContextOptRef processContext() const { return context_; }
-
   MockQuicConnectionDebugVisitor* mock_debug_visitor_;
 };
 
-DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory);
+class TestEnvoyQuicConnectionDebugVisitorFactoryFactory
+    : public EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface {
+public:
+  std::string name() const override { return "envoy.quic.connection_debug_visitor.mock"; }
 
-REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactory,
-                 Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryInterface);
+  Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<::test::common::config::DummyConfig>();
+  }
+
+  EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr
+  createFactory(const Protobuf::Message&, Server::Configuration::ListenerFactoryContext&) override {
+    return std::make_unique<TestEnvoyQuicConnectionDebugVisitorFactory>();
+  }
+};
+
+DECLARE_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory);
+
+REGISTER_FACTORY(TestEnvoyQuicConnectionDebugVisitorFactoryFactory,
+                 Envoy::Quic::EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface);
 
 class TestNetworkObserverRegistry : public Quic::EnvoyQuicNetworkObserverRegistry {
 public:

@@ -105,6 +105,12 @@ public:
     genericHandleResponse(message->type_url(), *message, control_plane_stats);
   }
 
+  absl::Status
+  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                  Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+                  BackOffStrategyPtr&& backoff_strategy,
+                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+
   EdsResourcesCacheOptRef edsResourcesCache() override {
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
@@ -155,7 +161,9 @@ protected:
   WatchMap& watchMapFor(const std::string& type_url);
   void handleEstablishedStream();
   void handleStreamEstablishmentFailure(bool next_attempt_may_send_initial_resource_version);
-  void genericHandleResponse(const std::string& type_url, const RS& response_proto,
+  // May modify the order of the resources in response_proto to put all the
+  // non-heartbeat resources first.
+  void genericHandleResponse(const std::string& type_url, RS& response_proto,
                              ControlPlaneStats& control_plane_stats);
   void trySendDiscoveryRequests();
   bool skipSubsequentNode() const { return skip_subsequent_node_; }
@@ -165,12 +173,16 @@ protected:
   }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
 
+  virtual absl::string_view methodName() const PURE;
+
 private:
   // Helper function to create the grpc_stream_ object.
   // TODO(adisuissa): this should be removed when envoy.restart_features.xds_failover_support
   // is deprecated.
-  std::unique_ptr<GrpcStreamInterface<RQ, RS>>
-  createGrpcStreamObject(GrpcMuxContext& grpc_mux_context);
+  std::unique_ptr<GrpcStreamInterface<RQ, RS>> createGrpcStreamObject(
+      Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
+      const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
+      BackOffStrategyPtr&& backoff_strategy, const RateLimitSettings& rate_limit_settings);
 
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
   // whether we *want* to send a (Delta)DiscoveryRequest).
@@ -187,6 +199,7 @@ private:
   // Invoked when dynamic context parameters change for a resource type.
   void onDynamicContextUpdate(absl::string_view resource_type_url);
 
+  Event::Dispatcher& dispatcher_;
   // Multiplexes the stream to the primary and failover sources.
   // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
   // convert from unique_ptr<GrpcStreamInterface> to GrpcMuxFailover directly.
@@ -248,6 +261,11 @@ public:
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string& type_url,
                              const absl::flat_hash_set<std::string>& for_update) override;
+
+private:
+  absl::string_view methodName() const override {
+    return "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources";
+  }
 };
 
 class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionStateFactory,
@@ -259,6 +277,11 @@ public:
   // GrpcStreamCallbacks
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");
+  }
+
+private:
+  absl::string_view methodName() const override {
+    return "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources";
   }
 };
 
@@ -276,6 +299,12 @@ public:
   Config::GrpcMuxWatchPtr addWatch(const std::string&, const absl::flat_hash_set<std::string>&,
                                    SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                                    const SubscriptionOptions&) override;
+
+  absl::Status updateMuxSource(Grpc::RawAsyncClientPtr&&, Grpc::RawAsyncClientPtr&&, Stats::Scope&,
+                               BackOffStrategyPtr&&,
+                               const envoy::config::core::v3::ApiConfigSource&) override {
+    return absl::UnimplementedError("");
+  }
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
     ENVOY_BUG(false, "unexpected request for on demand update");

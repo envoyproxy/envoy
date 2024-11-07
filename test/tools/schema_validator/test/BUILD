@@ -14,6 +14,7 @@ envoy_cc_test(
     data = [
         ":configs",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//test/tools/schema_validator:schema_validator_lib",
     ],

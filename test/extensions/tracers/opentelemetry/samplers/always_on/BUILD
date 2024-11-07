@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.samplers.always_on"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/samplers/always_on:always_on_sampler_lib",
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
     name = "always_on_sampler_test",
     srcs = ["always_on_sampler_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.samplers.always_on"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/tracers/opentelemetry/samplers/always_on:always_on_sampler_lib",
         "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
@@ -43,6 +45,7 @@ envoy_extension_cc_test(
         "always_on_sampler_integration_test.cc",
     ],
     extension_names = ["envoy.tracers.opentelemetry.samplers.always_on"],
+    rbe_pool = "6gig",
     deps = [
         "//source/exe:main_common_lib",
         "//source/extensions/tracers/opentelemetry:config",

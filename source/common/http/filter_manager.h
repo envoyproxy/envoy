@@ -651,6 +651,7 @@ public:
   }
 
   // ScopeTrackedObject
+  OptRef<const StreamInfo::StreamInfo> trackedStream() const override { return streamInfo(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_)
@@ -893,6 +894,8 @@ protected:
     bool decoder_filter_chain_aborted_{};
     bool encoder_filter_chain_aborted_{};
     bool saw_downstream_reset_{};
+    // True when the stream was recreated.
+    bool recreated_stream_{};
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield

@@ -65,7 +65,7 @@ envoy_cc_library(
         "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
         "//envoy/config:typed_config_interface",
-        "//envoy/server:process_context_interface",
+        "//envoy/server:factory_context_interface",
         "//envoy/stream_info:stream_info_interface",
         "@com_github_google_quiche//:quic_core_connection_lib",
         "@com_github_google_quiche//:quic_core_session_lib",

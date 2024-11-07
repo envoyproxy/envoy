@@ -125,10 +125,10 @@ public:
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
   bool preserveAuthorizationHeader() const { return preserve_authorization_header_; }
-  const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
-  const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& denyRedirectMatchers() const {
     return deny_redirect_header_matchers_;
   }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
@@ -152,12 +152,16 @@ public:
     return default_refresh_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
+  bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
+  bool disableRefreshTokenSetCookie() const { return disable_refresh_token_set_cookie_; }
   const OptRef<const RouteRetryPolicy> retryPolicy() const {
     if (!retry_policy_.has_value()) {
       return absl::nullopt;
     }
     return makeOptRef(retry_policy_.value());
   }
+  bool shouldUseRefreshToken(
+      const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -175,8 +179,8 @@ private:
   FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
-  const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
-  const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const std::string cookie_domain_;
   const AuthType auth_type_;
@@ -186,6 +190,8 @@ private:
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
   const bool disable_id_token_set_cookie_ : 1;
+  const bool disable_access_token_set_cookie_ : 1;
+  const bool disable_refresh_token_set_cookie_ : 1;
   absl::optional<RouteRetryPolicy> retry_policy_;
 };
 

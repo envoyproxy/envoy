@@ -24,6 +24,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "message_converter_utility_test",
     srcs = ["message_converter_utility_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":message_converter_test_lib",
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_utility_lib",
@@ -37,6 +38,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "message_converter_test",
     srcs = ["message_converter_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":message_converter_test_lib",
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_lib",
@@ -51,6 +53,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "stream_message_test",
     srcs = ["stream_message_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction/message_converter:stream_message_lib",
     ],
