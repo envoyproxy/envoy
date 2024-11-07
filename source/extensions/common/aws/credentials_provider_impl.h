@@ -118,7 +118,7 @@ public:
       Api::Api& api, Event::Dispatcher& dispatcher,
       envoy::config::core::v3::DataSource certificate_data_source,
       envoy::config::core::v3::DataSource private_key_data_source,
-      envoy::config::core::v3::DataSource certificate_chain_data_source);
+    absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source);
 
 private:
   Api::Api& api_;
@@ -126,7 +126,7 @@ private:
   Filesystem::WatcherPtr certificate_file_watcher_;
   envoy::config::core::v3::DataSource private_key_data_source_;
   Filesystem::WatcherPtr private_key_file_watcher_;
-  envoy::config::core::v3::DataSource certificate_chain_data_source_;
+  absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source_;
   Filesystem::WatcherPtr certificate_chain_file_watcher_;
   Event::Dispatcher& dispatcher_;
   absl::optional<SystemTime> expiration_time_;
@@ -134,9 +134,11 @@ private:
   bool needsRefresh() override;
   void refresh() override;
 
-  absl::Status pemFileToB64(std::string filename, std::string& output);
-  absl::Status pemFileToDer(std::string filename, std::vector<uint8_t>& output);
-  absl::Status pemFileToAlgorithmSerial(std::string filename,
+  absl::Status pemDataSourceToString(envoy::config::core::v3::DataSource& datasource,
+                                                                            std::string& pem);
+  absl::Status pemToB64(std::string pem, std::string& output);
+  absl::Status pemToDer(std::string pem, std::vector<uint8_t>& output);
+  absl::Status pemToAlgorithmSerial(std::string pem,
                                         Credentials::CertificateAlgorithm& algorithm,
                                         std::string& serial);
 
@@ -331,12 +333,12 @@ public:
                                       CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                       std::chrono::seconds initialization_timer,
-                                      absl::string_view role_arn,
-                                      absl::string_view role_session_name, absl::string_view region,
+                                      absl::string_view role_arn, absl::string_view profile_arn, absl::string_view trust_anchor_arn,
+                                      absl::string_view role_session_name, absl::optional<uint16_t> session_duration, absl::string_view region,
                                       absl::string_view cluster_name, absl::string_view uri,
                                       envoy::config::core::v3::DataSource certificate_data_source,
                                       envoy::config::core::v3::DataSource private_key_data_source,
-                                      envoy::config::core::v3::DataSource cert_chain_data_source
+                                      absl::optional<envoy::config::core::v3::DataSource> cert_chain_data_source
 
   );
 
@@ -353,7 +355,10 @@ private:
 
   const std::string role_arn_;
   const std::string role_session_name_;
+  const std::string profile_arn_;
+  const std::string trust_anchor_arn_;
   const std::string region_;
+  absl::optional<uint16_t> session_duration_;
   ServerFactoryContextOptRef server_factory_context_;
   Extensions::Common::Aws::SignerPtr roles_anywhere_signer_;
 };

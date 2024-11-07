@@ -83,11 +83,11 @@ private:
   absl::optional<std::string> session_token_;
 
   // RolesAnywhere certificate based credentials
-  absl::optional<std::string> certificate_b64_;
-  absl::optional<std::string> certificate_chain_b64_;
-  absl::optional<std::vector<uint8_t>> certificate_private_key_der_;
-  absl::optional<std::string> certificate_serial_;
-  absl::optional<CertificateAlgorithm> certificate_algorithm_;
+  absl::optional<std::string> certificate_b64_ = absl::nullopt;
+  absl::optional<std::string> certificate_chain_b64_ = absl::nullopt;
+  absl::optional<std::vector<uint8_t>> certificate_private_key_der_ = absl::nullopt;
+  absl::optional<std::string> certificate_serial_ = absl::nullopt;
+  absl::optional<CertificateAlgorithm> certificate_algorithm_ = absl::nullopt;
 };
 
 /**

@@ -3,11 +3,13 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <elf.h>
 #include <fstream>
 #include <memory>
 
 #include "envoy/common/exception.h"
 
+#include "google/protobuf/duration.pb.h"
 #include "source/common/common/base64.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/message_impl.h"
@@ -397,14 +399,28 @@ IAMRolesAnywhereCertificateCredentialsProvider::IAMRolesAnywhereCertificateCrede
     Api::Api& api, Event::Dispatcher& dispatcher,
     envoy::config::core::v3::DataSource certificate_data_source,
     envoy::config::core::v3::DataSource private_key_data_source,
-    envoy::config::core::v3::DataSource certificate_chain_data_source)
+    absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source)
     : api_(api), certificate_data_source_(certificate_data_source),
-      private_key_data_source_(private_key_data_source),
-      certificate_chain_data_source_(certificate_chain_data_source), dispatcher_(dispatcher) {
+      private_key_data_source_(private_key_data_source), certificate_chain_data_source_(certificate_chain_data_source),
+      dispatcher_(dispatcher) {
+  
 
+  if(certificate_data_source_.has_filename())
+  {
   createFileWatcher(dispatcher, certificate_data_source_, certificate_file_watcher_);
+  }
+  if(private_key_data_source_.has_filename())
+  {
   createFileWatcher(dispatcher, private_key_data_source_, private_key_file_watcher_);
-  createFileWatcher(dispatcher, certificate_chain_data_source_, certificate_chain_file_watcher_);
+  }
+
+  if(certificate_chain_data_source_.has_value())
+  {
+    if(certificate_chain_data_source_.value().has_filename())
+    {
+    createFileWatcher(dispatcher, certificate_chain_data_source_.value(), certificate_chain_file_watcher_);
+    }
+  }
 }
 
 bool IAMRolesAnywhereCertificateCredentialsProvider::needsRefresh() {
@@ -419,7 +435,7 @@ bool IAMRolesAnywhereCertificateCredentialsProvider::needsRefresh() {
 }
 
 absl::Status
-IAMRolesAnywhereCertificateCredentialsProvider::pemFileToDer(std::string filename,
+IAMRolesAnywhereCertificateCredentialsProvider::pemToDer(std::string filename,
                                                              std::vector<uint8_t>& output) {
   auto file_read_or_error = api_.fileSystem().fileReadToEnd(filename);
 
@@ -448,15 +464,59 @@ IAMRolesAnywhereCertificateCredentialsProvider::pemFileToDer(std::string filenam
   }
 }
 
-absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemFileToAlgorithmSerial(
-    std::string filename, Credentials::CertificateAlgorithm& algorithm, std::string& serial) {
-  auto file_read_or_error = api_.fileSystem().fileReadToEnd(filename);
-  if (file_read_or_error.ok()) {
+absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemDataSourceToString(envoy::config::core::v3::DataSource& datasource,
+                                                                          std::string& pem) 
+{
+  if(datasource.has_filename())
+  {
+    auto file_read_or_error = api_.fileSystem().fileReadToEnd(datasource.filename());
+    if (file_read_or_error.ok()) {
+      pem = file_read_or_error.value();
+      return absl::OkStatus();
+    }
+    else {
+      ENVOY_LOG(debug, fmt::format("{}: {}", datasource.filename(), file_read_or_error.status().message()));
+      return file_read_or_error.status();
+    }
+  }
+  else if(datasource.has_environment_variable())
+  {
+      const auto env = absl::NullSafeStringView(std::getenv(datasource.environment_variable().c_str()));
+      if(!env.empty())
+      {
+        pem = env;
+        return absl::OkStatus();
+      }
+      else {
+        absl::string_view message = "Invalid Environment Variable provided";
+        ENVOY_LOG(debug, fmt::format("{}: {}", datasource.environment_variable(), message));
+        return absl::InvalidArgumentError(message);
+      }
+  }
+  else if(datasource.has_inline_bytes())
+  {
+    pem = datasource.inline_bytes();
+    return absl::OkStatus();
+  }
+  else if(datasource.has_inline_string())
+  {
+    pem = datasource.inline_string();
+    return absl::OkStatus();
+  }
+  else {
+    absl::string_view message = "Invalid data source provided";
+    ENVOY_LOG(debug, fmt::format("{}: {}", datasource.environment_variable(), message));
+    return absl::InvalidArgumentError(message);
+  }
+}  
+
+absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemToAlgorithmSerial(
+    std::string pem, Credentials::CertificateAlgorithm& algorithm, std::string& serial) {
     BIO* bio = BIO_new(BIO_s_mem());
     if (bio == nullptr) {
       return absl::InvalidArgumentError("SSL internal error");
     }
-    if (BIO_puts(bio, file_read_or_error.value().c_str()) >= 0) {
+    if (BIO_puts(bio, pem.c_str()) >= 0) {
       X509* cert = nullptr;
       cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
       int nid = X509_get_signature_nid(cert);
@@ -483,21 +543,15 @@ absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemFileToAlgorithmS
     } else {
       return absl::InvalidArgumentError("PEM file could not be parsed");
     }
-  } else {
-    return file_read_or_error.status();
-  }
 }
 
-absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemFileToB64(std::string filename,
+absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemToB64(std::string pem,
                                                                           std::string& output) {
-  auto file_read_or_error = api_.fileSystem().fileReadToEnd(filename);
-
-  if (file_read_or_error.ok()) {
     BIO* bio = BIO_new(BIO_s_mem());
     if (bio == nullptr) {
       return absl::InvalidArgumentError("SSL internal error");
     }
-    if (BIO_puts(bio, file_read_or_error.value().c_str()) >= 0) {
+    if (BIO_puts(bio, pem.c_str()) >= 0) {
       X509* cert = nullptr;
       cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
       unsigned char* cert_in_der = nullptr;
@@ -512,9 +566,6 @@ absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemFileToB64(std::s
     } else {
       return absl::InvalidArgumentError("PEM file could not be parsed");
     }
-  } else {
-    return file_read_or_error.status();
-  }
 }
 
 void IAMRolesAnywhereCertificateCredentialsProvider::refresh() {
@@ -524,26 +575,21 @@ void IAMRolesAnywhereCertificateCredentialsProvider::refresh() {
   std::string cert_serial;
   std::vector<uint8_t> priv_key_der;
   Credentials::CertificateAlgorithm cert_algorithm;
-
-  auto status = pemFileToB64(certificate_data_source_.filename(), cert_der_b64);
-  if (!status.ok()) {
-    ENVOY_LOG(debug, fmt::format("{}: {}", certificate_data_source_.filename(), status.message()));
-  }
+  std::string pem;
+  // Certificate
+  auto status = pemDataSourceToString(certificate_data_source_, pem);
+  status = pemToB64(pem, cert_der_b64);
   status =
-      pemFileToAlgorithmSerial(certificate_data_source_.filename(), cert_algorithm, cert_serial);
-  if (!status.ok()) {
-    ENVOY_LOG(debug, fmt::format("{}: {}", certificate_data_source_.filename(), status.message()));
+    pemToAlgorithmSerial(pem, cert_algorithm, cert_serial);
+  // Certificate Chain
+  if(certificate_chain_data_source_.has_value())
+  {
+    status = pemDataSourceToString(certificate_chain_data_source_.value(),  pem);
+    status = pemToB64(pem, cert_chain_der_b64);
   }
-
-  status = pemFileToB64(certificate_chain_data_source_.filename(), cert_chain_der_b64);
-  if (!status.ok()) {
-    ENVOY_LOG(debug,
-              fmt::format("{}: {}", certificate_chain_data_source_.filename(), status.message()));
-  }
-  status = pemFileToDer(private_key_data_source_.filename(), priv_key_der);
-  if (!status.ok()) {
-    ENVOY_LOG(debug, fmt::format("{}: {}", private_key_data_source_.filename(), status.message()));
-  }
+  // Private Key
+  status = pemDataSourceToString(private_key_data_source_,  pem);
+  status = pemToDer(pem, priv_key_der);
 
   // We may have a cert chain or not, but we must always have a private key and certificate
   if (!cert_der_b64.empty() && !priv_key_der.empty()) {
@@ -558,25 +604,29 @@ void IAMRolesAnywhereCertificateCredentialsProvider::refresh() {
           Credentials(cert_der_b64, cert_algorithm, cert_serial, absl::nullopt, priv_key_der);
     }
   }
+  else
+  {
+    cached_credentials_ = Credentials();
+  }
 }
 
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
     CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-    std::chrono::seconds initialization_timer, absl::string_view role_arn,
-    absl::string_view role_session_name, absl::string_view region, absl::string_view cluster_name,
+    std::chrono::seconds initialization_timer, absl::string_view role_arn, absl::string_view profile_arn, absl::string_view trust_anchor_arn,
+    absl::string_view role_session_name, absl::optional<uint16_t> session_duration, absl::string_view region, absl::string_view cluster_name,
     absl::string_view uri, envoy::config::core::v3::DataSource certificate_data_source,
     envoy::config::core::v3::DataSource private_key_data_source,
-    envoy::config::core::v3::DataSource cert_chain_data_source
+    absl::optional<envoy::config::core::v3::DataSource> cert_chain_data_source
 
     )
     : MetadataCredentialsProviderBase(api, context, nullptr, create_metadata_fetcher_cb,
                                       cluster_name,
                                       envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri,
                                       refresh_state, initialization_timer),
-      role_arn_(role_arn), role_session_name_(role_session_name), region_(region),
-      server_factory_context_(context) {
+      role_arn_(role_arn), role_session_name_(role_session_name), profile_arn_(profile_arn), trust_anchor_arn_(trust_anchor_arn), region_(region),
+      session_duration_(session_duration), server_factory_context_(context) {
 
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereCertificateCredentialsProvider>(
@@ -633,6 +683,20 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   message.headers().setHost(uri_);
   message.headers().setPath("/sessions");
   // message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
+  
+    std::string body_data;
+    body_data.append("{");
+  if(session_duration_.has_value())
+  {
+    body_data.append(fmt::format("\"durationSeconds\": {},",session_duration_.value()));
+  }
+      body_data.append(fmt::format("\"profileArn\": \"{}\",",profile_arn_));
+    body_data.append(fmt::format("\"roleArn\": \"{}\",",role_arn_));
+    body_data.append(fmt::format("\"trustAnchorArn\": \"{}\"",trust_anchor_arn_));
+    body_data.append(fmt::format(",\"roleSessionName\": \"{}\"",role_session_name_));
+  body_data.append("}");
+
+  message.body().add(body_data);
   auto status = roles_anywhere_signer_->signEmptyPayload(message.headers());
 
   // Stop any existing timer.
@@ -1438,17 +1502,36 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
   } else if (config.has_iam_roles_anywhere()) {
     const auto& roles_anywhere = config.iam_roles_anywhere();
     const std::string iam_roles_anywhere_endpoint = Utility::getRolesAnywhereEndpoint(region);
-    const std::string& role_arn = roles_anywhere.role_arn();
-    const std::string role_session_name = sessionName(context.api());
+    std::string role_session_name;
+    if(roles_anywhere.role_session_name().empty())
+    {
+      role_session_name = roles_anywhere.role_session_name();
+    }
+    else {
+      role_session_name = sessionName(context.api());
+    }
 
-    const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+    absl::optional<uint16_t> session_duration;
+    if(roles_anywhere.has_session_duration())
+    {
+      session_duration = PROTOBUF_GET_SECONDS_OR_DEFAULT(
+      roles_anywhere, session_duration,
+      Extensions::Common::Aws::SignatureQueryParameterValues::DefaultExpiration);
+    }
+
     const auto initialization_timer = std::chrono::seconds(2);
-
+    // const auto cert_chain = 
+    absl::optional<envoy::config::core::v3::DataSource> cert_chain;
+    if(roles_anywhere.has_certificate_chain())
+    {
+      cert_chain = roles_anywhere.certificate_chain();
+    }
+    roles_anywhere.certificate_chain();
     return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
-        context.api(), context, MetadataFetcher::create, refresh_state, initialization_timer,
-        role_arn, role_session_name, region, iam_roles_anywhere_endpoint,
-        iam_roles_anywhere_endpoint, roles_anywhere.certificate(), roles_anywhere.private_key(),
-        roles_anywhere.certificate_chain());
+        context.api(), context, MetadataFetcher::create,  MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh, initialization_timer,
+        roles_anywhere.role_arn(), role_session_name, roles_anywhere.profile_arn(), roles_anywhere.trust_anchor_arn(), session_duration, region, iam_roles_anywhere_endpoint,
+        iam_roles_anywhere_endpoint, roles_anywhere.certificate(), roles_anywhere.private_key(), cert_chain
+        );
   } else {
     return absl::InvalidArgumentError("No AWS credential provider specified");
   }
