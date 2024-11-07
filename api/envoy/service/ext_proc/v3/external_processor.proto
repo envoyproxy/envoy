@@ -220,7 +220,7 @@ message HttpHeaders {
   map<string, google.protobuf.Struct> attributes = 2
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // If true, then there is no message body associated with this
+  // If ``true``, then there is no message body associated with this
   // request or response.
   bool end_of_stream = 3;
 }
@@ -229,10 +229,10 @@ message HttpHeaders {
 // response bodies are received.
 message HttpBody {
   // The contents of the body in the HTTP request/response. Note that in
-  // streaming mode multiple HttpBody messages may be sent.
+  // streaming mode multiple ``HttpBody`` messages may be sent.
   bytes body = 1;
 
-  // If true, this will be the last HttpBody message that will be sent and no
+  // If ``true``, this will be the last ``HttpBody`` message that will be sent and no
   // trailers will be sent for the current request/response.
   bool end_of_stream = 2;
 }
@@ -247,7 +247,7 @@ message HttpTrailers {
 
 // The following are messages that may be sent back by the server.
 
-// This message is sent by the external server to Envoy after HttpHeaders was
+// This message is sent by the external server to Envoy after ``HttpHeaders`` was
 // sent to it.
 message HeadersResponse {
   // Details the modifications (if any) to be made by Envoy to the current
@@ -255,7 +255,7 @@ message HeadersResponse {
   CommonResponse response = 1;
 }
 
-// This message is sent by the external server to Envoy after HttpBody was
+// This message is sent by the external server to Envoy after ``HttpBody`` was
 // sent to it.
 message BodyResponse {
   // Details the modifications (if any) to be made by Envoy to the current
@@ -263,7 +263,7 @@ message BodyResponse {
   CommonResponse response = 1;
 }
 
-// This message is sent by the external server to Envoy after HttpTrailers was
+// This message is sent by the external server to Envoy after ``HttpTrailers`` was
 // sent to it.
 message TrailersResponse {
   // Details the modifications (if any) to be made by Envoy to the current
