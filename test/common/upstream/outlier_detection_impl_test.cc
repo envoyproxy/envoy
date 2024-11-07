@@ -2821,12 +2821,13 @@ TEST_F(OutlierDetectorImplTest, BasicCall) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
         threshold: 3
-        enforcing: 100
-        error_buckets:
-          http_errors:
-            - range:
-                start: 500
-                end: 510
+        errors:
+          enforcing: 100
+          match:
+            http_codes:
+              - range:
+                  start: 500
+                  end: 510
   )EOF";
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
@@ -2872,19 +2873,21 @@ TEST_F(OutlierDetectorImplTest, TwoExtensions) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
         threshold: 3
-        enforcing: 100
-        error_buckets:
-          http_errors:
-            - range:
-                start: 500
-                end: 510
+        errors:
+          enforcing: 100
+          match:
+            http_codes:
+              - range:
+                  start: 500
+                  end: 510
     - name: "local_origin_monitor"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
         threshold: 3
-        enforcing: 100
-        error_buckets:
-          local_origin_errors: {}
+        errors:
+          enforcing: 100
+          match:
+            local_origin_events: {}
   )EOF";
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
@@ -2934,9 +2937,10 @@ TEST_F(OutlierDetectorImplTest, TwoExtensionsOneOverlapping) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
         threshold: 3
-        enforcing: 100
-        error_buckets:
-          http_errors:
+        errors:
+          enforcing: 100
+          match:
+            http_codes:
             - range:
                 start: 500
                 end: 510
@@ -2944,9 +2948,10 @@ TEST_F(OutlierDetectorImplTest, TwoExtensionsOneOverlapping) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
         threshold: 3
-        enforcing: 100
-        error_buckets:
-          local_origin_errors: {}
+        errors:
+          enforcing: 100
+          match:
+            local_origin_events: {}
   )EOF";
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);
@@ -3022,19 +3027,21 @@ TEST_F(OutlierDetectorImplTest, TwoExtensionsOnePreferred) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
         threshold: 3
-        enforcing: 100
-        error_buckets:
-          http_errors:
-            - range:
-                start: 500
-                end: 510
+        errors:
+          enforcing: 100
+          match:
+            http_codes:
+              - range:
+                  start: 500
+                  end: 510
     - name: "local_origin_monitor"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
         threshold: 3
-        enforcing: 100
-        error_buckets:
-          local_origin_errors: {}
+        errors:
+          enforcing: 100
+          match:
+            local_origin_events: {}
   )EOF";
   envoy::config::cluster::v3::OutlierDetection outlier_detection;
   TestUtility::loadFromYaml(yaml, outlier_detection);

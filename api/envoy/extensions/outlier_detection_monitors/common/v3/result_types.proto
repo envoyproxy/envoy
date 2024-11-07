@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package envoy.extensions.outlier_detection_monitors.common.v3;
+
+import "envoy/type/v3/range.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.outlier_detection_monitors.common.v3";
+option java_outer_classname = "ErrorTypesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/outlier_detection_monitors/common/v3;commonv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Outlier detection event buckets]
+
+// Outlier detection extensions require attaching event buckets. The purpose
+// of event buckets is describing which results should be of interest to
+// a outlier detection extension.
+
+// Bucket for HTTP codes. A result matches the bucket
+// if a HTTP code is within defined range.
+message HttpCodes {
+  type.v3.Int32Range range = 1 [(validate.rules).message = {required: true}];
+}
+
+// Bucket for locally originated events.
+message LocalOriginEvent {
+}
+
+// Bucket for database results.
+// Sub-parameters may be added later, like malformed response, error on write, etc.
+// [#not-implemented-hide:]
+message DatabaseResult {
+}
+
+// Union of possible error buckets.
+message ResultBuckets {
+  // List of buckets "catching" HTTP codes.
+  repeated HttpCodes http_codes = 1;
+
+  // List of buckets "catching" locally originated events.
+  repeated LocalOriginEvent local_origin_events = 2;
+
+  // List of buckets "catching" database results.
+  // [#not-implemented-hide:]
+  repeated DatabaseResult database_results = 3;
+}

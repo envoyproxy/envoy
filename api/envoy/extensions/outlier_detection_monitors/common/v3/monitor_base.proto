@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package envoy.extensions.outlier_detection_monitors.common.v3;
+
+import "envoy/extensions/outlier_detection_monitors/common/v3/result_types.proto";
+import "envoy/type/v3/range.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.outlier_detection_monitors.common.v3";
+option java_outer_classname = "MonitorBaseProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/outlier_detection_monitors/common/v3;commonv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Outlier detection extension base config]
+
+// Base config used by all types of outlier detection extensions.
+message MonitorBaseConfig {
+  // Set of result buckets. Each reported result is matched against
+  // that set.
+  ResultBuckets match = 1 [(validate.rules).message = {required: true}];
+
+  // The % chance that a host will be actually ejected when an monitor's
+  // algorithm decides that the host is unhealthy.
+  // This setting can be used to disable
+  // ejection or to ramp it up slowly. Defaults to 100.
+  google.protobuf.UInt32Value enforcing = 2 [(validate.rules).uint32 = {lte: 100}];
+}

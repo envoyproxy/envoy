@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/outlier_detection_monitors/common/v3/error_types.pb.h"
-#include "envoy/extensions/outlier_detection_monitors/common/v3/error_types.pb.validate.h"
+#include "envoy/extensions/outlier_detection_monitors/common/v3/result_types.pb.h"
+#include "envoy/extensions/outlier_detection_monitors/common/v3/result_types.pb.validate.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/upstream/outlier_detection.h"
 
@@ -14,41 +14,41 @@ namespace Outlier {
 
 using namespace Envoy::Upstream::Outlier;
 
-// ErrorsBucket is used by outlier detection monitors and is used to
-// "catch" reported Error (TypedError);
-class ErrorsBucket {
+// ResultsBucket is used by outlier detection monitors to
+// "catch" reported ExtResults.
+class ResultsBucket {
 public:
   virtual bool matchType(const ExtResult&) const PURE;
   virtual bool match(const ExtResult&) const PURE;
-  virtual ~ErrorsBucket() {}
+  virtual ~ResultsBucket() = default;
 };
 
-template <class E> class TypedErrorsBucket : public ErrorsBucket {
+template <class E> class TypedResultsBucket : public ResultsBucket {
 public:
   bool matchType(const ExtResult& result) const override {
     return absl::holds_alternative<E>(result);
   }
 
-  virtual ~TypedErrorsBucket() {}
+  virtual ~TypedResultsBucket() {}
 };
 
-using ErrorsBucketPtr = std::unique_ptr<ErrorsBucket>;
+using ResultsBucketPtr = std::unique_ptr<ResultsBucket>;
 
 // Class defines a range of consecutive HTTP codes.
-class HTTPCodesBucket : public TypedErrorsBucket<Upstream::Outlier::HttpCode> {
+class HTTPCodesBucket : public TypedResultsBucket<Upstream::Outlier::HttpCode> {
 public:
   HTTPCodesBucket() = delete;
   HTTPCodesBucket(uint64_t start, uint64_t end) : start_(start), end_(end) {}
   bool match(const ExtResult&) const override;
 
-  virtual ~HTTPCodesBucket() {}
+  virtual ~HTTPCodesBucket() = default;
 
 private:
   uint64_t start_, end_;
 };
 
 // Class defines a "bucket" which catches LocalOriginEvent.
-class LocalOriginEventsBucket : public TypedErrorsBucket<Upstream::Outlier::LocalOriginEvent> {
+class LocalOriginEventsBucket : public TypedResultsBucket<Upstream::Outlier::LocalOriginEvent> {
 public:
   LocalOriginEventsBucket() = default;
   bool match(const ExtResult&) const override;
@@ -63,18 +63,18 @@ public:
       : name_(name), enforce_(enforce),
         enforce_runtime_key_("outlier_detection.enforcing_extension." + name) {}
   void processBucketsConfig(
-      const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config);
-  void addErrorBucket(ErrorsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
+      const envoy::extensions::outlier_detection_monitors::common::v3::ResultBuckets& config);
+  void addResultBucket(ResultsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
 
   uint32_t enforce() const { return enforce_; }
   const std::string& name() const { return name_; }
   absl::string_view enforceRuntimeKey() const { return enforce_runtime_key_; }
-  const std::vector<ErrorsBucketPtr>& buckets() const { return buckets_; }
+  const std::vector<ResultsBucketPtr>& buckets() const { return buckets_; }
 
 private:
   std::string name_;
   uint32_t enforce_{100};
-  std::vector<ErrorsBucketPtr> buckets_;
+  std::vector<ResultsBucketPtr> buckets_;
   std::string enforce_runtime_key_;
 };
 
@@ -84,7 +84,7 @@ class ExtMonitorBase : public ExtMonitor {
 public:
   ExtMonitorBase(ExtMonitorConfigSharedPtr config) : config_(std::move(config)) {}
   ExtMonitorBase() = delete;
-  virtual ~ExtMonitorBase() {}
+  virtual ~ExtMonitorBase() = default;
   void putResult(const ExtResult) override;
 
   void setExtMonitorCallback(ExtMonitorCallback callback) override { callback_ = callback; }

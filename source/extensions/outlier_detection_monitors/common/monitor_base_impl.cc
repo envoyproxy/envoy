@@ -65,13 +65,13 @@ void ExtMonitorBase::putResult(const ExtResult result) {
 }
 
 void ExtMonitorConfig::processBucketsConfig(
-    const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config) {
-  for (const auto& http_bucket : config.http_errors()) {
-    addErrorBucket(
+    const envoy::extensions::outlier_detection_monitors::common::v3::ResultBuckets& config) {
+  for (const auto& http_bucket : config.http_codes()) {
+    addResultBucket(
         std::make_unique<HTTPCodesBucket>(http_bucket.range().start(), http_bucket.range().end()));
   }
-  for (auto i = 0; i < config.local_origin_errors().size(); i++) {
-    addErrorBucket(std::make_unique<LocalOriginEventsBucket>());
+  for (auto i = 0; i < config.local_origin_events().size(); i++) {
+    addResultBucket(std::make_unique<LocalOriginEventsBucket>());
   }
 }
 } // namespace Outlier

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.outlier_detection_monitors.consecutive_errors.v3;
 
-import "envoy/extensions/outlier_detection_monitors/common/v3/error_types.proto";
+import "envoy/extensions/outlier_detection_monitors/common/v3/monitor_base.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -22,13 +22,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // If number of consecutive errors exceeds the threshold, monitor will report that the host
 // is unhealthy.
 message ConsecutiveErrors {
+  // Base monitor config. Defines which results should be interpreted as errors
+  // and whether to enforce ejection when number of errors exceeds defined threshold.
+  common.v3.MonitorBaseConfig errors = 1 [(validate.rules).message = {required: true}];
+
   // The number of consecutive errors before ejection occurs.
   // Defaults to 3.
-  google.protobuf.UInt32Value threshold = 1 [(validate.rules).uint32 = {lte: 100}];
-
-  // The % chance that a host is actually ejected. Defaults to 100.
-  google.protobuf.UInt32Value enforcing = 2 [(validate.rules).uint32 = {lte: 100}];
-
-  // Error buckets.
-  common.v3.ErrorBuckets error_buckets = 3;
+  google.protobuf.UInt32Value threshold = 2 [(validate.rules).uint32 = {lte: 100}];
 }

@@ -65,7 +65,7 @@ public:
   MOCK_METHOD(void, onReset, ());
 };
 
-class TestBucket : public TypedErrorsBucket<Upstream::Outlier::HttpCode> {
+class TestBucket : public TypedResultsBucket<Upstream::Outlier::HttpCode> {
 public:
   TestBucket() = default;
 };
@@ -89,7 +89,7 @@ protected:
     auto bucket_raw_ptr = bucket.get();
 
     // Add bucket to the monitor.
-    config_->addErrorBucket(std::move(bucket));
+    config_->addResultBucket(std::move(bucket));
     return bucket_raw_ptr;
   }
 
