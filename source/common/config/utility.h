@@ -353,7 +353,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
+    THROW_IF_NOT_OK(translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config));
     return config;
   }
 
@@ -377,7 +377,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(typed_config, validation_visitor, *config);
+    THROW_IF_NOT_OK(translateOpaqueConfig(typed_config, validation_visitor, *config));
     return config;
   }
 
@@ -406,8 +406,9 @@ public:
    * @param typed_config opaque config packed in google.protobuf.Any
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
+   * @return a status indicating if translation was a success
    */
-  static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+  static absl::Status translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto);
 

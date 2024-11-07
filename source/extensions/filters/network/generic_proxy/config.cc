@@ -53,8 +53,8 @@ Factory::factoriesFromProto(const envoy::config::core::v3::TypedExtensionConfig&
   auto& factory = Config::Utility::getAndCheckFactory<CodecFactoryConfig>(codec_config);
 
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(),
-                                                context.messageValidationVisitor(), *message);
+  THROW_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(),
+                                                context.messageValidationVisitor(), *message));
   return {factory.createCodecFactory(*message, context.serverFactoryContext()),
           factory.createProxyFactory(*message, context.serverFactoryContext())};
 }
@@ -104,8 +104,8 @@ Factory::filtersFactoryFromProto(const ProtobufWkt::RepeatedPtrField<TypedExtens
 
     ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
     ASSERT(message != nullptr);
-    Envoy::Config::Utility::translateOpaqueConfig(filter.typed_config(),
-                                                  context.messageValidationVisitor(), *message);
+    THROW_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(filter.typed_config(),
+                                                  context.messageValidationVisitor(), *message));
 
     factories.push_back(
         {filter.name(), factory.createFilterFactoryFromProto(*message, stats_prefix, context)});

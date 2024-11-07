@@ -15,8 +15,8 @@ Server::Configuration::GuardDogActionPtr ProfileActionFactory::createGuardDogAct
     const envoy::config::bootstrap::v3::Watchdog::WatchdogAction& config,
     Server::Configuration::GuardDogActionFactoryContext& context) {
   auto message = createEmptyConfigProto();
-  Config::Utility::translateOpaqueConfig(config.config().typed_config(),
-                                         ProtobufMessage::getStrictValidationVisitor(), *message);
+  THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(config.config().typed_config(),
+                                         ProtobufMessage::getStrictValidationVisitor(), *message));
   return std::make_unique<ProfileAction>(dynamic_cast<ProfileActionConfig&>(*message), context);
 }
 
