@@ -59,28 +59,30 @@ public:
 */
 class ExtMonitorConfig {
 public:
-  ExtMonitorConfig(const std::string& name, uint32_t enforce) : name_(name), enforce_(enforce) {}
+  ExtMonitorConfig(const std::string& name, uint32_t enforce)
+      : name_(name), enforce_(enforce),
+        enforce_runtime_key_("outlier_detection.enforcing_extension." + name) {}
   void processBucketsConfig(
       const envoy::extensions::outlier_detection_monitors::common::v3::ErrorBuckets& config);
   void addErrorBucket(ErrorsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
 
   uint32_t enforce() const { return enforce_; }
   const std::string& name() const { return name_; }
+  absl::string_view enforceRuntimeKey() const { return enforce_runtime_key_; }
   const std::vector<ErrorsBucketPtr>& buckets() const { return buckets_; }
 
 private:
   std::string name_;
   uint32_t enforce_{100};
   std::vector<ErrorsBucketPtr> buckets_;
+  std::string enforce_runtime_key_;
 };
 
 using ExtMonitorConfigSharedPtr = std::shared_ptr<ExtMonitorConfig>;
 
 class ExtMonitorBase : public ExtMonitor {
 public:
-  ExtMonitorBase(ExtMonitorConfigSharedPtr config)
-      : config_(std::move(config)),
-        enforce_runtime_key_("outlier_detection.enforcing_extension." + config_->name()) {}
+  ExtMonitorBase(ExtMonitorConfigSharedPtr config) : config_(std::move(config)) {}
   ExtMonitorBase() = delete;
   virtual ~ExtMonitorBase() {}
   void putResult(const ExtResult) override;
@@ -90,7 +92,7 @@ public:
   void reset() override { onReset(); }
   uint32_t enforce() const override { return config_->enforce(); }
   absl::string_view name() const override { return config_->name(); }
-  absl::string_view enforceRuntimeKey() const override { return enforce_runtime_key_; }
+  absl::string_view enforceRuntimeKey() const override { return config_->enforceRuntimeKey(); }
 
   const ExtMonitorConfigSharedPtr& config() const { return config_; }
 
@@ -101,7 +103,6 @@ protected:
 
   ExtMonitor::ExtMonitorCallback callback_;
   ExtMonitorConfigSharedPtr config_;
-  std::string enforce_runtime_key_;
 };
 
 template <class ConfigProto>
