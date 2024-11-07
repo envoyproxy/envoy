@@ -495,7 +495,8 @@ bool ConnectivityGrid::isHttp3Broken() const {
 
 void ConnectivityGrid::markHttp3Broken() {
   host_->cluster().trafficStats()->upstream_http3_broken_.inc();
-  getHttp3StatusTracker().markHttp3Broken();
+  ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
+  alternate_protocols_->markHttp3Broken(origin_);
 }
 
 void ConnectivityGrid::markHttp3Confirmed() { getHttp3StatusTracker().markHttp3Confirmed(); }

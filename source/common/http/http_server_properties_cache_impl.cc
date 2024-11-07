@@ -297,8 +297,16 @@ HttpServerPropertiesCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origi
   return *it->second.h3_status_tracker;
 }
 
+void HttpServerPropertiesCacheImpl::markHttp3Broken(const Origin& origin) {
+  getOrCreateHttp3StatusTracker(origin).markHttp3Broken();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness")) {
+    maybeSetHttp3BrokenCanonicalOrigin(origin);
+  }
+}
+
 bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
-  absl::optional<Origin> canonical = getCanonicalOrigin(origin.hostname_);
+  absl::optional<Origin> canonical = getHttp3BrokenCanonicalOrigin(origin.hostname_);
 
   if (!Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness") ||
@@ -319,6 +327,28 @@ bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
   }
 
   return false;
+}
+
+absl::optional<HttpServerPropertiesCacheImpl::Origin>
+HttpServerPropertiesCacheImpl::getHttp3BrokenCanonicalOrigin(absl::string_view hostname) {
+  absl::string_view suffix = getCanonicalSuffix(hostname);
+  if (suffix.empty()) {
+    return {};
+  }
+
+  auto it = canonical_h3_broken_map_.find(std::string(suffix));
+  if (it == canonical_h3_broken_map_.end()) {
+    return {};
+  }
+  return it->second;
+}
+
+void HttpServerPropertiesCacheImpl::maybeSetHttp3BrokenCanonicalOrigin(const Origin& origin) {
+  absl::string_view suffix = getCanonicalSuffix(origin.hostname_);
+  if (suffix.empty()) {
+    return;
+  }
+  canonical_h3_broken_map_[std::string(suffix)] = origin;
 }
 
 void HttpServerPropertiesCacheImpl::resetBrokenness() {

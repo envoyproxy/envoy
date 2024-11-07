@@ -182,6 +182,11 @@ public:
   virtual bool isHttp3Broken(const Origin& origin) PURE;
 
   /**
+   * @ origin The origin to mark h3 broken.
+   */
+  virtual void markHttp3Broken(const Origin& origin) PURE;
+
+  /**
    * Changes any origins with status "Broken" for HTTP/3 to "Failed Recently"
    */
   virtual void resetBrokenness() PURE;

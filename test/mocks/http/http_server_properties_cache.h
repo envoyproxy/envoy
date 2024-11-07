@@ -22,6 +22,7 @@ public:
   MOCK_METHOD(HttpServerPropertiesCache::Http3StatusTracker&, getOrCreateHttp3StatusTracker,
               (const Origin& origin));
   MOCK_METHOD(bool, isHttp3Broken, (const Origin& origin));
+  MOCK_METHOD(void, markHttp3Broken, (const Origin& origin));
   MOCK_METHOD(void, resetBrokenness, ());
 };
 
