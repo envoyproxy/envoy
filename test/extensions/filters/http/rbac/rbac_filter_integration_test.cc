@@ -82,7 +82,7 @@ typed_config:
                 value:
                   string_match:
                     exact: "baz"
-              metadata_source: "ROUTE_ENTRY"
+              metadata_source: "ROUTE"
 )EOF";
 
 const std::string RBAC_CONFIG_WITH_DYNAMIC_METADATA = R"EOF(
@@ -111,7 +111,7 @@ typed_config:
                 value:
                   string_match:
                     exact: "bat"
-              metadata_source: "ROUTE_ENTRY"
+              metadata_source: "ROUTE"
 )EOF";
 
 const std::string RBAC_CONFIG_WITH_SOURCED_METADATA_ROUTE = R"EOF(
@@ -132,7 +132,7 @@ typed_config:
                 value:
                   string_match:
                     exact: "baz"
-              metadata_source: "ROUTE_ENTRY"
+              metadata_source: "ROUTE"
         principals:
           - sourced_metadata:
               metadata_matcher:
@@ -143,7 +143,7 @@ typed_config:
                 value:
                   string_match:
                     exact: "bat"
-              metadata_source: "ROUTE_ENTRY"
+              metadata_source: "ROUTE"
 )EOF";
 
 const std::string RBAC_CONFIG_WITH_PREFIX_MATCH = R"EOF(
