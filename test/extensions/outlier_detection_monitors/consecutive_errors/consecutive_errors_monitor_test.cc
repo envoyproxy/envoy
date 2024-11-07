@@ -15,20 +15,20 @@ TEST(ConsecutiveErrorsMonitorTest, BasicTest) {
   // At the start, the error counter is zero.
   // Report 3 errors. Reporting the 3rd error should indicate
   // that monitor has been tripped.
-  ASSERT_FALSE(monitor.onError());
-  ASSERT_FALSE(monitor.onError());
-  ASSERT_TRUE(monitor.onError());
+  ASSERT_FALSE(monitor.onMatch());
+  ASSERT_FALSE(monitor.onMatch());
+  ASSERT_TRUE(monitor.onMatch());
 
   // Reset the monitor.
   monitor.onReset();
 
-  ASSERT_FALSE(monitor.onError());
-  ASSERT_FALSE(monitor.onError());
+  ASSERT_FALSE(monitor.onMatch());
+  ASSERT_FALSE(monitor.onMatch());
   // Calling onSuccess should reset the errors counter.
   monitor.onSuccess();
-  ASSERT_FALSE(monitor.onError());
-  ASSERT_FALSE(monitor.onError());
-  ASSERT_TRUE(monitor.onError());
+  ASSERT_FALSE(monitor.onMatch());
+  ASSERT_FALSE(monitor.onMatch());
+  ASSERT_TRUE(monitor.onMatch());
 }
 
 } // namespace Outlier

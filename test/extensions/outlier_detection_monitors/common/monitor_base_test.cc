@@ -60,7 +60,7 @@ TEST(MonitorBaseTest, LocalOriginErrorBucket) {
 class MockMonitor : public ExtMonitorBase {
 public:
   MockMonitor(ExtMonitorConfigSharedPtr config) : ExtMonitorBase(config) {}
-  MOCK_METHOD(bool, onError, ());
+  MOCK_METHOD(bool, onMatch, ());
   MOCK_METHOD(void, onSuccess, ());
   MOCK_METHOD(void, onReset, ());
 };
@@ -114,7 +114,7 @@ TEST_F(MonitorTest, SingleBucketNotMatchingType) {
 
   // None of the follow-up routines should be called.
   EXPECT_CALL(*monitor_, onSuccess).Times(0);
-  EXPECT_CALL(*monitor_, onError).Times(0);
+  EXPECT_CALL(*monitor_, onMatch).Times(0);
   EXPECT_CALL(*monitor_, onReset).Times(0);
 
   // Monitor is interested only in Results of ExtResultType::TEST
@@ -147,7 +147,7 @@ TEST_F(MonitorTest, SingleBucketMatchingResultNotTripped) {
   addBucket1();
   // "matches" checks if the reported error matches the bucket.
   // If "matches" returns true, the result is considered an error
-  // and monitor's "onError" is called. Depending on type and
+  // and monitor's "onMatch" is called. Depending on type and
   // implementation of the monitor, it may increase internal
   // monitor's counters and "trip" the monitor.
   bool callback_called = false;
@@ -155,11 +155,11 @@ TEST_F(MonitorTest, SingleBucketMatchingResultNotTripped) {
       [&callback_called](const ExtMonitor*) { callback_called = true; });
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(true));
   // Return that the monitor has not been tripped.
-  EXPECT_CALL(*monitor_, onError).WillOnce(Return(false));
+  EXPECT_CALL(*monitor_, onMatch).WillOnce(Return(false));
 
   monitor_->putResult(HttpCode(200));
 
-  // Callback has not been called, because onError returned false,
+  // Callback has not been called, because onMatch returned false,
   // meaning that monitor has not tripped yet.
   ASSERT_FALSE(callback_called);
 }
@@ -168,7 +168,7 @@ TEST_F(MonitorTest, SingleBucketMatchingResultTripped) {
   addBucket1();
   // "matches" checks if the reported error matches the bucket.
   // If "matches" returns true, the result is considered an error
-  // and monitor's "onError" is called. Depending on type and
+  // and monitor's "onMatch" is called. Depending on type and
   // implementation of the monitor, it may increase internal
   // monitor's counters and "trip" the monitor.
   bool callback_called = false;
@@ -179,13 +179,13 @@ TEST_F(MonitorTest, SingleBucketMatchingResultTripped) {
   });
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(true));
   // Return that the monitor has been tripped.
-  EXPECT_CALL(*monitor_, onError).WillOnce(Return(true));
+  EXPECT_CALL(*monitor_, onMatch).WillOnce(Return(true));
   // After tripping, the monitor is reset
   EXPECT_CALL(*monitor_, onReset);
 
   monitor_->putResult(HttpCode(200));
 
-  // Callback has been called, because onError returned true,
+  // Callback has been called, because onMatch returned true,
   // meaning that monitor has tripped.
   ASSERT_TRUE(callback_called);
 }
@@ -208,7 +208,7 @@ TEST_F(MonitorTest, TwoBucketsFirstMatching) {
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(true));
   // Matching the second bucket should be skipped.
   EXPECT_CALL(*bucket2_, match(_)).Times(0);
-  EXPECT_CALL(*monitor_, onError).WillOnce(Return(false));
+  EXPECT_CALL(*monitor_, onMatch).WillOnce(Return(false));
 
   monitor_->putResult(HttpCode(200));
 }
@@ -225,13 +225,13 @@ TEST_F(MonitorTest, TwoBucketsSecondMatching) {
   });
   EXPECT_CALL(*bucket1_, match(_)).WillOnce(Return(false));
   EXPECT_CALL(*bucket2_, match(_)).WillOnce(Return(true));
-  EXPECT_CALL(*monitor_, onError).WillOnce(Return(true));
+  EXPECT_CALL(*monitor_, onMatch).WillOnce(Return(true));
   // After tripping, the monitor is reset
   EXPECT_CALL(*monitor_, onReset);
 
   monitor_->putResult(HttpCode(200));
 
-  // Callback has been called, because onError returned true,
+  // Callback has been called, because onMatch returned true,
   // meaning that monitor has tripped.
   ASSERT_TRUE(callback_called);
 }

@@ -25,8 +25,8 @@ void ExtMonitorBase::putResult(const ExtResult result) {
     return;
   }
 
-  bool matched_error = false;
   bool matched_type = false;
+  bool matched_value = false;
   // iterate over all error buckets
   for (auto& bucket : config_->buckets()) {
     // if the bucket is not interested in this type of result/error
@@ -39,7 +39,7 @@ void ExtMonitorBase::putResult(const ExtResult result) {
 
     // check if the bucket "catches" the result.
     if (bucket->match(result)) {
-      matched_error = true;
+      matched_value = true;
       break;
     }
   }
@@ -49,9 +49,9 @@ void ExtMonitorBase::putResult(const ExtResult result) {
     return;
   }
 
-  if (matched_error) {
+  if (matched_value) {
     // Count as error.
-    if (onError()) {
+    if (onMatch()) {
       callback_(this);
       // Reaching error was reported via callback.
       // but the host may or may not be ejected based on enforce_ parameter.

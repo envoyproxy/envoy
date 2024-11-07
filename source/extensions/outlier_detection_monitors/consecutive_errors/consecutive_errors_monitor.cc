@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Extensions {
 namespace Outlier {
 
-bool ConsecutiveErrorsMonitor::onError() {
+bool ConsecutiveErrorsMonitor::onMatch() {
   uint32_t expected_count = counter_.load();
 
   // no-op. Just keep executing compare_exchange_strong until threads synchronize.

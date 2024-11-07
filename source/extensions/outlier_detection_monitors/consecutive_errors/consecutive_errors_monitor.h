@@ -12,7 +12,7 @@ public:
   ConsecutiveErrorsMonitor(ExtMonitorConfigSharedPtr config, uint32_t max)
       : ExtMonitorBase(std::move(config)), max_(max) {}
   virtual ~ConsecutiveErrorsMonitor() {}
-  virtual bool onError() override;
+  virtual bool onMatch() override;
   virtual void onSuccess() override;
   virtual void onReset() override;
 
