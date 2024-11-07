@@ -353,7 +353,8 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
-    THROW_IF_NOT_OK(translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config));
+    THROW_IF_NOT_OK(
+        translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config));
     return config;
   }
 
@@ -409,8 +410,8 @@ public:
    * @return a status indicating if translation was a success
    */
   static absl::Status translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    ProtobufMessage::ValidationVisitor& validation_visitor,
-                                    Protobuf::Message& out_proto);
+                                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                                            Protobuf::Message& out_proto);
 
   /**
    * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
