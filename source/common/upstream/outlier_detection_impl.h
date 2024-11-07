@@ -398,9 +398,9 @@ public:
   void onConsecutive5xx(HostSharedPtr host);
   void onConsecutiveGatewayFailure(HostSharedPtr host);
   void onConsecutiveLocalOriginFailure(HostSharedPtr host);
-  void notifyMainThreadConsecutiveError(
-      HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type,
-      absl::optional<const ExtMonitor*> failed_monitor = absl::nullopt);
+  void notifyMainThreadConsecutiveError(HostSharedPtr host,
+                                        envoy::data::cluster::v3::OutlierEjectionType type,
+                                        const ExtMonitor* failed_monitor = nullptr);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
   void unejectHost(HostSharedPtr host);
@@ -448,16 +448,16 @@ private:
   void armIntervalTimer();
   void checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor, MonotonicTime now);
   void ejectHost(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type,
-                 absl::optional<const ExtMonitor*> failed_monitor);
+                 const ExtMonitor* failed_monitor);
   static DetectionStats generateStats(Stats::Scope& scope);
   void initialize(Cluster& cluster);
   void onConsecutiveErrorWorker(HostSharedPtr host,
                                 envoy::data::cluster::v3::OutlierEjectionType type,
-                                absl::optional<const ExtMonitor*> failed_monitor);
+                                const ExtMonitor* failed_monitor);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
   bool enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type,
-                       absl::optional<const ExtMonitor*> failed_monitor);
+                       const ExtMonitor* failed_monitor);
   void updateEnforcedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
   void updateDetectedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
   void processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);
@@ -525,7 +525,7 @@ public:
   // Upstream::Outlier::EventLogger
   void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
                 envoy::data::cluster::v3::OutlierEjectionType type, bool enforced,
-                absl::optional<const ExtMonitor*> failed_monitor) override;
+                const ExtMonitor* failed_monitor) override;
 
   void logUneject(const HostDescriptionConstSharedPtr& host) override;
 

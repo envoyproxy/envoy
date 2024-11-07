@@ -82,7 +82,7 @@ using ExtResult = absl::variant<HttpCode, LocalOriginEvent>;
 // Each monitor may implement different health detection algorithm.
 class ExtMonitor {
 public:
-  virtual ~ExtMonitor() {}
+  virtual ~ExtMonitor() = default;
   using ExtMonitorCallback = std::function<void(const ExtMonitor*)>;
 
   // Method to report a result to extensions.
@@ -234,7 +234,7 @@ public:
    */
   virtual void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
                         envoy::data::cluster::v3::OutlierEjectionType type, bool enforced,
-                        absl::optional<const ExtMonitor*> failed_monitor) PURE;
+                        const ExtMonitor* failed_monitor) PURE;
 
   /**
    * Log an unejection event.

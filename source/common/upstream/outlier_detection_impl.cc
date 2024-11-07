@@ -466,7 +466,7 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
 }
 
 bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type,
-                                   absl::optional<const ExtMonitor*> failed_monitor) {
+                                   const ExtMonitor* failed_monitor) {
   switch (type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::data::cluster::v3::CONSECUTIVE_5XX:
@@ -491,9 +491,9 @@ bool DetectorImpl::enforceEjection(envoy::data::cluster::v3::OutlierEjectionType
     return runtime_.snapshot().featureEnabled(EnforcingFailurePercentageLocalOriginRuntime,
                                               config_.enforcingFailurePercentageLocalOrigin());
   case envoy::data::cluster::v3::EXTENSION:
-    ASSERT(failed_monitor.has_value());
-    return runtime_.snapshot().featureEnabled(failed_monitor.value()->enforceRuntimeKey(),
-                                              failed_monitor.value()->enforce());
+    ASSERT(failed_monitor);
+    return runtime_.snapshot().featureEnabled(failed_monitor->enforceRuntimeKey(),
+                                              failed_monitor->enforce());
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
@@ -560,7 +560,7 @@ void DetectorImpl::updateDetectedEjectionStats(envoy::data::cluster::v3::Outlier
 }
 
 void DetectorImpl::ejectHost(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type,
-                             absl::optional<const ExtMonitor*> failed_monitor) {
+                             const ExtMonitor* failed_monitor) {
   uint64_t max_ejection_percent = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(MaxEjectionPercentRuntime, config_.maxEjectionPercent()));
   double ejected_percent = 100.0 * (ejections_active_helper_.value() + 1) / host_monitors_.size();
@@ -625,7 +625,7 @@ DetectionStats DetectorImpl::generateStats(Stats::Scope& scope) {
 
 void DetectorImpl::notifyMainThreadConsecutiveError(
     HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type,
-    absl::optional<const ExtMonitor*> failed_monitor) {
+    const ExtMonitor* failed_monitor) {
   // This event will come from all threads, so we synchronize with a post to the main thread.
   // NOTE: Unfortunately consecutive errors are complicated from a threading perspective because
   //       we catch consecutive errors on worker threads and then post back to the main thread.
@@ -660,7 +660,7 @@ void DetectorImpl::onConsecutiveLocalOriginFailure(HostSharedPtr host) {
 
 void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host,
                                             envoy::data::cluster::v3::OutlierEjectionType type,
-                                            absl::optional<const ExtMonitor*> failed_monitor) {
+                                            const ExtMonitor* failed_monitor) {
   // Ejections come in cross thread. There is a chance that the host has already been removed from
   // the set. If so, just ignore it.
   if (host_monitors_.count(host) == 0) {
@@ -807,7 +807,7 @@ void DetectorImpl::processSuccessRateEjections(
                 ->getSRMonitor(monitor_type)
                 .getEjectionType();
         updateDetectedEjectionStats(type);
-        ejectHost(host_success_rate_pair.host_, type, absl::nullopt);
+        ejectHost(host_success_rate_pair.host_, type, nullptr);
       }
     }
   }
@@ -828,7 +828,7 @@ void DetectorImpl::processSuccessRateEjections(
                 ? envoy::data::cluster::v3::FAILURE_PERCENTAGE
                 : envoy::data::cluster::v3::FAILURE_PERCENTAGE_LOCAL_ORIGIN;
         updateDetectedEjectionStats(type);
-        ejectHost(host_success_rate_pair.host_, type, absl::nullopt);
+        ejectHost(host_success_rate_pair.host_, type, nullptr);
       }
     }
   }
@@ -878,7 +878,7 @@ void DetectorImpl::runCallbacks(HostSharedPtr host) {
 
 void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
                                envoy::data::cluster::v3::OutlierEjectionType type, bool enforced,
-                               absl::optional<const ExtMonitor*> failed_monitor) {
+                               const ExtMonitor* failed_monitor) {
   envoy::data::cluster::v3::OutlierDetectionEvent event;
   event.set_type(type);
 
@@ -910,8 +910,8 @@ void EventLoggerImpl::logEject(const HostDescriptionConstSharedPtr& host, Detect
     event.mutable_eject_failure_percentage_event()->set_host_success_rate(
         host->outlierDetector().successRate(monitor_type));
   } else if (type == envoy::data::cluster::v3::EXTENSION) {
-    ASSERT(failed_monitor.has_value());
-    event.mutable_eject_extension_event()->set_monitor_name(failed_monitor.value()->name());
+    ASSERT(failed_monitor);
+    event.mutable_eject_extension_event()->set_monitor_name(failed_monitor->name());
   } else {
     event.mutable_eject_consecutive_event();
   }
