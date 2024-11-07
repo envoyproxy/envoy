@@ -336,7 +336,7 @@ HttpServerPropertiesCacheImpl::getHttp3BrokenCanonicalOrigin(absl::string_view h
     return {};
   }
 
-  auto it = canonical_h3_broken_map_.find(std::string(suffix));
+  auto it = canonical_h3_broken_map_.find(suffix);
   if (it == canonical_h3_broken_map_.end()) {
     return {};
   }
@@ -348,7 +348,7 @@ void HttpServerPropertiesCacheImpl::maybeSetHttp3BrokenCanonicalOrigin(const Ori
   if (suffix.empty()) {
     return;
   }
-  canonical_h3_broken_map_[std::string(suffix)] = origin;
+  canonical_h3_broken_map_[suffix] = origin;
 }
 
 void HttpServerPropertiesCacheImpl::resetBrokenness() {
@@ -375,7 +375,7 @@ HttpServerPropertiesCacheImpl::getCanonicalOrigin(absl::string_view hostname) {
     return {};
   }
 
-  auto it = canonical_alt_svc_map_.find(std::string(suffix));
+  auto it = canonical_alt_svc_map_.find(suffix);
   if (it == canonical_alt_svc_map_.end()) {
     return {};
   }
@@ -388,7 +388,7 @@ void HttpServerPropertiesCacheImpl::maybeSetCanonicalOrigin(const Origin& origin
     return;
   }
 
-  canonical_alt_svc_map_[std::string(suffix)] = origin;
+  canonical_alt_svc_map_[suffix] = origin;
 }
 
 } // namespace Http
