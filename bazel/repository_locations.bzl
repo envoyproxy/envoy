@@ -203,7 +203,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["build"],
         cpe = "N/A",
         license = "MIT",
-        license_url = "https://github.com/aignas/rules_shellcheck/blob/v{version}/LICENSE",
+        license_url = "https://github.com/aignas/rules_shellcheck/blob/{version}/LICENSE",
     ),
     com_github_awslabs_aws_c_auth = dict(
         project_name = "aws-c-auth",
@@ -336,7 +336,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2024-07-20",
         cpe = "cpe:2.3:a:fmt:fmt:*",
         license = "fmt",
-        license_url = "https://github.com/fmtlib/fmt/blob/{version}/LICENSE.rst",
+        license_url = "https://github.com/fmtlib/fmt/blob/{version}/LICENSE",
     ),
     com_github_gabime_spdlog = dict(
         project_name = "spdlog",
@@ -1278,6 +1278,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2024-10-25",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/cel-cpp/blob/v{version}/LICENSE",
     ),
     com_github_google_flatbuffers = dict(
         project_name = "FlatBuffers",
