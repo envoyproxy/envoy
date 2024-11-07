@@ -1,7 +1,6 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
 load(
     "//test/extensions/filters/network/common/fuzz:config.bzl",
     "READFILTER_FUZZ_FILTERS",
@@ -10,8 +9,6 @@ load(
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 envoy_py_namespace()
 

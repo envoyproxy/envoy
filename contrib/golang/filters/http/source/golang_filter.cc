@@ -527,6 +527,46 @@ CAPIStatus Filter::continueStatus(ProcessorState& state, GolangStatus status) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::addData(ProcessorState& state, absl::string_view data, bool is_streaming) {
+  if (state.filterState() == FilterState::ProcessingData) {
+    // Calling add{Decoded,Encoded}Data when processing data will mess up the buffer management
+    // in Golang filter. And more importantly, there is no need to use it to add data for now.
+    ENVOY_LOG(error, "golang filter calls addData when processing data is not supported, use "
+                     "`BufferInstance.Append` instead.");
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  if (state.isThreadSafe()) {
+    Buffer::OwnedImpl buffer;
+    buffer.add(data);
+    state.addData(buffer, is_streaming);
+    return CAPIStatus::CAPIOK;
+  }
+
+  auto weak_ptr = weak_from_this();
+  auto data_str = std::string(data);
+  state.getDispatcher().post([this, weak_ptr, &state, data_str, is_streaming] {
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      Buffer::OwnedImpl buffer;
+      buffer.add(data_str);
+      state.addData(buffer, is_streaming);
+    } else {
+      ENVOY_LOG(debug, "golang filter has gone or destroyed in addData");
+    }
+  });
+  return CAPIStatus::CAPIYield;
+}
+
 CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
                              int* value_len) {
   Thread::LockGuard lock(mutex_);
