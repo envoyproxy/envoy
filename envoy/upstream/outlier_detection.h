@@ -86,7 +86,7 @@ public:
   using ExtMonitorCallback = std::function<void(const ExtMonitor*)>;
 
   // Method to report a result to extensions.
-  virtual void putResult(const ExtResult&) PURE;
+  virtual void putResult(const ExtResult) PURE;
   virtual void setExtMonitorCallback(ExtMonitorCallback) PURE;
   virtual void reset() PURE;
 

@@ -83,7 +83,7 @@ public:
         enforce_runtime_key_("outlier_detection.enforcing_extension." + config_->name()) {}
   ExtMonitorBase() = delete;
   virtual ~ExtMonitorBase() {}
-  void putResult(const ExtResult&) override;
+  void putResult(const ExtResult) override;
 
   void setExtMonitorCallback(ExtMonitorCallback callback) override { callback_ = callback; }
 

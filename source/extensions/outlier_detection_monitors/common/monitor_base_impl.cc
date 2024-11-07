@@ -20,7 +20,7 @@ bool LocalOriginEventsBucket::match(const ExtResult& event) const {
             (local_origin_event.result() == Result::ExtOriginRequestSuccess)));
 }
 
-void ExtMonitorBase::putResult(const ExtResult& result) {
+void ExtMonitorBase::putResult(const ExtResult result) {
   if (config_->buckets().empty()) {
     return;
   }
