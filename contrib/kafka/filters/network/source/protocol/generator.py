@@ -12,8 +12,8 @@ def generate_main_code(
     response).
 
     These responses are then used to create:
-    - main_header_file - contains definitions of Kafka structures and their deserializers,
-    - main_cc_file - ???,
+    - main_h_file - header file for Kafka structures and their deserializers,
+    - main_cc_file - implementation code for the header above,
     - resolver_cc_file - contains request api key & version mapping to deserializer (from header file),
     - metrics_header_file - contains metrics with names corresponding to messages.
     """
