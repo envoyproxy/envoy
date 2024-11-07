@@ -106,7 +106,7 @@ jobs:
     secrets:
       app-id: ${{ secrets.lock-app-id }}
       app-key: ${{ secrets.lock-app-key }}
-    uses: ./.github/workflows/_cache.yml
+    uses: ./.github/workflows/_request_cache_docker.yml
     needs: request
     if: ${{ inputs.cache-docker }}
     with:

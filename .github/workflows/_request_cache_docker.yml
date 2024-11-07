@@ -1,4 +1,4 @@
-name: Cache prime (docker)
+name: Request/cache (prime Docker)
 
 permissions:
   contents: read
@@ -11,18 +11,19 @@ on:
       app-key:
         required: true
     inputs:
+      caches:
+        type: string
+        required: true
+      image-tag:
+        type: string
+        required: true
+
       arch:
         type: string
         default: x64
       cache-suffix:
         type: string
         default:
-      image-tag:
-        type: string
-        required: true
-      request:
-        type: string
-        required: true
       runs-on:
         type: string
         default: ubuntu-24.04
@@ -47,6 +48,8 @@ on:
 jobs:
   docker:
     runs-on: ${{ inputs.runs-on || 'ubuntu-24.04' }}
+    name: "[${{ inputs.arch }}] Prime Docker cache"
+    if: ${{ ! fromJSON(inputs.caches).docker[inputs.arch] }}
     steps:
     - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.2
       id: appauth
