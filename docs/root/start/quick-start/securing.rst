@@ -80,27 +80,34 @@ Firstly, you can ensure that the certificates are from a mutually trusted certif
    :language: yaml
    :linenos:
    :lineno-start: 42
-   :lines: 42-52
-   :emphasize-lines: 8-11
+   :lines: 42-53
+   :emphasize-lines: 9-12
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
-You can also ensure that the "Subject Alternative Names" for the cerficate match.
+You should also ensure that the Subject Alternative Names (SANs) for the certificate match.
 
 This is commonly used by web certificates (X.509) to identify the domain or domains that a
 certificate is valid for.
+
+For the most common case where the certificate should have a SAN matching the :ref:`SNI <start_quick_start_securing_sni_client>`
+which was sent, you can enable :ref:`auto_sni_san_validation <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_sni_san_validation>`
+and omit :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`
+in the validation context.
+
+To validate that a certificate has a SAN matching the downstream request ``host`` or ``:authority`` header, you can enable
+:ref:`auto_san_validation <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_san_validation>`.
+
+When multiple validation options are configured, ``auto_san_validation`` has the highest priority, followed by ``auto_sni_san_validation``,
+followed by ``match_typed_subject_alt_names``.
 
 .. literalinclude:: _include/envoy-demo-tls-validation.yaml
    :language: yaml
    :linenos:
    :lineno-start: 44
-   :lines: 44-54
-   :emphasize-lines: 6-7, 10-11
+   :lines: 44-55
+   :emphasize-lines: 6-7, 11-12
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
-.. note::
-
-   If the "Subject Alternative Names" for a certificate are for a wildcard domain, eg ``*.example.com``,
-   this is what you should use when matching with ``match_typed_subject_alt_names``.
 
 .. note::
 
@@ -204,3 +211,16 @@ When connecting to an Envoy endpoint that is protected by ``SNI``, this must mat
 :ref:`server_names <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>` set in the endpoint's
 :ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`, as
 :ref:`described above <start_quick_start_securing_sni>`.
+
+To derive SNI from a downstream HTTP header ``host`` or ``:authority``, turn on
+:ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>` to override the fixed SNI in
+:ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`. A custom header other than
+the ``host`` or ``:authority`` can also be supplied using the optional
+:ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>` field.
+
+To derive SNI from the host Envoy is connecting to, turn on :ref:`auto_host_sni
+<envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_host_sni>`, which will use the hostname
+of the upstream endpoint.
+
+When multiple options are configured, ``auto_sni`` has the highest priority, followed by ``auto_host_sni``, followed by
+the fixed ``sni``.
