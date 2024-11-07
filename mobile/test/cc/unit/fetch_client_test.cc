@@ -25,7 +25,7 @@ TEST(FetchClientTest, Http3) {
   // start.
   ASSERT_GE(protocols.at(0), Http::Protocol::Http2);
   // TODO(fredyw): In EngFlow CI, HTTP/3 does not work and will use HTTP/2 instead.
-  ASSERT_GE(protocols.at(1), Http::Protocol::Http3);
+  ASSERT_GE(protocols.at(1), Http::Protocol::Http2);
 }
 
 } // namespace
