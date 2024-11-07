@@ -613,10 +613,12 @@ FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffe
   }
 
   ProcessingRequest req = setupBodyChunk(state, data, end_stream);
-  // For STREAMED mode, insert the data into the internal queue.
-  // For FULL_DUPLEX_STREAMED mode, just drain the data.
-  state.enqueueStreamingChunk(data, end_stream);
-
+  if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
+    state.enqueueStreamingChunk(data, end_stream);
+  } else {
+    // For FULL_DUPLEX_STREAMED mode, just drain the data.
+    data.drain(data.length());
+  }
   // If the current state is HeadersCallback, stays in that state.
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
     sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);

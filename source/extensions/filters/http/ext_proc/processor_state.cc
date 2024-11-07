@@ -416,11 +416,6 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
 }
 
 void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stream) {
-  // If the body mode is FULL_DUPLEX_STREAMED, just drain the data.
-  if (bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
-    data.drain(data.length());
-    return;
-  }
   chunk_queue_.push(data, end_stream);
   if (queueOverHighLimit()) {
     requestWatermark();
@@ -428,9 +423,6 @@ void ProcessorState::enqueueStreamingChunk(Buffer::Instance& data, bool end_stre
 }
 
 QueuedChunkPtr ProcessorState::dequeueStreamingChunk(Buffer::OwnedImpl& out_data) {
-  if (bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
-    return nullptr;
-  }
   return chunk_queue_.pop(out_data);
 }
 
