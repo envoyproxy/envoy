@@ -890,15 +890,11 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   state.setTrailersAvailable(true);
   state.setTrailers(&trailers);
 
-  if (state.callbackState() != ProcessorState::CallbackState::Idle) {
-    if (state.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
-      ENVOY_LOG(trace, "Body mode is FULL_DUPLEX_STREAMED, sending trailers even though Envoy is "
-                       "waiting for header or body response");
-    } else {
-      ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
-      state.setPaused(true);
-      return FilterTrailersStatus::StopIteration;
-    }
+  if ((state.callbackState() != ProcessorState::CallbackState::Idle) &&
+      (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED)) {
+    ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
+    state.setPaused(true);
+    return FilterTrailersStatus::StopIteration;
   }
 
   if (!body_delivered &&
@@ -1046,14 +1042,12 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   if (observability_mode) {
     ENVOY_LOG(debug, "Sending trailers message in observability mode");
   } else {
-    if (state.callbackState() == ProcessorState::CallbackState::Idle) {
-      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                                 config_->messageTimeout(),
-                                 ProcessorState::CallbackState::TrailersCallback);
-    } else {
-      state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                                 config_->messageTimeout(), state.callbackState());
+    ProcessorState::CallbackState callback_state = state.callbackState();
+    if (callback_state == ProcessorState::CallbackState::Idle) {
+      callback_state = ProcessorState::CallbackState::TrailersCallback;
     }
+    state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
+                               config_->messageTimeout(), callback_state);
     ENVOY_LOG(debug, "Sending trailers message");
   }
 

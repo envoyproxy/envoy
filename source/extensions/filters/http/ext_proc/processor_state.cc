@@ -23,6 +23,7 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
   ENVOY_LOG(debug, "Start external processing call");
   callback_state_ = callback_state;
 
+  // Skip starting timer For FULL_DUPLEX_STREAMED body mode.
   if (bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
     if (message_timer_ == nullptr) {
       message_timer_ = filter_callbacks_->dispatcher().createTimer(cb);
@@ -87,7 +88,6 @@ bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
   }
 }
 
-// Send buffered data in STREAMED body mode.
 void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
   // Process the data being buffered in streaming mode.
   // Move the current buffer into the queue for remote processing and clear the buffered data.
@@ -449,7 +449,7 @@ void ProcessorState::continueIfNecessary() {
 
 bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_response) {
   Buffer::OwnedImpl chunk_data;
-  auto chunk = dequeueStreamingChunk(chunk_data);
+  QueuedChunkPtr chunk = dequeueStreamingChunk(chunk_data);
   ENVOY_BUG(chunk != nullptr, "Bad streamed body callback state");
   if (common_response.has_body_mutation()) {
     ENVOY_LOG(debug, "Applying body response to chunk of data. Size = {}", chunk->length);
