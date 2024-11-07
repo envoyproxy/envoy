@@ -1,4 +1,6 @@
 # .github/workflows/mobile-perf.yml regression tests these files are not used in the E-M build.
+source/extensions/filters/http/on_demand/config.h
+source/extensions/filters/http/on_demand/on_demand_update.h
 source/common/http/route_config_update_requster.h
 source/common/listener_manager/listener_manager_impl.h
 source/server/overload_manager_impl.cc
