@@ -63,21 +63,13 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
 
   const auto& credentials = credentials_provider_->getCredentials();
 
-  if (!iam_roles_anywhere_signing_) {
-    // Normal signing
     if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
       // Empty or "anonymous" credentials are a valid use-case for non-production environments.
       // This behavior matches what the AWS SDK would do.
       ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
       return absl::OkStatus();
     }
-  } else {
-    // IAM Roles Anywhere signing
-    if (!credentials.certificate() || !credentials.certificatePrivateKey() || !credentials.certificateAlgorithm()) {
-      ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
-      return absl::OkStatus();
-    }
-  }
+
 
   if (headers.Method() == nullptr) {
     return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :method header"};
@@ -91,11 +83,6 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
 
   if (!query_string_) {
     addRequiredHeaders(headers, long_date, credentials.sessionToken(), override_region);
-  }
-
-  if (iam_roles_anywhere_signing_) {
-    addRequiredCertHeaders(headers, credentials.certificate().value(),
-                           credentials.certificateChain());
   }
 
   const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
@@ -125,25 +112,14 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   ENVOY_LOG(debug, "Canonical request:\n{}", canonical_request);
 
   // Phase 2: Create a string to sign
-  std::string string_to_sign;
-  if (!iam_roles_anywhere_signing_) {
-    string_to_sign = createStringToSign(canonical_request, long_date, credential_scope);
-  } else {
-    string_to_sign =
-        createIamRolesAnywhereStringToSign(canonical_request, long_date, credential_scope, credentials.certificateAlgorithm().value());
-  }
+  std::string string_to_sign = createStringToSign(canonical_request, long_date, credential_scope);
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
 
   // Phase 3: Create a signature
-  std::string signature;
-  if (!iam_roles_anywhere_signing_) {
-    signature =
+  std::string signature =
         createSignature(credentials.accessKeyId().value(), credentials.secretAccessKey().value(),
                         short_date, string_to_sign, override_region);
-  } else {
-    signature = createIamRolesAnywhereSignature(credentials.certificatePrivateKey().value(),
-                                                string_to_sign);
-  }
+
   // Phase 4: Sign request
   if (query_string_) {
     // Append signature to existing query string
@@ -160,15 +136,8 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
 
   } else {
 
-    std::string authorization_header;
-
-    if (!iam_roles_anywhere_signing_) {
-      authorization_header = createAuthorizationHeader(
+    std::string authorization_header = createAuthorizationHeader(
           credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
-    } else {
-      authorization_header = createIamRolesAnywhereAuthorizationHeader(
-          credentials.certificateSerial().value(), credential_scope, canonical_headers, signature);
-    }
 
     headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 
@@ -178,6 +147,84 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     ENVOY_LOG(debug, "Header signing - Authorization header (sanitised): {}Signature=*****",
               sanitised_header[0]);
   }
+  return absl::OkStatus();
+}
+
+
+absl::Status SignerBaseImpl::signIAMRolesAnywhere(Http::RequestMessage& message, bool sign_body,
+                                  const absl::string_view override_region) {
+
+  const auto content_hash = createContentHash(message, sign_body);
+  auto& headers = message.headers();
+  return signIAMRolesAnywhere(headers, content_hash, override_region);
+}
+
+absl::Status SignerBaseImpl::signIAMRolesAnywhere(Http::RequestHeaderMap& headers, const std::string& content_hash,
+                                  const absl::string_view override_region) {
+
+  ENVOY_LOG(debug, "Begin IAM Roles Anywhere signing");
+  if ( !content_hash.empty()) {
+    headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
+  }
+
+  const auto& credentials = credentials_provider_->getCredentials();
+
+  if (!credentials.certificate() || !credentials.certificatePrivateKey() || !credentials.certificateAlgorithm()) {
+    ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
+    return absl::OkStatus();
+  }
+  
+  if (headers.Method() == nullptr) {
+    return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :method header"};
+  }
+  if (headers.Path() == nullptr) {
+    return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
+  }
+
+  const auto long_date = long_date_formatter_.now(time_source_);
+  const auto short_date = short_date_formatter_.now(time_source_);
+
+    addRequiredHeaders(headers, long_date, credentials.sessionToken(), override_region);
+    addRequiredCertHeaders(headers, credentials.certificate().value(),
+                           credentials.certificateChain());
+
+  const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
+
+  // Phase 1: Create a canonical request
+  const auto credential_scope = createCredentialScope(short_date, override_region);
+
+  // Handle query string parameters by appending them all to the path. Case is important for these
+  // query parameters.
+  auto query_params =
+      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
+
+  auto canonical_request = Utility::createCanonicalRequest(
+      headers.Method()->value().getStringView(), headers.Path()->value().getStringView(),
+      canonical_headers,
+      content_hash.empty() ? SignatureConstants::HashedEmptyString : content_hash,
+      Utility::shouldNormalizeUriPath(service_name_), Utility::useDoubleUriEncode(service_name_));
+  ENVOY_LOG(debug, "Canonical request:\n{}", canonical_request);
+
+  // Phase 2: Create a string to sign
+  std::string string_to_sign =
+        createIamRolesAnywhereStringToSign(canonical_request, long_date, credential_scope, credentials.certificateAlgorithm().value());
+  ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
+
+  // Phase 3: Create a signature
+  std::string signature = createIamRolesAnywhereSignature(credentials.certificatePrivateKey().value(),
+                                                string_to_sign);
+  // Phase 4: Sign request
+
+  std::string authorization_header = createIamRolesAnywhereAuthorizationHeader(
+        credentials.certificateSerial().value(), credential_scope, canonical_headers, signature);
+
+  headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
+
+  // Sanitize logged authorization header
+  std::vector<std::string> sanitised_header =
+      absl::StrSplit(authorization_header, absl::ByString("Signature="));
+  ENVOY_LOG(debug, "Header signing - Authorization header (sanitised): {}Signature=*****",
+            sanitised_header[0]);
   return absl::OkStatus();
 }
 
@@ -203,6 +250,7 @@ void SignerBaseImpl::addRequiredCertHeaders(Http::RequestHeaderMap& headers, con
   if (cert_chain.has_value()) {
     headers.setCopy(SignatureHeaders::get().X509Chain, cert_chain.value());
   }
+  headers.setCopy(Http::LowerCaseString("content-type"), "application/json");
 }
 
 std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message, bool sign_body) const {

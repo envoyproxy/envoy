@@ -435,16 +435,13 @@ bool IAMRolesAnywhereCertificateCredentialsProvider::needsRefresh() {
 }
 
 absl::Status
-IAMRolesAnywhereCertificateCredentialsProvider::pemToDer(std::string filename,
+IAMRolesAnywhereCertificateCredentialsProvider::pemToDer(std::string pem,
                                                              std::vector<uint8_t>& output) {
-  auto file_read_or_error = api_.fileSystem().fileReadToEnd(filename);
-
-  if (file_read_or_error.ok()) {
     BIO* bio = BIO_new(BIO_s_mem());
     if (bio == nullptr) {
       return absl::InvalidArgumentError("SSL internal error");
     }
-    if (BIO_puts(bio, file_read_or_error.value().c_str()) >= 0) {
+    if (BIO_puts(bio, pem.c_str()) >= 0) {
       RSA* pkey = nullptr;
       unsigned char* pkey_in_der = nullptr;
       pkey = PEM_read_bio_RSAPrivateKey(bio, nullptr, nullptr, nullptr);
@@ -459,9 +456,6 @@ IAMRolesAnywhereCertificateCredentialsProvider::pemToDer(std::string filename,
     } else {
       return absl::InvalidArgumentError("PEM file could not be parsed");
     }
-  } else {
-    return file_read_or_error.status();
-  }
 }
 
 absl::Status IAMRolesAnywhereCertificateCredentialsProvider::pemDataSourceToString(envoy::config::core::v3::DataSource& datasource,
@@ -632,7 +626,7 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
       std::make_shared<IAMRolesAnywhereCertificateCredentialsProvider>(
           api, context->mainThreadDispatcher(), certificate_data_source, private_key_data_source,
           cert_chain_data_source);
-  // Create our own signer just for Roles Anywhere, to avoid catch-22 of Signer dependency on
+  // Create our own signer just for IAM Roles Anywhere, to avoid catch-22 of Signer dependency on
   // credentials handler
   roles_anywhere_signer_ = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view(region_),
@@ -673,10 +667,6 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
 
   ENVOY_LOG(debug, "Getting AWS credentials from the rolesanywhere service at URI: {}", uri_);
 
-  // absl::string_view host;
-  // absl::string_view path;
-  // Http::Utility::extractHostPathFromUri(uri_, host, path);
-
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Http);
   message.headers().setMethod(Http::Headers::get().MethodValues.Post);
@@ -686,18 +676,18 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   
     std::string body_data;
     body_data.append("{");
-  if(session_duration_.has_value())
-  {
-    body_data.append(fmt::format("\"durationSeconds\": {},",session_duration_.value()));
-  }
+  // if(session_duration_.has_value())
+  // {
+  //   body_data.append(fmt::format("\"durationSeconds\": {},",session_duration_.value()));
+  // }
       body_data.append(fmt::format("\"profileArn\": \"{}\",",profile_arn_));
     body_data.append(fmt::format("\"roleArn\": \"{}\",",role_arn_));
     body_data.append(fmt::format("\"trustAnchorArn\": \"{}\"",trust_anchor_arn_));
-    body_data.append(fmt::format(",\"roleSessionName\": \"{}\"",role_session_name_));
+    // body_data.append(fmt::format(",\"roleSessionName\": \"{}\"","test"));
   body_data.append("}");
 
   message.body().add(body_data);
-  auto status = roles_anywhere_signer_->signEmptyPayload(message.headers());
+  auto status = roles_anywhere_signer_->signIAMRolesAnywhere(message, true, region_);
 
   // Stop any existing timer.
   if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
@@ -1526,10 +1516,11 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     {
       cert_chain = roles_anywhere.certificate_chain();
     }
+
     roles_anywhere.certificate_chain();
     return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
         context.api(), context, MetadataFetcher::create,  MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh, initialization_timer,
-        roles_anywhere.role_arn(), role_session_name, roles_anywhere.profile_arn(), roles_anywhere.trust_anchor_arn(), session_duration, region, iam_roles_anywhere_endpoint,
+        roles_anywhere.role_arn(),  roles_anywhere.profile_arn(), roles_anywhere.trust_anchor_arn(), role_session_name, session_duration, region, iam_roles_anywhere_endpoint,
         iam_roles_anywhere_endpoint, roles_anywhere.certificate(), roles_anywhere.private_key(), cert_chain
         );
   } else {

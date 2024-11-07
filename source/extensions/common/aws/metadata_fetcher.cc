@@ -106,7 +106,8 @@ public:
         });
 
     auto messagePtr = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headersPtr));
-
+    messagePtr->body().add(message.body());
+    
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(std::chrono::milliseconds(TIMEOUT))
                        .setParentSpan(parent_span)

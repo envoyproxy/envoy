@@ -283,7 +283,7 @@ Utility::joinCanonicalHeaderNames(const std::map<std::string, std::string>& cano
 }
 
 std::string Utility::getRolesAnywhereEndpoint(absl::string_view region) {
-  return fmt::format("rolesanywhere.{}.amazonaws.com", region);
+  return fmt::format("rolesanywhere.{}.amazonaws.com:443", region);
 }
 
 /**

@@ -104,6 +104,10 @@ public:
                                 const absl::string_view override_region = "") override;
   absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
                                    const absl::string_view override_region = "") override;
+  absl::Status signIAMRolesAnywhere(Http::RequestHeaderMap& headers, const std::string& content_hash,
+                                    const absl::string_view override_region) override;
+absl::Status signIAMRolesAnywhere(Http::RequestMessage& message, bool sign_body,
+                                  const absl::string_view override_region) override;
 
 protected:
   std::string getRegion() const;
