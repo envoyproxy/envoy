@@ -1,4 +1,11 @@
 load(
+    "@rules_rust//rust:defs.bzl",
+    "rust_clippy",
+    "rust_doc_test",
+    "rust_test",
+    "rustfmt_test",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
     "envoy_cc_test_library",
@@ -53,4 +60,27 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
+)
+
+# We have targets for the tests of SDK itself here so that //test/... will be able to run them.
+rust_test(
+    name = "rust_sdk_test",
+    crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+)
+
+rust_doc_test(
+    name = "rust_sdk_doc_test",
+    crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+)
+
+# As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,
+# we set the rust_fmt and clippy target here instead of the part of //tools/code_format target for now.
+rustfmt_test(
+    name = "rust_sdk_fmt",
+    targets = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
+)
+
+rust_clippy(
+    name = "rust_sdk_clippy",
+    deps = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
 )
