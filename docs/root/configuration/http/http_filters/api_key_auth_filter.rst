@@ -4,7 +4,7 @@ API key auth
 ============
 
 This HTTP filter can be used to authenticate users based on the unique API key. The filter will
-extract the API keys from the HTTP header, parameter query, or cookie and verify them against
+extract the API keys from either an HTTP header, a parameter query, or a cookie and verify them against
 the configured credential list.
 
 If the API key is valid and the related client is allowed, the request will be allowed to continue.
