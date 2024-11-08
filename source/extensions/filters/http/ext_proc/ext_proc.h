@@ -472,8 +472,12 @@ private:
 
   Http::FilterDataStatus handleDataBufferedMode(ProcessorState& state, Buffer::Instance& data,
                                                 bool end_stream);
+  Http::FilterDataStatus handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
+                                                    bool end_stream);
   Http::FilterDataStatus handleDataStreamedMode(ProcessorState& state, Buffer::Instance& data,
                                                 bool end_stream);
+  Http::FilterDataStatus handleDataFullDuplexStreamedMode(ProcessorState& state,
+                                                          Buffer::Instance& data, bool end_stream);
   Http::FilterDataStatus handleDataBufferedPartialMode(ProcessorState& state,
                                                        Buffer::Instance& data, bool end_stream);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);

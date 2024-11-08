@@ -377,15 +377,39 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
-// Replace the entire message body chunk received in the corresponding
-// HttpBody message with this new body, or clear the body.
+// [#not-implemented-hide:]
+// The body response message corresponding to FULL_DUPLEX_STREAMED body mode.
+message StreamedBodyResponse {
+  // The body response chunk that will be passed to the upstream/downstream by Envoy.
+  bytes body = 1;
+
+  // The server sets this flag to true if it has received a body request with
+  // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.HttpBody.end_of_stream>` set to true,
+  // and this is the last chunk of body responses.
+  bool end_of_stream = 2;
+}
+
+// This message specifies the body mutation the server sends to Envoy.
 message BodyMutation {
   // The type of mutation for the body.
   oneof mutation {
     // The entire body to replace.
+    // Should only be used when the corresponding ``BodySendMode`` in the
+    // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    // is not set to ``FULL_DUPLEX_STREAMED``.
     bytes body = 1;
 
     // Clear the corresponding body chunk.
+    // Should only be used when the corresponding ``BodySendMode`` in the
+    // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    // is not set to ``FULL_DUPLEX_STREAMED``.
+    // Clear the corresponding body chunk.
     bool clear_body = 2;
+
+    // [#not-implemented-hide:]
+    // Must be used when the corresponding ``BodySendMode`` in the
+    // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+    // is set to ``FULL_DUPLEX_STREAMED``.
+    StreamedBodyResponse streamed_response = 3;
   }
 }
