@@ -289,6 +289,8 @@ private:
   handleStreamedBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   bool handleDuplexStreamedBodyResponse(
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  absl::StatusOr<bool>
+  handleBodyInStreamedState(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);

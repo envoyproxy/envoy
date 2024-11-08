@@ -72,6 +72,7 @@ initGrpcService(const ExtProcPerRoute& config) {
   return absl::nullopt;
 }
 
+// TODO(#37046) Refactoring the exception throwing logic.
 void verifyProcessingModeConfig(const ExternalProcessor& config) {
   const ProcessingMode& processing_mode = config.processing_mode();
   if (config.has_http_service()) {

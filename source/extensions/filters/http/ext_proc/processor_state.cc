@@ -139,6 +139,7 @@ ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_res
   return ProcessorState::CallbackState::Idle;
 }
 
+// TODO(#37047) Refactoring this function by adding one helper function for each body mode.
 absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& response) {
   if (callback_state_ == CallbackState::HeadersCallback) {
     ENVOY_LOG(debug, "applying headers response. body mode = {}",
@@ -271,6 +272,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   return absl::FailedPreconditionError("spurious message");
 }
 
+// TODO(#37048) Refactoring this function by adding one helper function for each callback state.
 absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   bool should_continue = false;
   const auto& common_response = response.response();
@@ -313,26 +315,11 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
       onFinishProcessorCall(Grpc::Status::Ok);
       should_continue = true;
     } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      if (common_response.has_body_mutation() &&
-          common_response.body_mutation().has_streamed_response()) {
-        ENVOY_LOG(debug, "FULL_DUPLEX_STREAMED body response is received and body_mode_: {} ",
-                  ProcessingMode::BodySendMode_Name(body_mode_));
-        // streamed_response will only be supported if the ext_proc filter has body_mode set to
-        // FULL_DUPLEX_STREAMED.
-        if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
-          return absl::FailedPreconditionError(
-              "spurious message: streamed_response is received while body_mode_ is not "
-              "FULL_DUPLEX_STREAMED");
-        }
-        should_continue = handleDuplexStreamedBodyResponse(common_response);
-      } else {
-        if (body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
-          return absl::FailedPreconditionError(
-              "spurious message: Normal body mutation response is received while body_mode_ is "
-              "FULL_DUPLEX_STREAMED");
-        }
-        should_continue = handleStreamedBodyResponse(common_response);
+      absl::StatusOr<bool> result = handleBodyInStreamedState(common_response);
+      if (!result.ok()) {
+        return result.status();
       }
+      should_continue = *result;
     } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
       // Apply changes to the buffer that we sent to the server
       Buffer::OwnedImpl chunk_data;
@@ -499,6 +486,30 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
   }
   // If end_of_stream is true, Envoy should continue the filter chain operations.
   return end_of_stream;
+}
+
+absl::StatusOr<bool>
+ProcessorState::handleBodyInStreamedState(const CommonResponse& common_response) {
+  if (common_response.has_body_mutation() &&
+      common_response.body_mutation().has_streamed_response()) {
+    ENVOY_LOG(debug, "FULL_DUPLEX_STREAMED body response is received and body_mode_: {} ",
+              ProcessingMode::BodySendMode_Name(body_mode_));
+    // streamed_response will only be supported if the ext_proc filter has body_mode set to
+    // FULL_DUPLEX_STREAMED.
+    if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
+      return absl::FailedPreconditionError(
+          "spurious message: streamed_response is received while body_mode_ is not "
+          "FULL_DUPLEX_STREAMED");
+    }
+    return handleDuplexStreamedBodyResponse(common_response);
+  } else {
+    if (body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
+      return absl::FailedPreconditionError(
+          "spurious message: Normal body mutation response is received while body_mode_ is "
+          "FULL_DUPLEX_STREAMED");
+    }
+    return handleStreamedBodyResponse(common_response);
+  }
 }
 
 void DecodingProcessorState::setProcessingModeInternal(const ProcessingMode& mode) {
