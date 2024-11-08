@@ -80,8 +80,8 @@ Firstly, you can ensure that the certificates are from a mutually trusted certif
    :language: yaml
    :linenos:
    :lineno-start: 42
-   :lines: 42-53
-   :emphasize-lines: 9-12
+   :lines: 42-52
+   :emphasize-lines: 8-11
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
 You should also ensure that the Subject Alternative Names (SANs) for the certificate match.
@@ -104,8 +104,8 @@ followed by ``match_typed_subject_alt_names``.
    :language: yaml
    :linenos:
    :lineno-start: 44
-   :lines: 44-55
-   :emphasize-lines: 6-7, 11-12
+   :lines: 44-54
+   :emphasize-lines: 6-7, 10-11
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
 
