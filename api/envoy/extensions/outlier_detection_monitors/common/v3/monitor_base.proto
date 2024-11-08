@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.outlier_detection_monitors.common.v3;
 
 import "envoy/extensions/outlier_detection_monitors/common/v3/result_types.proto";
-import "envoy/type/v3/range.proto";
 
 import "google/protobuf/wrappers.proto";
 
