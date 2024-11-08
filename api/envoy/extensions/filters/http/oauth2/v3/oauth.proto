@@ -84,7 +84,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -186,6 +186,9 @@ message OAuth2Config {
   // will still process incoming Refresh Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
   // sessions would not set the Refresh Token cookie header.
   bool disable_refresh_token_set_cookie = 20;
+
+  // If set to true, the oauth2 filter will not send a nonce to the authorization server.
+  bool disable_nonce = 21;
 }
 
 // Filter config.
