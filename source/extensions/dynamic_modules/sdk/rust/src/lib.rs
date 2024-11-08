@@ -106,9 +106,8 @@ pub trait HttpFilter {} // TODO.
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
 ///
-/// This is a shallow wrapper around the raw pointer to the Envoy HTTP filter object, and it
-/// can be copied and stored somewhere else up until the corresponding [`HttpFilterConfig::destroy`]
-/// for the corresponding [`HttpFilterConfig`] is called.
+/// This is a shallow wrapper around the raw pointer to the Envoy HTTP filter config object, and it
+/// can be copied and used up until the corresponding [`HttpFilterConfig`] is dropped.
 //
 // TODO(@mathetake): make this only avaialble for non-test code, and provide a mock for testing. So that users
 // can write a unit tests for their HttpFilterConfig implementations.
