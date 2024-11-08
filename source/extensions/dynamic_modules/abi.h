@@ -22,8 +22,8 @@ extern "C" {
 // -----------------------------------------------------------------------------
 //
 // Types used in the ABI. The name of a type must be prefixed with "envoy_dynamic_module_type_".
-// *  Types with _in_module_ptr suffix are pointers owned by the module.
-// *  Types with _in_envoy_ptr suffix are pointers owned by Envoy.
+// Types with "_in_module_ptr" suffix are pointers owned by the module.
+// Types with "_in_envoy_ptr" suffix are pointers owned by Envoy.
 
 /**
  * envoy_dynamic_module_type_abi_version_in_envoy_ptr represents a null-terminated string that
