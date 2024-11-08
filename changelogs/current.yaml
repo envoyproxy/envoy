@@ -208,6 +208,9 @@ new_features:
     added nameserver rotation option to c-ares resolver. When enabled via :ref:rotate_nameservers
     <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.rotate_nameservers>, this
     performs round-robin selection of the configured nameservers for each resolution to help distribute query load.
+- area: ext_authz
+  change: |
+    added filter state field latency, bytesSent and bytesReceived access for CEL and logging.
 deprecated:
 - area: rbac
   change: |

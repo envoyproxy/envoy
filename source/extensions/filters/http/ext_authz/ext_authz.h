@@ -74,6 +74,18 @@ public:
     upstream_host_ = std::move(upstream_host);
   }
 
+  bool hasFieldSupport() const { return true; }
+  Envoy::StreamInfo::FilterState::Object::FieldType getField(absl::string_view field_name) const {
+    if (field_name == "latency" && latency_) {
+      return int64_t(latency_.value().count());
+    } else if (field_name == "bytesSent" && bytes_sent_) {
+      return int64_t(bytes_sent_.value());
+    } else if (field_name == "bytesReceived" && bytes_received_) {
+      return int64_t(bytes_received_.value());
+    }
+    return {};
+  }
+
   // For convenience in testing.
   void clearLatency() { latency_ = absl::nullopt; };
   void clearBytesSent() { bytes_sent_ = absl::nullopt; }

@@ -63,6 +63,24 @@ public:
       ASSERT_NE(ext_authz_logging_info->upstreamHost(), nullptr);
       EXPECT_EQ(ext_authz_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
     }
+
+    // Assert for CEL and accesslog field access
+    ASSERT_TRUE(ext_authz_logging_info->hasFieldSupport());
+    EXPECT_THAT(ext_authz_logging_info->getField("latency"),
+                testing::VariantWith<int64_t>(ext_authz_logging_info->latency().value().count()));
+    if (expect_envoy_grpc_specific_stats_) {
+      EXPECT_THAT(ext_authz_logging_info->getField("bytesSent"),
+                  testing::VariantWith<int64_t>(ext_authz_logging_info->bytesSent().value()));
+      if (expect_response_bytes_) {
+        EXPECT_THAT(ext_authz_logging_info->getField("bytesReceived"),
+                    testing::VariantWith<int64_t>(ext_authz_logging_info->bytesReceived().value()));
+      } else {
+        EXPECT_THAT(ext_authz_logging_info->getField("bytesReceived"),
+                    testing::VariantWith<int64_t>(0));
+      }
+    }
+    EXPECT_THAT(ext_authz_logging_info->getField("wrong_property_name"),
+                testing::VariantWith<absl::monostate>(absl::monostate{}));
   }
 
 private:

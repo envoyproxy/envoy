@@ -306,6 +306,8 @@ message ExtAuthz {
   //
   // If this is false the filter will not emit stats, but filter_metadata will still be respected if
   // it has a value.
+  //
+  // Fields ``latency``, ``bytesSent`` and ``bytesReceived`` are exposed for CEL and logging
   bool emit_filter_state_stats = 29;
 }
 
