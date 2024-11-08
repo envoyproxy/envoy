@@ -649,10 +649,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ == -1);
-  stream_id_ = parent_.adapter_->SubmitRequest(
-      buildHeaders(headers),
-      nullptr, end_stream,
-      base());
+  stream_id_ = parent_.adapter_->SubmitRequest(buildHeaders(headers), nullptr, end_stream, base());
   ASSERT(stream_id_ > 0);
 }
 
@@ -672,9 +669,7 @@ void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
 
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ != -1);
-  parent_.adapter_->SubmitResponse(
-      stream_id_, buildHeaders(headers),
-      nullptr, end_stream);
+  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers), nullptr, end_stream);
 }
 
 Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
