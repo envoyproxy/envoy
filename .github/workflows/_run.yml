@@ -92,16 +92,48 @@ on:
         type: string
         default: |
           - run: |
-              # disk space at beginning of build
+              # Pre build report
               df -h > "${TMP_REPORT}/df-pre"
+              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" ]]; then
+                  exit 0
+              fi
+              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" -maxdepth 1 -type d \
+                  | rev \
+                  | cut -d/ -f1 \
+                  | rev \
+                  > "${TMP_REPORT}/shas-pre"
+              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" ]]; then
+                  exit 0
+              fi
+              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" -maxdepth 1 -type d \
+                  | rev \
+                  | cut -d/ -f1 \
+                  | rev \
+                  >> "${TMP_REPORT}/shas-pre"
             shell: bash
       report-post:
         type: string
         default: |
           - run: |
-              # disk space at end of build
+              # Post build report
               df -h > "${TMP_REPORT}/df-post"
               (du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :) > "${TMP_REPORT}/du-post"
+              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" ]]; then
+                  exit 0
+              fi
+              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" -maxdepth 1 -type d \
+                  | rev \
+                  | cut -d/ -f1 \
+                  | rev \
+                  > "${TMP_REPORT}/shas-post"
+              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" ]]; then
+                  exit 0
+              fi
+              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" -maxdepth 1 -type d \
+                  | rev \
+                  | cut -d/ -f1 \
+                  | rev \
+                  >> "${TMP_REPORT}/shas-pre"
             shell: bash
       request:
         type: string
