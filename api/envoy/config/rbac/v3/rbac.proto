@@ -211,7 +211,8 @@ message Policy {
 message SourcedMetadata {
   // Metadata matcher configuration that defines what metadata to match against. This includes the filter name,
   // metadata key path, and expected value.
-  type.matcher.v3.MetadataMatcher metadata_matcher = 1 [(validate.rules).message = {required: true}];
+  type.matcher.v3.MetadataMatcher metadata_matcher = 1
+      [(validate.rules).message = {required: true}];
 
   // Specifies which metadata source should be used for matching. If not set,
   // defaults to DYNAMIC (dynamic metadata). Set to ROUTE to match against
@@ -265,7 +266,11 @@ message Permission {
 
     // Metadata that describes additional information about the action. This field is deprecated; please use
     // :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` instead.
-    type.matcher.v3.MetadataMatcher metadata = 7 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+    type.matcher.v3.MetadataMatcher metadata = 7 [
+      deprecated = true,
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
+      (envoy.annotations.disallowed_by_default) = true
+    ];
 
     // Negates matching the provided permission. For instance, if the value of
     // ``not_rule`` would match, this permission would not match. Conversely, if
@@ -389,7 +394,11 @@ message Principal {
 
     // Metadata that describes additional information about the principal. This field is deprecated; please use
     // :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>` instead.
-    type.matcher.v3.MetadataMatcher metadata = 7 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
+    type.matcher.v3.MetadataMatcher metadata = 7 [
+      deprecated = true,
+      (envoy.annotations.deprecated_at_minor_version) = "3.0",
+      (envoy.annotations.disallowed_by_default) = true
+    ];
 
     // Identifies the principal using a filter state object.
     type.matcher.v3.FilterStateMatcher filter_state = 12;
