@@ -872,39 +872,6 @@ TEST(PrincipalMatcher, AndIds) {
   checkMatcher(AndMatcher(principals, factory_context), false, conn);
 }
 
-TEST(PrincipalMatcher, OrIds) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
-  Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal> principals;
-
-  // Create two principals: one that matches direct remote IP and one that matches header
-  auto* principal1 = principals.Add();
-  auto* cidr = principal1->mutable_direct_remote_ip();
-  cidr->set_address_prefix("1.2.3.0");
-  cidr->mutable_prefix_len()->set_value(24);
-
-  auto* principal2 = principals.Add();
-  principal2->mutable_header()->set_name("test-header");
-  principal2->mutable_header()->mutable_string_match()->set_exact("test-value");
-
-  Envoy::Network::MockConnection conn;
-  Envoy::Http::TestRequestHeaderMapImpl headers;
-  NiceMock<StreamInfo::MockStreamInfo> info;
-
-  // Set up a matching IP address
-  Envoy::Network::Address::InstanceConstSharedPtr addr =
-      Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 123, false);
-  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
-
-  // Should match based on IP even without header
-  checkMatcher(OrMatcher(principals, factory_context), true, conn, headers, info);
-
-  // Should match based on header even with wrong IP
-  addr = Envoy::Network::Utility::parseInternetAddressNoThrow("5.6.7.8", 123, false);
-  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
-  headers.setReference(Envoy::Http::LowerCaseString("test-header"), "test-value");
-  checkMatcher(OrMatcher(principals, factory_context), true, conn, headers, info);
-}
-
 TEST(PrincipalMatcher, RemoteIpAndHeader) {
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
 
@@ -973,6 +940,51 @@ TEST(PrincipalMatcher, IdentifierNotSet) {
 
   // This should hit the IDENTIFIER_NOT_SET case and panic
   EXPECT_DEATH(Matcher::create(empty_principal, factory_context), ".*");
+}
+
+TEST(PrincipalMatcher, OrIds) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal> principals;
+
+  // Create two principals: one that matches direct remote IP and one that matches header
+  auto* principal1 = principals.Add();
+  auto* cidr = principal1->mutable_direct_remote_ip();
+  cidr->set_address_prefix("1.2.3.0");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  auto* principal2 = principals.Add();
+  principal2->mutable_header()->set_name("test-header");
+  principal2->mutable_header()->mutable_string_match()->set_exact("test-value");
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Store the header name as a member to ensure it lives throughout the test
+  const Envoy::Http::LowerCaseString test_header_name("test-header");
+
+  // Set up a matching IP address
+  Envoy::Network::Address::InstanceConstSharedPtr addr =
+      Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 123, false);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
+
+  // Should match based on IP even without header
+  checkMatcher(OrMatcher(principals, factory_context), true, conn, headers, info);
+
+  // Should match based on header even with wrong IP
+  addr = Envoy::Network::Utility::parseInternetAddressNoThrow("5.6.7.8", 123, false);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
+
+  // Add header and verify it matches
+  headers.setReference(test_header_name, "test-value");
+  checkMatcher(OrMatcher(principals, factory_context), true, conn, headers, info);
+
+  // Test with non-matching header value
+  headers.remove(test_header_name);
+  headers.setReference(test_header_name, "wrong-value");
+  addr = Envoy::Network::Utility::parseInternetAddressNoThrow("5.6.7.8", 123, false);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
+  checkMatcher(OrMatcher(principals, factory_context), false, conn, headers, info);
 }
 
 } // namespace
