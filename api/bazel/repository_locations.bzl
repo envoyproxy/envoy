@@ -163,6 +163,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/norbjd/protoc-gen-jsonschema/archive/{version}.zip"],
         use_category = ["build"],
         release_date = "2023-05-30",
+        license = "Apache-2.0",
+        license_url = "https://github.com/norbjd/protoc-gen-jsonschema/blob/{version}/LICENSE",
     ),
     dev_cel = dict(
         project_name = "CEL",
@@ -174,6 +176,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-spec/archive/v{version}.tar.gz"],
         use_category = ["api"],
         release_date = "2024-10-23",
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/cel-spec/blob/v{version}/LICENSE",
     ),
     envoy_toolshed = dict(
         project_name = "envoy_toolshed",
@@ -187,6 +191,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2024-11-04",
         cpe = "N/A",
         license = "Apache-2.0",
-        license_url = "https://github.com/envoyproxy/envoy/blob/bazel-v{version}/LICENSE",
+        license_url = "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE",
     ),
 )

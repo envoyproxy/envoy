@@ -2105,6 +2105,114 @@ TEST_P(DnsImplCustomResolverTest, CustomResolverValidAfterChannelDestruction) {
   EXPECT_FALSE(peer_->isChannelDirty());
 }
 
+TEST_F(DnsImplConstructor, VerifyDefaultTimeoutAndTries) {
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  EXPECT_EQ(resolvers->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::1");
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer->channel(), &opts, &optmask));
+  EXPECT_TRUE(opts.timeout == 5000);
+  EXPECT_TRUE(opts.tries == 4);
+  ares_free_data(resolvers);
+  ares_destroy_options(&opts);
+}
+
+TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4 = Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:54");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6 = Network::Utility::parseInternetAddressAndPortNoThrow("[::1]:54");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  auto query_timeout_seconds = std::make_unique<ProtobufWkt::UInt64Value>();
+  query_timeout_seconds->set_value(9);
+  cares.set_allocated_query_timeout_seconds(query_timeout_seconds.release());
+  auto query_tries = std::make_unique<ProtobufWkt::UInt32Value>();
+  query_tries->set_value(7);
+  cares.set_allocated_query_tries(query_tries.release());
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
+          .value();
+
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  EXPECT_EQ(resolvers->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::1");
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer->channel(), &opts, &optmask));
+  EXPECT_TRUE(opts.timeout == 9000);
+  EXPECT_TRUE(opts.tries == 7);
+  ares_free_data(resolvers);
+  ares_destroy_options(&opts);
+}
+
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
 protected:
   bool tcpOnly() const override { return false; }
