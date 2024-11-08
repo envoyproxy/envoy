@@ -66,7 +66,7 @@ envoy_cc_test_library(
 rust_test(
     name = "rust_sdk_test",
     crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
-    # tags = ["nocoverage"],
+    tags = ["nocoverage"],
 )
 
 rust_doc_test(
