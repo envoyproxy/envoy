@@ -17,23 +17,23 @@ pub extern "C" fn getSomeVariable() -> i32 {
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewHttpFilterConfigFunction`] signature.
 fn new_nop_http_filter_config_fn(
-    _envoy_filter_factory: envoy_proxy_dynamic_modules_rust_sdk::EnvoyHttpConfig,
+    _envoy_filter_factory: envoy_proxy_dynamic_modules_rust_sdk::EnvoyHttpFilterConfig,
     name: &str,
     config: &str,
-) -> Option<Box<dyn envoy_proxy_dynamic_modules_rust_sdk::HttpConfig>> {
+) -> Option<Box<dyn envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig>> {
     let name = name.to_string();
     let config = config.to_string();
     Some(Box::new(NopHttpFilterConfig { name, config }))
 }
 
-/// A no-op HTTP filter configuration that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpConfig`]
+/// A no-op HTTP filter configuration that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`]
 /// as well as the [`Drop`] to test the cleanup of the configuration.
 struct NopHttpFilterConfig {
     name: String,
     config: String,
 }
 
-impl envoy_proxy_dynamic_modules_rust_sdk::HttpConfig for NopHttpFilterConfig {}
+impl envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig for NopHttpFilterConfig {}
 
 impl Drop for NopHttpFilterConfig {
     fn drop(&mut self) {

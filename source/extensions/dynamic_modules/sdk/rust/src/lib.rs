@@ -28,16 +28,16 @@ pub mod abi {
 /// }
 ///
 /// fn my_new_http_filter_config_fn(
-///   _envoy_filter_config: EnvoyHttpConfig,
+///   _envoy_filter_config: EnvoyHttpFilterConfig,
 ///   _name: &str,
 ///   _config: &str,
-/// ) -> Option<Box<dyn HttpConfig>> {
-///   Some(Box::new(MyHttpConfig {}))
+/// ) -> Option<Box<dyn HttpFilterConfig>> {
+///   Some(Box::new(MyHttpFilterConfig {}))
 /// }
 ///
-/// struct MyHttpConfig {}
+/// struct MyHttpFilterConfig {}
 ///
-/// impl HttpConfig for MyHttpConfig {}
+/// impl HttpFilterConfig for MyHttpFilterConfig {}
 /// ```
 #[macro_export]
 macro_rules! declare_init_functions {
@@ -69,17 +69,17 @@ pub type ProgramInitFunction = fn() -> bool;
 
 /// The function signature for the new HTTP filter configuration function.
 ///
-/// This is called when a new HTTP filter configuration is created, and it must return a new instance of the [`HttpConfig`] object.
+/// This is called when a new HTTP filter configuration is created, and it must return a new instance of the [`HttpFilterConfig`] object.
 /// Returning `None` will cause the HTTP filter configuration to be rejected.
 //
 // TODO(@mathetake): I guess there would be a way to avoid the use of dyn in the first place.
-// E.g. one idea is to accept all concrete type parameters for HttpConfig and HttpFilter traits in declare_init_functions!,
+// E.g. one idea is to accept all concrete type parameters for HttpFilterConfig and HttpFilter traits in declare_init_functions!,
 // and generate the match statement based on that.
 pub type NewHttpFilterConfigFunction = fn(
-    envoy_filter_config: EnvoyHttpConfig,
+    envoy_filter_config: EnvoyHttpFilterConfig,
     name: &str,
     config: &str,
-) -> Option<Box<dyn HttpConfig>>;
+) -> Option<Box<dyn HttpFilterConfig>>;
 
 /// The global init function for HTTP filter configurations. This is set via the `declare_init_functions` macro,
 /// and is not intended to be set directly.
@@ -88,12 +88,12 @@ pub static mut NEW_HTTP_FILTER_CONFIG_FUNCTION: NewHttpFilterConfigFunction = |_
 };
 
 /// The trait that represents the configuration for an Envoy Http filter configuration.
-/// This has one to one mapping with the [`EnvoyHttpConfig`] object.
+/// This has one to one mapping with the [`EnvoyHttpFilterConfig`] object.
 ///
 /// The object is created when the corresponding Envoy Http filter config is created, and it is
 /// dropped when the corresponding Envoy Http filter config is destroyed. Therefore, the imlementation
 /// is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
-pub trait HttpConfig {
+pub trait HttpFilterConfig {
     /// This is called when a HTTP filter chain is created for a new stream.
     fn new_http_filter(&self) -> Box<dyn HttpFilter> {
         unimplemented!() // TODO.
@@ -104,16 +104,16 @@ pub trait HttpConfig {
 pub trait HttpFilter {} // TODO.
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
-/// mapping with the Envoy Http filter config object as well as [`HttpConfig`] object.
+/// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
 ///
 /// This is a shallow wrapper around the raw pointer to the Envoy HTTP filter object, and it
-/// can be copied and stored somewhere else up until the corresponding [`HttpConfig::destroy`]
-/// for the corresponding [`HttpConfig`] is called.
+/// can be copied and stored somewhere else up until the corresponding [`HttpFilterConfig::destroy`]
+/// for the corresponding [`HttpFilterConfig`] is called.
 //
 // TODO(@mathetake): make this only avaialble for non-test code, and provide a mock for testing. So that users
-// can write a unit tests for their HttpConfig implementations.
+// can write a unit tests for their HttpFilterConfig implementations.
 #[derive(Debug, Clone, Copy)]
-pub struct EnvoyHttpConfig {
+pub struct EnvoyHttpFilterConfig {
     raw_addr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 }
 
@@ -139,7 +139,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
         ""
     };
 
-    let envoy_filter_config = EnvoyHttpConfig {
+    let envoy_filter_config = EnvoyHttpFilterConfig {
         raw_addr: envoy_filter_config_ptr,
     };
 
@@ -150,7 +150,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
             return std::ptr::null();
         };
 
-    // We wrap the Box<dyn HttpConfig> in another Box to ensuure that the object is not dropped after being into a raw pointer.
+    // We wrap the Box<dyn HttpFilterConfig> in another Box to ensuure that the object is not dropped after being into a raw pointer.
     // To be honest, this seems like a hack, and we should find a better way to handle this.
     // See https://users.rust-lang.org/t/sending-a-boxed-trait-over-ffi/21708 for the exact problem.
     let boxed_filter_config_ptr = Box::into_raw(Box::new(filter_config));
@@ -161,9 +161,9 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
     http_filter: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
-    let config = http_filter as *mut *mut dyn HttpConfig;
+    let config = http_filter as *mut *mut dyn HttpFilterConfig;
 
-    // Drop the Box<dyn HttpConfig> and the Box<*mut dyn HttpConfig>
+    // Drop the Box<dyn HttpFilterConfig> and the Box<*mut dyn HttpFilterConfig>
     let _outer = Box::from_raw(config);
     let _inner = Box::from_raw(*config);
 }
