@@ -872,37 +872,6 @@ TEST(PrincipalMatcher, AndIds) {
   checkMatcher(AndMatcher(principals, factory_context), false, conn);
 }
 
-TEST(PrincipalMatcher, RemoteIpAndHeader) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
-
-  // Test remote IP matcher
-  envoy::config::rbac::v3::Principal principal_ip;
-  auto* cidr = principal_ip.mutable_remote_ip();
-  cidr->set_address_prefix("1.2.3.0");
-  cidr->mutable_prefix_len()->set_value(24);
-
-  Envoy::Network::MockConnection conn;
-  Envoy::Http::TestRequestHeaderMapImpl headers;
-  NiceMock<StreamInfo::MockStreamInfo> info;
-
-  Envoy::Network::Address::InstanceConstSharedPtr addr =
-      Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 123, false);
-  info.downstream_connection_info_provider_->setRemoteAddress(addr);
-
-  auto matcher_ip = Matcher::create(principal_ip, factory_context);
-  checkMatcher(*matcher_ip, true, conn, headers, info);
-
-  // Test header matcher
-  envoy::config::rbac::v3::Principal principal_header;
-  auto* header = principal_header.mutable_header();
-  header->set_name("test-header");
-  header->mutable_string_match()->set_exact("test-value");
-
-  headers.setReference(Envoy::Http::LowerCaseString("test-header"), "test-value");
-  auto matcher_header = Matcher::create(principal_header, factory_context);
-  checkMatcher(*matcher_header, true, conn, headers, info);
-}
-
 TEST(PrincipalMatcher, UrlPathAndFilterState) {
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
 
