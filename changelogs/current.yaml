@@ -189,3 +189,7 @@ new_features:
     specifying an optional source for the metadata to be matched in addition to the metadata matcher.
 
 deprecated:
+- area: rbac
+  change: |
+    metadata :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
+    favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.

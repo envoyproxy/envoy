@@ -626,6 +626,79 @@ TEST(UriTemplateMatcher, NoPathInHeader) {
   checkMatcher(UriTemplateMatcher(matcher), false, Envoy::Network::MockConnection(), headers);
 }
 
+TEST(MetadataMatcher, SourcedMetadataMatcher) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl header;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  std::shared_ptr<Router::MockRoute> route = std::make_shared<Router::MockRoute>();
+
+  // Set up dynamic metadata
+  auto dynamic_label = MessageUtil::keyValueStruct("dynamic_key", "dynamic_value");
+  envoy::config::core::v3::Metadata dynamic_metadata;
+  dynamic_metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", dynamic_label));
+  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(dynamic_metadata));
+
+  // Set up route metadata
+  auto route_label = MessageUtil::keyValueStruct("route_key", "route_value");
+  envoy::config::core::v3::Metadata route_metadata;
+  route_metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", route_label));
+  EXPECT_CALL(*route, metadata()).WillRepeatedly(ReturnRef(route_metadata));
+  EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+
+  // Test DYNAMIC source metadata match
+  {
+    envoy::type::matcher::v3::MetadataMatcher matcher;
+    matcher.set_filter("rbac");
+    matcher.add_path()->set_key("dynamic_key");
+    matcher.mutable_value()->mutable_string_match()->set_exact("dynamic_value");
+
+    checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context),
+                                 envoy::config::rbac::v3::MetadataSource::DYNAMIC),
+                 true, conn, header, info);
+
+    // Should not match with wrong value
+    matcher.mutable_value()->mutable_string_match()->set_exact("wrong_value");
+    checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context),
+                                 envoy::config::rbac::v3::MetadataSource::DYNAMIC),
+                 false, conn, header, info);
+  }
+
+  // Test ROUTE source metadata match
+  {
+    envoy::type::matcher::v3::MetadataMatcher matcher;
+    matcher.set_filter("rbac");
+    matcher.add_path()->set_key("route_key");
+    matcher.mutable_value()->mutable_string_match()->set_exact("route_value");
+
+    checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context),
+                                 envoy::config::rbac::v3::MetadataSource::ROUTE),
+                 true, conn, header, info);
+
+    // Should not match with wrong value
+    matcher.mutable_value()->mutable_string_match()->set_exact("wrong_value");
+    checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context),
+                                 envoy::config::rbac::v3::MetadataSource::ROUTE),
+                 false, conn, header, info);
+  }
+
+  // Test ROUTE source with null route
+  {
+    EXPECT_CALL(info, route()).WillRepeatedly(Return(nullptr));
+
+    envoy::type::matcher::v3::MetadataMatcher matcher;
+    matcher.set_filter("rbac");
+    matcher.add_path()->set_key("route_key");
+    matcher.mutable_value()->mutable_string_match()->set_exact("route_value");
+
+    checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context),
+                                 envoy::config::rbac::v3::MetadataSource::ROUTE),
+                 false, conn, header, info);
+  }
+}
+
 } // namespace
 } // namespace RBAC
 } // namespace Common
