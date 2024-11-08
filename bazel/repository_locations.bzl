@@ -1467,6 +1467,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
+    # After updating you may need to run:
+    #
+    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #
     rules_rust = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
