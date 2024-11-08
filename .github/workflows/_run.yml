@@ -133,7 +133,7 @@ on:
                   | rev \
                   | cut -d/ -f1 \
                   | rev \
-                  >> "${TMP_REPORT}/shas-pre"
+                  >> "${TMP_REPORT}/shas-post"
             shell: bash
       request:
         type: string
