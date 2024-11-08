@@ -53,7 +53,7 @@ public:
     auto ptr = createEmptyConfigProto();
     ASSERT(ptr != nullptr);
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*ptr);
-    return {reflectable_message->GetDescriptor()->full_name()};
+    return {std::string(reflectable_message->GetDescriptor()->full_name())};
   }
 };
 
