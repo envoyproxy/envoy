@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.clusters.dns.v3;
 
+import "envoy/config/core/v3/extension.proto";
+
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
@@ -55,4 +57,38 @@ message DnsCluster {
   // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount.
   // There will be no jitter if this value is omitted.
   google.protobuf.Duration dns_jitter = 6;
+
+  // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
+  // or any other DNS resolver types and the related parameters.
+  // For example, an object of
+  // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
+  // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
+  // :ref:`Cluster.dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolution_config>`
+  // configuration which replaces `Cluster.dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`.
+  // During the transition period when ``DnsCluster.typed_dns_resolver_config``, ``Cluster.dns_resolution_config``, and
+  // ``Cluster.typed_dns_resolver_config`` exists, Envoy will prefer, ``DnsCluster.typed_dns_resolver_config`` over
+  // ``Cluster.typed_dns_resolver_config`` over ``cluster.dns_resolver_config``.
+  // [#extension-category: envoy.network.dns_resolver]
+  envoy.config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 7;
+
+  // The DNS IP address resolution policy. If this setting is not specified, the
+  // value defaults to
+  // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.dns.v3.DnsCluster.DnsLookupFamily.AUTO>`.
+  DnsLookupFamily dns_lookup_family = 8;
+
+  DnsDiscoveryType dns_discovery_type = 9;
+
+  enum DnsLookupFamily {
+    UNSPECIFIED = 0;
+    AUTO = 1;
+    V4_ONLY = 2;
+    V6_ONLY = 3;
+    V4_PREFERRED = 4;
+    ALL = 5;
+  }
+
+  enum DnsDiscoveryType {
+    LOGICAL = 0;
+    STRICT = 1;
+  }
 }
