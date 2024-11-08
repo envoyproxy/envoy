@@ -305,7 +305,7 @@ void HttpServerPropertiesCacheImpl::resetBrokenness() {
 }
 
 void HttpServerPropertiesCacheImpl::resetStatus() {
-  for (auto& protocol : protocols_) {
+  for (std::pair<Origin, OriginData>& protocol : protocols_) {
     if (protocol.second.h3_status_tracker) {
       protocol.second.h3_status_tracker->markHttp3Pending();
     }
