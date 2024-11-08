@@ -53,6 +53,7 @@ env:
 jobs:
   start:
     runs-on: ubuntu-22.04
+    name: Start checks
     steps:
     - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.2
       id: check-config
