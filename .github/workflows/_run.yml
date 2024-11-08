@@ -238,6 +238,7 @@ jobs:
              "runs-on": $runsOn,
              "job-started": ${{ steps.started.outputs.value }}}
           | . * {$config, $check}
+
     - if: ${{ inputs.cache-build-image }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
       uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.2
