@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ConsecutiveErrors {
   // Base monitor config. Defines which results should be interpreted as errors
   // and whether to enforce ejection when number of errors exceeds defined threshold.
-  common.v3.MonitorBaseConfig errors = 1 [(validate.rules).message = {required: true}];
+  common.v3.MonitorCapture errors = 1 [(validate.rules).message = {required: true}];
 
   // The number of consecutive errors before ejection occurs.
   // Defaults to 3.

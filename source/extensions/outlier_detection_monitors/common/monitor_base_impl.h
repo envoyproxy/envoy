@@ -63,7 +63,7 @@ class ExtMonitorConfig {
 public:
   ExtMonitorConfig(
       const std::string& name,
-      const envoy::extensions::outlier_detection_monitors::common::v3::MonitorBaseConfig& config);
+      const envoy::extensions::outlier_detection_monitors::common::v3::MonitorCapture& config);
   void addResultBucket(ResultsBucketPtr&& bucket) { buckets_.push_back(std::move(bucket)); }
 
   uint32_t enforce() const { return enforce_; }

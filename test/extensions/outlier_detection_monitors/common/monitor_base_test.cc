@@ -79,7 +79,7 @@ public:
 class MonitorTest : public testing::Test {
 protected:
   void SetUp() override {
-    envoy::extensions::outlier_detection_monitors::common::v3::MonitorBaseConfig proto_config;
+    envoy::extensions::outlier_detection_monitors::common::v3::MonitorCapture proto_config;
     proto_config.mutable_enforcing()->set_value(43);
     config_ = std::make_shared<ExtMonitorConfig>(std::string(monitor_name_), proto_config);
     monitor_ = std::make_unique<MockMonitor>(config_);

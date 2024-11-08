@@ -66,7 +66,7 @@ void ExtMonitorBase::putResult(const ExtResult result) {
 
 ExtMonitorConfig::ExtMonitorConfig(
     const std::string& name,
-    const envoy::extensions::outlier_detection_monitors::common::v3::MonitorBaseConfig& config)
+    const envoy::extensions::outlier_detection_monitors::common::v3::MonitorCapture& config)
     : name_(name), enforce_(config.enforcing().value()),
       enforce_runtime_key_("outlier_detection.enforcing_extension." + name) {
   for (const auto& http_bucket : config.match().http_codes()) {

@@ -18,7 +18,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Outlier detection extension base config]
 
 // Base config used by all types of outlier detection extensions.
-message MonitorBaseConfig {
+// It defines which events the monitor should capture for further processing.
+message MonitorCapture {
   // Set of result buckets. Each reported result is matched against
   // that set.
   ResultBuckets match = 1 [(validate.rules).message = {required: true}];

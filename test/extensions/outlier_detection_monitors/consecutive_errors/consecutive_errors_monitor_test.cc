@@ -9,7 +9,7 @@ namespace Outlier {
 
 TEST(ConsecutiveErrorsMonitorTest, BasicTest) {
   // Create Consecutive Error monitor which "tripps" after 3 errors.
-  const envoy::extensions::outlier_detection_monitors::common::v3::MonitorBaseConfig config;
+  const envoy::extensions::outlier_detection_monitors::common::v3::MonitorCapture config;
   ConsecutiveErrorsMonitor monitor(std::make_shared<ExtMonitorConfig>("test-monitor", config), 3);
 
   // At the start, the error counter is zero.
