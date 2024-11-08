@@ -45,7 +45,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // In other words, the process is a request/response conversation, but
 // using a gRPC stream to make it easier for the server to
 // maintain state.
-
 service ExternalProcessor {
   // This begins the bidirectional stream that Envoy will use to
   // give the server control over what the filter does. The actual
@@ -129,6 +128,7 @@ message ProcessingRequest {
 // set to false, the server must send back exactly one ProcessingResponse message.
 // [#next-free-field: 11]
 message ProcessingResponse {
+  // The response type that is sent by the server.
   oneof response {
     option (validate.required) = true;
 
@@ -220,19 +220,25 @@ message HttpHeaders {
   map<string, google.protobuf.Struct> attributes = 2
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // If true, then there is no message body associated with this
+  // If ``true``, then there is no message body associated with this
   // request or response.
   bool end_of_stream = 3;
 }
 
-// This message contains the message body that Envoy sends to the external server.
+// This message is sent to the external server when the HTTP request and
+// response bodies are received.
 message HttpBody {
+  // The contents of the body in the HTTP request/response. Note that in
+  // streaming mode multiple ``HttpBody`` messages may be sent.
   bytes body = 1;
 
+  // If ``true``, this will be the last ``HttpBody`` message that will be sent and no
+  // trailers will be sent for the current request/response.
   bool end_of_stream = 2;
 }
 
-// This message contains the trailers.
+// This message is sent to the external server when the HTTP request and
+// response trailers are received.
 message HttpTrailers {
   // The header value is encoded in the
   // :ref:`raw_value <envoy_v3_api_field_config.core.v3.HeaderValue.raw_value>` field.
@@ -241,25 +247,34 @@ message HttpTrailers {
 
 // The following are messages that may be sent back by the server.
 
-// This message must be sent in response to an HttpHeaders message.
+// This message is sent by the external server to Envoy after ``HttpHeaders`` was
+// sent to it.
 message HeadersResponse {
+  // Details the modifications (if any) to be made by Envoy to the current
+  // request/response.
   CommonResponse response = 1;
 }
 
-// This message must be sent in response to an HttpTrailers message.
-message TrailersResponse {
-  // Instructions on how to manipulate the trailers
-  HeaderMutation header_mutation = 1;
-}
-
-// This message must be sent in response to an HttpBody message.
+// This message is sent by the external server to Envoy after ``HttpBody`` was
+// sent to it.
 message BodyResponse {
+  // Details the modifications (if any) to be made by Envoy to the current
+  // request/response.
   CommonResponse response = 1;
+}
+
+// This message is sent by the external server to Envoy after ``HttpTrailers`` was
+// sent to it.
+message TrailersResponse {
+  // Details the modifications (if any) to be made by Envoy to the current
+  // request/response trailers.
+  HeaderMutation header_mutation = 1;
 }
 
 // This message contains common fields between header and body responses.
 // [#next-free-field: 6]
 message CommonResponse {
+  // The status of the response.
   enum ResponseStatus {
     // Apply the mutation instructions in this message to the
     // request or response, and then continue processing the filter
@@ -322,7 +337,7 @@ message CommonResponse {
 // to the downstream codec, or reset the stream.
 // [#next-free-field: 6]
 message ImmediateResponse {
-  // The response code to return
+  // The response code to return.
   type.v3.HttpStatus status = 1 [(validate.rules).message = {required: true}];
 
   // Apply changes to the default headers, which will include content-type.
@@ -343,7 +358,7 @@ message ImmediateResponse {
 
 // This message specifies a gRPC status for an ImmediateResponse message.
 message GrpcStatus {
-  // The actual gRPC status
+  // The actual gRPC status.
   uint32 status = 1;
 }
 
@@ -365,11 +380,12 @@ message HeaderMutation {
 // Replace the entire message body chunk received in the corresponding
 // HttpBody message with this new body, or clear the body.
 message BodyMutation {
+  // The type of mutation for the body.
   oneof mutation {
-    // The entire body to replace
+    // The entire body to replace.
     bytes body = 1;
 
-    // Clear the corresponding body chunk
+    // Clear the corresponding body chunk.
     bool clear_body = 2;
   }
 }
