@@ -114,7 +114,7 @@ pub trait HttpFilter {} // TODO.
 // can write a unit tests for their HttpFilterConfig implementations.
 #[derive(Debug, Clone, Copy)]
 pub struct EnvoyHttpFilterConfig {
-    raw_addr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+    raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 }
 
 #[no_mangle]
@@ -140,7 +140,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
     };
 
     let envoy_filter_config = EnvoyHttpFilterConfig {
-        raw_addr: envoy_filter_config_ptr,
+        raw_ptr: envoy_filter_config_ptr,
     };
 
     let filter_config =
