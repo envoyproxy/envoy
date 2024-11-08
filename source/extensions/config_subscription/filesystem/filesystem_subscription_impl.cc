@@ -69,7 +69,7 @@ void FilesystemSubscriptionImpl::configRejected(const EnvoyException& e,
 std::string FilesystemSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr* config_update) {
   auto owned_message = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
   auto& message = *owned_message;
-  MessageUtil::loadFromFile(path_, message, validation_visitor_, api_);
+  THROW_IF_NOT_OK(MessageUtil::loadFromFile(path_, message, validation_visitor_, api_));
   *config_update = std::move(owned_message);
   const auto decoded_resources =
       THROW_OR_RETURN_VALUE(DecodedResourcesWrapper::create(*resource_decoder_, message.resources(),
@@ -120,7 +120,7 @@ std::string
 FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr* config_update) {
   auto owned_resource_message = std::make_unique<envoy::service::discovery::v3::Resource>();
   auto& resource_message = *owned_resource_message;
-  MessageUtil::loadFromFile(path_, resource_message, validation_visitor_, api_);
+  THROW_IF_NOT_OK(MessageUtil::loadFromFile(path_, resource_message, validation_visitor_, api_));
   // Dynamically load the collection message.
   const std::string collection_type =
       std::string(TypeUtil::typeUrlToDescriptorFullName(resource_message.resource().type_url()));
