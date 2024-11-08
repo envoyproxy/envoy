@@ -835,6 +835,146 @@ TEST(MetadataMatcher, NestedMetadata) {
                false, conn, header, info);
 }
 
+TEST(PrincipalMatcher, AndIds) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal::Set principals;
+
+  // Create a principal set with two conditions: any and authenticated
+  auto* principal1 = principals.add_ids();
+  principal1->set_any(true);
+
+  auto* principal2 = principals.add_ids();
+  auto* auth = principal2->mutable_authenticated();
+  auth->mutable_principal_name()->set_exact("example.com");
+
+  // Set up connection with SSL
+  Envoy::Network::MockConnection conn;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
+
+  // Set up all required SSL mock expectations
+  const std::vector<std::string> uri_sans{"example.com"};
+  const std::vector<std::string> dns_sans;
+  const std::string subject;
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
+
+  // Should match because one URI SAN matches and any() is true
+  checkMatcher(AndMatcher(principals, factory_context), true, conn);
+
+  // Change the expected principal name to make it fail
+  auth->mutable_principal_name()->set_exact("wrong.com");
+  checkMatcher(AndMatcher(principals, factory_context), false, conn);
+
+  // Test with no SSL connection
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(nullptr));
+  checkMatcher(AndMatcher(principals, factory_context), false, conn);
+}
+
+TEST(PrincipalMatcher, OrIds) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal> principals;
+
+  // Create two principals: one that matches direct remote IP and one that matches header
+  auto* principal1 = principals.Add();
+  auto* cidr = principal1->mutable_direct_remote_ip();
+  cidr->set_address_prefix("1.2.3.0");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  auto* principal2 = principals.Add();
+  principal2->mutable_header()->set_name("test-header");
+  principal2->mutable_header()->mutable_string_match()->set_exact("test-value");
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Set up a matching IP address
+  Envoy::Network::Address::InstanceConstSharedPtr addr =
+      Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 123, false);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
+
+  // Should match based on IP even without header
+  checkMatcher(OrMatcher(principals, factory_context), true, conn, headers, info);
+
+  // Should match based on header even with wrong IP
+  addr = Envoy::Network::Utility::parseInternetAddressNoThrow("5.6.7.8", 123, false);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
+  headers.setReference(Envoy::Http::LowerCaseString("test-header"), "test-value");
+  checkMatcher(OrMatcher(principals, factory_context), true, conn, headers, info);
+}
+
+TEST(PrincipalMatcher, RemoteIpAndHeader) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  // Test remote IP matcher
+  envoy::config::rbac::v3::Principal principal_ip;
+  auto* cidr = principal_ip.mutable_remote_ip();
+  cidr->set_address_prefix("1.2.3.0");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  Envoy::Network::Address::InstanceConstSharedPtr addr =
+      Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 123, false);
+  info.downstream_connection_info_provider_->setRemoteAddress(addr);
+
+  auto matcher_ip = Matcher::create(principal_ip, factory_context);
+  checkMatcher(*matcher_ip, true, conn, headers, info);
+
+  // Test header matcher
+  envoy::config::rbac::v3::Principal principal_header;
+  auto* header = principal_header.mutable_header();
+  header->set_name("test-header");
+  header->mutable_string_match()->set_exact("test-value");
+
+  headers.setReference(Envoy::Http::LowerCaseString("test-header"), "test-value");
+  auto matcher_header = Matcher::create(principal_header, factory_context);
+  checkMatcher(*matcher_header, true, conn, headers, info);
+}
+
+TEST(PrincipalMatcher, UrlPathAndFilterState) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  // Test URL path matcher
+  envoy::config::rbac::v3::Principal principal_path;
+  auto* path = principal_path.mutable_url_path();
+  path->mutable_path()->set_exact("/test");
+
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/test");
+
+  auto matcher_path = Matcher::create(principal_path, factory_context);
+  checkMatcher(*matcher_path, true, Envoy::Network::MockConnection(), headers);
+
+  // Test filter state matcher
+  envoy::config::rbac::v3::Principal principal_filter_state;
+  auto* filter_state = principal_filter_state.mutable_filter_state();
+  filter_state->set_key("test.key");
+  filter_state->mutable_string_match()->set_exact("test.value");
+
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  StreamInfo::FilterStateImpl filter_state_impl(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state_impl.setData("test.key", std::make_shared<TestObject>(),
+                            StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(info), filterState()).WillRepeatedly(ReturnRef(filter_state_impl));
+
+  auto matcher_filter_state = Matcher::create(principal_filter_state, factory_context);
+  checkMatcher(*matcher_filter_state, true, Envoy::Network::MockConnection(), headers, info);
+}
+
+// Test for IDENTIFIER_NOT_SET case
+TEST(PrincipalMatcher, IdentifierNotSet) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal empty_principal;
+
+  // This should hit the IDENTIFIER_NOT_SET case and panic
+  EXPECT_DEATH(Matcher::create(empty_principal, factory_context), ".*");
+}
+
 } // namespace
 } // namespace RBAC
 } // namespace Common
