@@ -278,8 +278,9 @@ public:
   // It has somewhat inconsistent handling of invalid file contents,
   // occasionally failing over to try another type of parsing, or silently
   // failing instead of throwing an exception.
-  static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  static absl::Status loadFromFile(const std::string& path, Protobuf::Message& message,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                                   Api::Api& api);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.

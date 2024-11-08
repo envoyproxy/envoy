@@ -8,6 +8,7 @@ import "envoy/config/core/v3/resolver.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.network.dns_resolver.cares.v3";
 option java_outer_classname = "CaresDnsResolverProto";
@@ -19,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.network.dns_resolver.cares]
 
 // Configuration for c-ares DNS resolver.
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message CaresDnsResolverConfig {
   // A list of dns resolver addresses.
   // :ref:`use_resolvers_as_fallback<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
@@ -47,4 +48,17 @@ message CaresDnsResolverConfig {
   // This option allows for number of UDP based DNS queries to be capped. Note, this
   // is only applicable to c-ares DNS resolver currently.
   google.protobuf.UInt32Value udp_max_queries = 5;
+
+  // The number of seconds each name server is given to respond to a query on the first try of any given server.
+  //
+  // Note: While the c-ares library defaults to 2 seconds, Envoy's default (if this field is unset) is 5 seconds.
+  // This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
+  google.protobuf.UInt64Value query_timeout_seconds = 6 [(validate.rules).uint64 = {gte: 1}];
+
+  // The maximum number of query attempts the resolver will make before giving up.
+  // Each attempt may use a different name server.
+  //
+  // Note: While the c-ares library defaults to 3 attempts, Envoy's default (if this field is unset) is 4 attempts.
+  // This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
+  google.protobuf.UInt32Value query_tries = 7 [(validate.rules).uint32 = {gte: 1}];
 }
