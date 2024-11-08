@@ -27,7 +27,7 @@ public:
   ~DynamicModuleHttpFilterConfig();
 
   // The corresponding in-module configuration.
-  envoy_dynamic_module_type_http_filter_config_in_module_ptr in_module_config_ = nullptr;
+  envoy_dynamic_module_type_http_filter_config_module_ptr in_module_config_ = nullptr;
 
   // The function pointer to the module's destroy function, resolved in the constructor.
   decltype(&envoy_dynamic_module_on_http_filter_config_destroy) in_module_config_destroy_ = nullptr;

@@ -28,7 +28,7 @@ pub mod abi {
 /// }
 ///
 /// fn my_new_http_filter_config_fn(
-///   _envoy_filter_factory: EnvoyHttpConfig,
+///   _envoy_filter_config: EnvoyHttpConfig,
 ///   _name: &str,
 ///   _config: &str,
 /// ) -> Option<Box<dyn HttpConfig>> {
@@ -72,9 +72,11 @@ pub type ProgramInitFunction = fn() -> bool;
 /// This is called when a new HTTP filter configuration is created, and it must return a new instance of the [`HttpConfig`] object.
 /// Returning `None` will cause the HTTP filter configuration to be rejected.
 //
-// TODO(@mathetake): I guess there would be a way to avoid the use of dyn in the first place. E.g. one idea is to accept a type parameter declare_init_functions! macro.
+// TODO(@mathetake): I guess there would be a way to avoid the use of dyn in the first place.
+// E.g. one idea is to accept all concrete type parameters for HttpConfig and HttpFilter traits in declare_init_functions!,
+// and generate the match statement based on that.
 pub type NewHttpFilterConfigFunction = fn(
-    envoy_filter_factory: EnvoyHttpConfig,
+    envoy_filter_config: EnvoyHttpConfig,
     name: &str,
     config: &str,
 ) -> Option<Box<dyn HttpConfig>>;
@@ -89,20 +91,13 @@ pub static mut NEW_HTTP_FILTER_CONFIG_FUNCTION: NewHttpFilterConfigFunction = |_
 /// This has one to one mapping with the [`EnvoyHttpConfig`] object.
 ///
 /// The object is created when the corresponding Envoy Http filter config is created, and it is
-/// destroyed when the corresponding Envoy Http filter config is destroyed.
+/// dropped when the corresponding Envoy Http filter config is destroyed. Therefore, the imlementation
+/// is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
 pub trait HttpConfig {
     /// This is called when a HTTP filter chain is created for a new stream.
     fn new_http_filter(&self) -> Box<dyn HttpFilter> {
         unimplemented!() // TODO.
     }
-
-    /// This is called when the corresponding Envoy Http filter config is destroyed/unloaded.
-    ///
-    /// After this returns, this object is destructed.
-    //
-    // NOTE: alternatively, we can replace this with `Drop` trait, but this allows us to clarify the lifetime of the
-    // object and explain exactly when the object is destroyed.
-    fn destroy(&mut self) {}
 }
 
 /// The trait that represents an Envoy Http filter for each stream.
@@ -119,17 +114,17 @@ pub trait HttpFilter {} // TODO.
 // can write a unit tests for their HttpConfig implementations.
 #[derive(Debug, Clone, Copy)]
 pub struct EnvoyHttpConfig {
-    raw_addr: abi::envoy_dynamic_module_type_http_filter_config_in_envoy_ptr,
+    raw_addr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 }
 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
-    envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_in_envoy_ptr,
+    envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
     name_ptr: *const u8,
     name_size: usize,
     config_ptr: *const u8,
     config_size: usize,
-) -> abi::envoy_dynamic_module_type_http_filter_config_in_module_ptr {
+) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
     // This assumes that the name and config are valid UTF-8 strings. Should we relax? At the moment, both are String at protobuf level.
     let name = if name_size > 0 {
         let slice = std::slice::from_raw_parts(name_ptr, name_size);
@@ -159,17 +154,16 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
     // To be honest, this seems like a hack, and we should find a better way to handle this.
     // See https://users.rust-lang.org/t/sending-a-boxed-trait-over-ffi/21708 for the exact problem.
     let boxed_filter_config_ptr = Box::into_raw(Box::new(filter_config));
-    boxed_filter_config_ptr as abi::envoy_dynamic_module_type_http_filter_config_in_module_ptr
+    boxed_filter_config_ptr as abi::envoy_dynamic_module_type_http_filter_config_module_ptr
 }
 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
-    http_filter: abi::envoy_dynamic_module_type_http_filter_config_in_module_ptr,
+    http_filter: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
-    let factory = http_filter as *mut *mut dyn HttpConfig;
-    (**factory).destroy();
+    let config = http_filter as *mut *mut dyn HttpConfig;
 
     // Drop the Box<dyn HttpConfig> and the Box<*mut dyn HttpConfig>
-    let _outer = Box::from_raw(factory);
-    let _inner = Box::from_raw(*factory);
+    let _outer = Box::from_raw(config);
+    let _inner = Box::from_raw(*config);
 }

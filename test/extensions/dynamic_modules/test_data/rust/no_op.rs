@@ -26,14 +26,17 @@ fn new_nop_http_filter_config_fn(
     Some(Box::new(NopHttpFilterConfig { name, config }))
 }
 
-/// A no-op HTTP filter configuration that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpConfig`] trait.
+/// A no-op HTTP filter configuration that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpConfig`]
+/// as well as the [`Drop`] to test the cleanup of the configuration.
 struct NopHttpFilterConfig {
     name: String,
     config: String,
 }
 
-impl envoy_proxy_dynamic_modules_rust_sdk::HttpConfig for NopHttpFilterConfig {
-    fn destroy(&mut self) {
+impl envoy_proxy_dynamic_modules_rust_sdk::HttpConfig for NopHttpFilterConfig {}
+
+impl Drop for NopHttpFilterConfig {
+    fn drop(&mut self) {
         assert_eq!(self.name, "foo");
         assert_eq!(self.config, "bar");
     }
