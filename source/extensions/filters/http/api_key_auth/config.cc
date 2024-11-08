@@ -21,9 +21,9 @@ Http::FilterFactoryCb ApiKeyAuthFilterFactory::createFilterFactoryFromProtoTyped
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 ApiKeyAuthFilterFactory::createRouteSpecificFilterConfigTyped(
-    const ApiKeyAuthPerScopeProto& proto_config, Server::Configuration::ServerFactoryContext&,
+    const ApiKeyAuthPerRouteProto& proto_config, Server::Configuration::ServerFactoryContext&,
     ProtobufMessage::ValidationVisitor&) {
-  return std::make_unique<ScopeConfig>(proto_config);
+  return std::make_unique<RouteConfig>(proto_config);
 }
 
 REGISTER_FACTORY(ApiKeyAuthFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);

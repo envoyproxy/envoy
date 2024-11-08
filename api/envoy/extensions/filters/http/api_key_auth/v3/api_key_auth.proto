@@ -28,50 +28,22 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //    authentication_header: "X-API-KEY"
 //    credentials:
 //      entries:
-//      - api_key: 09876abcdefg
+//      - key: 09876abcdefg
 //        client_id: user
+//    key_sources:
+//      entries:
+//      - header: "X-API-KEY"
 //
-// If multiple fields of ``authentication_header``, ``authentication_query``, and ``authentication_cookie``
-// are set. Then filter will try to fetch the API key from the following fields in order:
-//
-// 1. ``authentication_header``
-// 2. ``authentication_query``
-// 3. ``authentication_cookie``
-//
-// If none of the fields are set, then the filter will reject the request.
 message ApiKeyAuth {
-  message Credential {
-    // The value of the unique API key.
-    string api_key = 1 [(validate.rules).string = {min_len: 1}];
-
-    // The unique id or identity that used to identify the client or consumer.
-    string client_id = 2 [(validate.rules).string = {min_len: 1}];
-  }
-
-  message Credentials {
-    repeated Credential entries = 1;
-  }
-
-  // Api credentials used to authenticate the clients.
+  // The credentials that are used to authenticate the clients.
   Credentials credentials = 1 [(udpa.annotations.sensitive) = true];
 
-  // The header name to fetch the key.
-  // If multiple values are present in the given header, the filter rejects the request.
-  string authentication_header = 2
-      [(validate.rules).string =
-           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
-
-  // The query parameter name to fetch the key.
-  string authentication_query = 3 [(validate.rules).string = {max_len: 1024}];
-
-  // The cookie name to fetch the key.
-  string authentication_cookie = 4
-      [(validate.rules).string =
-           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
+  // The key sources to fetch the key from the coming request.
+  KeySources key_sources = 2;
 }
 
 // API key auth configuration of per route or per virtual host or per route configuration.
-message ApiKeyAuthPerScope {
+message ApiKeyAuthPerRoute {
   // Route specific APIKeyAuth configuration. This is optional and could be used to override the
   // filter level ApiKeyAuth configuration **partly**.
   //
@@ -88,4 +60,51 @@ message ApiKeyAuthPerScope {
   // If more complex authorization is required, then use the :ref:`HTTP RBAC filter
   // <config_http_filters_rbac>` instead.
   repeated string allowed_clients = 2;
+}
+
+// Single credential entry that contains the API key and the related client id.
+message Credential {
+  // The value of the unique API key.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The unique id or identity that used to identify the client or consumer.
+  string client_id = 2 [(validate.rules).string = {min_len: 1}];
+}
+
+// The credentials that are used to authenticate the clients.
+message Credentials {
+  // The list of credentials. Explicitly setting the Credentials message with zero entries is
+  // allowed and will result in the filter rejecting all requests.
+  repeated Credential entries = 1;
+}
+
+message KeySource {
+  // The header name to fetch the key. If multiple header values are present, the first one will be
+  // used.
+  //
+  // If set, takes precedence over ``query`` and ``cookie``.
+  string header = 1
+      [(validate.rules).string =
+           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
+
+  // The query parameter name to fetch the key. If multiple query values are present, the first one
+  // will be used.
+  //
+  // Only makes sense if ``header`` is not set. If set, takes precedence over ``cookie``.
+  string query = 2 [(validate.rules).string = {max_len: 1024}];
+
+  // The cookie name to fetch the key.
+  //
+  // Only makes sense if the ``header`` and ``query`` are not set.
+  string cookie = 3
+      [(validate.rules).string =
+           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
+}
+
+// The key sources to fetch the key from the coming request.
+message KeySources {
+  // The list of key sources. Explicitly setting the KeySources message with zero entries is
+  // not allowed. The order of the key sources is important and the filter will try to fetch the
+  // key one by one from the key sources in the order they are defined.
+  repeated KeySource entries = 1 [(validate.rules).repeated = {min_items: 1}];
 }

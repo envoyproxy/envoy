@@ -56,10 +56,12 @@ An example scope specific configuration of the filter may look like the followin
         route: { cluster: some_service }
         typed_per_filter_config:
           api_key_auth:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerScope
+            "@type": type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute
             override_config:
               credentials:
                 entries:
+                - api_key: one_key
+                  client_id: one_client
                 - api_key: another_key
                   client_id: another_client
               authentication_query: api_key
@@ -76,6 +78,33 @@ An example scope specific configuration of the filter may look like the followin
 
 In this example we customize credential list and key source for ``/admin`` route, and disable
 authentication for ``/static`` prefixed routes.
+
+Conbining the per-route configuration example and the filter configuration example, given the following
+requests, the filter will behave as follows:
+
+.. code-block:: text
+
+  # The request will be allowed because the API key is valid and the client is allowed.
+  GET /admin?api_key=another_key HTTP/1.1
+  host: example.com
+
+  # The request will be denied with 403 status code because the API key is valid but the client is
+  # not allowed.
+  GET /admin?api_key=one_key HTTP/1.1
+  host: example.com
+
+  # The request will be denied with 401 status code because the API key is invalid.
+  GET /admin?api_key=invalid_key HTTP/1.1
+  host: example.com
+
+  # The request will be allowed because the filter is disabled for specific route.
+  GET /static HTTP/1.1
+  host: example.com
+
+  # The request will be allowed because the API key is valid and no client validation is configured.
+  GET / HTTP/1.1
+  host: example.com
+  Authorization: "Bearer one_key"
 
 Statistics
 ----------

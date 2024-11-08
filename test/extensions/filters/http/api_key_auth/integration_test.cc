@@ -21,11 +21,13 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth
   credentials:
     entries:
-      - api_key: key1
+      - key: key1
         client_id: user1
-      - api_key: key2
+      - key: key2
         client_id: user2
-  authentication_header: "Authorization"
+  key_sources:
+    entries:
+      - header: "Authorization"
 )EOF";
 
 const std::string ApiKeyAuthScopeConfig =
@@ -45,7 +47,7 @@ public:
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                cfg) {
-          envoy::extensions::filters::http::api_key_auth::v3::ApiKeyAuthPerScope per_route_config;
+          envoy::extensions::filters::http::api_key_auth::v3::ApiKeyAuthPerRoute per_route_config;
           TestUtility::loadFromYaml(ApiKeyAuthScopeConfig, per_route_config);
 
           auto* config = cfg.mutable_route_config()

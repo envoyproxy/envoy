@@ -18,11 +18,13 @@ TEST(ApiKeyAuthFilterFactoryTest, DuplicateApiKey) {
   const std::string yaml = R"(
   credentials:
     entries:
-      - api_key: key1
+      - key: key1
         client_id: user1
-      - api_key: key1
+      - key: key1
         client_id: user2
-  authentication_header: "Authorization"
+  key_sources:
+    entries:
+      - header: "Authorization
   )";
 
   ApiKeyAuthProto proto_config;
@@ -40,11 +42,13 @@ TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {
   const std::string yaml = R"(
   credentials:
     entries:
-      - api_key: key1
+      - key: key1
         client_id: user1
-      - api_key: key2
+      - key: key2
         client_id: user2
-  authentication_header: "Authorization"
+  key_sources:
+    entries:
+      - header: "Authorization
   )";
 
   ApiKeyAuthProto proto_config;
@@ -54,12 +58,12 @@ TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {
   override_config:
     credentials:
       entries:
-        - api_key: key3
+        - key: key3
           client_id: user3
   allowed_clients:
     - user1
   )";
-  ApiKeyAuthPerScopeProto scope_proto_config;
+  ApiKeyAuthPerRouteProto scope_proto_config;
   TestUtility::loadFromYaml(scope_yaml, scope_proto_config);
 
   ApiKeyAuthFilterFactory factory;

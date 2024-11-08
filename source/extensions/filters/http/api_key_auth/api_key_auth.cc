@@ -15,73 +15,85 @@ namespace HttpFilters {
 namespace ApiKeyAuth {
 
 ApiKeyAuthConfig::ApiKeyAuthConfig(const ApiKeyAuthProto& proto_config)
-    : key_source_(proto_config.authentication_header(), proto_config.authentication_query(),
-                  proto_config.authentication_cookie()) {
+    : key_sources_(proto_config.key_sources()) {
   if (!proto_config.has_credentials()) {
     return;
   }
 
-  ApiKeyMap api_key_map;
-  api_key_map.reserve(proto_config.credentials().entries_size());
+  Credentials credentials;
+  credentials.reserve(proto_config.credentials().entries_size());
 
   for (const auto& credential : proto_config.credentials().entries()) {
-    if (api_key_map.contains(credential.api_key())) {
+    if (credentials.contains(credential.key())) {
       throwEnvoyExceptionOrPanic("Duplicate API key.");
     }
-    api_key_map[credential.api_key()] = credential.client_id();
+    credentials[credential.key()] = credential.client_id();
   }
 
-  api_key_map_ = std::move(api_key_map);
+  credentials_ = std::move(credentials);
 }
 
-ScopeConfig::ScopeConfig(const ApiKeyAuthPerScopeProto& proto)
+RouteConfig::RouteConfig(const ApiKeyAuthPerRouteProto& proto)
     : override_config_(proto.override_config()) {
   allowed_clients_.insert(proto.allowed_clients().begin(), proto.allowed_clients().end());
 }
 
-KeySource::KeySource(absl::string_view header, absl::string_view query, absl::string_view cookie)
-    : header_(header), query_(query), cookie_(cookie) {}
-
-KeyResult KeySource::getApiKey(const Http::RequestHeaderMap& headers,
-                               std::string& key_buffer) const {
-  // Try to get the API key from the header first if the header key is not empty.
-  if (!header_.get().empty()) {
-    if (const auto auth_header = headers.get(header_); !auth_header.empty()) {
-      if (auth_header.size() > 1) {
-        return {{}, true};
-      }
-
-      absl::string_view auth_header_view = auth_header[0]->value().getStringView();
-      if (absl::StartsWith(auth_header_view, "Bearer ")) {
-        auth_header_view = auth_header_view.substr(7);
-      }
-      return {auth_header_view};
-    }
+KeySources::Source::Source(absl::string_view header, absl::string_view query,
+                           absl::string_view cookie) {
+  if (!header.empty()) {
+    source_ = Http::LowerCaseString(header);
+  } else if (!query.empty()) {
+    source_ = std::string(query);
+    query_source_ = true;
+  } else {
+    source_ = std::string(cookie);
   }
+}
 
-  // If the API key is not found in the header, try to get it from the query parameter
-  // if the query key is not empty.
-  if (!query_.empty()) {
-    auto query_params =
+KeySources::KeySources(const KeySourcesProto& proto_config) {
+  key_sources_.reserve(proto_config.entries_size());
+  for (const auto& source : proto_config.entries()) {
+    key_sources_.emplace_back(source.header(), source.query(), source.cookie());
+  }
+}
+
+absl::string_view KeySources::Source::getKey(const Http::RequestHeaderMap& headers,
+                                             std::string& buffer) const {
+  if (absl::holds_alternative<Http::LowerCaseString>(source_)) {
+    if (const auto header = headers.get(absl::get<Http::LowerCaseString>(source_));
+        !header.empty()) {
+      absl::string_view header_view = header[0]->value().getStringView();
+      if (absl::StartsWith(header_view, "Bearer ")) {
+        header_view = header_view.substr(7);
+      }
+      std::cout << "header_view: " << header_view << std::endl;
+      return header_view;
+    }
+  } else if (query_source_) {
+    auto params =
         Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
-    if (auto iter = query_params.data().find(query_); iter != query_params.data().end()) {
-      if (iter->second.size() > 1) {
-        return {{}, true};
-      }
+    if (auto iter = params.data().find(absl::get<std::string>(source_));
+        iter != params.data().end()) {
       if (!iter->second.empty()) {
-        key_buffer = std::move(iter->second[0]);
-        return {absl::string_view{key_buffer}};
+        buffer = std::move(iter->second[0]);
+        return buffer;
       }
     }
+  } else {
+    buffer = Http::Utility::parseCookieValue(headers, absl::get<std::string>(source_));
+    return buffer;
   }
 
-  // If the API key is not found in the header and query parameter, try to get it from the
-  // cookie if the cookie key is not empty.
-  if (!cookie_.empty()) {
-    key_buffer = Http::Utility::parseCookieValue(headers, cookie_);
-    return {absl::string_view{key_buffer}};
-  }
+  return {};
+}
 
+absl::string_view KeySources::getKey(const Http::RequestHeaderMap& headers,
+                                     std::string& buffer) const {
+  for (const auto& source : key_sources_) {
+    if (auto key = source.getKey(headers, buffer); !key.empty()) {
+      return key;
+    }
+  }
   return {};
 }
 
@@ -92,46 +104,43 @@ FilterConfig::FilterConfig(const ApiKeyAuthProto& proto_config, Stats::Scope& sc
 ApiKeyAuthFilter::ApiKeyAuthFilter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
 
 Http::FilterHeadersStatus ApiKeyAuthFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const ScopeConfig* override_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<ScopeConfig>(decoder_callbacks_);
+  const RouteConfig* override_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(decoder_callbacks_);
 
-  OptRef<const ApiKeyMap> api_key_map = config_->apiKeyMap();
-  OptRef<const KeySource> key_source = config_->keySource();
+  OptRef<const Credentials> credentials = config_->credentials();
+  OptRef<const KeySources> key_sources = config_->keySources();
 
   // If there is an override config, then try to override the API key map and key source.
   if (override_config != nullptr) {
-    OptRef<const ApiKeyMap> override_api_key_map = override_config->apiKeyMap();
-    if (override_api_key_map.has_value()) {
-      api_key_map = override_api_key_map;
+    OptRef<const Credentials> override_credentials = override_config->credentials();
+    if (override_credentials.has_value()) {
+      credentials = override_credentials;
     }
 
-    OptRef<const KeySource> override_key_source = override_config->keySource();
-    if (override_key_source.has_value()) {
-      key_source = override_key_source;
+    OptRef<const KeySources> override_key_sources = override_config->keySources();
+    if (override_key_sources.has_value()) {
+      key_sources = override_key_sources;
     }
   }
 
-  if (!key_source.has_value()) {
+  if (!key_sources.has_value()) {
     return onDenied(Http::Code::Unauthorized, "Client authentication failed.",
-                    "missing_key_source");
+                    "missing_key_sources");
   }
-  if (!api_key_map.has_value()) {
+  if (!credentials.has_value()) {
     return onDenied(Http::Code::Unauthorized, "Client authentication failed.",
                     "missing_credentials");
   }
 
   std::string key_buffer;
-  const KeyResult key_result = key_source->getApiKey(headers, key_buffer);
+  absl::string_view key_result = key_sources->getKey(headers, key_buffer);
 
-  if (key_result.multiple_keys_error) {
-    return onDenied(Http::Code::Unauthorized, "Client authentication failed.", "multiple_api_key");
-  }
-  if (key_result.key_string_view.empty()) {
+  if (key_result.empty()) {
     return onDenied(Http::Code::Unauthorized, "Client authentication failed.", "missing_api_key");
   }
 
-  const auto credential = api_key_map->find(key_result.key_string_view);
-  if (credential == api_key_map->end()) {
+  const auto credential = credentials->find(key_result);
+  if (credential == credentials->end()) {
     return onDenied(Http::Code::Unauthorized, "Client authentication failed.", "unkonwn_api_key");
   }
 

@@ -243,7 +243,7 @@ envoy.filters.http.api_key_auth:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth
-  - envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerScope
+  - envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute
 envoy.filters.http.buffer:
   categories:
   - envoy.filters.http

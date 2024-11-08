@@ -31,54 +31,96 @@ struct ApiKeyAuthStats {
 };
 
 using ApiKeyAuthProto = envoy::extensions::filters::http::api_key_auth::v3::ApiKeyAuth;
-using ApiKeyAuthPerScopeProto =
-    envoy::extensions::filters::http::api_key_auth::v3::ApiKeyAuthPerScope;
+using ApiKeyAuthPerRouteProto =
+    envoy::extensions::filters::http::api_key_auth::v3::ApiKeyAuthPerRoute;
+using KeySourcesProto = envoy::extensions::filters::http::api_key_auth::v3::KeySources;
 
-using ApiKeyMap = absl::flat_hash_map<std::string, std::string>;
+// Credentials is a map of API key to client ID.
+using Credentials = absl::flat_hash_map<std::string, std::string>;
 
-class KeyResult {
+/**
+ * The sources to get the API key from the incoming request.
+ */
+class KeySources {
 public:
-  absl::string_view key_string_view;
-  bool multiple_keys_error{false};
-};
+  KeySources(const KeySourcesProto& proto_config);
 
-class KeySource {
-public:
-  KeySource(absl::string_view header, absl::string_view query, absl::string_view cookie);
+  /**
+   * To get the API key from the incoming request.
+   * @param headers the incoming request headers.
+   * @param key_buffer the buffer to store the API key.
+   * @return the result of getting the API key.
+   */
+  absl::string_view getKey(const Http::RequestHeaderMap& headers, std::string& buffer) const;
 
-  KeyResult getApiKey(const Http::RequestHeaderMap& headers, std::string& key_buffer) const;
-  bool valid() const { return !header_.get().empty() || !query_.empty() || !cookie_.empty(); }
+  /**
+   * To check if the sources are empty.
+   */
+  bool empty() const { return key_sources_.empty(); }
 
 private:
-  const Http::LowerCaseString header_{""};
-  const std::string query_;
-  const std::string cookie_;
+  class Source {
+  public:
+    Source(absl::string_view header, absl::string_view query, absl::string_view cookie);
+    absl::string_view getKey(const Http::RequestHeaderMap& headers, std::string& buffer) const;
+
+  private:
+    absl::variant<Http::LowerCaseString, std::string> source_{""};
+    bool query_source_{};
+  };
+
+  std::vector<Source> key_sources_;
 };
 
+/**
+ * The parsed configuration for API key auth. This class is shared by the filter configuration
+ * and the route configuration.
+ */
 struct ApiKeyAuthConfig {
 public:
   ApiKeyAuthConfig(const ApiKeyAuthProto& proto_config);
 
-  OptRef<const KeySource> keySource() const {
-    return key_source_.valid() ? makeOptRef(key_source_) : OptRef<const KeySource>{};
+  /**
+   * To get the optional reference of the key sources.
+   */
+  OptRef<const KeySources> keySources() const {
+    return !key_sources_.empty() ? makeOptRef(key_sources_) : OptRef<const KeySources>{};
   }
-  OptRef<const ApiKeyMap> apiKeyMap() const {
-    return api_key_map_.has_value() ? makeOptRef<const ApiKeyMap>(api_key_map_.value())
-                                    : OptRef<const ApiKeyMap>{};
+
+  /**
+   * To get the optional reference of the credentials.
+   */
+  OptRef<const Credentials> credentials() const {
+    return credentials_.has_value() ? makeOptRef<const Credentials>(credentials_.value())
+                                    : OptRef<const Credentials>{};
   }
 
 private:
-  const KeySource key_source_;
-  absl::optional<ApiKeyMap> api_key_map_;
+  const KeySources key_sources_;
+  absl::optional<Credentials> credentials_;
 };
 
-class ScopeConfig : public Router::RouteSpecificFilterConfig {
+class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
-  ScopeConfig(const ApiKeyAuthPerScopeProto& proto_config);
+  RouteConfig(const ApiKeyAuthPerRouteProto& proto_config);
 
-  OptRef<const ApiKeyMap> apiKeyMap() const { return override_config_.apiKeyMap(); }
-  OptRef<const KeySource> keySource() const { return override_config_.keySource(); }
+  /**
+   * To get the optional reference of the credentials. If this returns an valid reference, then
+   * the credentials will override the default credentials.
+   */
+  OptRef<const Credentials> credentials() const { return override_config_.credentials(); }
 
+  /**
+   * To get the optional reference of the key sources. If this returns an valid reference, then
+   * the key sources will override the default key sources.
+   */
+  OptRef<const KeySources> keySources() const { return override_config_.keySources(); }
+
+  /**
+   * To check if the client is allowed.
+   * @param client_id the client ID to check.
+   * @return true if the client is allowed, otherwise false.
+   */
   bool allowClient(absl::string_view client_id) const {
     return allowed_clients_.empty() || allowed_clients_.contains(client_id);
   }
@@ -99,9 +141,19 @@ public:
   FilterConfig(const ApiKeyAuthProto& proto_config, Stats::Scope& scope,
                const std::string& stats_prefix);
 
-  OptRef<const ApiKeyMap> apiKeyMap() const { return default_config_.apiKeyMap(); }
-  OptRef<const KeySource> keySource() const { return default_config_.keySource(); }
+  /**
+   * To get the optional reference of the default credentials.
+   */
+  OptRef<const Credentials> credentials() const { return default_config_.credentials(); }
 
+  /**
+   * To get the optional reference of the default key sources.
+   */
+  OptRef<const KeySources> keySources() const { return default_config_.keySources(); }
+
+  /**
+   * To get the stats of the filter.
+   */
   ApiKeyAuthStats& stats() { return stats_; }
 
 private:
