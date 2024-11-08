@@ -66,21 +66,25 @@ envoy_cc_test_library(
 rust_test(
     name = "rust_sdk_test",
     crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+    # tags = ["nocoverage"],
 )
 
 rust_doc_test(
     name = "rust_sdk_doc_test",
     crate = "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+    tags = ["nocoverage"],
 )
 
 # As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,
 # we set the rust_fmt and clippy target here instead of the part of //tools/code_format target for now.
 rustfmt_test(
     name = "rust_sdk_fmt",
+    tags = ["nocoverage"],
     targets = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
 )
 
 rust_clippy(
     name = "rust_sdk_clippy",
+    tags = ["nocoverage"],
     deps = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
 )
