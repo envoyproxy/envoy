@@ -315,11 +315,11 @@ Api::SysCallIntResult IoHandleImpl::setBlocking(bool) { return makeInvalidSyscal
 
 absl::optional<int> IoHandleImpl::domain() { return absl::nullopt; }
 
-Network::Address::InstanceConstSharedPtr IoHandleImpl::localAddress() {
+absl::StatusOr<Network::Address::InstanceConstSharedPtr> IoHandleImpl::localAddress() {
   return IoHandleImpl::getCommonInternalAddress();
 }
 
-Network::Address::InstanceConstSharedPtr IoHandleImpl::peerAddress() {
+absl::StatusOr<Network::Address::InstanceConstSharedPtr> IoHandleImpl::peerAddress() {
   return IoHandleImpl::getCommonInternalAddress();
 }
 
