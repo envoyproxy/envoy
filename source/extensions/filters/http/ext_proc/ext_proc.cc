@@ -72,6 +72,36 @@ initGrpcService(const ExtProcPerRoute& config) {
   return absl::nullopt;
 }
 
+// TODO(#37046) Refactoring the exception throwing logic.
+void verifyProcessingModeConfig(const ExternalProcessor& config) {
+  const ProcessingMode& processing_mode = config.processing_mode();
+  if (config.has_http_service()) {
+    // In case http_service configured, the processing mode can only support sending headers.
+    if (processing_mode.request_body_mode() != ProcessingMode::NONE ||
+        processing_mode.response_body_mode() != ProcessingMode::NONE ||
+        processing_mode.request_trailer_mode() == ProcessingMode::SEND ||
+        processing_mode.response_trailer_mode() == ProcessingMode::SEND) {
+      throw EnvoyException(
+          "If the ext_proc filter is configured with http_service instead of gRPC service, "
+          "then the processing modes of this filter can not be configured to send body or "
+          "trailer.");
+    }
+  }
+
+  if ((processing_mode.request_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
+      (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
+    throw EnvoyException(
+        "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
+        "then the request_trailer_mode has to be set to SEND");
+  }
+  if ((processing_mode.response_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
+      (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
+    throw EnvoyException(
+        "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
+        "then the response_trailer_mode has to be set to SEND");
+  }
+}
+
 std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
   std::vector<std::string> namespaces;
   for (const auto& single_ns : ns) {
@@ -231,16 +261,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
-  if (!grpc_service_.has_value()) {
-    // In case http_service configured, the processing mode can only support sending headers.
-    if (processing_mode_.request_body_mode() != ProcessingMode::NONE ||
-        processing_mode_.response_body_mode() != ProcessingMode::NONE ||
-        processing_mode_.request_trailer_mode() == ProcessingMode::SEND ||
-        processing_mode_.response_trailer_mode() == ProcessingMode::SEND) {
-      throw EnvoyException(
-          "If http_service is configured, processing modes can not send any body or trailer.");
-    }
-  }
+  // Validate processing mode configuration.
+  verifyProcessingModeConfig(config);
   if (config.disable_clear_route_cache() && (route_cache_action_ != ExternalProcessor::DEFAULT)) {
     throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
                          "be set to none-default at the same time.");
@@ -562,7 +584,6 @@ FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::I
     case StreamOpenState::IgnoreError:
       return FilterDataStatus::Continue;
     case StreamOpenState::Ok:
-      // Fall through
       break;
     }
 
@@ -579,6 +600,38 @@ FilterDataStatus Filter::handleDataBufferedMode(ProcessorState& state, Buffer::I
   ENVOY_LOG(trace, "onData: Buffering");
   state.setPaused(true);
   return FilterDataStatus::StopIterationAndBuffer;
+}
+
+FilterDataStatus Filter::handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
+                                                    bool end_stream) {
+  switch (openStream()) {
+  case StreamOpenState::Error:
+    return FilterDataStatus::StopIterationNoBuffer;
+  case StreamOpenState::IgnoreError:
+    return FilterDataStatus::Continue;
+  case StreamOpenState::Ok:
+    break;
+  }
+
+  ProcessingRequest req = setupBodyChunk(state, data, end_stream);
+  if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
+    state.enqueueStreamingChunk(data, end_stream);
+  } else {
+    // For FULL_DUPLEX_STREAMED mode, just drain the data.
+    data.drain(data.length());
+  }
+  // If the current state is HeadersCallback, stays in that state.
+  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+    sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
+  } else {
+    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
+  }
+  if (end_stream || state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+    state.setPaused(true);
+    return FilterDataStatus::StopIterationNoBuffer;
+  } else {
+    return FilterDataStatus::Continue;
+  }
 }
 
 FilterDataStatus Filter::handleDataStreamedMode(ProcessorState& state, Buffer::Instance& data,
@@ -599,31 +652,15 @@ FilterDataStatus Filter::handleDataStreamedMode(ProcessorState& state, Buffer::I
   // the ability to modify each chunk, in order. Doing this any other way would have required
   // substantial changes to the filter manager. See
   // https://github.com/envoyproxy/envoy/issues/16760 for a discussion.
-  switch (openStream()) {
-  case StreamOpenState::Error:
-    return FilterDataStatus::StopIterationNoBuffer;
-  case StreamOpenState::IgnoreError:
-    return FilterDataStatus::Continue;
-  case StreamOpenState::Ok:
-    // Fall through
-    break;
-  }
+  return handleDataStreamedModeBase(state, data, end_stream);
+}
 
-  // Need to first enqueue the data into the chunk queue before sending.
-  ProcessingRequest req = setupBodyChunk(state, data, end_stream);
-  state.enqueueStreamingChunk(data, end_stream);
-  // If the current state is HeadersCallback, stays in that state.
-  if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    sendBodyChunk(state, ProcessorState::CallbackState::HeadersCallback, req);
-  } else {
-    sendBodyChunk(state, ProcessorState::CallbackState::StreamedBodyCallback, req);
-  }
-  if (end_stream || state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    state.setPaused(true);
-    return FilterDataStatus::StopIterationNoBuffer;
-  } else {
-    return FilterDataStatus::Continue;
-  }
+FilterDataStatus Filter::handleDataFullDuplexStreamedMode(ProcessorState& state,
+                                                          Buffer::Instance& data, bool end_stream) {
+  // FULL_DUPLEX_STREAMED body mode works similar to STREAMED except it does not put the data
+  // into the internal queue. And there is no internal queue based flow control. A copy of the
+  // data is dispatched to the external processor and the original data is drained.
+  return handleDataStreamedModeBase(state, data, end_stream);
 }
 
 FilterDataStatus Filter::handleDataBufferedPartialMode(ProcessorState& state,
@@ -672,6 +709,8 @@ FilterDataStatus Filter::handleDataBufferedPartialMode(ProcessorState& state,
 }
 
 FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, bool end_stream) {
+  state.setBodyReceived(true);
+
   if (config_->observabilityMode()) {
     return sendDataInObservabilityMode(data, state, end_stream);
   }
@@ -690,10 +729,13 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   }
 
   if (state.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
-    if (state.bodyMode() == ProcessingMode::STREAMED &&
-        config_->sendBodyWithoutWaitingForHeaderResponse()) {
-      ENVOY_LOG(trace, "Sending body data even header processing is still in progress as body mode "
-                       "is STREAMED and send_body_without_waiting_for_header_response is enabled");
+    if ((state.bodyMode() == ProcessingMode::STREAMED &&
+         config_->sendBodyWithoutWaitingForHeaderResponse()) ||
+        state.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
+      ENVOY_LOG(trace,
+                "Sending body data even though header processing is still in progress as body mode "
+                "is FULL_DUPLEX_STREAMED or STREAMED and "
+                "send_body_without_waiting_for_header_response is enabled");
     } else {
       ENVOY_LOG(trace, "Header processing still in progress -- holding body data");
       // We don't know what to do with the body until the response comes back.
@@ -714,6 +756,9 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
   case ProcessingMode::STREAMED:
     result = handleDataStreamedMode(state, data, end_stream);
     break;
+  case ProcessingMode::FULL_DUPLEX_STREAMED:
+    result = handleDataFullDuplexStreamedMode(state, data, end_stream);
+    break;
   case ProcessingMode::BUFFERED_PARTIAL:
     result = handleDataBufferedPartialMode(state, data, end_stream);
     break;
@@ -723,7 +768,6 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     result = FilterDataStatus::Continue;
     break;
   }
-
   return result;
 }
 
@@ -847,7 +891,8 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
   state.setTrailersAvailable(true);
   state.setTrailers(&trailers);
 
-  if (state.callbackState() != ProcessorState::CallbackState::Idle) {
+  if ((state.callbackState() != ProcessorState::CallbackState::Idle) &&
+      (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED)) {
     ENVOY_LOG(trace, "Previous callback still executing -- holding header iteration");
     state.setPaused(true);
     return FilterTrailersStatus::StopIteration;
@@ -982,6 +1027,12 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
 
 void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers,
                           bool observability_mode) {
+  // Skip if the trailers is already sent to the server.
+  if (state.trailersSentToServer()) {
+    return;
+  }
+  state.setTrailersSentToServer(true);
+
   ProcessingRequest req;
   req.set_observability_mode(observability_mode);
   addAttributes(state, req);
@@ -989,13 +1040,15 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   auto* trailers_req = state.mutableTrailers(req);
   MutationUtils::headersToProto(trailers, config_->allowedHeaders(), config_->disallowedHeaders(),
                                 *trailers_req->mutable_trailers());
-
   if (observability_mode) {
     ENVOY_LOG(debug, "Sending trailers message in observability mode");
   } else {
+    ProcessorState::CallbackState callback_state = state.callbackState();
+    if (callback_state == ProcessorState::CallbackState::Idle) {
+      callback_state = ProcessorState::CallbackState::TrailersCallback;
+    }
     state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this),
-                               config_->messageTimeout(),
-                               ProcessorState::CallbackState::TrailersCallback);
+                               config_->messageTimeout(), callback_state);
     ENVOY_LOG(debug, "Sending trailers message");
   }
 
@@ -1181,6 +1234,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   // and filter is waiting for header processing response.
   // Otherwise, the response mode_override proto field is ignored.
   if (config_->allowModeOverride() && !config_->sendBodyWithoutWaitingForHeaderResponse() &&
+      (config_->processingMode().request_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
+      (config_->processingMode().response_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
       inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
     const auto& mode_overide = response->mode_override();
