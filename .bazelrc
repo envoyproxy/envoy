@@ -389,9 +389,9 @@ build:remote-ci --config=ci
 build:remote-ci --remote_download_minimal
 
 # Note this config is used by mobile CI also.
-build:ci --noshow_progress
-build:ci --noshow_loading_progress
-build:ci --test_output=errors
+common:ci --noshow_progress
+common:ci --noshow_loading_progress
+common:ci --test_output=errors
 
 # Fuzz builds
 
