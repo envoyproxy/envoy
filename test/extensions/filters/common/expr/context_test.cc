@@ -967,6 +967,188 @@ TEST(Context, EmptyXdsWrapper) {
   }
 }
 
+// Test edge cases for header maps
+TEST(Context, HeaderMapEdgeCases) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto header_map = std::make_shared<Http::TestRequestHeaderMapImpl>();
+
+  // Add headers one by one
+  header_map->addCopy("normal-header", "value");
+  header_map->addCopy("empty-header", "");
+  header_map->addCopy("huge-header", std::string(16384, 'x'));
+  header_map->addCopy("duplicate-header", "value1");
+  header_map->addCopy("duplicate-header", "value2");
+
+  Protobuf::Arena arena;
+  HeadersWrapper<Http::RequestHeaderMap> headers(arena, header_map.get());
+
+  {
+    auto value = headers[CelValue::CreateStringView("huge-header")];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ(16384u, value.value().StringOrDie().value().size());
+  }
+
+  {
+    auto value = headers[CelValue::CreateStringView("empty-header")];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_TRUE(value.value().StringOrDie().value().empty());
+  }
+
+  {
+    auto value = headers[CelValue::CreateStringView("duplicate-header")];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("value1,value2", value.value().StringOrDie().value());
+  }
+}
+
+// Test concurrent access to the extractors
+TEST(Context, ConcurrentAccess) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto header_map = std::make_shared<Http::TestRequestHeaderMapImpl>();
+  header_map->addCopy("test", "value");
+
+  std::vector<std::thread> threads;
+  const int thread_count = 10;
+  std::atomic<int> success_count{0};
+
+  // Create and start all threads first
+  for (int i = 0; i < thread_count; ++i) {
+    threads.emplace_back([&]() {
+      Protobuf::Arena arena;
+      HeadersWrapper<Http::RequestHeaderMap> headers(arena, header_map.get());
+      auto value = headers[CelValue::CreateStringView("test")];
+      if (value.has_value() && value.value().IsString() &&
+          value.value().StringOrDie().value() == "value") {
+        success_count.fetch_add(1, std::memory_order_relaxed);
+      }
+    });
+  }
+
+  // Wait for all threads to complete
+  for (auto& thread : threads) {
+    thread.join();
+  }
+
+  EXPECT_EQ(thread_count, success_count.load(std::memory_order_relaxed));
+}
+
+// Test FilterState with complex nested objects
+TEST(Context, ComplexFilterState) {
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
+  Protobuf::Arena arena;
+
+  // Create a complex nested structure in filter state
+  const std::string nested_key = "nested_key";
+  auto complex_object = std::make_shared<Envoy::Router::StringAccessorImpl>("complex_value");
+  filter_state.setData(nested_key, complex_object, StreamInfo::FilterState::StateType::ReadOnly);
+
+  FilterStateWrapper wrapper(arena, filter_state);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(nested_key)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsBytes());
+    EXPECT_EQ("complex_value", value.value().BytesOrDie().value());
+  }
+}
+
+// Test SSL information edge cases
+TEST(Context, SslEdgeCases) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  Protobuf::Arena arena;
+  ConnectionWrapper connection(arena, info);
+
+  // Test empty SSL arrays
+  std::vector<std::string> empty_sans;
+  EXPECT_CALL(*ssl_info, uriSanPeerCertificate()).WillRepeatedly(Return(empty_sans));
+  EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillRepeatedly(Return(empty_sans));
+
+  info.downstream_connection_info_provider_->setSslConnection(ssl_info);
+
+  {
+    auto value = connection[CelValue::CreateStringView(URISanPeerCertificate)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    auto value = connection[CelValue::CreateStringView(DNSSanPeerCertificate)];
+    EXPECT_FALSE(value.has_value());
+  }
+}
+
+// Test upstream host metadata variations
+TEST(Context, UpstreamHostMetadataVariations) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host(
+      new NiceMock<Upstream::MockHostDescription>());
+
+  // Test with nullptr metadata
+  EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(nullptr));
+  info.upstreamInfo()->setUpstreamHost(host);
+
+  Protobuf::Arena arena;
+  XDSWrapper wrapper(arena, &info, nullptr);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  // Create a new host for the new test case
+  host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto empty_metadata = std::make_shared<const envoy::config::core::v3::Metadata>();
+  EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(empty_metadata));
+  info.upstreamInfo()->setUpstreamHost(host);
+
+  {
+    auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];
+    EXPECT_TRUE(value.has_value());
+    EXPECT_TRUE(value.value().IsMessage());
+  }
+}
+
+// Test request path variations
+TEST(Context, RequestPathVariations) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Define test cases with expected results
+  const std::vector<std::tuple<std::string, std::string, std::string>> test_cases = {
+      {"/path", "/path", ""},
+      {"/path?", "/path", ""},
+      {"/path?query", "/path", "query"},
+      {"/path?query#fragment", "/path", "query"},
+      {"/path#fragment", "/path", ""},
+      {"/?query", "/", "query"},
+      {"/#fragment", "/", ""},
+      {"#fragment", "", ""}};
+
+  for (const auto& [input_path, expected_path, expected_query] : test_cases) {
+    Http::TestRequestHeaderMapImpl header_map{{":path", input_path}};
+    Protobuf::Arena arena;
+    RequestWrapper request(arena, &header_map, info);
+
+    {
+      auto path_value = request[CelValue::CreateStringView(UrlPath)];
+      EXPECT_TRUE(path_value.has_value()) << "Input path: " << input_path;
+      ASSERT_TRUE(path_value.value().IsString()) << "Input path: " << input_path;
+      EXPECT_EQ(expected_path, path_value.value().StringOrDie().value())
+          << "Input path: " << input_path;
+    }
+
+    {
+      auto query_value = request[CelValue::CreateStringView(Query)];
+      EXPECT_TRUE(query_value.has_value()) << "Input path: " << input_path;
+      ASSERT_TRUE(query_value.value().IsString()) << "Input path: " << input_path;
+      EXPECT_EQ(expected_query, query_value.value().StringOrDie().value())
+          << "Input path: " << input_path;
+    }
+  }
+}
+
 } // namespace
 } // namespace Expr
 } // namespace Common
