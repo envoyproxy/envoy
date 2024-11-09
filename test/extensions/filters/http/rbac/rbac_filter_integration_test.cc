@@ -752,7 +752,7 @@ TEST_P(RBACIntegrationTest, RouteMetadataMatcherDeny) {
               testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));
 }
 
-TEST_P(RBACIntegrationTest, DynamicMetadataMatcherAllow) {
+TEST_P(RBACIntegrationTest, DEPRECATED_FEATURE_TEST(DynamicMetadataMatcherAllow)) {
   config_helper_.prependFilter(RBAC_CONFIG_WITH_DYNAMIC_METADATA);
   config_helper_.prependFilter(SET_METADATA_FILTER_CONFIG);
   // Set route metadata
