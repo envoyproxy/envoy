@@ -967,6 +967,58 @@ TEST(Context, EmptyXdsWrapper) {
   }
 }
 
+TEST(Context, EdgeCaseTests) {
+  // Set up mocks correctly
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Fix ConnectionInfoProvider mocks
+  info.downstream_connection_info_provider_ =
+      std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
+
+  // Test UpstreamWrapper with null addresses
+  {
+    Protobuf::Arena arena;
+    UpstreamWrapper upstream(arena, info);
+
+    auto upstream_info_impl = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+    info.setUpstreamInfo(upstream_info_impl);
+
+    // Test with null upstream host
+    auto no_host = upstream[CelValue::CreateStringView(Address)];
+    EXPECT_FALSE(no_host.has_value());
+
+    // Test with host but null address
+    auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    EXPECT_CALL(*host, address()).WillRepeatedly(Return(nullptr));
+    upstream_info_impl->setUpstreamHost(host);
+    auto no_address = upstream[CelValue::CreateStringView(Address)];
+    EXPECT_FALSE(no_address.has_value());
+  }
+}
+
+TEST(Context, BackendLatencyEdgeCases) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Http::TestResponseHeaderMapImpl header_map{};
+  Http::TestResponseTrailerMapImpl trailer_map{};
+  Protobuf::Arena arena;
+  ResponseWrapper response(arena, &header_map, &trailer_map, info);
+
+  // Test when upstreamInfo is not available - setup mock first
+  EXPECT_CALL(info, upstreamInfo())
+      .WillRepeatedly(Return(std::shared_ptr<StreamInfo::UpstreamInfo>(nullptr)));
+
+  // Then make the call we want to test
+  auto no_latency = response[CelValue::CreateStringView(BackendLatency)];
+  EXPECT_FALSE(no_latency.has_value());
+
+  // Test with UpstreamInfo but incomplete timing
+  auto upstream_info = std::make_shared<StreamInfo::UpstreamInfoImpl>();
+  info.setUpstreamInfo(upstream_info);
+
+  auto incomplete_timing = response[CelValue::CreateStringView(BackendLatency)];
+  EXPECT_FALSE(incomplete_timing.has_value());
+}
+
 } // namespace
 } // namespace Expr
 } // namespace Common
