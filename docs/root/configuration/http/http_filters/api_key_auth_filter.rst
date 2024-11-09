@@ -47,7 +47,7 @@ An example scope specific configuration of the filter may look like the followin
 In this example we customize credential list and key source for ``/admin`` route, and disable
 authentication for ``/static`` prefixed routes.
 
-Conbining the per-route configuration example and the filter configuration example, given the following
+Combining the per-route configuration example and the filter configuration example, given the following
 requests, the filter will behave as follows:
 
 .. code-block:: text
@@ -84,5 +84,5 @@ The HTTP basic auth filter outputs statistics in the ``http.<stat_prefix>.api_ke
   :widths: 1, 1, 2
 
   allowed, Counter, Total number of allowed requests
-  unauthorized, Counter, Total number of requests that have not valid API key
+  unauthorized, Counter, Total number of requests that have invalid API key
   forbidden, Counter, Total number of requests that have valid API key but not allowed
