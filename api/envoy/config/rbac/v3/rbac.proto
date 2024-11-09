@@ -393,10 +393,8 @@ message Principal {
 
     // Metadata that describes additional information about the principal. This field is deprecated; please use
     // :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>` instead.
-    type.matcher.v3.MetadataMatcher metadata = 7 [
-      deprecated = true,
-      (envoy.annotations.deprecated_at_minor_version) = "3.0"
-    ];
+    type.matcher.v3.MetadataMatcher metadata = 7
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Identifies the principal using a filter state object.
     type.matcher.v3.FilterStateMatcher filter_state = 12;
