@@ -1,0 +1,45 @@
+name: Request/cache
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      app-id:
+        required: true
+      app-key:
+        required: true
+
+    inputs:
+      env:
+        type: string
+        required: true
+      caches:
+        type: string
+        required: true
+
+
+jobs:
+  docker:
+    secrets:
+      app-id: ${{ secrets.app-id }}
+      app-key: ${{ secrets.app-key }}
+    name: Docker/${{ matrix.arch }}
+    uses: ./.github/workflows/_request_cache_docker.yml
+    with:
+      arch: ${{ matrix.arch }}
+      cache-suffix: ${{ matrix.cache-suffix }}
+      caches: ${{ inputs.caches }}
+      image-tag: ${{ fromJSON(inputs.env).request.build-image.default }}
+      runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: docker-x64
+          arch: x64
+        - target: docker-arm64
+          arch: arm64
+          cache-suffix: -arm64
+          runs-on: envoy-arm64-small

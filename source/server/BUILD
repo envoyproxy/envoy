@@ -248,7 +248,7 @@ envoy_cc_library(
         "//bazel:linux_x86_64": ["options_impl_platform_linux.h"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.h"],
         "//bazel:linux_ppc": ["options_impl_platform_linux.h"],
-        "//bazel:linux_s390x": ["options_impl_platform_linux.cc"],
+        "//bazel:linux_s390x": ["options_impl_platform_linux.h"],
         "//bazel:linux_mips64": ["options_impl_platform_linux.h"],
         "//conditions:default": [],
     }),

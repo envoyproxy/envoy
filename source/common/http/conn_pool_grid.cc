@@ -417,9 +417,17 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
   bool delay_tcp_attempt = true;
   bool delay_alternate_http3_attempt = true;
   if (shouldAttemptHttp3() && options.can_use_http3_) {
-    if (getHttp3StatusTracker().hasHttp3FailedRecently()) {
-      overriding_options.can_send_early_data_ = false;
-      delay_tcp_attempt = false;
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
+      if (getHttp3StatusTracker().isHttp3Pending() ||
+          getHttp3StatusTracker().hasHttp3FailedRecently()) {
+        overriding_options.can_send_early_data_ = false;
+        delay_tcp_attempt = false;
+      }
+    } else {
+      if (getHttp3StatusTracker().hasHttp3FailedRecently()) {
+        overriding_options.can_send_early_data_ = false;
+        delay_tcp_attempt = false;
+      }
     }
     if (http3_pool_ && http3_alternate_pool_ && !http3_pool_->hasActiveConnections() &&
         http3_alternate_pool_->hasActiveConnections()) {

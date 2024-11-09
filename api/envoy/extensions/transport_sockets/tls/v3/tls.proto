@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.transport_sockets.tls]
 // The TLS contexts below provide the transport socket configuration for upstream/downstream TLS.
 
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message UpstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.UpstreamTlsContext";
@@ -41,6 +41,26 @@ message UpstreamTlsContext {
 
   // SNI string to use when creating TLS backend connections.
   string sni = 2 [(validate.rules).string = {max_bytes: 255}];
+
+  // If true, replaces the SNI for the connection with the hostname of the upstream host, if
+  // the hostname is known due to either a DNS cluster type or the
+  // :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` is set on
+  // the host.
+  //
+  // See :ref:`SNI configuration <start_quick_start_securing_sni_client>` for details on how this
+  // interacts with other validation options.
+  bool auto_host_sni = 6;
+
+  // If true, replace any Subject Alternative Name validations with a validation for a DNS SAN matching
+  // the SNI value sent. Note that the validation will be against the actual requested SNI, regardless of how it
+  // is configured.
+  //
+  // For the common case where an SNI value is sent and it is expected that the server certificate contains a SAN
+  // matching that SNI value, this option will do the correct SAN validation.
+  //
+  // See :ref:`validation configuration <start_quick_start_securing_validation>` for how this interacts with
+  // other validation options.
+  bool auto_sni_san_validation = 7;
 
   // If true, server-initiated TLS renegotiation will be allowed.
   //
