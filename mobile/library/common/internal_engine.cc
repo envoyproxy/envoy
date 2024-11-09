@@ -303,6 +303,14 @@ void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
           [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
       cache_manager.forEachThreadLocalCache(clear_brokenness);
     }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
+      Http::HttpServerPropertiesCacheManager& cache_manager =
+          server_->httpServerPropertiesCacheManager();
+
+      Http::HttpServerPropertiesCacheManager::CacheFn reset_status =
+          [](Http::HttpServerPropertiesCache& cache) { cache.resetStatus(); };
+      cache_manager.forEachThreadLocalCache(reset_status);
+    }
     connectivity_manager_->refreshDns(configuration, true);
   });
 }

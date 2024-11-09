@@ -8,9 +8,11 @@ on:
     paths:
     - include/**
     - source/common/**
-    branches-ignore:
-    - dependabot/**
+    branches:
+    - main
   pull_request:
+    branches:
+    - main
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
@@ -61,13 +63,14 @@ jobs:
 
     - name: Free disk space
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.2.37
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.2
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
       uses: github/codeql-action/init@662472033e021d55d94146f66f6058822b0b39fd  # codeql-bundle-v3.27.0
       with:
         languages: cpp
+        trap-caching: false
 
     - name: Install deps
       if: ${{ env.BUILD_TARGETS != '' }}
@@ -110,3 +113,5 @@ jobs:
     - name: Perform CodeQL Analysis
       if: ${{ env.BUILD_TARGETS != '' }}
       uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd  # codeql-bundle-v3.27.0
+      with:
+        trap-caching: false

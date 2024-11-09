@@ -932,11 +932,7 @@ TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestBodyBufferedPartial) {
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
 }
 
-TEST_F(FastFailOrderingTest,
-       GrpcErrorOnTransitionAboveQueueLimitWhenSendingStreamChunkWithDeferredProcessing) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{std::string(Runtime::defer_processing_backedup_streams), "true"}});
-
+TEST_F(FastFailOrderingTest, GrpcErrorOnTransitionAboveQueueLimitWhenSendingStreamChunk) {
   initialize([](ExternalProcessor& cfg) {
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_header_mode(ProcessingMode::SKIP);

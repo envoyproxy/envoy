@@ -31,7 +31,7 @@ envoy_cc_test_library(
         "//test/config/integration:server_xds_files",
         "//test/config/integration/certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":http_integration_lib",
         "//source/common/common:matchers_lib",
@@ -59,7 +59,7 @@ envoy_cc_test(
     srcs = envoy_select_admin_functionality(
         ["ads_integration_test.cc"],
     ),
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     tags = [
         "cpu:3",
     ],
@@ -537,7 +537,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     shard_count = 10,
     tags = [
         "cpu:3",
@@ -641,7 +641,7 @@ envoy_cc_test(
     srcs = [
         "buffer_accounting_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],
@@ -866,7 +866,7 @@ envoy_cc_test(
     srcs = [
         "instantiate_protocol_integration_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
     shard_count = 16,
@@ -1143,6 +1143,7 @@ envoy_cc_test_library(
         "//test/mocks/http:header_validator_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:listener_factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_system_interface",
@@ -1482,7 +1483,7 @@ envoy_cc_test(
     name = "websocket_integration_test",
     size = "large",
     srcs = ["websocket_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],
@@ -1697,7 +1698,7 @@ envoy_cc_test(
     name = "listener_extension_discovery_integration_test",
     size = "large",
     srcs = ["listener_extension_discovery_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     deps = [
         ":http_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -2514,7 +2515,7 @@ envoy_cc_test(
         "//conditions:default": ["quic_protocol_integration_test.cc"],
     }),
     data = ["//test/config/integration/certs"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     shard_count = 16,
     tags = [
         "cpu:4",
@@ -2561,7 +2562,7 @@ envoy_cc_test(
         "nofips",
     ],
     deps = envoy_select_enable_http3([
-        "//source/extensions/quic/connection_debug_visitor:envoy_quic_connection_debug_visitor_basic",
+        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/tls/cert_validator:timed_cert_validator",
@@ -2628,7 +2629,7 @@ envoy_cc_test(
     name = "weighted_cluster_integration_test",
     size = "large",
     srcs = ["weighted_cluster_integration_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],

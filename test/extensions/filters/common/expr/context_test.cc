@@ -513,6 +513,8 @@ TEST(Context, ConnectionAttributes) {
       .WillRepeatedly(ReturnRef(connection_termination_details));
   const std::string downstream_transport_failure_reason = "TlsError";
   info.setDownstreamTransportFailureReason(downstream_transport_failure_reason);
+  const uint32_t upstream_request_attempt_count = 3;
+  info.setAttemptCount(upstream_request_attempt_count);
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
@@ -700,6 +702,13 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(downstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(UpstreamRequestAttemptCount)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(upstream_request_attempt_count, value.value().Uint64OrDie());
   }
 
   {

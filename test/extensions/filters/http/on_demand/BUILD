@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["on_demand_integration_test.cc"],
     extension_names = ["envoy.filters.http.on_demand"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
     tags = [
         "cpu:3",
     ],
