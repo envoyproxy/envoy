@@ -266,10 +266,8 @@ message Permission {
 
     // Metadata that describes additional information about the action. This field is deprecated; please use
     // :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` instead.
-    type.matcher.v3.MetadataMatcher metadata = 7 [
-      deprecated = true,
-      (envoy.annotations.deprecated_at_minor_version) = "3.0"
-    ];
+    type.matcher.v3.MetadataMatcher metadata = 7
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Negates matching the provided permission. For instance, if the value of
     // ``not_rule`` would match, this permission would not match. Conversely, if
