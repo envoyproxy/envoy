@@ -104,7 +104,8 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
   setUpstreamProtocol(Http::CodecType::HTTP2);
   config_helper_.configureUpstreamTls(
       false, false, absl::nullopt,
-      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& ctx) {
+      [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& upstream_ctx) {
+        auto& ctx = *upstream_ctx.mutable_common_tls_context();
         auto& params = *ctx.mutable_tls_params();
         params.set_tls_minimum_protocol_version(
             envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);

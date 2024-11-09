@@ -265,6 +265,9 @@ TEST_F(LuaClusterSpecifierPluginTest, ClusterMethods) {
   Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
   auto route = plugin_->route(mock_route, headers);
   EXPECT_EQ("pass", route->routeEntry()->clusterName());
+
+  // Force the runtime to gc and destroy all the userdata.
+  config_->perLuaCodeSetup()->runtimeGC();
 }
 
 } // namespace Lua
