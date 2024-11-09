@@ -65,8 +65,6 @@ void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingR
   stream_.sendMessage(std::move(request), end_stream);
 }
 
-// TODO(tyxia) Refactor the logic of close() function. Invoking it when stream is already closed
-// is redundant.
 bool ExternalProcessorStreamImpl::closeLocalStream() {
   if (!local_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
@@ -91,7 +89,6 @@ void ExternalProcessorStreamImpl::onReceiveMessage(ProcessingResponsePtr&& respo
 
 void ExternalProcessorStreamImpl::onCreateInitialMetadata(Http::RequestHeaderMap&) {}
 void ExternalProcessorStreamImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) {}
-
 void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) {}
 
 void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,

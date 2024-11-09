@@ -222,20 +222,18 @@ ProcessingMode allDisabledMode() {
 
 } // namespace
 
-FilterConfig::FilterConfig(
-    const ExternalProcessor& config,
-    const std::chrono::milliseconds message_timeout,
-    const uint32_t max_message_timeout_ms, Stats::Scope& scope,
-    const std::string& stats_prefix, bool is_upstream,
-    Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
-    Server::Configuration::CommonFactoryContext& context)
+FilterConfig::FilterConfig(const ExternalProcessor& config,
+                           const std::chrono::milliseconds message_timeout,
+                           const uint32_t max_message_timeout_ms, Stats::Scope& scope,
+                           const std::string& stats_prefix, bool is_upstream,
+                           Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+                           Server::Configuration::CommonFactoryContext& context)
     : failure_mode_allow_(config.failure_mode_allow()),
       observability_mode_(config.observability_mode()),
       route_cache_action_(config.route_cache_action()),
-      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
-          config, deferred_close_timeout, DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
-      message_timeout_(message_timeout),
-      max_message_timeout_ms_(max_message_timeout_ms),
+      deferred_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, deferred_close_timeout,
+                                                         DEFAULT_DEFERRED_CLOSE_TIMEOUT_MS)),
+      message_timeout_(message_timeout), max_message_timeout_ms_(max_message_timeout_ms),
       grpc_service_(getFilterGrpcService(config)),
       send_body_without_waiting_for_header_response_(
           config.send_body_without_waiting_for_header_response()),
@@ -245,10 +243,8 @@ FilterConfig::FilterConfig(
       filter_metadata_(config.filter_metadata()),
       allow_mode_override_(config.allow_mode_override()),
       disable_immediate_response_(config.disable_immediate_response()),
-      allowed_headers_(initHeaderMatchers(
-          config.forward_rules().allowed_headers(), context)),
-      disallowed_headers_(initHeaderMatchers(
-          config.forward_rules().disallowed_headers(), context)),
+      allowed_headers_(initHeaderMatchers(config.forward_rules().allowed_headers(), context)),
+      disallowed_headers_(initHeaderMatchers(config.forward_rules().disallowed_headers(), context)),
       is_upstream_(is_upstream),
       untyped_forwarding_namespaces_(
           config.metadata_options().forwarding_namespaces().untyped().begin(),
@@ -261,8 +257,7 @@ FilterConfig::FilterConfig(
           config.metadata_options().receiving_namespaces().untyped().end()),
       allowed_override_modes_(config.allowed_override_modes().begin(),
                               config.allowed_override_modes().end()),
-      expression_manager_(builder, context.localInfo(),
-                          config.request_attributes(),
+      expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
@@ -1586,12 +1581,9 @@ void DeferredDeletableStream::cleanupStreamOnTimer() {
 
 // In the deferred closure mode, stream closure is deferred upon filter destruction, with a timer
 // to prevent unbounded resource usage growth.
-void DeferredDeletableStream::deferredClose(
-    Envoy::Event::Dispatcher& dispatcher) {
-  derferred_close_timer =
-      dispatcher.createTimer([this] { cleanupStreamOnTimer(); });
-  derferred_close_timer->enableTimer(
-      std::chrono::milliseconds(deferred_close_timeout));
+void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher) {
+  derferred_close_timer = dispatcher.createTimer([this] { cleanupStreamOnTimer(); });
+  derferred_close_timer->enableTimer(std::chrono::milliseconds(deferred_close_timeout));
 }
 
 std::string responseCaseToString(const ProcessingResponse::ResponseCase response_case) {

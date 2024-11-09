@@ -501,8 +501,7 @@ private:
   Http::FilterHeadersStatus
   sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers, ProcessorState& state,
                                  bool end_stream);
-  Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data,
-                                                     ProcessorState& state,
+  Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
                                                      bool end_stream);
   void deferredResetStream();
 
