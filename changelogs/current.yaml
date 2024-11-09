@@ -201,5 +201,5 @@ new_features:
 deprecated:
 - area: rbac
   change: |
-    metadata :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
+    metadata :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
     favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.
