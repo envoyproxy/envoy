@@ -116,5 +116,5 @@ The HTTP basic auth filter outputs statistics in the ``http.<stat_prefix>.api_ke
   :widths: 1, 1, 2
 
   allowed, Counter, Total number of allowed requests
-  unauthorized, Counter, Total number of requests that have not valid API key
+  unauthorized, Counter, Total number of requests that have invalid API key
   forbidden, Counter, Total number of requests that have valid API key but not allowed
