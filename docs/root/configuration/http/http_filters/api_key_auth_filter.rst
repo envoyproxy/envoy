@@ -79,7 +79,7 @@ An example scope specific configuration of the filter may look like the followin
 In this example we customize credential list and key source for ``/admin`` route, and disable
 authentication for ``/static`` prefixed routes.
 
-Conbining the per-route configuration example and the filter configuration example, given the following
+Combining the per-route configuration example and the filter configuration example, given the following
 requests, the filter will behave as follows:
 
 .. code-block:: text
