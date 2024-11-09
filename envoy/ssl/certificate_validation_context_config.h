@@ -94,6 +94,18 @@ public:
    * @return the max depth used when verifying the certificate-chain
    */
   virtual absl::optional<uint32_t> maxVerifyDepth() const PURE;
+
+  /**
+   * @return true if the SAN validation rules should be replaced with a rule to validate that the
+   * certificate matches the transmitted SNI.
+   */
+  virtual bool autoSniSanMatch() const PURE;
+
+  // SECURITY NOTE
+  //
+  // When adding or changing this interface, it is likely that a change is needed to
+  // `DefaultCertValidator::updateDigestForSessionId` in
+  // `source/common/tls/cert_validator/default_validator.cc`.
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;
