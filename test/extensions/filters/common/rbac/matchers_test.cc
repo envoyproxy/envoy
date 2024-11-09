@@ -699,6 +699,263 @@ TEST(MetadataMatcher, SourcedMetadataMatcher) {
   }
 }
 
+TEST(PortRangeMatcher, TestEdgeCases) {
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Test boundary conditions
+  envoy::type::v3::Int32Range range;
+  range.set_start(1);
+  range.set_end(65535);
+
+  // Test port at start of range
+  Envoy::Network::Address::InstanceConstSharedPtr addr1 =
+      Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 1, false);
+  info.downstream_connection_info_provider_->setLocalAddress(addr1);
+  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+
+  // Test port at end of range - 1
+  Envoy::Network::Address::InstanceConstSharedPtr addr2 =
+      Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 65534, false);
+  info.downstream_connection_info_provider_->setLocalAddress(addr2);
+  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+
+  // Test port exactly at end (should be false as range is exclusive at end)
+  Envoy::Network::Address::InstanceConstSharedPtr addr3 =
+      Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 65535, false);
+  info.downstream_connection_info_provider_->setLocalAddress(addr3);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+}
+
+TEST(PathMatcher, HeaderEdgeCases) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  envoy::type::matcher::v3::PathMatcher matcher;
+
+  // Test that path matcher matches exact paths
+  matcher.mutable_path()->mutable_safe_regex()->mutable_google_re2();
+  matcher.mutable_path()->mutable_safe_regex()->set_regex("^/$");
+  headers.setPath("/");
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
+
+  // Test path with query parameters - regex should match path part only
+  matcher.mutable_path()->mutable_safe_regex()->set_regex("^/path$");
+  headers.setPath("/path?param=value");
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/different?param=value");
+  checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers);
+
+  // Test URL encoded paths - should match the encoded form
+  matcher.mutable_path()->mutable_safe_regex()->set_regex("^/path%20with%20spaces$");
+  headers.setPath("/path%20with%20spaces");
+  checkMatcher(PathMatcher(matcher, context), true, Envoy::Network::MockConnection(), headers);
+  headers.setPath("/path with spaces"); // Not URL encoded
+  checkMatcher(PathMatcher(matcher, context), false, Envoy::Network::MockConnection(), headers);
+}
+
+TEST(HeaderMatcher, MultipleHeaderValues) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::route::v3::HeaderMatcher config;
+  config.set_name("multi-header");
+  config.mutable_string_match()->set_exact("value1");
+
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  Envoy::Http::LowerCaseString header_name("multi-header");
+  headers.setReference(header_name, "value1");
+
+  RBAC::HeaderMatcher matcher(config, factory_context);
+  checkMatcher(matcher, true, Envoy::Network::MockConnection(), headers);
+
+  // Test with non-matching value
+  headers.remove(header_name);
+  headers.setReference(header_name, "value2");
+  checkMatcher(matcher, false, Envoy::Network::MockConnection(), headers);
+}
+
+TEST(AuthenticatedMatcher, EmptyCertificateFields) {
+  Envoy::Network::MockConnection conn;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
+
+  // Test with empty URI SANs but valid DNS SANs
+  const std::vector<std::string> empty_uri_sans;
+  const std::vector<std::string> dns_sans{"example.com"};
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(empty_uri_sans));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
+
+  envoy::config::rbac::v3::Principal::Authenticated auth;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  auth.mutable_principal_name()->set_exact("example.com");
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), true, conn);
+
+  // Test with both empty URI and DNS SANs but valid subject
+  const std::vector<std::string> empty_dns_sans;
+  std::string subject = "CN=example.com";
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(empty_dns_sans));
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
+
+  auth.mutable_principal_name()->set_exact("CN=example.com");
+  checkMatcher(AuthenticatedMatcher(auth, factory_context), true, conn);
+}
+
+TEST(MetadataMatcher, NestedMetadata) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl header;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Create nested metadata structure
+  ProtobufWkt::Struct nested_struct;
+  (*nested_struct.mutable_fields())["nested_key"] = ValueUtil::stringValue("nested_value");
+
+  ProtobufWkt::Struct top_struct;
+  (*top_struct.mutable_fields())["top_key"] = ValueUtil::structValue(nested_struct);
+
+  envoy::config::core::v3::Metadata metadata;
+  metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", top_struct));
+  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  // Test matching nested value
+  envoy::type::matcher::v3::MetadataMatcher matcher;
+  matcher.set_filter("rbac");
+  matcher.add_path()->set_key("top_key");
+  matcher.add_path()->set_key("nested_key");
+  matcher.mutable_value()->mutable_string_match()->set_exact("nested_value");
+
+  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context),
+                               envoy::config::rbac::v3::MetadataSource::DYNAMIC),
+               true, conn, header, info);
+
+  // Test non-matching nested value
+  matcher.mutable_value()->mutable_string_match()->set_exact("wrong_value");
+  checkMatcher(MetadataMatcher(Matchers::MetadataMatcher(matcher, context),
+                               envoy::config::rbac::v3::MetadataSource::DYNAMIC),
+               false, conn, header, info);
+}
+
+TEST(PrincipalMatcher, AndIds) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal::Set principals;
+
+  // Create a principal set with two conditions: any and authenticated
+  auto* principal1 = principals.add_ids();
+  principal1->set_any(true);
+
+  auto* principal2 = principals.add_ids();
+  auto* auth = principal2->mutable_authenticated();
+  auth->mutable_principal_name()->set_exact("example.com");
+
+  // Set up connection with SSL
+  Envoy::Network::MockConnection conn;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
+
+  // Set up all required SSL mock expectations
+  const std::vector<std::string> uri_sans{"example.com"};
+  const std::vector<std::string> dns_sans;
+  const std::string subject;
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(uri_sans));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
+
+  // Should match because one URI SAN matches and any() is true
+  checkMatcher(AndMatcher(principals, factory_context), true, conn);
+
+  // Change the expected principal name to make it fail
+  auth->mutable_principal_name()->set_exact("fail.com");
+  checkMatcher(AndMatcher(principals, factory_context), false, conn);
+
+  // Test with no SSL connection
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(nullptr));
+  checkMatcher(AndMatcher(principals, factory_context), false, conn);
+}
+
+TEST(PrincipalMatcher, UrlPathAndFilterState) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  // Test URL path matcher
+  envoy::config::rbac::v3::Principal principal_path;
+  auto* path = principal_path.mutable_url_path();
+  path->mutable_path()->set_exact("/test");
+
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/test");
+
+  auto matcher_path = Matcher::create(principal_path, factory_context);
+  checkMatcher(*matcher_path, true, Envoy::Network::MockConnection(), headers);
+
+  // Test filter state matcher
+  envoy::config::rbac::v3::Principal principal_filter_state;
+  auto* filter_state = principal_filter_state.mutable_filter_state();
+  filter_state->set_key("test.key");
+  filter_state->mutable_string_match()->set_exact("test.value");
+
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  StreamInfo::FilterStateImpl filter_state_impl(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state_impl.setData("test.key", std::make_shared<TestObject>(),
+                            StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(info), filterState()).WillRepeatedly(ReturnRef(filter_state_impl));
+
+  auto matcher_filter_state = Matcher::create(principal_filter_state, factory_context);
+  checkMatcher(*matcher_filter_state, true, Envoy::Network::MockConnection(), headers, info);
+}
+
+// Test for IDENTIFIER_NOT_SET case
+TEST(PrincipalMatcher, IdentifierNotSet) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal empty_principal;
+
+  // This should hit the IDENTIFIER_NOT_SET case and panic
+  EXPECT_DEATH(Matcher::create(empty_principal, factory_context), ".*");
+}
+
+TEST(PrincipalMatcher, OrIds) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal> principals;
+
+  // Create two principals: one that matches direct remote IP and one that matches header
+  auto* principal1 = principals.Add();
+  auto* cidr = principal1->mutable_direct_remote_ip();
+  cidr->set_address_prefix("1.2.3.0");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  auto* principal2 = principals.Add();
+  principal2->mutable_header()->set_name("test-header");
+  principal2->mutable_header()->mutable_string_match()->set_exact("test-value");
+
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  // Store the header name as a member to ensure it lives throughout the test
+  const Envoy::Http::LowerCaseString test_header_name("test-header");
+
+  // Set up a matching IP address
+  Envoy::Network::Address::InstanceConstSharedPtr addr =
+      Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 123, false);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
+
+  // Should match based on IP even without header
+  checkMatcher(OrMatcher(principals, factory_context), true, conn, headers, info);
+
+  // Should match based on header even with wrong IP
+  addr = Envoy::Network::Utility::parseInternetAddressNoThrow("5.6.7.8", 123, false);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
+
+  // Add header and verify it matches
+  headers.setReference(test_header_name, "test-value");
+  checkMatcher(OrMatcher(principals, factory_context), true, conn, headers, info);
+
+  // Test with non-matching header value
+  headers.remove(test_header_name);
+  headers.setReference(test_header_name, "wrong-value");
+  addr = Envoy::Network::Utility::parseInternetAddressNoThrow("5.6.7.8", 123, false);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
+  checkMatcher(OrMatcher(principals, factory_context), false, conn, headers, info);
+}
+
 } // namespace
 } // namespace RBAC
 } // namespace Common
