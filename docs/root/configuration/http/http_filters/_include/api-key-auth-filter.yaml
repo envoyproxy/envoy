@@ -18,8 +18,10 @@ static_resources:
             - name: local_service
               domains: ["*"]
               routes:
-              - match: { path: "/admin" }
-                route: { cluster: upstream_com }
+              - match:
+                  path: "/admin"
+                route:
+                  cluster: upstream_com
                 typed_per_filter_config:
                   api_key_auth:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute
@@ -35,14 +37,18 @@ static_resources:
                         - query: api_key
                     allowed_clients:
                       - another_client
-              - match: { prefix: "/static" }
-                route: { cluster: upstream_com }
+              - match:
+                  prefix: "/static"
+                route:
+                  cluster: upstream_com
                 typed_per_filter_config:
                   api_key_auth:
                     "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
                     disabled: true
-              - match: { prefix: "/" }
-                route: { cluster: upstream_com }
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: upstream_com
           http_filters:
           - name: api_key_auth
             typed_config:
@@ -54,6 +60,9 @@ static_resources:
               key_sources:
                 entries:
                 - header: Authorization
+          - name: envoy.filters.http.router
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: upstream_com
     type: LOGICAL_DNS
