@@ -19,9 +19,9 @@ TEST(ApiKeyAuthFilterFactoryTest, DuplicateApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
       - key: key1
-        client_id: user2
+        client: user2
   key_sources:
     entries:
       - header: "Authorization
@@ -38,17 +38,41 @@ TEST(ApiKeyAuthFilterFactoryTest, DuplicateApiKey) {
       EnvoyException, "Duplicate API key.");
 }
 
+TEST(ApiKeyAuthFilterFactoryTest, EmptyKeySource) {
+  const std::string yaml = R"(
+  credentials:
+    entries:
+      - key: key1
+        client: user1
+      - key: key2
+        client: user2
+  key_sources:
+    entries:
+      - header: ""
+  )";
+
+  ApiKeyAuthProto proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  ApiKeyAuthFilterFactory factory;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_THROW_WITH_MESSAGE(
+      { auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context); },
+      EnvoyException, "One of 'header'/'query'/'cookie' must be set.");
+}
+
 TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {
   const std::string yaml = R"(
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
       - key: key2
-        client_id: user2
+        client: user2
   key_sources:
     entries:
-      - header: "Authorization
+      - header: "Authorization"
   )";
 
   ApiKeyAuthProto proto_config;
@@ -59,7 +83,7 @@ TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {
     credentials:
       entries:
         - key: key3
-          client_id: user3
+          client: user3
   allowed_clients:
     - user1
   )";
@@ -76,10 +100,10 @@ TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
   status_or.value()(filter_callback);
 
-  auto scope_config =
+  const auto route_config =
       factory.createRouteSpecificFilterConfig(scope_proto_config, context.server_factory_context_,
                                               ProtobufMessage::getNullValidationVisitor());
-  EXPECT_TRUE(scope_config != nullptr);
+  EXPECT_TRUE(route_config != nullptr);
 }
 
 } // namespace

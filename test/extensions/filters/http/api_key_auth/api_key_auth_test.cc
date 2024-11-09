@@ -44,7 +44,7 @@ TEST_F(FilterTest, NoHeaderApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - header: "Authorization"
@@ -68,7 +68,7 @@ TEST_F(FilterTest, HeaderApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - header: "Authorization"
@@ -89,7 +89,7 @@ TEST_F(FilterTest, NoQueryApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - query: "api_key"
@@ -110,7 +110,7 @@ TEST_F(FilterTest, QueryApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - query: "api_key"
@@ -128,7 +128,7 @@ TEST_F(FilterTest, NoCookieApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - cookie: "api_key"
@@ -150,7 +150,7 @@ TEST_F(FilterTest, CookieApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - cookie: "api_key"
@@ -169,7 +169,7 @@ TEST_F(FilterTest, FallbackToQueryApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - header: "Authorization"
@@ -190,7 +190,7 @@ TEST_F(FilterTest, FallbackToCookieApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - header: "Authorization"
@@ -211,7 +211,7 @@ TEST_F(FilterTest, UnkonwnApiKey) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - header: "Authorization"
@@ -236,7 +236,7 @@ TEST_F(FilterTest, RouteConfigOverrideCredentials) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - header: "Authorization"
@@ -247,7 +247,7 @@ TEST_F(FilterTest, RouteConfigOverrideCredentials) {
     credentials:
       entries:
         - key: key2
-          client_id: user2
+          client: user2
   )EOF";
 
   setup(config_yaml, route_config_yaml);
@@ -283,7 +283,7 @@ TEST_F(FilterTest, RouteConfigOverrideKeySource) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - header: "Authorization"
@@ -327,7 +327,7 @@ TEST_F(FilterTest, RouteConfigOverrideKeySourceAndCredentials) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   key_sources:
     entries:
       - header: "Authorization"
@@ -337,7 +337,7 @@ TEST_F(FilterTest, RouteConfigOverrideKeySourceAndCredentials) {
     credentials:
       entries:
         - key: key2
-          client_id: user2
+          client: user2
     key_sources:
       entries:
         - query: "api_key"
@@ -402,7 +402,7 @@ TEST_F(FilterTest, NoKeySource) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
   )EOF";
   setup(config_yaml, {});
   // No key source is provided.
@@ -420,9 +420,9 @@ TEST_F(FilterTest, KnownApiKeyButNotAllowed) {
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
       - key: key2
-        client_id: user2
+        client: user2
   key_sources:
     entries:
       - header: "Authorization"

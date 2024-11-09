@@ -118,11 +118,11 @@ public:
 
   /**
    * To check if the client is allowed.
-   * @param client_id the client ID to check.
+   * @param client the client ID to check.
    * @return true if the client is allowed, otherwise false.
    */
-  bool allowClient(absl::string_view client_id) const {
-    return allowed_clients_.empty() || allowed_clients_.contains(client_id);
+  bool allowClient(absl::string_view client) const {
+    return allowed_clients_.empty() || allowed_clients_.contains(client);
   }
 
 private:

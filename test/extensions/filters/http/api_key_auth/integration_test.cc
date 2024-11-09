@@ -22,9 +22,9 @@ typed_config:
   credentials:
     entries:
       - key: key1
-        client_id: user1
+        client: user1
       - key: key2
-        client_id: user2
+        client: user2
   key_sources:
     entries:
       - header: "Authorization"
@@ -62,21 +62,17 @@ public:
   }
 };
 
-class ApiKeyAuthIntegrationTestAllProtocols : public ApiKeyAuthIntegrationTest {};
-
 INSTANTIATE_TEST_SUITE_P(
-    Protocols, ApiKeyAuthIntegrationTestAllProtocols,
+    Protocols, ApiKeyAuthIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// Request with valid credential
-TEST_P(ApiKeyAuthIntegrationTestAllProtocols, ValidCredential) {
+// Request with valid credential.
+TEST_P(ApiKeyAuthIntegrationTest, ValidCredential) {
   initializeFilter();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-
   {
-
     auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
         {":method", "GET"},
         {":path", "/"},
@@ -92,7 +88,6 @@ TEST_P(ApiKeyAuthIntegrationTestAllProtocols, ValidCredential) {
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
-
   {
     auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
         {":method", "GET"},
@@ -111,7 +106,7 @@ TEST_P(ApiKeyAuthIntegrationTestAllProtocols, ValidCredential) {
   }
 }
 
-TEST_P(ApiKeyAuthIntegrationTestAllProtocols, NoCredential) {
+TEST_P(ApiKeyAuthIntegrationTest, NoCredential) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -128,7 +123,7 @@ TEST_P(ApiKeyAuthIntegrationTestAllProtocols, NoCredential) {
   EXPECT_EQ("Client authentication failed.", response->body());
 }
 
-TEST_P(ApiKeyAuthIntegrationTestAllProtocols, InvalidCredentical) {
+TEST_P(ApiKeyAuthIntegrationTest, InvalidCredentical) {
   initializeFilter();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -146,7 +141,7 @@ TEST_P(ApiKeyAuthIntegrationTestAllProtocols, InvalidCredentical) {
   EXPECT_EQ("Client authentication failed.", response->body());
 }
 
-TEST_P(ApiKeyAuthIntegrationTestAllProtocols, NotAllowdClient) {
+TEST_P(ApiKeyAuthIntegrationTest, NotAllowdClientOfPerRouteOverride) {
   initializeWithPerRouteConfig();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 

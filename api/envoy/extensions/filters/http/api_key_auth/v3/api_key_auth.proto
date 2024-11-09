@@ -29,7 +29,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //    credentials:
 //      entries:
 //      - key: 09876abcdefg
-//        client_id: user
+//        client: user
 //    key_sources:
 //      entries:
 //      - header: "X-API-KEY"
@@ -68,19 +68,19 @@ message Credential {
   string key = 1 [(validate.rules).string = {min_len: 1}];
 
   // The unique id or identity that used to identify the client or consumer.
-  string client_id = 2 [(validate.rules).string = {min_len: 1}];
+  string client = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // The credentials that are used to authenticate the clients.
 message Credentials {
-  // The list of credentials. Explicitly setting the Credentials message with zero entries is
-  // allowed and will result in the filter rejecting all requests.
-  repeated Credential entries = 1;
+  // The list of credentials.
+  repeated Credential entries = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
 message KeySource {
   // The header name to fetch the key. If multiple header values are present, the first one will be
-  // used.
+  // used. The the header value is started with "Bearer ", the prefix will be stripped to get the
+  // key value.
   //
   // If set, takes precedence over ``query`` and ``cookie``.
   string header = 1
@@ -103,8 +103,7 @@ message KeySource {
 
 // The key sources to fetch the key from the coming request.
 message KeySources {
-  // The list of key sources. Explicitly setting the KeySources message with zero entries is
-  // not allowed. The order of the key sources is important and the filter will try to fetch the
-  // key one by one from the key sources in the order they are defined.
+  // The list of key sources. The order of the key sources is important and the filter will try to
+  // fetch the key one by one from the key sources in the order they are defined.
   repeated KeySource entries = 1 [(validate.rules).repeated = {min_items: 1}];
 }

@@ -27,7 +27,7 @@ ApiKeyAuthConfig::ApiKeyAuthConfig(const ApiKeyAuthProto& proto_config)
     if (credentials.contains(credential.key())) {
       throwEnvoyExceptionOrPanic("Duplicate API key.");
     }
-    credentials[credential.key()] = credential.client_id();
+    credentials[credential.key()] = credential.client();
   }
 
   credentials_ = std::move(credentials);
@@ -45,8 +45,10 @@ KeySources::Source::Source(absl::string_view header, absl::string_view query,
   } else if (!query.empty()) {
     source_ = std::string(query);
     query_source_ = true;
-  } else {
+  } else if (!cookie.empty()) {
     source_ = std::string(cookie);
+  } else {
+    throwEnvoyExceptionOrPanic("One of 'header'/'query'/'cookie' must be set.");
   }
 }
 
@@ -66,7 +68,6 @@ absl::string_view KeySources::Source::getKey(const Http::RequestHeaderMap& heade
       if (absl::StartsWith(header_view, "Bearer ")) {
         header_view = header_view.substr(7);
       }
-      std::cout << "header_view: " << header_view << std::endl;
       return header_view;
     }
   } else if (query_source_) {
@@ -104,22 +105,19 @@ FilterConfig::FilterConfig(const ApiKeyAuthProto& proto_config, Stats::Scope& sc
 ApiKeyAuthFilter::ApiKeyAuthFilter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
 
 Http::FilterHeadersStatus ApiKeyAuthFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const RouteConfig* override_config =
+  const RouteConfig* route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(decoder_callbacks_);
 
   OptRef<const Credentials> credentials = config_->credentials();
   OptRef<const KeySources> key_sources = config_->keySources();
 
   // If there is an override config, then try to override the API key map and key source.
-  if (override_config != nullptr) {
-    OptRef<const Credentials> override_credentials = override_config->credentials();
-    if (override_credentials.has_value()) {
-      credentials = override_credentials;
+  if (route_config != nullptr) {
+    if (OptRef<const Credentials> override = route_config->credentials(); override.has_value()) {
+      credentials = override;
     }
-
-    OptRef<const KeySources> override_key_sources = override_config->keySources();
-    if (override_key_sources.has_value()) {
-      key_sources = override_key_sources;
+    if (OptRef<const KeySources> override = route_config->keySources(); override.has_value()) {
+      key_sources = override;
     }
   }
 
@@ -144,8 +142,10 @@ Http::FilterHeadersStatus ApiKeyAuthFilter::decodeHeaders(Http::RequestHeaderMap
     return onDenied(Http::Code::Unauthorized, "Client authentication failed.", "unkonwn_api_key");
   }
 
-  if (override_config != nullptr) {
-    if (!override_config->allowClient(credential->second)) {
+  // If route config is not null then check if the client is allowed or not based on the route
+  // configuration.
+  if (route_config != nullptr) {
+    if (!route_config->allowClient(credential->second)) {
       return onDenied(Http::Code::Forbidden, "Client is forbidden.", "client_not_allowed");
     }
   }

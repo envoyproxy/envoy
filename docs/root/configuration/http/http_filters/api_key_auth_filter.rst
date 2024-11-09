@@ -20,17 +20,11 @@ Configuration
 
 An example configuration of the filter may look like the following:
 
-.. code-block:: yaml
-
-  http_filters:
-  - name: api_key_auth
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth
-      credentials:
-        entries:
-        - api_key: one_key
-          client_id: one_client
-      authentication_header: Authorization
+.. literalinclude:: _include/api-key-auth-filter.yaml
+    :language: yaml
+    :lines: 46-56
+    :linenos:
+    :caption: :download:`api-key-auth-filter.yaml <_include/api-key-auth-filter.yaml>`
 
 Per-Route Configuration
 -----------------------
@@ -44,37 +38,11 @@ configured for specific scope like a route or virtual host to allow or deny spec
 
 An example scope specific configuration of the filter may look like the following:
 
-.. code-block:: yaml
-
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      routes:
-      - match: { path: "/admin" }
-        route: { cluster: some_service }
-        typed_per_filter_config:
-          api_key_auth:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute
-            override_config:
-              credentials:
-                entries:
-                - api_key: one_key
-                  client_id: one_client
-                - api_key: another_key
-                  client_id: another_client
-              authentication_query: api_key
-            allowed_clients:
-              - client_id: another_client
-      - match: { prefix: "/static" }
-        route: { cluster: some_service }
-        typed_per_filter_config:
-          api_key_auth:
-            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
-            disabled: true
-      - match: { prefix: "/" }
-        route: { cluster: some_service }
+.. literalinclude:: _include/api-key-auth-filter.yaml
+    :language: yaml
+    :lines: 16-45
+    :linenos:
+    :caption: :download:`api-key-auth-filter.yaml <_include/api-key-auth-filter.yaml>`
 
 In this example we customize credential list and key source for ``/admin`` route, and disable
 authentication for ``/static`` prefixed routes.
