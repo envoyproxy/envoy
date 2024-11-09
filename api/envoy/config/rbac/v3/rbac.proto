@@ -268,8 +268,7 @@ message Permission {
     // :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` instead.
     type.matcher.v3.MetadataMatcher metadata = 7 [
       deprecated = true,
-      (envoy.annotations.deprecated_at_minor_version) = "3.0",
-      (envoy.annotations.disallowed_by_default) = true
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
     ];
 
     // Negates matching the provided permission. For instance, if the value of
@@ -396,8 +395,7 @@ message Principal {
     // :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>` instead.
     type.matcher.v3.MetadataMatcher metadata = 7 [
       deprecated = true,
-      (envoy.annotations.deprecated_at_minor_version) = "3.0",
-      (envoy.annotations.disallowed_by_default) = true
+      (envoy.annotations.deprecated_at_minor_version) = "3.0"
     ];
 
     // Identifies the principal using a filter state object.

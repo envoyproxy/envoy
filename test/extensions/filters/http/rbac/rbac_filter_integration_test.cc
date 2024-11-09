@@ -94,14 +94,13 @@ typed_config:
     policies:
       "allow policy":
         permissions:
-          - sourced_metadata:
-              metadata_matcher:
-                filter: "my.ns"
-                path:
-                  - key: "foo"
-                value:
-                  string_match:
-                    exact: "baz"
+          - metadata:
+              filter: "my.ns"
+              path:
+                - key: "foo"
+              value:
+                string_match:
+                  exact: "baz"
         principals:
           - sourced_metadata:
               metadata_matcher:
