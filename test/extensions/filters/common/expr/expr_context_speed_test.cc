@@ -41,12 +41,8 @@ public:
         arena_, &request_headers_, info_);
     response_ = std::make_unique<Extensions::Filters::Common::Expr::ResponseWrapper>(
         arena_, &response_headers_, &response_trailers_, info_);
-    connection_ =
-        std::make_unique<Extensions::Filters::Common::Expr::ConnectionWrapper>(arena_, info_);
     filter_state_ = std::make_unique<Extensions::Filters::Common::Expr::FilterStateWrapper>(
         arena_, *info_.filterState());
-    xds_ = std::make_unique<Extensions::Filters::Common::Expr::XDSWrapper>(arena_, &info_,
-                                                                           &local_info_);
   }
 
   void testRequestAttributes(::benchmark::State& state) {
@@ -71,19 +67,6 @@ public:
       auto attr = attributes[idx];
       auto value =
           (*response_)[Extensions::Filters::Common::Expr::CelValue::CreateStringView(attr)];
-      benchmark::DoNotOptimize(value);
-      idx = (idx + 1) % attributes.size();
-    }
-  }
-
-  void testConnectionAttributes(::benchmark::State& state) {
-    static const std::vector<absl::string_view> attributes = {"mtls", "dns_san_peer_certificate"};
-    size_t idx = 0;
-
-    for (auto _ : state) { // NOLINT
-      auto attr = attributes[idx];
-      auto value =
-          (*connection_)[Extensions::Filters::Common::Expr::CelValue::CreateStringView(attr)];
       benchmark::DoNotOptimize(value);
       idx = (idx + 1) % attributes.size();
     }
@@ -155,9 +138,7 @@ private:
 
   std::unique_ptr<Extensions::Filters::Common::Expr::RequestWrapper> request_;
   std::unique_ptr<Extensions::Filters::Common::Expr::ResponseWrapper> response_;
-  std::unique_ptr<Extensions::Filters::Common::Expr::ConnectionWrapper> connection_;
   std::unique_ptr<Extensions::Filters::Common::Expr::FilterStateWrapper> filter_state_;
-  std::unique_ptr<Extensions::Filters::Common::Expr::XDSWrapper> xds_;
 };
 
 // Individual benchmark functions
@@ -169,11 +150,6 @@ static void bmRequestAttributes(::benchmark::State& state) {
 static void bmResponseAttributes(::benchmark::State& state) {
   ExpressionContextSpeedTest speed_test(state.range(0));
   speed_test.testResponseAttributes(state);
-}
-
-static void bmConnectionAttributes(::benchmark::State& state) {
-  ExpressionContextSpeedTest speed_test(state.range(0));
-  speed_test.testConnectionAttributes(state);
 }
 
 static void bmFilterState(::benchmark::State& state) {
@@ -195,9 +171,4 @@ BENCHMARK(bmFilterState)
     ->Unit(::benchmark::kMicrosecond)
     ->RangeMultiplier(100)
     ->Range(1000, 10000000);
-
-BENCHMARK(bmConnectionAttributes)
-    ->Unit(::benchmark::kMicrosecond)
-    ->RangeMultiplier(100)
-    ->Range(100, 1000000);
 } // namespace Envoy
