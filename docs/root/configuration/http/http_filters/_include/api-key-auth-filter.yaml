@@ -36,7 +36,7 @@ static_resources:
                         entries:
                         - query: api_key
                     allowed_clients:
-                      - another_client
+                    - another_client
               - match:
                   prefix: "/static"
                 route:
