@@ -48,8 +48,10 @@ public:
   /**
    * To get the API key from the incoming request.
    * @param headers the incoming request headers.
-   * @param buffer the buffer to store the API key.
-   * @return the result of getting the API key.
+   * @param buffer the buffer that used to store the API key value that parsed from query or
+   *        cookie.
+   * @return the result string view of getting the API key. The string view will reference to
+   *         HTTP request header value or the input buffer.
    */
   absl::string_view getKey(const Http::RequestHeaderMap& headers, std::string& buffer) const;
 
