@@ -52,7 +52,8 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
 
 void ProcessorState::stopMessageTimer() {
   if (message_timer_) {
-    ENVOY_LOG(debug, "Traffic direction {}: timer disabled", trafficDirectionDebugStr());
+    ENVOY_LOG(debug, "Traffic direction {}: timer disabled",
+              trafficDirectionDebugStr());
     message_timer_->disableTimer();
   }
 }

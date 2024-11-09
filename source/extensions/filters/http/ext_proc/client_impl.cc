@@ -66,16 +66,15 @@ void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingR
 
 // TODO(tyxia) Refactor the logic of close() function. Invoking it when stream is already closed
 // is redundant.
-bool ExternalProcessorStreamImpl::close() {
-  if (!stream_closed_) {
+bool ExternalProcessorStreamImpl::closeLocalStream() {
+  if (!local_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
     // Unregister the watermark callbacks, if any exist (e.g., filter is not destroyed yet)
     if (grpc_side_stream_flow_control_ && callbacks_.has_value()) {
       stream_.removeWatermarkCallbacks();
     }
     stream_.closeStream();
-    stream_closed_ = true;
-    stream_.resetStream();
+    local_closed_ = true;
     return true;
   }
   return false;
@@ -91,12 +90,16 @@ void ExternalProcessorStreamImpl::onReceiveMessage(ProcessingResponsePtr&& respo
 
 void ExternalProcessorStreamImpl::onCreateInitialMetadata(Http::RequestHeaderMap&) {}
 void ExternalProcessorStreamImpl::onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) {}
+
 void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) {}
 
 void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                                 const std::string& message) {
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  stream_closed_ = true;
+  // Also mark the client stream as closed: the underlying http async stream is
+  // closed and cleaned up already after processing trailers.
+  local_closed_ = true;
+  remote_closed_ = true;
 
   if (!callbacks_.has_value()) {
     ENVOY_LOG(debug, "Underlying filter object has been destroyed.");

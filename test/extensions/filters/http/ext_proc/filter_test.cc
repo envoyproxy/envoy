@@ -163,16 +163,30 @@ protected:
     // This will fail if, at the end of the test, we left any timers enabled.
     // (This particular test suite does not actually let timers expire,
     // although other test suites do.)
-    EXPECT_TRUE(allTimersDisabled());
+    EXPECT_TRUE(allNonDeferredCloseTimersAreDisabled());
   }
 
-  bool allTimersDisabled() {
-    for (auto* t : timers_) {
+  // Since no trailers are sent, the last timer created by deferred close, is
+  // the only one that should be enabled.
+  bool allNonDeferredCloseTimersAreDisabled() {
+    if (timers_.empty()) {
+      return true;
+    }
+    // if trailers are seen, there is no deferred close timer.
+    bool has_deferred_close_timer = no_trailers_ ? true : false;
+    for (int i = 0; i < timers_.size() - 1; ++i) {
+      auto* t = timers_[i];
       if (t->enabled_) {
         return false;
       }
     }
-    return true;
+    // The last timer is the deferred close timer.
+    if (has_deferred_close_timer) {
+      // Last timer is not disabled.
+      return timers_[timers_.size() - 1]->enabled_;
+    } else {
+      return !(timers_[timers_.size() - 1]->enabled_);
+    }
   }
 
   ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
@@ -190,11 +204,8 @@ protected:
     // We never send with the "close" flag set
     EXPECT_CALL(*stream, send(_, false)).WillRepeatedly(Invoke(this, &HttpFilterTest::doSend));
 
-    EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
-
-    // close is idempotent and only called once per filter
-    EXPECT_CALL(*stream, close()).WillOnce(Invoke(this, &HttpFilterTest::doSendClose));
-
+    EXPECT_CALL(*stream, streamInfo())
+        .WillRepeatedly(ReturnRef(async_client_stream_info_));
     return stream;
   }
 
@@ -202,9 +213,9 @@ protected:
     (*dynamic_metadata_.mutable_filter_metadata())[ns] = val;
   };
 
-  void doSend(ProcessingRequest&& request, Unused) { last_request_ = std::move(request); }
-
-  bool doSendClose() { return !server_closed_stream_; }
+  void doSend(ProcessingRequest&& request, Unused) {
+    last_request_ = std::move(request);
+  }
 
   void setUpDecodingBuffering(Buffer::Instance& buf, bool expect_modification = false) {
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buf));
@@ -596,7 +607,6 @@ protected:
   std::unique_ptr<MockClient> client_;
   ExternalProcessorCallbacks* stream_callbacks_ = nullptr;
   ProcessingRequest last_request_;
-  bool server_closed_stream_ = false;
   bool observability_mode_ = false;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
@@ -611,6 +621,11 @@ protected:
   TestResponseHeaderMapImpl response_headers_;
   TestRequestTrailerMapImpl request_trailers_;
   TestResponseTrailerMapImpl response_trailers_;
+  // If no trailers received, this means a non-clean close.
+  // Filter::onDestroy() will schedule a timer to
+  // cleanup the stream. This means the last timer will be active in most
+  // cases(timer out default is 5s).
+  bool no_trailers_ = true;
   std::vector<Event::MockTimer*> timers_;
   Event::MockTimer* deferred_close_timer_;
   Envoy::Event::SimulatedTimeSystem* test_time_;
@@ -1608,14 +1623,16 @@ TEST_F(HttpFilterTest, StreamingSendRequestDataGrpcFail) {
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   // Oh no! The remote server had a failure!
   TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
-  server_closed_stream_ = true;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
+                             Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused,
+              std::function<void(ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused) { modify_headers(immediate_response_headers); }));
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
+  no_trailers_ = false;
 
   // Sending another chunk of data. No more gRPC call.
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
@@ -1664,14 +1681,17 @@ TEST_F(HttpFilterTest, StreamingSendResponseDataGrpcFail) {
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
-  server_closed_stream_ = true;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
+                             Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused,
+              std::function<void(ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused) { modify_headers(immediate_response_headers); }));
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
+  no_trailers_ = false;
+
   // Sending 40 more chunks of data. No more gRPC calls.
   sendChunkRequestData(chunk_number * 2, false);
 
@@ -1713,14 +1733,16 @@ TEST_F(HttpFilterTest, GrpcFailOnRequestTrailer) {
   EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
-  server_closed_stream_ = true;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
+                             Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused,
+              std::function<void(ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused) { modify_headers(immediate_response_headers); }));
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
+  no_trailers_ = false;
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
@@ -1729,7 +1751,7 @@ TEST_F(HttpFilterTest, GrpcFailOnRequestTrailer) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
-  EXPECT_EQ(0, config_->stats().streams_closed_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
   EXPECT_EQ(1, config_->stats().streams_failed_.value());
 
   auto& grpc_calls_in = getGrpcCalls(envoy::config::core::v3::TrafficDirection::INBOUND);
@@ -2272,14 +2294,16 @@ TEST_F(HttpFilterTest, PostAndFail) {
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   // Oh no! The remote server had a failure!
   TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
-  server_closed_stream_ = true;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
+                             Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused,
+              std::function<void(ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused) { modify_headers(immediate_response_headers); }));
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
+  no_trailers_ = false;
 
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
@@ -2324,14 +2348,16 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
-  server_closed_stream_ = true;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
+                             Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
+      .WillOnce(Invoke(
+          [&immediate_response_headers](
+              Unused, Unused,
+              std::function<void(ResponseHeaderMap & headers)> modify_headers,
+              Unused, Unused) { modify_headers(immediate_response_headers); }));
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
+  no_trailers_ = false;
 
   Buffer::OwnedImpl resp_data("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
@@ -2370,8 +2396,8 @@ TEST_F(HttpFilterTest, PostAndIgnoreFailure) {
 
   // Oh no! The remote server had a failure which we will ignore
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  server_closed_stream_ = true;
   stream_callbacks_->onGrpcError(Grpc::Status::Internal);
+  no_trailers_ = false;
 
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
@@ -2410,8 +2436,8 @@ TEST_F(HttpFilterTest, PostAndClose) {
 
   // Close the stream, which should tell the filter to keep on going
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  server_closed_stream_ = true;
   stream_callbacks_->onGrpcClose();
+  no_trailers_ = false;
 
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
@@ -2446,12 +2472,13 @@ TEST_F(HttpFilterTest, PostAndDownstreamReset) {
 
   EXPECT_FALSE(last_request_.observability_mode());
   ASSERT_TRUE(last_request_.has_request_headers());
-  EXPECT_FALSE(allTimersDisabled());
-
+  // Request header timer is enabled.
+  EXPECT_TRUE(std::any_of(timers_.begin(), timers_.end(),
+                          [](const auto& timer) { return timer->enabled_; }));
   // Call onDestroy to mimic a downstream client reset.
   filter_->onDestroy();
 
-  EXPECT_TRUE(allTimersDisabled());
+  EXPECT_TRUE(allNonDeferredCloseTimersAreDisabled());
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
@@ -3460,6 +3487,7 @@ TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
   EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
 
   stream_callbacks_->onGrpcClose();
+  no_trailers_ = false;
   filter_->onDestroy();
 
   EXPECT_EQ(2, config_->stats().rejected_header_mutations_.value());
@@ -3499,6 +3527,7 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
   stream_callbacks_->onReceiveMessage(std::move(resp1));
   EXPECT_TRUE(immediate_response_headers.empty());
   stream_callbacks_->onGrpcClose();
+  no_trailers_ = false;
 
   filter_->onDestroy();
 }
@@ -4428,6 +4457,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 1);
   EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
+  filter_->onDestroy();
 }
 
 TEST_F(HttpFilterTest, HeaderProcessingInObservabilityMode) {
