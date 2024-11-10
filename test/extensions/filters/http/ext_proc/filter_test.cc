@@ -174,7 +174,7 @@ protected:
     }
     // if trailers are seen, there is no deferred close timer.
     bool has_deferred_close_timer = no_trailers_ ? true : false;
-    for (int i = 0; i < timers_.size() - 1; ++i) {
+    for (unsigned long i = 0; i+1 < timers_.size() - 1; ++i) {
       auto* t = timers_[i];
       if (t->enabled_) {
         return false;
