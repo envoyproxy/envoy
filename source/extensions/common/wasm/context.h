@@ -173,6 +173,10 @@ public:
 
   // Http::StreamFilterBase. Note: This calls onDone() in Wasm.
   void onDestroy() override;
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
+    local_reply_count_++;
+    return Http::LocalErrorStatus::Continue;
+  }
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -459,6 +463,8 @@ protected:
       state_prototypes_;
 
   proxy_wasm::AbiVersion abi_version_{proxy_wasm::AbiVersion::Unknown};
+
+  uint64_t local_reply_count_{};
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

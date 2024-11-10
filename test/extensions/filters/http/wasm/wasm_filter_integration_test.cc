@@ -33,7 +33,8 @@ public:
 
   void TearDown() override { fake_upstream_connection_.reset(); }
 
-  void setupWasmFilter(const std::string& config, const std::string& root_id = "") {
+  void setupWasmFilter(const std::string& config, const std::string& root_id = "",
+                       uint64_t downstream_buffer_limit = 8192) {
     bool downstream = std::get<2>(GetParam());
     const std::string yaml = TestEnvironment::substitute(absl::StrCat(
         R"EOF(
@@ -57,12 +58,13 @@ public:
                     filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
         )EOF"));
     config_helper_.prependFilter(yaml, downstream);
+    config_helper_.setBufferLimits(8192, downstream_buffer_limit);
   }
 
   template <typename TMap> void assertCompareMaps(const TMap& m1, const TMap& m2) {
     m1.iterate([&m2](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
       Http::LowerCaseString lower_key{std::string(entry.key().getStringView())};
-      if (entry.value() == "") {
+      if (entry.value().empty()) {
         EXPECT_TRUE(m2.get(lower_key).empty());
       } else {
         if (m2.get(lower_key).empty()) {
@@ -232,6 +234,62 @@ TEST_P(WasmFilterIntegrationTest, BodyBufferedMultipleChunksManipulation) {
   runTest(request_headers, request_body, expected_request_headers, "request_very_long_body.end",
           upstream_response_headers, upstream_response_body, expected_response_headers,
           "upstream_very_long_body.end");
+}
+
+TEST_P(WasmFilterIntegrationTest, LargeResponseHitBufferLimit) {
+  setupWasmFilter("", "body", 10);
+  HttpIntegrationTest::initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":scheme", "http"}, {":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+
+  Http::TestRequestHeaderMapImpl expected_request_headers{{":path", "/"}};
+
+  Http::TestResponseHeaderMapImpl upstream_response_headers{{":status", "200"},
+                                                            {"x-test-operation", "SetEndOfBodies"}};
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "413"}};
+
+  auto upstream_response_body =
+      std::vector<std::string>{{"upstream_"}, {"very_"}, {"long_"}, {"body"}};
+  runTest(request_headers, {}, expected_request_headers, "", upstream_response_headers,
+          upstream_response_body, expected_response_headers, "Payload Too Large");
+}
+
+TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {
+  setupWasmFilter("", "body", 10);
+  HttpIntegrationTest::initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                 {":method", "POST"},
+                                                 {":path", "/"},
+                                                 {":authority", "host"},
+                                                 {"x-test-operation", "SetEndOfBodies"}};
+
+  auto request_body = std::vector<std::string>{{"request_"}, {"very_"}, {"long_"}, {"body"}};
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  request_encoder_ = &encoder_decoder.first;
+  for (size_t n = 0; n < request_body.size(); n++) {
+    Buffer::OwnedImpl buffer(request_body[n]);
+    codec_client_->sendData(*request_encoder_, buffer, n == request_body.size() - 1);
+  }
+
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "413"}};
+
+  assertCompareMaps<Http::ResponseHeaderMap>(expected_response_headers, response->headers());
+  EXPECT_STREQ("Payload Too Large", response->body().c_str());
+
+  // cleanup
+  codec_client_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
 } // namespace
