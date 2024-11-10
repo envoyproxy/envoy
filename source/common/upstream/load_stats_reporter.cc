@@ -26,8 +26,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
 }
 
 void LoadStatsReporter::setRetryTimer() {
-  ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.",
-            RETRY_DELAY_MS);
+  ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.", RETRY_DELAY_MS);
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
 }
 
@@ -246,10 +245,12 @@ void LoadStatsReporter::onRemoteClose(Grpc::Status::GrpcStatus status, const std
   response_timer_->disableTimer();
   stream_ = nullptr;
   if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
+    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+              message);
     handleFailure();
   } else {
-    ENVOY_LOG(debug, "{} gRPC config stream closed gracefully, {}", service_method_.name(), message);
+    ENVOY_LOG(debug, "{} gRPC config stream closed gracefully, {}", service_method_.name(),
+              message);
     setRetryTimer();
   }
 }
