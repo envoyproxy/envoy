@@ -197,6 +197,10 @@ new_features:
   change: |
     added :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` which allows
     specifying an optional source for the metadata to be matched in addition to the metadata matcher.
+- area: sni_dynamic_forward_proxy
+  change: |
+    Added support in sni_dynamic_forward_proxy for saving the resolved upstream address in the filter state.
+    The state is saved with the key ``envoy.stream.upstream_address``.
 
 deprecated:
 - area: rbac
