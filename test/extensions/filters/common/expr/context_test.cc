@@ -1104,6 +1104,34 @@ TEST(Context, BackendLatencyEdgeCases) {
   EXPECT_FALSE(incomplete_timing.has_value());
 }
 
+TEST(Context, UpstreamEdgeCases) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  EXPECT_CALL(info, upstreamInfo())
+      .WillRepeatedly(Return(std::shared_ptr<StreamInfo::UpstreamInfo>(nullptr)));
+  Protobuf::Arena arena;
+  UpstreamWrapper upstream(arena, info);
+
+  {
+    const auto value = upstream[CelValue::CreateStringView(Address)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = upstream[CelValue::CreateStringView(Port)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = upstream[CelValue::CreateStringView(UpstreamLocalAddress)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = upstream[CelValue::CreateStringView(UpstreamTransportFailureReason)];
+    EXPECT_FALSE(value.has_value());
+  }
+}
+
 } // namespace
 } // namespace Expr
 } // namespace Common
