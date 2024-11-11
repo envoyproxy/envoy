@@ -143,7 +143,7 @@ private:
   // `hostname`.
   absl::optional<Origin> getCanonicalOriginForHttp3Brokenness(absl::string_view hostname);
 
-  // Updates the canonial origin for http3 brokenness book keeping.
+  // Updates the canonical origin for http3 brokenness book keeping.
   void maybeSetCanonicalOriginForHttp3Brokenness(const Origin& origin);
 
   // Returns the canonical origin, if any, associated with `hostname`.
