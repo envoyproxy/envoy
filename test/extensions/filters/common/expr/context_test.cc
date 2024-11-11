@@ -1106,6 +1106,7 @@ TEST(Context, BackendLatencyEdgeCases) {
 
 TEST(Context, UpstreamEdgeCases) {
   NiceMock<StreamInfo::MockStreamInfo> info;
+  info.setUpstreamInfo(nullptr);
   EXPECT_CALL(info, upstreamInfo())
       .WillRepeatedly(Return(std::shared_ptr<StreamInfo::UpstreamInfo>(nullptr)));
   Protobuf::Arena arena;
