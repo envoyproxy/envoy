@@ -44,6 +44,7 @@ constexpr char AWS_ROLE_SESSION_NAME[] = "AWS_ROLE_SESSION_NAME";
 constexpr char CREDENTIALS[] = "Credentials";
 constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
 constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
+
 constexpr char TOKEN[] = "Token";
 constexpr char EXPIRATION[] = "Expiration";
 constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
@@ -57,6 +58,14 @@ constexpr char AWS_CONTAINER_CREDENTIALS_FULL_URI[] = "AWS_CONTAINER_CREDENTIALS
 constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
 constexpr char AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE[] = "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE";
 constexpr char AWS_EC2_METADATA_DISABLED[] = "AWS_EC2_METADATA_DISABLED";
+
+// IAM Roles Anywhere credential strings
+constexpr char CREDENTIALSET[] = "credentialSet";
+constexpr char CREDENTIALS_LOWER[] = "credentials";
+constexpr char ACCESS_KEY_ID_LOWER[] = "accessKeyId";
+constexpr char SECRET_ACCESS_KEY_LOWER[] = "secretAccessKey";
+constexpr char EXPIRATION_LOWER[] = "expiration";
+constexpr char SESSION_TOKEN_LOWER[] = "sessionToken";
 
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
 constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
@@ -722,7 +731,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
     return;
   }
 
-  auto credentialset_object_or_error = document_json_or_error.value()->getObjectArray("credentialSet", false);
+  auto credentialset_object_or_error = document_json_or_error.value()->getObjectArray(CREDENTIALSET, false);
     if (!credentialset_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credentialset_object_or_error.status().message());
@@ -731,7 +740,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   }
 
   // We only consider the first credential returned in a CredentialSet
-  auto credential_object_or_error = credentialset_object_or_error.value()[0]->getObject("credeentials");
+  auto credential_object_or_error = credentialset_object_or_error.value()[0]->getObject(CREDENTIALS_LOWER);
     if (!credential_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credential_object_or_error.status().message());
@@ -740,20 +749,20 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   }
 
   const auto access_key_id =
-      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), ACCESS_KEY_ID, "");
+      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), ACCESS_KEY_ID_LOWER, "");
   const auto secret_access_key =
-      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), SECRET_ACCESS_KEY, "");
+      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), SECRET_ACCESS_KEY_LOWER, "");
   const auto session_token =
-      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), TOKEN, "");
+      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), SESSION_TOKEN_LOWER, "");
 
   ENVOY_LOG(debug,
             "Found following AWS credentials from rolesanywhere service: {}={}, {}={}, {}={}",
-            AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
-            secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
+            ACCESS_KEY_ID_LOWER, access_key_id, SECRET_ACCESS_KEY_LOWER,
+            secret_access_key.empty() ? "" : "*****", SESSION_TOKEN_LOWER,
             session_token.empty() ? "" : "*****");
 
   const auto expiration_str =
-      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), EXPIRATION, "");
+      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), EXPIRATION_LOWER, "");
 
   if (!expiration_str.empty()) {
     absl::Time expiration_time;
