@@ -714,7 +714,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   }
   absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
 
-  document_json_or_error = Json::Factory::loadFromStringNoThrow(credential_document_value);
+  document_json_or_error = Json::Factory::loadFromString(credential_document_value);
   if (!document_json_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               document_json_or_error.status().message());
@@ -722,7 +722,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
     return;
   }
 
-  auto credentialset_object_or_error = document_json_or_error.value()->getObjectArrayNoThrow("credentialSet", false);
+  auto credentialset_object_or_error = document_json_or_error.value()->getObjectArray("credentialSet", false);
     if (!credentialset_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credentialset_object_or_error.status().message());
@@ -730,7 +730,8 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
     return;
   }
 
-  auto credential_object_or_error = credentialset_object_or_error.value()[0]->getObjectNoThrow("credeentials");
+  // We only consider the first credential returned in a CredentialSet
+  auto credential_object_or_error = credentialset_object_or_error.value()[0]->getObject("credeentials");
     if (!credential_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credential_object_or_error.status().message());
@@ -1353,80 +1354,86 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
     absl::string_view region,
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+    const absl::optional<::envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider_config,
     const CredentialsProviderChainFactories& factories) {
 
-  ENVOY_LOG(debug, "Using environment credentials provider");
-  add(factories.createEnvironmentCredentialsProvider());
+  if(!credential_provider_config.has_value())
+  {
 
-  ENVOY_LOG(debug, "Using credentials file credentials provider");
-  add(factories.createCredentialsFileCredentialsProvider(api));
+    ENVOY_LOG(debug, "Using environment credentials provider");
+    add(factories.createEnvironmentCredentialsProvider());
 
-  // Initial state for an async credential receiver
-  auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
-  // Initial amount of time for async credential receivers to wait for an initial refresh to succeed
-  auto initialization_timer = std::chrono::seconds(2);
+    ENVOY_LOG(debug, "Using credentials file credentials provider");
+    add(factories.createCredentialsFileCredentialsProvider(api));
 
-  // WebIdentityCredentialsProvider can be used only if `context` is supplied which is required to
-  // use http async http client to make http calls to fetch the credentials.
-  if (context) {
-    const auto web_token_path = absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE));
-    const auto role_arn = absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN));
-    if (!web_token_path.empty() && !role_arn.empty()) {
-      const auto session_name = sessionName(api);
-      const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-      const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
+    // Initial state for an async credential receiver
+    auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+    // Initial amount of time for async credential receivers to wait for an initial refresh to succeed
+    auto initialization_timer = std::chrono::seconds(2);
 
-      const auto cluster_name = stsClusterName(region_uuid);
+    // WebIdentityCredentialsProvider can be used only if `context` is supplied which is required to
+    // use http async http client to make http calls to fetch the credentials.
+    if (context) {
+      const auto web_token_path = absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE));
+      const auto role_arn = absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN));
+      if (!web_token_path.empty() && !role_arn.empty()) {
+        const auto session_name = sessionName(api);
+        const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+        const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
 
-      ENVOY_LOG(
-          debug,
-          "Using web identity credentials provider with STS endpoint: {} and session name: {}",
-          sts_endpoint, session_name);
-      add(factories.createWebIdentityCredentialsProvider(
-          api, context, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name,
-          web_token_path, "", sts_endpoint, role_arn, session_name, refresh_state,
-          initialization_timer));
+        const auto cluster_name = stsClusterName(region_uuid);
+
+        ENVOY_LOG(
+            debug,
+            "Using web identity credentials provider with STS endpoint: {} and session name: {}",
+            sts_endpoint, session_name);
+        add(factories.createWebIdentityCredentialsProvider(
+            api, context, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name,
+            web_token_path, "", sts_endpoint, role_arn, session_name, refresh_state,
+            initialization_timer));
+      }
     }
-  }
 
-  // Even if WebIdentity is supported keep the fallback option open so that
-  // Envoy can use other credentials provider if available.
-  const auto relative_uri =
-      absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI));
-  const auto full_uri = absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_FULL_URI));
-  const auto metadata_disabled = absl::NullSafeStringView(std::getenv(AWS_EC2_METADATA_DISABLED));
+    // Even if WebIdentity is supported keep the fallback option open so that
+    // Envoy can use other credentials provider if available.
+    const auto relative_uri =
+        absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI));
+    const auto full_uri = absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_FULL_URI));
+    const auto metadata_disabled = absl::NullSafeStringView(std::getenv(AWS_EC2_METADATA_DISABLED));
 
-  if (!relative_uri.empty()) {
-    const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
-    ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
-    add(factories.createContainerCredentialsProvider(
-        api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
-        CONTAINER_METADATA_CLUSTER, uri, refresh_state, initialization_timer));
-  } else if (!full_uri.empty()) {
-    auto authorization_token =
-        absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
-    if (!authorization_token.empty()) {
-      ENVOY_LOG(debug,
-                "Using container role credentials provider with URI: "
-                "{} and authorization token",
-                full_uri);
+    if (!relative_uri.empty()) {
+      const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
+      ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
       add(factories.createContainerCredentialsProvider(
           api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
-          CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer,
-          authorization_token));
-    } else {
-      ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
-      add(factories.createContainerCredentialsProvider(
+          CONTAINER_METADATA_CLUSTER, uri, refresh_state, initialization_timer));
+    } else if (!full_uri.empty()) {
+      auto authorization_token =
+          absl::NullSafeStringView(std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN));
+      if (!authorization_token.empty()) {
+        ENVOY_LOG(debug,
+                  "Using container role credentials provider with URI: "
+                  "{} and authorization token",
+                  full_uri);
+        add(factories.createContainerCredentialsProvider(
+            api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
+            CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer,
+            authorization_token));
+      } else {
+        ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
+        add(factories.createContainerCredentialsProvider(
+            api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
+            CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer));
+      }
+    } else if (metadata_disabled != TRUE) {
+      ENVOY_LOG(debug, "Using instance profile credentials provider");
+      add(factories.createInstanceProfileCredentialsProvider(
           api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
-          CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer));
+          refresh_state, initialization_timer, EC2_METADATA_CLUSTER));
     }
-  } else if (metadata_disabled != TRUE) {
-    ENVOY_LOG(debug, "Using instance profile credentials provider");
-    add(factories.createInstanceProfileCredentialsProvider(
-        api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
-        refresh_state, initialization_timer, EC2_METADATA_CLUSTER));
   }
 }
+
 
 // Container credentials and instance profile credentials are both singletons, as they exist only
 // once on the underlying host and can be shared across all invocations of request signing consumer

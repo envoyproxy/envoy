@@ -107,6 +107,8 @@ filter chain within the cluster configuration.
     :linenos:
     :caption: :download:`aws-request-signing-filter-upstream.yaml <_include/aws-request-signing-filter-upstream.yaml>`
 
+.. _config_http_filters_aws_request_signing_credentials:
+
 .. include:: _include/aws_credentials.rst
 
 .. _config_http_filters_aws_request_signing_region:
