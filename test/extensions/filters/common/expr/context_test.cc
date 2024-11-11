@@ -236,6 +236,29 @@ TEST(Context, RequestAttributes) {
   }
 }
 
+TEST(Context, RequestAttributesNoHeaders) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Http::TestRequestHeaderMapImpl header_map{};
+  Protobuf::Arena arena;
+  RequestWrapper request(arena, &header_map, info);
+
+  EXPECT_CALL(info, bytesReceived()).WillRepeatedly(Return(10));
+
+  {
+    auto value = request[CelValue::CreateStringView(UrlPath)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("", value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = request[CelValue::CreateStringView(Query)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("", value.value().StringOrDie().value());
+  }
+}
+
 TEST(Context, RequestFallbackAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Http::TestRequestHeaderMapImpl header_map{
@@ -952,6 +975,33 @@ TEST(Context, XDSAttributes) {
   }
 }
 
+TEST(Context, XDSAttributesEdgeCases) {
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info(
+      new NiceMock<Upstream::MockClusterInfo>());
+  EXPECT_CALL(info, upstreamClusterInfo()).WillRepeatedly(Return(nullptr));
+  std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
+  EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+  info.downstream_connection_info_provider_->setListenerInfo(nullptr);
+
+  Protobuf::Arena arena;
+  XDSWrapper wrapper(arena, &info, &local_info);
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ClusterName)];
+    EXPECT_FALSE(value.has_value());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ListenerMetadata)];
+    EXPECT_FALSE(value.has_value());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ListenerDirection)];
+    EXPECT_FALSE(value.has_value());
+  }
+}
+
 TEST(Context, EmptyXdsWrapper) {
   Protobuf::Arena arena;
   XDSWrapper wrapper(arena, nullptr, nullptr);
@@ -963,6 +1013,41 @@ TEST(Context, EmptyXdsWrapper) {
 
   {
     const auto value = wrapper[CelValue::CreateStringView(ClusterName)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ClusterMetadata)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(RouteName)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(RouteMetadata)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(FilterChainName)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ListenerMetadata)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(ListenerDirection)];
     EXPECT_FALSE(value.has_value());
   }
 }
