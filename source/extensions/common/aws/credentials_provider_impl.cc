@@ -708,6 +708,7 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
 void IAMRolesAnywhereCredentialsProvider::extractCredentials(
     const std::string&& credential_document_value) {
   if (credential_document_value.empty()) {
+    ENVOY_LOG(error, "Empty AWS credentials document received from rolesanywhere service");
     handleFetchDone();
     return;
   }
@@ -721,12 +722,28 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
     return;
   }
 
+  auto credentialset_object_or_error = document_json_or_error.value()->getObjectArrayNoThrow("credentialSet", false);
+    if (!credentialset_object_or_error.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
+              credentialset_object_or_error.status().message());
+    handleFetchDone();
+    return;
+  }
+
+  auto credential_object_or_error = credentialset_object_or_error.value()[0]->getObjectNoThrow("credeentials");
+    if (!credential_object_or_error.ok()) {
+    ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
+              credential_object_or_error.status().message());
+    handleFetchDone();
+    return;
+  }
+
   const auto access_key_id =
-      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), ACCESS_KEY_ID, "");
+      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), ACCESS_KEY_ID, "");
   const auto secret_access_key =
-      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), SECRET_ACCESS_KEY, "");
+      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), SECRET_ACCESS_KEY, "");
   const auto session_token =
-      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), TOKEN, "");
+      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), TOKEN, "");
 
   ENVOY_LOG(debug,
             "Found following AWS credentials from rolesanywhere service: {}={}, {}={}, {}={}",
@@ -735,7 +752,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
             session_token.empty() ? "" : "*****");
 
   const auto expiration_str =
-      Utility::getStringFromJsonOrDefault(document_json_or_error.value(), EXPIRATION, "");
+      Utility::getStringFromJsonOrDefault(credential_object_or_error.value(), EXPIRATION, "");
 
   if (!expiration_str.empty()) {
     absl::Time expiration_time;

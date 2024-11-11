@@ -133,7 +133,7 @@ public:
     ASSERT(receiver_);
     complete_ = true;
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
-    if (status_code == enumToInt(Http::Code::OK)) {
+    if (status_code == enumToInt(Http::Code::OK)||(status_code == enumToInt(Http::Code::Created))) {
       ENVOY_LOG(debug, "{}: fetch AWS Metadata [cluster = {}]: success", __func__, cluster_name_);
       if (response->body().length() != 0) {
         const auto body = response->bodyAsString();
