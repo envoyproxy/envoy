@@ -987,8 +987,10 @@ void DownstreamFilterManager::sendLocalReply(
   }
 
   if (!filter_manager_callbacks_.responseHeaders().has_value() &&
-      !filter_manager_callbacks_.informationalHeaders().has_value()) {
-    // If the response has not started at all, send the response through the filter chain.
+      (!filter_manager_callbacks_.informationalHeaders().has_value() ||
+       state_.informational_response_headers_encoded_)) {
+    // If the response has not started at all, or if the only response so far is an informational
+    // 1xx that has already been fully processed, send the response through the filter chain.
 
     if (auto cb = filter_manager_callbacks_.downstreamCallbacks(); cb.has_value()) {
       // The initial route maybe never be set or the cached route maybe cleared by the filters.
@@ -1197,6 +1199,7 @@ void FilterManager::encode1xxHeaders(ActiveStreamEncoderFilter* filter,
     }
   }
 
+  state_.informational_response_headers_encoded_ = true;
   filter_manager_callbacks_.encode1xxHeaders(headers);
 }
 
