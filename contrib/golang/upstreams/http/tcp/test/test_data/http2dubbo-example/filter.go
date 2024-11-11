@@ -86,8 +86,7 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, buffer
   - 2. get dubboArgs from http body
   - 3. change dubboInterface for gray_traffic by router_name
   - 4. construct & set data for sending to upstream
-  - 5. set remote half close for conn by cluster_name
-  - 6. set envoy-self half close for conn
+  - 5. set envoy-self half close for conn
     *
   - @param bufferForUpstreamData supplies data to be set for sending to upstream.
   - @param endOfStream if end of stream.
@@ -122,13 +121,7 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 	buf := transformToDubboFrame(f.dubboMethod, f.dubboInterface, dubboArgs)
 	_ = buffer.Set(buf.Bytes())
 
-	// =========== step 5: enable remote half close conn by cluster =========== //
-	clusterName, _ := f.callbacks.StreamInfo().VirtualClusterName()
-	if clusterName == f.config.clusterNameForEnableRemoteHalfClose {
-		f.callbacks.EnableHalfClose(true)
-	}
-
-	// =========== step 6: set upstream conn tunneling =========== //
+	// =========== step 5: set upstream conn tunneling =========== //
 	if !f.config.enableTunneling {
 		return api.SendDataWithNotTunneling
 	}
@@ -153,6 +146,7 @@ const (
   - 2. aggregate multi dubbo frame when server has big response
   - 3. convert body from dubbo to http
   - 4. construct http response header
+  - 5. set label for specify-cluster
     *
   - @param responseHeaderForSet to construct & set http response header.
   - @param buffer supplies data to be set for sending to downstream.
@@ -199,6 +193,12 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 	responseHeaderForSet.Set("content-type", "application/json; charset=utf-8")
 	responseHeaderForSet.Set("extension", "golang-tcp-upstream")
 
+	// =========== step 5: set label for specify-cluster =========== //
+	clusterName, _ := f.callbacks.StreamInfo().VirtualClusterName()
+	if clusterName == f.config.clusterNameForSpecialLabel {
+		responseHeaderForSet.Set("lable-for-special-cluster", "special-cluster")
+	}
+
 	return api.ReceiveDataFinish
 }
 
@@ -215,6 +215,7 @@ func (*tcpUpstreamFilter) OnDestroy(reason api.DestroyReason) {
 	if reason != api.Normal {
 		api.LogInfof("[OnDestroy] , unexpected destroy, reason: %+v", reason)
 	}
+	api.LogInfof("[OnDestroy] , normal destroy, reason: %+v", reason)
 }
 
 func transformToDubboFrame(methodName, interfaceName string, dubboArgsFromHttp map[string]string) *bytes.Buffer {

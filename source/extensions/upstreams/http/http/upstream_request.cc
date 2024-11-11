@@ -61,8 +61,8 @@ void HttpConnPool::onPoolReady(Envoy::Http::RequestEncoder& request_encoder,
                                absl::optional<Envoy::Http::Protocol> protocol) {
   conn_pool_stream_handle_ = nullptr;
   auto upstream =
-      std::make_shared<HttpUpstream>(callbacks_->upstreamToDownstream(), &request_encoder);
-  callbacks_->onPoolReady(upstream, host,
+      std::make_unique<HttpUpstream>(callbacks_->upstreamToDownstream(), &request_encoder);
+  callbacks_->onPoolReady(std::move(upstream), host,
                           request_encoder.getStream().connectionInfoProvider(), info, protocol);
 }
 

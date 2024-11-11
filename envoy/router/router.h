@@ -1507,7 +1507,7 @@ public:
    * @param info supplies the stream info object associated with the upstream connection.
    * @param protocol supplies the protocol associated with the upstream connection.
    */
-  virtual void onPoolReady(std::shared_ptr<GenericUpstream>&& upstream,
+  virtual void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                            Upstream::HostDescriptionConstSharedPtr host,
                            const Network::ConnectionInfoProvider& connection_info_provider,
                            StreamInfo::StreamInfo& info,
@@ -1583,7 +1583,7 @@ public:
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 };
 
-using GenericConnPoolPtr = std::shared_ptr<GenericConnPool>;
+using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
 
 /*
  * A factory for creating generic connection pools.

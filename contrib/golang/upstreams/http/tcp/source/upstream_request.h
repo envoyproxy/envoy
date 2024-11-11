@@ -37,6 +37,8 @@ class TcpUpstream;
 
 class FilterConfig;
 
+class Filter;
+
 struct HttpConfigInternal : httpConfig {
   std::weak_ptr<FilterConfig> config_;
   HttpConfigInternal(std::weak_ptr<FilterConfig> c) { config_ = c; }
@@ -79,13 +81,13 @@ private:
 // Go code only touch the fields in httpRequest
 class RequestInternal : public httpRequest {
 public:
-  RequestInternal(TcpUpstream& filter)
+  RequestInternal(Filter& filter)
       : decoding_state_(filter, this), encoding_state_(filter, this) {
     configId = 0;
   }
 
-  void setWeakFilter(std::weak_ptr<TcpUpstream> f) { filter_ = f; }
-  std::weak_ptr<TcpUpstream> weakFilter() { return filter_; }
+  void setWeakFilter(std::weak_ptr<Filter> f) { filter_ = f; }
+  std::weak_ptr<Filter> weakFilter() { return filter_; }
 
   DecodingProcessorState& decodingState() { return decoding_state_; }
   EncodingProcessorState& encodingState() { return encoding_state_; }
@@ -94,11 +96,52 @@ public:
   std::string strValue;
 
 private:
-  std::weak_ptr<TcpUpstream> filter_;
+  std::weak_ptr<Filter> filter_;
 
   // The state of the filter on both the encoding and decoding side.
   DecodingProcessorState decoding_state_;
   EncodingProcessorState encoding_state_;
+};
+
+class Filter : public std::enable_shared_from_this<Filter>,
+                     Logger::Loggable<Logger::Id::http> {
+public:
+  Filter(FilterConfigSharedPtr config, const std::string cluster_name, const std::string route_name) : config_(config),
+   req_(new RequestInternal(*this)), encoding_state_(req_->encodingState()), decoding_state_(req_->decodingState()),  cluster_name_(cluster_name), route_name_(route_name) {
+    // req is used by go, so need to use raw memory and then it is safe to release at the gc
+    // finalize phase of the go object.
+    req_->plugin_name.data = config->pluginName().data();
+    req_->plugin_name.len = config->pluginName().length();
+  };
+
+  bool initRequest();
+  bool initResponse();
+
+  bool isProcessingInGo() {
+    return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();
+  }    
+
+  CAPIStatus getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data, int* value_len);
+  CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
+  CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
+  CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
+  CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
+  CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
+  CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
+
+  FilterConfigSharedPtr config_;
+
+  RequestInternal* req_{nullptr};
+
+  EncodingProcessorState& encoding_state_;
+  DecodingProcessorState& decoding_state_;
+
+  // store response header for http
+  std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
+
+private:
+  const std::string cluster_name_;
+  const std::string route_name_;
 };
 
 // Wrapper HttpRequestInternal to DeferredDeletable.
@@ -199,6 +242,8 @@ enum class HttpStatusCode : uint64_t {
   UpstreamProtocolError = 500,
 };
 
+using FilterSharedPtr = std::shared_ptr<Filter>;
+
 class TcpUpstream : public Router::GenericUpstream,
                     public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
                     public std::enable_shared_from_this<TcpUpstream>,
@@ -226,28 +271,12 @@ public:
   void onBelowWriteBufferLowWatermark() override;
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
-  CAPIStatus getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data, int* value_len);
-  CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
-  CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
-  CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
-  CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
-  CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
-                             absl::string_view& value, bufferAction action);
-
-  CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
-
-  void enableHalfClose(bool enabled);
-
-  bool isProcessingInGo() {
-  return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();
-  }                   
-
   const Router::RouteEntry* route_entry_;
 
-private:
-  // return true when it is first inited.
-  bool initRequest();
-  bool initResponse();
+// private:
+//   // return true when it is first inited.
+//   bool initRequest();
+//   bool initResponse();
 
 private:
   Router::UpstreamToDownstream* upstream_request_;
@@ -255,17 +284,16 @@ private:
   Buffer::OwnedImpl response_buffer_{};
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 
-  // store response header for http
-  std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
-
   Dso::TcpUpstreamDsoPtr dynamic_lib_;
 
   FilterConfigSharedPtr config_;
 
-  RequestInternal* req_{nullptr};
+  FilterSharedPtr filter_;
 
-  EncodingProcessorState& encoding_state_;
-  DecodingProcessorState& decoding_state_;
+  // RequestInternal* req_{nullptr};
+
+  // EncodingProcessorState& encoding_state_;
+  // DecodingProcessorState& decoding_state_;
 };
 
 

@@ -12,7 +12,7 @@ Router::GenericConnPoolPtr UdpGenericConnPoolFactory::createGenericConnPool(
     Upstream::ThreadLocalCluster& thread_local_cluster,
     Router::GenericConnPoolFactory::UpstreamProtocol, Upstream::ResourcePriority,
     absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx, const Protobuf::Message&) const {
-  auto ret = std::make_shared<UdpConnPool>(thread_local_cluster, ctx);
+  auto ret = std::make_unique<UdpConnPool>(thread_local_cluster, ctx);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
 

@@ -51,11 +51,11 @@ void UdpConnPool::newStream(Router::GenericConnectionPoolCallbacks* callbacks) {
   ASSERT(upstream_to_downstream.connection().has_value());
   Event::Dispatcher& dispatcher = upstream_to_downstream.connection()->dispatcher();
   auto upstream =
-      std::make_shared<UdpUpstream>(&upstream_to_downstream, std::move(socket), host_, dispatcher);
+      std::make_unique<UdpUpstream>(&upstream_to_downstream, std::move(socket), host_, dispatcher);
   StreamInfo::StreamInfoImpl stream_info(dispatcher.timeSource(), nullptr,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  callbacks->onPoolReady(upstream, host_, connection_info_provider, stream_info, {});
+  callbacks->onPoolReady(std::move(upstream), host_, connection_info_provider, stream_info, {});
 }
 
 UdpUpstream::UdpUpstream(Router::UpstreamToDownstream* upstream_to_downstream,

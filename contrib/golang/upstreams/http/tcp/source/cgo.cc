@@ -24,7 +24,7 @@ absl::string_view stringViewFromGoPointer(void* p, int len) {
 extern "C" {
 
 CAPIStatus envoyGoTcpUpstreamProcessStateHandlerWrapper(
-    void* s, std::function<CAPIStatus(std::shared_ptr<TcpUpstream>&, ProcessorState&)> f) {
+    void* s, std::function<CAPIStatus(std::shared_ptr<Filter>&, ProcessorState&)> f) {
   auto state = static_cast<ProcessorState*>(reinterpret_cast<processState*>(s));
   if (!state->isProcessingInGo()) {
     return CAPIStatus::CAPINotInGo;
@@ -38,7 +38,7 @@ CAPIStatus envoyGoTcpUpstreamProcessStateHandlerWrapper(
 }
 
 CAPIStatus envoyGoTcpUpstreamHandlerWrapper(void* r,
-                                       std::function<CAPIStatus(std::shared_ptr<TcpUpstream>&)> f) {
+                                       std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
   auto req = reinterpret_cast<RequestInternal*>(r);
   auto weak_filter = req->weakFilter();
   if (auto filter = weak_filter.lock()) {
@@ -74,7 +74,7 @@ CAPIStatus envoyGoTcpUpstreamGetHeader(void* s, void* key_data, int key_len, uin
                                       int* value_len) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [key_data, key_len, value_data, value_len](std::shared_ptr<TcpUpstream>& filter,
+      [key_data, key_len, value_data, value_len](std::shared_ptr<Filter>& filter,
                                                  ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
         return filter->getHeader(state, key_str, value_data, value_len);
@@ -83,7 +83,7 @@ CAPIStatus envoyGoTcpUpstreamGetHeader(void* s, void* key_data, int key_len, uin
 
 CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [strs, buf](std::shared_ptr<TcpUpstream>& filter, ProcessorState& state) -> CAPIStatus {
+      s, [strs, buf](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto go_strs = reinterpret_cast<GoString*>(strs);
         auto go_buf = reinterpret_cast<char*>(buf);
         return filter->copyHeaders(state, go_strs, go_buf);
@@ -94,7 +94,7 @@ CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len,
                                             int value_len, headerAction act) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [key_data, key_len, value_data, value_len, act](std::shared_ptr<TcpUpstream>& filter,
+      [key_data, key_len, value_data, value_len, act](std::shared_ptr<Filter>& filter,
                                                       ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
         auto value_str = stringViewFromGoPointer(value_data, value_len);
@@ -104,7 +104,7 @@ CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len,
 
 CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer_ptr, void* data) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [buffer_ptr, data](std::shared_ptr<TcpUpstream>& filter, ProcessorState& state) -> CAPIStatus {
+      s, [buffer_ptr, data](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         return filter->copyBuffer(state, buffer, reinterpret_cast<char*>(data));
       });
@@ -113,7 +113,7 @@ CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer_ptr, void* data)
 CAPIStatus envoyGoTcpUpstreamDrainBuffer(void* s, uint64_t buffer_ptr, uint64_t length) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [buffer_ptr, length](std::shared_ptr<TcpUpstream>& filter, ProcessorState& state) -> CAPIStatus {
+      [buffer_ptr, length](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         return filter->drainBuffer(state, buffer, length);
       });
@@ -123,7 +123,7 @@ CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* s, uint64_t buffer_ptr, void*
                                             bufferAction action) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [buffer_ptr, data, length, action](std::shared_ptr<TcpUpstream>& filter,
+      [buffer_ptr, data, length, action](std::shared_ptr<Filter>& filter,
                                          ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         auto value = stringViewFromGoPointer(data, length);
@@ -133,16 +133,8 @@ CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* s, uint64_t buffer_ptr, void*
 
 CAPIStatus envoyGoTcpUpstreamGetStringValue(void* r, int id, uint64_t* value_data, int* value_len) {
   return envoyGoTcpUpstreamHandlerWrapper(
-      r, [id, value_data, value_len](std::shared_ptr<TcpUpstream>& filter) -> CAPIStatus {
+      r, [id, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
         return filter->getStringValue(id, value_data, value_len);
-      });
-}
-
-CAPIStatus envoyGoTcpUpstreamConnEnableHalfClose(void* r, int enabled) {
-  return envoyGoTcpUpstreamHandlerWrapper(
-      r, [enabled](std::shared_ptr<TcpUpstream>& filter) -> CAPIStatus {
-        filter->enableHalfClose(enabled == 0 ? false:true);
-        return CAPIOK;
       });
 }
 

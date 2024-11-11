@@ -19,9 +19,9 @@ func init() {
 }
 
 type config struct {
-	routerNameForGrayTraffic            string
-	clusterNameForEnableRemoteHalfClose string
-	enableTunneling                     bool
+	routerNameForGrayTraffic   string
+	clusterNameForSpecialLabel string
+	enableTunneling            bool
 }
 
 type parser struct {
@@ -47,14 +47,14 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 		return nil, fmt.Errorf("router_for_gray_traffic: expect string while got %T", routerName)
 	}
 
-	clusterName, ok := v.AsMap()["cluster_for_enable_remote_half_close"]
+	clusterName, ok := v.AsMap()["cluster_for_special_label"]
 	if !ok {
-		return nil, errors.New("missing cluster_for_enable_remote_half_close")
+		return nil, errors.New("missing cluster_for_special_label")
 	}
 	if clusterNameStr, ok := clusterName.(string); ok {
-		conf.clusterNameForEnableRemoteHalfClose = clusterNameStr
+		conf.clusterNameForSpecialLabel = clusterNameStr
 	} else {
-		return nil, fmt.Errorf("cluster_for_enable_remote_half_close: expect string while got %T", clusterName)
+		return nil, fmt.Errorf("cluster_for_special_label: expect string while got %T", clusterName)
 	}
 
 	enableTunneling, ok := v.AsMap()["enable_tunneling"]
@@ -64,7 +64,7 @@ func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (int
 	if enableTunnelingBool, ok := enableTunneling.(bool); ok {
 		conf.enableTunneling = enableTunnelingBool
 	} else {
-		return nil, fmt.Errorf("envoy_self_enable_half_close: expect bool while got %T", enableTunnelingBool)
+		return nil, fmt.Errorf("enable_tunneling: expect bool while got %T", enableTunnelingBool)
 	}
 
 	return conf, nil

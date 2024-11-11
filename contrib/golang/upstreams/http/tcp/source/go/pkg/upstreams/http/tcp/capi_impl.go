@@ -91,16 +91,6 @@ func capiStatusToStr(status C.CAPIStatus) string {
 	return "unknown status"
 }
 
-func (c *cgoApiImpl) UpstreamConnEnableHalfClose(r unsafe.Pointer, enableHalfClose int) {
-	req := (*httpRequest)(r)
-	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
-	// since there might be multiple concurrency goroutines invoking this API on the Go side.
-	req.mutex.Lock()
-	defer req.mutex.Unlock()
-
-	C.envoyGoTcpUpstreamConnEnableHalfClose(unsafe.Pointer(req.req), C.int(enableHalfClose))
-}
-
 func (c *cgoApiImpl) GetHeader(s unsafe.Pointer, key string) string {
 	state := (*processState)(s)
 	var valueData C.uint64_t

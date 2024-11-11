@@ -99,8 +99,6 @@ type NetworkCAPI interface {
 }
 
 type TcpUpstreamCAPI interface {
-	// UpstreamConnEnableHalfClose upstream conn EnableHalfClose
-	UpstreamConnEnableHalfClose(f unsafe.Pointer, enableHalfClose int)
 	// Header related
 	GetHeader(s unsafe.Pointer, key string) string
 	CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string

@@ -147,7 +147,6 @@ CAPIStatus envoyGoFilterGetFilterState(void* wrapper, void* key, void* value);
 
 // tcp upstream
 CAPIStatus envoyGoTcpUpstreamInfo(void* u, int info_type, void* ret);
-CAPIStatus envoyGoTcpUpstreamConnEnableHalfClose(void* u, int enable_half_close);
 CAPIStatus envoyGoTcpUpstreamGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf);
 CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len, void* value_data, int value_len, headerAction action);

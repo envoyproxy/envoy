@@ -25,6 +25,8 @@ namespace Golang {
 
 class TcpUpstream;
 
+class Filter;
+
 class BufferList : public NonCopyable {
 public:
   BufferList() = default;
@@ -59,7 +61,7 @@ enum class FilterState {
 
 class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
 public:
-  explicit ProcessorState(TcpUpstream& filter, httpRequest* r) : filter_(filter) {
+  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
     req = r;
   }
   virtual ~ProcessorState() = default;
@@ -84,12 +86,12 @@ protected:
   Buffer::InstancePtr data_buffer_{nullptr};
 
 protected:
-  TcpUpstream& filter_;
+  Filter& filter_;
 };
 
 class DecodingProcessorState : public ProcessorState {
 public:
-  explicit DecodingProcessorState(TcpUpstream& filter, httpRequest* r) : ProcessorState(filter, r) {
+  explicit DecodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {
     is_encoding = 0;
   }
   // store response header for http
@@ -98,7 +100,7 @@ public:
 
 class EncodingProcessorState : public ProcessorState {
 public:
-  explicit EncodingProcessorState(TcpUpstream& filter, httpRequest* r) : ProcessorState(filter, r) {
+  explicit EncodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {
     is_encoding = 1;
   }
 };

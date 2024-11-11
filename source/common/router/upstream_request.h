@@ -69,7 +69,7 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public GenericConnectionPoolCallbacks,
                         public Event::DeferredDeletable {
 public:
-  UpstreamRequest(RouterFilterInterface& parent, std::shared_ptr<GenericConnPool>&& conn_pool,
+  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
                   bool can_send_early_data, bool can_use_http3, bool enable_half_close);
   ~UpstreamRequest() override;
   void deleteIsPending() override { cleanUp(); }
@@ -116,7 +116,7 @@ public:
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(std::shared_ptr<GenericUpstream>&& upstream,
+  void onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
                    Upstream::HostDescriptionConstSharedPtr host,
                    const Network::ConnectionInfoProvider& address_provider,
                    StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) override;
@@ -189,10 +189,10 @@ private:
   void resetUpstreamLogFlushTimer();
 
   RouterFilterInterface& parent_;
-  std::shared_ptr<GenericConnPool> conn_pool_;
+  std::unique_ptr<GenericConnPool> conn_pool_;
   Event::TimerPtr per_try_timeout_;
   Event::TimerPtr per_try_idle_timeout_;
-  std::shared_ptr<GenericUpstream> upstream_;
+  std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   DownstreamWatermarkManager downstream_watermark_manager_{*this};

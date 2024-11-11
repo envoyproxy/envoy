@@ -673,7 +673,7 @@ public:
                absl::string_view transport_failure_reason,
                Upstream::HostDescriptionConstSharedPtr host));
   MOCK_METHOD(void, onPoolReady,
-              (std::shared_ptr<GenericUpstream> && upstream,
+              (std::unique_ptr<GenericUpstream> && upstream,
                Upstream::HostDescriptionConstSharedPtr host,
                const Network::ConnectionInfoProvider& info_provider, StreamInfo::StreamInfo& info,
                absl::optional<Http::Protocol> protocol));

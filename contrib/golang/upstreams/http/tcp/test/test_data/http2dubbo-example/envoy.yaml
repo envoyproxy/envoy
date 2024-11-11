@@ -50,7 +50,7 @@ static_resources:
           "@type": type.googleapis.com/xds.type.v3.TypedStruct
           value:
             router_for_gray_traffic: "local_route"
-            cluster_for_enable_remote_half_close: "local_service"
+            cluster_for_special_label: "local_service"
             enable_tunneling: true
 
       ## =========== Here is config for golang tcp upstream extension =========== END ##      

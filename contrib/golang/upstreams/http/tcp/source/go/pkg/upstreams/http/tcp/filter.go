@@ -178,14 +178,6 @@ func (r *httpRequest) Finalize(reason int) {
 	cAPI.Finalize(unsafe.Pointer(r), reason)
 }
 
-func (s *httpRequest) EnableHalfClose(enabled bool) {
-	var enabledInt int
-	if enabled {
-		enabledInt = 1
-	}
-	cAPI.UpstreamConnEnableHalfClose(unsafe.Pointer(s), enabledInt)
-}
-
 type streamInfo struct {
 	request *httpRequest
 }

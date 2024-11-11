@@ -263,8 +263,6 @@ func (*EmptyUpstreamFilter) OnEvent(event ConnectionEvent) {
 
 type TcpUpstreamCallbackHandler interface {
 	FilterCallbackHandler
-	// EnableHalfClose only for upstream connection
-	EnableHalfClose(enabled bool)
 }
 
 type ConnectionCallback interface {

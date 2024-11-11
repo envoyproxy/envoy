@@ -295,7 +295,7 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
       thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);
 }
 
-std::shared_ptr<Router::GenericConnPool>
+std::unique_ptr<Router::GenericConnPool>
 HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
                              Upstream::LoadBalancerContext* context,
                              absl::optional<Http::Protocol> protocol) {
