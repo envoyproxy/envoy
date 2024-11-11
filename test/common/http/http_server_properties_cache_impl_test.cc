@@ -455,7 +455,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
   ASSERT_FALSE(protocols.has_value());
 }
 
-TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokennessNoBackPropagation) {
+TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokenness) {
   Runtime::maybeSetRuntimeGuard(
       "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
   std::string suffix = ".example.com";
@@ -478,8 +478,40 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokennessNoBackPro
   EXPECT_FALSE(protocols_->isHttp3Broken(origin2));
 
   // Marking origin2 broken will promote it to being canonical. origin3 will use this canonical
-  // origin to determine QUIC brokenness, while origin1 has its own tracker already and is exempt.
+  // origin to determine QUIC brokenness. Since origin1's http3 status is unknown, it's also
+  // considered broken.
   protocols_->markHttp3Broken(origin2);
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin2));
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin3));
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin1));
+}
+
+TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokennessNoBackPropagation) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
+  std::string suffix = ".example.com";
+  std::string host1 = "first.example.com";
+  std::string host2 = "www.second.example.com";
+  std::string host3 = "www.third.example.com";
+  const HttpServerPropertiesCacheImpl::Origin origin1 = {https_, host1, port1_};
+  const HttpServerPropertiesCacheImpl::Origin origin2 = {https_, host2, port2_};
+  const HttpServerPropertiesCacheImpl::Origin origin3 = {https_, host3, port3_};
+
+  suffixes_.push_back(suffix);
+  initialize();
+  protocols_->setAlternatives(origin1, protocols1_);
+
+  OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
+      protocols_->findAlternatives(origin2);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols1_, protocols.ref());
+  EXPECT_FALSE(protocols_->isHttp3Broken(origin1));
+  EXPECT_FALSE(protocols_->isHttp3Broken(origin2));
+  protocols_->getOrCreateHttp3StatusTracker(origin1).markHttp3Confirmed();
+  protocols_->markHttp3Broken(origin2);
+
+  // Marking origin2 broken will promote it to being canonical. origin3 will use this canonical
+  // origin to determine QUIC brokenness, while origin1 has its own tracker already and is exempt.
   EXPECT_TRUE(protocols_->isHttp3Broken(origin2));
   EXPECT_TRUE(protocols_->isHttp3Broken(origin3));
   EXPECT_FALSE(protocols_->isHttp3Broken(origin1));

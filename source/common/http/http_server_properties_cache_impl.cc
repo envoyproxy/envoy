@@ -301,16 +301,13 @@ void HttpServerPropertiesCacheImpl::markHttp3Broken(const Origin& origin) {
   getOrCreateHttp3StatusTracker(origin).markHttp3Broken();
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness")) {
-    maybeSetHttp3BrokenCanonicalOrigin(origin);
+    maybeSetCanonicalOriginForHttp3Brokenness(origin);
   }
 }
 
 bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
-  absl::optional<Origin> canonical = getHttp3BrokenCanonicalOrigin(origin.hostname_);
-
   if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness") ||
-      !canonical.has_value()) {
+          "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness")) {
     return getOrCreateHttp3StatusTracker(origin).isHttp3Broken();
   }
 
@@ -321,6 +318,10 @@ bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
     return entry_it->second.h3_status_tracker->isHttp3Broken();
   }
 
+  absl::optional<Origin> canonical = getCanonicalOriginForHttp3Brokenness(origin.hostname_);
+  if (!canonical.has_value()) {
+    return false;
+  }
   if (auto entry_it = protocols_.find(*canonical);
       entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
     return entry_it->second.h3_status_tracker->isHttp3Broken();
@@ -330,7 +331,7 @@ bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
 }
 
 absl::optional<HttpServerPropertiesCacheImpl::Origin>
-HttpServerPropertiesCacheImpl::getHttp3BrokenCanonicalOrigin(absl::string_view hostname) {
+HttpServerPropertiesCacheImpl::getCanonicalOriginForHttp3Brokenness(absl::string_view hostname) {
   absl::string_view suffix = getCanonicalSuffix(hostname);
   if (suffix.empty()) {
     return {};
@@ -343,7 +344,8 @@ HttpServerPropertiesCacheImpl::getHttp3BrokenCanonicalOrigin(absl::string_view h
   return it->second;
 }
 
-void HttpServerPropertiesCacheImpl::maybeSetHttp3BrokenCanonicalOrigin(const Origin& origin) {
+void HttpServerPropertiesCacheImpl::maybeSetCanonicalOriginForHttp3Brokenness(
+    const Origin& origin) {
   absl::string_view suffix = getCanonicalSuffix(origin.hostname_);
   if (suffix.empty()) {
     return;

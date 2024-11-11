@@ -141,10 +141,10 @@ private:
 
   // Returns the canonical origin from the canonical_h3_broken_map, if any, associated with
   // `hostname`.
-  absl::optional<Origin> getHttp3BrokenCanonicalOrigin(absl::string_view hostname);
+  absl::optional<Origin> getCanonicalOriginForHttp3Brokenness(absl::string_view hostname);
 
   // Updates the canonial origin for http3 brokenness book keeping.
-  void maybeSetHttp3BrokenCanonicalOrigin(const Origin& origin);
+  void maybeSetCanonicalOriginForHttp3Brokenness(const Origin& origin);
 
   // Returns the canonical origin, if any, associated with `hostname`.
   absl::optional<Origin> getCanonicalOrigin(absl::string_view hostname);
@@ -160,7 +160,7 @@ private:
   // protocol mapping.
   absl::flat_hash_map<std::string, Origin> canonical_alt_svc_map_;
 
-  // Contains a map of servers which are known to have http3 broken.
+  // Contains a map of origins which are known to have http3 broken.
   // Map from a canonical suffix to an actual origin, which is known to have broken QUIC.
   absl::flat_hash_map<std::string, Origin> canonical_h3_broken_map_;
 
