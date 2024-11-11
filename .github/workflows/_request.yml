@@ -132,7 +132,7 @@ jobs:
         key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}-arm64
 
     - name: Caches
-      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.1
+      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.2
       id: caches
       with:
         input-format: yaml
