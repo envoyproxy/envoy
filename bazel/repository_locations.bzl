@@ -96,12 +96,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "envoy_examples",
         project_desc = "Envoy proxy examples",
         project_url = "https://github.com/envoyproxy/examples",
-        version = "0.0.5",
-        sha256 = "2660070645623edbf4136d3a47109249bd53ffd8ff99ea13159439ad0be757cc",
+        version = "0.0.6",
+        sha256 = "ee28325f076186cb2254aa694110d95f4ae992b3f6fb40d557fbc0a6494a1ccf",
         strip_prefix = "examples-{version}",
         urls = ["https://github.com/envoyproxy/examples/archive/v{version}.tar.gz"],
         use_category = ["test_only"],
-        release_date = "2024-09-05",
+        release_date = "2024-11-06",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/envoyproxy/examples/blob/v{version}/LICENSE",
@@ -133,13 +133,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # 1. Open https://chromiumdash.appspot.com/releases?platform=Linux and find the latest Stable release.
         # 2. In the info for that release, open the "Branch Base Commit" link, then open DEPS, and use the <boringssl_revision>.
         #
-        # chromium-126.0.6478.55 (linux/stable)
-        version = "2db0eb3f96a5756298dcd7f9319e56a98585bd10",
-        sha256 = "cd240bf27450f75cd5f41c512a06297c00646cdbac9f87b604e9312771db15a6",
+        # chromium-130.0.6723.69 (linux/stable)
+        version = "58f3bc83230d2958bb9710bc910972c4f5d382dc",
+        sha256 = "50db81f25e3ee0f90b95182fc244ceb58aefbac59456bf3f55f1c519c5584d71",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-04-29",
+        release_date = "2024-09-13",
         cpe = "cpe:2.3:a:google:boringssl:*",
         license = "Mixed",
         license_url = "https://github.com/google/boringssl/blob/{version}/LICENSE",
@@ -203,7 +203,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["build"],
         cpe = "N/A",
         license = "MIT",
-        license_url = "https://github.com/aignas/rules_shellcheck/blob/v{version}/LICENSE",
+        license_url = "https://github.com/aignas/rules_shellcheck/blob/{version}/LICENSE",
     ),
     com_github_awslabs_aws_c_auth = dict(
         project_name = "aws-c-auth",
@@ -336,7 +336,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2024-07-20",
         cpe = "cpe:2.3:a:fmt:fmt:*",
         license = "fmt",
-        license_url = "https://github.com/fmtlib/fmt/blob/{version}/LICENSE.rst",
+        license_url = "https://github.com/fmtlib/fmt/blob/{version}/LICENSE",
     ),
     com_github_gabime_spdlog = dict(
         project_name = "spdlog",
@@ -412,12 +412,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "gRPC",
         project_desc = "gRPC C core library",
         project_url = "https://grpc.io",
-        version = "1.62.1",
-        sha256 = "c9f9ae6e4d6f40464ee9958be4068087881ed6aa37e30d0e64d40ed7be39dd01",
+        version = "1.63.2",
+        sha256 = "5b5b9c6507ec166ec0e9e82f58280c36544540ecdd818eaab7b8601596b74c9e",
         strip_prefix = "grpc-{version}",
         urls = ["https://github.com/grpc/grpc/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-03-08",
+        release_date = "2024-08-02",
         cpe = "cpe:2.3:a:grpc:grpc:*",
         license = "Apache-2.0",
         license_url = "https://github.com/grpc/grpc/blob/v{version}/LICENSE",
@@ -1278,6 +1278,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         release_date = "2024-10-25",
         cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/google/cel-cpp/blob/v{version}/LICENSE",
     ),
     com_github_google_flatbuffers = dict(
         project_name = "FlatBuffers",
@@ -1465,12 +1467,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
+    # After updating you may need to run:
+    #
+    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #
     rules_rust = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.53.0",
-        sha256 = "85e2013727ab26fb22abdffe4b2ac0c27a2d5b6296167ba63d8f6e13140f51f9",
+        version = "0.54.1",
+        sha256 = "af4f56caae50a99a68bfce39b141b509dd68548c8204b98ab7a1cafc94d5bb02",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
@@ -1482,7 +1488,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         implied_untracked_deps = ["rules_cc"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2024-10-18",
+        release_date = "2024-11-07",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",

@@ -184,6 +184,10 @@ type FilterProcessCallbacks interface {
 	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
 	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
+	// AddData add extra data when processing headers/trailers.
+	// For example, turn a headers only request into a request with a body, add more body when processing trailers, and so on.
+	// The second argument isStreaming supplies if this caller streams data or buffers the full body.
+	AddData(data []byte, isStreaming bool)
 }
 
 type DecoderFilterCallbacks interface {

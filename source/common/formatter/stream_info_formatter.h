@@ -143,6 +143,12 @@ private:
       "DS_RX_BEG"; // Downstream request receiving begin.
   static constexpr absl::string_view LastDownstreamRxByteReceived =
       "DS_RX_END"; // Downstream request receiving end.
+  static constexpr absl::string_view UpstreamConnectStart =
+      "US_CX_BEG"; // Upstream TCP connection establishment start.
+  static constexpr absl::string_view UpstreamConnectEnd =
+      "US_CX_END"; // Upstream TCP connection establishment start.
+  static constexpr absl::string_view UpstreamTLSConnectEnd =
+      "US_HS_END"; // Upstream TLS connection establishment start.
   static constexpr absl::string_view FirstUpstreamTxByteSent =
       "US_TX_BEG"; // Upstream request sending begin.
   static constexpr absl::string_view LastUpstreamTxByteSent =

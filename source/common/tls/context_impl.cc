@@ -458,7 +458,8 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
 }
 
 absl::StatusOr<bssl::UniquePtr<SSL>>
-ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
+ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
+                    Upstream::HostDescriptionConstSharedPtr) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
   // selected certificate via SSL_set_SSL_CTX().

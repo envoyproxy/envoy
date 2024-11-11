@@ -25,8 +25,6 @@ jobs:
     secrets:
       app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
-      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
-      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
     permissions:
       actions: read
       contents: read
@@ -35,7 +33,6 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_load.yml
     with:
-      cache-docker: false
       check-name: mobile-ios-tests
 
   tests:

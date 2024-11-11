@@ -78,6 +78,15 @@ bug_fixes:
 - area: scoped_rds
   change: |
     Fixes scope key leak and spurious scope key conflicts when an update to an SRDS resource changes the key.
+- area: stats ads grpc
+  change: |
+    Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
+    in the :ref:`google_grpc <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>` resource used for ADS, and adds
+    that as a tag ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
+- area: access_log
+  change: |
+    Relaxed the restriction on SNI logging to allow the ``_`` character, even if
+    ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -123,6 +132,16 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: tls
+  change: |
+    Added an :ref:`option
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_host_sni>` to change the upstream
+    SNI to the configured hostname for the upstream.
+- area: tls
+  change: |
+    Added an :ref:`option
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_sni_san_validation>` to validate
+    the upstream server certificate SANs against the actual SNI value sent, regardless of the method of configuring SNI.
 - area: xds
   change: |
     Added support for ADS replacement by invoking ``xdsManager().setAdsConfigSource()`` with a new config source.
@@ -133,6 +152,12 @@ new_features:
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
     %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
+- area: access_log
+  change: |
+    Added support for logging upstream connection establishment duration in the
+    :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` access log
+    formatter operator. The following time points were added: ``%US_CX_BEG%``,
+    ``%US_CX_END%``, ``%US_HS_END%``.
 - area: quic
   change: |
     Added :ref:`QUIC stats debug visitor <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>` to
@@ -151,9 +176,36 @@ new_features:
 - area: lua
   change: |
     Added ssl :ref:`parsedSubjectPeerCertificate() <config_http_filters_lua_parsed_name>` API.
+- area: lua cluster specifier
+  change: |
+    Added ability for a Lua script to query clusters for current requests and connections.
 - area: udp_proxy
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
     by setting a per-session state object under the key ``envoy.udp_proxy.cluster``.
+- area: CEL-attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``upstream.request_attempt_count``
+    to get the number of times a request is attempted upstream.
+- area: ip-tagging
+  change: |
+    Adds support for specifying an alternate header
+    :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+    for appending IP tags via ip-tagging filter instead of using the default header ``x-envoy-ip-tags``.
+- area: c-ares
+  change: |
+    added two new options to c-ares resolver for configuring custom timeouts and tries while resolving DNS
+    queries. Custom timeouts could be configured by specifying :ref:`query_timeout_seconds
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.query_timeout_seconds>` and
+    custom tries could be configured by specifying :ref:`query_tries
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.query_tries>`.
+- area: rbac
+  change: |
+    added :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` which allows
+    specifying an optional source for the metadata to be matched in addition to the metadata matcher.
 
 deprecated:
+- area: rbac
+  change: |
+    metadata :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
+    favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.

@@ -912,11 +912,11 @@ void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& wit
   }
 }
 
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api) {
+absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Api::Api& api) {
   auto file_or_error = api.fileSystem().fileReadToEnd(path);
-  THROW_IF_NOT_OK_REF(file_or_error.status());
+  RETURN_IF_NOT_OK_REF(file_or_error.status());
   const std::string contents = file_or_error.value();
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
@@ -924,20 +924,20 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     if (message.ParseFromString(contents)) {
       MessageUtil::checkForUnexpectedFields(message, validation_visitor);
     }
-    // Ideally this would throw an error if ParseFromString fails for consistency
+    // Ideally this would return an error if ParseFromString fails for consistency
     // but instead it will silently fail.
-    return;
+    return absl::OkStatus();
   }
 
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
     if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-      return;
+      return absl::OkStatus();
     }
 #endif
-    throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                               message.GetTypeName() + ")");
+    return absl::InvalidArgumentError("Unable to parse file \"" + path +
+                                      "\" as a text protobuf (type " + message.GetTypeName() + ")");
   }
 #ifdef ENVOY_ENABLE_YAML
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
@@ -950,9 +950,10 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     loadFromJson(contents, message, validation_visitor);
   }
 #else
-  throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" (type " +
-                             message.GetTypeName() + ")");
+  return absl::InvalidArgumentError("Unable to parse file \"" + path + "\" (type " +
+                                    message.GetTypeName() + ")");
 #endif
+  return absl::OkStatus();
 }
 
 } // namespace Envoy

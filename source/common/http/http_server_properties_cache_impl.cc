@@ -304,6 +304,14 @@ void HttpServerPropertiesCacheImpl::resetBrokenness() {
   }
 }
 
+void HttpServerPropertiesCacheImpl::resetStatus() {
+  for (const std::pair<Origin, OriginData>& protocol : protocols_) {
+    if (protocol.second.h3_status_tracker) {
+      protocol.second.h3_status_tracker->markHttp3Pending();
+    }
+  }
+}
+
 absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string_view hostname) {
   for (const std::string& suffix : canonical_suffixes_) {
     if (absl::EndsWith(hostname, suffix)) {

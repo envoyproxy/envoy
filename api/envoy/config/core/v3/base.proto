@@ -453,6 +453,7 @@ message HeaderValueOption {
 message HeaderMap {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderMap";
 
+  // A list of header names and their values.
   repeated HeaderValue headers = 1;
 }
 
