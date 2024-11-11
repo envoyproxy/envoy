@@ -311,8 +311,7 @@ bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
     return getOrCreateHttp3StatusTracker(origin).isHttp3Broken();
   }
 
-  // Note that we don't create a new tracker for the origin if there's already a corresponding one
-  // for the canonical origin.
+  // Note that we don't create a new tracker for the origin.
   if (auto entry_it = protocols_.find(origin);
       entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
     return entry_it->second.h3_status_tracker->isHttp3Broken();
