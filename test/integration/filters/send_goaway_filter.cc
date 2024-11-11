@@ -39,6 +39,19 @@ public:
     return Http::FilterMetadataStatus::Continue;
   }
 
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
+    auto result = headers.get(Http::LowerCaseString("send-encoder-goaway"));
+    if (result.empty()) {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    decoder_callbacks_->sendGoAwayAndClose();
+    result = headers.get(Http::LowerCaseString("continue-encoder-filter-chain"));
+    if (!result.empty() && result[0]->value() == "true") {
+      return Http::FilterHeadersStatus::Continue;
+    }
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
 private:
   bool go_away_skiped_ = false;
 };

@@ -860,7 +860,15 @@ public:
 
   virtual bool shouldLoadShed() { return false; };
 
-  void sendGoAwayAndClose() { filter_manager_callbacks_.sendGoAwayAndClose(); }
+  void sendGoAwayAndClose() {
+    // Stop filter chain iteration by checking encoder or decoder chain.
+    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+      state_.decoder_filter_chain_aborted_ = true;
+    } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+      state_.encoder_filter_chain_aborted_ = true;
+    }
+    filter_manager_callbacks_.sendGoAwayAndClose();
+  }
 
 protected:
   struct State {
