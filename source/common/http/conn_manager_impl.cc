@@ -17,7 +17,6 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/header_validator_errors.h"
 #include "envoy/network/drain_decision.h"
-#include "envoy/network/proxy_protocol.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
@@ -172,8 +171,7 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
         Network::ProxyProtocolFilterState::key(),
         std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             read_callbacks_->connection().connectionInfoProvider().remoteAddress(),
-            read_callbacks_->connection().connectionInfoProvider().localAddress(),
-            Envoy::Network::ProxyProtocolVersion::NotUsed}),
+            read_callbacks_->connection().connectionInfoProvider().localAddress()}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }

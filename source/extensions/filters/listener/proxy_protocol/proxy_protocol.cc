@@ -226,9 +226,11 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
               Network::ProxyProtocolFilterState::key())) {
         cb_->filterState().setData(
             Network::ProxyProtocolFilterState::key(),
-            std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-                socket.connectionInfoProvider().remoteAddress(),
-                socket.connectionInfoProvider().localAddress(), header_version_}),
+            std::make_unique<Network::ProxyProtocolFilterState>(
+                Network::ProxyProtocolDataWithVersion{
+                    {socket.connectionInfoProvider().remoteAddress(),
+                     socket.connectionInfoProvider().localAddress()},
+                    static_cast<Network::ProxyProtocolVersion>(header_version_)}),
             StreamInfo::FilterState::StateType::Mutable,
             StreamInfo::FilterState::LifeSpan::Connection);
       }
@@ -263,9 +265,10 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
 
       cb_->filterState().setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              socket.connectionInfoProvider().remoteAddress(),
-              socket.connectionInfoProvider().localAddress(), header_version_, parsed_tlvs_}),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+              {socket.connectionInfoProvider().remoteAddress(),
+               socket.connectionInfoProvider().localAddress(), parsed_tlvs_},
+              static_cast<Network::ProxyProtocolVersion>(header_version_)}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     } else {
@@ -280,9 +283,10 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
                              proxy_protocol_header_.value().extensions_length_));
       cb_->filterState().setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              proxy_protocol_header_.value().remote_address_,
-              proxy_protocol_header_.value().local_address_, header_version_, parsed_tlvs_}),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+              {proxy_protocol_header_.value().remote_address_,
+               proxy_protocol_header_.value().local_address_, parsed_tlvs_},
+              static_cast<Network::ProxyProtocolVersion>(header_version_)}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }

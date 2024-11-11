@@ -15,7 +15,6 @@
 
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_UNIX;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_HEADER_LEN;
-using ProxyProtocolVersion = Envoy::Network::ProxyProtocolVersion;
 
 namespace Envoy {
 namespace Extensions {
@@ -24,6 +23,12 @@ namespace ProxyProtocol {
 
 using KeyValuePair =
     envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair;
+
+enum class ProxyProtocolVersion {
+  NotFound = static_cast<int>(Envoy::Network::ProxyProtocolVersion::NotFound),
+  V1 = static_cast<int>(Envoy::Network::ProxyProtocolVersion::V1),
+  V2 = static_cast<int>(Envoy::Network::ProxyProtocolVersion::V2)
+};
 
 enum class ReadOrParseState { Done, TryAgainLater, Error, Denied };
 

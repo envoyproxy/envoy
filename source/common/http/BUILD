@@ -371,7 +371,6 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
-        "//envoy/network:proxy_protocol_options_lib",
         "//envoy/router:scopes_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server/overload:overload_manager_interface",
