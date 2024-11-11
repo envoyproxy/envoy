@@ -170,5 +170,5 @@ BENCHMARK(bmResponseAttributes)
 BENCHMARK(bmFilterState)
     ->Unit(::benchmark::kMicrosecond)
     ->RangeMultiplier(100)
-    ->Range(1000, 10000000);
+    ->Range(100, 1000000);
 } // namespace Envoy
