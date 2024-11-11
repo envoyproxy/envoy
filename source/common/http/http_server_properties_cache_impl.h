@@ -162,7 +162,7 @@ private:
 
   // Contains a map of origins which are known to have http3 broken.
   // Map from a canonical suffix to an actual origin, which is known to have broken QUIC.
-  absl::flat_hash_map<std::string, Origin> canonical_h3_broken_map_;
+  absl::flat_hash_map<std::string, Origin> canonical_h3_brokenness_map_;
 
   // Contains list of suffixes (for example ".c.youtube.com",
   // ".googlevideo.com", ".googleusercontent.com") of canonical hostnames.

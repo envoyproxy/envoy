@@ -337,8 +337,8 @@ HttpServerPropertiesCacheImpl::getCanonicalOriginForHttp3Brokenness(absl::string
     return {};
   }
 
-  auto it = canonical_h3_broken_map_.find(suffix);
-  if (it == canonical_h3_broken_map_.end()) {
+  auto it = canonical_h3_brokenness_map_.find(suffix);
+  if (it == canonical_h3_brokenness_map_.end()) {
     return {};
   }
   return it->second;
@@ -350,7 +350,7 @@ void HttpServerPropertiesCacheImpl::maybeSetCanonicalOriginForHttp3Brokenness(
   if (suffix.empty()) {
     return;
   }
-  canonical_h3_broken_map_[suffix] = origin;
+  canonical_h3_brokenness_map_[suffix] = origin;
 }
 
 void HttpServerPropertiesCacheImpl::resetBrokenness() {
