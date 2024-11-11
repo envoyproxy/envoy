@@ -77,9 +77,10 @@ private:
                               const absl::string_view string_to_sign,
                               const absl::string_view override_region) const override;
 
-  std::string
-  createIamRolesAnywhereSignature(const std::vector<uint8_t> cert_private_key,
-                                  const absl::string_view string_to_sign) const override;
+std::string
+createIamRolesAnywhereSignature(const std::string cert_private_key_pem, 
+// const Credentials::CertificateAlgorithm cert_algorithm,
+                                                 const absl::string_view string_to_sign) const override;
 
   std::string createIamRolesAnywhereStringToSign(absl::string_view canonical_request,
                                                  absl::string_view long_date,

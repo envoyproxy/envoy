@@ -7,6 +7,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "openssl/evp.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,9 +44,9 @@ public:
 
   Credentials(std::string certificate_b64, CertificateAlgorithm certificate_algorithm,
               std::string certificate_serial, absl::optional<std::string> certificate_chain_b64,
-              std::vector<uint8_t> certificate_private_key_der)
+              std::string certificate_private_key_pem)
       : certificate_b64_(certificate_b64),
-        certificate_private_key_der_(certificate_private_key_der),
+        certificate_private_key_pem_(certificate_private_key_pem),
         certificate_serial_(certificate_serial), certificate_algorithm_(certificate_algorithm) {
     if (certificate_chain_b64.has_value()) {
       certificate_chain_b64_ = certificate_chain_b64.value();
@@ -68,8 +69,8 @@ public:
     return certificate_algorithm_;
   }
 
-  const absl::optional<std::vector<uint8_t>>& certificatePrivateKey() const {
-    return certificate_private_key_der_;
+  const absl::optional<std::string> certificatePrivateKey() const {
+    return certificate_private_key_pem_;
   }
 
   bool operator==(const Credentials& other) const {
@@ -85,7 +86,7 @@ private:
   // RolesAnywhere certificate based credentials
   absl::optional<std::string> certificate_b64_ = absl::nullopt;
   absl::optional<std::string> certificate_chain_b64_ = absl::nullopt;
-  absl::optional<std::vector<uint8_t>> certificate_private_key_der_ = absl::nullopt;
+  absl::optional<std::string> certificate_private_key_pem_ = absl::nullopt;
   absl::optional<std::string> certificate_serial_ = absl::nullopt;
   absl::optional<CertificateAlgorithm> certificate_algorithm_ = absl::nullopt;
 };

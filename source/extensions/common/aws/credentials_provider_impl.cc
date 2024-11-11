@@ -567,7 +567,7 @@ void IAMRolesAnywhereCertificateCredentialsProvider::refresh() {
   std::string cert_der_b64;
   std::string cert_chain_der_b64;
   std::string cert_serial;
-  std::vector<uint8_t> priv_key_der;
+  std::string private_key_pem;
   Credentials::CertificateAlgorithm cert_algorithm;
   std::string pem;
   // Certificate
@@ -582,20 +582,20 @@ void IAMRolesAnywhereCertificateCredentialsProvider::refresh() {
     status = pemToB64(pem, cert_chain_der_b64);
   }
   // Private Key
-  status = pemDataSourceToString(private_key_data_source_,  pem);
-  status = pemToDer(pem, priv_key_der);
+  status = pemDataSourceToString(private_key_data_source_,  private_key_pem);
+  // status = pemToDer(pem, priv_key_der);
 
   // We may have a cert chain or not, but we must always have a private key and certificate
-  if (!cert_der_b64.empty() && !priv_key_der.empty()) {
+  if (!cert_der_b64.empty() && !private_key_pem.empty()) {
     if (!cert_chain_der_b64.empty()) {
       ENVOY_LOG(debug,
                 "Setting certificate credentials with cert, serial, private key and cert chain");
       cached_credentials_ =
-          Credentials(cert_der_b64, cert_algorithm, cert_serial, cert_chain_der_b64, priv_key_der);
+          Credentials(cert_der_b64, cert_algorithm, cert_serial, cert_chain_der_b64, private_key_pem);
     } else {
       ENVOY_LOG(debug, "Setting certificate credentials with cert, serial and private key");
       cached_credentials_ =
-          Credentials(cert_der_b64, cert_algorithm, cert_serial, absl::nullopt, priv_key_der);
+          Credentials(cert_der_b64, cert_algorithm, cert_serial, absl::nullopt, private_key_pem);
     }
   }
   else

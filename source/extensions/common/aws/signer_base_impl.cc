@@ -211,12 +211,17 @@ absl::Status SignerBaseImpl::signIAMRolesAnywhere(Http::RequestHeaderMap& header
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
 
   // Phase 3: Create a signature
-  std::string signature = createIamRolesAnywhereSignature(credentials.certificatePrivateKey().value(),
+  std::string signature = createIamRolesAnywhereSignature(credentials.certificatePrivateKey().value(), 
+  // credentials.certificateAlgorithm().value(),
                                                 string_to_sign);
   // Phase 4: Sign request
+  // REMOVEME
+  ENVOY_LOG(debug, "signature:\n{}", signature);
 
   std::string authorization_header = createIamRolesAnywhereAuthorizationHeader(
         credentials.certificateSerial().value(), credential_scope, canonical_headers, signature);
+  // REMOVEME
+  ENVOY_LOG(debug, "auth header:\n{}", authorization_header);
 
   headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 

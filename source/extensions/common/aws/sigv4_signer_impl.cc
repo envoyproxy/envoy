@@ -40,7 +40,7 @@ std::string SigV4SignerImpl::createStringToSign(absl::string_view canonical_requ
 std::string
 SigV4SignerImpl::createIamRolesAnywhereStringToSign(absl::string_view canonical_request,
                                                     absl::string_view long_date,
-                                                    absl::string_view credential_scope, Credentials::CertificateAlgorithm cert_algorithm) const {
+                                                    absl::string_view credential_scope, const Credentials::CertificateAlgorithm cert_algorithm) const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   if(cert_algorithm == Credentials::CertificateAlgorithm::RSA)
   {
@@ -76,11 +76,60 @@ std::string SigV4SignerImpl::createSignature(
 }
 
 std::string
-SigV4SignerImpl::createIamRolesAnywhereSignature(const std::vector<uint8_t> cert_private_key,
+SigV4SignerImpl::createIamRolesAnywhereSignature(const std::string cert_private_key_pem, 
+// const Credentials::CertificateAlgorithm cert_algorithm,
                                                  const absl::string_view string_to_sign) const {
 
-  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  return Hex::encode(crypto_util.getSha256Hmac(cert_private_key, string_to_sign));
+BIO* bio = BIO_new( BIO_s_mem() );
+BIO_write( bio, cert_private_key_pem.c_str(),cert_private_key_pem.size());
+
+EVP_PKEY* pkey;
+PEM_read_bio_PrivateKey( bio, &pkey, nullptr, nullptr );
+BIO_free(bio);
+auto pkey_size = EVP_PKEY_size(pkey);
+
+// if(cert_algorithm == Credentials::CertificateAlgorithm::RSA)
+//   {
+    auto evp = EVP_get_digestbyname("sha256");
+    auto ctx = EVP_MD_CTX_new();
+    EVP_SignInit(ctx, evp);
+
+    EVP_SignUpdate(ctx, string_to_sign.data(), string_to_sign.size());
+
+std::vector<unsigned char> output(pkey_size);
+unsigned int sig_len;
+    EVP_SignFinal(ctx, output.data(), &sig_len, pkey);
+    output.resize(sig_len);
+    return Hex::encode(output);
+    // md_ctx = _lib.EVP_MD_CTX_new()
+    // md_ctx = _ffi.gc(md_ctx, _lib.EVP_MD_CTX_free)
+
+    // _lib.EVP_SignInit(md_ctx, digest_obj)
+    // _lib.EVP_SignUpdate(md_ctx, data, len(data))
+
+    // length = _lib.EVP_PKEY_size(pkey._pkey)
+    // _openssl_assert(length > 0)
+    // signature_buffer = _ffi.new("unsigned char[]", length)
+    // signature_length = _ffi.new("unsigned int *")
+    // final_result = _lib.EVP_SignFinal(
+    //     md_ctx, signature_buffer, signature_length, pkey._pkey
+    // )
+
+//   }
+//   else {
+//         auto evp = EVP_get_digestbyname("sha256");
+//     auto ctx = EVP_MD_CTX_new();
+//     EVP_SignInit(ctx, evp);
+
+//     EVP_SignUpdate(ctx, string_to_sign.data(), string_to_sign.size());
+
+// std::vector<unsigned char> output(pkey_size);
+// unsigned int sig_len;
+//     EVP_SignFinal(ctx, output.data(), &sig_len, pkey);
+//     output.resize(sig_len);
+//     return Hex::encode(output);
+
+//   }                   
 }
 
 std::string SigV4SignerImpl::createAuthorizationHeader(

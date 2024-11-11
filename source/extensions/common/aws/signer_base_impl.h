@@ -150,7 +150,8 @@ protected:
   }
 
   virtual std::string createIamRolesAnywhereSignature(
-      ABSL_ATTRIBUTE_UNUSED const std::vector<uint8_t> cert_private_key,
+      ABSL_ATTRIBUTE_UNUSED const std::string cert_private_key,
+      // ABSL_ATTRIBUTE_UNUSED const Credentials::CertificateAlgorithm cert_algorithm,
       ABSL_ATTRIBUTE_UNUSED const absl::string_view string_to_sign) const {
     return "";
   }
