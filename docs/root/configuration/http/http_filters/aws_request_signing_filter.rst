@@ -86,6 +86,14 @@ An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildc
     :linenos:
     :caption: :download:`aws-request-signing-filter-sigv4a.yaml <_include/aws-request-signing-filter-sigv4a.yaml>`
 
+An example of configuring this filter to use IAM Roles Anywhere to retrieve credentials:
+
+.. literalinclude:: _include/aws-request-signing-filter-iam-roles-anywhere.yaml
+    :language: yaml
+    :lines: 25-44
+    :lineno-start: 25
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-iam-roles-anywhere.yaml <_include/aws-request-signing-filter-iam-roles-anywhere.yaml>`
 
 Configuration as an upstream HTTP filter
 ----------------------------------------

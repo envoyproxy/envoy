@@ -16,6 +16,7 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
+#include "source/common/config/datasource.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -24,6 +25,7 @@
 
 #include "absl/strings/string_view.h"
 #include "signer.h"
+#include "sigv4_signer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -86,6 +88,24 @@ protected:
   virtual void refresh() PURE;
 };
 
+class CachedX509CredentialsProviderBase : public X509CredentialsProvider,
+                                          public Logger::Loggable<Logger::Id::aws> {
+public:
+  X509Credentials getCredentials() override {
+    refreshIfNeeded();
+    return cached_credentials_;
+  }
+
+protected:
+  SystemTime last_updated_;
+  X509Credentials cached_credentials_;
+
+  void refreshIfNeeded();
+
+  virtual bool needsRefresh() PURE;
+  virtual void refresh() PURE;
+};
+
 /**
  * Retrieve AWS credentials from the credentials file.
  *
@@ -112,38 +132,36 @@ private:
  * Retrieve IAM Roles Certificate for use in signing.
  *
  */
-class IAMRolesAnywhereCertificateCredentialsProvider : public CachedCredentialsProviderBase {
+class IAMRolesAnywhereX509CredentialsProvider : public CachedX509CredentialsProviderBase {
 public:
-  IAMRolesAnywhereCertificateCredentialsProvider(
-      Api::Api& api, Event::Dispatcher& dispatcher,
+  IAMRolesAnywhereX509CredentialsProvider(
+      Api::Api& api, ThreadLocal::SlotAllocator& tls, Event::Dispatcher& dispatcher,
       envoy::config::core::v3::DataSource certificate_data_source,
       envoy::config::core::v3::DataSource private_key_data_source,
-    absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source);
+      absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source);
 
 private:
   Api::Api& api_;
   envoy::config::core::v3::DataSource certificate_data_source_;
-  Filesystem::WatcherPtr certificate_file_watcher_;
+  Config::DataSource::DataSourceProviderPtr certificate_data_source_provider_;
+  Config::DataSource::DataSourceProviderPtr private_key_data_source_provider_;
+  absl::optional<Config::DataSource::DataSourceProviderPtr> certificate_chain_data_source_provider_;
   envoy::config::core::v3::DataSource private_key_data_source_;
-  Filesystem::WatcherPtr private_key_file_watcher_;
   absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source_;
-  Filesystem::WatcherPtr certificate_chain_file_watcher_;
   Event::Dispatcher& dispatcher_;
   absl::optional<SystemTime> expiration_time_;
+  ThreadLocal::SlotAllocator& tls_;
+  std::chrono::seconds cache_duration_;
 
   bool needsRefresh() override;
   void refresh() override;
 
-  absl::Status pemDataSourceToString(envoy::config::core::v3::DataSource& datasource,
-                                                                            std::string& pem);
-  absl::Status pemToB64(std::string pem, std::string& output);
-  absl::Status pemToDer(std::string pem, std::vector<uint8_t>& output);
-  absl::Status pemToAlgorithmSerial(std::string pem,
-                                        Credentials::CertificateAlgorithm& algorithm,
-                                        std::string& serial);
-
-  void createFileWatcher(Event::Dispatcher& dispatcher, envoy::config::core::v3::DataSource& source,
-                         Filesystem::WatcherPtr& watcher);
+  absl::Status pemToDerB64(std::string pem, std::string& output, bool chain = false);
+  absl::Status
+  pemToAlgorithmSerialExpiration(std::string pem,
+                                 X509Credentials::PublicKeySignatureAlgorithm& algorithm,
+                                 std::string& serial, SystemTime& time);
+  std::chrono::seconds getCacheDuration();
 };
 
 class LoadClusterEntryHandle {
@@ -329,16 +347,17 @@ class IAMRolesAnywhereCredentialsProvider : public MetadataCredentialsProviderBa
                                             public Envoy::Singleton::Instance,
                                             public MetadataFetcher::MetadataReceiver {
 public:
-  IAMRolesAnywhereCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
-                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
-                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-                                      std::chrono::seconds initialization_timer,
-                                      absl::string_view role_arn, absl::string_view profile_arn, absl::string_view trust_anchor_arn,
-                                      absl::string_view role_session_name, absl::optional<uint16_t> session_duration, absl::string_view region,
-                                      absl::string_view cluster_name, absl::string_view uri,
-                                      envoy::config::core::v3::DataSource certificate_data_source,
-                                      envoy::config::core::v3::DataSource private_key_data_source,
-                                      absl::optional<envoy::config::core::v3::DataSource> cert_chain_data_source
+  IAMRolesAnywhereCredentialsProvider(
+      Api::Api& api, ServerFactoryContextOptRef context,
+      CreateMetadataFetcherCb create_metadata_fetcher_cb,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      std::chrono::seconds initialization_timer, absl::string_view role_arn,
+      absl::string_view profile_arn, absl::string_view trust_anchor_arn,
+      absl::string_view role_session_name, absl::optional<uint16_t> session_duration,
+      absl::string_view region, absl::string_view cluster_name,
+      envoy::config::core::v3::DataSource certificate_data_source,
+      envoy::config::core::v3::DataSource private_key_data_source,
+      absl::optional<envoy::config::core::v3::DataSource> cert_chain_data_source
 
   );
 
@@ -360,7 +379,7 @@ private:
   const std::string region_;
   absl::optional<uint16_t> session_duration_;
   ServerFactoryContextOptRef server_factory_context_;
-  Extensions::Common::Aws::SignerPtr roles_anywhere_signer_;
+  std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> roles_anywhere_signer_;
 };
 
 /**
@@ -479,20 +498,28 @@ public:
       std::chrono::seconds initialization_timer,
       absl::string_view authorization_token = {}) const PURE;
 
-  // virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
-  //     Api::Api& api, ServerFactoryContextOptRef context,
-  //     CreateMetadataFetcherCb create_metadata_fetcher_cb,
-  //     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-  //     std::chrono::seconds initialization_timer, absl::string_view role_arn,
-  //     absl::string_view role_session_name, absl::string_view region, absl::string_view
-  //     cluster_name, absl::string_view uri) const PURE;
-
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) const PURE;
+};
+
+/**
+ * Credential provider based on an inline credential.
+ */
+class InlineCredentialProvider : public CredentialsProvider {
+public:
+  explicit InlineCredentialProvider(absl::string_view access_key_id,
+                                    absl::string_view secret_access_key,
+                                    absl::string_view session_token)
+      : credentials_(access_key_id, secret_access_key, session_token) {}
+
+  Credentials getCredentials() override { return credentials_; }
+
+private:
+  const Credentials credentials_;
 };
 
 /**
@@ -507,16 +534,14 @@ public:
   DefaultCredentialsProviderChain(
       Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       absl::string_view region,
-      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
-      const absl::optional<::envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider_config = absl::nullopt)
+      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl)
       : DefaultCredentialsProviderChain(api, context, singleton_manager, region,
-                                        fetch_metadata_using_curl, credential_provider_config, *this) {}
+                                        fetch_metadata_using_curl, *this) {}
 
   DefaultCredentialsProviderChain(
       Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
-      const absl::optional<::envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider_config, 
       const CredentialsProviderChainFactories& factories);
 
 private:
@@ -537,14 +562,6 @@ private:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
       absl::string_view authorization_token) const override;
-
-  // CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
-  //     Api::Api& api, ServerFactoryContextOptRef context,
-  //     CreateMetadataFetcherCb create_metadata_fetcher_cb,
-  //     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-  //     std::chrono::seconds initialization_timer, absl::string_view role_arn,
-  //     absl::string_view role_session_name, absl::string_view region, absl::string_view
-  //     cluster_name, absl::string_view uri) const override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
@@ -569,22 +586,6 @@ private:
 };
 
 /**
- * Credential provider based on an inline credential.
- */
-class InlineCredentialProvider : public CredentialsProvider {
-public:
-  explicit InlineCredentialProvider(absl::string_view access_key_id,
-                                    absl::string_view secret_access_key,
-                                    absl::string_view session_token)
-      : credentials_(access_key_id, secret_access_key, session_token) {}
-
-  Credentials getCredentials() override { return credentials_; }
-
-private:
-  const Credentials credentials_;
-};
-
-/**
  * Create an AWS credentials provider from the proto configuration instead of using the default
  * credentials provider chain.
  */
@@ -595,6 +596,9 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
 using InstanceProfileCredentialsProviderPtr = std::shared_ptr<InstanceProfileCredentialsProvider>;
 using ContainerCredentialsProviderPtr = std::shared_ptr<ContainerCredentialsProvider>;
 using WebIdentityCredentialsProviderPtr = std::shared_ptr<WebIdentityCredentialsProvider>;
+using IAMRolesAnywhereX509CredentialsProviderPtr =
+    std::shared_ptr<IAMRolesAnywhereX509CredentialsProvider>;
+using IAMRolesAnywhereCredentialsProviderPtr = std::shared_ptr<IAMRolesAnywhereCredentialsProvider>;
 
 } // namespace Aws
 } // namespace Common

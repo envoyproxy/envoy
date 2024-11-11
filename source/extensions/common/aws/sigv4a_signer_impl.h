@@ -53,6 +53,7 @@ class SigV4ASignerImpl : public SignerBaseImpl {
 
   // Allow friend access for signer corpus testing
   friend class SigV4ASignerImplFriend;
+  friend class X509SigV4ASignerImplFriend;
 
 public:
   SigV4ASignerImpl(
@@ -63,6 +64,12 @@ public:
       const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : SignerBaseImpl(service_name, region, credentials_provider, context, matcher_config,
                        query_string, expiration_time) {}
+
+  // Not implemented, used for test case coverage
+  SigV4ASignerImpl(absl::string_view service_name, absl::string_view region,
+                   const X509CredentialsProviderSharedPtr& credentials_provider,
+                   Envoy::TimeSource& timesource)
+      : SignerBaseImpl(service_name, region, credentials_provider, timesource) {}
 
 private:
   void addRegionHeader(Http::RequestHeaderMap& headers,
@@ -77,17 +84,39 @@ private:
   std::string createStringToSign(const absl::string_view canonical_request,
                                  const absl::string_view long_date,
                                  const absl::string_view credential_scope) const override;
-
   std::string
-  createSignature(const absl::string_view access_key_id, const absl::string_view secret_access_key,
+  createSignature(const Credentials credentials,
                   ABSL_ATTRIBUTE_UNUSED const absl::string_view short_date,
                   const absl::string_view string_to_sign,
                   ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const override;
 
-  std::string createAuthorizationHeader(const absl::string_view access_key_id,
+  std::string createAuthorizationHeader(const Credentials credentials,
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) const override;
+
+  // No X509 Implementation of SigV4A signing available
+  std::string createAuthorizationHeader(
+      ABSL_ATTRIBUTE_UNUSED const X509Credentials x509_credentials,
+      ABSL_ATTRIBUTE_UNUSED const absl::string_view credential_scope,
+      ABSL_ATTRIBUTE_UNUSED const std::map<std::string, std::string>& canonical_headers,
+      ABSL_ATTRIBUTE_UNUSED const absl::string_view signature) const override {
+    return "";
+  };
+
+  std::string createStringToSign(
+      ABSL_ATTRIBUTE_UNUSED const X509Credentials x509_credentials,
+      ABSL_ATTRIBUTE_UNUSED const absl::string_view canonical_request,
+      ABSL_ATTRIBUTE_UNUSED const absl::string_view long_date,
+      ABSL_ATTRIBUTE_UNUSED const absl::string_view credential_scope) const override {
+    return "";
+  };
+
+  std::string
+  createSignature(ABSL_ATTRIBUTE_UNUSED const X509Credentials x509_credentials,
+                  ABSL_ATTRIBUTE_UNUSED const absl::string_view string_to_sign) const override {
+    return "";
+  };
 
   absl::string_view getAlgorithmString() const override;
 };

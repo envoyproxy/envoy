@@ -47,17 +47,38 @@ public:
                             const absl::string_view override_region = "") PURE;
 
   /**
-   * Sign an AWS request using IAMRolesAnywhere signing algorithm.
+   * Sign an AWS request.
+   * @param message an AWS API request message.
+   * @param sign_body include the message body in the signature. The body must be fully buffered.
+   * @param override_region override the default region that has to be used to sign the request
+   */
+  virtual absl::Status signX509(Http::RequestMessage& message, bool sign_body,
+                                const absl::string_view override_region = "") PURE;
+
+  /**
+   * Sign an AWS request without a payload (empty string used as content hash).
+   * @param headers AWS API request headers.
+   * @param override_region override the default region that has to be used to sign the request
+   */
+  virtual absl::Status signX509EmptyPayload(Http::RequestHeaderMap& headers,
+                                            const absl::string_view override_region = "") PURE;
+
+  /**
+   * Sign an AWS request using the literal string UNSIGNED-PAYLOAD in the canonical request.
+   * @param headers AWS API request headers.
+   * @param override_region override the default region that has to be used to sign the request
+   */
+  virtual absl::Status signX509UnsignedPayload(Http::RequestHeaderMap& headers,
+                                               const absl::string_view override_region = "") PURE;
+
+  /**
+   * Sign an AWS request.
    * @param headers AWS API request headers.
    * @param content_hash The Hex encoded SHA-256 of the body of the AWS API request.
    * @param override_region override the default region that has to be used to sign the request
    */
-  virtual absl::Status signIAMRolesAnywhere(Http::RequestHeaderMap& headers, const std::string& content_hash,
-        const absl::string_view override_region) PURE;
-
-  virtual absl::Status signIAMRolesAnywhere(Http::RequestMessage& message, bool sign_body,
-                                    const absl::string_view override_region) PURE;
-
+  virtual absl::Status signX509(Http::RequestHeaderMap& headers, const std::string& content_hash,
+                                const absl::string_view override_region = "") PURE;
 };
 
 using SignerPtr = std::unique_ptr<Signer>;

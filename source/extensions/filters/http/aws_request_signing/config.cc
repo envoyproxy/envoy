@@ -60,42 +60,15 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
       config.query_string(), expiration_time,
       Extensions::Common::Aws::SignatureQueryParameterValues::DefaultExpiration);
 
-
   absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr>
-      credentials_provider;
-
-  if(config.has_credential_provider())
-  {
-    auto credential_provider_config = config.credential_provider();
-      if(config.credential_provider().explicit_credential_provider_chain())
-      {
-        credentials_provider = Extensions::Common::Aws::createCredentialsProviderFromConfig(
-                    server_context, region, credential_provider_config);
-      }
-      else
-      {
-        credentials_provider = std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-                    server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,
-                    Extensions::Common::Aws::Utility::fetchMetadata, credential_provider_config);
-      }
-  }
-  else
-  {
-            credentials_provider = std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-                    server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,
+      credentials_provider =
+          config.has_credential_provider()
+              ? Extensions::Common::Aws::createCredentialsProviderFromConfig(
+                    server_context, region, config.credential_provider())
+              : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+                    server_context.api(), makeOptRef(server_context),
+                    server_context.singletonManager(), region,
                     Extensions::Common::Aws::Utility::fetchMetadata);
-  }
-
-
-  // absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr>
-  //     credentials_provider =
-  //         config.has_credential_provider()
-  //             ? Extensions::Common::Aws::createCredentialsProviderFromConfig(
-  //                   server_context, region, config.credential_provider())
-  //             : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-  //                   server_context.api(), makeOptRef(server_context),
-  //                   server_context.singletonManager(), region,
-  //                   Extensions::Common::Aws::Utility::fetchMetadata);
   if (!credentials_provider.ok()) {
     return credentials_provider.status();
   }
@@ -158,38 +131,13 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
       per_route_config.aws_request_signing().query_string(), expiration_time, 5);
 
   absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr>
-      credentials_provider;
-
-  if(per_route_config.aws_request_signing().has_credential_provider())
-  {
-    auto credential_provider_config = per_route_config.aws_request_signing().credential_provider();
-      if(per_route_config.aws_request_signing().credential_provider().explicit_credential_provider_chain())
-      {
-        credentials_provider = Extensions::Common::Aws::createCredentialsProviderFromConfig(
-                    context, region, credential_provider_config);
-      }
-      else
-      {
-        credentials_provider = std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-                    context.api(), makeOptRef(context), context.singletonManager(), region,
-                    Extensions::Common::Aws::Utility::fetchMetadata, credential_provider_config);
-      }
-  }
-  else
-  {
-            credentials_provider = std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+      credentials_provider =
+          per_route_config.aws_request_signing().has_credential_provider()
+              ? Extensions::Common::Aws::createCredentialsProviderFromConfig(
+                    context, region, per_route_config.aws_request_signing().credential_provider())
+              : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
                     context.api(), makeOptRef(context), context.singletonManager(), region,
                     Extensions::Common::Aws::Utility::fetchMetadata);
-  }
-
-  // absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr>
-  //     credentials_provider =
-  //         per_route_config.aws_request_signing().has_credential_provider()
-  //             ? Extensions::Common::Aws::createCredentialsProviderFromConfig(
-  //                   context, region, per_route_config.aws_request_signing().credential_provider())
-  //             : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-  //                   context.api(), makeOptRef(context), context.singletonManager(), region,
-  //                   Extensions::Common::Aws::Utility::fetchMetadata);
   if (!credentials_provider.ok()) {
     throw EnvoyException(std::string(credentials_provider.status().message()));
   }

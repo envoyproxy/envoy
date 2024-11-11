@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <ios>
+#include <memory>
 #include <string>
 
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
@@ -2478,6 +2479,7 @@ public:
     MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createCredentialsFileCredentialsProvider, (Api::Api&),
                 (const));
+
     MOCK_METHOD(CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
@@ -2492,18 +2494,22 @@ public:
                  MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                  absl::string_view),
                 (const));
+
+    MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
+                (Api::Api&, ServerFactoryContextOptRef, CreateMetadataFetcherCb,
+                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
+                 absl::string_view, absl::string_view, absl::string_view, absl::string_view,
+                 absl::optional<uint16_t>, absl::string_view, absl::string_view,
+                 const ::envoy::config::core::v3::DataSource&,
+                 const ::envoy::config::core::v3::DataSource&,
+                 absl::optional<const ::envoy::config::core::v3::DataSource>),
+                (const));
+
     MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef, Singleton::Manager&,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
                  CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                  std::chrono::seconds, absl::string_view),
-                (const));
-    MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
-                (Api::Api & api, ServerFactoryContextOptRef context,
-                 CreateMetadataFetcherCb create_metadata_fetcher_cb,
-                 MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-                 std::chrono::seconds initialization_timer, absl::string_view cluster_name,
-                 absl::string_view uri),
                 (const));
   };
 

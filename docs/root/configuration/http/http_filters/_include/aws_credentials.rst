@@ -46,6 +46,10 @@ secret access key (the session token is optional).
    The static internal cluster will still be added even if initially ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is
    not set so that subsequently if the reloadable feature is set to ``true`` the cluster config is available to fetch the credentials.
 
+5. `IAM Roles Anywhere <https://docs.aws.amazon.com/rolesanywhere/latest/userguide/introduction.html>`_ can be used to retrieve IAM temporary credentials in exchange for an X509 Certificate.
+   A PEM formatted certificate, private key and certificate chain can be provided using the :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field.
+   Private keys must currently be provided in unencrypted format.
+
 Alternatively, each AWS filter (either AWS Request Signing or AWS Lambda) has its own optional configuration to specify the source of the credentials. For example, AWS Request Signing filter
 has :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field.
 

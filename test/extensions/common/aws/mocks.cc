@@ -13,6 +13,12 @@ MockSigner::MockSigner() = default;
 
 MockSigner::~MockSigner() = default;
 
+MockIAMRolesAnywhereCredentialsProvider::~MockIAMRolesAnywhereCredentialsProvider() = default;
+
+MockX509CredentialsProvider::MockX509CredentialsProvider() = default;
+
+MockX509CredentialsProvider::~MockX509CredentialsProvider() = default;
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

@@ -27,8 +27,8 @@ public:
   static constexpr absl::string_view SigV4SignatureVersion{"AWS4"};
   static constexpr absl::string_view SigV4StringToSignFormat{"{}\n{}\n{}\n{}"};
   static constexpr absl::string_view SigV4Algorithm{"AWS4-HMAC-SHA256"};
-  static constexpr absl::string_view SigV4RolesAnywhereRSA{"AWS4-X509-RSA-SHA256"};
-  static constexpr absl::string_view SigV4RolesAnywhereECDSA{"AWS4-X509-ECDSA-SHA256"};
+  static constexpr absl::string_view X509SigV4RSA{"AWS4-X509-RSA-SHA256"};
+  static constexpr absl::string_view X509SigV4ECDSA{"AWS4-X509-ECDSA-SHA256"};
 };
 
 using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
@@ -55,13 +55,10 @@ public:
       : SignerBaseImpl(service_name, region, credentials_provider, context, matcher_config,
                        query_string, expiration_time) {}
 
-  // Constructor for IAMRolesAnywhere
   SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
-                  const CredentialsProviderSharedPtr& credentials_provider,
+                  const X509CredentialsProviderSharedPtr& credentials_provider,
                   Envoy::TimeSource& timesource)
-      : SignerBaseImpl(service_name, region, credentials_provider, timesource) {
-    iam_roles_anywhere_signing_ = true;
-  }
+      : SignerBaseImpl(service_name, region, credentials_provider, timesource) {}
 
 private:
   std::string createCredentialScope(const absl::string_view short_date,
@@ -71,30 +68,28 @@ private:
                                  const absl::string_view long_date,
                                  const absl::string_view credential_scope) const override;
 
-  std::string createSignature(ABSL_ATTRIBUTE_UNUSED const absl::string_view access_key_id,
-                              const absl::string_view secret_access_key,
-                              const absl::string_view short_date,
+  std::string createSignature(const Credentials credentials, const absl::string_view short_date,
                               const absl::string_view string_to_sign,
                               const absl::string_view override_region) const override;
 
-std::string
-createIamRolesAnywhereSignature(const std::string cert_private_key_pem, 
-// const Credentials::CertificateAlgorithm cert_algorithm,
-                                                 const absl::string_view string_to_sign) const override;
-
-  std::string createIamRolesAnywhereStringToSign(absl::string_view canonical_request,
-                                                 absl::string_view long_date,
-                                                 absl::string_view credential_scope, Credentials::CertificateAlgorithm cert_algorithm) const override;
-
-  std::string createAuthorizationHeader(const absl::string_view access_key_id,
+  std::string createAuthorizationHeader(const Credentials credentials,
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) const override;
 
-  std::string createIamRolesAnywhereAuthorizationHeader(
-      const absl::string_view cert_serial, const absl::string_view credential_scope,
-      const std::map<std::string, std::string>& canonical_headers,
-      absl::string_view signature) const override;
+  // X509 variants of SigV4 signing for IAM Roles Anywhere support
+  std::string createSignature(const X509Credentials credentials,
+                              const absl::string_view string_to_sign) const override;
+
+  std::string createAuthorizationHeader(const X509Credentials x509_credentials,
+                                        const absl::string_view credential_scope,
+                                        const std::map<std::string, std::string>& canonical_headers,
+                                        const absl::string_view signature) const override;
+
+  std::string createStringToSign(const X509Credentials x509_credentials,
+                                 const absl::string_view canonical_request,
+                                 const absl::string_view long_date,
+                                 const absl::string_view credential_scope) const override;
 
   absl::string_view getAlgorithmString() const override;
 };

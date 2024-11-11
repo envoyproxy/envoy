@@ -4,7 +4,6 @@
 
 #include <cstddef>
 
-#include "credentials_provider.h"
 #include "envoy/common/exception.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -37,34 +36,14 @@ std::string SigV4SignerImpl::createStringToSign(absl::string_view canonical_requ
       Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
 }
 
-std::string
-SigV4SignerImpl::createIamRolesAnywhereStringToSign(absl::string_view canonical_request,
-                                                    absl::string_view long_date,
-                                                    absl::string_view credential_scope, const Credentials::CertificateAlgorithm cert_algorithm) const {
-  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  if(cert_algorithm == Credentials::CertificateAlgorithm::RSA)
-  {
-      return fmt::format(
-      SigV4SignatureConstants::SigV4StringToSignFormat,
-      SigV4SignatureConstants::SigV4RolesAnywhereRSA, long_date, credential_scope,
-      Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
-  }
-  else {
-      return fmt::format(
-      SigV4SignatureConstants::SigV4StringToSignFormat,
-      SigV4SignatureConstants::SigV4RolesAnywhereECDSA, long_date, credential_scope,
-      Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
-  }
-}
-
-std::string SigV4SignerImpl::createSignature(
-    ABSL_ATTRIBUTE_UNUSED const absl::string_view access_key_id,
-    const absl::string_view secret_access_key, const absl::string_view short_date,
-    const absl::string_view string_to_sign, const absl::string_view override_region) const {
+std::string SigV4SignerImpl::createSignature(const Credentials credentials,
+                                             const absl::string_view short_date,
+                                             const absl::string_view string_to_sign,
+                                             const absl::string_view override_region) const {
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  const auto secret_key =
-      absl::StrCat(SigV4SignatureConstants::SigV4SignatureVersion, secret_access_key);
+  const auto secret_key = absl::StrCat(SigV4SignatureConstants::SigV4SignatureVersion,
+                                       credentials.secretAccessKey().value());
   const auto date_key = crypto_util.getSha256Hmac(
       std::vector<uint8_t>(secret_key.begin(), secret_key.end()), short_date);
   const auto region_key =
@@ -75,90 +54,85 @@ std::string SigV4SignerImpl::createSignature(
   return Hex::encode(crypto_util.getSha256Hmac(signing_key, string_to_sign));
 }
 
-std::string
-SigV4SignerImpl::createIamRolesAnywhereSignature(const std::string cert_private_key_pem, 
-// const Credentials::CertificateAlgorithm cert_algorithm,
-                                                 const absl::string_view string_to_sign) const {
-
-BIO* bio = BIO_new( BIO_s_mem() );
-BIO_write( bio, cert_private_key_pem.c_str(),cert_private_key_pem.size());
-
-EVP_PKEY* pkey;
-PEM_read_bio_PrivateKey( bio, &pkey, nullptr, nullptr );
-BIO_free(bio);
-auto pkey_size = EVP_PKEY_size(pkey);
-
-// if(cert_algorithm == Credentials::CertificateAlgorithm::RSA)
-//   {
-    auto evp = EVP_get_digestbyname("sha256");
-    auto ctx = EVP_MD_CTX_new();
-    EVP_SignInit(ctx, evp);
-
-    EVP_SignUpdate(ctx, string_to_sign.data(), string_to_sign.size());
-
-std::vector<unsigned char> output(pkey_size);
-unsigned int sig_len;
-    EVP_SignFinal(ctx, output.data(), &sig_len, pkey);
-    output.resize(sig_len);
-    return Hex::encode(output);
-    // md_ctx = _lib.EVP_MD_CTX_new()
-    // md_ctx = _ffi.gc(md_ctx, _lib.EVP_MD_CTX_free)
-
-    // _lib.EVP_SignInit(md_ctx, digest_obj)
-    // _lib.EVP_SignUpdate(md_ctx, data, len(data))
-
-    // length = _lib.EVP_PKEY_size(pkey._pkey)
-    // _openssl_assert(length > 0)
-    // signature_buffer = _ffi.new("unsigned char[]", length)
-    // signature_length = _ffi.new("unsigned int *")
-    // final_result = _lib.EVP_SignFinal(
-    //     md_ctx, signature_buffer, signature_length, pkey._pkey
-    // )
-
-//   }
-//   else {
-//         auto evp = EVP_get_digestbyname("sha256");
-//     auto ctx = EVP_MD_CTX_new();
-//     EVP_SignInit(ctx, evp);
-
-//     EVP_SignUpdate(ctx, string_to_sign.data(), string_to_sign.size());
-
-// std::vector<unsigned char> output(pkey_size);
-// unsigned int sig_len;
-//     EVP_SignFinal(ctx, output.data(), &sig_len, pkey);
-//     output.resize(sig_len);
-//     return Hex::encode(output);
-
-//   }                   
-}
-
 std::string SigV4SignerImpl::createAuthorizationHeader(
-    const absl::string_view access_key_id, const absl::string_view credential_scope,
+    const Credentials credentials, const absl::string_view credential_scope,
     const std::map<std::string, std::string>& canonical_headers,
     absl::string_view signature) const {
-
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
   return fmt::format(SigV4SignatureConstants::SigV4AuthorizationHeaderFormat,
                      SigV4SignatureConstants::SigV4Algorithm,
-                     createAuthorizationCredential(access_key_id, credential_scope), signed_headers,
-                     signature);
-}
-
-std::string SigV4SignerImpl::createIamRolesAnywhereAuthorizationHeader(
-    const absl::string_view cert_serial, const absl::string_view credential_scope,
-    const std::map<std::string, std::string>& canonical_headers,
-    absl::string_view signature) const {
-
-  const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
-
-  return fmt::format(SigV4SignatureConstants::SigV4AuthorizationHeaderFormat,
-                     SigV4SignatureConstants::SigV4RolesAnywhereRSA,
-                     createAuthorizationCredential(cert_serial, credential_scope), signed_headers,
+                     createAuthorizationCredential(credentials, credential_scope), signed_headers,
                      signature);
 }
 
 absl::string_view SigV4SignerImpl::getAlgorithmString() const {
   return SigV4SignatureConstants::SigV4Algorithm;
+}
+
+std::string SigV4SignerImpl::createStringToSign(const X509Credentials x509_credentials,
+                                                const absl::string_view canonical_request,
+                                                const absl::string_view long_date,
+                                                const absl::string_view credential_scope) const {
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  if (x509_credentials.publicKeySignatureAlgorithm() ==
+      X509Credentials::PublicKeySignatureAlgorithm::RSA) {
+    return fmt::format(
+        SigV4SignatureConstants::SigV4StringToSignFormat, SigV4SignatureConstants::X509SigV4RSA,
+        long_date, credential_scope,
+        Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
+  } else {
+    return fmt::format(
+        SigV4SignatureConstants::SigV4StringToSignFormat, SigV4SignatureConstants::X509SigV4ECDSA,
+        long_date, credential_scope,
+        Hex::encode(crypto_util.getSha256Digest(Buffer::OwnedImpl(canonical_request))));
+  }
+}
+
+std::string SigV4SignerImpl::createSignature(const X509Credentials x509_credentials,
+                                             const absl::string_view string_to_sign) const {
+
+  std::string key = x509_credentials.certificatePrivateKey().value();
+  auto keysize = x509_credentials.certificatePrivateKey().value().size();
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.c_str(), keysize));
+
+  bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+
+  auto pkey_size = EVP_PKEY_size(pkey.get());
+  EVP_MD_CTX ctx;
+  EVP_MD_CTX_init(&ctx);
+
+  auto evp = EVP_get_digestbyname("sha256");
+  EVP_SignInit(&ctx, evp);
+  EVP_SignUpdate(&ctx, string_to_sign.data(), string_to_sign.size());
+
+  std::vector<unsigned char> output(pkey_size);
+  unsigned int sig_len;
+  EVP_SignFinal(&ctx, output.data(), &sig_len, pkey.get());
+  output.resize(sig_len);
+  EVP_MD_CTX_cleanup(&ctx);
+  return Hex::encode(output);
+}
+
+std::string SigV4SignerImpl::createAuthorizationHeader(
+    const X509Credentials x509_credentials, const absl::string_view credential_scope,
+    const std::map<std::string, std::string>& canonical_headers,
+    const absl::string_view signature) const {
+
+  const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
+
+  if (x509_credentials.publicKeySignatureAlgorithm() ==
+      X509Credentials::PublicKeySignatureAlgorithm::RSA) {
+    return fmt::format(SigV4SignatureConstants::SigV4AuthorizationHeaderFormat,
+                       SigV4SignatureConstants::X509SigV4RSA,
+                       createAuthorizationCredential(x509_credentials, credential_scope),
+                       signed_headers, signature);
+
+  } else {
+    return fmt::format(SigV4SignatureConstants::SigV4AuthorizationHeaderFormat,
+                       SigV4SignatureConstants::X509SigV4ECDSA,
+                       createAuthorizationCredential(x509_credentials, credential_scope),
+                       signed_headers, signature);
+  }
 }
 
 } // namespace Aws

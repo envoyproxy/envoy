@@ -177,6 +177,21 @@ public:
                     const absl::string_view = "") override {
     return absl::OkStatus();
   };
+  absl::Status signX509(Http::RequestMessage&, bool, const absl::string_view) override {
+    return absl::OkStatus();
+  };
+
+  absl::Status signX509EmptyPayload(Http::RequestHeaderMap&, const absl::string_view) override {
+    return absl::OkStatus();
+  };
+  absl::Status signX509UnsignedPayload(Http::RequestHeaderMap&, const absl::string_view) override {
+    return absl::OkStatus();
+  };
+
+  absl::Status signX509(Http::RequestHeaderMap&, const std::string&,
+                        const absl::string_view) override {
+    return absl::OkStatus();
+  };
 };
 
 class MockAuthContext : public ::grpc::AuthContext {

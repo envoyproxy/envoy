@@ -207,26 +207,23 @@ public:
     return signer_->createStringToSign(canonical_request, long_date, credential_scope);
   }
 
-  std::string createSignature(ABSL_ATTRIBUTE_UNUSED const absl::string_view access_key_id,
-                              const absl::string_view secret_access_key,
-                              const absl::string_view short_date,
+  std::string createSignature(const Credentials credentials, const absl::string_view short_date,
                               const absl::string_view string_to_sign,
                               const absl::string_view override_region) {
-    return signer_->createSignature(access_key_id, secret_access_key, short_date, string_to_sign,
-                                    override_region);
+    return signer_->createSignature(credentials, short_date, string_to_sign, override_region);
   }
 
-  std::string createAuthorizationHeader(const absl::string_view access_key_id,
+  std::string createAuthorizationHeader(const Credentials credentials,
                                         const absl::string_view credential_scope,
                                         const std::map<std::string, std::string>& canonical_headers,
                                         const absl::string_view signature) {
-    return signer_->createAuthorizationHeader(access_key_id, credential_scope, canonical_headers,
-                                              signature, false);
+    return signer_->createAuthorizationHeader(credentials, credential_scope, canonical_headers,
+                                              signature);
   }
 
-  std::string createAuthorizationCredential(absl::string_view access_key_id,
+  std::string createAuthorizationCredential(const Credentials credentials,
                                             absl::string_view credential_scope) {
-    return signer_->createAuthorizationCredential(access_key_id, credential_scope);
+    return signer_->createAuthorizationCredential(credentials, credential_scope);
   }
 
   void createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
@@ -307,8 +304,8 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusHeaderSigning) {
   const auto source_string_to_sign = readStringFile("header-string-to-sign.txt");
   EXPECT_EQ(source_string_to_sign, calculated_string_to_sign);
 
-  const auto calculated_signature =
-      signer_friend.createSignature(akid_, skid_, short_date_, calculated_string_to_sign, region_);
+  const auto calculated_signature = signer_friend.createSignature(
+      Credentials(akid_, skid_), short_date_, calculated_string_to_sign, region_);
 
   const auto source_header_signature = readStringFile("header-signature.txt");
 
@@ -354,7 +351,9 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
   signer_friend.addRegionQueryParam(query_params, region_);
 
   signer_friend.createQueryParams(
-      query_params, signer_friend.createAuthorizationCredential(akid_, calculated_credential_scope),
+      query_params,
+      signer_friend.createAuthorizationCredential(Credentials(akid_, skid_),
+                                                  calculated_credential_scope),
       long_date_, token_.empty() ? absl::optional<std::string>(absl::nullopt) : token_,
       calculated_canonical_headers, expiration_);
 
@@ -377,8 +376,8 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
   const auto source_string_to_sign = readStringFile("query-string-to-sign.txt");
   EXPECT_EQ(source_string_to_sign, calculated_string_to_sign);
 
-  const auto calculated_signature =
-      signer_friend.createSignature(akid_, skid_, short_date_, calculated_string_to_sign, region_);
+  const auto calculated_signature = signer_friend.createSignature(
+      Credentials(akid_, skid_), short_date_, calculated_string_to_sign, region_);
 
   const auto source_query_signature_ = readStringFile("query-signature.txt");
 

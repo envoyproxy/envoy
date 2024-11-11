@@ -23,12 +23,12 @@ namespace Common {
 namespace Aws {
 
 std::string SigV4ASignerImpl::createAuthorizationHeader(
-    const absl::string_view access_key_id, const absl::string_view credential_scope,
+    const Credentials credentials, const absl::string_view credential_scope,
     const std::map<std::string, std::string>& canonical_headers,
     absl::string_view signature) const {
   const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
   return fmt::format(SigV4ASignatureConstants::SigV4AAuthorizationHeaderFormat,
-                     createAuthorizationCredential(access_key_id, credential_scope), signed_headers,
+                     createAuthorizationCredential(credentials, credential_scope), signed_headers,
                      signature);
 }
 
@@ -63,14 +63,14 @@ void SigV4ASignerImpl::addRegionQueryParam(Envoy::Http::Utility::QueryParamsMult
 }
 
 std::string SigV4ASignerImpl::createSignature(
-    const absl::string_view access_key_id, const absl::string_view secret_access_key,
-    ABSL_ATTRIBUTE_UNUSED const absl::string_view short_date,
+    const Credentials credentials, ABSL_ATTRIBUTE_UNUSED const absl::string_view short_date,
     const absl::string_view string_to_sign,
     ABSL_ATTRIBUTE_UNUSED const absl::string_view override_region) const {
 
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
 
-  EC_KEY* ec_key = SigV4AKeyDerivation::derivePrivateKey(access_key_id, secret_access_key);
+  EC_KEY* ec_key = SigV4AKeyDerivation::derivePrivateKey(credentials.accessKeyId().value(),
+                                                         credentials.secretAccessKey().value());
   if (!ec_key) {
     ENVOY_LOG(debug, "SigV4A key derivation failed");
     return blank_str_;
