@@ -91,15 +91,6 @@ func capiStatusToStr(status C.CAPIStatus) string {
 	return "unknown status"
 }
 
-func (c *cgoApiImpl) GetHeader(s unsafe.Pointer, key string) string {
-	state := (*processState)(s)
-	var valueData C.uint64_t
-	var valueLen C.int
-	res := C.envoyGoTcpUpstreamGetHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
-	handleCApiStatus(res)
-	return unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
-}
-
 func (c *cgoApiImpl) CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
 	state := (*processState)(s)
 	var strs []string

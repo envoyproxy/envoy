@@ -48,7 +48,7 @@ struct HttpConfigInternal : httpConfig {
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
- * Configuration for the HTTP golang extension filter.
+ * Configuration for the Tcp Upstream golang extension filter.
  */
 class FilterConfig : public std::enable_shared_from_this<FilterConfig>,
                      Logger::Loggable<Logger::Id::http> {
@@ -72,8 +72,6 @@ private:
 
   Dso::TcpUpstreamDsoPtr dso_lib_;
   uint64_t config_id_{0};
-  // TODO(duxin40): use rwlock.
-  Thread::MutexBasicLockable mutex_{};
   // filter level config is created in C++ side, and freed by Golang GC finalizer.
   HttpConfigInternal* config_{nullptr};
 };
@@ -121,7 +119,6 @@ public:
     return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();
   }    
 
-  CAPIStatus getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data, int* value_len);
   CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
   CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
   CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
@@ -142,18 +139,6 @@ public:
 private:
   const std::string cluster_name_;
   const std::string route_name_;
-};
-
-// Wrapper HttpRequestInternal to DeferredDeletable.
-// Since we want keep httpRequest at the top of the HttpRequestInternal,
-// so, HttpRequestInternal can not inherit the virtual class DeferredDeletable.
-class RequestInternalWrapper : public Envoy::Event::DeferredDeletable {
-public:
-  RequestInternalWrapper(RequestInternal* req) : req_(req) {}
-  ~RequestInternalWrapper() override { delete req_; }
-
-private:
-  RequestInternal* req_;
 };
 
 class TcpConnPool : public Router::GenericConnPool,
@@ -273,15 +258,9 @@ public:
 
   const Router::RouteEntry* route_entry_;
 
-// private:
-//   // return true when it is first inited.
-//   bool initRequest();
-//   bool initResponse();
-
 private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
-  Buffer::OwnedImpl response_buffer_{};
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 
   Dso::TcpUpstreamDsoPtr dynamic_lib_;
@@ -290,10 +269,6 @@ private:
 
   FilterSharedPtr filter_;
 
-  // RequestInternal* req_{nullptr};
-
-  // EncodingProcessorState& encoding_state_;
-  // DecodingProcessorState& decoding_state_;
 };
 
 

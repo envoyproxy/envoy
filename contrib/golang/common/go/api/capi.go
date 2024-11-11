@@ -100,7 +100,6 @@ type NetworkCAPI interface {
 
 type TcpUpstreamCAPI interface {
 	// Header related
-	GetHeader(s unsafe.Pointer, key string) string
 	CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
 	SetRespHeader(s unsafe.Pointer, key string, value string, add bool)
 	// Buffer related

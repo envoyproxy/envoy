@@ -329,28 +329,6 @@ void TcpUpstream::onBelowWriteBufferLowWatermark() {
   }
 }
 
-
-CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
-                             int* value_len) {
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-  auto headers = state.headers;
-  if (headers == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
-    return CAPIStatus::CAPIInvalidPhase;
-  }
-  auto result = headers->get(Envoy::Http::LowerCaseString(key));
-
-  if (!result.empty()) {
-    auto str = result[0]->value().getStringView();
-    *value_data = reinterpret_cast<uint64_t>(str.data());
-    *value_len = str.length();
-  }
-  return CAPIStatus::CAPIOK;
-}
-
 void copyHeaderMapToGo(const Envoy::Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
   auto i = 0;
   m.iterate([&i, &go_strs, &go_buf](const Envoy::Http::HeaderEntry& header) -> Envoy::Http::HeaderMap::Iterate {

@@ -54,8 +54,7 @@ func (h *requestOrResponseHeaderMapImpl) initHeaders() {
 }
 
 func (h *requestOrResponseHeaderMapImpl) GetRaw(key string) string {
-	// GetRaw is case-sensitive
-	return cAPI.GetHeader(unsafe.Pointer(h.state), key)
+	panic("do not support this action")
 }
 
 func (h *requestOrResponseHeaderMapImpl) Get(key string) (string, bool) {

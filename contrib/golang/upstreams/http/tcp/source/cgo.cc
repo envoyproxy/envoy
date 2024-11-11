@@ -69,18 +69,6 @@ void envoyGoConfigTcpUpstreamFinalize(void* c) {
   delete config;
 }
 
-// unsafe API, without copy memory from c to go.
-CAPIStatus envoyGoTcpUpstreamGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data,
-                                      int* value_len) {
-  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s,
-      [key_data, key_len, value_data, value_len](std::shared_ptr<Filter>& filter,
-                                                 ProcessorState& state) -> CAPIStatus {
-        auto key_str = stringViewFromGoPointer(key_data, key_len);
-        return filter->getHeader(state, key_str, value_data, value_len);
-      });
-}
-
 CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s, [strs, buf](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {

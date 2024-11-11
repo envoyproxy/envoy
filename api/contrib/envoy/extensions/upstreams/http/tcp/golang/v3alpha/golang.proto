@@ -30,7 +30,7 @@ message Config {
 
   // Globally unique name of the Go plugin.
   //
-  // This name **must** be consistent with the name registered in ``network::RegisterNetworkFilterConfigFactory``
+  // This name **must** be consistent with the name registered in ``tcp::RegisterTcpUpstreamFactoryAndConfigParser``
   //
   string plugin_name = 3 [(validate.rules).string = {min_len: 1}];
 
