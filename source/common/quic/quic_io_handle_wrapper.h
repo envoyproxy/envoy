@@ -117,10 +117,10 @@ public:
     return io_handle_.setBlocking(blocking);
   }
   absl::optional<int> domain() override { return io_handle_.domain(); }
-  Network::Address::InstanceConstSharedPtr localAddress() override {
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> localAddress() override {
     return io_handle_.localAddress();
   }
-  Network::Address::InstanceConstSharedPtr peerAddress() override {
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> peerAddress() override {
     return io_handle_.peerAddress();
   }
 

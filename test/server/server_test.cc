@@ -1207,14 +1207,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
                             EnvoyException, "cluster manager: duplicate cluster 'service_google'");
 }
 
-// Regression tests for SdsApi throwing exceptions in initialize().
-TEST_P(ServerInstanceImplTest, BadSdsConfigSource) {
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/bad_sds_config_source.yaml"), EnvoyException,
-      "envoy.config.core.v3.ApiConfigSource must have a statically defined non-EDS cluster: "
-      "'sds-grpc' does not exist, was added via api, or is an EDS cluster");
-}
-
 // Test for protoc-gen-validate constraint on invalid timeout entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
   EXPECT_THROW_WITH_REGEX(
@@ -1730,7 +1722,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
-    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
     EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
     EXPECT_EQ(log.logger_name, "misc");
   }));

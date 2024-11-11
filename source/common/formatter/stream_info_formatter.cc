@@ -326,6 +326,30 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
            }
            return {};
          }},
+        {UpstreamConnectStart,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().upstream_connect_start_;
+           }
+           return {};
+         }},
+        {UpstreamConnectEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().upstream_connect_complete_;
+           }
+           return {};
+         }},
+        {UpstreamTLSConnectEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().upstream_handshake_complete_;
+           }
+           return {};
+         }},
         {FirstUpstreamTxByteSent,
          [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
            const auto upstream_info = stream_info.upstreamInfo();

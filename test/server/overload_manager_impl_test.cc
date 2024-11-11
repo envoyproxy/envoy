@@ -600,6 +600,8 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
             min_scale: { value: 10 } # percent
           - timer: TRANSPORT_SOCKET_CONNECT
             min_scale: { value: 40 } # percent
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_scale: { value: 20 } # percent
       triggers:
         - name: "envoy.resource_monitors.fake_resource1"
           scaled:
@@ -613,6 +615,7 @@ constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimu
      Event::AbsoluteMinimum(std::chrono::seconds(2))},
     {TimerType::HttpDownstreamIdleStreamTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
     {TimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.4))},
+    {TimerType::HttpDownstreamMaxConnectionTimeout, Event::ScaledMinimum(UnitFloat(0.2))},
 };
 TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
   auto manager(createOverloadManager(kReducedTimeoutsConfig));

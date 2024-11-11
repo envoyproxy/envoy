@@ -34,6 +34,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cancel_wrapper_test",
+    srcs = ["cancel_wrapper_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:cancel_wrapper_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "containers_test",
     srcs = ["containers_test.cc"],
     rbe_pool = "6gig",

@@ -958,6 +958,15 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
+    std::string requested_server_name = "outbound_.8080_._.example.com";
+    stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+    EXPECT_EQ("outbound_.8080_._.example.com", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("outbound_.8080_._.example.com")));
+  }
+
+  {
+    StreamInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
     std::string requested_server_name = "stub-server";
     stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
     EXPECT_EQ("stub-server", upstream_format.formatWithContext({}, stream_info));
@@ -1097,8 +1106,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     std::vector<std::string> time_points{
-        "DS_RX_BEG", "DS_RX_END", "US_TX_BEG", "US_TX_END",         "US_RX_BEG",
-        "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
+        "DS_RX_BEG", "DS_RX_END", "US_CX_BEG", "US_CX_END", "US_HS_END", "US_TX_BEG",
+        "US_TX_END", "US_RX_BEG", "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
     };
 
     std::vector<std::string> precisions{"ms", "us", "ns"};
@@ -1142,43 +1151,61 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(2000000))));
       stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
-      // US_TX_BEG
+      // US_CX_BEG
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(3000000))));
+      stream_info.upstream_info_->upstreamTiming().upstream_connect_start_ =
+          time_system.monotonicTime();
+
+      // US_CX_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+      stream_info.upstream_info_->upstreamTiming().upstream_connect_complete_ =
+          time_system.monotonicTime();
+
+      // US_HS_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+      stream_info.upstream_info_->upstreamTiming().upstream_handshake_complete_ =
+          time_system.monotonicTime();
+
+      // US_TX_BEG
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(6000000))));
       stream_info.upstream_info_->upstreamTiming().first_upstream_tx_byte_sent_ =
           time_system.monotonicTime();
 
       // US_TX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(7000000))));
       stream_info.upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_ =
           time_system.monotonicTime();
 
       // US_RX_BEG
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(8000000))));
       stream_info.upstream_info_->upstreamTiming().first_upstream_rx_byte_received_ =
           time_system.monotonicTime();
 
       // US_RX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(6000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(9000000))));
       stream_info.upstream_info_->upstreamTiming().last_upstream_rx_byte_received_ =
           time_system.monotonicTime();
 
       // DS_TX_BEG
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(7000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(10000000))));
       stream_info.downstream_timing_.onFirstDownstreamTxByteSent(time_system);
 
       // DS_TX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(8000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(11000000))));
       stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
 
       // custom_time_point
       stream_info.downstream_timing_.setValue("custom_time_point",
-                                              MonotonicTime(std::chrono::nanoseconds(9000000)));
+                                              MonotonicTime(std::chrono::nanoseconds(12000000)));
 
       for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
         for (size_t end_index = 0; end_index < time_points.size(); end_index++) {
@@ -3294,65 +3321,6 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterCamelStringTest) {
   }
 }
 
-TEST(SubstitutionFormatterTest,
-     GrpcStatusFormatterCamelStringTest_validate_grpc_header_before_log_grpc_status) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.validate_grpc_header_before_log_grpc_status", "false"},
-  });
-
-  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
-                                GrpcStatusFormatter::Format::CamelString);
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
-
-  std::vector<std::string> grpc_statuses{
-      "OK",       "Canceled",       "Unknown",          "InvalidArgument",   "DeadlineExceeded",
-      "NotFound", "AlreadyExists",  "PermissionDenied", "ResourceExhausted", "FailedPrecondition",
-      "Aborted",  "OutOfRange",     "Unimplemented",    "Internal",          "Unavailable",
-      "DataLoss", "Unauthenticated"};
-  for (size_t i = 0; i < grpc_statuses.size(); ++i) {
-    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
-    EXPECT_EQ(grpc_statuses[i], formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
-  }
-  {
-    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
-    EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue("-1")));
-    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue("42738")));
-    response_trailer.clear();
-  }
-  {
-    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue("-1")));
-    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue("42738")));
-    response_header.clear();
-  }
-}
-
 TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
                                 GrpcStatusFormatter::Format::SnakeString);
@@ -3439,77 +3407,6 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterSnakeStringTest) {
   }
 }
 
-TEST(SubstitutionFormatterTest,
-     GrpcStatusFormatterSnakeStringTest_validate_grpc_header_before_log_grpc_status) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.validate_grpc_header_before_log_grpc_status", "false"},
-  });
-
-  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
-                                GrpcStatusFormatter::Format::SnakeString);
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
-
-  std::vector<std::string> grpc_statuses{"OK",
-                                         "CANCELLED",
-                                         "UNKNOWN",
-                                         "INVALID_ARGUMENT",
-                                         "DEADLINE_EXCEEDED",
-                                         "NOT_FOUND",
-                                         "ALREADY_EXISTS",
-                                         "PERMISSION_DENIED",
-                                         "RESOURCE_EXHAUSTED",
-                                         "FAILED_PRECONDITION",
-                                         "ABORTED",
-                                         "OUT_OF_RANGE",
-                                         "UNIMPLEMENTED",
-                                         "INTERNAL",
-                                         "UNAVAILABLE",
-                                         "DATA_LOSS",
-                                         "UNAUTHENTICATED"};
-  for (size_t i = 0; i < grpc_statuses.size(); ++i) {
-    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
-    EXPECT_EQ(grpc_statuses[i], formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue(grpc_statuses[i])));
-  }
-  {
-    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
-    EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue("-1")));
-    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue("42738")));
-    response_trailer.clear();
-  }
-  {
-    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue("-1")));
-    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::stringValue("42738")));
-    response_header.clear();
-  }
-}
-
 TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
                                 GrpcStatusFormatter::Format::Number);
@@ -3578,62 +3475,6 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
                 ProtoEq(ValueUtil::nullValue()));
     response_header.clear();
     request_header = {{":method", "GET"}, {":path", "/"}, {"content-type", "application/grpc"}};
-  }
-}
-
-TEST(SubstitutionFormatterTest,
-     GrpcStatusFormatterNumberTest_validate_grpc_header_before_log_grpc_status) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.validate_grpc_header_before_log_grpc_status", "false"},
-  });
-
-  GrpcStatusFormatter formatter("grpc-status", "", absl::optional<size_t>(),
-                                GrpcStatusFormatter::Format::Number);
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  Http::TestRequestHeaderMapImpl request_header;
-  Http::TestResponseHeaderMapImpl response_header;
-  Http::TestResponseTrailerMapImpl response_trailer;
-  std::string body;
-
-  HttpFormatterContext formatter_context(&request_header, &response_header, &response_trailer,
-                                         body);
-
-  const int grpcStatuses = static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown) + 1;
-
-  for (size_t i = 0; i < grpcStatuses; ++i) {
-    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", std::to_string(i)}};
-    EXPECT_EQ(std::to_string(i), formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::numberValue(i)));
-  }
-  {
-    response_trailer = Http::TestResponseTrailerMapImpl{{"not-a-grpc-status", "13"}};
-    EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::nullValue()));
-  }
-  {
-    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::numberValue(-1)));
-    response_trailer = Http::TestResponseTrailerMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::numberValue(42738)));
-    response_trailer.clear();
-  }
-  {
-    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "-1"}};
-    EXPECT_EQ("-1", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::numberValue(-1)));
-    response_header = Http::TestResponseHeaderMapImpl{{"grpc-status", "42738"}};
-    EXPECT_EQ("42738", formatter.formatWithContext(formatter_context, stream_info));
-    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
-                ProtoEq(ValueUtil::numberValue(42738)));
-    response_header.clear();
   }
 }
 

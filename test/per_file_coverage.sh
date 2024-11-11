@@ -9,7 +9,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:95.5"
 "source/common/event:95.6" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:96.3" # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
-"source/common/http/http2:96.0"
+"source/common/http/http2:95.9"
 "source/common/json:95.2"
 "source/common/matcher:94.7"
 "source/common/memory:74.5" # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
@@ -24,6 +24,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tls/private_key:88.9"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:94.2" # increased by #32346, need coverage for terminate_handler and hot restart failures
+"source/extensions/common:96.5"
 "source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
 "source/extensions/common/tap:94.6"
 "source/extensions/common/wasm:95.0" # flaky: be careful adjusting
