@@ -57,7 +57,7 @@ TEST(DynamoRequestParser, parseTableNameSingleOperation) {
       }
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     // Supported operation
     for (const std::string& operation : supported_single_operations) {
@@ -69,7 +69,7 @@ TEST(DynamoRequestParser, parseTableNameSingleOperation) {
   }
 
   {
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(R"({"TableName":"Pets"})");
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(R"({"TableName":"Pets"})");
     EXPECT_EQ("Pets", RequestParser::parseTable("GetItem", *json_data).table_name);
   }
 }
@@ -88,7 +88,7 @@ TEST(DynamoRequestParser, parseTableNameTransactOperation) {
       ]
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     for (const std::string& operation : supported_transact_operations) {
       RequestParser::TableDescriptor table = RequestParser::parseTable(operation, *json_data);
@@ -109,7 +109,7 @@ TEST(DynamoRequestParser, parseTableNameTransactOperation) {
       ]
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     for (const std::string& operation : supported_transact_operations) {
       RequestParser::TableDescriptor table = RequestParser::parseTable(operation, *json_data);
@@ -130,7 +130,7 @@ TEST(DynamoRequestParser, parseTableNameTransactOperation) {
       ]
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     for (const std::string& operation : supported_transact_operations) {
       RequestParser::TableDescriptor table = RequestParser::parseTable(operation, *json_data);
@@ -143,20 +143,20 @@ TEST(DynamoRequestParser, parseTableNameTransactOperation) {
 TEST(DynamoRequestParser, parseErrorType) {
   {
     EXPECT_EQ("ResourceNotFoundException",
-              RequestParser::parseErrorType(*Json::Factory::loadFromString(
+              RequestParser::parseErrorType(**Json::Factory::loadFromString(
                   "{\"__type\":\"com.amazonaws.dynamodb.v20120810#ResourceNotFoundException\"}")));
   }
 
   {
     EXPECT_EQ("ResourceNotFoundException",
-              RequestParser::parseErrorType(*Json::Factory::loadFromString(
+              RequestParser::parseErrorType(**Json::Factory::loadFromString(
                   "{\"__type\":\"com.amazonaws.dynamodb.v20120810#ResourceNotFoundException\","
                   "\"message\":\"Requested resource not found: Table: tablename not found\"}")));
   }
 
   {
     EXPECT_EQ("", RequestParser::parseErrorType(
-                      *Json::Factory::loadFromString("{\"__type\":\"UnKnownError\"}")));
+                      **Json::Factory::loadFromString("{\"__type\":\"UnKnownError\"}")));
   }
 }
 
@@ -170,7 +170,7 @@ TEST(DynamoRequestParser, parseTableNameBatchOperation) {
       }
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     RequestParser::TableDescriptor table = RequestParser::parseTable("BatchGetItem", *json_data);
     EXPECT_EQ("", table.table_name);
@@ -186,7 +186,7 @@ TEST(DynamoRequestParser, parseTableNameBatchOperation) {
       }
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     RequestParser::TableDescriptor table = RequestParser::parseTable("BatchGetItem", *json_data);
     EXPECT_EQ("table_2", table.table_name);
@@ -203,7 +203,7 @@ TEST(DynamoRequestParser, parseTableNameBatchOperation) {
       }
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     RequestParser::TableDescriptor table = RequestParser::parseTable("BatchGetItem", *json_data);
     EXPECT_EQ("", table.table_name);
@@ -219,7 +219,7 @@ TEST(DynamoRequestParser, parseTableNameBatchOperation) {
       }
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     RequestParser::TableDescriptor table = RequestParser::parseTable("BatchWriteItem", *json_data);
     EXPECT_EQ("table_2", table.table_name);
@@ -227,22 +227,22 @@ TEST(DynamoRequestParser, parseTableNameBatchOperation) {
   }
 
   {
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString("{}");
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString("{}");
     RequestParser::TableDescriptor table =
-        RequestParser::parseTable("BatchWriteItem", *Json::Factory::loadFromString("{}"));
+        RequestParser::parseTable("BatchWriteItem", **Json::Factory::loadFromString("{}"));
     EXPECT_EQ("", table.table_name);
     EXPECT_TRUE(table.is_single_table);
   }
 
   {
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString("{\"RequestItems\":{}}");
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString("{\"RequestItems\":{}}");
     RequestParser::TableDescriptor table = RequestParser::parseTable("BatchWriteItem", *json_data);
     EXPECT_EQ("", table.table_name);
     EXPECT_TRUE(table.is_single_table);
   }
 
   {
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString("{}");
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString("{}");
     RequestParser::TableDescriptor table = RequestParser::parseTable("BatchGetItem", *json_data);
     EXPECT_EQ("", table.table_name);
     EXPECT_TRUE(table.is_single_table);
@@ -250,20 +250,20 @@ TEST(DynamoRequestParser, parseTableNameBatchOperation) {
 }
 TEST(DynamoRequestParser, parseBatchUnProcessedKeys) {
   {
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString("{}");
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString("{}");
     std::vector<std::string> unprocessed_tables =
         RequestParser::parseBatchUnProcessedKeys(*json_data);
     EXPECT_EQ(0u, unprocessed_tables.size());
   }
   {
     std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(
-        *Json::Factory::loadFromString("{\"UnprocessedKeys\":{}}"));
+        **Json::Factory::loadFromString("{\"UnprocessedKeys\":{}}"));
     EXPECT_EQ(0u, unprocessed_tables.size());
   }
 
   {
     std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(
-        *Json::Factory::loadFromString(R"({"UnprocessedKeys":{"table_1" :{}}})"));
+        **Json::Factory::loadFromString(R"({"UnprocessedKeys":{"table_1" :{}}})"));
     EXPECT_EQ("table_1", unprocessed_tables[0]);
     EXPECT_EQ(1u, unprocessed_tables.size());
   }
@@ -277,7 +277,7 @@ TEST(DynamoRequestParser, parseBatchUnProcessedKeys) {
       }
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     std::vector<std::string> unprocessed_tables =
         RequestParser::parseBatchUnProcessedKeys(*json_data);
@@ -292,17 +292,17 @@ TEST(DynamoRequestParser, parseBatchUnProcessedKeys) {
 TEST(DynamoRequestParser, parsePartitionIds) {
   {
     std::vector<RequestParser::PartitionDescriptor> partitions =
-        RequestParser::parsePartitions(*Json::Factory::loadFromString("{}"));
-    EXPECT_EQ(0u, partitions.size());
-  }
-  {
-    std::vector<RequestParser::PartitionDescriptor> partitions =
-        RequestParser::parsePartitions(*Json::Factory::loadFromString("{\"ConsumedCapacity\":{}}"));
+        RequestParser::parsePartitions(**Json::Factory::loadFromString("{}"));
     EXPECT_EQ(0u, partitions.size());
   }
   {
     std::vector<RequestParser::PartitionDescriptor> partitions = RequestParser::parsePartitions(
-        *Json::Factory::loadFromString(R"({"ConsumedCapacity":{ "Partitions":{}}})"));
+        **Json::Factory::loadFromString("{\"ConsumedCapacity\":{}}"));
+    EXPECT_EQ(0u, partitions.size());
+  }
+  {
+    std::vector<RequestParser::PartitionDescriptor> partitions = RequestParser::parsePartitions(
+        **Json::Factory::loadFromString(R"({"ConsumedCapacity":{ "Partitions":{}}})"));
     EXPECT_EQ(0u, partitions.size());
   }
   {
@@ -316,7 +316,7 @@ TEST(DynamoRequestParser, parsePartitionIds) {
       }
     }
     )EOF";
-    Json::ObjectSharedPtr json_data = Json::Factory::loadFromString(json_string);
+    Json::ObjectSharedPtr json_data = *Json::Factory::loadFromString(json_string);
 
     std::vector<RequestParser::PartitionDescriptor> partitions =
         RequestParser::parsePartitions(*json_data);

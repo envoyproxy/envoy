@@ -13,7 +13,12 @@ on:
     - completed
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  group: >-
+    ${{ ((github.event.workflow_run.head_branch == 'main'
+          || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+          && github.event.repository.full_name == github.repository)
+        && github.run_id
+        || github.event.workflow_run.head_branch }}-${{ github.event.repository.full_name }}-${{ github.workflow }}
   cancel-in-progress: true
 
 env:
@@ -25,8 +30,6 @@ jobs:
     secrets:
       app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
-      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
-      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
     permissions:
       actions: read
       contents: read

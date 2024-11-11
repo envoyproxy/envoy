@@ -24,13 +24,6 @@ concurrency:
 
 jobs:
   request:
-    # For branches this can be pinned to a specific version if required
-    # NB: `uses` cannot be dynamic so it _must_ be hardcoded anywhere it is read
-    uses: envoyproxy/envoy/.github/workflows/_request.yml@main
-    if: >-
-      ${{ github.repository == 'envoyproxy/envoy'
-          || (vars.ENVOY_CI && github.event_name != 'schedule')
-          || (vars.ENVOY_SCHEDULED_CI && github.event_name == 'schedule') }}
     permissions:
       actions: read
       contents: read
@@ -41,3 +34,12 @@ jobs:
       # these are required to start checks
       app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
+    # For branches this can be pinned to a specific version if required
+    # NB: `uses` cannot be dynamic so it _must_ be hardcoded anywhere it is read
+    uses: envoyproxy/envoy/.github/workflows/_request.yml@main
+    if: >-
+      ${{ github.repository == 'envoyproxy/envoy'
+          || (vars.ENVOY_CI && github.event_name != 'schedule')
+          || (vars.ENVOY_SCHEDULED_CI && github.event_name == 'schedule') }}

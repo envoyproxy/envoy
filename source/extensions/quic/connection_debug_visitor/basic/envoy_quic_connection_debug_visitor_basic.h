@@ -23,7 +23,7 @@ namespace Quic {
 class EnvoyQuicConnectionDebugVisitorBasic : public quic::QuicConnectionDebugVisitor,
                                              private Logger::Loggable<Logger::Id::connection> {
 public:
-  EnvoyQuicConnectionDebugVisitorBasic(quic::QuicSession* session,
+  EnvoyQuicConnectionDebugVisitorBasic(quic::QuicSession& session,
                                        const StreamInfo::StreamInfo& stream_info)
       : session_(session), stream_info_(stream_info) {
     // Workaround for gcc not understanding [[maybe_unused]] for class members.
@@ -35,12 +35,19 @@ public:
                           quic::ConnectionCloseSource source) override;
 
 private:
-  quic::QuicSession* session_;
+  quic::QuicSession& session_;
   const StreamInfo::StreamInfo& stream_info_;
 };
 
 class EnvoyQuicConnectionDebugVisitorFactoryBasic
     : public EnvoyQuicConnectionDebugVisitorFactoryInterface {
+  std::unique_ptr<quic::QuicConnectionDebugVisitor>
+  createQuicConnectionDebugVisitor(Event::Dispatcher&, quic::QuicSession& session,
+                                   const StreamInfo::StreamInfo& stream_info) override;
+};
+
+class EnvoyQuicConnectionDebugVisitorFactoryFactoryBasic
+    : public EnvoyQuicConnectionDebugVisitorFactoryFactoryInterface {
 public:
   std::string name() const override { return "envoy.quic.connection_debug_visitor.basic"; }
 
@@ -48,9 +55,10 @@ public:
     return std::make_unique<envoy::extensions::quic::connection_debug_visitor::v3::BasicConfig>();
   }
 
-  std::unique_ptr<quic::QuicConnectionDebugVisitor>
-  createQuicConnectionDebugVisitor(quic::QuicSession* session,
-                                   const StreamInfo::StreamInfo& stream_info) override;
+  EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr
+  createFactory(const Protobuf::Message&, Server::Configuration::ListenerFactoryContext&) override {
+    return std::make_unique<EnvoyQuicConnectionDebugVisitorFactoryBasic>();
+  }
 };
 
 DECLARE_FACTORY(EnvoyQuicConnectionDebugVisitorFactoryBasic);

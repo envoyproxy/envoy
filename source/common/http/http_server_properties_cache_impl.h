@@ -92,6 +92,7 @@ public:
   HttpServerPropertiesCache::Http3StatusTracker&
   getOrCreateHttp3StatusTracker(const Origin& origin) override;
   void resetBrokenness() override;
+  void resetStatus() override;
 
 private:
   // Time source used to check expiration of entries.

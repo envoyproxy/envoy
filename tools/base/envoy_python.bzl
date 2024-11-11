@@ -172,7 +172,7 @@ def envoy_jinja_env(
         deps = [name_entry_point],
     )
 
-def envoy_genjson(name, srcs = [], yaml_srcs = [], filter = None, args = None):
+def envoy_genjson(name, srcs = [], yaml_srcs = [], filter = None, args = None, visibility = None):
     '''Generate JSON from JSON and YAML sources
 
     By default the sources will be merged in jq `slurp` mode.
@@ -223,6 +223,7 @@ def envoy_genjson(name, srcs = [], yaml_srcs = [], filter = None, args = None):
         out = "%s.json" % name,
         args = args,
         filter = filter,
+        visibility = visibility,
     )
 
 def envoy_py_data(
@@ -283,6 +284,7 @@ def envoy_py_data(
         name = name_entry_point,
         pkg = "@base_pip3//envoy_base_utils",
         script = "envoy.data_env",
+        data = init_data,
     )
 
     native.genrule(
