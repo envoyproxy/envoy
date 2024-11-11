@@ -762,15 +762,39 @@ TEST(HeaderMatcher, MultipleHeaderValues) {
 
   Envoy::Http::TestRequestHeaderMapImpl headers;
   Envoy::Http::LowerCaseString header_name("multi-header");
+
+  // Test single value match
   headers.setReference(header_name, "value1");
+  RBAC::HeaderMatcher matcher1(config, factory_context);
+  checkMatcher(matcher1, true, Envoy::Network::MockConnection(), headers);
 
-  RBAC::HeaderMatcher matcher(config, factory_context);
-  checkMatcher(matcher, true, Envoy::Network::MockConnection(), headers);
+  // Test multiple values with match present
+  headers.addReference(header_name, "value2"); // Now header has both "value1" and "value2"
+  config.mutable_string_match()->set_contains("value1");
+  RBAC::HeaderMatcher matcher2(config, factory_context);
+  checkMatcher(matcher2, true, Envoy::Network::MockConnection(), headers);
 
-  // Test with non-matching value
+  // Test multiple values without match present
   headers.remove(header_name);
-  headers.setReference(header_name, "value2");
-  checkMatcher(matcher, false, Envoy::Network::MockConnection(), headers);
+  headers.addReference(header_name, "value2");
+  headers.addReference(header_name, "value3");
+  config.mutable_string_match()->set_suffix("value1");
+  RBAC::HeaderMatcher matcher3(config, factory_context);
+  checkMatcher(matcher3, false, Envoy::Network::MockConnection(), headers);
+
+  // Test empty value
+  headers.remove(header_name);
+  headers.addReference(header_name, "");
+  config.mutable_string_match()->set_exact("value1");
+  RBAC::HeaderMatcher matcher4(config, factory_context);
+  checkMatcher(matcher4, false, Envoy::Network::MockConnection(), headers);
+
+  // Test multiple values including empty
+  headers.addReference(header_name, "value1");
+  headers.addReference(header_name, "");
+  config.mutable_string_match()->set_contains("value1");
+  RBAC::HeaderMatcher matcher5(config, factory_context);
+  checkMatcher(matcher5, true, Envoy::Network::MockConnection(), headers);
 }
 
 TEST(AuthenticatedMatcher, EmptyCertificateFields) {
