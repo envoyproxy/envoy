@@ -1,3 +1,4 @@
+**Summary of changes**:
 
 * Envoy now logs warnings when `internal_address_config` is not set.  If you see this logged warning and wish to retain trusted status for internal addresses you must explicitly configure `internal_address_config` (which will turn off the warning) before the next Envoy release.
 * Removed support for (long deprecated) opentracing. 
