@@ -23,9 +23,7 @@ public:
   const RequestIDExtensionSharedPtr& requestIDExtension() override {
     return parent_.requestIDExtension();
   }
-  const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override {
-    return parent_.accessLogs();
-  }
+  const AccessLog::InstanceVector& accessLogs() override { return parent_.accessLogs(); }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return parent_.accessLogFlushInterval();
   }
