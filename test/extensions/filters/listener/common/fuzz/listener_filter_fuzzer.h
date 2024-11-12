@@ -69,9 +69,7 @@ public:
   Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
     return connection_balancer_;
   }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
-    return empty_access_logs_;
-  }
+  const AccessLog::InstanceVector& accessLogs() const override { return empty_access_logs_; }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
   uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
     return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
@@ -114,7 +112,7 @@ private:
   NiceMock<Network::MockConnectionCallbacks> connection_callbacks_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
-  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  const AccessLog::InstanceVector empty_access_logs_;
   std::unique_ptr<Init::Manager> init_manager_;
   bool connection_established_{};
   const Network::ListenerInfoConstSharedPtr listener_info_;

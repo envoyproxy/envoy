@@ -189,18 +189,25 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
-    std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-      std::list<AccessLog::InstanceSharedPtr> combined_log_handlers(
-          filter_manager_.accessLogHandlers());
-      std::list<AccessLog::InstanceSharedPtr> config_log_handlers_(
-          connection_manager_.config_->accessLogs());
+    AccessLog::InstanceInlinedVector accessLogHandlers() override {
+      AccessLog::InstanceInlinedVector combined_log_handlers;
+
+      const AccessLog::InstanceVector& config_log_handlers =
+          connection_manager_.config_->accessLogs();
+      const AccessLog::InstanceVector& filter_log_handlers = filter_manager_.accessLogHandlers();
+
       if (!Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.filter_access_loggers_first")) {
-        combined_log_handlers.insert(combined_log_handlers.begin(), config_log_handlers_.begin(),
-                                     config_log_handlers_.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+
       } else {
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers_.begin(),
-                                     config_log_handlers_.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
       }
       return combined_log_handlers;
     }

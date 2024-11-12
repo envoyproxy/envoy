@@ -20,7 +20,7 @@ const Network::Socket& ValidationAdmin::socket() { return *socket_; }
 
 ConfigTracker& ValidationAdmin::getConfigTracker() { return config_tracker_; }
 
-void ValidationAdmin::startHttpListener(std::list<AccessLog::InstanceSharedPtr>,
+void ValidationAdmin::startHttpListener(AccessLog::InstanceVector,
                                         Network::Address::InstanceConstSharedPtr,
                                         Network::Socket::OptionsSharedPtr) {}
 

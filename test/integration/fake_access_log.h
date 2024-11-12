@@ -51,7 +51,7 @@ public:
 private:
   std::mutex log_callback_lock_;
   LogSignature log_cb_{nullptr};
-  std::vector<AccessLog::InstanceSharedPtr> access_log_instances_;
+  AccessLog::InstanceVector access_log_instances_;
 };
 
 } // namespace Envoy

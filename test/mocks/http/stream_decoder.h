@@ -31,7 +31,7 @@ public:
   // Http::RequestDecoder
   MOCK_METHOD(void, decodeHeaders_, (RequestHeaderMapSharedPtr & headers, bool end_stream));
   MOCK_METHOD(void, decodeTrailers_, (RequestTrailerMapPtr & trailers));
-  MOCK_METHOD(std::list<AccessLog::InstanceSharedPtr>, accessLogHandlers, ());
+  MOCK_METHOD(AccessLog::InstanceInlinedVector, accessLogHandlers, ());
 };
 
 class MockResponseDecoder : public ResponseDecoder {

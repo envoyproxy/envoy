@@ -31,7 +31,7 @@ public:
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;
-  void startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
+  void startHttpListener(AccessLog::InstanceVector access_logs,
                          Network::Address::InstanceConstSharedPtr address,
                          Network::Socket::OptionsSharedPtr) override;
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
