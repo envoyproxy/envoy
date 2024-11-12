@@ -6,9 +6,15 @@ permissions:
 on:
   workflow_call:
     secrets:
+      gcs-cache-key:
+        required: true
       gcp-key:
         required: true
+
     inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -24,6 +30,7 @@ concurrency:
 jobs:
   coverage:
     secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
       gcp-key: ${{ secrets.gcp-key }}
     permissions:
       contents: read
@@ -41,6 +48,7 @@ jobs:
         error:
         Error:
         lower than limit
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
       request: ${{ inputs.request }}
       steps-post: |

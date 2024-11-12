@@ -1,0 +1,106 @@
+name: Request/Cache prime (bazel)
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      app-id:
+        required: true
+      app-key:
+        required: true
+      gcs-cache-key:
+        required: true
+
+    inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
+
+      arch:
+        type: string
+        default: x64
+      bazel-extra:
+        type: string
+        default: >-
+          --config=remote-envoy-engflow
+      caches:
+        type: string
+        required: true
+      request:
+        type: string
+        required: true
+      runs-on:
+        type: string
+        default: ubuntu-24.04
+      lock-repository:
+        type: string
+        default: envoyproxy/ci-mutex
+      targets:
+        type: string
+        default: ...
+
+
+jobs:
+  bazel:
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ${{ inputs.runs-on || 'ubuntu-24.04' }}
+    name: "[${{ inputs.arch }}] Prime Bazel cache"
+    if: ${{ ! fromJSON(inputs.caches).bazel[inputs.arch] }}
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.5
+      id: checkout-target
+      name: Checkout Envoy repository (target branch)
+      with:
+        branch: ${{ fromJSON(inputs.request).request.target-branch }}
+        config: |
+          fetch-depth: 1
+
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.5
+      id: appauth
+      name: Appauth (mutex lock)
+      with:
+        app_id: ${{ secrets.app-id }}
+        key: ${{ secrets.app-key }}
+
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.5
+      name: Setup GCP
+      with:
+        key: ${{ secrets.gcs-cache-key }}
+    - run: |
+        # Simulate container build directory
+        sudo mkdir /build
+        sudo chown runner:docker /build
+        echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
+    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.5
+      id: bazel-cache
+      name: Prime Bazel cache
+      with:
+        change-directory: false
+        # TODO(phlax): add loop for multiple targets
+        command: |
+          # Simulate container source directory
+          sudo mkdir /source
+          sudo chown runner:docker /source
+          cd /source
+          git clone "$GITHUB_WORKSPACE" .
+
+          echo "Fetching: ${{ inputs.targets }}"
+          # ironically the repository_cache is just about the only thing you dont want to cache
+          bazel --output_user_root=/build/bazel_root \
+                --output_base=/build/bazel_root/base \
+                aquery "deps(${{ inputs.targets }})" \
+                --config=ci \
+                --repository_cache=/tmp/cache \
+                ${{ inputs.bazel-extra }} \
+                > /dev/null
+        gcs-bucket: ${{ inputs.gcs-cache-bucket }}
+        key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch }}
+        lock-token: ${{ steps.appauth.outputs.token }}
+        lock-repository: ${{ inputs.lock-repository }}
+        mount-tmpfs: false
+        path: /build/bazel_root
+        run-as-sudo: false

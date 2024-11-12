@@ -36,6 +36,8 @@ jobs:
       check-name: prechecks
 
   format:
+    secrets:
+      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
       actions: read
       contents: read
@@ -47,10 +49,13 @@ jobs:
     needs:
     - load
     with:
+      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
 
   deps:
+    secrets:
+      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
       actions: read
       contents: read
@@ -62,6 +67,7 @@ jobs:
     needs:
     - load
     with:
+      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       dependency-review: ${{ github.event_name == 'pull_request_target' && github.repository == 'envoyproxy/envoy' }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
@@ -69,6 +75,7 @@ jobs:
   publish:
     secrets:
       gcp-key: ${{ fromJSON(needs.load.outputs.trusted) && secrets.GCP_SERVICE_ACCOUNT_KEY_TRUSTED || secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
     permissions:
       actions: read
       contents: read
@@ -80,6 +87,7 @@ jobs:
     needs:
     - load
     with:
+      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
 
