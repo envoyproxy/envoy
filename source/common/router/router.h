@@ -199,7 +199,7 @@ public:
 /**
  * Configuration for the router filter.
  */
-class FilterConfig : Http::FilterChainFactory {
+class FilterConfig : public Http::FilterChainFactory {
 public:
   FilterConfig(Server::Configuration::CommonFactoryContext& factory_context,
                Stats::StatName stat_prefix, const LocalInfo::LocalInfo& local_info,
