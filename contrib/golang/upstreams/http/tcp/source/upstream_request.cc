@@ -100,11 +100,7 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
     conn_pool_data_ = thread_local_cluster.tcpConnPool(priority, ctx);
 
     envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config c;
-    
-    ProtobufWkt::Any any;
-    any.ParseFromString(config.SerializeAsString());
-
-    auto s = c.ParseFromString(any.value());
+    auto s = c.ParseFromString(config.SerializeAsString());
     ASSERT(s, "any.value() ParseFromString should always successful");
 
     ENVOY_LOG(debug, "tcp upstream load tcp_upstream_golang library at parse config: {} {}", c.library_id(), c.library_path());

@@ -826,12 +826,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 std::unique_ptr<GenericConnPool>
 Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   GenericConnPoolFactory* factory = nullptr;
+  ProtobufTypes::MessagePtr message;
   if (cluster_->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
         cluster_->upstreamConfig().ref());
     ENVOY_BUG(factory != nullptr,
               fmt::format("invalid factory type '{}', failing over to default upstream",
                           cluster_->upstreamConfig().ref().DebugString()));
+    message = Envoy::Config::Utility::translateToFactoryConfig(
+    *cluster_->upstreamConfig(), config_->factory_context_.messageValidationVisitor(), *factory);                                            
   }
   if (!factory) {
     factory = &config_->router_context_.genericConnPoolFactory();
@@ -852,7 +855,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   }
   return factory->createGenericConnPool(thread_local_cluster, upstream_protocol,
                                         route_entry_->priority(),
-                                        callbacks_->streamInfo().protocol(), this, cluster_->upstreamConfig()->typed_config());
+                                        callbacks_->streamInfo().protocol(), this, *message);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
