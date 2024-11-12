@@ -31,7 +31,7 @@ public:
   MOCK_METHOD(Network::Socket&, socket, ());
   MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
   MOCK_METHOD(void, startHttpListener,
-              (AccessLog::InstanceVector access_logs,
+              (AccessLog::InstanceSharedPtrVector access_logs,
                Network::Address::InstanceConstSharedPtr address,
                Network::Socket::OptionsSharedPtr socket_options));
   MOCK_METHOD(Http::Code, request,

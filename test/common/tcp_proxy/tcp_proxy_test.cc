@@ -73,7 +73,8 @@ public:
 
     configure(config);
     mock_access_logger_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
-    const_cast<AccessLog::InstanceVector&>(config_->accessLogs()).push_back(mock_access_logger_);
+    const_cast<AccessLog::InstanceSharedPtrVector&>(config_->accessLogs())
+        .push_back(mock_access_logger_);
     upstream_local_address_ = *Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = *Network::Utility::resolveUrl("tcp://127.0.0.1:80");
     for (uint32_t i = 0; i < connections; i++) {

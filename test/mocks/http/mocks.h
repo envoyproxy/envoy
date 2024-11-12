@@ -621,7 +621,7 @@ public:
   }
 
   MOCK_METHOD(const RequestIDExtensionSharedPtr&, requestIDExtension, ());
-  MOCK_METHOD(const AccessLog::InstanceVector&, accessLogs, ());
+  MOCK_METHOD(const AccessLog::InstanceSharedPtrVector&, accessLogs, ());
   MOCK_METHOD(bool, flushAccessLogOnNewRequest, ());
   MOCK_METHOD(bool, flushAccessLogOnTunnelSuccessfullyEstablished, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());

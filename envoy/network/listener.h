@@ -273,9 +273,9 @@ public:
   virtual ResourceLimit& openConnections() PURE;
 
   /**
-   * @return AccessLog::InstanceVector access logs emitted by the listener.
+   * @return AccessLog::InstanceSharedPtrVector access logs emitted by the listener.
    */
-  virtual const AccessLog::InstanceVector& accessLogs() const PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() const PURE;
 
   /**
    * @return pending connection backlog for TCP listeners.

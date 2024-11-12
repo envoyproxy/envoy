@@ -128,7 +128,7 @@ public:
 
   // Http::ConnectionManagerConfig
   const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
-  const AccessLog::InstanceVector& accessLogs() override { return access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
     return flush_access_log_on_tunnel_successfully_established_;
@@ -252,7 +252,7 @@ public:
       config_;
   NiceMock<Random::MockRandomGenerator> random_;
   RequestIDExtensionSharedPtr request_id_extension_;
-  AccessLog::InstanceVector access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   bool flush_access_log_on_new_request_ = false;
   bool flush_access_log_on_tunnel_successfully_established_ = false;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;

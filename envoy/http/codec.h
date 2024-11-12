@@ -262,7 +262,7 @@ public:
   /**
    * @return List of shared pointers to access loggers for this stream.
    */
-  virtual AccessLog::InstanceInlinedVector accessLogHandlers() PURE;
+  virtual AccessLog::InstanceSharedPtrVector accessLogHandlers() PURE;
 };
 
 /**

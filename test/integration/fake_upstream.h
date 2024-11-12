@@ -232,7 +232,7 @@ public:
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
   }
-  AccessLog::InstanceInlinedVector accessLogHandlers() override { return access_log_handlers_; }
+  AccessLog::InstanceSharedPtrVector accessLogHandlers() override { return access_log_handlers_; }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -267,7 +267,7 @@ private:
   Http::MetadataMap metadata_map_;
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   std::shared_ptr<StreamInfo::StreamInfo> stream_info_;
-  AccessLog::InstanceInlinedVector access_log_handlers_;
+  AccessLog::InstanceSharedPtrVector access_log_handlers_;
   bool received_data_{false};
   bool grpc_stream_started_{false};
   Http::ServerHeaderValidatorPtr header_validator_;
@@ -904,7 +904,9 @@ private:
       return connection_balancer_;
     }
     bool shouldBypassOverloadManager() const override { return false; }
-    const AccessLog::InstanceVector& accessLogs() const override { return empty_access_logs_; }
+    const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
+      return empty_access_logs_;
+    }
     const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
       return listener_info_;
     }
@@ -925,7 +927,7 @@ private:
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     BasicResourceLimitImpl connection_resource_;
-    const AccessLog::InstanceVector empty_access_logs_;
+    const AccessLog::InstanceSharedPtrVector empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
     const Network::ListenerInfoConstSharedPtr listener_info_;
     std::unique_ptr<Server::Configuration::MockListenerFactoryContext> context_;

@@ -189,12 +189,14 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
-    AccessLog::InstanceInlinedVector accessLogHandlers() override {
-      AccessLog::InstanceInlinedVector combined_log_handlers;
-
-      const AccessLog::InstanceVector& config_log_handlers =
+    AccessLog::InstanceSharedPtrVector accessLogHandlers() override {
+      const AccessLog::InstanceSharedPtrVector& config_log_handlers =
           connection_manager_.config_->accessLogs();
-      const AccessLog::InstanceVector& filter_log_handlers = filter_manager_.accessLogHandlers();
+      const AccessLog::InstanceSharedPtrVector& filter_log_handlers =
+          filter_manager_.accessLogHandlers();
+
+      AccessLog::InstanceSharedPtrVector combined_log_handlers;
+      combined_log_handlers.reserve(config_log_handlers.size() + filter_log_handlers.size());
 
       if (!Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.filter_access_loggers_first")) {

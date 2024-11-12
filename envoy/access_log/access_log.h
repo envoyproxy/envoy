@@ -103,9 +103,7 @@ using FilterPtr = std::unique_ptr<Filter>;
  */
 using Instance = InstanceBase<Formatter::HttpFormatterContext>;
 using InstanceSharedPtr = std::shared_ptr<Instance>;
-
-using InstanceInlinedVector = absl::InlinedVector<InstanceSharedPtr, 4>;
-using InstanceVector = std::vector<InstanceSharedPtr>;
+using InstanceSharedPtrVector = std::vector<InstanceSharedPtr>;
 
 } // namespace AccessLog
 } // namespace Envoy

@@ -217,7 +217,7 @@ public:
   /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.
    */
-  virtual const AccessLog::InstanceVector& accessLogs() PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() PURE;
 
   /**
    * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.

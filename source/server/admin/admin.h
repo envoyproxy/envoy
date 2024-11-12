@@ -94,7 +94,7 @@ public:
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
-  void startHttpListener(AccessLog::InstanceVector access_logs,
+  void startHttpListener(AccessLog::InstanceSharedPtrVector access_logs,
                          Network::Address::InstanceConstSharedPtr address,
                          Network::Socket::OptionsSharedPtr socket_options) override;
   uint32_t concurrency() const override { return server_.options().concurrency(); }
@@ -127,7 +127,7 @@ public:
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
     return request_id_extension_;
   }
-  const AccessLog::InstanceVector& accessLogs() override { return access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override { return false; }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
@@ -395,7 +395,9 @@ private:
       return connection_balancer_;
     }
     ResourceLimit& openConnections() override { return open_connections_; }
-    const AccessLog::InstanceVector& accessLogs() const override { return empty_access_logs_; }
+    const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
+      return empty_access_logs_;
+    }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
     uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
       return Network::DefaultMaxConnectionsToAcceptPerSocketEvent;
@@ -412,7 +414,7 @@ private:
     BasicResourceLimitImpl open_connections_;
 
   private:
-    const AccessLog::InstanceVector empty_access_logs_;
+    const AccessLog::InstanceSharedPtrVector empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
   };
@@ -448,7 +450,7 @@ private:
   const Network::ListenerInfoConstSharedPtr listener_info_;
   AdminFactoryContext factory_context_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
-  AccessLog::InstanceVector access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   const bool flush_access_log_on_new_request_ = false;
   const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;

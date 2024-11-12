@@ -35,7 +35,7 @@ public:
   // Log this stream using available stream info and access loggers.
   void maybeDoDeferredLog(bool record_ack_timing = true);
   // Set list of pointers to access loggers.
-  void setAccessLogHandlers(AccessLog::InstanceInlinedVector handlers) {
+  void setAccessLogHandlers(AccessLog::InstanceSharedPtrVector handlers) {
     access_log_handlers_ = std::move(handlers);
   }
   // Set headers, trailers, and stream info used for deferred logging.
@@ -55,7 +55,7 @@ public:
 private:
   uint64_t bytes_outstanding_ = 0;
   bool fin_sent_ = false;
-  AccessLog::InstanceInlinedVector access_log_handlers_{};
+  AccessLog::InstanceSharedPtrVector access_log_handlers_{};
   Http::RequestHeaderMapConstSharedPtr request_header_map_;
   Http::ResponseHeaderMapConstSharedPtr response_header_map_;
   Http::ResponseTrailerMapConstSharedPtr response_trailer_map_;
