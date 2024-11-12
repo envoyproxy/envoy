@@ -213,8 +213,6 @@ public:
 protected:
   friend class RequestLookupValues;
   friend class ResponseLookupValues;
-  // friend class RequestWrapper;
-  // friend class ResponseWrapper;
   Protobuf::Arena& arena_;
   const T* value_;
 };
