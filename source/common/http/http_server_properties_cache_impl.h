@@ -160,8 +160,8 @@ private:
   // protocol mapping.
   absl::flat_hash_map<std::string, Origin> canonical_alt_svc_map_;
 
-  // Contains a map of origins which are known to have http3 broken.
-  // Map from a canonical suffix to an actual origin, which is known to have broken QUIC.
+  // Contains a map of origins whose http3 status are known.
+  // Map from a canonical suffix to an actual origin that can provide http3 brokenness info.
   absl::flat_hash_map<std::string, Origin> canonical_h3_brokenness_map_;
 
   // Contains list of suffixes (for example ".c.youtube.com",
