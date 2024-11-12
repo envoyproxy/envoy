@@ -66,7 +66,7 @@ public:
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) override {
     if (config.has_on_demand()) {
       EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
-                  allocateOdCdsApi(_, _, _))
+                  allocateOdCdsApi(_, _, _, _))
           .WillOnce(
               Invoke([this]() { return Upstream::MockOdCdsApiHandlePtr(mock_odcds_api_handle_); }));
     }

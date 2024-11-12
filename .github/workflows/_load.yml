@@ -10,18 +10,11 @@ on:
         required: true
       app-key:
         required: true
-      lock-app-id:
-        required: true
-      lock-app-key:
-        required: true
 
     inputs:
       agent-ubuntu:
         type: string
         default: ubuntu-22.04
-      cache-docker:
-        type: boolean
-        default: true
       check-name:
         type: string
         required: true
@@ -107,7 +100,7 @@ jobs:
     # Handle any failure in triggering job
     # Remove any `checks` we dont care about
     # Prepare a check request
-    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.3.5
       name: Load env
       id: data
       with:
@@ -118,13 +111,13 @@ jobs:
         GH_TOKEN: ${{ github.token }}
 
     #  Update the check
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.5
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.3.5
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
@@ -132,7 +125,7 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.data.outputs.data).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.5
       name: Print request summary
       with:
         input: |
@@ -152,7 +145,7 @@ jobs:
           | $summary.summary as $summary
           | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.5
       id: request-output
       name: Load request
       with:
@@ -168,30 +161,3 @@ jobs:
           | .summary = {title: .summary_title}
           | del(.request.message, .summary_title)
         print-result: ${{ fromJSON(env.CI_DEBUG || 'false') && true || false }}
-
-  cache:
-    secrets:
-      app-id: ${{ secrets.lock-app-id }}
-      app-key: ${{ secrets.lock-app-key }}
-    name: ${{ matrix.name || matrix.target }}
-    needs: request
-    uses: ./.github/workflows/_cache.yml
-    if: ${{ inputs.cache-docker && ! fromJSON(needs.request.outputs.skip) }}
-    with:
-      arch: ${{ matrix.arch }}
-      cache-suffix: ${{ matrix.cache-suffix }}
-      image-tag: ${{ fromJSON(needs.request.outputs.build-image).default }}
-      request: ${{ toJSON(needs.request.outputs) }}
-      runs-on: ${{ matrix.runs-on }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - target: docker-x64
-          name: Docker (x64)
-          arch: x64
-        - target: docker-arm64
-          name: Docker (arm64)
-          arch: arm64
-          cache-suffix: -arm64
-          runs-on: envoy-arm64-small

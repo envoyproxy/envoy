@@ -1467,12 +1467,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
+    # After updating you may need to run:
+    #
+    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #
     rules_rust = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.53.0",
-        sha256 = "85e2013727ab26fb22abdffe4b2ac0c27a2d5b6296167ba63d8f6e13140f51f9",
+        version = "0.54.1",
+        sha256 = "af4f56caae50a99a68bfce39b141b509dd68548c8204b98ab7a1cafc94d5bb02",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
@@ -1484,7 +1488,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         implied_untracked_deps = ["rules_cc"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2024-10-18",
+        release_date = "2024-11-07",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",

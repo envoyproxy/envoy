@@ -19,7 +19,7 @@ static const std::string INLINE_STRING = "<inline>";
 
 CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
-    Api::Api& api)
+    bool auto_sni_san_match, Api::Api& api)
     : ca_cert_(THROW_OR_RETURN_VALUE(
           THROW_OR_RETURN_VALUE(Config::DataSource::read(config.trusted_ca(), true, api),
                                 std::string),
@@ -47,14 +47,15 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       api_(api), only_verify_leaf_cert_crl_(config.only_verify_leaf_cert_crl()),
       max_verify_depth_(config.has_max_verify_depth()
                             ? absl::optional<uint32_t>(config.max_verify_depth().value())
-                            : absl::nullopt) {}
+                            : absl::nullopt),
+      auto_sni_san_match_(auto_sni_san_match) {}
 
 absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
 CertificateValidationContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
-    Api::Api& api) {
+    bool auto_sni_san_match, Api::Api& api) {
   auto config = std::unique_ptr<CertificateValidationContextConfigImpl>(
-      new CertificateValidationContextConfigImpl(context, api));
+      new CertificateValidationContextConfigImpl(context, auto_sni_san_match, api));
   absl::Status status = config->initialize();
   if (status.ok()) {
     return config;

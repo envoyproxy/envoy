@@ -10,6 +10,10 @@ on:
         required: true
       app-key:
         required: true
+      lock-app-id:
+        required: true
+      lock-app-key:
+        required: true
 
     # Defaults are set .github/config.yml on the `main` branch.
     inputs:
@@ -38,16 +42,17 @@ jobs:
       pull-requests: read
     outputs:
       env: ${{ steps.data.outputs.value }}
+      caches: ${{ steps.caches.outputs.value }}
       config: ${{ steps.config.outputs.config }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.5
       id: started
       name: Create timestamp
       with:
         options: -r
         filter: |
           now
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.5
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -60,7 +65,7 @@ jobs:
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
     # use
     - name: Generate environment variables from commit
-      uses: envoyproxy/toolshed/gh-actions/envoy/ci/request@actions-v0.3.1
+      uses: envoyproxy/toolshed/gh-actions/envoy/ci/request@actions-v0.3.5
       id: env
       with:
         branch-name: ${{ steps.checkout.outputs.branch-name }}
@@ -69,9 +74,10 @@ jobs:
         started: ${{ steps.started.outputs.value }}
         token: ${{ secrets.GITHUB_TOKEN }}
         vars: ${{ toJSON(vars) }}
+
     - name: Request summary
       id: summary
-      uses: envoyproxy/toolshed/gh-actions/github/env/summary@actions-v0.3.1
+      uses: envoyproxy/toolshed/gh-actions/github/env/summary@actions-v0.3.5
       with:
         actor: ${{ toJSON(fromJSON(steps.env.outputs.data).request.actor) }}
         base-sha: ${{ fromJSON(steps.env.outputs.data).request.base-sha }}
@@ -87,7 +93,7 @@ jobs:
         target-branch: ${{ fromJSON(steps.env.outputs.data).request.target-branch }}
 
     - name: Environment data
-      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.1
+      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.5
       id: data
       with:
         input: |
@@ -101,7 +107,7 @@ jobs:
           | .env.config.envoy.icon as $icon
           | .link as $link
           | "\($icon) Request ([\($title)](\($link)))" as $linkedTitle
-          |  .summary as $summary
+          | .summary as $summary
           | .env
           | .summary = {
               $summary,
@@ -110,10 +116,46 @@ jobs:
               "linked-title": $linkedTitle}
           | del(.config.tables)
 
+    - name: Check Docker cache (x64)
+      id: cache-exists-docker-x64
+      uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a  # v4.1.2
+      with:
+        lookup-only: true
+        path: /tmp/cache
+        key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}
+    - name: Check Docker cache (arm64)
+      id: cache-exists-docker-arm64
+      uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a  # v4.1.2
+      with:
+        lookup-only: true
+        path: /tmp/cache
+        key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}-arm64
+
+    - name: Caches
+      uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.5
+      id: caches
+      with:
+        input-format: yaml
+        input: |
+          docker:
+            x64: ${{ steps.cache-exists-docker-x64.outputs.cache-hit || 'false' }}
+            arm64: ${{ steps.cache-exists-docker-arm64.outputs.cache-hit || 'false' }}
+
+  cache:
+    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
+    needs: incoming
+    uses: ./.github/workflows/_request_cache.yml
+    secrets:
+      app-id: ${{ secrets.lock-app-id }}
+      app-key: ${{ secrets.lock-app-key }}
+    with:
+      caches: ${{ needs.incoming.outputs.caches }}
+      env: ${{ needs.incoming.outputs.env }}
+
   checks:
     if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
     needs: incoming
-    uses: ./.github/workflows/_start.yml
+    uses: ./.github/workflows/_request_checks.yml
     secrets:
       app-id: ${{ secrets.app-id }}
       app-key: ${{ secrets.app-key }}
