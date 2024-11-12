@@ -14,6 +14,10 @@
 #include "gmock/gmock.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Filters {
+namespace Common {
+namespace Expr {
 
 using testing::NiceMock;
 using testing::Return;
@@ -47,7 +51,10 @@ public:
 
   void testRequestAttributes(::benchmark::State& state) {
     static const std::vector<absl::string_view> attributes = {
-        "scheme", "path", "method", "referer", "user-agent", "size", "total_size", "protocol"};
+        absl::string_view("scheme"),     absl::string_view("path"),
+        absl::string_view("method"),     absl::string_view("referer"),
+        absl::string_view("user-agent"), absl::string_view("size"),
+        absl::string_view("total_size"), absl::string_view("protocol")};
     size_t idx = 0;
 
     for (auto _ : state) { // NOLINT
@@ -59,8 +66,9 @@ public:
   }
 
   void testResponseAttributes(::benchmark::State& state) {
-    static const std::vector<absl::string_view> attributes = {"code", "size", "headers", "trailers",
-                                                              "grpc_status"};
+    static const std::vector<absl::string_view> attributes = {
+        absl::string_view("code"), absl::string_view("size"), absl::string_view("headers"),
+        absl::string_view("trailers"), absl::string_view("grpc_status")};
     size_t idx = 0;
 
     for (auto _ : state) { // NOLINT
@@ -168,4 +176,9 @@ BENCHMARK(bmResponseAttributes)
     ->Range(100, 1000000);
 
 BENCHMARK(bmFilterState)->Unit(::benchmark::kMicrosecond)->RangeMultiplier(100)->Range(10, 100000);
+
+} // namespace Expr
+} // namespace Common
+} // namespace Filters
+} // namespace Extensions
 } // namespace Envoy
