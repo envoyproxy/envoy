@@ -66,7 +66,7 @@ public:
 
     // Assert for CEL and accesslog field access
     ASSERT_TRUE(ext_authz_logging_info->hasFieldSupport());
-    EXPECT_THAT(ext_authz_logging_info->getField("latency"),
+    EXPECT_THAT(ext_authz_logging_info->getField("latency_us"),
                 testing::VariantWith<int64_t>(ext_authz_logging_info->latency().value().count()));
     if (expect_envoy_grpc_specific_stats_) {
       EXPECT_THAT(ext_authz_logging_info->getField("bytesSent"),
@@ -76,7 +76,7 @@ public:
                     testing::VariantWith<int64_t>(ext_authz_logging_info->bytesReceived().value()));
       } else {
         EXPECT_THAT(ext_authz_logging_info->getField("bytesReceived"),
-                    testing::VariantWith<int64_t>(0));
+                    testing::VariantWith<absl::monostate>(absl::monostate{}));
       }
     }
     EXPECT_THAT(ext_authz_logging_info->getField("wrong_property_name"),

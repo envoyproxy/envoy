@@ -210,7 +210,7 @@ new_features:
     performs round-robin selection of the configured nameservers for each resolution to help distribute query load.
 - area: ext_authz
   change: |
-    added filter state field latency, bytesSent and bytesReceived access for CEL and logging.
+    added filter state field latency_us, bytesSent and bytesReceived access for CEL and logging.
 deprecated:
 - area: rbac
   change: |

@@ -205,7 +205,7 @@ The ext_authz span keeps the sampling status of the parent span, i.e. in the tra
 
 Logging
 -------
-When :ref:`filter_enabled <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_filter_state_stats>` is set to true,
-ext_authz exposes fields ``latency``, ``bytesSent`` and ``bytesReceived`` for usage in CEL and logging.
-* ``filter_state["envoy.filters.http.ext_authz"].latency)``
-* ``%FILTER_STATE(envoy.filters.http.ext_authz:FIELD:latency)%``
+When :ref:`emit_filter_state_stats <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_filter_state_stats>` is set to true,
+ext_authz exposes fields ``latency_us``, ``bytesSent`` and ``bytesReceived`` for usage in CEL and logging.
+* ``filter_state["envoy.filters.http.ext_authz"].latency_us)``
+* ``%FILTER_STATE(envoy.filters.http.ext_authz:FIELD:latency_us)%``

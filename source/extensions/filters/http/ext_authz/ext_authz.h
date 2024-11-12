@@ -76,11 +76,11 @@ public:
 
   bool hasFieldSupport() const { return true; }
   Envoy::StreamInfo::FilterState::Object::FieldType getField(absl::string_view field_name) const {
-    if (field_name == "latency" && latency_) {
+    if (field_name == "latency_us" && latency_.has_value()) {
       return int64_t(latency_.value().count());
-    } else if (field_name == "bytesSent" && bytes_sent_) {
+    } else if (field_name == "bytesSent" && bytes_sent_.value()) {
       return int64_t(bytes_sent_.value());
-    } else if (field_name == "bytesReceived" && bytes_received_) {
+    } else if (field_name == "bytesReceived" && bytes_received_.value()) {
       return int64_t(bytes_received_.value());
     }
     return {};
