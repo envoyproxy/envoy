@@ -66,7 +66,6 @@ public:
   }
   virtual ~ProcessorState() = default;
 
-
   FilterState filterState() const { return static_cast<FilterState>(state); }
   void setFilterState(FilterState st) { state = static_cast<int>(st); }
   bool isProcessingInGo() {

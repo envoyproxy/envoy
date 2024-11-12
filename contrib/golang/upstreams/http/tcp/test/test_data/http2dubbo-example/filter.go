@@ -113,7 +113,7 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 	_ = json.Unmarshal(f.httpReqBodyBuf.Bytes(), &dubboArgs)
 
 	// =========== step 3: assign dubboInterface for gray traffic by router =========== //
-	if f.callbacks.StreamInfo().GetRouteName() == f.config.routerNameForGrayTraffic {
+	if f.callbacks.GetRouteName() == f.config.routerNameForGrayTraffic {
 		f.dubboInterface = GrayInterfaceName
 	}
 
@@ -194,8 +194,7 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 	responseHeaderForSet.Set("extension", "golang-tcp-upstream")
 
 	// =========== step 5: set label for specify-cluster =========== //
-	clusterName, _ := f.callbacks.StreamInfo().VirtualClusterName()
-	if clusterName == f.config.clusterNameForSpecialLabel {
+	if f.callbacks.GetVirtualClusterName() == f.config.clusterNameForSpecialLabel {
 		responseHeaderForSet.Set("lable-for-special-cluster", "special-cluster")
 	}
 

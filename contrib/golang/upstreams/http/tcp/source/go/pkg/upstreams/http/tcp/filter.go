@@ -40,11 +40,6 @@ import (
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
-const (
-	NoWaitingCallback  = 0
-	MayWaitingCallback = 1
-)
-
 type panicInfo struct {
 	paniced bool
 	details string
@@ -67,26 +62,12 @@ type httpRequest struct {
 	// So, no cycle reference, GC finalizer could work well.
 	decodingState processState
 	encodingState processState
-	streamInfo    streamInfo
 }
 
 // processState implements the FilterCallbacks interface.
 type processState struct {
 	request      *httpRequest
 	processState *C.processState
-}
-
-const (
-	// Values align with "enum class FilterState" in C++
-	ProcessingData = 4
-)
-
-func (s *processState) Continue(status api.StatusType) {
-	panic("please implement me")
-}
-
-func (s *processState) SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string) {
-	panic("please implement me")
 }
 
 func (s *processState) RecoverPanic() {
@@ -117,18 +98,6 @@ func (s *processState) RecoverPanic() {
 	}
 }
 
-func (r *httpRequest) StreamInfo() api.StreamInfo {
-	return &r.streamInfo
-}
-
-func (r *httpRequest) DecoderFilterCallbacks() api.DecoderFilterCallbacks {
-	return &r.decodingState
-}
-
-func (r *httpRequest) EncoderFilterCallbacks() api.EncoderFilterCallbacks {
-	return &r.encodingState
-}
-
 func (r *httpRequest) pluginName() string {
 	return C.GoStringN(r.req.plugin_name.data, C.int(r.req.plugin_name.len))
 }
@@ -146,18 +115,6 @@ func (r *httpRequest) recoverPanic() {
 	}
 }
 
-func (r *httpRequest) ClearRouteCache() {
-	panic("please implement me")
-}
-
-func (r *httpRequest) Continue(status api.StatusType) {
-	panic("please implement me")
-}
-
-func (r *httpRequest) SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string) {
-	panic("please implement me")
-}
-
 func (r *httpRequest) Log(level api.LogType, message string) {
 	// TODO performance optimization points:
 	// Add a new goroutine to write logs asynchronously and avoid frequent cgo calls
@@ -170,108 +127,18 @@ func (r *httpRequest) LogLevel() api.LogType {
 	return cAPI.LogLevel()
 }
 
-func (r *httpRequest) GetProperty(key string) (string, error) {
-	panic("please implement me")
-}
-
 func (r *httpRequest) Finalize(reason int) {
 	cAPI.Finalize(unsafe.Pointer(r), reason)
 }
 
-type streamInfo struct {
-	request *httpRequest
-}
-
-func (s *streamInfo) GetRouteName() string {
-	name, _ := cAPI.GetStringValue(unsafe.Pointer(s.request), ValueRouteName)
+func (r *httpRequest) GetRouteName() string {
+	name, _ := cAPI.GetStringValue(unsafe.Pointer(r), ValueRouteName)
 	return name
 }
-
-func (s *streamInfo) FilterChainName() string {
-	panic("please implement me")
-}
-
-func (s *streamInfo) Protocol() (string, bool) {
-	panic("please implement me")
-}
-
-func (s *streamInfo) ResponseCode() (uint32, bool) {
-	panic("please implement me")
-}
-
-func (s *streamInfo) ResponseCodeDetails() (string, bool) {
-	panic("please implement me")
-}
-
-func (s *streamInfo) AttemptCount() uint32 {
-	panic("please implement me")
-}
-
-type dynamicMetadata struct {
-	request *httpRequest
-}
-
-func (s *streamInfo) DynamicMetadata() api.DynamicMetadata {
-	return &dynamicMetadata{
-		request: s.request,
-	}
-}
-
-func (d *dynamicMetadata) Get(filterName string) map[string]interface{} {
-	panic("please implement me")
-}
-
-func (d *dynamicMetadata) Set(filterName string, key string, value interface{}) {
-	panic("please implement me")
-}
-
-func (s *streamInfo) DownstreamLocalAddress() string {
-	panic("please implement me")
-}
-
-func (s *streamInfo) DownstreamRemoteAddress() string {
-	panic("please implement me")
-}
-
-// UpstreamLocalAddress return the upstream local address.
-func (s *streamInfo) UpstreamLocalAddress() (string, bool) {
-	panic("please implement me")
-}
-
-// UpstreamRemoteAddress return the upstream remote address.
-func (s *streamInfo) UpstreamRemoteAddress() (string, bool) {
-	panic("please implement me")
-}
-
-func (s *streamInfo) UpstreamClusterName() (string, bool) {
-	panic("please implement me")
-}
-
-func (s *streamInfo) VirtualClusterName() (string, bool) {
-	name, _ := cAPI.GetStringValue(unsafe.Pointer(s.request), ValueClusterName)
-	return name, true
-}
-
-func (s *streamInfo) WorkerID() uint32 {
-	return uint32(s.request.req.worker_id)
-}
-
-type filterState struct {
-	request *httpRequest
-}
-
-func (s *streamInfo) FilterState() api.FilterState {
-	return &filterState{
-		request: s.request,
-	}
-}
-
-func (f *filterState) SetString(key, value string, stateType api.StateType, lifeSpan api.LifeSpan, streamSharing api.StreamSharing) {
-	panic("please implement me")
-}
-
-func (f *filterState) GetString(key string) string {
-	panic("please implement me")
+func (r *httpRequest) GetVirtualClusterName() string {
+	// in upstream stage, cluster has been determined.
+	name, _ := cAPI.GetStringValue(unsafe.Pointer(r), ValueClusterName)
+	return name
 }
 
 type tcpUpstreamConfig struct {
@@ -282,10 +149,12 @@ func (c *tcpUpstreamConfig) Finalize() {
 	cAPI.ConfigFinalize(unsafe.Pointer(c.config))
 }
 
+// TODO(duxin40) support this in the near future
 func (c *tcpUpstreamConfig) DefineCounterMetric(name string) api.CounterMetric {
-	panic("please implement me")
+	panic("do not support this action for now")
 }
 
+// TODO(duxin40) support this in the near future
 func (c *tcpUpstreamConfig) DefineGaugeMetric(name string) api.GaugeMetric {
-	panic("please implement me")
+	panic("do not support this action for now")
 }

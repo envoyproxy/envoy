@@ -73,8 +73,6 @@ func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
 
-	// Requests.initialize(uint32(c.concurrency))
-
 	configNum := atomic.AddUint64(&configNumGenerator, 1)
 
 	name := utils.BytesToString(uint64(c.plugin_name_ptr), uint64(c.plugin_name_len))
@@ -82,12 +80,9 @@ func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 
 	var parsedConfig interface{}
 	var err error
-	if c.is_route_config == 1 {
-		parsedConfig, err = configParser.Parse(&any, nil)
-	} else {
-		config := createConfig(c)
-		parsedConfig, err = configParser.Parse(&any, config)
-	}
+	config := createConfig(c)
+	parsedConfig, err = configParser.Parse(&any, config)
+
 	if err != nil {
 		cAPI.Log(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
 		return 0

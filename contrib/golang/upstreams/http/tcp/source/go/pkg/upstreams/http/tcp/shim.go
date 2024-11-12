@@ -43,12 +43,6 @@ var (
 	ErrDupRequestKey = errors.New("dup request key")
 )
 
-// wrap the UpstreamFilter to ensure that the runtime.finalizer can be triggered
-// regardless of whether there is a circular reference in the UpstreamFilter.
-type upstreamConnWrapper struct {
-	api.TcpUpstreamFilter
-}
-
 var Requests = &requestMap{}
 
 type requestMap struct {
@@ -109,7 +103,6 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	}
 	req.decodingState.request = req
 	req.encodingState.request = req
-	req.streamInfo.request = req
 
 	req.cond.L = &req.waitingLock
 	// NP: make sure filter will be deleted.

@@ -261,10 +261,6 @@ func (*EmptyUpstreamFilter) OnData(buffer []byte, endOfStream bool) FilterStatus
 func (*EmptyUpstreamFilter) OnEvent(event ConnectionEvent) {
 }
 
-type TcpUpstreamCallbackHandler interface {
-	FilterCallbackHandler
-}
-
 type ConnectionCallback interface {
 	// StreamInfo returns the stream info of the connection
 	StreamInfo() StreamInfo
@@ -339,6 +335,13 @@ type GaugeMetric interface {
 
 // TODO
 type HistogramMetric interface {
+}
+
+type TcpUpstreamCallbackHandler interface {
+	// GetRouteName returns the name of the route which got matched
+	GetRouteName() string
+	// GetVirtualClusterName returns the name of the virtual cluster which got matched
+	GetVirtualClusterName() string
 }
 
 type TcpUpstreamFilter interface {

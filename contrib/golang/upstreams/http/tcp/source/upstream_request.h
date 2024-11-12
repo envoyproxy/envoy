@@ -147,8 +147,10 @@ public:
   bool has_destroyed_ ABSL_GUARDED_BY(mutex_){false};
 
 private:
+  // store cluster_name_ and route_name_ for go side to get
   const std::string cluster_name_;
   const std::string route_name_;
+
 };
 
 class TcpConnPool : public Router::GenericConnPool,
@@ -157,11 +159,11 @@ class TcpConnPool : public Router::GenericConnPool,
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
               Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config);
+
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
     upstream_handle_ = conn_pool_data_.value().newConnection(*this);
   }
-
   bool cancelAnyPendingStream() override {
     if (upstream_handle_) {
       upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::Default);
@@ -265,7 +267,7 @@ private:
   Dso::TcpUpstreamDsoPtr dynamic_lib_;
 
   FilterConfigSharedPtr config_;
-
+  // perform operations and store data for go side
   FilterSharedPtr filter_;
 
 };

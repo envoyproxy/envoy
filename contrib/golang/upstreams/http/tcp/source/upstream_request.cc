@@ -47,7 +47,6 @@ void FilterConfig::newGoPluginConfig() {
   config_->plugin_name_len = plugin_name_.length();
   config_->config_ptr = buf_ptr;
   config_->config_len = buf.length();
-  config_->is_route_config = 0;
 
   config_id_ = dso_lib_->envoyGoOnTcpUpstreamConfig(config_);
 
@@ -446,8 +445,6 @@ CAPIStatus Filter::setRespHeader(ProcessorState& state, absl::string_view key, a
   default:
     RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
   }
-  
-
   return CAPIStatus::CAPIOK;
 }
 
