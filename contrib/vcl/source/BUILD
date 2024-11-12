@@ -16,17 +16,25 @@ envoy_contrib_package()
 
 cc_library(
     name = "vpp_vcl",
-    srcs = [
+    hdrs = ["external/vppcom.h"],
+    additional_linker_inputs = [
         "external/libsvm.a",
-        "external/libvlibapi.a",
         "external/libvlibmemoryclient.a",
+        "external/libvlibapi.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
-        "external/vppcom.h",
     ],
-    hdrs = ["external/vppcom.h"],
     defines = ["VPP_VCL"],
     includes = ["external/"],
+    linkopts = [
+        "-Wl,--start-group",
+        "$(location external/libsvm.a)",
+        "$(location external/libvlibmemoryclient.a)",
+        "$(location external/libvlibapi.a)",
+        "$(location external/libvppcom.a)",
+        "$(location external/libvppinfra.a)",
+        "-Wl,--end-group",
+    ],
     tags = ["skip_on_windows"],
     visibility = ["//visibility:public"],
 )
@@ -40,7 +48,10 @@ envoy_cmake(
         "BUILD_SHARED_LIBS": "OFF",
         "CMAKE_ENABLE_EXPORTS": "OFF",
     },
-    copts = ["-Wno-unused-variable"],
+    copts = [
+        "-Wno-unused-variable",
+        "-Wno-error=array-bounds",
+    ],
     default_cache_entries = {},
     env = {
         "PLYPATHS": "$(locations %s)" % requirement("ply"),
@@ -73,8 +84,8 @@ genrule(
     name = "build_files",
     outs = [
         "external/libsvm.a",
-        "external/libvlibapi.a",
         "external/libvlibmemoryclient.a",
+        "external/libvlibapi.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
         "external/vppcom.h",
