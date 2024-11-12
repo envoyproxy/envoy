@@ -27,11 +27,11 @@ using testing::ReturnRef;
  * Generates a request with the path:
  * - /shelves/shelf_x/route_x
  */
-static Http::TestRequestHeaderMapImpl genRequestHeaders(int shelf_id, int route_num) {
+static Http::TestRequestHeaderMapImpl genRequestHeaders(int route_num) {
   return Http::TestRequestHeaderMapImpl{
       {":authority", "www.google.com"},
       {":method", "GET"},
-      {":path", absl::StrCat("/shelves/shelf_", shelf_id, "/route_", route_num)},
+      {":path", absl::StrCat("/shelves/shelf_", route_num, "/route_", route_num)},
       {"x-forwarded-proto", "http"}};
 }
 
@@ -220,7 +220,7 @@ static void bmRouteTableSize(benchmark::State& state, RouteMatch::PathSpecifierC
     // Do the actual timing here.
     // Single request that will match the last route in the config.
     int last_route_num = state.range(0) - 1;
-    config->route(genRequestHeaders(last_route_num, last_route_num), stream_info, 0);
+    config->route(genRequestHeaders(last_route_num), stream_info, 0);
   }
 }
 
@@ -277,7 +277,7 @@ static void bmRouteTableSizeWithExactMatcherTree(benchmark::State& state) {
   for (auto _ : state) {
     // Match against the last route in the config
     int last_route_num = state.range(0) - 1;
-    config->route(genRequestHeaders(last_route_num, last_route_num), stream_info, 0);
+    config->route(genRequestHeaders(last_route_num), stream_info, 0);
   }
 }
 
@@ -306,9 +306,8 @@ static void bmRouteTableSizeWithPrefixMatcherTree(benchmark::State& state) {
   for (auto _ : state) {
     // Match against the last route in the last shelf
     int shelf_count = static_cast<int>(std::sqrt(state.range(0)));
-    int last_shelf_num = shelf_count - 1;
     int last_route_num = shelf_count - 1;
-    config->route(genRequestHeaders(last_shelf_num, last_route_num), stream_info, 0);
+    config->route(genRequestHeaders(last_route_num), stream_info, 0);
   }
 }
 
