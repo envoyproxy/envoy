@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.clusters.dns.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/extensions/clusters/common/dns/v3/dns.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -74,18 +75,9 @@ message DnsCluster {
   // The DNS IP address resolution policy. If this setting is not specified, the
   // value defaults to
   // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.dns.v3.DnsCluster.DnsLookupFamily.AUTO>`.
-  DnsLookupFamily dns_lookup_family = 8;
+  envoy.extensions.clusters.common.dns.v3.DnsLookupFamily dns_lookup_family = 8;
 
   DnsDiscoveryType dns_discovery_type = 9;
-
-  enum DnsLookupFamily {
-    UNSPECIFIED = 0;
-    AUTO = 1;
-    V4_ONLY = 2;
-    V6_ONLY = 3;
-    V4_PREFERRED = 4;
-    ALL = 5;
-  }
 
   enum DnsDiscoveryType {
     LOGICAL = 0;

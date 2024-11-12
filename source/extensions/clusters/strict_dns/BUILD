@@ -15,6 +15,8 @@ envoy_cc_extension(
     # prevously considered core code.
     visibility = ["//visibility:public"],
     deps = [
+        "//source/common/common:dns_utils_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/upstream:cluster_factory_includes",
         "//source/common/upstream:upstream_includes",
         "//source/extensions/clusters/common:dns_cluster_backcompat_lib",

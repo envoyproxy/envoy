@@ -444,11 +444,11 @@ TEST_F(LogicalDnsParamTest, UseNewConfig) {
       "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
       dns_refresh_rate: 4s
       respect_dns_ttl: true
+      dns_lookup_family: V4_ONLY
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
   # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
-  dns_lookup_family: V4_ONLY
   load_assignment:
         endpoints:
           - lb_endpoints:

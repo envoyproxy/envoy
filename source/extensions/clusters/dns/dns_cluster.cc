@@ -37,12 +37,12 @@ DnsClusterFactory::createClusterWithConfig(
         fmt::format("Didn't find a registered cluster factory implementation for name: '{}'",
                     cluster_type_name));
   }
-  auto value = factory->create(cluster, context);
-  if (!value.ok()) {
-    return value.status();
+  auto dns_cluster = factory->create(cluster, context);
+  if (!dns_cluster.ok()) {
+    return dns_cluster.status();
   }
-  return std::make_pair(std::dynamic_pointer_cast<ClusterImplBase>(value->first),
-                        std::move(value->second));
+  return std::make_pair(std::dynamic_pointer_cast<ClusterImplBase>(dns_cluster->first),
+                        std::move(dns_cluster->second));
 }
 
 /**

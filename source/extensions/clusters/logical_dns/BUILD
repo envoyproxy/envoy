@@ -21,6 +21,7 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:cluster_factory_lib",

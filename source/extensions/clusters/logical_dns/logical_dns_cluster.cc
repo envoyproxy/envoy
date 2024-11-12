@@ -17,6 +17,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -89,6 +90,8 @@ LogicalDnsCluster::LogicalDnsCluster(
       dns_jitter_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_jitter, 0))),
       respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
+      dns_lookup_family_(
+          Envoy::DnsUtils::getDnsLookupFamilyFromEnum(dns_cluster.dns_lookup_family())),
       resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
           [this]() -> void { startResolve(); })),
       local_info_(context.serverFactoryContext().localInfo()),
@@ -110,7 +113,6 @@ LogicalDnsCluster::LogicalDnsCluster(
   } else {
     hostname_ = lbEndpoint().endpoint().hostname();
   }
-  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 }
 
 void LogicalDnsCluster::startPreInit() {
@@ -140,8 +142,8 @@ void LogicalDnsCluster::startResolve() {
         std::chrono::milliseconds final_refresh_rate = dns_refresh_rate_ms_;
 
         // If the DNS resolver successfully resolved with an empty response list, the logical DNS
-        // cluster does not update. This ensures that a potentially previously resolved address does
-        // not stabilize back to 0 hosts.
+        // cluster does not update. This ensures that a potentially previously resolved address
+        // does not stabilize back to 0 hosts.
         if (status == Network::DnsResolver::ResolutionStatus::Completed && !response.empty()) {
           info_->configUpdateStats().update_success_.inc();
           const auto addrinfo = response.front().addrInfo();
@@ -204,12 +206,27 @@ void LogicalDnsCluster::startResolve() {
       });
 }
 
+absl::StatusOr<Network::DnsResolverSharedPtr> LogicalDnsClusterFactory::selectDnsResolver(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
+    ClusterFactoryContext& context) {
+  if (proto_config.has_typed_dns_resolver_config()) {
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDnsResolverFactoryFromTypedConfig(proto_config.typed_dns_resolver_config());
+    auto& server_context = context.serverFactoryContext();
+    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
+                                                  server_context.api(),
+                                                  proto_config.typed_dns_resolver_config());
+  }
+  return ClusterFactoryImplBase::selectDnsResolver(cluster, context);
+}
+
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 LogicalDnsClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
     ClusterFactoryContext& context) {
-  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
+  auto dns_resolver_or_error = selectDnsResolver(cluster, proto_config, context);
   THROW_IF_NOT_OK(dns_resolver_or_error.status());
 
   absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> cluster_or_error;

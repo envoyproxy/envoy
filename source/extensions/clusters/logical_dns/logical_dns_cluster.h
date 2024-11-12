@@ -48,6 +48,9 @@ public:
          const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
          ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
 
+
+
+
 protected:
   LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
                     const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
@@ -97,6 +100,13 @@ class LogicalDnsClusterFactory : public Upstream::ConfigurableClusterFactoryBase
                                      envoy::extensions::clusters::dns::v3::DnsCluster> {
 public:
   LogicalDnsClusterFactory() : ConfigurableClusterFactoryBase("envoy.cluster.logical_dns") {}
+
+  absl::StatusOr<Network::DnsResolverSharedPtr>
+  selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
+                    const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
+                    ClusterFactoryContext& context);
+
+
 
 private:
   friend class LogicalDnsClusterTest;

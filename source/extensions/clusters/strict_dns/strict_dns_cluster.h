@@ -90,6 +90,12 @@ class StrictDnsClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
 public:
   StrictDnsClusterFactory() : ConfigurableClusterFactoryBase("envoy.cluster.strict_dns") {}
 
+
+  absl::StatusOr<Network::DnsResolverSharedPtr>
+  selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
+                    const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
+                    ClusterFactoryContext& context);
+
 private:
   absl::StatusOr<
       std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>

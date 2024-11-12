@@ -1,5 +1,6 @@
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
 
@@ -32,6 +33,26 @@ void createDnsClusterFromLegacyFields(
 
   if (cluster.has_dns_jitter()) {
     dns_cluster.mutable_dns_jitter()->CopyFrom(cluster.dns_jitter());
+  }
+
+  switch (cluster.dns_lookup_family()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::config::cluster::v3::Cluster::AUTO:
+    dns_cluster.set_dns_lookup_family(envoy::extensions::clusters::common::dns::v3::AUTO);
+    break;
+  case envoy::config::cluster::v3::Cluster::V4_ONLY:
+    dns_cluster.set_dns_lookup_family(envoy::extensions::clusters::common::dns::v3::V4_ONLY);
+    break;
+  case envoy::config::cluster::v3::Cluster::V6_ONLY:
+    dns_cluster.set_dns_lookup_family(envoy::extensions::clusters::common::dns::v3::V6_ONLY);
+    break;
+  case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
+    dns_cluster.set_dns_lookup_family(
+        envoy::extensions::clusters::common::dns::v3::V4_PREFERRED);
+    break;
+  case envoy::config::cluster::v3::Cluster::ALL:
+    dns_cluster.set_dns_lookup_family(envoy::extensions::clusters::common::dns::v3::ALL);
+    break;
   }
 }
 
