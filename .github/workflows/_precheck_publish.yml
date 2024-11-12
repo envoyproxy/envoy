@@ -8,7 +8,12 @@ on:
     secrets:
       gcp-key:
         required: true
+      gcs-cache-key:
+        required: true
     inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -25,16 +30,19 @@ jobs:
   publish:
     secrets:
       gcp-key: ${{ secrets.gcp-key }}
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name || matrix.target }}
     with:
+      arch: ${{ matrix.arch }}
       bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       gcs-only: "true"
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
