@@ -598,6 +598,12 @@ UDP
   Upstream host name (e.g., DNS name). If no DNS name is available, the main address of the upstream host
   (e.g., ip:port for TCP connections) will be used.
 
+.. _config_access_log_format_upstream_host_name_without_port:
+
+%UPSTREAM_HOST_NAME_WITHOUT_PORT%
+  Upstream host name (e.g., DNS name) without port component. If no DNS name is available,
+  the main address of the upstream host (e.g., ip for TCP connections) will be used.
+
 %UPSTREAM_CLUSTER%
   Upstream cluster to which the upstream host belongs to. :ref:`alt_stat_name
   <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` will be used if provided.

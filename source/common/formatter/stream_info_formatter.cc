@@ -2,6 +2,7 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -1082,6 +1083,28 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                       // If no hostname is available, the main address is used.
                       return host->address()->asString();
                     }
+                    return absl::make_optional<std::string>(std::move(host_name));
+                  });
+            }}},
+          {"UPSTREAM_HOST_NAME_WITHOUT_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                    const auto opt_ref = stream_info.upstreamInfo();
+                    if (!opt_ref.has_value()) {
+                      return absl::nullopt;
+                    }
+                    const auto host = opt_ref->upstreamHost();
+                    if (host == nullptr) {
+                      return absl::nullopt;
+                    }
+                    std::string host_name = host->hostname();
+                    if (host_name.empty()) {
+                      // If no hostname is available, the main address is used.
+                      return host->address()->ip()->addressAsString();
+                    }
+                    Envoy::Http::HeaderUtility::stripPortFromHost(host_name);
                     return absl::make_optional<std::string>(std::move(host_name));
                   });
             }}},
