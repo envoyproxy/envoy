@@ -844,7 +844,7 @@ TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
 
   // Set up QuicStatsGatherer with required access logger, stream info, headers and trailers.
   std::shared_ptr<AccessLog::MockInstance> mock_logger(new NiceMock<AccessLog::MockInstance>());
-  std::list<AccessLog::InstanceSharedPtr> loggers = {mock_logger};
+  AccessLog::InstanceInlinedVector loggers = {mock_logger};
   Event::GlobalTimeSystem test_time_;
   Envoy::StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, test_time_.timeSystem(),
                                                 nullptr,
