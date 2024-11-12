@@ -51,7 +51,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  * Configuration for the Tcp Upstream golang extension filter.
  */
 class FilterConfig : public std::enable_shared_from_this<FilterConfig>,
-                     Logger::Loggable<Logger::Id::http> {
+                     Logger::Loggable<Logger::Id::golang> {
 public:
   FilterConfig(const envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config,
    Dso::TcpUpstreamDsoPtr dso_lib);
@@ -102,14 +102,14 @@ private:
 };
 
 class Filter : public std::enable_shared_from_this<Filter>,
-                     Logger::Loggable<Logger::Id::http> {
+                     Logger::Loggable<Logger::Id::golang> {
 public:
-  Filter(FilterConfigSharedPtr config, const std::string cluster_name, const std::string route_name) : config_(config),
-   req_(new RequestInternal(*this)), encoding_state_(req_->encodingState()), decoding_state_(req_->decodingState()),  cluster_name_(cluster_name), route_name_(route_name) {
-    // req is used by go, so need to use raw memory and then it is safe to release at the gc
-    // finalize phase of the go object.
-    req_->plugin_name.data = config->pluginName().data();
-    req_->plugin_name.len = config->pluginName().length();
+  Filter(FilterConfigSharedPtr config, const std::string cluster_name, const std::string route_name);
+  ~Filter();
+
+  enum class EnvoyValue {
+    RouteName = 1,
+    ClusterName,
   };
 
   bool initRequest();
@@ -126,6 +126,11 @@ public:
   CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
 
+  bool hasDestroyed() {
+    Thread::LockGuard lock(mutex_);
+    return has_destroyed_;
+  };
+
   FilterConfigSharedPtr config_;
 
   RequestInternal* req_{nullptr};
@@ -136,6 +141,11 @@ public:
   // store response header for http
   std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
 
+  // lock for has_destroyed_/etc, to avoid race between envoy c thread and go thread (when calling
+  // back from go).
+  Thread::MutexBasicLockable mutex_{};
+  bool has_destroyed_ ABSL_GUARDED_BY(mutex_){false};
+
 private:
   const std::string cluster_name_;
   const std::string route_name_;
@@ -143,7 +153,6 @@ private:
 
 class TcpConnPool : public Router::GenericConnPool,
                     public Envoy::Tcp::ConnectionPool::Callbacks,
-                    public std::enable_shared_from_this<TcpConnPool>,
                     Logger::Loggable<Logger::Id::golang> {
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
@@ -189,55 +198,45 @@ private:
   FilterConfigSharedPtr config_;
 };
 
-enum class EndStreamType {
-	NotEndStream,
-	EndStream,
-};
-
-enum class SendDataStatus {
-  // Send data with upstream conn not half close.
-	SendDataWithTunneling,
-	// Send data with upstream conn half close.
-	SendDataWithNotTunneling,
-	// Not Send data.
-	NotSendData,
-};
-
-enum class ReceiveDataStatus {
-	// Continue to deal with further data.
-	ReceiveDataContinue,
-	// Finish dealing with data.
-	ReceiveDataFinish,
-	// Failure when dealing with data.
-	ReceiveDataFailure,
-};
-
-enum class DestroyReason {
-  Normal,
-  Terminate,
-};
-
-enum class EnvoyValue {
-  RouteName = 1,
-  ClusterName,
-};
-
-enum class HttpStatusCode : uint64_t {
-  Success = 200,
-  UpstreamProtocolError = 500,
-};
-
 using FilterSharedPtr = std::shared_ptr<Filter>;
 
 class TcpUpstream : public Router::GenericUpstream,
                     public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
-                    public std::enable_shared_from_this<TcpUpstream>,
                     Logger::Loggable<Logger::Id::golang>  {
 public:
   TcpUpstream(Router::UpstreamToDownstream* upstream_request,
               Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream, Dso::TcpUpstreamDsoPtr dynamic_lib,
               FilterConfigSharedPtr config);
   ~TcpUpstream() override;            
+
+  enum class EndStreamType {
+    NotEndStream,
+    EndStream,
+  };
+  enum class SendDataStatus {
+    // Send data with upstream conn not half close.
+    SendDataWithTunneling,
+    // Send data with upstream conn half close.
+    SendDataWithNotTunneling,
+    // Not Send data.
+    NotSendData,
+  };
+  enum class ReceiveDataStatus {
+    // Continue to deal with further data.
+    ReceiveDataContinue,
+    // Finish dealing with data.
+    ReceiveDataFinish,
+    // Failure when dealing with data.
+    ReceiveDataFailure,
+  };
+  enum class DestroyReason {
+    Normal,
+    Terminate,
+  };
+  enum class HttpStatusCode : uint64_t {
+    Success = 200,
+    UpstreamProtocolError = 500,
+  };
 
   // GenericUpstream
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers, bool end_stream) override;

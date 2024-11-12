@@ -59,6 +59,24 @@ void FilterConfig::newGoPluginConfig() {
   ENVOY_LOG(debug, "tcp upstream new plugin config, id: {}", config_id_);
 }
 
+Filter::Filter(FilterConfigSharedPtr config, const std::string cluster_name, const std::string route_name) : config_(config),
+  req_(new RequestInternal(*this)), encoding_state_(req_->encodingState()),
+   decoding_state_(req_->decodingState()),  cluster_name_(cluster_name), route_name_(route_name) {
+
+  // req is used by go, so need to use raw memory and then it is safe to release at the gc
+  // finalize phase of the go object.
+  req_->plugin_name.data = config->pluginName().data();
+  req_->plugin_name.len = config->pluginName().length();
+};
+
+Filter::~Filter() {
+  if (req_->configId == 0) {
+    // should release the req object, since stream reset may happen before calling into Go side,
+    // which means no GC finializer will be invoked to release this C++ object.
+    delete req_;
+  }
+}
+
 bool Filter::initRequest() {
   if (req_->configId == 0) {
     req_->setWeakFilter(weak_from_this());
@@ -67,6 +85,15 @@ bool Filter::initRequest() {
   }
   return false;
 };
+
+bool Filter::initResponse() {
+  if (resp_headers_ == nullptr) {
+    auto headers{Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>({})};
+    resp_headers_ = std::move(headers);
+    return true;
+  }
+  return false;
+}
 
 TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, 
   Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config) {
@@ -117,10 +144,25 @@ TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
 }
 
 TcpUpstream::~TcpUpstream() {
-  auto reason = (filter_->decoding_state_.isProcessingInGo() || filter_->encoding_state_.isProcessingInGo())
-                  ? DestroyReason::Terminate
-                  : DestroyReason::Normal;
+  ENVOY_LOG(debug, "tcp upstream on destroy");
 
+  // initRequest haven't be called yet, which mean haven't called into Go.
+  if (filter_->req_->configId == 0) {
+    return;
+  }
+
+  {
+    Thread::LockGuard lock(filter_->mutex_);
+    if (filter_->has_destroyed_) {
+      ENVOY_LOG(debug, "tcp upstream has been destroyed");
+      return;
+    }
+    filter_->has_destroyed_ = true;
+  }                
+
+  auto reason = (filter_->decoding_state_.isProcessingInGo() || filter_->encoding_state_.isProcessingInGo())
+                ? DestroyReason::Terminate
+                : DestroyReason::Normal;
   dynamic_lib_->envoyGoOnTcpUpstreamDestroy(filter_->req_, int(reason));
 
 }
@@ -248,15 +290,6 @@ void TcpUpstream::resetStream() {
   upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
-bool Filter::initResponse() {
-  if (resp_headers_ == nullptr) {
-    auto headers{Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>({})};
-    resp_headers_ = std::move(headers);
-    return true;
-  }
-  return false;
-}
-
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "tcp upstream onUpstreamData, data length: {}, end_stream: {}", data.length(), end_stream);
 
@@ -361,13 +394,18 @@ void copyHeaderMapToGo(const Envoy::Http::HeaderMap& m, GoString* go_strs, char*
 }
 
 CAPIStatus Filter::copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "tcp upstream has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
   if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
+    ENVOY_LOG(debug, "tcp upstream is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
   auto headers = state.headers;
   if (headers == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
+    ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
   copyHeaderMapToGo(*headers, go_strs, go_buf);
@@ -378,20 +416,25 @@ CAPIStatus Filter::copyHeaders(ProcessorState& state, GoString* go_strs, char* g
 // callback to run in the envoy worker thread.
 CAPIStatus Filter::setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
                              headerAction act) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "tcp upstream has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }                            
   if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang filter is not processing Go");
+    ENVOY_LOG(debug, "tcp upstream is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
 
   auto* s = dynamic_cast<DecodingProcessorState*>(&state);
   if (s == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid state: {} when dynamic_cast state", __func__);
+    ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {} when dynamic_cast state", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
 
   auto headers = s->resp_headers;
   if (headers == nullptr) {
-    ENVOY_LOG(debug, "invoking cgo api at invalid state: {} when get resp headers", __func__);
+    ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {} when get resp headers", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
 
@@ -413,6 +456,11 @@ CAPIStatus Filter::setRespHeader(ProcessorState& state, absl::string_view key, a
 }
 
 CAPIStatus Filter::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "tcp upstream has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }  
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "tcp upstream is not processing Go");
     return CAPIStatus::CAPINotInGo;
@@ -431,6 +479,11 @@ CAPIStatus Filter::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, c
 }
 
 CAPIStatus Filter::drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "tcp upstream has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }    
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "tcp upstream is not processing Go");
     return CAPIStatus::CAPINotInGo;
@@ -446,6 +499,11 @@ CAPIStatus Filter::drainBuffer(ProcessorState& state, Buffer::Instance* buffer, 
 
 CAPIStatus Filter::setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
                                    absl::string_view& value, bufferAction action) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "tcp upstream has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }                                      
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "tcp upstream is not processing Go");
     return CAPIStatus::CAPINotInGo;
@@ -466,6 +524,11 @@ CAPIStatus Filter::setBufferHelper(ProcessorState& state, Buffer::Instance* buff
 }
 
 CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "tcp upstream has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }    
   // refer the string to req_->strValue, not deep clone, make sure it won't be freed while reading
   // it on the Go side.
   switch (static_cast<EnvoyValue>(id)) {
@@ -477,7 +540,7 @@ CAPIStatus Filter::getStringValue(int id, uint64_t* value_data, int* value_len) 
     break;
   }
   default:
-    RELEASE_ASSERT(false, absl::StrCat("invalid string value id: ", id));
+    RELEASE_ASSERT(false, absl::StrCat("tcp upstream invalid string value id: ", id));
   }
 
   *value_data = reinterpret_cast<uint64_t>(req_->strValue.data());
