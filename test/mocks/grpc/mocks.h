@@ -11,6 +11,7 @@
 
 #include "source/common/grpc/typed_async_client.h"
 
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -24,6 +25,7 @@ public:
   ~MockAsyncRequest() override;
 
   MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
 };
 
 class MockAsyncStream : public RawAsyncStream {
@@ -39,7 +41,8 @@ public:
   MOCK_METHOD(void, resetStream, ());
   MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
-  MOCK_METHOD(void, setWatermarkCallbacks, (Http::DecoderFilterWatermarkCallbacks&));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), ());
+  MOCK_METHOD(void, setWatermarkCallbacks, (Http::SidestreamWatermarkCallbacks&));
   MOCK_METHOD(void, removeWatermarkCallbacks, ());
 };
 

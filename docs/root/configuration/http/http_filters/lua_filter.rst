@@ -365,8 +365,10 @@ trailers()
 
   local trailers = handle:trailers()
 
-Returns the stream's trailers. May return nil if there are no trailers. The trailers may be
-modified before they are sent to the next filter.
+Returns the stream's trailers. Before calling this method, the caller should call ``body()`` or
+``bodyChunks()`` to consume the body, otherwise the trailers will not be available.
+May return nil if there are no trailers. The trailers may be modified before they are sent
+to the next filter.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
@@ -1099,6 +1101,28 @@ dnsSansLocalCertificate()
 
 Returns the DNS entries (as a table) in the SAN field of the local certificate. Returns an empty
 table if there is no local certificate, or no SAN field, or no DNS SAN entries.
+
+oidsPeerCertificate()
+^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:oidsPeerCertificate()
+
+Returns the string representation of OIDs (as a table) from the peer certificate. This is for
+reading the OID strings from the certificate, not the extension values associated with OIDs.
+Returns an empty table if there is no peer certificate or no OIDs.
+
+oidsLocalCertificate()
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  downstreamSslConnection:oidsLocalCertificate()
+
+Returns the string representation of OIDs (as a table) from the local certificate. This is for
+reading the OID strings from the certificate, not the extension values associated with OIDs.
+Returns an empty table if there is no local certificate or no OIDs.
 
 validFromPeerCertificate()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^

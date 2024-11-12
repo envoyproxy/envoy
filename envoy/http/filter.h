@@ -463,13 +463,11 @@ public:
   virtual const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const PURE;
 
   /**
-   * Find all the available per route filter configs, invoking the callback with each config (if
-   * it is present). Iteration of the configs is in order of specificity. That means that the
-   * callback will be called first for a config on a Virtual host, then a route, and finally a route
-   * entry (weighted cluster). If a config is not present, the callback will not be invoked.
+   * Return all the available per route filter configs. The configs is in order of specificity.
+   * That means that the config from a route configuration will be first, then the config from a
+   * virtual host, then the config from a route.
    */
-  virtual void traversePerFilterConfig(
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
+  virtual Router::RouteSpecificFilterConfigs perFilterConfigs() const PURE;
 
   /**
    * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
@@ -526,33 +524,12 @@ public:
   virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 };
 
-class DecoderFilterWatermarkCallbacks {
-public:
-  virtual ~DecoderFilterWatermarkCallbacks() = default;
-
-  /**
-   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
-   * their high watermark.
-   *
-   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
-   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
-   * the low watermark callbacks an equal number of times as the respective buffers are drained.
-   */
-  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
-
-  /**
-   * Called when a decoder filter or any buffers the filter sends data to go from over its high
-   * watermark to under its low watermark.
-   */
-  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
-};
 /**
  * Stream decoder filter callbacks add additional callbacks that allow a
  * decoding filter to restart decoding if they decide to hold data (e.g. for
  * buffering or rate limiting).
  */
-class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks,
-                                     public virtual DecoderFilterWatermarkCallbacks {
+class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
 public:
   /**
    * Continue iterating through the filter chain with buffered headers and body data. This routine
@@ -728,6 +705,22 @@ public:
   virtual void encodeMetadata(MetadataMapPtr&& metadata_map) PURE;
 
   /**
+   * Called when the buffer for a decoder filter or any buffers the filter sends data to go over
+   * their high watermark.
+   *
+   * In the case of a filter such as the router filter, which spills into multiple buffers (codec,
+   * connection etc.) this may be called multiple times. Any such filter is responsible for calling
+   * the low watermark callbacks an equal number of times as the respective buffers are drained.
+   */
+  virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when a decoder filter or any buffers the filter sends data to go from over its high
+   * watermark to under its low watermark.
+   */
+  virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
+
+  /**
    * This routine can be called by a filter to subscribe to watermark events on the downstream
    * stream and downstream connection.
    *
@@ -901,7 +894,7 @@ public:
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter : public StreamFilterBase {
+class StreamDecoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -1117,7 +1110,7 @@ public:
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter : public StreamFilterBase {
+class StreamEncoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with supported 1xx headers.
@@ -1205,6 +1198,9 @@ public:
   virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
 
   const StreamInfo::FilterState& filterState() const { return streamInfo().filterState(); }
+  const envoy::config::core::v3::Metadata& metadata() const {
+    return streamInfo().dynamicMetadata();
+  }
 
   const Network::Address::Instance& localAddress() const {
     return *connectionInfoProvider().localAddress();

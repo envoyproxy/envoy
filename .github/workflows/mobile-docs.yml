@@ -1,0 +1,97 @@
+name: Mobile/Docs
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
+    with:
+      check-name: mobile-docs
+
+  docs:
+    secrets:
+      ssh-key-extra: ${{ needs.load.outputs.trusted  && secrets.ENVOY_MOBILE_WEBSITE_DEPLOY_KEY || '' }}
+    permissions:
+      contents: read
+      packages: read
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-docs }}
+    needs: load
+    uses: ./.github/workflows/_run.yml
+    with:
+      args: >-
+        --
+      command: ./docs/build.sh
+      request: ${{ needs.load.outputs.request }}
+      target: mobile-docs
+      cache-build-image: ${{ fromJSON(needs.load.outputs.build-image).build-image }}
+      checkout-extra: |
+        repository: envoy-mobile/envoy-mobile.github.io
+        path: mobile-docs
+        fetch-depth: 0
+        branch: master
+      docker-ipv6: false
+      source: |
+        echo "ENVOY_DOCKER_SOURCE_DIR=/source/mobile" >> $GITHUB_ENV
+        # Path relative to ./mobile directory
+        echo "MOBILE_DOCS_CHECKOUT_DIR=../mobile-docs" >> $GITHUB_ENV
+      steps-post: |
+        - name: Publish docs
+          shell: bash
+          run: |
+            ./ci/run_envoy_docker.sh docs/publish.sh
+        # This step needs to be done outside the container to access ssh creds
+        - name: Push changes
+          # && github.repository == 'envoyproxy/envoy'
+          if: ${{ needs.load.outputs.trusted }}
+          shell: bash
+          run: |
+            git -C mobile-docs status
+            exit 0
+            git -C mobile-docs push origin master
+      timeout-minutes: 20
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      upload-name: docs
+      upload-path: mobile/generated/docs
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-docs }}
+    needs:
+    - load
+    - docs
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

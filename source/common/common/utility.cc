@@ -18,13 +18,13 @@
 #include "source/common/common/hash.h"
 #include "source/common/singleton/const_singleton.h"
 
-#include "absl/container/node_hash_map.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/time/time.h"
+#include "re2/re2.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -33,9 +33,11 @@ namespace {
 
 class SpecifierConstantValues {
 public:
-  // This captures three groups: subsecond-specifier, subsecond-specifier width and
-  // second-specifier.
-  const std::regex PATTERN{"(%([1-9])?f)|(%s)", std::regex::optimize};
+  // This pattern contains three parts:
+  // 1. %[1-9*]?f: Envoy subseconds specifier with an optional width.
+  // 2. %s: Envoy seconds specifier.
+  // 3. %E[1-9*][Sf]: absl::FormatTime() seconds/subseconds specifier.
+  const re2::RE2 RE2_PATTERN{"(%[1-9*]?f|%s|%E[1-9*][Sf])"};
 };
 
 using SpecifierConstants = ConstSingleton<SpecifierConstantValues>;
@@ -68,157 +70,240 @@ const std::string errorDetails(int error_code) {
 #endif
 }
 
-std::string DateFormatter::fromTime(const SystemTime& time) const {
-  struct CachedTime {
-    // The string length of a number of seconds since the Epoch. E.g. for "1528270093", the length
-    // is 10.
-    size_t seconds_length;
+std::string DateFormatter::fromTime(SystemTime time) const {
+  // A map is used to keep different formatted format strings at a given seconds.
+  static thread_local CachedTimes CACHE;
+  static thread_local CachedTimes CACHE_LOCAL;
 
-    // A container object to hold a absl::FormatTime string, its timestamp (in seconds) and a list
-    // of position offsets for each specifier found in a format string.
-    struct Formatted {
-      // The resulted string after format string is passed to absl::FormatTime at a given point in
-      // time.
-      std::string str;
+  if (specifiers_.empty()) {
+    return {};
+  }
 
-      // A timestamp (in seconds) when this object is created.
-      std::chrono::seconds epoch_time_seconds;
+  CachedTimes& cached_times = local_time_ ? CACHE_LOCAL : CACHE;
 
-      // List of offsets for each specifier found in a format string. This is needed to compensate
-      // the position of each recorded specifier due to the possible size change of the previous
-      // segment (after being formatted).
-      SpecifierOffsets specifier_offsets;
-    };
-    // A map is used to keep different formatted format strings at a given second.
-    absl::node_hash_map<std::string, const Formatted> formatted;
-  };
-  static thread_local CachedTime cached_time;
+  const auto epoch_time_ss =
+      std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch());
 
-  const std::chrono::nanoseconds epoch_time_ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch());
+  const auto iter = cached_times.find(raw_format_string_, raw_format_hash_);
 
-  const std::chrono::seconds epoch_time_seconds =
-      std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ns);
+  if (iter == cached_times.end() || iter->second.epoch_time_seconds != epoch_time_ss) {
+    // No cached entry found for the given format string and time.
 
-  const auto& item = cached_time.formatted.find(raw_format_string_);
-  if (item == cached_time.formatted.end() ||
-      item->second.epoch_time_seconds != epoch_time_seconds) {
     // Remove all the expired cached items.
-    for (auto it = cached_time.formatted.cbegin(); it != cached_time.formatted.cend();) {
-      if (it->second.epoch_time_seconds != epoch_time_seconds) {
+    for (auto it = cached_times.cbegin(); it != cached_times.cend();) {
+      if (it->second.epoch_time_seconds != epoch_time_ss) {
         auto next_it = std::next(it);
-        cached_time.formatted.erase(it);
+        cached_times.erase(it);
         it = next_it;
       } else {
         ++it;
       }
     }
 
-    const time_t current_time = std::chrono::system_clock::to_time_t(time);
+    auto new_iter = cached_times.emplace(
+        std::make_pair(raw_format_string_, formatTimeAndOffsets(time, epoch_time_ss)));
 
-    // Build a new formatted format string at current time.
-    CachedTime::Formatted formatted;
-    const std::string seconds_str = fmt::format_int(epoch_time_seconds.count()).str();
-    formatted.str =
-        fromTimeAndPrepareSpecifierOffsets(current_time, formatted.specifier_offsets, seconds_str);
-    cached_time.seconds_length = seconds_str.size();
-
-    // Stamp the formatted string using the current epoch time in seconds, and then cache it in.
-    formatted.epoch_time_seconds = epoch_time_seconds;
-    cached_time.formatted.emplace(std::make_pair(raw_format_string_, formatted));
+    ASSERT(new_iter.second);
+    return new_iter.first->second.formatted;
   }
 
-  const auto& formatted = cached_time.formatted.at(raw_format_string_);
-  ASSERT(specifiers_.size() == formatted.specifier_offsets.size());
+  const auto& formatted = iter->second;
+  ASSERT(specifiers_.size() == formatted.offsets.size());
 
-  // Copy the current cached formatted format string, then replace its subseconds part (when it has
-  // non-zero width) by correcting its position using prepared subseconds offsets.
-  std::string formatted_str = formatted.str;
-  std::string nanoseconds = fmt::format_int(epoch_time_ns.count()).str();
-  // Special case handling for beginning of time, we should never need to do this outside of
-  // tests or a time machine.
-  if (nanoseconds.size() < 10) {
-    nanoseconds = std::string(10 - nanoseconds.size(), '0') + nanoseconds;
-  }
+  // Copy the current cached formatted format string, then replace its subseconds specifier
+  // (when it has non-zero width) by correcting its position using prepared subseconds offsets.
+  std::string formatted_str = formatted.formatted;
 
-  for (size_t i = 0; i < specifiers_.size(); ++i) {
-    const auto& specifier = specifiers_.at(i);
-
-    // When specifier.width_ is zero, skip the replacement. This is the last segment or it has no
-    // specifier.
-    if (specifier.width_ > 0 && !specifier.second_) {
-      ASSERT(specifier.position_ + formatted.specifier_offsets.at(i) < formatted_str.size());
-      formatted_str.replace(specifier.position_ + formatted.specifier_offsets.at(i),
-                            specifier.width_,
-                            nanoseconds.substr(cached_time.seconds_length, specifier.width_));
+  for (size_t i = specifiers_.size(); i != 0; i--) {
+    if (specifiers_[i - 1].subsecondsSpecifier()) {
+      const auto offset = formatted.offsets[i - 1];
+      const auto substr = specifiers_[i - 1].subsecondsToString(time);
+      formatted_str.replace(offset.offset, offset.length, substr);
     }
   }
-
-  ASSERT(formatted_str.size() == formatted.str.size());
   return formatted_str;
 }
 
-void DateFormatter::parse(const std::string& format_string) {
-  std::string suffix = format_string;
-  std::smatch matched;
-  // "step" is the last specifier's position + the last specifier's width. It's not the current
-  // position in "format_string" because the length has changed. It is actually the index which
-  // points to the end of the last specifier in formatted string (generated in the future).
-  size_t step = 0;
-  while (regex_search(suffix, matched, SpecifierConstants::get().PATTERN)) {
-    // The std::smatch matched for (%([1-9])?f)|(%s): [all, subsecond-specifier, subsecond-specifier
-    // width, second-specifier].
-    const std::string& width_specifier = matched[2];
-    const std::string& second_specifier = matched[3];
+void DateFormatter::parse(absl::string_view format_string) {
+  absl::string_view format = format_string;
+  absl::string_view matched;
 
-    // In the template string to be used in runtime substitution, the width is the number of
-    // characters to be replaced.
-    const size_t width = width_specifier.empty() ? 9 : width_specifier.at(0) - '0';
+  // PartialMatch will return the leftmost-longest match. And the matched will be mutated
+  // to point to matched piece
+  while (re2::RE2::PartialMatch(format, SpecifierConstants::get().RE2_PATTERN, &matched)) {
+    ASSERT(!matched.empty());
 
-    ASSERT(!suffix.empty());
-    // This records matched position, the width of current subsecond pattern, and also the string
-    // segment before the matched position. These values will be used later at data path.
-    specifiers_.emplace_back(
-        second_specifier.empty()
-            ? Specifier(step + matched.position(), width, suffix.substr(0, matched.position()))
-            : Specifier(step + matched.position(), suffix.substr(0, matched.position())));
-    step = specifiers_.back().position_ + specifiers_.back().width_;
-    suffix = matched.suffix();
+    // Get matched position based the matched and format view. For example:
+    // this-is-prefix-string-%s-this-is-suffix-string
+    // |------ prefix -------||                     |
+    // |                   matched                  |
+    // |------------------ format ------------------|
+    const size_t prefix_length = matched.data() - format.data();
+
+    std::string prefix_string = std::string(format.substr(0, prefix_length));
+
+    Specifier::SpecifierType specifier{};
+    uint8_t width{};
+
+    if (matched.size() == 2) {
+      // Handle the seconds specifier (%s) or subseconds specifier without width (%f).
+
+      ASSERT(matched[1] == 's' || matched[1] == 'f');
+      if (matched[1] == 's') {
+        specifier = Specifier::SpecifierType::Second;
+      } else {
+        specifier = Specifier::SpecifierType::EnvoySubsecond;
+        width = 9;
+      }
+    } else if (matched.size() == 3) {
+      // Handle subseconds specifier with width (%#f, %*f, '#' means number between 1-9,
+      // '*' is literal).
+
+      ASSERT(matched[2] == 'f');
+      specifier = Specifier::SpecifierType::EnvoySubsecond;
+      width = matched[1] == '*' ? std::numeric_limits<uint8_t>::max() : matched[1] - '0';
+    } else {
+      // To improve performance, we will cache the formatted string for every second.
+      // And when doing the runtime substitution, we will get the cached result and
+      // replace the subseconds part.
+      // In order to make sure the subseconds part of absl::FormatTime() can be replaced,
+      // we need to handle the subseconds specifier of absl::FormatTime() here.
+
+      // Handle the absl subseconds specifier (%E#S, %E*S, %E#f, %E*f, '#' means number
+      // between 1-9, '*' is literal).
+
+      ASSERT(matched.size() == 4);
+      ASSERT(matched[3] == 'S' || matched[3] == 'f');
+
+      if (matched[3] == 'S') {
+        // %E#S or %E*S includes the seconds, dot, and subseconds. For example, %E6S
+        // will output "30.654321".
+        // We will let the absl::FormatTime() to handle the seconds parts. So we need
+        // to add the seconds specifier to the prefix string to ensure the final
+        // formatted string is correct.
+        prefix_string.push_back('%');
+        prefix_string.push_back('S');
+
+        specifier = Specifier::SpecifierType::AbslSubsecondS;
+      } else {
+        specifier = Specifier::SpecifierType::AbslSubsecondF;
+      }
+
+      width = matched[2] == '*' ? std::numeric_limits<uint8_t>::max() : matched[2] - '0';
+    }
+
+    if (!prefix_string.empty()) {
+      specifiers_.push_back(Specifier(prefix_string));
+    }
+
+    ASSERT(format.size() >= prefix_length + matched.size());
+    ASSERT(specifier != Specifier::SpecifierType::String);
+    specifiers_.emplace_back(Specifier(specifier, width));
+    format = format.substr(prefix_length + matched.size());
   }
 
   // To capture the segment after the last specifier pattern of a format string by creating a zero
   // width specifier. E.g. %3f-this-is-the-last-%s-segment-%Y-until-this.
-  if (!suffix.empty()) {
-    Specifier specifier(step, 0, suffix);
-    specifiers_.emplace_back(specifier);
+  if (!format.empty()) {
+    specifiers_.emplace_back(Specifier(format));
   }
 }
 
-std::string
-DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
-                                                  const absl::string_view seconds_str) const {
-  std::string formatted_time;
+std::string DateFormatter::Specifier::subsecondsToString(SystemTime time) const {
+  ASSERT(specifier_ > SpecifierType::Second);
+  ASSERT(width_ > 0);
 
-  int32_t previous = 0;
-  specifier_offsets.reserve(specifiers_.size());
-  for (const auto& specifier : specifiers_) {
-    std::string current_format =
-        absl::FormatTime(specifier.segment_, absl::FromTimeT(time), absl::UTCTimeZone());
-    absl::StrAppend(&formatted_time, current_format,
-                    specifier.second_ ? seconds_str : std::string(specifier.width_, '?'));
+  absl::string_view nanoseconds;
 
-    // This computes and saves offset of each specifier's pattern to correct its position after the
-    // previous string segment is formatted. An offset can be a negative value.
-    //
-    // If the current specifier is a second specifier (%s), it needs to be corrected by 2.
-    const int32_t offset =
-        (current_format.length() + (specifier.second_ ? (seconds_str.size() - 2) : 0)) -
-        specifier.segment_.size();
-    specifier_offsets.emplace_back(previous + offset);
-    previous += offset;
+  std::string string_buffer;
+  fmt::format_int formatted(std::chrono::nanoseconds(time.time_since_epoch()).count());
+
+  // 1. Get the subseconds part of the formatted time.
+  if (formatted.size() < 9) {
+    // Special case. This should never happen in actual practice.
+    string_buffer = std::string(9 - formatted.size(), '0');
+    string_buffer.append(formatted.data(), formatted.size());
+    nanoseconds = string_buffer;
+  } else {
+    nanoseconds = absl::string_view(formatted.data() + formatted.size() - 9, 9);
+  }
+  ASSERT(nanoseconds.size() == 9);
+
+  // 2. Calculate the actual width that will be used.
+  uint8_t width = width_;
+  if (width == std::numeric_limits<uint8_t>::max()) {
+    // Dynamic width specifier. Remove trailing zeros.
+    if (const auto i = nanoseconds.find_last_not_of('0'); i != absl::string_view::npos) {
+      width = i + 1;
+    } else {
+      // This only happens for subseconds specifiers with dynamic width (%E*S, %E*f, %*f)
+      // and the subseconds are all zeros.
+      width = 0;
+    }
   }
 
-  return formatted_time;
+  // 3. Handle the specifiers of %E#S and %E*S. The seconds part will be handled by
+  // absl::FormatTime() by string specifier. So we only need to return the dot and
+  // subseconds part.
+  if (specifier_ == SpecifierType::AbslSubsecondS) {
+    if (width == 0) {
+      // No subseconds and dot for %E*S in this case.
+      return {};
+    }
+
+    std::string output;
+    output.push_back('.'); // Add the dot.
+    output.append(nanoseconds.data(), width);
+    return output;
+  }
+
+  // 4. Handle the specifiers of %E#f, %E*f, and %f, %#f, %*f. At least one subsecond digit
+  // will be returned for these specifiers even if the subseconds are all zeros and dynamic
+  // width is used.
+  return std::string(nanoseconds.substr(0, std::max<uint8_t>(width, 1)));
+}
+
+std::string DateFormatter::Specifier::toString(SystemTime time,
+                                               std::chrono::seconds epoch_time_seconds,
+                                               bool local) const {
+  switch (specifier_) {
+  case SpecifierType::String:
+    ASSERT(!string_.empty());
+    // Handle the string first. It may be absl::FormatTime() format string.
+    if (absl_format_) {
+      return absl::FormatTime(string_, absl::FromChrono(time),
+                              local ? absl::LocalTimeZone() : absl::UTCTimeZone());
+    } else {
+      return string_;
+    }
+  case SpecifierType::Second:
+    // Handle the seconds specifier.
+    return fmt::format_int(epoch_time_seconds.count()).str();
+  case SpecifierType::EnvoySubsecond:
+  case SpecifierType::AbslSubsecondS:
+  case SpecifierType::AbslSubsecondF:
+    // Handle the sub-seconds specifier.
+    return subsecondsToString(time);
+  }
+
+  return {}; // Should never reach here. Make the gcc happy.
+}
+
+DateFormatter::CacheableTime
+DateFormatter::formatTimeAndOffsets(SystemTime time,
+                                    std::chrono::seconds epoch_time_seconds) const {
+  CacheableTime ret;
+  ret.epoch_time_seconds = epoch_time_seconds;
+  ret.formatted.reserve(64);
+  ret.offsets.reserve(specifiers_.size());
+
+  for (const auto& specifier : specifiers_) {
+    const auto offset = ret.formatted.size();
+    ret.formatted.append(specifier.toString(time, epoch_time_seconds, local_time_));
+    ret.offsets.push_back({offset, ret.formatted.size() - offset});
+  }
+
+  return ret;
 }
 
 std::string DateFormatter::now(TimeSource& time_source) const {
@@ -518,16 +603,22 @@ std::string StringUtil::sanitizeInvalidHostname(const absl::string_view source) 
   return ret_str;
 }
 
-const std::string& getDefaultDateFormat() {
+const std::string& getDefaultDateFormat(bool local_time) {
+  if (local_time) {
+    CONSTRUCT_ON_FIRST_USE(std::string, "%Y-%m-%dT%H:%M:%E3S%z");
+  }
   CONSTRUCT_ON_FIRST_USE(std::string, "%Y-%m-%dT%H:%M:%E3SZ");
 }
 
-std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
+std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time, bool local_time) {
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
     std::string formatted_time;
   };
-  static thread_local CachedTime cached_time;
+  static thread_local CachedTime cached_time_utc;
+  static thread_local CachedTime cached_time_local;
+
+  CachedTime& cached_time = local_time ? cached_time_local : cached_time_utc;
 
   const std::chrono::milliseconds epoch_time_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(system_time.time_since_epoch());
@@ -536,14 +627,15 @@ std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) 
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
   if (cached_time.formatted_time.empty() || cached_time.epoch_time_seconds != epoch_time_seconds) {
-    cached_time.formatted_time = absl::FormatTime(
-        getDefaultDateFormat(), absl::FromChrono(system_time), absl::UTCTimeZone());
+    cached_time.formatted_time =
+        absl::FormatTime(getDefaultDateFormat(local_time), absl::FromChrono(system_time),
+                         local_time ? absl::LocalTimeZone() : absl::UTCTimeZone());
     cached_time.epoch_time_seconds = epoch_time_seconds;
   } else {
-    // Overwrite the digits in the ".000Z" at the end of the string with the
+    // Overwrite the digits in the ".000Z" or ".000%z" at the end of the string with the
     // millisecond count from the input time.
-    ASSERT(cached_time.formatted_time.length() == 24);
-    size_t offset = cached_time.formatted_time.length() - 4;
+    ASSERT(cached_time.formatted_time.length() >= 23);
+    size_t offset = 20;
     uint32_t msec = epoch_time_ms.count() % 1000;
     cached_time.formatted_time[offset++] = ('0' + (msec / 100));
     msec %= 100;

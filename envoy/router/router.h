@@ -122,6 +122,7 @@ public:
   virtual ~RouteSpecificFilterConfig() = default;
 };
 using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
+using RouteSpecificFilterConfigs = absl::InlinedVector<const RouteSpecificFilterConfig*, 4>;
 
 /**
  * CorsPolicy for Route and VirtualHost.
@@ -686,18 +687,14 @@ public:
    * hierarchy (Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
   virtual const RouteSpecificFilterConfig*
-  mostSpecificPerFilterConfig(const std::string& name) const PURE;
+  mostSpecificPerFilterConfig(absl::string_view name) const PURE;
 
   /**
-   * Find all the available per route filter configs, invoking the callback with
-   * each config (if it is present). Iteration of the configs is in order of
-   * specificity. That means that the callback will be called first for a config on
-   * a route configuration, virtual host, route, and finally a route entry (weighted cluster). If
-   * a config is not present, the callback will not be invoked.
+   * Return all the available per route filter configs. The configs is in order of specificity.
+   * That means that the config from a route configuration will be first, then the config from a
+   * virtual host, then the config from a route.
    */
-  virtual void traversePerFilterConfig(
-      const std::string& filter_name,
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
+  virtual Router::RouteSpecificFilterConfigs perFilterConfigs(absl::string_view name) const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
@@ -710,6 +707,13 @@ public:
    * for this virtual host.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+
+  /**
+   * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
+   * @param headers supplies the request headers.
+   * @return the virtual cluster or nullptr if there is no match.
+   */
+  virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
 };
 
 /**
@@ -894,6 +898,23 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
+   * Returns the final host value for the request, taking into account route-level mutations.
+   *
+   * The value returned is computed with the following logic in order:
+   *
+   * 1. If a host rewrite is configured for the route, it returns that value.
+   * 2. If a host rewrite header is specified, it attempts to use the value from that header.
+   * 3. If a host rewrite path regex is configured, it applies the regex to the request path and
+   *    returns the result.
+   * 4. If none of the above apply, it returns the original host value from the request headers.
+   *
+   * @param headers The constant reference to the request headers.
+   * @note This function will not attempt to restore the port in the host value. If port information
+   *       is required, it should be handled separately.
+   */
+  virtual const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const PURE;
+
+  /**
    * Returns the HTTP status code to use when configured cluster is not found.
    * @return Http::Code to use when configured cluster is not found.
    */
@@ -1043,18 +1064,6 @@ public:
    * be subtracted from the value provided by the header.
    */
   virtual absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const PURE;
-
-  /**
-   * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
-   * @param headers supplies the request headers.
-   * @return the virtual cluster or nullptr if there is no match.
-   */
-  virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const PURE;
-
-  /**
-   * @return const VirtualHost& the virtual host that owns the route.
-   */
-  virtual const VirtualHost& virtualHost() const PURE;
 
   /**
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
@@ -1236,17 +1245,14 @@ public:
    * hierarchy(Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
   virtual const RouteSpecificFilterConfig*
-  mostSpecificPerFilterConfig(const std::string& name) const PURE;
+  mostSpecificPerFilterConfig(absl::string_view name) const PURE;
 
   /**
-   * Find all the available per route filter configs, invoking the callback with each config (if
-   * it is present). Iteration of the configs is in order of specificity. That means that the
-   * callback will be called first for a config on a Virtual host, then a route, and finally a route
-   * entry (weighted cluster). If a config is not present, the callback will not be invoked.
+   * Return all the available per route filter configs. The configs is in order of specificity.
+   * That means that the config from a route configuration will be first, then the config from a
+   * virtual host, then the config from a route.
    */
-  virtual void traversePerFilterConfig(
-      const std::string& filter_name,
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const PURE;
+  virtual Router::RouteSpecificFilterConfigs perFilterConfigs(absl::string_view name) const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
@@ -1264,6 +1270,11 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;
+
+  /**
+   * @return const VirtualHost& the virtual host that owns the route.
+   */
+  virtual const VirtualHost& virtualHost() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
@@ -1544,15 +1555,13 @@ public:
   virtual void encodeTrailers(const Http::RequestTrailerMap& trailers) PURE;
 
   // TODO(vikaschoudhary16): Remove this api.
-  // This api is only used to enable half-close semantics on the upstream connection.
-  // This ideally should be done via calling connection.enableHalfClose() but since TcpProxy
-  // does not have access to the upstream connection, it is done via this api for now.
+  // This api is only used to enable TCP tunneling semantics in the upstream codec.
+  // TCP proxy extension uses this API when proxyingn TCP tunnel via HTTP CONNECT or POST.
   /**
-   * Enable half-close semantics on the upstream connection. Reading a remote half-close
+   * Enable TCP tunneling semantics on the upstream codec. Reading a remote half-close
    * will not fully close the connection. This is off by default.
-   * @param enabled Whether to set half-close semantics as enabled or disabled.
    */
-  virtual void enableHalfClose() PURE;
+  virtual void enableTcpTunneling() PURE;
   /**
    * Enable/disable further data from this stream.
    */

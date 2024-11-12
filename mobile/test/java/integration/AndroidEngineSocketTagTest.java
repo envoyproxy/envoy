@@ -142,7 +142,8 @@ public class AndroidEngineSocketTagTest {
             .start(requestScenario.useDirectExecutor ? Runnable::run
                                                      : Executors.newSingleThreadExecutor());
     streamRef.set(stream); // Set before sending headers to avoid race conditions.
-    stream.sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
+    stream.sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody(),
+                       /* idempotent= */ false);
     latch.await();
     response.get().throwAssertionErrorIfAny();
     return response.get();

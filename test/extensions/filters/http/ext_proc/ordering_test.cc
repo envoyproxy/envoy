@@ -76,7 +76,7 @@ protected:
         std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
             Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
         factory_context_);
-    filter_ = std::make_unique<Filter>(config_, std::move(client_), proto_config.grpc_service());
+    filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
@@ -84,10 +84,10 @@ protected:
   void TearDown() override { filter_->onDestroy(); }
 
   // Called by the "start" method on the stream by the filter
-  virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                             const Grpc::GrpcServiceConfigWithHashKey&,
-                                             const Envoy::Http::AsyncClient::StreamOptions&,
-                                             Envoy::Http::DecoderFilterWatermarkCallbacks*) {
+  virtual ExternalProcessorStreamPtr
+  doStart(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey&,
+          const Envoy::Http::AsyncClient::StreamOptions&,
+          Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<NiceMock<MockStream>>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
@@ -223,10 +223,10 @@ protected:
 // A base class for tests that will check that gRPC streams fail while being created
 class FastFailOrderingTest : public OrderingTest {
   // All tests using this class have gRPC streams that will fail while being opened.
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
-                                     const Grpc::GrpcServiceConfigWithHashKey&,
-                                     const Envoy::Http::AsyncClient::StreamOptions&,
-                                     Envoy::Http::DecoderFilterWatermarkCallbacks*) override {
+  ExternalProcessorStreamPtr
+  doStart(ExternalProcessorCallbacks& callbacks, const Grpc::GrpcServiceConfigWithHashKey&,
+          const Envoy::Http::AsyncClient::StreamOptions&,
+          Envoy::Http::StreamFilterSidestreamWatermarkCallbacks&) override {
     callbacks.onGrpcError(Grpc::Status::Internal);
     // Returns nullptr on start stream failure.
     return nullptr;
@@ -492,13 +492,7 @@ TEST_F(OrderingTest, ResponseSomeDataComesFast) {
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
-  // Some of the data might come back but we should watermark so that we
-  // don't fill the buffer.
-  EXPECT_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
   EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_body_1, false));
-
-  // When the response does comes back, we should lift the watermark
-  EXPECT_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   sendResponseHeadersReply();
 
   EXPECT_CALL(stream_delegate_, send(_, false));

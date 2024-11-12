@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile
 
+import android.util.Pair
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
@@ -34,9 +35,13 @@ open class EngineBuilder() {
   private var dnsPreresolveHostnames = listOf<String>()
   private var enableDNSCache = false
   private var dnsCacheSaveIntervalSeconds = 1
+  // null means the DNS resolver will try indefinitely until it succeeds.
+  private var dnsNumRetries: Int? = null
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
   internal var useCares = false
+  internal var caresFallbackResolvers = mutableListOf<Pair<String, Int>>()
+  internal var forceV6 = true
   private var useGro = false
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
@@ -44,7 +49,7 @@ open class EngineBuilder() {
   private var quicCanonicalSuffixes = mutableListOf<String>()
   private var enableGzipDecompression = true
   private var enableBrotliDecompression = false
-  private var enablePortMigration = false
+  private var numTimeoutsToTriggerPortMigration = 0
   private var enableSocketTagging = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 1
@@ -143,6 +148,18 @@ open class EngineBuilder() {
   }
 
   /**
+   * Specifies the number of retries before the resolver gives up. If not specified, the resolver
+   * will retry indefinitely until it succeeds or the DNS query times out.
+   *
+   * @param dnsNumRetries the number of retries
+   * @return this builder
+   */
+  fun setDnsNumRetries(dnsNumRetries: Int): EngineBuilder {
+    this.dnsNumRetries = dnsNumRetries
+    return this
+  }
+
+  /**
    * Specify whether to drain connections after the resolution of a soft DNS refresh. A refresh may
    * be triggered directly via the Engine API, or as a result of a network status update provided by
    * the OS. Draining connections does not interrupt existing connections or requests, but will
@@ -205,6 +222,29 @@ open class EngineBuilder() {
   }
 
   /**
+   * Add fallback resolver to c_ares.
+   *
+   * @param host ip address string
+   * @param port port for the resolver
+   * @return This builder.
+   */
+  fun addCaresFallbackResolver(host: String, port: Int): EngineBuilder {
+    this.caresFallbackResolvers.add(Pair(host, port))
+    return this
+  }
+
+  /**
+   * Specify whether local ipv4 addresses should be mapped to ipv6. Defaults to true.
+   *
+   * @param forceV6 whether or not to translate v4 to v6.
+   * @return This builder.
+   */
+  fun forceV6(forceV6: Boolean): EngineBuilder {
+    this.forceV6 = forceV6
+    return this
+  }
+
+  /**
    * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
    * system.
    *
@@ -228,13 +268,14 @@ open class EngineBuilder() {
   }
 
   /**
-   * Specify whether to do quic port migration or not. Defaults to false.
+   * Configure QUIC port migration. Defaults to disabled.
    *
-   * @param enablePortMigration whether or not to allow quic port migration.
+   * @param numTimeoutsToTriggerPortMigration number of timeouts to trigger port migration. If 0,
+   *   port migration is disabled.
    * @return This builder.
    */
-  fun enablePortMigration(enablePortMigration: Boolean): EngineBuilder {
-    this.enablePortMigration = enablePortMigration
+  fun setNumTimeoutsToTriggerPortMigration(numTimeoutsToTriggerPortMigration: Int): EngineBuilder {
+    this.numTimeoutsToTriggerPortMigration = numTimeoutsToTriggerPortMigration
     return this
   }
 
@@ -526,9 +567,11 @@ open class EngineBuilder() {
         dnsPreresolveHostnames,
         enableDNSCache,
         dnsCacheSaveIntervalSeconds,
+        dnsNumRetries ?: -1,
         enableDrainPostDnsRefresh,
         enableHttp3,
         useCares,
+        forceV6,
         useGro,
         http3ConnectionOptions,
         http3ClientConnectionOptions,
@@ -536,7 +579,7 @@ open class EngineBuilder() {
         quicCanonicalSuffixes,
         enableGzipDecompression,
         enableBrotliDecompression,
-        enablePortMigration,
+        numTimeoutsToTriggerPortMigration,
         enableSocketTagging,
         enableInterfaceBinding,
         h2ConnectionKeepaliveIdleIntervalMilliseconds,
@@ -554,6 +597,7 @@ open class EngineBuilder() {
         runtimeGuards,
         enablePlatformCertificatesValidation,
         upstreamTlsSni,
+        caresFallbackResolvers,
       )
 
     return EngineImpl(engineType(), engineConfiguration, logLevel)

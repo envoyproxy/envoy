@@ -11,6 +11,13 @@ final class KeyValueStoreTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testKeyValueStore() {
     // swiftlint:disable:next line_length
     let kvStoreType = "type.googleapis.com/envoymobile.extensions.filters.http.test_kv_store.TestKeyValueStore"
@@ -59,7 +66,7 @@ final class KeyValueStoreTests: XCTestCase {
 
     let requestHeaders = RequestHeadersBuilder(
       method: .get, scheme: "http",
-      authority: "localhost:" + String(EnvoyTestServer.getEnvoyPort()), path: "/simple.txt"
+      authority: "localhost:" + String(EnvoyTestServer.getHttpPort()), path: "/simple.txt"
     )
     .build()
 
@@ -77,6 +84,6 @@ final class KeyValueStoreTests: XCTestCase {
     )
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

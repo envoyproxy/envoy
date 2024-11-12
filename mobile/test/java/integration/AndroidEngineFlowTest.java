@@ -305,7 +305,8 @@ public class AndroidEngineFlowTest {
                           return null;
                         })
                         .start(Executors.newSingleThreadExecutor())
-                        .sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
+                        .sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody(),
+                                     /* idempotent= */ false);
     if (requestScenario.cancelBeforeSendingRequestBody) {
       stream.cancel();
     } else {

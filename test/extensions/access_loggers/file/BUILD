@@ -15,7 +15,9 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.access_loggers.file"],
+    rbe_pool = "2core",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/access_loggers/file:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",

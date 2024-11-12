@@ -648,6 +648,218 @@ using UdpListenerFilterFactoryCb = std::function<void(
     UdpListenerFilterManager& udp_listener_filter_manager, UdpReadFilterCallbacks& callbacks)>;
 
 /**
+ * Common interface for UdpSessionReadFilterCallbacks and UdpSessionWriteFilterCallbacks.
+ */
+class UdpSessionFilterCallbacks {
+public:
+  virtual ~UdpSessionFilterCallbacks() = default;
+
+  /**
+   * @return uint64_t the ID of the originating UDP session.
+   */
+  virtual uint64_t sessionId() const PURE;
+
+  /**
+   * @return StreamInfo for logging purposes.
+   */
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * Allows a filter to inject a datagram to successive filters in the session filter chain.
+   * The injected datagram will be iterated as a regular received datagram, and may also be
+   * stopped by further filters. This can be used, for example, to continue processing previously
+   * buffered datagrams by a filter after an asynchronous operation ended.
+   */
+  virtual void injectDatagramToFilterChain(Network::UdpRecvData& data) PURE;
+};
+
+class UdpSessionReadFilterCallbacks : public UdpSessionFilterCallbacks {
+public:
+  ~UdpSessionReadFilterCallbacks() override = default;
+
+  /**
+   * If a read filter stopped filter iteration, continueFilterChain() can be called to continue the
+   * filter chain. It will have onNewSession() called if it was not previously called.
+   * @return false if the session is removed and no longer valid, otherwise returns true.
+   */
+  virtual bool continueFilterChain() PURE;
+};
+
+class UdpSessionWriteFilterCallbacks : public UdpSessionFilterCallbacks {};
+
+class UdpSessionFilterBase {
+public:
+  virtual ~UdpSessionFilterBase() = default;
+
+  /**
+   * This routine is called before the access log handlers' final log() is called. Filters can use
+   * this callback to enrich the data passed in to the log handlers.
+   */
+  void onSessionComplete() {
+    if (!on_session_complete_already_called_) {
+      onSessionCompleteInternal();
+      on_session_complete_already_called_ = true;
+    }
+  }
+
+protected:
+  /**
+   * This routine is called by onSessionComplete to enrich the data passed in to the log handlers.
+   */
+  virtual void onSessionCompleteInternal() { ASSERT(!on_session_complete_already_called_); }
+
+private:
+  bool on_session_complete_already_called_{false};
+};
+
+/**
+ * Return codes for read filter invocations.
+ */
+enum class UdpSessionReadFilterStatus {
+  // Continue to further session filters.
+  Continue,
+  // Stop executing further session filters.
+  StopIteration,
+};
+
+/**
+ * Session read filter interface.
+ */
+class UdpSessionReadFilter : public virtual UdpSessionFilterBase {
+public:
+  ~UdpSessionReadFilter() override = default;
+
+  /**
+   * Called when a new UDP session is first established. Filters should do one time long term
+   * processing that needs to be done when a session is established. Filter chain iteration
+   * can be stopped if needed.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual UdpSessionReadFilterStatus onNewSession() PURE;
+
+  /**
+   * Called when UDP datagram is read and matches the session that manages the filter.
+   * @param data supplies the read data which may be modified.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual UdpSessionReadFilterStatus onData(Network::UdpRecvData& data) PURE;
+
+  /**
+   * Initializes the read filter callbacks used to interact with the filter manager. It will be
+   * called by the filter manager a single time when the filter is first registered.
+   *
+   * IMPORTANT: No outbound networking or complex processing should be done in this function.
+   *            That should be done in the context of onNewSession() if needed.
+   *
+   * @param callbacks supplies the callbacks.
+   */
+  virtual void initializeReadFilterCallbacks(UdpSessionReadFilterCallbacks& callbacks) PURE;
+};
+
+using UdpSessionReadFilterSharedPtr = std::shared_ptr<UdpSessionReadFilter>;
+
+/**
+ * Return codes for write filter invocations.
+ */
+enum class UdpSessionWriteFilterStatus {
+  // Continue to further session filters.
+  Continue,
+  // Stop executing further session filters.
+  StopIteration,
+};
+
+/**
+ * Session write filter interface.
+ */
+class UdpSessionWriteFilter : public virtual UdpSessionFilterBase {
+public:
+  ~UdpSessionWriteFilter() override = default;
+
+  /**
+   * Called when data is to be written on the UDP session.
+   * @param data supplies the buffer to be written which may be modified.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual UdpSessionWriteFilterStatus onWrite(Network::UdpRecvData& data) PURE;
+
+  /**
+   * Initializes the write filter callbacks used to interact with the filter manager. It will be
+   * called by the filter manager a single time when the filter is first registered.
+   *
+   * IMPORTANT: No outbound networking or complex processing should be done in this function.
+   *            That should be done in the context of ReadFilter::onNewSession() if needed.
+   *
+   * @param callbacks supplies the callbacks.
+   */
+  virtual void initializeWriteFilterCallbacks(UdpSessionWriteFilterCallbacks& callbacks) PURE;
+};
+
+using UdpSessionWriteFilterSharedPtr = std::shared_ptr<UdpSessionWriteFilter>;
+
+/**
+ * A combination read and write filter. This allows a single filter instance to cover
+ * both the read and write paths.
+ */
+class UdpSessionFilter : public virtual UdpSessionReadFilter,
+                         public virtual UdpSessionWriteFilter {};
+using UdpSessionFilterSharedPtr = std::shared_ptr<UdpSessionFilter>;
+
+/**
+ * These callbacks are provided by the UDP session manager to the factory so that the factory
+ * can * build the filter chain in an application specific way.
+ */
+class UdpSessionFilterChainFactoryCallbacks {
+public:
+  virtual ~UdpSessionFilterChainFactoryCallbacks() = default;
+
+  /**
+   * Add a read filter that is used when reading UDP session data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addReadFilter(UdpSessionReadFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a write filter that is used when writing UDP session data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addWriteFilter(UdpSessionWriteFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a bidirectional filter that is used when reading and writing UDP session data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addFilter(UdpSessionFilterSharedPtr filter) PURE;
+};
+
+/**
+ * This function is used to wrap the creation of a UDP session filter chain for new sessions as they
+ * come in. Filter factories create the function at configuration initialization time, and then
+ * they are used at runtime.
+ * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
+ * function will install a single filter, but it's technically possibly to install more than one
+ * if desired.
+ */
+using UdpSessionFilterFactoryCb =
+    std::function<void(UdpSessionFilterChainFactoryCallbacks& callbacks)>;
+
+/**
+ * A UdpSessionFilterChainFactory is used by a UDP session manager to create a UDP session filter
+ * chain when a new session is created.
+ */
+class UdpSessionFilterChainFactory {
+public:
+  virtual ~UdpSessionFilterChainFactory() = default;
+
+  /**
+   * Called when a new UDP session is created.
+   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
+   *                  UdpSessionFilterChainFactoryCallbacks.
+   * @return true if filter chain was created successfully. Otherwise false.
+   */
+  virtual bool createFilterChain(UdpSessionFilterChainFactoryCallbacks& callbacks) const PURE;
+};
+
+/**
  * Creates a chain of network filters for a new connection.
  */
 class FilterChainFactory {

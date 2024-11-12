@@ -11,6 +11,13 @@ final class FilterResetIdleTests: XCTestCase {
     register_test_extensions()
   }
 
+  override static func tearDown() {
+    super.tearDown()
+    // Flush the stdout and stderror to show the print output.
+    fflush(stdout)
+    fflush(stderr)
+  }
+
   func testFilterResetIdle() {
     let filterName = "reset_idle_test_filter"
 
@@ -115,7 +122,7 @@ final class FilterResetIdleTests: XCTestCase {
     cancelExpectation.isInverted = true
 
     EnvoyTestServer.startHttp1PlaintextServer()
-    let port = String(EnvoyTestServer.getEnvoyPort())
+    let port = String(EnvoyTestServer.getHttpPort())
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
@@ -159,6 +166,6 @@ final class FilterResetIdleTests: XCTestCase {
     )
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

@@ -139,6 +139,11 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   return must_send_discovery_request_;
 }
 
+void DeltaSubscriptionState::markStreamFresh(bool should_send_initial_resource_versions) {
+  any_request_sent_yet_in_current_stream_ = false;
+  should_send_initial_resource_versions_ = should_send_initial_resource_versions;
+}
+
 UpdateAck DeltaSubscriptionState::handleResponse(
     const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   // We *always* copy the response's nonce into the next request, even if we're going to make that
@@ -213,12 +218,14 @@ void DeltaSubscriptionState::handleGoodResponse(
     }
   }
 
-  watch_map_.onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
+  absl::Span<const envoy::service::discovery::v3::Resource* const> non_heartbeat_resources_span =
+      absl::MakeConstSpan(non_heartbeat_resources.data(), non_heartbeat_resources.size());
+  watch_map_.onConfigUpdate(non_heartbeat_resources_span, message.removed_resources(),
                             message.system_version_info());
 
   // Processing point when resources are successfully ingested.
   if (xds_config_tracker_.has_value()) {
-    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources,
+    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources_span,
                                           message.removed_resources());
   }
 
@@ -286,21 +293,25 @@ DeltaSubscriptionState::getNextRequestAckless() {
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
     for (auto const& [resource_name, resource_state] : requested_resource_state_) {
-      // Populate initial_resource_versions with the resource versions we currently have.
-      // Resources we are interested in, but are still waiting to get any version of from the
-      // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-      if (!resource_state.isWaitingForServer()) {
-        (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
+      if (should_send_initial_resource_versions_) {
+        // Populate initial_resource_versions with the resource versions we currently have.
+        // Resources we are interested in, but are still waiting to get any version of from the
+        // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
+        if (!resource_state.isWaitingForServer()) {
+          (*request.mutable_initial_resource_versions())[resource_name] = resource_state.version();
+        }
       }
       // We are going over a list of resources that we are interested in, so add them to
       // resource_names_subscribe.
       names_added_.insert(resource_name);
     }
-    for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
-      (*request.mutable_initial_resource_versions())[resource_name] = resource_version;
-    }
-    for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
-      (*request.mutable_initial_resource_versions())[resource_name] = resource_version;
+    if (should_send_initial_resource_versions_) {
+      for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
+        (*request.mutable_initial_resource_versions())[resource_name] = resource_version;
+      }
+      for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
+        (*request.mutable_initial_resource_versions())[resource_name] = resource_version;
+      }
     }
     // If this is a legacy wildcard request, then make sure that the resource_names_subscribe is
     // empty.

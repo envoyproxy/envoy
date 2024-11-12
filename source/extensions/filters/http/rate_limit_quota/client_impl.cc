@@ -9,7 +9,7 @@ namespace RateLimitQuota {
 
 Grpc::RawAsyncClientSharedPtr
 getOrThrow(absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error) {
-  THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+  THROW_IF_NOT_OK_REF(client_or_error.status());
   return client_or_error.value();
 }
 
@@ -64,7 +64,14 @@ RateLimitQuotaUsageReports RateLimitClientImpl::buildReport(absl::optional<size_
 // This function covers both periodical report and immediate report case, with the difference that
 // bucked id in periodical report case is empty.
 void RateLimitClientImpl::sendUsageReport(absl::optional<size_t> bucket_id) {
-  ASSERT(stream_ != nullptr);
+  if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "The RLQS stream has been closed and must be restarted to send reports.");
+    if (absl::Status err = startStream(nullptr); !err.ok()) {
+      ENVOY_LOG(error, "Failed to start the stream to send reports.");
+      return;
+    }
+  }
+
   // Build the report and then send the report to RLQS server.
   // `end_stream` should always be set to false as we don't want to close the stream locally.
   stream_->sendMessage(buildReport(bucket_id), /*end_stream=*/false);
@@ -81,7 +88,7 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 
     // Get the hash id value from BucketId in the response.
     const size_t bucket_id = MessageUtil::hash(action.bucket_id());
-    ENVOY_LOG(trace,
+    ENVOY_LOG(debug,
               "Received a response for bucket id proto :\n {}, and generated "
               "the associated hashed bucket id: {}",
               action.bucket_id().DebugString(), bucket_id);
@@ -90,31 +97,61 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
       ENVOY_LOG(error, "The received response is not matched to any quota cache entry: ",
                 response->ShortDebugString());
     } else {
-      quota_buckets_[bucket_id]->bucket_action = action;
-      if (quota_buckets_[bucket_id]->bucket_action.has_quota_assignment_action()) {
-        auto rate_limit_strategy = quota_buckets_[bucket_id]
-                                       ->bucket_action.quota_assignment_action()
-                                       .rate_limit_strategy();
+      switch (action.bucket_action_case()) {
+      case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
+          kQuotaAssignmentAction: {
+        absl::optional<BucketAction> cached_action = quota_buckets_[bucket_id]->cached_action;
+        quota_buckets_[bucket_id]->current_assignment_time = time_source_.monotonicTime();
 
-        if (rate_limit_strategy.has_token_bucket()) {
-          const auto& interval_proto = rate_limit_strategy.token_bucket().fill_interval();
-          // Convert absl::duration to int64_t seconds
-          int64_t fill_interval_sec = absl::ToInt64Seconds(
-              absl::Seconds(interval_proto.seconds()) + absl::Nanoseconds(interval_proto.nanos()));
-          double fill_rate_per_sec =
-              static_cast<double>(rate_limit_strategy.token_bucket().tokens_per_fill().value()) /
-              fill_interval_sec;
-          uint32_t max_tokens = rate_limit_strategy.token_bucket().max_tokens();
-          ENVOY_LOG(
-              trace,
-              "Created the token bucket limiter for hashed bucket id: {}, with max_tokens: {}; "
-              "fill_interval_sec: {}; fill_rate_per_sec: {}.",
-              bucket_id, max_tokens, fill_interval_sec, fill_rate_per_sec);
-          quota_buckets_[bucket_id]->token_bucket_limiter =
-              std::make_unique<TokenBucketImpl>(max_tokens, time_source_, fill_rate_per_sec);
+        if (cached_action.has_value() &&
+            Protobuf::util::MessageDifferencer::Equals(*cached_action, action)) {
+          ENVOY_LOG(debug,
+                    "Cached action matches the incoming response so only TTL is updated for bucket "
+                    "id: {}",
+                    bucket_id);
+          break;
         }
+        quota_buckets_[bucket_id]->cached_action = action;
+        if (quota_buckets_[bucket_id]->cached_action->has_quota_assignment_action()) {
+          auto rate_limit_strategy = quota_buckets_[bucket_id]
+                                         ->cached_action->quota_assignment_action()
+                                         .rate_limit_strategy();
+
+          if (rate_limit_strategy.has_token_bucket()) {
+            const auto& interval_proto = rate_limit_strategy.token_bucket().fill_interval();
+            // Convert absl::duration to int64_t seconds
+            int64_t fill_interval_sec =
+                absl::ToInt64Seconds(absl::Seconds(interval_proto.seconds()) +
+                                     absl::Nanoseconds(interval_proto.nanos()));
+            double fill_rate_per_sec =
+                static_cast<double>(rate_limit_strategy.token_bucket().tokens_per_fill().value()) /
+                fill_interval_sec;
+            uint32_t max_tokens = rate_limit_strategy.token_bucket().max_tokens();
+            ENVOY_LOG(trace,
+                      "Created the token bucket limiter for hashed bucket "
+                      "id: {}, with max_tokens: {}; "
+                      "fill_interval_sec: {}; fill_rate_per_sec: {}.",
+                      bucket_id, max_tokens, fill_interval_sec, fill_rate_per_sec);
+            quota_buckets_[bucket_id]->token_bucket_limiter =
+                std::make_unique<TokenBucketImpl>(max_tokens, time_source_, fill_rate_per_sec);
+          }
+        }
+        break;
+      }
+      case envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse_BucketAction::
+          kAbandonAction: {
+        quota_buckets_.erase(bucket_id);
+        ENVOY_LOG(debug, "Bucket id {} removed from the cache by abandon action.", bucket_id);
+        break;
+      }
+      default: {
+        ENVOY_LOG_EVERY_POW_2(error, "Unset bucket action type {}",
+                              static_cast<int>(action.bucket_action_case()));
+        break;
+      }
       }
     }
+    ENVOY_LOG(debug, "Assignment cached for bucket id {}.", bucket_id);
   }
 
   // `rlqs_callback_` has been reset to nullptr for periodical report case.
@@ -127,36 +164,41 @@ void RateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response)
 
 void RateLimitClientImpl::closeStream() {
   // Close the stream if it is in open state.
-  if (stream_ != nullptr && !stream_closed_) {
+  if (stream_ != nullptr) {
     ENVOY_LOG(debug, "Closing gRPC stream");
     stream_->closeStream();
-    stream_closed_ = true;
     stream_->resetStream();
+    stream_ = nullptr;
   }
 }
 
 void RateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                         const std::string& message) {
-  // TODO(tyxia) Revisit later, maybe add some logging.
-  stream_closed_ = true;
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  closeStream();
+  stream_ = nullptr;
 }
 
-absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo& stream_info) {
+absl::Status RateLimitClientImpl::startStream(const StreamInfo::StreamInfo* stream_info) {
   // Starts stream if it has not been opened yet.
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Trying to start the new gRPC stream");
+    auto stream_options = Http::AsyncClient::RequestOptions();
+    if (stream_info) {
+      stream_options.setParentContext(Http::AsyncClient::ParentContext{stream_info});
+    }
     stream_ = aync_client_.start(
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.rate_limit_quota.v3.RateLimitQuotaService.StreamRateLimitQuotas"),
-        *this,
-        Http::AsyncClient::RequestOptions().setParentContext(
-            Http::AsyncClient::ParentContext{&stream_info}));
+        *this, stream_options);
   }
 
-  // Returns error status if start failed (i.e., stream_ is nullptr).
-  return stream_ == nullptr ? absl::InternalError("Failed to start the stream") : absl::OkStatus();
+  // If still null after attempting a start.
+  if (stream_ == nullptr) {
+    return absl::InternalError("Failed to start the stream");
+  }
+
+  ENVOY_LOG(debug, "gRPC stream has been started");
+  return absl::OkStatus();
 }
 
 } // namespace RateLimitQuota

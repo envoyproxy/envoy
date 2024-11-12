@@ -1,0 +1,179 @@
+name: Mobile/Android build
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
+    with:
+      check-name: mobile-android
+
+  build:
+    permissions:
+      contents: read
+      packages: read
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android }}
+    needs: load
+    name: Build envoy.aar distributable
+    uses: ./.github/workflows/_mobile_container_ci.yml
+    with:
+      args: >-
+        build
+        --config=mobile-remote-release-clang-android
+        //:android_dist
+      container: ${{ fromJSON(needs.load.outputs.build-image).mobile }}
+      diskspace-hack: true
+      request: ${{ needs.load.outputs.request }}
+      timeout-minutes: 90
+      target: build
+
+  kotlin-hello-world:
+    permissions:
+      contents: read
+      packages: read
+    name: kotlin-hello-world
+    uses: ./.github/workflows/_run.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android }}
+    needs:
+    - load
+    - build
+    with:
+      command: ./bazelw
+      container-command:
+      docker-ipv6: false
+      # Return to using:
+      #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
+      args: >-
+        build
+        --config=mobile-remote-release-clang-android
+        //examples/kotlin/hello_world:hello_envoy_kt
+      request: ${{ needs.load.outputs.request }}
+      target: kotlin-hello-world
+      runs-on: envoy-x64-small
+      steps-pre: |
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.35
+      steps-post: |
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.35
+          with:
+            apk: bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
+            app: io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
+            status: 200
+      timeout-minutes: 50
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      working-directory: mobile
+
+  apps:
+    permissions:
+      contents: read
+      packages: read
+    name: Android apps
+    uses: ./.github/workflows/_run.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android-all }}
+    needs:
+    - load
+    - build
+    with:
+      command: ./bazelw
+      container-command:
+      args: ${{ matrix.args }}
+      request: ${{ needs.load.outputs.request }}
+      target: ${{ matrix.target }}
+      runs-on: envoy-x64-small
+      steps-pre: |
+        - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.2.35
+      steps-post: ${{ matrix.steps-post }}
+      timeout-minutes: 50
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      working-directory: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: java-hello-world
+          steps-post: |
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.35
+              with:
+                apk: bazel-bin/examples/java/hello_world/hello_envoy.apk
+                app: io.envoyproxy.envoymobile.helloenvoy/.MainActivity
+                status: 301
+          target: java-hello-world
+          args: >-
+            build
+            --config=mobile-remote-release-clang-android
+            //examples/java/hello_world:hello_envoy
+        - name: kotlin-baseline-app
+          # Return to using:
+          #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+          # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
+          args: >-
+            build
+            --config=mobile-remote-release-clang-android
+            //test/kotlin/apps/baseline:hello_envoy_kt
+          steps-post: |
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.35
+              with:
+                apk: bazel-bin/test/kotlin/apps/baseline/hello_envoy_kt.apk
+                app: io.envoyproxy.envoymobile.helloenvoybaselinetest/.MainActivity
+                status: 301
+          target: kotlin-baseline-app
+        - name: kotlin-experimental-app
+          # Return to using:
+          #   ./bazelw mobile-install --fat_apk_cpu=x86_64 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+          # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
+          args: >-
+            build
+            --config=mobile-remote-release-clang-android
+            //test/kotlin/apps/experimental:hello_envoy_kt
+          steps-post: |
+            - uses: envoyproxy/toolshed/gh-actions/envoy/android/post@actions-v0.2.35
+              with:
+                apk: bazel-bin/test/kotlin/apps/experimental/hello_envoy_kt.apk
+                app: io.envoyproxy.envoymobile.helloenvoyexperimentaltest/.MainActivity
+                status: 200
+          target: kotlin-experimental-app
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-android }}
+    needs:
+    - load
+    - build
+    - kotlin-hello-world
+    - apps
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

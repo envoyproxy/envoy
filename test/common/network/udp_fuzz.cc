@@ -47,6 +47,7 @@ public:
   uint32_t workerIndex() const override;
   Network::UdpPacketWriter& udpPacketWriter() override;
   size_t numPacketsExpectedPerEventLoop() const override;
+  const Network::IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const override;
 
 private:
   UdpFuzz* my_upf_;
@@ -185,6 +186,11 @@ void FuzzUdpListenerCallbacks::onDatagramsDropped(uint32_t dropped) {
 
 size_t FuzzUdpListenerCallbacks::numPacketsExpectedPerEventLoop() const {
   return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
+}
+
+const Network::IoHandle::UdpSaveCmsgConfig& FuzzUdpListenerCallbacks::udpSaveCmsgConfig() const {
+  static const Network::IoHandle::UdpSaveCmsgConfig empty_config{};
+  return empty_config;
 }
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) { UdpFuzz udp_instance(buf, len); }

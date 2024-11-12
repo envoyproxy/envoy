@@ -26,7 +26,7 @@ public:
                const PrioritySet& priority_set, Runtime::Loader& runtime,
                Random::RandomGenerator& random, TimeSource& time_source));
 
-  LoadBalancerConfigPtr loadConfig(const Protobuf::Message&,
+  LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&, const Protobuf::Message&,
                                    ProtobufMessage::ValidationVisitor&) override {
     return std::make_unique<EmptyLoadBalancerConfig>();
   }

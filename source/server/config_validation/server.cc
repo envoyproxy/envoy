@@ -102,7 +102,7 @@ void ValidationInstance::initialize(const Options& options,
 
   auto producer_or_error =
       Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
-  THROW_IF_STATUS_NOT_OK(producer_or_error, throw);
+  THROW_IF_NOT_OK_REF(producer_or_error.status());
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   }
@@ -111,9 +111,11 @@ void ValidationInstance::initialize(const Options& options,
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
       options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
 
-  overload_manager_ = std::make_unique<OverloadManagerImpl>(
-      dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options_);
+  overload_manager_ = THROW_OR_RETURN_VALUE(
+      OverloadManagerImpl::create(
+          dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
+          messageValidationContext().staticValidationVisitor(), *api_, options_),
+      std::unique_ptr<OverloadManagerImpl>);
   null_overload_manager_ = std::make_unique<NullOverloadManager>(threadLocal(), false);
   absl::Status creation_status = absl::OkStatus();
   Configuration::InitialImpl initial_config(bootstrap_, creation_status);
@@ -136,6 +138,11 @@ void ValidationInstance::initialize(const Options& options,
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin()->getConfigTracker());
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
+
+  http_server_properties_cache_manager_ =
+      std::make_unique<Http::HttpServerPropertiesCacheManagerImpl>(
+          serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
+          thread_local_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,

@@ -206,13 +206,7 @@ void ClientIntegrationTest::basicTest() {
                                    std::to_string(request_data.length()));
 
   EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
-  stream_callbacks.on_data_ = [this](const Buffer::Instance& buffer, uint64_t length,
-                                     bool end_stream, envoy_stream_intel) {
-    if (end_stream) {
-      std::string response_body(length, ' ');
-      buffer.copyOut(0, length, response_body.data());
-      EXPECT_EQ(response_body, "");
-    }
+  stream_callbacks.on_data_ = [this](const Buffer::Instance&, uint64_t, bool, envoy_stream_intel) {
     cc_.on_data_calls_++;
   };
 
@@ -700,7 +694,7 @@ TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
                        true);
   Network::TestResolver::unblockResolve();
   terminal_callback_.waitReady();
-  EXPECT_EQ(2, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
+  EXPECT_LE(2, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
 }
 
 TEST_P(ClientIntegrationTest, ReresolveAndDrain) {
@@ -1306,33 +1300,6 @@ TEST_P(ClientIntegrationTest, Proxying) {
   ASSERT_EQ(cc_.on_complete_calls_, 2);
 }
 
-TEST_P(ClientIntegrationTest, DirectResponse) {
-  initialize();
-
-  // Override to not validate stream intel.
-  EnvoyStreamCallbacks stream_callbacks = createDefaultStreamCallbacks();
-  stream_callbacks.on_complete_ = [this](envoy_stream_intel, envoy_final_stream_intel final_intel) {
-    cc_.on_complete_received_byte_count_ = final_intel.received_byte_count;
-    cc_.on_complete_calls_++;
-    cc_.terminal_callback_->setReady();
-  };
-
-  default_request_headers_.setHost("127.0.0.1");
-  default_request_headers_.setPath("/");
-
-  stream_ = createNewStream(std::move(stream_callbacks));
-  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
-                       true);
-  terminal_callback_.waitReady();
-  ASSERT_EQ(cc_.status_, "404");
-  ASSERT_EQ(cc_.on_headers_calls_, 1);
-  stream_.reset();
-
-  // Verify the default runtime values.
-  EXPECT_FALSE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
-  EXPECT_TRUE(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_true"));
-}
-
 TEST_P(ClientIntegrationTest, TestRuntimeSet) {
   builder_.addRuntimeGuard("test_feature_true", false);
   builder_.addRuntimeGuard("test_feature_false", true);
@@ -1366,7 +1333,7 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
 TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
   initialize();
-  internalEngine()->setPreferredNetwork(NetworkType::WLAN);
+  internalEngine()->onDefaultNetworkChanged(NetworkType::WLAN);
   basicTest();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);

@@ -103,3 +103,48 @@ message ApplicationProtocolInput {
 message FilterStateInput {
   string key = 1 [(validate.rules).string = {min_len: 1}];
 }
+
+// Input that matches dynamic metadata by key.
+// DynamicMetadataInput provides a general interface using ``filter`` and ``path`` to retrieve value from
+// :ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`.
+//
+// For example, for the following Metadata:
+//
+// .. code-block:: yaml
+//
+//    filter_metadata:
+//      envoy.xxx:
+//        prop:
+//          foo: bar
+//          xyz:
+//            hello: envoy
+//
+// The following DynamicMetadataInput will retrieve a string value "bar" from the Metadata.
+//
+// .. code-block:: yaml
+//
+//    filter: envoy.xxx
+//    path:
+//    - key: prop
+//    - key: foo
+//
+// [#extension: envoy.matching.inputs.dynamic_metadata]
+message DynamicMetadataInput {
+  // Specifies the segment in a path to retrieve value from Metadata.
+  // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means that
+  // if the segment key refers to a list, it has to be the last segment in a path.
+  message PathSegment {
+    oneof segment {
+      option (validate.required) = true;
+
+      // If specified, use the key to retrieve the value in a Struct.
+      string key = 1 [(validate.rules).string = {min_len: 1}];
+    }
+  }
+
+  // The filter name to retrieve the Struct from the Metadata.
+  string filter = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The path to retrieve the Value from the Struct.
+  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
+}

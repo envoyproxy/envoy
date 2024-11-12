@@ -48,6 +48,7 @@ public:
 
   const std::string hostname1_ = "hostname1";
   const std::string hostname2_ = "hostname2";
+  const std::string hostname3_ = "hostname3";
   const uint32_t port1_ = 1;
   const uint32_t port2_ = 2;
   const std::string https_ = "https";
@@ -61,6 +62,7 @@ public:
 
   const HttpServerPropertiesCacheImpl::Origin origin1_ = {https_, hostname1_, port1_};
   const HttpServerPropertiesCacheImpl::Origin origin2_ = {https_, hostname2_, port2_};
+  const HttpServerPropertiesCacheImpl::Origin origin3_ = {https_, hostname3_, port2_};
 
   HttpServerPropertiesCacheImpl::AlternateProtocol protocol1_;
   HttpServerPropertiesCacheImpl::AlternateProtocol protocol2_;
@@ -380,11 +382,33 @@ TEST_P(HttpServerPropertiesCacheImplTest, GetOrCreateHttp3StatusTracker) {
   protocols_->getOrCreateHttp3StatusTracker(origin1_).markHttp3Broken();
   EXPECT_EQ(1u, protocols_->size());
   EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
 
-  // Fetch HTTP/3 status for another origin should overwrite the cache.
+  // Fetch HTTP/3 status for another origin should overwrite the cache because
+  // it's limited to one entry.
   EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin2_).isHttp3Broken());
   EXPECT_EQ(1u, protocols_->size());
   EXPECT_FALSE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
+}
+
+TEST_P(HttpServerPropertiesCacheImplTest, ClearBrokenness) {
+  initialize();
+  EXPECT_EQ(0u, protocols_->size());
+
+  protocols_->getOrCreateHttp3StatusTracker(origin1_).markHttp3Broken();
+  protocols_->getOrCreateHttp3StatusTracker(origin2_).markHttp3Confirmed();
+  protocols_->getOrCreateHttp3StatusTracker(origin3_).markHttp3Broken();
+
+  EXPECT_EQ(3u, protocols_->size());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin3_).isHttp3Broken());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin2_).isHttp3Confirmed());
+
+  protocols_->resetBrokenness();
+
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).hasHttp3FailedRecently());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin3_).hasHttp3FailedRecently());
+  EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin2_).isHttp3Confirmed());
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {

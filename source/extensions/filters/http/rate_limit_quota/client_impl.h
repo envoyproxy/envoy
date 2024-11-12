@@ -45,7 +45,7 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // RateLimitClient methods.
-  absl::Status startStream(const StreamInfo::StreamInfo& stream_info) override;
+  absl::Status startStream(const StreamInfo::StreamInfo* stream_info) override;
   void closeStream() override;
   // Send the usage report to RLQS server
   void sendUsageReport(absl::optional<size_t> bucket_id) override;
@@ -58,8 +58,6 @@ private:
   // Build the usage report (i.e., the request sent to RLQS server) from the buckets in quota bucket
   // cache.
   RateLimitQuotaUsageReports buildReport(absl::optional<size_t> bucket_id);
-
-  bool stream_closed_ = false;
   // Domain from filter configuration. The same domain name throughout the whole lifetime of client.
   std::string domain_name_;
   // Client is stored as the bare object since there is no ownership transfer involved.

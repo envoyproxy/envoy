@@ -35,6 +35,8 @@
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/network/upstream_subject_alt_names.h"
+#include "source/common/orca/orca_load_metrics.h"
+#include "source/common/orca/orca_parser.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/retry_state_impl.h"
@@ -384,7 +386,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         config_->empty_stat_name_,
         response_status_code,
         internal_request,
-        route_entry_->virtualHost().statName(),
+        route_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
@@ -516,7 +518,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   cluster_ = cluster->info();
 
   // Set up stat prefixes, etc.
-  request_vcluster_ = route_entry_->virtualCluster(headers);
+  request_vcluster_ = route_->virtualHost().virtualCluster(headers);
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
@@ -580,7 +582,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       (upstream_http_protocol_options.value().auto_sni() ||
        upstream_http_protocol_options.value().auto_san_validation())) {
     // Default the header to Host/Authority header.
-    absl::string_view header_value = headers.getHostValue();
+    std::string header_value = route_entry_->getRequestHostValue(headers);
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san")) {
+      header_value = std::string(headers.getHostValue());
+    }
 
     // Check whether `override_auto_sni_header` is specified.
     const auto override_auto_sni_header =
@@ -755,17 +761,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const bool can_send_early_data =
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
 
-  include_timeout_retry_header_in_request_ =
-      route_entry_->virtualHost().includeIsTimeoutRetryHeader();
+  include_timeout_retry_header_in_request_ = route_->virtualHost().includeIsTimeoutRetryHeader();
 
   // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.
   // For retries etc, HTTP/3 usability may transition from true to false, but
   // will never transition from false to true.
   bool can_use_http3 =
       !transport_socket_options_ || !transport_socket_options_->http11ProxyInfo().has_value();
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
-                                        can_use_http3, false /*enable_half_close*/);
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
+      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
+      allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
   if (streaming_shadows_) {
@@ -806,7 +811,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           shadow_streams_.insert(shadow_stream);
           shadow_stream->setDestructorCallback(
               [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
-          shadow_stream->setWatermarkCallbacks(*callbacks_);
+          shadow_stream->setWatermarkCallbacks(watermark_callbacks_);
         }
       }
     }
@@ -994,6 +999,8 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   if (callbacks_->decoderBufferLimit() != 0) {
     retry_shadow_buffer_limit_ = callbacks_->decoderBufferLimit();
   }
+
+  watermark_callbacks_.setDecoderFilterCallbacks(callbacks_);
 }
 
 void Filter::cleanup() {
@@ -1462,6 +1469,7 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::CoreResponseFlag::UpstreamConnectionTermination;
   case Http::StreamResetReason::LocalReset:
   case Http::StreamResetReason::LocalRefusedStreamReset:
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
     return StreamInfo::CoreResponseFlag::LocalReset;
   case Http::StreamResetReason::Overflow:
     return StreamInfo::CoreResponseFlag::UpstreamOverflow;
@@ -1562,6 +1570,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       grpc_to_http_status = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
     }
   }
+
+  maybeProcessOrcaLoadReport(*headers, upstream_request);
 
   if (grpc_status.has_value()) {
     upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(grpc_to_http_status);
@@ -1732,6 +1742,8 @@ void Filter::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers,
     }
   }
 
+  maybeProcessOrcaLoadReport(*trailers, upstream_request);
+
   onUpstreamComplete(upstream_request);
 
   callbacks_->encodeTrailers(std::move(trailers));
@@ -1743,6 +1755,10 @@ void Filter::onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) {
 
 void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   if (!downstream_end_stream_) {
+    if (allow_multiplexed_upstream_half_close_) {
+      // Continue request if downstream is not done yet.
+      return;
+    }
     upstream_request.resetStream();
   }
   Event::Dispatcher& dispatcher = callbacks_->dispatcher();
@@ -1768,7 +1784,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
         response_time,
         upstream_request.upstreamCanary(),
         internal_request,
-        route_entry_->virtualHost().statName(),
+        route_->virtualHost().statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
@@ -2015,9 +2031,9 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
     cleanup();
     return;
   }
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool), can_send_early_data,
-                                        can_use_http3, false /*enable_tcp_tunneling*/);
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
+      *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
+      allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
@@ -2093,6 +2109,48 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
     }
   }
   return false;
+}
+
+void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
+                                        UpstreamRequest& upstream_request) {
+  // Process the load report only once, so if response has report in headers,
+  // then don't process it in trailers.
+  if (orca_load_report_received_) {
+    return;
+  }
+  // Check whether we need to send the load report to the LRS or invoke the ORCA
+  // callbacks.
+  auto host = upstream_request.upstreamHost();
+  const bool need_to_send_load_report =
+      (host != nullptr) && cluster_->lrsReportMetricNames().has_value();
+  if (!need_to_send_load_report && orca_load_report_callbacks_.expired()) {
+    return;
+  }
+
+  absl::StatusOr<xds::data::orca::v3::OrcaLoadReport> orca_load_report =
+      Envoy::Orca::parseOrcaLoadReportHeaders(headers_or_trailers);
+  if (!orca_load_report.ok()) {
+    ENVOY_STREAM_LOG(trace, "Headers don't have orca load report: {}", *callbacks_,
+                     orca_load_report.status().message());
+    return;
+  }
+
+  orca_load_report_received_ = true;
+
+  if (need_to_send_load_report) {
+    ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
+                     orca_load_report->DebugString());
+    Envoy::Orca::addOrcaLoadReportToLoadMetricStats(cluster_->lrsReportMetricNames().value(),
+                                                    orca_load_report.value(),
+                                                    host->loadMetricStats());
+  }
+  if (auto callbacks = orca_load_report_callbacks_.lock(); callbacks != nullptr) {
+    const absl::Status status = callbacks->onOrcaLoadReport(*orca_load_report, *host);
+    if (!status.ok()) {
+      ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
+                       status.message());
+    }
+  }
 }
 
 RetryStatePtr

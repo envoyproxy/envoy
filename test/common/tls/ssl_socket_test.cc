@@ -172,12 +172,25 @@ public:
 
   const std::string& expectedSha256Digest() const { return expected_sha256_digest_; }
 
+  TestUtilOptions& setExpectedSha256Digests(std::vector<std::string>& expected_sha256_digests) {
+    expected_sha256_digests_ = expected_sha256_digests;
+    return *this;
+  }
+  const std::vector<std::string> expectedSha256Digests() const { return expected_sha256_digests_; }
+
   TestUtilOptions& setExpectedSha1Digest(const std::string& expected_sha1_digest) {
     expected_sha1_digest_ = expected_sha1_digest;
     return *this;
   }
 
   const std::string& expectedSha1Digest() const { return expected_sha1_digest_; }
+
+  TestUtilOptions& setExpectedSha1Digests(std::vector<std::string>& expected_sha1_digests) {
+    expected_sha1_digests_ = expected_sha1_digests;
+    return *this;
+  }
+
+  const std::vector<std::string> expectedSha1Digests() const { return expected_sha1_digests_; }
 
   TestUtilOptions& setExpectedLocalUri(const std::string& expected_local_uri) {
     expected_local_uri_ = {expected_local_uri};
@@ -186,12 +199,33 @@ public:
 
   const std::vector<std::string>& expectedLocalUri() const { return expected_local_uri_; }
 
+  TestUtilOptions& setExpectedLocalDns(const std::string& expected_local_dns) {
+    expected_local_dns_ = {expected_local_dns};
+    return *this;
+  }
+
+  const std::vector<std::string>& expectedLocalDns() const { return expected_local_dns_; }
+
+  TestUtilOptions& setExpectedLocalIp(const std::string& expected_local_ip) {
+    expected_local_ip_ = {expected_local_ip};
+    return *this;
+  }
+
+  const std::vector<std::string>& expectedLocalIp() const { return expected_local_ip_; }
+
   TestUtilOptions& setExpectedSerialNumber(const std::string& expected_serial_number) {
     expected_serial_number_ = expected_serial_number;
     return *this;
   }
 
   const std::string& expectedSerialNumber() const { return expected_serial_number_; }
+
+  TestUtilOptions& setExpectedSerialNumbers(std::vector<std::string>& expected_serial_numbers) {
+    expected_serial_numbers_ = expected_serial_numbers;
+    return *this;
+  }
+
+  const std::vector<std::string> expectedSerialNumbers() const { return expected_serial_numbers_; }
 
   TestUtilOptions& setExpectedPeerIssuer(const std::string& expected_peer_issuer) {
     expected_peer_issuer_ = expected_peer_issuer;
@@ -213,6 +247,20 @@ public:
   }
 
   const std::string& expectedLocalSubject() const { return expected_local_subject_; }
+
+  TestUtilOptions& setExpectedPeerOids(const std::vector<std::string>& expected_peer_oids) {
+    expected_peer_oids_ = expected_peer_oids;
+    return *this;
+  }
+
+  const std::vector<std::string>& expectedPeerOids() const { return expected_peer_oids_; }
+
+  TestUtilOptions& setExpectedLocalOids(const std::vector<std::string>& expected_local_oids) {
+    expected_local_oids_ = expected_local_oids;
+    return *this;
+  }
+
+  const std::vector<std::string>& expectedLocalOids() const { return expected_local_oids_; }
 
   TestUtilOptions& setExpectedPeerCert(const std::string& expected_peer_cert) {
     expected_peer_cert_ = expected_peer_cert;
@@ -314,12 +362,19 @@ private:
   NiceMock<Runtime::MockLoader> runtime_;
   Network::ConnectionEvent expected_server_close_event_{Network::ConnectionEvent::RemoteClose};
   std::string expected_sha256_digest_;
+  std::vector<std::string> expected_sha256_digests_;
   std::string expected_sha1_digest_;
+  std::vector<std::string> expected_sha1_digests_;
   std::vector<std::string> expected_local_uri_;
+  std::vector<std::string> expected_local_dns_;
+  std::vector<std::string> expected_local_ip_;
   std::string expected_serial_number_;
+  std::vector<std::string> expected_serial_numbers_;
   std::string expected_peer_issuer_;
   std::string expected_peer_subject_;
   std::string expected_local_subject_;
+  std::vector<std::string> expected_peer_oids_;
+  std::vector<std::string> expected_local_oids_;
   std::string expected_peer_cert_;
   std::string expected_peer_cert_chain_;
   std::string expected_valid_from_peer_cert_;
@@ -373,7 +428,7 @@ void testUtil(const TestUtilOptions& options) {
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.serverCtxYaml()),
                             server_tls_context);
   auto server_cfg = THROW_OR_RETURN_VALUE(
-      ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context),
+      ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context, false),
       std::unique_ptr<ServerContextConfigImpl>);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
@@ -443,12 +498,26 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedSha256Digest(),
                   server_connection->ssl()->sha256PeerCertificateDigest());
       }
+      if (!options.expectedSha256Digests().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSha256Digests(),
+                  server_connection->ssl()->sha256PeerCertificateChainDigests());
+        EXPECT_EQ(options.expectedSha256Digests(),
+                  server_connection->ssl()->sha256PeerCertificateChainDigests());
+      }
       if (!options.expectedSha1Digest().empty()) {
         // Assert twice to ensure a cached value is returned and still valid.
         EXPECT_EQ(options.expectedSha1Digest(),
                   server_connection->ssl()->sha1PeerCertificateDigest());
         EXPECT_EQ(options.expectedSha1Digest(),
                   server_connection->ssl()->sha1PeerCertificateDigest());
+      }
+      if (!options.expectedSha1Digests().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSha1Digests(),
+                  server_connection->ssl()->sha1PeerCertificateChainDigests());
+        EXPECT_EQ(options.expectedSha1Digests(),
+                  server_connection->ssl()->sha1PeerCertificateChainDigests());
       }
       // Assert twice to ensure a cached value is returned and still valid.
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
@@ -459,18 +528,64 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
         EXPECT_EQ(options.expectedLocalUri(), server_connection->ssl()->uriSanLocalCertificate());
       }
+
+      if (!options.expectedLocalDns().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedLocalDns(), server_connection->ssl()->dnsSansLocalCertificate());
+        EXPECT_EQ(options.expectedLocalDns(), server_connection->ssl()->dnsSansLocalCertificate());
+      }
+
+      if (!options.expectedLocalIp().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedLocalIp(), server_connection->ssl()->ipSansLocalCertificate());
+        EXPECT_EQ(options.expectedLocalIp(), server_connection->ssl()->ipSansLocalCertificate());
+      }
+
       EXPECT_EQ(options.expectedSerialNumber(),
                 server_connection->ssl()->serialNumberPeerCertificate());
+      EXPECT_EQ(options.expectedSerialNumber(),
+                server_connection->ssl()->serialNumberPeerCertificate());
+      if (!options.expectedSerialNumbers().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedSerialNumbers(),
+                  server_connection->ssl()->serialNumbersPeerCertificates());
+        EXPECT_EQ(options.expectedSerialNumbers(),
+                  server_connection->ssl()->serialNumbersPeerCertificates());
+      }
       if (!options.expectedPeerIssuer().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
         EXPECT_EQ(options.expectedPeerIssuer(), server_connection->ssl()->issuerPeerCertificate());
       }
       if (!options.expectedPeerSubject().empty()) {
+        EXPECT_EQ(options.expectedPeerSubject(),
+                  server_connection->ssl()->subjectPeerCertificate());
         EXPECT_EQ(options.expectedPeerSubject(),
                   server_connection->ssl()->subjectPeerCertificate());
       }
       if (!options.expectedLocalSubject().empty()) {
         EXPECT_EQ(options.expectedLocalSubject(),
                   server_connection->ssl()->subjectLocalCertificate());
+        EXPECT_EQ(options.expectedLocalSubject(),
+                  server_connection->ssl()->subjectLocalCertificate());
+      }
+      if (!options.expectedPeerOids().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_THAT(
+            options.expectedPeerOids(),
+            testing::UnorderedElementsAreArray(server_connection->ssl()->oidsPeerCertificate()));
+        EXPECT_THAT(
+            options.expectedPeerOids(),
+            testing::UnorderedElementsAreArray(server_connection->ssl()->oidsPeerCertificate()));
+      }
+      if (!options.expectedLocalOids().empty()) {
+        // Assert twice to ensure a cached value is returned and still valid.
+        EXPECT_THAT(
+            options.expectedLocalOids(),
+            testing::UnorderedElementsAreArray(server_connection->ssl()->oidsLocalCertificate()));
+        EXPECT_THAT(
+            options.expectedLocalOids(),
+            testing::UnorderedElementsAreArray(server_connection->ssl()->oidsLocalCertificate()));
       }
       if (!options.expectedPeerCert().empty()) {
         std::string urlencoded = absl::StrReplaceAll(
@@ -508,8 +623,7 @@ void testUtil(const TestUtilOptions& options) {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->subjectPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansPeerCertificate());
         EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansPeerCertificate());
-        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->dnsSansLocalCertificate());
-        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->ipSansLocalCertificate());
+        EXPECT_EQ(std::vector<std::string>{}, server_connection->ssl()->oidsPeerCertificate());
       }
       if (options.expectNoCertChain()) {
         EXPECT_EQ(EMPTY_STRING,
@@ -737,7 +851,8 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   ASSERT(transport_socket.has_typed_config());
   transport_socket.typed_config().UnpackTo(&tls_context);
 
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, transport_socket_factory_context);
+  auto server_cfg =
+      *ServerContextConfigImpl::create(tls_context, transport_socket_factory_context, false);
 
   auto factory_or_error = ServerSslSocketFactory::create(
       std::move(server_cfg), manager, *server_stats_store.rootScope(), server_names);
@@ -817,6 +932,8 @@ void testUtilV2(const TestUtilOptionsV2& options) {
       if (!options.expectedALPNProtocol().empty()) {
         EXPECT_EQ(options.expectedALPNProtocol(), client_connection->nextProtocol());
       }
+      // Assert twice to ensure a cached value is returned and still valid.
+      EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       EXPECT_EQ(options.expectedClientCertUri(), server_connection->ssl()->uriSanPeerCertificate());
       EXPECT_EQ(options.expectedClientCertIpSans(),
                 server_connection->ssl()->ipSansPeerCertificate());
@@ -1031,7 +1148,7 @@ TEST_P(SslSocketTest, ServerTransportSocketOptions) {
   ;
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   auto server_ssl_socket_factory =
@@ -1096,6 +1213,66 @@ TEST_P(SslSocketTest, GetCertDigestInvalidFiles) {
   testUtil(
       test_options.setExpectedSha256Digest("").setExpectedSha1Digest("").setExpectedSerialNumber(
           ""));
+}
+
+TEST_P(SslSocketTest, GetCertDigests) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_san_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  std::vector<std::string> sha256Digests = {TEST_NO_SAN_CERT_256_HASH,
+                                            TEST_INTERMEDIATE_CA_CERT_256_HASH};
+  std::vector<std::string> sha1Digests = {TEST_NO_SAN_CERT_1_HASH,
+                                          TEST_INTERMEDIATE_CA_CERT_1_HASH};
+  std::vector<std::string> serialNumbers = {TEST_NO_SAN_CERT_SERIAL,
+                                            TEST_INTERMEDIATE_CA_CERT_SERIAL};
+  testUtil(test_options.setExpectedSha256Digests(sha256Digests)
+               .setExpectedSha1Digests(sha1Digests)
+               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL) // test checks first serial #
+               .setExpectedSerialNumbers(serialNumbers));
+}
+
+TEST_P(SslSocketTest, GetCertDigestsInvalidFiles) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  std::vector<std::string> emptyStringVec;
+  testUtil(test_options.setExpectedSha256Digests(emptyStringVec)
+               .setExpectedSha1Digests(emptyStringVec)
+               .setExpectedSerialNumbers(emptyStringVec));
 }
 
 TEST_P(SslSocketTest, GetCertDigestInline) {
@@ -1372,6 +1549,38 @@ TEST_P(SslSocketTest, NoCert) {
   testUtil(test_options.setExpectedServerStats("ssl.no_certificate")
                .setExpectNoCert()
                .setExpectNoCertChain());
+}
+
+TEST_P(SslSocketTest, NoLocalCert) {
+  ContextManagerImpl manager(factory_context_.serverFactoryContext());
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(version_));
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
+  auto client_cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Stats::TestUtil::TestStore client_stats_store;
+  auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
+                                                                   *client_stats_store.rootScope());
+  Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
+      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
+      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
+  Network::MockConnectionCallbacks client_connection_callbacks;
+  client_connection->addConnectionCallbacks(client_connection_callbacks);
+
+  EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->uriSanLocalCertificate());
+  EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->dnsSansLocalCertificate());
+  EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->ipSansLocalCertificate());
+  EXPECT_EQ(std::vector<std::string>{}, client_connection->ssl()->oidsLocalCertificate());
+  EXPECT_EQ(EMPTY_STRING, client_connection->ssl()->subjectLocalCertificate());
+
+  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
+  client_connection->close(Network::ConnectionCloseType::NoFlush);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
 // Prefer ECDSA certificate when multiple RSA certificates are present and the
@@ -1793,6 +2002,54 @@ TEST_P(SslSocketTest, GetUriWithLocalUriSan) {
                .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
 }
 
+TEST_P(SslSocketTest, GetDnsWithLocalDnsSan) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedServerStats("ssl.no_certificate")
+               .setExpectNoCert()
+               .setExpectNoCertChain()
+               .setExpectedLocalDns("server1.example.com"));
+}
+
+TEST_P(SslSocketTest, GetIpWithLocalIpSan) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_ip_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_ip_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedServerStats("ssl.no_certificate")
+               .setExpectNoCert()
+               .setExpectNoCertChain()
+               .setExpectedLocalIp("1.1.1.1"));
+}
+
 TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
   const std::string client_ctx_yaml = R"EOF(
   common_tls_context:
@@ -1824,6 +2081,60 @@ TEST_P(SslSocketTest, GetSubjectsWithBothCerts) {
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US")
                .setExpectedLocalSubject(
                    "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US"));
+}
+
+TEST_P(SslSocketTest, GetOidsWithBothCerts) {
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/extensions_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/extensions_key.pem"
+)EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  require_client_certificate: true
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedSerialNumber(TEST_EXTENSIONS_CERT_SERIAL)
+               .setExpectedPeerOids({"2.5.29.14", "2.5.29.15", "2.5.29.19", "2.5.29.35",
+                                     "2.5.29.37", "1.2.3.4.5.6.7.8", "1.2.3.4.5.6.7.9"})
+               .setExpectedLocalOids({"2.5.29.14"}));
+}
+
+TEST_P(SslSocketTest, GetOidsWithLocalNoExtensionCert) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_extension_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/no_extension_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+
+  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+  testUtil(test_options.setExpectedServerStats("ssl.no_certificate")
+               .setExpectNoCert()
+               .setExpectNoCertChain()
+               .setExpectedLocalOids({}));
 }
 
 TEST_P(SslSocketTest, GetPeerCert) {
@@ -3077,7 +3388,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
@@ -3137,7 +3448,7 @@ TEST_P(SslSocketTest, HalfClose) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
@@ -3223,7 +3534,7 @@ TEST_P(SslSocketTest, ShutdownWithCloseNotify) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
@@ -3315,7 +3626,7 @@ TEST_P(SslSocketTest, ShutdownWithoutCloseNotify) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
@@ -3423,7 +3734,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
@@ -3520,13 +3831,13 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml1), server_tls_context1);
-  auto server_cfg1 =
-      *ServerContextConfigImpl::create(server_tls_context1, transport_socket_factory_context);
+  auto server_cfg1 = *ServerContextConfigImpl::create(server_tls_context1,
+                                                      transport_socket_factory_context, false);
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml2), server_tls_context2);
-  auto server_cfg2 =
-      *ServerContextConfigImpl::create(server_tls_context2, transport_socket_factory_context);
+  auto server_cfg2 = *ServerContextConfigImpl::create(server_tls_context2,
+                                                      transport_socket_factory_context, false);
   auto server_ssl_socket_factory1 = *ServerSslSocketFactory::create(
       std::move(server_cfg1), manager, *server_stats_store.rootScope(), server_names1);
   auto server_ssl_socket_factory2 = *ServerSslSocketFactory::create(
@@ -3682,7 +3993,7 @@ void testSupportForSessionResumption(const std::string& server_ctx_yaml,
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg =
-      *ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context);
+      *ServerContextConfigImpl::create(server_tls_context, transport_socket_factory_context, false);
 
   auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
       std::move(server_cfg), manager, *server_stats_store.rootScope(), {});
@@ -4324,10 +4635,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context1);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context1, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context1, factory_context_, false);
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
-  auto server2_cfg = *ServerContextConfigImpl::create(tls_context2, factory_context_);
+  auto server2_cfg = *ServerContextConfigImpl::create(tls_context2, factory_context_, false);
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
   ContextManagerImpl manager(server_factory_context);
   Stats::TestUtil::TestStore server_stats_store;
@@ -4459,7 +4770,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_ctx_proto;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
   auto server_cfg =
-      *ServerContextConfigImpl::create(server_ctx_proto, transport_socket_factory_context);
+      *ServerContextConfigImpl::create(server_ctx_proto, transport_socket_factory_context, false);
   auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
       std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
 
@@ -4722,7 +5033,7 @@ TEST_P(SslSocketTest, SslError) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   ContextManagerImpl manager(factory_context_.serverFactoryContext());
   Stats::TestUtil::TestStore server_stats_store;
   auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
@@ -5254,7 +5565,7 @@ TEST_P(SslSocketTest, SetSignatureAlgorithms) {
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
-  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(server_tls_context, factory_context_, false);
   ContextManagerImpl manager(factory_context_.serverFactoryContext());
   Stats::TestUtil::TestStore server_stats_store;
   auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
@@ -5866,7 +6177,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
   sds_secret_configs->mutable_sds_config();
-  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_);
+  auto server_cfg = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
   EXPECT_TRUE(server_cfg->tlsCertificates().empty());
   EXPECT_FALSE(server_cfg->isReady());
 
@@ -5958,7 +6269,8 @@ protected:
   void initialize() {
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
                               downstream_tls_context_);
-    auto server_cfg = *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_);
+    auto server_cfg =
+        *ServerContextConfigImpl::create(downstream_tls_context_, factory_context_, false);
     manager_ = std::make_unique<ContextManagerImpl>(factory_context_.serverFactoryContext());
     server_ssl_socket_factory_ = *ServerSslSocketFactory::create(std::move(server_cfg), *manager_,
                                                                  *server_stats_store_.rootScope(),

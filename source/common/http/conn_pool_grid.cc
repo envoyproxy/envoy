@@ -26,12 +26,19 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 
 static constexpr uint32_t kDefaultTimeoutMs = 300;
 
-std::string getSni(const Network::TransportSocketOptionsConstSharedPtr& options,
-                   Network::UpstreamTransportSocketFactory& transport_socket_factory) {
+std::string getTargetHostname(const Network::TransportSocketOptionsConstSharedPtr& options,
+                              Upstream::HostConstSharedPtr& host) {
   if (options && options->serverNameOverride().has_value()) {
     return options->serverNameOverride().value();
   }
-  return std::string(transport_socket_factory.defaultServerNameIndication());
+  std::string default_sni =
+      std::string(host->transportSocketFactory().defaultServerNameIndication());
+  if (!default_sni.empty() ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_alt_svc_for_ips")) {
+    return default_sni;
+  }
+  // If there's no configured SNI the hostname is probably an IP address. Return it here.
+  return host->hostname();
 }
 
 } // namespace
@@ -215,7 +222,7 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
   }
   if (callbacks != nullptr) {
     callbacks->onPoolReady(encoder, host, info, protocol);
-  } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.avoid_zombie_streams")) {
+  } else {
     encoder.getStream().resetStream(StreamResetReason::LocalReset);
   }
 }
@@ -290,16 +297,18 @@ ConnectivityGrid::ConnectivityGrid(
     Upstream::ClusterConnectivityState& state, TimeSource& time_source,
     HttpServerPropertiesCacheSharedPtr alternate_protocols,
     ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
-    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info)
+    Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
+    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host), options_(options),
       transport_socket_options_(transport_socket_options), state_(state),
       next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
       time_source_(time_source), alternate_protocols_(alternate_protocols),
       quic_stat_names_(quic_stat_names), scope_(scope),
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
-      origin_("https", getSni(transport_socket_options, host_->transportSocketFactory()),
+      origin_("https", getTargetHostname(transport_socket_options, host_),
               host_->address()->ip()->port()),
-      quic_info_(quic_info), priority_(priority) {
+      quic_info_(quic_info), priority_(priority),
+      network_observer_registry_(network_observer_registry) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
@@ -379,7 +388,7 @@ ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool(bool attempt_alter
                                  transport_socket_options_, state_, quic_stat_names_,
                                  *alternate_protocols_, scope_,
                                  makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this),
-                                 quic_info_, attempt_alternate_address);
+                                 quic_info_, network_observer_registry_, attempt_alternate_address);
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {

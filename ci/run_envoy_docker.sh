@@ -2,8 +2,10 @@
 
 set -e
 
+CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+
 # shellcheck source=ci/envoy_build_sha.sh
-. "$(dirname "$0")"/envoy_build_sha.sh
+. "${CURRENT_SCRIPT_DIR}"/envoy_build_sha.sh
 
 function is_windows() {
   [[ "$(uname -s)" == *NT* ]]
@@ -129,7 +131,6 @@ docker run --rm \
        -e BAZEL_STARTUP_OPTIONS \
        -e BAZEL_BUILD_EXTRA_OPTIONS \
        -e BAZEL_EXTRA_TEST_OPTIONS \
-       -e BAZEL_FAKE_SCM_REVISION \
        -e BAZEL_REMOTE_CACHE \
        -e BAZEL_STARTUP_EXTRA_OPTIONS \
        -e CI_BRANCH \
@@ -156,15 +157,15 @@ docker run --rm \
        -e ENVOY_PUBLISH_DRY_RUN \
        -e ENVOY_REPO \
        -e ENVOY_TARBALL_DIR \
-       -e SYSTEM_PULLREQUEST_PULLREQUESTNUMBER \
+       -e ENVOY_GEN_COMPDB_OPTIONS \
        -e GCS_ARTIFACT_BUCKET \
+       -e GCS_REDIRECT_PATH \
        -e GITHUB_REF_NAME \
        -e GITHUB_REF_TYPE \
        -e GITHUB_TOKEN \
        -e GITHUB_APP_ID \
        -e GITHUB_INSTALL_ID \
        -e MOBILE_DOCS_CHECKOUT_DIR \
-       -e BUILD_SOURCEBRANCHNAME \
        -e BAZELISK_BASE_URL \
        -e ENVOY_BUILD_ARCH \
        -e SYSTEM_STAGEDISPLAYNAME \

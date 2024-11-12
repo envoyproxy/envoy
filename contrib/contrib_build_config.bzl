@@ -27,7 +27,6 @@ CONTRIB_EXTENSIONS = {
     # "envoy.filters.network.mysql_proxy":                        "//contrib/mysql_proxy/filters/network/source:config",
     # "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     # "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
-    # "envoy.filters.network.generic_proxy":                      "//contrib/generic_proxy/filters/network/source:config",
     # "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
     "envoy.filters.network.smtp_proxy":                         "//contrib/smtp_proxy/filters/network/source:config",
 
@@ -72,9 +71,6 @@ CONTRIB_EXTENSIONS = {
     #
     # Extensions for generic proxy
     #
-    # "envoy.filters.generic.router":                             "//contrib/generic_proxy/filters/network/source/router:config",
-    # "envoy.generic_proxy.codecs.dubbo":                         "//contrib/generic_proxy/filters/network/source/codecs/dubbo:config",
-    # "envoy.generic_proxy.codecs.http1":                         "//contrib/generic_proxy/filters/network/source/codecs/http1:config",
     # "envoy.generic_proxy.codecs.kafka":                         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
 
     #

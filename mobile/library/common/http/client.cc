@@ -11,7 +11,6 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "library/common/bridge/utility.h"
-#include "library/common/http/header_utility.h"
 #include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/system/system_helper.h"
 
@@ -135,7 +134,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   if (bytes_to_send_ > 0 || !explicit_flow_control_) {
     // We shouldn't be calling sendDataToBridge with newly arrived data if there's buffered data.
     ASSERT(!response_data_.get() || response_data_->length() == 0);
-    sendDataToBridge(data, end_stream);
+    sendData(data, end_stream);
   }
 
   // If not all the bytes have been sent up, buffer any remaining data in response_data.
@@ -148,7 +147,7 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   }
 }
 
-void Client::DirectStreamCallbacks::sendDataToBridge(Buffer::Instance& data, bool end_stream) {
+void Client::DirectStreamCallbacks::sendData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!explicit_flow_control_ || bytes_to_send_ > 0);
 
   // Cap by bytes_to_send_ if and only if applying explicit flow control.
@@ -203,10 +202,10 @@ void Client::DirectStreamCallbacks::encodeTrailers(const ResponseTrailerMap& tra
     return;
   }
 
-  sendTrailersToBridge(trailers);
+  sendTrailers(trailers);
 }
 
-void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMap& trailers) {
+void Client::DirectStreamCallbacks::sendTrailers(const ResponseTrailerMap& trailers) {
   ENVOY_LOG(debug, "[S{}] dispatching to platform response trailers for stream:\n{}",
             direct_stream_.stream_handle_, trailers);
 
@@ -238,13 +237,13 @@ void Client::DirectStreamCallbacks::resumeData(size_t bytes_to_send) {
   // 1) it has been received from the peer and
   // 2) there are no trailers
   if (hasDataToSend()) {
-    sendDataToBridge(*response_data_, remote_end_stream_received_ && !response_trailers_.get());
+    sendData(*response_data_, remote_end_stream_received_ && !response_trailers_.get());
     bytes_to_send_ = 0;
   }
 
   // If all buffered data has been sent, send and free up trailers.
   if (!hasDataToSend() && response_trailers_.get() && bytes_to_send_ > 0) {
-    sendTrailersToBridge(*response_trailers_);
+    sendTrailers(*response_trailers_);
     response_trailers_.reset();
     bytes_to_send_ = 0;
   }
@@ -318,10 +317,10 @@ void Client::DirectStreamCallbacks::onError() {
 
   http_client_.removeStream(direct_stream_.stream_handle_);
   direct_stream_.request_decoder_ = nullptr;
-  sendErrorToBridge();
+  sendError();
 }
 
-void Client::DirectStreamCallbacks::sendErrorToBridge() {
+void Client::DirectStreamCallbacks::sendError() {
   if (remote_end_stream_forwarded_) {
     // If the request was not fully sent, but the response was complete, Envoy
     // will reset the stream after sending the fin bit. Don't pass this class of
@@ -552,7 +551,8 @@ void Client::startStream(envoy_stream_t new_stream_handle, EnvoyStreamCallbacks&
   ENVOY_LOG(debug, "[S{}] start stream", new_stream_handle);
 }
 
-void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream) {
+void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream,
+                         bool idempotent) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::AllowOnlyForOpenStreams);
@@ -597,6 +597,12 @@ void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, boo
   // a request here:
   // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
   headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
+  // When the request is idempotent, it is safe to retry.
+  if (idempotent) {
+    // https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on
+    headers->addCopy(Headers::get().EnvoyRetryOn,
+                     Headers::get().EnvoyRetryOnValues.Http3PostConnectFailure);
+  }
   ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
             *headers);
   request_decoder->decodeHeaders(std::move(headers), end_stream);
@@ -650,9 +656,9 @@ void Client::sendData(envoy_stream_t stream, Buffer::InstancePtr buffer, bool en
       direct_stream->wants_write_notification_ = false;
       // A new callback must be scheduled each time to capture any changes to the
       // DirectStream's callbacks from call to call.
-      scheduled_callback_ = dispatcher_.createSchedulableCallback(
+      direct_stream->scheduled_callback_ = dispatcher_.createSchedulableCallback(
           [direct_stream] { direct_stream->callbacks_->onSendWindowAvailable(); });
-      scheduled_callback_->scheduleCallbackNextIteration();
+      direct_stream->scheduled_callback_->scheduleCallbackNextIteration();
     } else {
       // Otherwise, make sure the stack will send a notification when the
       // buffers are drained.
@@ -693,7 +699,6 @@ void Client::cancelStream(envoy_stream_t stream) {
   // whether it was closed or not.
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::AllowForAllStreams);
-  scheduled_callback_ = nullptr;
   if (direct_stream) {
     // Attempt to latch the latest stream info. This will be a no-op if the stream
     // is already complete.
@@ -753,6 +758,7 @@ void Client::removeStream(envoy_stream_t stream_handle) {
           "[S{}] removeStream is a private method that is only called with stream ids that exist",
           stream_handle));
 
+  direct_stream->scheduled_callback_ = nullptr;
   // The DirectStream should live through synchronous code that already has a reference to it.
   // Hence why it is scheduled for deferred deletion. If this was all that was needed then it
   // would be sufficient to return a shared_ptr in getStream. However, deferred deletion is still

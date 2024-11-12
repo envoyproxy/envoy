@@ -42,13 +42,53 @@ namespace ExtAuthz {
   COUNTER(disabled)                                                                                \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(invalid)                                                                                 \
-  COUNTER(ignored_dynamic_metadata)
+  COUNTER(ignored_dynamic_metadata)                                                                \
+  COUNTER(filter_state_name_collision)
 
 /**
  * Wrapper struct for ext_authz filter stats. @see stats_macros.h
  */
 struct ExtAuthzFilterStats {
   ALL_EXT_AUTHZ_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
+public:
+  explicit ExtAuthzLoggingInfo(const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata)
+      : filter_metadata_(filter_metadata) {}
+
+  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
+  absl::optional<std::chrono::microseconds> latency() const { return latency_; };
+  absl::optional<uint64_t> bytesSent() const { return bytes_sent_; }
+  absl::optional<uint64_t> bytesReceived() const { return bytes_received_; }
+  Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
+  Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
+
+  void setLatency(std::chrono::microseconds ms) { latency_ = ms; };
+  void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
+  void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
+  void setClusterInfo(Upstream::ClusterInfoConstSharedPtr cluster_info) {
+    cluster_info_ = std::move(cluster_info);
+  }
+  void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr upstream_host) {
+    upstream_host_ = std::move(upstream_host);
+  }
+
+  // For convenience in testing.
+  void clearLatency() { latency_ = absl::nullopt; };
+  void clearBytesSent() { bytes_sent_ = absl::nullopt; }
+  void clearBytesReceived() { bytes_received_ = absl::nullopt; }
+  void clearClusterInfo() { cluster_info_ = nullptr; }
+  void clearUpstreamHost() { upstream_host_ = nullptr; }
+
+private:
+  const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata_;
+  absl::optional<std::chrono::microseconds> latency_;
+  // The following stats are populated for ext_authz filters using Envoy gRPC only.
+  absl::optional<uint64_t> bytes_sent_;
+  absl::optional<uint64_t> bytes_received_;
+  Upstream::ClusterInfoConstSharedPtr cluster_info_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
 };
 
 /**
@@ -139,6 +179,10 @@ public:
   bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
+  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
+
+  bool emitFilterStateStats() const { return emit_filter_state_stats_; }
+
   bool chargeClusterResponseStats() const { return charge_cluster_response_stats_; }
 
   const Filters::Common::ExtAuthz::MatcherSharedPtr& allowedHeadersMatcher() const {
@@ -189,6 +233,8 @@ private:
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
+  const absl::optional<ProtobufWkt::Struct> filter_metadata_;
+  const bool emit_filter_state_stats_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
@@ -323,6 +369,7 @@ private:
   void initiateCall(const Http::RequestHeaderMap& headers);
   void continueDecoding();
   bool isBufferFull(uint64_t num_bytes_processing) const;
+  void updateLoggingInfo();
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
@@ -356,6 +403,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
+  ExtAuthzLoggingInfo* logging_info_{nullptr};
 
   // This is used to hold the final configs after we merge them with per-route configs.
   bool allow_partial_message_{};

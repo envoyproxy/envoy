@@ -42,7 +42,7 @@ void TraceSegmentReporter::onCreateInitialMetadata(Http::RequestHeaderMap& metad
   }
 }
 
-void TraceSegmentReporter::report(TracingContextPtr tracing_context) {
+void TraceSegmentReporter::report(TracingContextSharedPtr tracing_context) {
   ASSERT(tracing_context);
   auto request = tracing_context->createSegmentObject();
   ENVOY_LOG(trace, "Try to report segment to SkyWalking Server:\n{}", request.DebugString());

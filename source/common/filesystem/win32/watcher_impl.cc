@@ -56,7 +56,7 @@ absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnCh
   }
 
   const absl::StatusOr<PathSplitResult> result_or_error = file_system_.splitPathFromFilename(path);
-  RETURN_IF_STATUS_NOT_OK(result_or_error);
+  RETURN_IF_NOT_OK_REF(result_or_error.status());
   const PathSplitResult& result = result_or_error.value();
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here

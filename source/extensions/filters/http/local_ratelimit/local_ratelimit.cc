@@ -23,10 +23,8 @@ const std::string& PerConnectionRateLimiter::key() {
 
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& config,
-    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-    Upstream::ClusterManager& cm, Singleton::Manager& singleton_manager, Stats::Scope& scope,
-    Runtime::Loader& runtime, const bool per_route)
-    : dispatcher_(dispatcher), status_(toErrorCode(config.status().code())),
+    Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope, const bool per_route)
+    : dispatcher_(context.mainThreadDispatcher()), status_(toErrorCode(config.status().code())),
       stats_(generateStats(config.stat_prefix(), scope)),
       fill_interval_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config.token_bucket(), fill_interval, 0))),
@@ -38,7 +36,7 @@ FilterConfig::FilterConfig(
           config.has_always_consume_default_token_bucket()
               ? config.always_consume_default_token_bucket().value()
               : true),
-      local_info_(local_info), runtime_(runtime),
+      local_info_(context.localInfo()), runtime_(context.runtime()),
       filter_enabled_(
           config.has_filter_enabled()
               ? absl::optional<Envoy::Runtime::FractionalPercent>(
@@ -73,20 +71,35 @@ FilterConfig::FilterConfig(
     throw EnvoyException("local rate limit token bucket must be set for per filter configs");
   }
 
+  absl::Status creation_status;
+  rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
+      config.rate_limits(), context, creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
+
+  if (rate_limit_config_->empty()) {
+    if (!config.descriptors().empty()) {
+      ENVOY_LOG_FIRST_N(
+          warn, 20,
+          "'descriptors' is set but only used by route configuration. Please configure the local "
+          "rate limit filter using the embedded 'rate_limits' field as route configuration for "
+          "local rate limits will be ignored in the future.");
+    }
+  }
+
   Filters::Common::LocalRateLimit::ShareProviderSharedPtr share_provider;
   if (config.has_local_cluster_rate_limit()) {
     if (rate_limit_per_connection_) {
       throw EnvoyException("local_cluster_rate_limit is set and "
                            "local_rate_limit_per_downstream_connection is set to true");
     }
-    if (!cm.localClusterName().has_value()) {
+    if (!context.clusterManager().localClusterName().has_value()) {
       throw EnvoyException("local_cluster_rate_limit is set but no local cluster name is present");
     }
 
     // If the local cluster name is set then the relevant cluster must exist or the cluster
     // manager will fail to initialize.
     share_provider_manager_ = Filters::Common::LocalRateLimit::ShareProviderManager::singleton(
-        dispatcher, cm, singleton_manager);
+        dispatcher_, context.clusterManager(), context.singletonManager());
     if (!share_provider_manager_) {
       throw EnvoyException("local_cluster_rate_limit is set but no local cluster is present");
     }
@@ -95,7 +108,7 @@ FilterConfig::FilterConfig(
   }
 
   rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
-      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher, descriptors_,
+      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, descriptors_,
       always_consume_default_token_bucket_, std::move(share_provider));
 }
 
@@ -137,7 +150,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   std::vector<RateLimit::LocalDescriptor> descriptors;
   if (used_config_->hasDescriptors()) {
-    populateDescriptors(descriptors, headers);
+    if (used_config_->hasRateLimitConfigs()) {
+      used_config_->populateDescriptors(headers, decoder_callbacks_->streamInfo(), descriptors);
+    } else {
+      populateDescriptors(descriptors, headers);
+    }
   }
 
   if (ENVOY_LOG_CHECK_LEVEL(debug)) {
@@ -241,11 +258,11 @@ void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descri
   case VhRateLimitOptions::Ignore:
     return;
   case VhRateLimitOptions::Include:
-    populateDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, headers);
+    populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
     return;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateDescriptors(route_entry->virtualHost().rateLimitPolicy(), descriptors, headers);
+      populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
     }
     return;
   }

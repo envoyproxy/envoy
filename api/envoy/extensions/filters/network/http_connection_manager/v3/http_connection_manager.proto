@@ -37,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 58]
+// [#next-free-field: 59]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -58,9 +58,8 @@ message HttpConnectionManager {
     // Prior knowledge is allowed).
     HTTP2 = 2;
 
-    // [#not-implemented-hide:] QUIC implementation is not production ready yet. Use this enum with
-    // caution to prevent accidental execution of QUIC code. I.e. `!= HTTP2` is no longer sufficient
-    // to distinguish HTTP1 and HTTP2 traffic.
+    // The connection manager will assume that the client is speaking HTTP/3.
+    // This needs to be consistent with listener and transport socket config.
     HTTP3 = 3;
   }
 
@@ -447,6 +446,21 @@ message HttpConnectionManager {
   config.core.v3.HttpProtocolOptions common_http_protocol_options = 35
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
+  // If set to true, Envoy will not start a drain timer for downstream HTTP1 connections after
+  // :ref:`common_http_protocol_options.max_connection_duration
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` passes.
+  // Instead, Envoy will wait for the next downstream request, add connection:close to the response
+  // headers, then close the connection after the stream ends.
+  //
+  // This behavior is compliant with `RFC 9112 section 9.6 <https://www.rfc-editor.org/rfc/rfc9112#name-tear-down>`_
+  //
+  // If set to false, ``max_connection_duration`` will cause Envoy to enter the normal drain
+  // sequence for HTTP1 with Envoy eventually closing the connection (once there are no active
+  // streams).
+  //
+  // Has no effect if ``max_connection_duration`` is unset. Defaults to false.
+  bool http1_safe_max_connection_duration = 58;
+
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
   // [#comment:TODO: The following fields are ignored when the
   // :ref:`header validation configuration <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.typed_header_validation_config>`
@@ -459,7 +473,6 @@ message HttpConnectionManager {
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
   // Additional HTTP/3 settings that are passed directly to the HTTP/3 codec.
-  // [#not-implemented-hide:]
   config.core.v3.Http3ProtocolOptions http3_protocol_options = 44;
 
   // An optional override that the connection manager will write to the server
@@ -480,7 +493,12 @@ message HttpConnectionManager {
 
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.
+  // The default value can be overridden by setting runtime key ``envoy.reloadable_features.max_request_headers_size_kb``.
   // Requests that exceed this limit will receive a 431 response.
+  //
+  // Note: currently some protocol codecs impose limits on the maximum size of a single header:
+  //   HTTP/2 (when using nghttp2) limits a single header to around 100kb.
+  //   HTTP/3 limits a single header to around 1024kb.
   google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32 = {lte: 8192 gt: 0}];
 
@@ -589,26 +607,33 @@ message HttpConnectionManager {
   // emitted by the connection manager.
   repeated config.accesslog.v3.AccessLog access_log = 13;
 
+  // The interval to flush the above access logs.
+  //
   // .. attention::
-  // This field is deprecated in favor of
-  // :ref:`access_log_flush_interval
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`.
-  // Note that if both this field and :ref:`access_log_flush_interval
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
-  // are specified, the former (deprecated field) is ignored.
+  //
+  //   This field is deprecated in favor of
+  //   :ref:`access_log_flush_interval
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`.
+  //   Note that if both this field and :ref:`access_log_flush_interval
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.access_log_flush_interval>`
+  //   are specified, the former (deprecated field) is ignored.
   google.protobuf.Duration access_log_flush_interval = 54 [
     deprecated = true,
     (validate.rules).duration = {gte {nanos: 1000000}},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
+  // If set to true, HCM will flush an access log once when a new HTTP request is received, after the request
+  // headers have been evaluated, and before iterating through the HTTP filter chain.
+  //
   // .. attention::
-  // This field is deprecated in favor of
-  // :ref:`flush_access_log_on_new_request
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`.
-  // Note that if both this field and :ref:`flush_access_log_on_new_request
-  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
-  // are specified, the former (deprecated field) is ignored.
+  //
+  //   This field is deprecated in favor of
+  //   :ref:`flush_access_log_on_new_request
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`.
+  //   Note that if both this field and :ref:`flush_access_log_on_new_request
+  //   <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
+  //   are specified, the former (deprecated field) is ignored.
   bool flush_access_log_on_new_request = 55
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

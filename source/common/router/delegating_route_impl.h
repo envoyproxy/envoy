@@ -28,13 +28,11 @@ public:
   const Router::RouteTracing* tracingConfig() const override;
 
   const RouteSpecificFilterConfig*
-  mostSpecificPerFilterConfig(const std::string& name) const override {
+  mostSpecificPerFilterConfig(absl::string_view name) const override {
     return base_route_->mostSpecificPerFilterConfig(name);
   }
-  void traversePerFilterConfig(
-      const std::string& filter_name,
-      std::function<void(const Router::RouteSpecificFilterConfig&)> cb) const override {
-    base_route_->traversePerFilterConfig(filter_name, cb);
+  RouteSpecificFilterConfigs perFilterConfigs(absl::string_view filter_name) const override {
+    return base_route_->perFilterConfigs(filter_name);
   }
 
   const envoy::config::core::v3::Metadata& metadata() const override {
@@ -47,6 +45,7 @@ public:
     return base_route_->filterDisabled(name);
   }
   const std::string& routeName() const override { return base_route_->routeName(); }
+  const VirtualHost& virtualHost() const override;
 
 private:
   const Router::RouteConstSharedPtr base_route_;
@@ -73,6 +72,7 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
   absl::optional<std::string>
@@ -101,8 +101,6 @@ public:
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderOffset() const override;
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override;
   absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override;
-  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override;
-  const VirtualHost& virtualHost() const override;
   bool autoHostRewrite() const override;
   bool appendXfh() const override;
   const MetadataMatchCriteria* metadataMatchCriteria() const override;

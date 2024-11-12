@@ -47,7 +47,7 @@ UpstreamTapSocketConfigFactory::createTransportSocketFactory(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
-  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
 
   auto& server_context = context.serverFactoryContext();
   return std::make_unique<TapSocketFactory>(
@@ -72,7 +72,7 @@ DownstreamTapSocketConfigFactory::createTransportSocketFactory(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto factory_or_error = inner_config_factory.createTransportSocketFactory(*inner_factory_config,
                                                                             context, server_names);
-  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
   auto& server_context = context.serverFactoryContext();
   return std::make_unique<DownstreamTapSocketFactory>(
       outer_config,

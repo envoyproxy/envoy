@@ -1,0 +1,195 @@
+name: Mobile/iOS build
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
+
+
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
+    with:
+      cache-docker: false
+      check-name: mobile-ios
+
+  build:
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-ios }}
+    needs: load
+    name: ios-build
+    with:
+      args: ${{ matrix.args }}
+      command: ./bazelw
+      container-command:
+      docker-ipv6: false
+      request: ${{ needs.load.outputs.request }}
+      runs-on: macos-12-large
+      source: |
+        source ./ci/mac_ci_setup.sh
+        ./bazelw shutdown
+      steps-post: ${{ matrix.steps-post }}
+      target: ${{ matrix.target }}
+      timeout-minutes: ${{ matrix.timeout-minutes }}
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      working-directory: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: Build Envoy.framework distributable
+          args: >-
+            build
+            --config=mobile-remote-ci-macos-ios
+            //library/swift:ios_framework
+          target: ios
+          timeout-minutes: 120
+
+  hello-world:
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-ios }}
+    needs:
+    - load
+    - build
+    name: ios-hello-world
+    with:
+      args: >-
+        build
+        ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+        ${{ matrix.app }}
+      command: ./bazelw
+      container-command:
+      docker-ipv6: false
+      request: ${{ needs.load.outputs.request }}
+      runs-on: macos-12-large
+      source: |
+        source ./ci/mac_ci_setup.sh
+        ./bazelw shutdown
+      steps-post: |
+        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.35
+          with:
+            app: ${{ matrix.app }}
+            args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+            expected: received headers with status ${{ matrix.expected-status }}
+          env:
+            ANDROID_NDK_HOME:
+            ANDROID_HOME:
+      target: ${{ matrix.target }}
+      timeout-minutes: ${{ matrix.timeout-minutes }}
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      working-directory: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: Build swift hello world
+          app: //examples/swift/hello_world:app
+          expected-status: 200
+          target: swift-hello-world
+          timeout-minutes: 90
+
+  apps:
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-ios-all }}
+    needs:
+    - load
+    - build
+    name: ios-apps
+    with:
+      args: >-
+        build
+        ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+        ${{ matrix.app }}
+      command: ./bazelw
+      container-command:
+      docker-ipv6: false
+      request: ${{ needs.load.outputs.request }}
+      runs-on: macos-12-large
+      source: |
+        source ./ci/mac_ci_setup.sh
+      steps-post: |
+        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.35
+          with:
+            app: ${{ matrix.app }}
+            args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+            expected: >-
+              ${{ matrix.expected
+                  || format('received headers with status {0}', matrix.expected-status) }}
+            timeout: ${{ matrix.timeout || '5m' }}
+          env:
+            ANDROID_NDK_HOME:
+            ANDROID_HOME:
+      target: ${{ matrix.target }}
+      timeout-minutes: 90
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      working-directory: mobile
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: Build swift baseline app
+          app: //test/swift/apps/baseline:app
+          expected-status: 301
+          target: swift-baseline-app
+        - name: Build swift experimental app
+          args: >-
+            --config=mobile-remote-ci-macos-ios
+          app: //test/swift/apps/experimental:app
+          expected-status: 200
+          target: swift-experimental-app
+        - name: Build swift async await
+          app: //examples/swift/async_await:app
+          expected: >-
+            Uploaded 7 MB of data
+          target: swift-async-await
+          timeout: 10m
+        - name: Build objc hello world
+          app: //examples/objective-c/hello_world:app
+          expected-status: 301
+          target: objc-hello-world
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-ios }}
+    needs:
+    - load
+    - build
+    - hello-world
+    - apps
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

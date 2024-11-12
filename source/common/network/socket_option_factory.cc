@@ -98,12 +98,24 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
                 socket_option.DebugString());
       continue;
     }
+
+    absl::optional<Network::Socket::Type> socket_type = absl::nullopt;
+    if (socket_option.has_type() && socket_option.type().has_stream()) {
+      if (socket_option.type().has_datagram()) {
+        ENVOY_LOG(
+            warn,
+            "Both Stream and Datagram socket types are set, setting the socket type to Stream.");
+      }
+      socket_type = Network::Socket::Type::Stream;
+    } else if (socket_option.has_type() && socket_option.type().has_datagram()) {
+      socket_type = Network::Socket::Type::Datagram;
+    }
     options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
         socket_option.state(),
         Network::SocketOptionName(
             socket_option.level(), socket_option.name(),
             fmt::format("{}/{}", socket_option.level(), socket_option.name())),
-        buf));
+        buf, socket_type));
   }
   return options;
 }
@@ -166,6 +178,33 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpRecvTosOptions() {
   options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
       envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_RECVTOS,
       ENVOY_SOCKET_IPV6_RECVTCLASS, 1));
+  return options;
+}
+
+std::unique_ptr<Socket::Options>
+SocketOptionFactory::buildDoNotFragmentOptions(bool supports_v4_mapped_v6_addresses) {
+  auto options = std::make_unique<Socket::Options>();
+#ifdef ENVOY_IP_DONTFRAG
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_IP_DONTFRAG, ENVOY_IPV6_DONTFRAG,
+      1));
+  // v4 mapped v6 addresses don't support ENVOY_IP_DONTFRAG on MAC OS.
+  (void)supports_v4_mapped_v6_addresses;
+#elif defined(ENVOY_IP_MTU_DISCOVER)
+  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_IP_MTU_DISCOVER,
+      ENVOY_IP_MTU_DISCOVER_VALUE, ENVOY_IPV6_MTU_DISCOVER, ENVOY_IPV6_MTU_DISCOVER_VALUE));
+
+  if (supports_v4_mapped_v6_addresses) {
+    ENVOY_LOG_MISC(trace, "Also apply the V4 option to v6 socket to support v4-mapped addresses.");
+    options->push_back(
+        std::make_shared<SocketOptionImpl>(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                                           ENVOY_IP_MTU_DISCOVER, ENVOY_IP_MTU_DISCOVER_VALUE));
+  }
+#else
+  (void)supports_v4_mapped_v6_addresses;
+  ENVOY_LOG_MISC(trace, "Platform supports neither socket option IP_DONTFRAG nor IP_MTU_DISCOVER");
+#endif
   return options;
 }
 

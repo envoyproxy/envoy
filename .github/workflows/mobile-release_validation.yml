@@ -1,0 +1,93 @@
+name: Mobile/Release validation
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
+      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_load.yml
+    with:
+      cache-docker: false
+      check-name: mobile-release-validation
+
+  validate-swiftpm-example:
+    permissions:
+      contents: read
+      packages: read
+    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-release-validation }}
+    needs: load
+    uses: ./.github/workflows/_run.yml
+    name: Build xframework
+    with:
+      args: >-
+        build
+        --config=mobile-remote-ci-macos-ios
+        //:ios_xcframework
+      command: ./bazelw
+      container-command:
+      docker-ipv6: false
+      request: ${{ needs.load.outputs.request }}
+      runs-on: macos-12
+      source: |
+        source ./ci/mac_ci_setup.sh
+      # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
+      steps-post: |
+        - run: |
+            unzip mobile/bazel-bin/library/swift/Envoy.xcframework.zip \
+                  -d mobile/examples/swift/swiftpm/Packages \
+                || :
+          shell: bash
+          name: Unzip xcframework
+        - run: |
+            xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj \
+                       -scheme EnvoySwiftPMExample \
+                       -destination platform="iOS Simulator,name=iPhone 14 Pro Max,OS=16.1"
+          shell: bash
+          name: Build app
+        # TODO(jpsim): Run app and inspect logs to validate
+      target: validate-swiftpm-example
+      timeout-minutes: 120
+      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      working-directory: mobile
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: >-
+      ${{ always()
+          && github.event.workflow_run.conclusion == 'success'
+          && fromJSON(needs.load.outputs.request).run.mobile-release-validation }}
+    needs:
+    - load
+    - validate-swiftpm-example
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

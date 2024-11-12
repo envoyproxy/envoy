@@ -33,6 +33,7 @@
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/http_server_properties_cache_impl.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
@@ -61,23 +62,22 @@ public:
       : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
         dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
         secret_manager_(secret_manager), quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_factory_(context.singletonManager(), tls,
-                                                   {context, context.messageValidationVisitor()}),
-        alternate_protocols_cache_manager_(alternate_protocols_cache_manager_factory_.get()),
+        alternate_protocols_cache_manager_(context.httpServerPropertiesCacheManager()),
         server_(server) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
-  Http::ConnectionPool::InstancePtr
-  allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                   ResourcePriority priority, std::vector<Http::Protocol>& protocol,
-                   const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
-                       alternate_protocol_options,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   TimeSource& time_source, ClusterConnectivityState& state,
-                   Http::PersistentQuicInfoPtr& quic_info) override;
+  Http::ConnectionPool::InstancePtr allocateConnPool(
+      Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+      std::vector<Http::Protocol>& protocol,
+      const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+          alternate_protocol_options,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      TimeSource& time_source, ClusterConnectivityState& state,
+      Http::PersistentQuicInfoPtr& quic_info,
+      OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) override;
   Tcp::ConnectionPool::InstancePtr
   allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                       ResourcePriority priority,
@@ -104,8 +104,7 @@ protected:
   Ssl::ContextManager& ssl_context_manager_;
   Secret::SecretManager& secret_manager_;
   Quic::QuicStatNames& quic_stat_names_;
-  Http::HttpServerPropertiesCacheManagerFactoryImpl alternate_protocols_cache_manager_factory_;
-  Http::HttpServerPropertiesCacheManagerSharedPtr alternate_protocols_cache_manager_;
+  Http::HttpServerPropertiesCacheManager& alternate_protocols_cache_manager_;
   Server::Instance& server_;
 };
 
@@ -254,7 +253,8 @@ public:
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                          const std::string& version_info) override;
+                          const std::string& version_info,
+                          const bool avoid_cds_removal = false) override;
 
   void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
     init_helper_.setPrimaryClustersInitializedCb(callback);
@@ -288,7 +288,7 @@ public:
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
-  bool removeCluster(const std::string& cluster) override;
+  bool removeCluster(const std::string& cluster, const bool remove_ignored = false) override;
   void shutdown() override {
     shutdown_ = true;
     if (resume_cds_ != nullptr) {
@@ -374,6 +374,9 @@ public:
 
   Config::EdsResourcesCacheOptRef edsResourcesCache() override;
 
+  void
+  createNetworkObserverRegistries(Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) override;
+
 protected:
   // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
   // clusterManagerFromProto() static method. The init() method must be called after construction.
@@ -425,20 +428,22 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostMapConstSharedPtr map, UnitFloat drop_overload);
+                                HostMapConstSharedPtr map, UnitFloat drop_overload,
+                                absl::string_view drop_category);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
         LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-        UnitFloat drop_overload);
+        UnitFloat drop_overload, absl::string_view drop_category);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
     const HostMapConstSharedPtr cross_priority_host_map_;
     UnitFloat drop_overload_{0};
+    const std::string drop_category_;
   };
 
   using ClusterInitializationObjectConstSharedPtr =
@@ -608,7 +613,11 @@ private:
       void drainConnPools(DrainConnectionsHostPredicate predicate,
                           ConnectionPool::DrainBehavior behavior);
       UnitFloat dropOverload() const override { return drop_overload_; }
+      const std::string& dropCategory() const override { return drop_category_; }
       void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
+      void setDropCategory(absl::string_view drop_category) override {
+        drop_category_ = drop_category;
+      }
 
     private:
       Http::ConnectionPool::Instance*
@@ -625,6 +634,7 @@ private:
       ThreadLocalClusterManagerImpl& parent_;
       PrioritySetImpl priority_set_;
       UnitFloat drop_overload_{0};
+      std::string drop_category_;
 
       // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
       // may keep a reference to the cluster_info_.
@@ -698,6 +708,18 @@ private:
      */
     ClusterEntry* initializeClusterInlineIfExists(absl::string_view cluster);
 
+    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> getNetworkObserverRegistry() {
+      return makeOptRefFromPtr(network_observer_registry_.get());
+    }
+
+#ifdef ENVOY_ENABLE_QUIC
+    void createThreadLocalNetworkObserverRegistry(
+        Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) {
+      network_observer_registry_ =
+          factory.createQuicNetworkObserverRegistry(thread_local_dispatcher_);
+    }
+#endif
+
     ClusterManagerImpl& parent_;
     Event::Dispatcher& thread_local_dispatcher_;
     // Known clusters will exclusively exist in either `thread_local_clusters_`
@@ -723,17 +745,20 @@ private:
   private:
     static ThreadLocalClusterManagerStats generateStats(Stats::Scope& scope,
                                                         const std::string& thread_name);
+
+    Quic::EnvoyQuicNetworkObserverRegistryPtr network_observer_registry_;
   };
 
   struct ClusterData : public ClusterManagerCluster {
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
                 const uint64_t cluster_config_hash, const std::string& version_info,
                 bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
-                TimeSource& time_source)
+                TimeSource& time_source, const bool avoid_cds_removal = false)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
-          last_updated_(time_source.systemTime()),
-          added_via_api_(added_via_api), added_or_updated_{}, required_for_ads_(required_for_ads) {}
+          last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
+          avoid_cds_removal_(avoid_cds_removal), added_or_updated_{},
+          required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -766,6 +791,7 @@ private:
     Common::CallbackHandlePtr priority_update_cb_;
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
+    const bool avoid_cds_removal_ : 1;
     bool added_or_updated_ : 1;
     const bool required_for_ads_ : 1;
   };
@@ -843,7 +869,8 @@ private:
   absl::StatusOr<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                              const uint64_t cluster_hash,
                                              const std::string& version_info, bool added_via_api,
-                                             bool required_for_ads, ClusterMap& cluster_map);
+                                             bool required_for_ads, ClusterMap& cluster_map,
+                                             bool avoid_cds_removal = false);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
@@ -873,7 +900,7 @@ private:
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
       LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-      UnitFloat drop_overload);
+      UnitFloat drop_overload, absl::string_view drop_category);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 

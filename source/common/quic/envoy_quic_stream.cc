@@ -79,7 +79,7 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void EnvoyQuicStream::encodeTrailersImpl(spdy::Http2HeaderBlock&& trailers) {
+void EnvoyQuicStream::encodeTrailersImpl(quiche::HttpHeaderBlock&& trailers) {
   if (quic_stream_.write_side_closed()) {
     IS_ENVOY_BUG("encodeTrailers is called on write-closed stream.");
     return;
@@ -123,10 +123,10 @@ std::unique_ptr<char[]> dataFromString(const std::string& str) {
 void serializeMetadata(const Http::MetadataMapPtr& metadata, quic::QuicStreamId id,
                        absl::InlinedVector<quiche::QuicheMemSlice, 2>& slices) {
   quic::NoopDecoderStreamErrorDelegate decoder_stream_error_delegate;
-  quic::QpackEncoder qpack_encoder(&decoder_stream_error_delegate,
-                                   quic::HuffmanEncoding::kDisabled);
+  quic::QpackEncoder qpack_encoder(&decoder_stream_error_delegate, quic::HuffmanEncoding::kDisabled,
+                                   quic::CookieCrumbling::kDisabled);
 
-  spdy::Http2HeaderBlock header_block;
+  quiche::HttpHeaderBlock header_block;
   for (const auto& [key, value] : *metadata) {
     header_block.AppendValueOrAddHeader(key, value);
   }

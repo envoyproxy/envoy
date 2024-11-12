@@ -38,6 +38,14 @@
 #include "absl/container/node_hash_map.h"
 
 namespace Envoy {
+
+namespace Quic {
+
+class EnvoyQuicNetworkObserverRegistryFactory;
+class EnvoyQuicNetworkObserverRegistry;
+
+} // namespace Quic
+
 namespace Upstream {
 
 /**
@@ -237,10 +245,15 @@ public:
    *
    * @param cluster supplies the cluster configuration.
    * @param version_info supplies the xDS version of the cluster.
+   * @param avoid_cds_removal If set to true, the cluster will be ignored from removal during CDS
+   *                       update. It can be overridden by setting `remove_ignored` to true while
+   *                       calling removeCluster(). This is useful for clusters whose lifecycle
+   *                       is managed with custom implementation, e.g., DFP clusters.
    * @return true if the action results in an add/update of a cluster.
    */
   virtual bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                  const std::string& version_info) PURE;
+                                  const std::string& version_info,
+                                  const bool avoid_cds_removal = false) PURE;
 
   /**
    * Set a callback that will be invoked when all primary clusters have been initialized.
@@ -323,10 +336,11 @@ public:
    * Remove a cluster via API. Only clusters added via addOrUpdateCluster() can
    * be removed in this manner. Statically defined clusters present when Envoy starts cannot be
    * removed.
-   *
+   * Cluster created using `addOrUpdateCluster()` with `avoid_cds_removal` set to true.
+   * can be removed by setting `remove_ignored` to true while removeCluster().
    * @return true if the action results in the removal of a cluster.
    */
-  virtual bool removeCluster(const std::string& cluster) PURE;
+  virtual bool removeCluster(const std::string& cluster, const bool remove_ignored = false) PURE;
 
   /**
    * Shutdown the cluster manager prior to destroying connection pools and other thread local data.
@@ -467,6 +481,13 @@ public:
    * Returns an EdsResourcesCache that is unique for the cluster manager.
    */
   virtual Config::EdsResourcesCacheOptRef edsResourcesCache() PURE;
+
+  /**
+   * Create a QUIC network observer registry for each worker thread using the given factory.
+   * @param factory used to create a registry object.
+   */
+  virtual void createNetworkObserverRegistries(
+      Envoy::Quic::EnvoyQuicNetworkObserverRegistryFactory& factory) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -515,6 +536,8 @@ public:
   /**
    * Allocate an HTTP connection pool for the host. Pools are separated by 'priority',
    * 'protocol', and 'options->hashKey()', if any.
+   * @param network_observer_registry if not null all the QUIC connections created by this pool
+   * should register to it for network events.
    */
   virtual Http::ConnectionPool::InstancePtr
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
@@ -524,7 +547,8 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                    TimeSource& time_source, ClusterConnectivityState& state,
-                   Http::PersistentQuicInfoPtr& quic_info) PURE;
+                   Http::PersistentQuicInfoPtr& quic_info,
+                   OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) PURE;
 
   /**
    * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and

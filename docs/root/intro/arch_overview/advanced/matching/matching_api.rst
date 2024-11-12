@@ -30,6 +30,7 @@ These input functions are available for matching HTTP requests:
 * :ref:`Response header value <extension_envoy.matching.inputs.response_headers>`.
 * :ref:`Response trailer value <extension_envoy.matching.inputs.response_trailers>`.
 * :ref:`Query parameters value <extension_envoy.matching.inputs.query_params>`.
+* :ref:`Dynamic metadata <extension_envoy.matching.inputs.dynamic_metadata>`.
 
 .. _extension_category_envoy.matching.network.input:
 

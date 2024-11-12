@@ -22,6 +22,7 @@ builtin:
 - envoy.matching.inputs.transport_protocol
 - envoy.matching.inputs.application_protocol
 - envoy.matching.inputs.filter_state
+- envoy.matching.inputs.dynamic_metadata
 - envoy.matching.inputs.uri_san
 - envoy.matching.inputs.dns_san
 - envoy.matching.inputs.subject

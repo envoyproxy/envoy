@@ -375,7 +375,13 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
     if (entry.raw_string_value_.empty()) {
-      entry.raw_string_value_ = absl::StrCat(value.bool_value());
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.boolean_to_string_fix")) {
+        // Convert boolean to "true"/"false"
+        entry.raw_string_value_ = value.bool_value() ? "true" : "false";
+      } else {
+        // Use absl::StrCat for backward compatibility, which converts to "1"/"0"
+        entry.raw_string_value_ = absl::StrCat(value.bool_value());
+      }
     }
     break;
   case ProtobufWkt::Value::kStructValue:
@@ -439,9 +445,9 @@ absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string
 
   Filesystem::Directory directory(path);
   Filesystem::DirectoryIteratorImpl it = directory.begin();
-  RETURN_IF_STATUS_NOT_OK(it);
+  RETURN_IF_NOT_OK_REF(it.status());
   for (; it != directory.end(); ++it) {
-    RETURN_IF_STATUS_NOT_OK(it);
+    RETURN_IF_NOT_OK_REF(it.status());
     Filesystem::DirectoryEntry entry = *it;
     std::string full_path = path + "/" + entry.name_;
     std::string full_prefix;
@@ -465,7 +471,7 @@ absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string
       // Read the file and remove any comments. A comment is a line starting with a '#' character.
       // Comments are useful for placeholder files with no value.
       auto file_or_error = api.fileSystem().fileReadToEnd(full_path);
-      RETURN_IF_STATUS_NOT_OK(file_or_error);
+      RETURN_IF_NOT_OK_REF(file_or_error.status());
       const std::string text_file{file_or_error.value()};
 
       const auto lines = StringUtil::splitToken(text_file, "\n");
@@ -492,7 +498,7 @@ absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string
 #endif
     }
   }
-  RETURN_IF_STATUS_NOT_OK(it);
+  RETURN_IF_NOT_OK_REF(it.status());
   return absl::OkStatus();
 }
 
@@ -721,7 +727,7 @@ absl::Status RtdsSubscription::onConfigRemoved(
 
 absl::Status LoaderImpl::loadNewSnapshot() {
   auto snapshot_or_error = createNewSnapshot();
-  RETURN_IF_STATUS_NOT_OK(snapshot_or_error);
+  RETURN_IF_NOT_OK_REF(snapshot_or_error.status());
   std::shared_ptr<SnapshotImpl> ptr = std::move(snapshot_or_error.value());
   tls_->set([ptr](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);

@@ -49,6 +49,15 @@ bool labelWildcardMatch(absl::string_view dns_label, absl::string_view pattern);
 std::string getSerialNumberFromCertificate(X509& cert);
 
 /**
+ * Maps a stack of x509 certificates to a vector of strings extracted from the certificates.
+ * @param stack the stack of certificates
+ * @param field_extractor the function to extract the field from each certificate.
+ * @return std::vector<std::string> returns the list of fields extracted from the certificates.
+ */
+std::vector<std::string> mapX509Stack(stack_st_X509& stack,
+                                      std::function<std::string(X509&)> field_extractor);
+
+/**
  * Retrieves the subject alternate names of a certificate.
  * @param cert the certificate
  * @param type type of subject alternate name
@@ -78,6 +87,13 @@ std::string getIssuerFromCertificate(X509& cert);
  * @return std::string the subject field for the certificate.
  */
 std::string getSubjectFromCertificate(X509& cert);
+
+/**
+ * Retrieves the extension OIDs from certificate.
+ * @param cert the certificate
+ * @return std::vector returns the string list of ASN.1 object identifiers.
+ */
+std::vector<std::string> getCertificateExtensionOids(X509& cert);
 
 /**
  * Retrieves the value of a specific X509 extension from the cert, if present.
