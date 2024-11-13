@@ -17,7 +17,7 @@ The Generic Matching API offers exceptional flexibility, enabling a wide array o
 **Usecase 1:** A single trie structure for all url paths in :path header
 
 Suppose one wants to route requests with following path prefixes to respective clusters using trie or hashmap for sublinear route searching
-
+![Pic1](sublinear_routing_img1.png)
 
 A request with :path header set to url /new_endpoint/path/2/abc should be routed to cluster_2
 
@@ -90,9 +90,9 @@ static_resources:
 ```
 
 **Usecase 2:** Configuration for Hierarchical trie structures in example below illustrates how three different trie structures can be created by Envoy using nested prefix_match_map which can do request matching across various headers.:
-Note: Use of exact_match_map will result in creation of hashmaps instead of tries.
+**Note:** Use of exact_match_map will result in creation of hashmaps instead of tries.
 
-
+![Pic2](sublinear_routing_img2.png)
 
 For an incoming request with :path header set to say /new_endpoint/path/2/video, x-foo-header set to foo-2 and x-bar-header set to bar-2, three longest-prefix-match trie lookups will happen across A, B and C tries in the order of nesting for a successful request match.
 
@@ -219,6 +219,8 @@ static_resources:
 ```
 
 **Usecase 3:** Mixing sublinear route matching with traditional prefix based inorder linear routing.
+
+![Pic3](sublinear_routing_img3.png)
 
 ```
 static_resources:
