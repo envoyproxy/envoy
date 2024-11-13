@@ -125,8 +125,9 @@ paths:
     - source/common/router/config_impl.cc
     - source/common/router/scoped_config_impl.cc
     - source/common/common/utility.cc
-    - source/common/common/regex.h
     - source/exe/stripped_main_base.cc
+    - source/common/http/header_utility.cc
+    - source/common/common/matchers.h
     - source/server/options_impl.cc
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js

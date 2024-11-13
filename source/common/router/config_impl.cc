@@ -230,7 +230,9 @@ createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine
       route.redirect().prefix_rewrite(),
       route.redirect().has_regex_rewrite() ? route.redirect().regex_rewrite().substitution() : "",
       route.redirect().has_regex_rewrite()
-          ? Regex::Utility::parseRegex(route.redirect().regex_rewrite().pattern(), regex_engine)
+          ? THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(
+                                      route.redirect().regex_rewrite().pattern(), regex_engine),
+                                  Regex::CompiledMatcherPtr)
           : nullptr,
       route.redirect().path_redirect().find('?') != absl::string_view::npos,
       route.redirect().https_redirect(),
@@ -556,8 +558,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                     : absl::nullopt),
       host_rewrite_path_regex_(
           route.route().has_host_rewrite_path_regex()
-              ? Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern(),
-                                           factory_context.regexEngine())
+              ? THROW_OR_RETURN_VALUE(
+                    Regex::Utility::parseRegex(route.route().host_rewrite_path_regex().pattern(),
+                                               factory_context.regexEngine()),
+                    Regex::CompiledMatcherPtr)
               : nullptr),
       host_rewrite_path_regex_substitution_(
           route.route().has_host_rewrite_path_regex()
@@ -710,8 +714,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   }
 
   if (!route.route().hash_policy().empty()) {
-    hash_policy_ = std::make_unique<Http::HashPolicyImpl>(route.route().hash_policy(),
-                                                          factory_context.regexEngine());
+    hash_policy_ = THROW_OR_RETURN_VALUE(
+        Http::HashPolicyImpl::create(route.route().hash_policy(), factory_context.regexEngine()),
+        std::unique_ptr<Http::HashPolicyImpl>);
   }
 
   if (route.match().has_tls_context()) {
@@ -789,8 +794,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (route.route().has_regex_rewrite()) {
     auto rewrite_spec = route.route().regex_rewrite();
-    regex_rewrite_ =
-        Regex::Utility::parseRegex(rewrite_spec.pattern(), factory_context.regexEngine());
+    regex_rewrite_ = THROW_OR_RETURN_VALUE(
+        Regex::Utility::parseRegex(rewrite_spec.pattern(), factory_context.regexEngine()),
+        Regex::CompiledMatcherPtr);
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 
