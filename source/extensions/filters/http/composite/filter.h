@@ -162,7 +162,7 @@ private:
     Http::StreamEncoderFilterSharedPtr encoder_filter_;
     Http::StreamDecoderFilterSharedPtr decoder_filter_;
   };
-  AccessLog::InstanceVector access_loggers_;
+  AccessLog::InstanceSharedPtrVector access_loggers_;
 
   Http::StreamFilterSharedPtr delegated_filter_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

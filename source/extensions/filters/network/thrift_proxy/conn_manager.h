@@ -42,7 +42,7 @@ public:
   virtual Router::Config& routerConfig() PURE;
   virtual bool payloadPassthrough() const PURE;
   virtual uint64_t maxRequestsPerConnection() const PURE;
-  virtual const AccessLog::InstanceVector& accessLogs() const PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() const PURE;
   virtual bool headerKeysPreserveCase() const PURE;
 };
 

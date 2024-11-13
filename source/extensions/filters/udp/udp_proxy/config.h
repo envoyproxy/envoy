@@ -139,10 +139,12 @@ public:
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const override {
     return upstream_socket_config_;
   }
-  const AccessLog::InstanceVector& sessionAccessLogs() const override {
+  const AccessLog::InstanceSharedPtrVector& sessionAccessLogs() const override {
     return session_access_logs_;
   }
-  const AccessLog::InstanceVector& proxyAccessLogs() const override { return proxy_access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& proxyAccessLogs() const override {
+    return proxy_access_logs_;
+  }
   const UdpSessionFilterChainFactory& sessionFilterFactory() const override { return *this; };
   bool hasSessionFilters() const override { return !filter_factories_.empty(); }
   const UdpTunnelingConfigPtr& tunnelingConfig() const override { return tunneling_config_; };
@@ -192,8 +194,8 @@ private:
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
-  AccessLog::InstanceVector session_access_logs_;
-  AccessLog::InstanceVector proxy_access_logs_;
+  AccessLog::InstanceSharedPtrVector session_access_logs_;
+  AccessLog::InstanceSharedPtrVector proxy_access_logs_;
   UdpTunnelingConfigPtr tunneling_config_;
   std::shared_ptr<UdpSessionFilterConfigProviderManager>
       udp_session_filter_config_provider_manager_;

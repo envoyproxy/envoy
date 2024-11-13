@@ -30,7 +30,7 @@ struct FactoryCallbacksWrapper : public Http::FilterChainFactoryCallbacks {
       absl::variant<Http::StreamDecoderFilterSharedPtr, Http::StreamEncoderFilterSharedPtr,
                     Http::StreamFilterSharedPtr>;
   absl::optional<FilterAlternative> filter_to_inject_;
-  AccessLog::InstanceVector access_loggers_;
+  AccessLog::InstanceSharedPtrVector access_loggers_;
   std::vector<absl::Status> errors_;
 };
 } // namespace Composite

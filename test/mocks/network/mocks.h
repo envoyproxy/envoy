@@ -507,7 +507,9 @@ public:
   MOCK_METHOD(bool, ignoreGlobalConnLimit, (), (const));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 
-  const AccessLog::InstanceVector& accessLogs() const override { return empty_access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
+    return empty_access_logs_;
+  }
 
   const ListenerInfoConstSharedPtr& listenerInfo() const override { return listener_info_; }
 
@@ -517,7 +519,7 @@ public:
   ListenerInfoConstSharedPtr listener_info_;
   Stats::IsolatedStoreImpl store_;
   std::string name_;
-  const AccessLog::InstanceVector empty_access_logs_;
+  const AccessLog::InstanceSharedPtrVector empty_access_logs_;
 };
 
 class MockListener : public Listener {

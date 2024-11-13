@@ -170,7 +170,7 @@ public:
     void setDirection(envoy::config::core::v3::TrafficDirection direction) {
       direction_ = direction;
     }
-    const AccessLog::InstanceVector& accessLogs() const override { return access_logs_; }
+    const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
     ResourceLimit& openConnections() override { return open_connections_; }
     uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
     uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
@@ -196,7 +196,7 @@ public:
     const bool continue_on_listener_filters_timeout_;
     std::unique_ptr<UdpListenerConfigImpl> udp_listener_config_;
     BasicResourceLimitImpl open_connections_;
-    const AccessLog::InstanceVector access_logs_;
+    const AccessLog::InstanceSharedPtrVector access_logs_;
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;
