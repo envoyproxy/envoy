@@ -74,7 +74,7 @@ public:
     upstream_host_ = std::move(upstream_host);
   }
 
-  bool hasFieldSupport() const { return true; }
+  bool hasFieldSupport() const override { return true; }
   Envoy::StreamInfo::FilterState::Object::FieldType getField(absl::string_view field_name) const {
     if (field_name == "latency_us" && latency_.has_value()) {
       return int64_t(latency_.value().count());
