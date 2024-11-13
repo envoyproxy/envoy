@@ -47,8 +47,7 @@ void createDnsClusterFromLegacyFields(
     dns_cluster.set_dns_lookup_family(envoy::extensions::clusters::common::dns::v3::V6_ONLY);
     break;
   case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
-    dns_cluster.set_dns_lookup_family(
-        envoy::extensions::clusters::common::dns::v3::V4_PREFERRED);
+    dns_cluster.set_dns_lookup_family(envoy::extensions::clusters::common::dns::v3::V4_PREFERRED);
     break;
   case envoy::config::cluster::v3::Cluster::ALL:
     dns_cluster.set_dns_lookup_family(envoy::extensions::clusters::common::dns::v3::ALL);

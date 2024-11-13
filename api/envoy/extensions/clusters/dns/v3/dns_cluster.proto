@@ -77,6 +77,8 @@ message DnsCluster {
   // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.dns.v3.DnsCluster.DnsLookupFamily.AUTO>`.
   envoy.extensions.clusters.common.dns.v3.DnsLookupFamily dns_lookup_family = 8;
 
+  // Whether to do logical or strict dns resolution.
+  // This field is only considered when the ``name`` field of the ``TypedConfig`` is ``envoy.cluster.dns``.
   DnsDiscoveryType dns_discovery_type = 9;
 
   enum DnsDiscoveryType {

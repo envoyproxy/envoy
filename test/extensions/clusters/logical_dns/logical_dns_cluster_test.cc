@@ -14,6 +14,7 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
+#include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -84,8 +85,10 @@ protected:
     cluster_->initialize([&]() -> void { initialized_.ready(); });
   }
 
+  template <class Factory = LogicalDnsClusterFactory>
   absl::Status factorySetupFromV3Yaml(const std::string& yaml) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
+    resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver_; };
@@ -93,22 +96,24 @@ protected:
         server_context_, server_context_.cluster_manager_, resolver_fn, ssl_context_manager_,
         nullptr, false);
 
-    LogicalDnsClusterFactory factory;
-    envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
-    if (cluster_config.has_cluster_type()) {
-      ProtobufTypes::MessagePtr dns_cluster_msg =
-          std::make_unique<envoy::extensions::clusters::dns::v3::DnsCluster>();
-      Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                             factory_context.messageValidationVisitor(),
-                                             *dns_cluster_msg);
-      dns_cluster =
-          MessageUtil::downcastAndValidate<const envoy::extensions::clusters::dns::v3::DnsCluster&>(
-              *dns_cluster_msg, factory_context.messageValidationVisitor());
-    } else {
-      createDnsClusterFromLegacyFields(cluster_config, dns_cluster);
-    }
+    Factory factory;
 
-    return factory.createClusterWithConfig(cluster_config, dns_cluster, factory_context).status();
+    auto status_or_cluster = factory.create(cluster_config, factory_context);
+    if (status_or_cluster.ok()) {
+      cluster_ = std::dynamic_pointer_cast<LogicalDnsCluster>(status_or_cluster->first);
+      priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
+          [&](uint32_t, const HostVector&, const HostVector&) {
+            membership_updated_.ready();
+            return absl::OkStatus();
+          });
+      cluster_->initialize([&]() -> void { initialized_.ready(); });
+    } else {
+      // the Event::MockTimer constructor creates EXPECT_CALL for the dispatcher.
+      // If we want cluster creation to fail, there won't be a cluster to create the timer,
+      // so we need to clear the expectation manually.
+      server_context_.dispatcher_.createTimer([]() -> void {});
+    }
+    return status_or_cluster.status();
   }
 
   void expectResolve(Network::DnsLookupFamily dns_lookup_family,
@@ -444,11 +449,11 @@ TEST_F(LogicalDnsParamTest, UseNewConfig) {
       "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
       dns_refresh_rate: 4s
       respect_dns_ttl: true
+      # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+      # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
       dns_lookup_family: V4_ONLY
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
-  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
-  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
   load_assignment:
         endpoints:
           - lb_endpoints:
@@ -596,6 +601,80 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
             "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 }
 
+// Test using both types of names in the cluster type.
+TEST_F(LogicalDnsClusterTest, UseDnsFactory2) {
+  const std::string config = R"EOF(
+  name: name
+  cluster_type:
+    name: envoy.cluster.dns
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      dns_lookup_family: V4_ONLY
+      dns_discovery_type: LOGICAL
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  wait_for_warm_on_init: false
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  ASSERT_TRUE(factorySetupFromV3Yaml<DnsClusterFactory>(config).ok());
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
+}
+
+TEST_F(LogicalDnsClusterTest, UseDnsFactory) {
+  const std::string config = R"EOF(
+  name: name
+  cluster_type:
+    name: envoy.cluster.logical_dns
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      dns_lookup_family: V4_ONLY
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  wait_for_warm_on_init: false
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  ASSERT_TRUE(factorySetupFromV3Yaml<DnsClusterFactory>(config).ok());
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
+}
+
 TEST_F(LogicalDnsClusterTest, Basic) {
   const std::string basic_yaml_hosts = R"EOF(
   name: name
@@ -712,7 +791,7 @@ TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
 
   EXPECT_CALL(initialized_, ready());
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  setupFromV3Yaml(config);
+  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000 + jitter_ms), _));

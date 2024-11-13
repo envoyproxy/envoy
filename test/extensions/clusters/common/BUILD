@@ -16,6 +16,7 @@ envoy_cc_test(
         "//source/extensions/clusters/common:dns_cluster_backcompat_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/common/dns/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dns/v3:pkg_cc_proto",
     ],
 )

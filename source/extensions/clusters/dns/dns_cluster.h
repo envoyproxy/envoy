@@ -11,6 +11,8 @@
 namespace Envoy {
 namespace Upstream {
 
+class LogicalDnsClusterTest;
+
 /**
  * Factory for DnsClusterImpl
  */
@@ -21,6 +23,7 @@ public:
   DnsClusterFactory() : ConfigurableClusterFactoryBase("envoy.cluster.dns") {}
 
 private:
+  friend class LogicalDnsClusterTest;
   absl::StatusOr<
       std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,

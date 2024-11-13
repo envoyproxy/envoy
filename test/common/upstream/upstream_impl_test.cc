@@ -1475,6 +1475,94 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
                          TestUtility::makeDnsResponse({}));
 }
 
+TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig) {
+  ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.cluster.strict_dns
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        dns_refresh_rate: 4s
+        dns_jitter: 0s
+        respect_dns_ttl: true
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_,
+      [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, ssl_context_manager_,
+      nullptr, false);
+
+  auto factory = StrictDnsClusterFactory();
+  auto cluster = factory.create(cluster_config, factory_context);
+  ASSERT_TRUE(cluster.ok());
+
+  cluster->first->initialize([] {});
+
+  EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
+  ON_CALL(random_, random()).WillByDefault(Return(8000));
+  resolver.dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(30)));
+}
+
+TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
+  ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.cluster.dns
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        dns_refresh_rate: 4s
+        dns_jitter: 0s
+        respect_dns_ttl: true
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_,
+      [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, ssl_context_manager_,
+      nullptr, false);
+
+  auto factory = StrictDnsClusterFactory();
+  auto cluster = factory.create(cluster_config, factory_context);
+  ASSERT_TRUE(cluster.ok());
+
+  cluster->first->initialize([] {});
+
+  EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
+  ON_CALL(random_, random()).WillByDefault(Return(8000));
+  resolver.dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(30)));
+}
+
 TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
@@ -3353,8 +3441,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->set_address("1.2.3.6");
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_,
+        nullptr, false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -6329,3 +6417,4 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
+

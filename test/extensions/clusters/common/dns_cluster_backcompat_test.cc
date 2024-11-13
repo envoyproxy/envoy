@@ -1,4 +1,5 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/common/dns/v3/dns.pb.h"
 #include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
 
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
@@ -20,9 +21,12 @@ TEST_F(DnsClusterBackcompatUtilTest, Empty) {
   ASSERT_FALSE(dns_cluster.has_dns_refresh_rate());
   ASSERT_FALSE(dns_cluster.has_dns_failure_refresh_rate());
   ASSERT_FALSE(dns_cluster.respect_dns_ttl());
+  ASSERT_TRUE(dns_cluster.dns_lookup_family() ==
+              envoy::extensions::clusters::common::dns::v3::AUTO);
+  ASSERT_FALSE(dns_cluster.has_typed_dns_resolver_config());
 };
 
-TEST_F(DnsClusterBackcompatUtilTest, EmptyButSetFailureRefresRate) {
+TEST_F(DnsClusterBackcompatUtilTest, EmptyButSetFailureRefreshRate) {
   envoy::config::cluster::v3::Cluster cluster{};
 
   cluster.mutable_dns_failure_refresh_rate();
@@ -34,6 +38,9 @@ TEST_F(DnsClusterBackcompatUtilTest, EmptyButSetFailureRefresRate) {
   ASSERT_FALSE(dns_cluster.dns_failure_refresh_rate().has_base_interval());
   ASSERT_FALSE(dns_cluster.dns_failure_refresh_rate().has_max_interval());
   ASSERT_FALSE(dns_cluster.respect_dns_ttl());
+  ASSERT_TRUE(dns_cluster.dns_lookup_family() ==
+              envoy::extensions::clusters::common::dns::v3::AUTO);
+  ASSERT_FALSE(dns_cluster.has_typed_dns_resolver_config());
 };
 
 TEST_F(DnsClusterBackcompatUtilTest, FullClusterConfig) {
@@ -54,6 +61,7 @@ TEST_F(DnsClusterBackcompatUtilTest, FullClusterConfig) {
             seconds: 7
             nanos: 8
           respect_dns_ttl: true
+          dns_lookup_family: V6_ONLY
       )EOF");
 
   envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
@@ -67,6 +75,53 @@ TEST_F(DnsClusterBackcompatUtilTest, FullClusterConfig) {
   ASSERT_EQ(dns_cluster.dns_refresh_rate().seconds(), 7);
   ASSERT_EQ(dns_cluster.dns_refresh_rate().nanos(), 8);
   ASSERT_TRUE(dns_cluster.respect_dns_ttl());
+  ASSERT_TRUE(dns_cluster.dns_lookup_family() ==
+              envoy::extensions::clusters::common::dns::v3::V6_ONLY);
+  ASSERT_FALSE(dns_cluster.has_typed_dns_resolver_config());
 };
+
+TEST_F(DnsClusterBackcompatUtilTest, LookupFamilyTranslation) {
+  envoy::config::cluster::v3::Cluster cluster =
+      TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(R"EOF(
+          type: STRICT_DNS
+          dns_lookup_family: V6_ONLY
+      )EOF");
+  envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
+  createDnsClusterFromLegacyFields(cluster, dns_cluster);
+  ASSERT_TRUE(dns_cluster.dns_lookup_family() ==
+              envoy::extensions::clusters::common::dns::v3::V6_ONLY);
+
+  cluster = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(R"EOF(
+          type: STRICT_DNS
+          dns_lookup_family: V4_ONLY
+      )EOF");
+  createDnsClusterFromLegacyFields(cluster, dns_cluster);
+  ASSERT_TRUE(dns_cluster.dns_lookup_family() ==
+              envoy::extensions::clusters::common::dns::v3::V4_ONLY);
+
+  cluster = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(R"EOF(
+          type: STRICT_DNS
+          dns_lookup_family: AUTO
+      )EOF");
+  createDnsClusterFromLegacyFields(cluster, dns_cluster);
+  ASSERT_TRUE(dns_cluster.dns_lookup_family() ==
+              envoy::extensions::clusters::common::dns::v3::AUTO);
+
+  cluster = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(R"EOF(
+          type: STRICT_DNS
+          dns_lookup_family: V4_PREFERRED
+      )EOF");
+  createDnsClusterFromLegacyFields(cluster, dns_cluster);
+  ASSERT_TRUE(dns_cluster.dns_lookup_family() ==
+              envoy::extensions::clusters::common::dns::v3::V4_PREFERRED);
+
+  cluster = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(R"EOF(
+          type: STRICT_DNS
+          dns_lookup_family: ALL
+      )EOF");
+  createDnsClusterFromLegacyFields(cluster, dns_cluster);
+  ASSERT_TRUE(dns_cluster.dns_lookup_family() ==
+              envoy::extensions::clusters::common::dns::v3::ALL);
+}
 } // namespace Upstream
 } // namespace Envoy
