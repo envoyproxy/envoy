@@ -12,7 +12,7 @@ These implementations can be used recursively and even combined with each other 
 
 ## Trie-based Matching in Action
 
-The Generic Matching API offers exceptional flexibility, enabling a wide array of route matching configurations. The following examples showcase its versatility, particularly in the realm of sublinear matching. While some of these may not be ideal for production use, they serve to illustrate the API's vast potential.
+The Generic Matching API offers exceptional flexibility, enabling a wide variety of route matching configurations. The following examples showcase its versatility, particularly in the realm of sublinear matching. While some of these may not be ideal for production use, they serve to illustrate the API's vast potential.
 
 **Usecase 1:** A single trie structure for all url paths in :path header
 
