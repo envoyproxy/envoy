@@ -25,7 +25,7 @@ ApiKeyAuthConfig::ApiKeyAuthConfig(const ApiKeyAuthProto& proto_config)
 
   for (const auto& credential : proto_config.credentials().entries()) {
     if (credentials.contains(credential.key())) {
-      throwEnvoyExceptionOrPanic("Duplicate API key.");
+      throw EnvoyException("Duplicate API key.");
     }
     credentials[credential.key()] = credential.client();
   }
@@ -48,7 +48,7 @@ KeySources::Source::Source(absl::string_view header, absl::string_view query,
   } else if (!cookie.empty()) {
     source_ = std::string(cookie);
   } else {
-    throwEnvoyExceptionOrPanic("One of 'header'/'query'/'cookie' must be set.");
+    throw EnvoyException("One of 'header'/'query'/'cookie' must be set.");
   }
 }
 
@@ -113,11 +113,13 @@ Http::FilterHeadersStatus ApiKeyAuthFilter::decodeHeaders(Http::RequestHeaderMap
 
   // If there is an override config, then try to override the API key map and key source.
   if (route_config != nullptr) {
-    if (OptRef<const Credentials> override = route_config->credentials(); override.has_value()) {
-      credentials = override;
+    if (OptRef<const Credentials> route_credentials = route_config->credentials();
+        route_credentials.has_value()) {
+      credentials = route_credentials;
     }
-    if (OptRef<const KeySources> override = route_config->keySources(); override.has_value()) {
-      key_sources = override;
+    if (OptRef<const KeySources> route_key_sources = route_config->keySources();
+        route_key_sources.has_value()) {
+      key_sources = route_key_sources;
     }
   }
 

@@ -206,6 +206,68 @@ TEST_F(FilterTest, FallbackToCookieApiKey) {
   EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
 }
 
+TEST_F(FilterTest, OrderOfKeySources) {
+  const std::string config_yaml = R"EOF(
+  credentials:
+    entries:
+      - key: key1
+        client: user1
+  key_sources:
+    entries:
+      - header: "Authorization"
+      - query: "api_key"
+      - cookie: "api_key"
+  )EOF";
+
+  setup(config_yaml, {});
+
+  {
+    // Header, query, and cookie all have the key. The filter should use the header.
+    // But the header contains the wrong key.
+    Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                   {":method", "GET"},
+                                                   {":path", "/path?api_key=key1"},
+                                                   {"cookie", "api_key=key1"},
+                                                   {"Authorization", "Bearer key2"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.unauthorized").value(), 1);
+  }
+
+  {
+    // Header, query, and cookie all have the key. The filter should use the header.
+    Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                   {":method", "GET"},
+                                                   {":path", "/path?api_key=key1"},
+                                                   {"cookie", "api_key=key1"},
+                                                   {"Authorization", "Bearer key1"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 1);
+  }
+
+  {
+    // Query and cookie have the key. The filter should use the query.
+    // But the query contains the wrong key.
+    Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                   {":method", "GET"},
+                                                   {":path", "/path?api_key=key2"},
+                                                   {"cookie", "api_key=key1"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.unauthorized").value(), 2);
+  }
+
+  {
+    // Query and cookie have the key. The filter should use the query.
+    Http::TestRequestHeaderMapImpl request_headers{{":authority", "host"},
+                                                   {":method", "GET"},
+                                                   {":path", "/path?api_key=key1"},
+                                                   {"cookie", "api_key=key1"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ(stats_.counterFromString("stats.api_key_auth.allowed").value(), 2);
+  }
+}
+
 TEST_F(FilterTest, UnkonwnApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
