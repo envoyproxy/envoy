@@ -48,9 +48,6 @@ public:
          const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
          ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
 
-
-
-
 protected:
   LogicalDnsCluster(const envoy::config::cluster::v3::Cluster& cluster,
                     const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
@@ -105,8 +102,6 @@ public:
   selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
                     const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
                     ClusterFactoryContext& context);
-
-
 
 private:
   friend class LogicalDnsClusterTest;

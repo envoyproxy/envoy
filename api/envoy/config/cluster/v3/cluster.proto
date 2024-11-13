@@ -972,8 +972,11 @@ message Cluster {
   // this setting is ignored.
   // This field is deprecated in favor of :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` and
   // will be ignored if :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is set.
-  google.protobuf.Duration dns_jitter = 58
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0", (validate.rules).duration = {gte {}}];
+  google.protobuf.Duration dns_jitter = 58 [
+    deprecated = true,
+    (envoy.annotations.deprecated_at_minor_version) = "3.0",
+    (validate.rules).duration = {gte {}}
+  ];
 
   // If the DNS failure refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,

@@ -120,8 +120,7 @@ TEST_F(DnsClusterBackcompatUtilTest, LookupFamilyTranslation) {
           dns_lookup_family: ALL
       )EOF");
   createDnsClusterFromLegacyFields(cluster, dns_cluster);
-  ASSERT_TRUE(dns_cluster.dns_lookup_family() ==
-              envoy::extensions::clusters::common::dns::v3::ALL);
+  ASSERT_TRUE(dns_cluster.dns_lookup_family() == envoy::extensions::clusters::common::dns::v3::ALL);
 }
 } // namespace Upstream
 } // namespace Envoy

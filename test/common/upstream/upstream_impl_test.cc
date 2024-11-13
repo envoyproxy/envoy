@@ -3500,8 +3500,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->set_address("1.2.3.6");
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_,
-        nullptr, false);
+        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+        false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -6476,4 +6476,3 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
-
