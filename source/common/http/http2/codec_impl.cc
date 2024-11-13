@@ -647,56 +647,9 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   parent_.adapter_->SubmitTrailer(stream_id_, final_headers);
 }
 
-std::pair<int64_t, bool>
-ConnectionImpl::StreamDataFrameSource::SelectPayloadLength(size_t max_length) {
-  if (stream_.pending_send_data_->length() == 0 && !stream_.local_end_stream_) {
-    ASSERT(!stream_.data_deferred_);
-    stream_.data_deferred_ = true;
-    return {kBlocked, false};
-  } else {
-    const size_t length = std::min<size_t>(max_length, stream_.pending_send_data_->length());
-    bool end_data = false;
-    if (stream_.local_end_stream_ && length == stream_.pending_send_data_->length()) {
-      end_data = true;
-      if (stream_.pending_trailers_to_encode_) {
-        stream_.submitTrailers(*stream_.pending_trailers_to_encode_);
-        stream_.pending_trailers_to_encode_.reset();
-      } else {
-        send_fin_ = true;
-      }
-    }
-    return {static_cast<int64_t>(length), end_data};
-  }
-}
-
-bool ConnectionImpl::StreamDataFrameSource::Send(absl::string_view frame_header,
-                                                 size_t payload_length) {
-  stream_.parent_.protocol_constraints_.incrementOutboundDataFrameCount();
-
-  Buffer::OwnedImpl output;
-  stream_.parent_.addOutboundFrameFragment(
-      output, reinterpret_cast<const uint8_t*>(frame_header.data()), frame_header.size());
-  if (!stream_.parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
-    ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
-                   stream_.parent_.connection_);
-    stream_.setDetails(Http2ResponseCodeDetails::get().outbound_frame_flood);
-  }
-
-  stream_.parent_.stats_.pending_send_bytes_.sub(payload_length);
-  output.move(*stream_.pending_send_data_, payload_length);
-  stream_.parent_.connection_.write(output, false);
-  return true;
-}
-
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ == -1);
-  const bool skip_frame_source =
-      end_stream ||
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_visitor_for_data");
-  stream_id_ = parent_.adapter_->SubmitRequest(
-      buildHeaders(headers),
-      skip_frame_source ? nullptr : std::make_unique<StreamDataFrameSource>(*this), end_stream,
-      base());
+  stream_id_ = parent_.adapter_->SubmitRequest(buildHeaders(headers), nullptr, end_stream, base());
   ASSERT(stream_id_ > 0);
 }
 
@@ -716,12 +669,7 @@ void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
 
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ != -1);
-  const bool skip_frame_source =
-      end_stream ||
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_visitor_for_data");
-  parent_.adapter_->SubmitResponse(
-      stream_id_, buildHeaders(headers),
-      skip_frame_source ? nullptr : std::make_unique<StreamDataFrameSource>(*this), end_stream);
+  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers), nullptr, end_stream);
 }
 
 Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
