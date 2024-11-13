@@ -456,6 +456,7 @@ visibility_excludes:
 - source/extensions/clusters/static/
 - source/extensions/clusters/original_dst/
 - source/extensions/clusters/logical_dns/
+- source/extensions/clusters/dns/
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
