@@ -22,7 +22,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // API Key HTTP authentication.
 //
 // For example, the following configuration configures the filter to authenticate the clients using
-// the API key from the header ``X-API-KEY``. And only the clients with the key ``fake-key`` are
+// the API key from the header 'X-API-KEY'. And only the clients with the key 'fake-key' are
 // considered as authenticated.
 //
 // .. code-block:: yaml
