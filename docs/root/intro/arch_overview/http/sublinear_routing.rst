@@ -1,6 +1,8 @@
-# Sublinear Route Matching in Envoy
+Sublinear Route Matching in Envoy
+=================================
 
-## Overview
+ Overview
+ --------
 
 An incoming request to Envoy needs to be matched to a cluster based on defined [routes](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-virtualhost). Typically, a well understood, linear route search matching with O(n) search cost (see  [Virtual Host](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-virtualhost) → [Routes](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-route)) is employed where the cost of route matching to clusters linearly goes up with increasing number of route rules. It can become a scalability issue with higher latencies as the number of routes go up in o(5k+). To overcome these scalability challenges the Generic Matcher API ( [Virtual Host → matcher{}](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-virtualhost) → [matcher_tree](https://www.envoyproxy.io/docs/envoy/latest/xds/type/matcher/v3/matcher.proto#envoy-v3-api-msg-xds-type-matcher-v3-matcher-matchertree)) can offer a robust and flexible framework for route matching with two distinct sublinear matching implementations:
 
@@ -10,7 +12,8 @@ An incoming request to Envoy needs to be matched to a cluster based on defined [
 
 These implementations can be used recursively and even combined with each other in nested fashion using Generic Matching API. It also enables mixing sublinear and linear route matching for breaking up route matching space for diverse use-cases.
 
-## Trie-based Matching in Action
+ Trie-based Matching in Actions
+ ------------------------------
 
 The Generic Matching API offers exceptional flexibility, enabling a wide variety of route matching configurations. The following examples showcase its versatility, particularly in the realm of sublinear matching. While some of these may not be ideal for production use, they serve to illustrate the API's vast potential.
 
