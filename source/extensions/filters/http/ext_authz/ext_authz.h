@@ -75,7 +75,7 @@ public:
   }
 
   bool hasFieldSupport() const override { return true; }
-  Envoy::StreamInfo::FilterState::Object::FieldType getField(absl::string_view field_name) const {
+  Envoy::StreamInfo::FilterState::Object::FieldType getField(absl::string_view field_name) const override {
     if (field_name == "latency_us" && latency_.has_value()) {
       return int64_t(latency_.value().count());
     } else if (field_name == "bytesSent" && bytes_sent_.has_value()) {
