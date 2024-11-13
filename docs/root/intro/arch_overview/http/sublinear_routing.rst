@@ -28,69 +28,13 @@ To achieve the above results, Envoy config below will create a single trie struc
 
 **NOTE:** Changing prefix_match_map to exact_match_map in below configuration will result in use of hash based path matching (instead of trie) and will succeed in lookup if :path header in request matches exactly with one of the routes defined.
 
-```
-static_resources:
-  listeners:
-  - name: listener_0
-    address:
-      socket_address:
-        address: 0.0.0.0
-        port_value: 10000
-    filter_chains:
-    - filters:
-      - name: envoy.http_connection_manager
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          stat_prefix: ingress_http
-          codec_type: AUTO
-          http_filters:
-          - name: envoy.filters.http.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-          route_config:
-            name: local_route
-            virtual_hosts:
-            - name: local_service
-              domains: ["*"]
-              matcher:
-                matcher_tree:
-                  input:
-                    name: request-headers
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: :path
-                  prefix_match_map:
-                    map:
-                      "/new_endpoint/path/1":
-                        action:
-                          name: route_foo
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: ""
-                            route:
-                              cluster: cluster_1
-                      "/new_endpoint/path/2":
-                        action:
-                          name: route_foo
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: ""
-                            route:
-                              cluster: cluster_2
-                      "/new_endpoint/path/3":
-                        action:
-                          name: route_bar
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: ""
-                            route:
-                              cluster: cluster_3
-                        clusters:
-  <Define cluster_0/1/2/3>
-```
+.. literalinclude:: /_configs/route/sublinear_routing_example1.yaml
+    :language: yaml
+    :lines: 11-46
+    :emphasize-lines: 24-25
+    :linenos:
+    :lineno-start: 1
+    :caption: :download:`route-scope.yaml </_configs/route/sublinear_routing_example1.yaml>`
 
 **Usecase 2:** Configuration for Hierarchical trie structures in example below illustrates how three different trie structures can be created by Envoy using nested prefix_match_map which can do request matching across various headers.:
 **Note:** Use of exact_match_map will result in creation of hashmaps instead of tries.
@@ -99,290 +43,35 @@ static_resources:
 
 For an incoming request with :path header set to say /new_endpoint/path/2/video, x-foo-header set to foo-2 and x-bar-header set to bar-2, three longest-prefix-match trie lookups will happen across A, B and C tries in the order of nesting for a successful request match.
 
-```
-static_resources:
-  listeners:
-  - name: listener_0
-    address:
-      socket_address:
-        address: 0.0.0.0
-        port_value: 10000
-    filter_chains:
-    - filters:
-      - name: envoy.http_connection_manager
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          stat_prefix: ingress_http
-          codec_type: AUTO
-          http_filters:
-          - name: envoy.filters.http.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-          route_config:
-            name: local_route
-            virtual_hosts:
-            - name: local_service
-              domains: ["*"]
-              matcher:
-                matcher_tree:
-                  input:
-                    name: request-headers
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: :path
-                  prefix_match_map:
-                    map:
-                      "/new_endpoint/path/1":
-                        action:
-                          name: route_foo
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: /new_endpoint/foo
-                            route:
-                              cluster: cluster_1
-                      "/new_endpoint/path/2":
-                        matcher:
-                          matcher_tree:
-                            input:
-                              name: request-headers
-                              typed_config:
-                                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                                header_name: x-foo-header
-                            prefix_match_map:
-                              map:
-                                "foo-1":
-                                  action:
-                                    name: route_foo
-                                    typed_config:
-                                      "@type": type.googleapis.com/envoy.config.route.v3.Route
-                                      match:
-                                        prefix: ""
-                                      route:
-                                        cluster: cluster_foo_1
-                                "foo-2":
-                                  matcher:
-                                    matcher_tree:
-                                      input:
-                                        name: request-headers
-                                        typed_config:
-                                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                                          header_name: x-bar-header
-                                      prefix_match_map:
-                                        map:
-                                          "bar-1":
-                                            action:
-                                              name: route_foo
-                                              typed_config:
-                                                "@type": type.googleapis.com/envoy.config.route.v3.Route
-                                                match:
-                                                  prefix: ""
-                                                route:
-                                                  cluster: cluster_bar_1
-                                          "bar-2":
-                                            action:
-                                              name: route_foo
-                                              typed_config:
-                                                "@type": type.googleapis.com/envoy.config.route.v3.Route
-                                                match:
-                                                  prefix: ""
-                                                route:
-                                                  cluster: cluster_bar_2
-                                              
-                                          "bar-3":
-                                            action:
-                                              name: route_foo
-                                              typed_config:
-                                                "@type": type.googleapis.com/envoy.config.route.v3.Route
-                                                match:
-                                                  prefix: ""
-                                                route:
-                                                  cluster: cluster_bar_3
-
-                                "foo-3":
-                                  action:
-                                    name: route_foo
-                                    typed_config:
-                                      "@type": type.googleapis.com/envoy.config.route.v3.Route
-                                      match:
-                                        prefix: ""
-                                      route:
-                                        cluster: cluster_foo_3
-                      "/new_endpoint/path/3":
-                        action:
-                          name: route_bar
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: ""
-                            route:
-                              cluster: cluster_3
- 
-  clusters:
-```
+.. literalinclude:: /_configs/route/sublinear_routing_example2.yaml
+    :language: yaml
+    :lines: 11-46
+    :emphasize-lines: 24-25
+    :linenos:
+    :lineno-start: 1
+    :caption: :download:`route-scope.yaml </_configs/route/sublinear_routing_example2.yaml>`
 
 **Usecase 3:** Mixing sublinear route matching with traditional prefix based inorder linear routing.
 
 ![Pic3](sublinear_routing_img3.png)
 
-```
-static_resources:
-  listeners:
-  - name: listener_0
-    address:
-      socket_address:
-        address: 0.0.0.0
-        port_value: 10000
-    filter_chains:
-    - filters:
-      - name: envoy.http_connection_manager
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-          stat_prefix: ingress_http
-          codec_type: AUTO
-          http_filters:
-          - name: envoy.filters.http.router
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-          route_config:
-            name: local_route
-            virtual_hosts:
-            - name: local_service
-              domains: ["*"]
-              matcher:
-                matcher_tree:
-                  input:
-                    name: request-headers
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: :path
-                  prefix_match_map:
-                    map:
-                      "/new_endpoint/path/1":
-                        action:
-                          name: route_foo
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: ""
-                            route:
-                              cluster: cluster_1
-                      "/new_endpoint/path/2":
-                        action:
-                          name: route_bar
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: ""
-                            route:
-                              cluster: cluster_2
-                      "/new_endpoint/path/3":
-                        action:
-                          name: route_list
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.RouteList 
-                            routes:
-                            - match:
-                                prefix: ""
-                                headers:
-                                - name: x-foo-header
-                                  string_match:
-                                    exact: foo-1
-                              route:
-                                cluster: cluster_3_1
-                            - match:
-                                prefix: ""
-                                headers:
-                                - name: x-foo-header
-                                  string_match:
-                                    exact: foo-2
-                              route:
-                                cluster: cluster_3_2
-                            - match:
-                                prefix: ""
-                                headers:
-                                - name: x-foo-header
-                                  string_match:
-                                    exact: foo-3
-                              route:
-                                cluster: cluster_3_3
-  clusters:
-```
+.. literalinclude:: /_configs/route/sublinear_routing_example3.yaml
+    :language: yaml
+    :lines: 11-46
+    :emphasize-lines: 24-25
+    :linenos:
+    :lineno-start: 1
+    :caption: :download:`route-scope.yaml </_configs/route/sublinear_routing_example3.yaml>`
 
 **Usecase 4:** This example shows how one can run exact matches first (using hashmap) and if no matches are found then attempt prefix matches (using tries).
-```
-          route_config:
-            name: local_route
-            virtual_hosts:
-            - name: local_service
-              domains: ["*"]
-              matcher:
-                matcher_tree:
-                  input:
-                    name: request-headers
-                    typed_config:
-                      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: :path
-                  exact_match_map:
-                    map:
-                      "/new_endpoint/foo/0":
-                        action:
-                          name: route_foo
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: ""
-                            route:
-                              cluster: cluster_0
-                      "/new_endpoint/foo/1":
-                        action:
-                          name: route_bar
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: ""
-                            route:
-                              cluster: cluster_1
-                      "/new_endpoint/foo/2":
-                        action:
-                          name: route_bar
-                          typed_config:
-                            "@type": type.googleapis.com/envoy.config.route.v3.Route
-                            match:
-                              prefix: /new_endpoint
-                            route:
-                              cluster: cluster_2
-                on_no_match:
-                  matcher:
-                    matcher_tree:
-                      input:
-                        name: prefix-matches
-                        typed_config:
-                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                          header_name: :path
-                      prefix_match_map:
-                        map:
-                          "/new_endpoint/foo":
-                            action:
-                              name: route_foo_prefix
-                              typed_config:
-                                "@type": type.googleapis.com/envoy.config.route.v3.Route
-                                match:
-                                  prefix: ""
-                                route:
-                                  cluster: cluster_1
-                          "/new_endpoint":
-                            action:
-                              name: route_foo_prefix
-                              typed_config:
-                                "@type": type.googleapis.com/envoy.config.route.v3.Route
-                                match:
-                                  prefix: ""
-                                route:
-                                  cluster: cluster_2
-  clusters:
-```
 
+.. literalinclude:: /_configs/route/sublinear_routing_example4.yaml
+    :language: yaml
+    :lines: 11-46
+    :emphasize-lines: 24-25
+    :linenos:
+    :lineno-start: 1
+    :caption: :download:`route-scope.yaml </_configs/route/sublinear_routing_example4.yaml>`
 
 
 

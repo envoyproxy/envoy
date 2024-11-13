@@ -1,0 +1,70 @@
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              matcher:
+                matcher_tree:
+                  input:
+                    name: request-headers
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                      header_name: :path
+                  exact_match_map:
+                    map:
+                      "/new_endpoint/foo/0":
+                        action:
+                          name: route_foo
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.config.route.v3.Route
+                            match:
+                              prefix: ""
+                            route:
+                              cluster: cluster_0
+                      "/new_endpoint/foo/1":
+                        action:
+                          name: route_bar
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.config.route.v3.Route
+                            match:
+                              prefix: ""
+                            route:
+                              cluster: cluster_1
+                      "/new_endpoint/foo/2":
+                        action:
+                          name: route_bar
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.config.route.v3.Route
+                            match:
+                              prefix: /new_endpoint
+                            route:
+                              cluster: cluster_2
+                on_no_match:
+                  matcher:
+                    matcher_tree:
+                      input:
+                        name: prefix-matches
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                          header_name: :path
+                      prefix_match_map:
+                        map:
+                          "/new_endpoint/foo":
+                            action:
+                              name: route_foo_prefix
+                              typed_config:
+                                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                                match:
+                                  prefix: ""
+                                route:
+                                  cluster: cluster_1
+                          "/new_endpoint":
+                            action:
+                              name: route_foo_prefix
+                              typed_config:
+                                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                                match:
+                                  prefix: ""
+                                route:
+                                  cluster: cluster_2
+  clusters:
