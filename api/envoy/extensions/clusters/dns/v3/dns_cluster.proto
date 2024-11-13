@@ -57,7 +57,7 @@ message DnsCluster {
   // DNS jitter causes the cluster to refresh DNS entries later by a random amount of time to avoid a
   // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount.
   // There will be no jitter if this value is omitted.
-  google.protobuf.Duration dns_jitter = 6;
+  google.protobuf.Duration dns_jitter = 6 [(validate.rules).duration = {gte {}}];
 
   // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
   // or any other DNS resolver types and the related parameters.

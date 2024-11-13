@@ -180,6 +180,17 @@ public:
   getOrCreateHttp3StatusTracker(const Origin& origin) PURE;
 
   /**
+   * @param origin The origin to check h3 brokenness for.
+   * @return true if it's broken.
+   */
+  virtual bool isHttp3Broken(const Origin& origin) PURE;
+
+  /**
+   * @ origin The origin to mark h3 broken.
+   */
+  virtual void markHttp3Broken(const Origin& origin) PURE;
+
+  /**
    * Changes any origins with status "Broken" for HTTP/3 to "Failed Recently"
    */
   virtual void resetBrokenness() PURE;
