@@ -280,6 +280,37 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const
   return absl::nullopt;
 }
 
+template <typename T> absl::optional<T> maybeGetUnsignedIntFromHeader(const cmsghdr& cmsg) {
+  static_assert(std::is_unsigned_v<T>, "return type must be unsigned integral");
+  switch (cmsg.cmsg_len) {
+  case CMSG_LEN(sizeof(uint8_t)):
+    return static_cast<T>(*reinterpret_cast<const uint8_t*>(CMSG_DATA(&cmsg)));
+  case CMSG_LEN(sizeof(uint16_t)):
+    return static_cast<T>(*reinterpret_cast<const uint16_t*>(CMSG_DATA(&cmsg)));
+  case CMSG_LEN(sizeof(uint32_t)):
+    return static_cast<T>(*reinterpret_cast<const uint32_t*>(CMSG_DATA(&cmsg)));
+  case CMSG_LEN(sizeof(uint64_t)):
+    return static_cast<T>(*reinterpret_cast<const uint64_t*>(CMSG_DATA(&cmsg)));
+  default:;
+  }
+  IS_ENVOY_BUG(
+      fmt::format("unexpected cmsg_len value for unsigned integer payload: {}", cmsg.cmsg_len));
+  return absl::nullopt;
+}
+
+absl::optional<uint8_t> maybeGetTosFromHeader(const cmsghdr& cmsg) {
+  if (
+#ifdef __APPLE__
+      (cmsg.cmsg_level == IPPROTO_IP && cmsg.cmsg_type == IP_RECVTOS) ||
+#else
+      (cmsg.cmsg_level == IPPROTO_IP && cmsg.cmsg_type == IP_TOS) ||
+#endif // __APPLE__
+      (cmsg.cmsg_level == IPPROTO_IPV6 && cmsg.cmsg_type == IPV6_TCLASS)) {
+    return maybeGetUnsignedIntFromHeader<uint8_t>(cmsg);
+  }
+  return absl::nullopt;
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
                                                     const UdpSaveCmsgConfig& save_cmsg_config,
@@ -359,17 +390,17 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       }
 #ifdef UDP_GRO
       if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
-        output.msg_[0].gso_size_ = *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg));
+        absl::optional<uint16_t> maybe_gso = maybeGetUnsignedIntFromHeader<uint16_t>(*cmsg);
+        if (maybe_gso) {
+          output.msg_[0].gso_size_ = *maybe_gso;
+        }
       }
 #endif
-      if (receive_ecn_ &&
-#ifdef __APPLE__
-          ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
-#else
-          ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) ||
-#endif // __APPLE__
-           (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS))) {
-        output.msg_[0].tos_ = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
+      if (receive_ecn_) {
+        absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+        if (maybe_tos) {
+          output.msg_[0].tos_ = *maybe_tos;
+        }
       }
     }
   }
@@ -455,15 +486,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
           output.msg_[0].saved_cmsg_ = cmsg_slice;
         }
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
-        if (receive_ecn_ &&
-#ifdef __APPLE__
-            ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
-#else
-            ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) ||
-#endif // __APPLE__
-             (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS))) {
-          output.msg_[i].tos_ = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
-          continue;
+        if (receive_ecn_) {
+          absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+          if (maybe_tos) {
+            output.msg_[0].tos_ = *maybe_tos;
+            continue;
+          }
         }
         if (addr != nullptr) {
           // This is a IP packet info message.
