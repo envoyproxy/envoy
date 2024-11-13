@@ -104,6 +104,6 @@ message KeySource {
 // The key sources to fetch the key from the coming request.
 message KeySources {
   // The list of key sources. The order of the key sources is important and the filter will try to
-  // fetch the key one by one from the key sources in the order they are defined.
+  // fetch the key one by one from the key sources in the order they are defined. The first matched key source will be used (regardless of whether the credentials match or not).
   repeated KeySource entries = 1 [(validate.rules).repeated = {min_items: 1}];
 }
