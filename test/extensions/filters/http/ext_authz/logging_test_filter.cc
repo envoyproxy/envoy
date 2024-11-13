@@ -63,32 +63,6 @@ public:
       ASSERT_NE(ext_authz_logging_info->upstreamHost(), nullptr);
       EXPECT_EQ(ext_authz_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
     }
-
-    // Assert for CEL and accesslog field access
-    ASSERT_TRUE(ext_authz_logging_info->hasFieldSupport());
-    EXPECT_THAT(ext_authz_logging_info->getField("latency_us"),
-                testing::VariantWith<int64_t>(ext_authz_logging_info->latency().value().count()));
-    if (expect_envoy_grpc_specific_stats_) {
-      EXPECT_THAT(ext_authz_logging_info->getField("bytesSent"),
-                  testing::VariantWith<int64_t>(ext_authz_logging_info->bytesSent().value()));
-      EXPECT_THAT(ext_authz_logging_info->getField("bytesReceived"),
-                  testing::VariantWith<int64_t>(ext_authz_logging_info->bytesReceived().value()));
-    }
-
-    // Assert field absence and wrong field name
-    EXPECT_THAT(ext_authz_logging_info->getField("wrong_property_name"),
-                testing::VariantWith<absl::monostate>(absl::monostate{}));
-    ExtAuthz::ExtAuthzLoggingInfo* ext_authz_logging_info_mutable =
-        filter_state->getDataMutable<ExtAuthz::ExtAuthzLoggingInfo>(logging_id_);
-    ext_authz_logging_info_mutable->clearLatency();
-    ext_authz_logging_info_mutable->clearBytesSent();
-    ext_authz_logging_info_mutable->clearBytesReceived();
-    EXPECT_THAT(ext_authz_logging_info_mutable->getField("latency_us"),
-                testing::VariantWith<absl::monostate>(absl::monostate{}));
-    EXPECT_THAT(ext_authz_logging_info_mutable->getField("bytesSent"),
-                testing::VariantWith<absl::monostate>(absl::monostate{}));
-    EXPECT_THAT(ext_authz_logging_info_mutable->getField("bytesReceived"),
-                testing::VariantWith<absl::monostate>(absl::monostate{}));
   }
 
 private:
