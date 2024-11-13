@@ -79,7 +79,7 @@ message Credentials {
 
 message KeySource {
   // The header name to fetch the key. If multiple header values are present, the first one will be
-  // used. The the header value is started with "Bearer ", the prefix will be stripped to get the
+  // used. If the header value starts with ``Bearer ``, this prefix will be stripped to get the
   // key value.
   //
   // If set, takes precedence over ``query`` and ``cookie``.
