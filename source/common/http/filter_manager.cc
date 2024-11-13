@@ -1078,11 +1078,8 @@ void DownstreamFilterManager::executeLocalReplyIfPrepared() {
 }
 
 bool DownstreamFilterManager::createDownstreamFilterChain() {
-  const auto result =
-      createFilterChain(filter_chain_factory_, /*allow_upgrade_filter_chain=*/true, false);
-  ASSERT(result.created);
-
-  return result.upgrade_rejected;
+  return createFilterChain(filter_chain_factory_, /*allow_upgrade_filter_chain=*/true, false)
+      .upgrade_rejected;
 }
 
 void DownstreamFilterManager::sendLocalReplyViaFilterChain(
