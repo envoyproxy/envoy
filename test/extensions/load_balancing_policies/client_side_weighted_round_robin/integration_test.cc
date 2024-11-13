@@ -359,7 +359,7 @@ TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, ClusterUpDownUp) {
   // runNormalLoadBalancing();
 }
 
-// Tests adding a cluster, adding another, then removing and readding the first.
+// Tests adding a cluster, adding another, then removing and adding back the first.
 TEST_P(ClientSideWeightedRoundRobinXdsIntegrationTest, TwoClusters) {
   // Calls our initialize(), which includes establishing a listener, route, and
   // cluster.
