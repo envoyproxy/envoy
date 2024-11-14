@@ -91,6 +91,10 @@ bug_fixes:
   change: |
     Fixed bug where setting ``dns_jitter <envoy_v3_api_field_config.cluster.v3.Cluster.dns_jitter>`` to large values caused Envoy Bug
     to fire.
+- area: OAuth2
+  change: |
+    Fixed ID token and refresh token don't respect the :ref:`cookie_domain
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.credentials.cookie_domain>` field.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
