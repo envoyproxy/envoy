@@ -862,6 +862,7 @@ protected:
 
     UdpProxyFilter& filter_;
     Upstream::ThreadLocalCluster& cluster_;
+    Upstream::ClusterInfoConstSharedPtr cluster_info_;
     UdpProxyUpstreamStats cluster_stats_;
     absl::flat_hash_set<ActiveSession*> sessions_;
 
