@@ -117,10 +117,11 @@ public:
   // Http::FilterChainFactory
   bool createFilterChain(Http::FilterChainManager& manager, bool,
                          const Http::FilterChainOptions&) const override;
-  bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
-    return false;
+  Http::FilterChainFactory::UpgradeAction
+  createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                           Http::FilterChainManager&,
+                           const Http::FilterChainOptions&) const override {
+    return Http::FilterChainFactory::UpgradeAction::Ignored;
   }
 
   // Http::ConnectionManagerConfig

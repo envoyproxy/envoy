@@ -100,17 +100,24 @@ public:
   createFilterChain(FilterChainManager& manager, bool only_create_if_configured = false,
                     const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;
 
+  enum class UpgradeAction {
+    Rejected,
+    Accepted,
+    Ignored,
+  };
+
   /**
    * Called when a new upgrade stream is created on the connection.
    * @param upgrade supplies the upgrade header from downstream
    * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
    * @param manager supplies the "sink" that is used for actually creating the filter chain. @see
    *                FilterChainManager.
-   * @return true if upgrades of this type are allowed and the filter chain has been created.
-   *    returns false if this upgrade type is not configured, and no filter chain is created.
+   * @return ACCEPTED if upgrades of this type are allowed and the filter chain has been created.
+   *    returns REJECTED if this upgrade type is not allowed, and no filter chain is created.
+   *    returns IGNORED if the upgrade type should be ignored and no upgrade will take place.
    */
   using UpgradeMap = std::map<std::string, bool>;
-  virtual bool createUpgradeFilterChain(
+  virtual UpgradeAction createUpgradeFilterChain(
       absl::string_view upgrade, const UpgradeMap* per_route_upgrade_map,
       FilterChainManager& manager,
       const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;

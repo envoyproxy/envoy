@@ -1029,10 +1029,11 @@ public:
         manager, Http::EmptyFilterChainOptions{}, http_filter_factories_);
     return true;
   }
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
+  Http::FilterChainFactory::UpgradeAction
+  createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
+                           const Http::FilterChainOptions&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
-    return false;
+    return Http::FilterChainFactory::UpgradeAction::Rejected;
   }
 
   Http::Http1::CodecStats& http1CodecStats() const override;

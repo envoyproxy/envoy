@@ -248,10 +248,11 @@ public:
     return true;
   }
 
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
-                                const Http::FilterChainOptions&) const override {
+  Http::FilterChainFactory::UpgradeAction
+  createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
+                           const Http::FilterChainOptions&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
-    return false;
+    return FilterChainFactory::UpgradeAction::Rejected;
   }
 
   using HeaderVector = std::vector<Http::LowerCaseString>;

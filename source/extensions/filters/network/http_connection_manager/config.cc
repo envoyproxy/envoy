@@ -364,6 +364,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
+      ignore_unconfigured_upgrades_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ignore_unconfigured_upgrades, true)),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
       http3_options_(Http3::Utility::initializeAndValidateOptions(
@@ -729,11 +731,17 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
-    const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
+    const bool ignored = PROTOBUF_GET_WRAPPED_OR_DEFAULT(upgrade_config, ignore, false);
+    const bool enabled = PROTOBUF_GET_WRAPPED_OR_DEFAULT(upgrade_config, enabled, !ignored);
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=
         upgrade_filter_factories_.end()) {
       creation_status = absl::InvalidArgumentError(
           fmt::format("Error: multiple upgrade configs with the same name: '{}'", name));
+      return;
+    }
+    if (enabled && ignored) {
+      creation_status = absl::InvalidArgumentError(fmt::format(
+          "Error: upgrade config set both `ignored` and `enabled` for upgrade type: '{}'", name));
       return;
     }
     if (!upgrade_config.filters().empty()) {
@@ -747,11 +755,11 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       SET_AND_RETURN_IF_NOT_OK(status, creation_status);
 
       upgrade_filter_factories_.emplace(
-          std::make_pair(name, FilterConfig{std::move(factories), enabled}));
+          std::make_pair(name, FilterConfig{std::move(factories), enabled, ignored}));
     } else {
       std::unique_ptr<FilterFactoriesList> factories(nullptr);
       upgrade_filter_factories_.emplace(
-          std::make_pair(name, FilterConfig{std::move(factories), enabled}));
+          std::make_pair(name, FilterConfig{std::move(factories), enabled, ignored}));
     }
   }
 }
@@ -796,7 +804,7 @@ bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& ma
   return true;
 }
 
-bool HttpConnectionManagerConfig::createUpgradeFilterChain(
+Http::FilterChainFactory::UpgradeAction HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
     Http::FilterChainManager& callbacks, const Http::FilterChainOptions& options) const {
@@ -806,7 +814,7 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     if (route_it != per_route_upgrade_map->end()) {
       // Upgrades explicitly not allowed on this route.
       if (route_it->second == false) {
-        return false;
+        return Http::FilterChainFactory::UpgradeAction::Rejected;
       }
       // Upgrades explicitly enabled on this route.
       route_enabled = true;
@@ -814,18 +822,29 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
   }
 
   auto it = findUpgradeCaseInsensitive(upgrade_filter_factories_, upgrade_type);
-  if ((it == upgrade_filter_factories_.end() || !it->second.allow_upgrade) && !route_enabled) {
-    // Either the HCM disables upgrades and the route-config does not override,
-    // or neither is configured for this upgrade.
-    return false;
-  }
-  const FilterFactoriesList* filters_to_use = &filter_factories_;
-  if (it != upgrade_filter_factories_.end() && it->second.filter_factories != nullptr) {
-    filters_to_use = it->second.filter_factories.get();
+  if (route_enabled || (it != upgrade_filter_factories_.end() && it->second.allow_upgrade)) {
+    // Either the per-route config enables this upgrade, or the HCM config allows the upgrade.
+    const FilterFactoriesList* filters_to_use = &filter_factories_;
+    if (it != upgrade_filter_factories_.end() && it->second.filter_factories != nullptr) {
+      filters_to_use = it->second.filter_factories.get();
+    }
+
+    Http::FilterChainUtility::createFilterChainForFactories(callbacks, options, *filters_to_use);
+    return Http::FilterChainFactory::UpgradeAction::Accepted;
   }
 
-  Http::FilterChainUtility::createFilterChainForFactories(callbacks, options, *filters_to_use);
-  return true;
+  if ((ignore_unconfigured_upgrades_ && it == upgrade_filter_factories_.end()) ||
+      (it != upgrade_filter_factories_.end() && it->second.ignore)) {
+    // Either the HCM ignores all unconfigured upgrades, or this upgrade type is configured to be
+    // ignored.
+    return Http::FilterChainFactory::UpgradeAction::Ignored;
+  }
+
+  // Fall-through cases: the HCM does not ignore unconfigured upgrades, or this upgrade type is
+  // configured to be disallowed.
+  ASSERT(!ignore_unconfigured_upgrades_ || (it != upgrade_filter_factories_.end() &&
+                                            !it->second.ignore && !it->second.allow_upgrade));
+  return Http::FilterChainFactory::UpgradeAction::Rejected;
 }
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {

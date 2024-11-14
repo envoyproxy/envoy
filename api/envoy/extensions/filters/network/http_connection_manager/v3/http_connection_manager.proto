@@ -37,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 59]
+// [#next-free-field: 60]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -289,11 +289,18 @@ message HttpConnectionManager {
     // HTTP connections will be used for this upgrade type.
     repeated HttpFilter filters = 2;
 
-    // Determines if upgrades are enabled or disabled by default. Defaults to true.
+    // Determines if upgrades are enabled or disabled by default. Defaults to true, unless
+    // :ref:`ignore <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.ignore>`
+    // is enabled. It is invalid to set both this option and ``disabled`` to true.
     // This can be overridden on a per-route basis with :ref:`cluster
     // <envoy_v3_api_field_config.route.v3.RouteAction.upgrade_configs>` as documented in the
     // :ref:`upgrade documentation <arch_overview_upgrades>`.
     google.protobuf.BoolValue enabled = 3;
+
+    // If enabled, Envoy will ignore upgrade requests of this type. It is invalid to set both this option and
+    // :ref:`enabled <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.enabled>`
+    // to true.
+    google.protobuf.BoolValue ignore = 4;
   }
 
   // [#not-implemented-hide:] Transformations that apply to path headers. Transformations are applied
@@ -786,6 +793,13 @@ message HttpConnectionManager {
   bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6 = 20;
 
   repeated UpgradeConfig upgrade_configs = 23;
+
+  // If enabled, if Envoy receives an Upgrade request from a client and no configuration for
+  // the upgrade type is found in
+  // :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`,
+  // Envoy will ignore the upgrade request. If disabled, Envoy will respond with an error and close the connection.
+  // The default is true.
+  google.protobuf.BoolValue ignore_unconfigured_upgrades = 59;
 
   // Should paths be normalized according to RFC 3986 before any processing of
   // requests by HTTP filters or routing? This affects the upstream ``:path`` header

@@ -1647,14 +1647,20 @@ bool FilterManager::createFilterChain() {
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
 
-    if (filter_chain_factory_.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                       upgrade_map, *this, options)) {
+    auto result = filter_chain_factory_.createUpgradeFilterChain(upgrade->value().getStringView(),
+                                                                 upgrade_map, *this, options);
+    switch (result) {
+    case FilterChainFactory::UpgradeAction::Accepted:
       filter_manager_callbacks_.upgradeFilterChainCreated();
       return true;
-    } else {
+    case FilterChainFactory::UpgradeAction::Rejected:
       upgrade_rejected = true;
       // Fall through to the default filter chain. The function calling this
       // will send a local reply indicating that the upgrade failed.
+      break;
+    case FilterChainFactory::UpgradeAction::Ignored:
+      filter_manager_callbacks_.requestHeaders()->removeUpgrade();
+      break;
     }
   }
 
@@ -1714,11 +1720,11 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
 
   if (headers != nullptr) {
     // The call to setResponseHeaders is needed to ensure that the headers are properly logged in
-    // access logs before the stream is destroyed. Since the function expects a ResponseHeaderPtr&&,
-    // ownership of the headers must be passed. This cannot happen earlier in the flow (such as in
-    // the call to setupRedirect) because at that point it is still possible for the headers to be
-    // used in a different logical branch. We work around this by creating a copy and passing
-    // ownership of the copy instead.
+    // access logs before the stream is destroyed. Since the function expects a
+    // ResponseHeaderPtr&&, ownership of the headers must be passed. This cannot happen earlier in
+    // the flow (such as in the call to setupRedirect) because at that point it is still possible
+    // for the headers to be used in a different logical branch. We work around this by creating a
+    // copy and passing ownership of the copy instead.
     ResponseHeaderMapPtr headers_copy = createHeaderMap<ResponseHeaderMapImpl>(*headers);
     parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers_copy));
     parent_.filter_manager_callbacks_.chargeStats(*headers);

@@ -144,12 +144,14 @@ public:
   using FilterFactoriesList = Envoy::Http::FilterChainUtility::FilterFactoriesList;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
-    bool allow_upgrade;
+    const bool allow_upgrade;
+    const bool ignore;
   };
-  bool createUpgradeFilterChain(absl::string_view upgrade_type,
-                                const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-                                Http::FilterChainManager& manager,
-                                const Http::FilterChainOptions& options) const override;
+  Http::FilterChainFactory::UpgradeAction
+  createUpgradeFilterChain(absl::string_view upgrade_type,
+                           const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
+                           Http::FilterChainManager& manager,
+                           const Http::FilterChainOptions& options) const override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
@@ -307,6 +309,7 @@ private:
   const uint32_t xff_num_trusted_hops_;
   const bool skip_xff_append_;
   const std::string via_;
+  const bool ignore_unconfigured_upgrades_;
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Config::ConfigProviderManager* scoped_routes_config_provider_manager_;
