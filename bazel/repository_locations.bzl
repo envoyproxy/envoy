@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "28.2"
+PROTOBUF_VERSION = "28.3"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,11 +8,11 @@ PROTOBUF_VERSION = "28.2"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "91d8253cdc0f0f0fc51c2b69c80677996632f525ad84504bfa5b4ee38ad3e49c",
-    linux_x86_64 = "2febfd42b59ce93a28eb789019a470a3dd0449619bc04f84dad1333da261dec1",
-    osx_aarch_64 = "7bb048f52841789d9ec61983be0ce4c9e4fb3bd9a143462820ba9a3be0a03797",
-    osx_x86_64 = "232f07d12bf4806207a79ec2c7378301c52e6f2f7efdd21c0dd416f0bda103ec",
-    win64 = "4bde19271ed7cab9003570f28c6e4c4d71963eaf1211a86bf3bb25d9b895177a",
+    linux_aarch_64 = "1de522032a8b194002fe35cab86d747848238b5e4de4f99648372079f5b46f9a",
+    linux_x86_64 = "0ad949f04a6a174da83cdcbdb36dee0a4925272a5b6d83f79a6bf9852076d53f",
+    osx_aarch_64 = "92ceefda6a7293ec014e6ecac82d64719357145cb6fc2865badadeb5e62c0431",
+    osx_x86_64 = "97fe5d442090b4dbc23cd1384fb9b444fa1dc6e67d15bb5e1fe4de0da7638b20",
+    win64 = "ce64f49bdeddef49ce4bd313a8f59bcf92fcf67b5831efbf66170386d2e66948",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -952,11 +952,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "b2340aa47faf7ef10a0328190319d3f3bee1b24f426d4ce8f4253b6f27ce16db",
+        sha256 = "7c3ebd7aaedd86fa5dc479a0fda803f602caaf78d8aff7ce83b89e1b8ae7442a",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-09-18",
+        release_date = "2024-10-22",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1467,12 +1467,16 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
+    # After updating you may need to run:
+    #
+    #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
+    #
     rules_rust = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.53.0",
-        sha256 = "85e2013727ab26fb22abdffe4b2ac0c27a2d5b6296167ba63d8f6e13140f51f9",
+        version = "0.54.1",
+        sha256 = "af4f56caae50a99a68bfce39b141b509dd68548c8204b98ab7a1cafc94d5bb02",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
@@ -1484,7 +1488,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         implied_untracked_deps = ["rules_cc"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2024-10-18",
+        release_date = "2024-11-07",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",
@@ -1594,7 +1598,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2024-09-18",
+            release_date = "2024-10-22",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",

@@ -87,6 +87,10 @@ bug_fixes:
   change: |
     Relaxed the restriction on SNI logging to allow the ``_`` character, even if
     ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
+- area: DNS
+  change: |
+    Fixed bug where setting ``dns_jitter <envoy_v3_api_field_config.cluster.v3.Cluster.dns_jitter>`` to large values caused Envoy Bug
+    to fire.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -132,6 +136,16 @@ new_features:
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
+- area: tls
+  change: |
+    Added an :ref:`option
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_host_sni>` to change the upstream
+    SNI to the configured hostname for the upstream.
+- area: tls
+  change: |
+    Added an :ref:`option
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_sni_san_validation>` to validate
+    the upstream server certificate SANs against the actual SNI value sent, regardless of the method of configuring SNI.
 - area: xds
   change: |
     Added support for ADS replacement by invoking ``xdsManager().setAdsConfigSource()`` with a new config source.
@@ -142,6 +156,12 @@ new_features:
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
     %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
+- area: access_log
+  change: |
+    Added support for logging upstream connection establishment duration in the
+    :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` access log
+    formatter operator. The following time points were added: ``%US_CX_BEG%``,
+    ``%US_CX_END%``, ``%US_HS_END%``.
 - area: quic
   change: |
     Added :ref:`QUIC stats debug visitor <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>` to
@@ -183,5 +203,17 @@ new_features:
     <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.query_timeout_seconds>` and
     custom tries could be configured by specifying :ref:`query_tries
     <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.query_tries>`.
-
+- area: rbac
+  change: |
+    added :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` which allows
+    specifying an optional source for the metadata to be matched in addition to the metadata matcher.
+- area: c-ares
+  change: |
+    added nameserver rotation option to c-ares resolver. When enabled via :ref:rotate_nameservers
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.rotate_nameservers>, this
+    performs round-robin selection of the configured nameservers for each resolution to help distribute query load.
 deprecated:
+- area: rbac
+  change: |
+    metadata :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
+    favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.

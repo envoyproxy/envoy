@@ -420,6 +420,9 @@ The following command operators are supported:
 
     * ``DS_RX_BEG``: The time point of the downstream request receiving begin.
     * ``DS_RX_END``: The time point of the downstream request receiving end.
+    * ``US_CX_BEG``: The time point of the upstream TCP connect begin.
+    * ``US_CX_END``: The time point of the upstream TCP connect end.
+    * ``US_HS_END``: The time point of the upstream TLS handshake end.
     * ``US_TX_BEG``: The time point of the upstream request sending begin.
     * ``US_TX_END``: The time point of the upstream request sending end.
     * ``US_RX_BEG``: The time point of the upstream response receiving begin.
@@ -427,6 +430,9 @@ The following command operators are supported:
     * ``DS_TX_BEG``: The time point of the downstream response sending begin.
     * ``DS_TX_END``: The time point of the downstream response sending end.
     * Dynamic value: Other values will be treated as custom time points that are set by named keys.
+
+    NOTE: Upstream connection establishment time points (US_CX_*, US_HS_END) repeat for all requests
+    in a given connection.
 
     The PRECISION is specified by the following values (NOTE: all values here are case-sensitive):
 

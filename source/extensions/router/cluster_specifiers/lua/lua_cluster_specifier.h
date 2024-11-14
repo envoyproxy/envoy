@@ -66,6 +66,8 @@ public:
     };
   }
 
+  void onMarkDead() override { cluster_.reset(); }
+
 private:
   DECLARE_LUA_FUNCTION(ClusterWrapper, luaNumConnections);
   DECLARE_LUA_FUNCTION(ClusterWrapper, luaNumRequests);
@@ -74,7 +76,7 @@ private:
   Upstream::ClusterInfoConstSharedPtr cluster_;
 };
 
-using ClusterRef = Filters::Common::Lua::LuaRef<ClusterWrapper>;
+using ClusterRef = Filters::Common::Lua::LuaDeathRef<ClusterWrapper>;
 
 class RouteHandleWrapper : public Filters::Common::Lua::BaseLuaObject<RouteHandleWrapper> {
 public:
@@ -91,7 +93,10 @@ public:
   // All embedded references should be reset when the object is marked dead. This is to ensure that
   // we won't do the resetting in the destructor, which may be called after the referenced
   // coroutine's lua_State is closed. And if that happens, the resetting will cause a crash.
-  void onMarkDead() override { headers_wrapper_.reset(); }
+  void onMarkDead() override {
+    headers_wrapper_.reset();
+    clusters_.clear();
+  }
 
 private:
   /**
