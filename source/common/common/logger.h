@@ -245,6 +245,8 @@ public:
    */
   static std::string escapeLogLine(absl::string_view source);
 
+  spdlog::formatter* get_formatter();
+
 private:
   friend class SinkDelegate;
 

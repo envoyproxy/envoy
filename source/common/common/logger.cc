@@ -82,6 +82,14 @@ void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatt
   formatter_ = std::move(formatter);
 }
 
+spdlog::formatter* DelegatingLogSink::get_formatter() {
+  absl::MutexLock lock(&format_mutex_);
+  if (formatter_) {
+    return formatter_.get();
+  }
+  return nullptr;
+}
+
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
   absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
