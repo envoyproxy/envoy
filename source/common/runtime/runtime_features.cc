@@ -113,6 +113,9 @@ RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
+// Used to temporarily allow the legacy append behavior on ext_proc header mutations
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_legacy_append);
+
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO(adisuissa) reset to true to enable unified mux by default

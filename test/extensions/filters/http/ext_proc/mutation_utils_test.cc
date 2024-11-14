@@ -6,6 +6,7 @@
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -55,6 +56,12 @@ TEST_F(MutationUtilsTest, TestBuildHeaders) {
 }
 
 TEST_F(MutationUtilsTest, TestApplyMutations) {
+  // NOTE: The use of `append` has been deprecated in favor of `append_action`. This is a temporary
+  // provision for users who have enabled legacy behavior, which will be phased out entirely in the
+  // future.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.ext_proc_legacy_append", "true"}});
+
   Http::TestRequestHeaderMapImpl headers{
       {":scheme", "https"},
       {":method", "GET"},
@@ -162,6 +169,12 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
 }
 
 TEST_F(MutationUtilsTest, TestNonAppendableHeaders) {
+  // NOTE: The use of `append` has been deprecated in favor of `append_action`. This is a temporary
+  // provision for users who have enabled legacy behavior, which will be phased out entirely in the
+  // future.
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.ext_proc_legacy_append", "true"}});
+
   Http::TestRequestHeaderMapImpl headers;
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
@@ -442,6 +455,148 @@ TEST_F(MutationUtilsTest, TestDisallowHeaderSetNotAllowHeader) {
   Http::TestRequestHeaderMapImpl expected{{"content-type", "text/plain; encoding=UTF8"},
                                           {"x-something-else", "yes"}};
   EXPECT_THAT(proto_headers, HeaderProtosEqual(expected));
+}
+
+TEST_F(MutationUtilsTest, TestAppendActionBehaviors) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"},         {"existing-header", "original"},
+      {"append-target", "first"}, {"overwrite-target", "original"},
+      {"multiple-append", "1"},
+  };
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+
+  // Test APPEND_IF_EXISTS_OR_ADD
+  auto* s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+  s->mutable_header()->set_key("append-target");
+  s->mutable_header()->set_raw_value("second");
+
+  // Should be added since header doesn't exist
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+  s->mutable_header()->set_key("new-appended");
+  s->mutable_header()->set_raw_value("value");
+
+  // Test ADD_IF_ABSENT
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+  s->mutable_header()->set_key("existing-header");
+  s->mutable_header()->set_raw_value("should-not-be-added");
+
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+  s->mutable_header()->set_key("new-header");
+  s->mutable_header()->set_raw_value("new-value");
+
+  // Test OVERWRITE_IF_EXISTS
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+  s->mutable_header()->set_key("overwrite-target");
+  s->mutable_header()->set_raw_value("new-value");
+
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+  s->mutable_header()->set_key("non-existent");
+  s->mutable_header()->set_raw_value("should-not-be-added");
+
+  // Test OVERWRITE_IF_EXISTS_OR_ADD
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  s->mutable_header()->set_key("existing-header");
+  s->mutable_header()->set_raw_value("overwritten");
+
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  s->mutable_header()->set_key("new-overwritten");
+  s->mutable_header()->set_raw_value("added");
+
+  // Test multiple appends to same header
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+  s->mutable_header()->set_key("multiple-append");
+  s->mutable_header()->set_raw_value("2");
+
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+  s->mutable_header()->set_key("multiple-append");
+  s->mutable_header()->set_raw_value("3");
+
+  // Use the default mutation rules
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Stats::MockCounter rejections;
+  EXPECT_TRUE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {":method", "GET"},
+      {"append-target", "first"},
+      {"append-target", "second"},
+      {"new-appended", "value"},
+      {"new-header", "new-value"},
+      {"overwrite-target", "new-value"},
+      {"existing-header", "overwritten"},
+      {"new-overwritten", "added"},
+      {"multiple-append", "1"},
+      {"multiple-append", "2"},
+      {"multiple-append", "3"},
+  };
+
+  EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+}
+
+// Test interaction between legacy append and new append_action
+TEST_F(MutationUtilsTest, TestAppendActionWithLegacyAppend) {
+  Http::TestRequestHeaderMapImpl headers{
+      {"target", "original"},
+  };
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+
+  // Set with legacy append first
+  auto* s = mutation.add_set_headers();
+  s->mutable_append()->set_value(true);
+  s->mutable_header()->set_key("target");
+  s->mutable_header()->set_raw_value("legacy-append");
+
+  // Then with new append_action
+  s = mutation.add_set_headers();
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+  s->mutable_header()->set_key("target");
+  s->mutable_header()->set_raw_value("new-append");
+
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Stats::MockCounter rejections;
+  EXPECT_TRUE(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections).ok());
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {"target", "original"},
+      {"target", "legacy-append"},
+      {"target", "new-append"},
+  };
+
+  EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
+}
+
+TEST_F(MutationUtilsTest, TestInvalidAppendConfig) {
+  Http::TestRequestHeaderMapImpl headers{
+      {"original-header", "value"},
+  };
+
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
+  auto* s = mutation.add_set_headers();
+  s->mutable_header()->set_key("test-header");
+  s->mutable_header()->set_raw_value("test-value");
+  s->mutable_append()->set_value(true);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+
+  Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
+  Stats::MockCounter rejections;
+
+  auto result = MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.message(), "Both append and append_action are set and it's not allowed");
 }
 
 } // namespace

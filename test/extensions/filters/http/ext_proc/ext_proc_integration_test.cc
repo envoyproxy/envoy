@@ -1131,6 +1131,8 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingSucceeded) {
 
         // Set host header to match the domain of virtual host in routing configuration.
         auto* mut = response_header_mutation->add_set_headers();
+        mut->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         mut->mutable_header()->set_key(":authority");
         mut->mutable_header()->set_raw_value(vhost_domain);
 
@@ -1222,18 +1224,26 @@ TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         mut1->mutable_header()->set_key(":path");
         mut1->mutable_header()->set_raw_value("/mutated_path/bluh");
 
         auto* mut2 = response_header_mutation->add_set_headers();
+        mut2->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         mut2->mutable_header()->set_key(":scheme");
         mut2->mutable_header()->set_raw_value("https");
 
         auto* mut3 = response_header_mutation->add_set_headers();
+        mut3->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         mut3->mutable_header()->set_key(":authority");
         mut3->mutable_header()->set_raw_value("new_host");
 
         auto* mut4 = response_header_mutation->add_set_headers();
+        mut4->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         mut4->mutable_header()->set_key(":method");
         mut4->mutable_header()->set_raw_value("POST");
         return true;
@@ -1606,9 +1616,13 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponse) {
       *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
+        add1->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         add1->mutable_header()->set_key("x-response-processed");
         add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
+        add2->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         add2->mutable_header()->set_key(":status");
         add2->mutable_header()->set_raw_value("201");
         return true;
@@ -1661,9 +1675,13 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeadersOnResponseTwoStatuses) {
       *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
+        add1->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         add1->mutable_header()->set_key("x-response-processed");
         add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
+        add2->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         add2->mutable_header()->set_key(":status");
         add2->mutable_header()->set_raw_value("201");
         auto* add3 = response_mutation->add_set_headers();
@@ -2362,6 +2380,10 @@ TEST_P(ExtProcIntegrationTest, GetAndIncorrectlyModifyHeaderOnBodyPartialBuffer)
 // Test the ability of the filter to turn a GET into a POST by adding a body
 // and changing the method.
 TEST_P(ExtProcIntegrationTest, ConvertGetToPost) {
+  // NOTE: The use of `append` has been deprecated in favor of `append_action`. This is a temporary
+  // provision for users who have enabled legacy behavior, which will be phased out entirely in the
+  // future.
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_legacy_append", "true"}});
   initializeConfig();
   HttpIntegrationTest::initialize();
 
@@ -3033,9 +3055,13 @@ TEST_P(ExtProcIntegrationTest, PerRouteGrpcService) {
       *grpc_upstreams_[1], false, [](const HttpHeaders&, HeadersResponse& headers_resp) {
         auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* add1 = response_mutation->add_set_headers();
+        add1->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         add1->mutable_header()->set_key("x-response-processed");
         add1->mutable_header()->set_raw_value("1");
         auto* add2 = response_mutation->add_set_headers();
+        add2->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
         add2->mutable_header()->set_key(":status");
         add2->mutable_header()->set_raw_value("201");
         return true;
@@ -5242,6 +5268,163 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideDisallowed) {
   });
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, HeaderAppendAction) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest([](Http::HeaderMap& headers) {
+    headers.addCopy(LowerCaseString("x-append-test"), "original");
+    headers.addCopy(LowerCaseString("x-overwrite-test"), "original");
+  });
+
+  // Test different append actions
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& /*headers*/, HeadersResponse& headers_resp) {
+        auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+
+        // Append to existing header
+        auto* mut1 = response_mutation->add_set_headers();
+        mut1->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+        mut1->mutable_header()->set_key("x-append-test");
+        mut1->mutable_header()->set_raw_value("appended");
+
+        // Add new header
+        auto* mut2 = response_mutation->add_set_headers();
+        mut2->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+        mut2->mutable_header()->set_key("x-new-absent");
+        mut2->mutable_header()->set_raw_value("new");
+
+        // Overwrite existing header
+        auto* mut3 = response_mutation->add_set_headers();
+        mut3->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+        mut3->mutable_header()->set_key("x-overwrite-test");
+        mut3->mutable_header()->set_raw_value("overwritten");
+
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Get a copy of upstream headers for comparison
+  Http::TestRequestHeaderMapImpl expected_request_headers{
+      {":scheme", "http"},
+      {":method", "GET"},
+      {":path", "/"},
+      {":authority", "host"},
+      {"x-append-test", "original"},
+      {"x-append-test", "appended"},
+      {"x-new-absent", "new"},
+      {"x-overwrite-test", "overwritten"},
+      {"x-envoy-expected-rq-timeout-ms", "15000"},
+      {"x-forwarded-proto", "http"}};
+
+  Http::TestRequestHeaderMapImpl upstream_headers;
+  const auto& headers = upstream_request_->headers();
+  headers.iterate([&upstream_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    // Skip x-request-id header
+    if (header.key().getStringView() != "x-request-id") {
+      upstream_headers.addCopy(Http::LowerCaseString(std::string(header.key().getStringView())),
+                               std::string(header.value().getStringView()));
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
+  EXPECT_THAT(&upstream_headers, HeaderMapEqualIgnoreOrder(&expected_request_headers));
+
+  // Complete the request
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 504);
+}
+
+TEST_P(ExtProcIntegrationTest, HeaderAppendActionWithResponseHeaders) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  handleUpstreamRequest();
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false,
+      [](const HttpHeaders& /*headers*/, HeadersResponse& headers_resp) {
+        auto* response_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+
+        auto* mut1 = response_mutation->add_set_headers();
+        mut1->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+        mut1->mutable_header()->set_key("x-multiple-test");
+        mut1->mutable_header()->set_raw_value("first");
+
+        auto* mut2 = response_mutation->add_set_headers();
+        mut2->set_append_action(
+            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+        mut2->mutable_header()->set_key("x-multiple-test");
+        mut2->mutable_header()->set_raw_value("second");
+
+        return true;
+      });
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  const Http::ResponseHeaderMap& response_headers = response->headers();
+  EXPECT_EQ(
+      response_headers.get(Http::LowerCaseString("x-multiple-test"))[0]->value().getStringView(),
+      "first");
+  EXPECT_EQ(
+      response_headers.get(Http::LowerCaseString("x-multiple-test"))[1]->value().getStringView(),
+      "second");
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+}
+
+TEST_P(ExtProcIntegrationTest, HeaderAppendActionWithTrailers) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  Http::TestRequestTrailerMapImpl request_trailers{
+      {"x-trailer-test", "original"},
+  };
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+
+  processRequestTrailersMessage(
+      *grpc_upstreams_[0], false, [](const HttpTrailers& /*trailers*/, TrailersResponse& resp) {
+        auto* trailer_mut = resp.mutable_header_mutation();
+        auto* mut = trailer_mut->add_set_headers();
+        mut->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
+        mut->mutable_header()->set_key("x-trailer-test");
+        mut->mutable_header()->set_raw_value("appended");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  ASSERT_TRUE(upstream_request_->trailers());
+  const auto& trailer_values =
+      upstream_request_->trailers()->get(Http::LowerCaseString("x-trailer-test"));
+  ASSERT_EQ(trailer_values.size(), 2);
+  EXPECT_EQ(trailer_values[0]->value().getStringView(), "original");
+  EXPECT_EQ(trailer_values[1]->value().getStringView(), "appended");
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 504);
 }
 
 } // namespace Envoy
