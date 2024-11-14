@@ -87,6 +87,10 @@ bug_fixes:
   change: |
     Relaxed the restriction on SNI logging to allow the ``_`` character, even if
     ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
+- area: DNS
+  change: |
+    Fixed bug where setting ``dns_jitter <envoy_v3_api_field_config.cluster.v3.Cluster.dns_jitter>`` to large values caused Envoy Bug
+    to fire.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -203,7 +207,11 @@ new_features:
   change: |
     added :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` which allows
     specifying an optional source for the metadata to be matched in addition to the metadata matcher.
-
+- area: c-ares
+  change: |
+    added nameserver rotation option to c-ares resolver. When enabled via :ref:rotate_nameservers
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.rotate_nameservers>, this
+    performs round-robin selection of the configured nameservers for each resolution to help distribute query load.
 deprecated:
 - area: rbac
   change: |
