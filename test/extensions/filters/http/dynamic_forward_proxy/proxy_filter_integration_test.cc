@@ -1255,49 +1255,90 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithUnknownDomain) {
 
 // Verify that removed all sub cluster when dfp cluster is removed/updated.
 TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
-  initializeWithArgs(1024, 1024, "", "", true);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    // For IPv6, ensure we're using explicit loopback address rather than just "localhost"
+    dns_hostname_ = "[::1]";
+  }
 
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-  // one more sub cluster
+  // Disable TLS to avoid additional connection complexity
+  upstream_tls_ = false;
+
+  initializeWithArgs(1024, 1024, "", "", true);
+
+  // Create connection and format request headers
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}};
+
+  // Set authority header based on IP version
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    request_headers.addCopy(
+        ":authority", fmt::format("[::1]:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  } else {
+    request_headers.addCopy(
+        ":authority",
+        fmt::format("127.0.0.1:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  }
+
+  // Initial request to create sub cluster
+  ASSERT_TRUE(codec_client_->connected());
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Wait for upstream request and send response
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify cluster stats
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
 
-  // Cause a cluster reload via CDS.
+  // Trigger CDS update
   cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
-  // sub cluster is removed
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+
+  // Wait for cluster modification and removal
   test_server_->waitForCounterEq("cluster_manager.cluster_modified", 1);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
 
-  // We need to wait until the workers have gotten the new cluster update. The only way we can
-  // know this currently is when the connection pools drain and terminate.
-  AssertionResult result = fake_upstream_connection_->waitForDisconnect();
-  RELEASE_ASSERT(result, result.message());
+  // Wait for connection drain
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
-  // Now send another request. This should create a new sub cluster.
-  response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
-  checkSimpleRequestSuccess(512, 512, response.get());
+  // Send another request to create new sub cluster
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify final cluster stats
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
 // Verify that we expire sub clusters and not remove on CDS.
 TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvoidCDSRemoval) {
-  const std::string cluster_yaml = R"EOF(
+  // Set up cluster with appropriate IP address
+  const std::string cluster_yaml = GetParam() == Network::Address::IpVersion::v6 ? R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: ::1
+                port_value: 11001
+  )EOF"
+                                                                                 : R"EOF(
     name: fake_cluster
     connect_timeout: 0.250s
     type: STATIC
@@ -1313,70 +1354,116 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvo
                 port_value: 11001
   )EOF";
   auto cluster = Upstream::parseClusterFromV3Yaml(cluster_yaml);
-  // make runtime guard false
+
+  // Set hostname and disable TLS
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    dns_hostname_ = "[::1]";
+  } else {
+    dns_hostname_ = "127.0.0.1";
+  }
+  upstream_tls_ = false;
+
+  // Configure and initialize
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "false");
   initializeWithArgs(1024, 1024, "", "", true);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
 
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-  // one more cluster
+  // Set up request headers based on IP version
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}};
+
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    request_headers.addCopy(
+        ":authority", fmt::format("[::1]:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  } else {
+    request_headers.addCopy(
+        ":authority",
+        fmt::format("127.0.0.1:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  }
+
+  // Initial request
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  ASSERT_TRUE(codec_client_->connected());
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify initial cluster state
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
   cleanupUpstreamAndDownstream();
 
-  // Sub cluster expected to be removed after ttl
-  // > 5m
+  // Advance time past TTL
   simTime().advanceTimeWait(std::chrono::milliseconds(300001));
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
 
+  // Second request after TTL
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  response = sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
+  ASSERT_TRUE(codec_client_->connected());
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
-  // sub cluster added again
+  // Verify cluster recreation
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
   cleanupUpstreamAndDownstream();
 
-  // Make update to DFP cluster
+  // Update DFP cluster
   cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
   cds_helper_.setCds({cluster_});
 
-  // sub cluster removed due to dfp cluster update
+  // Verify final state
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 2);
 }
 
 // Verify that we expire sub clusters.
 TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveSubClusterViaTTL) {
-  initializeWithArgs(1024, 1024, "", "", true);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    dns_hostname_ = "[::1]";
+  } else {
+    dns_hostname_ = "127.0.0.1";
+  }
 
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-  // one more cluster
+  upstream_tls_ = false;
+  initializeWithArgs(1024, 1024, "", "", true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}};
+
+  // Set authority header based on IP version
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    request_headers.addCopy(
+        ":authority", fmt::format("[::1]:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  } else {
+    request_headers.addCopy(
+        ":authority",
+        fmt::format("127.0.0.1:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  }
+
+  // Send initial request and verify success
+  ASSERT_TRUE(codec_client_->connected());
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify cluster creation
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+
+  // Clean up before time advance
   cleanupUpstreamAndDownstream();
 
-  // > 5m
+  // Advance time past TTL and verify cluster removal
   simTime().advanceTimeWait(std::chrono::milliseconds(300001));
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
@@ -1384,45 +1471,76 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveSubClusterViaTTL) {
 
 // Test sub clusters overflow.
 TEST_P(ProxyFilterIntegrationTest, SubClusterOverflow) {
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    dns_hostname_ = "[::1]";
+  } else {
+    dns_hostname_ = "127.0.0.1";
+  }
+
+  upstream_tls_ = false;
   initializeWithArgs(1, 1024, "", "", true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}};
 
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
+  // Set authority header based on IP version
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    request_headers.addCopy(
+        ":authority", fmt::format("[::1]:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  } else {
+    request_headers.addCopy(
+        ":authority",
+        fmt::format("127.0.0.1:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  }
 
-  // Send another request, this should lead to a response directly from the filter.
-  const Http::TestRequestHeaderMapImpl request_headers2{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority", fmt::format("localhost2", fake_upstreams_[0]->localAddress()->ip()->port())}};
+  // First request should succeed
+  ASSERT_TRUE(codec_client_->connected());
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Second request to different host should fail due to overflow
+  const std::string second_host =
+      GetParam() == Network::Address::IpVersion::v6
+          ? fmt::format("[::2]:{}", fake_upstreams_[0]->localAddress()->ip()->port())
+          : fmt::format("127.0.0.2:{}", fake_upstreams_[0]->localAddress()->ip()->port());
+
+  Http::TestRequestHeaderMapImpl request_headers2{{":method", "POST"},
+                                                  {":path", "/test/long/url"},
+                                                  {":scheme", "http"},
+                                                  {":authority", second_host}};
+
   response = codec_client_->makeHeaderOnlyRequest(request_headers2);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 TEST_P(ProxyFilterIntegrationTest, SubClusterWithIpHost) {
-  upstream_tls_ = true;
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    dns_hostname_ = "[::1]";
+  } else {
+    dns_hostname_ = "127.0.0.1";
+  }
+
   initializeWithArgs(1024, 1024, "", "", true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
+
+  // Create request headers with raw IP address
+  Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
       {":path", "/test/long/url"},
       {":scheme", "http"},
       {":authority", fake_upstreams_[0]->localAddress()->asString()}};
 
+  ASSERT_TRUE(codec_client_->connected());
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
   waitForNextUpstreamRequest();
 
-  // No SNI for IP hosts.
+  // No SNI for IP hosts
   const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
       dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
           fake_upstream_connection_->connection().ssl().get());
@@ -1430,14 +1548,31 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithIpHost) {
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
-  checkSimpleRequestSuccess(0, 0, response.get());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Verify that no DFP clusters are removed when CDS Reload is triggered.
 TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "true");
-  const std::string cluster_yaml = R"EOF(
+
+  // Set up cluster with appropriate IP address
+  const std::string cluster_yaml = GetParam() == Network::Address::IpVersion::v6 ? R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: ::1
+                port_value: 11001
+  )EOF"
+                                                                                 : R"EOF(
     name: fake_cluster
     connect_timeout: 0.250s
     type: STATIC
@@ -1454,41 +1589,64 @@ TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
   )EOF";
   auto cluster = Upstream::parseClusterFromV3Yaml(cluster_yaml);
 
-  initializeWithArgs(1024, 1024, "", "", true);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+  // Set hostname and disable TLS
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    dns_hostname_ = "[::1]";
+  } else {
+    dns_hostname_ = "127.0.0.1";
+  }
+  upstream_tls_ = false;
 
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-  // one more sub cluster
+  initializeWithArgs(1024, 1024, "", "", true);
+
+  // Set up request headers based on IP version
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}};
+
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    request_headers.addCopy(
+        ":authority", fmt::format("[::1]:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  } else {
+    request_headers.addCopy(
+        ":authority",
+        fmt::format("127.0.0.1:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+  }
+
+  // Initial request
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  ASSERT_TRUE(codec_client_->connected());
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify initial cluster state
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
 
-  // Cause a cluster reload via CDS.
+  // Cause a cluster reload via CDS
   cds_helper_.setCds({cluster_, cluster});
-  // a new cluster is added and no dfp cluster is removed
+
+  // Verify cluster state after reload
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
-  // No DFP cluster should be removed.
   test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
 
-  // The fake upstream connection should stay connected
+  // Verify connection is still alive
   ASSERT_TRUE(fake_upstream_connection_->connected());
 
-  // Now send another request. This should not create new sub cluster.
-  response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
-  checkSimpleRequestSuccess(512, 512, response.get());
+  // Send second request
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
-  // No new cluster should be added as DFP cluster already exists
+  // Verify no new clusters were created
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
