@@ -322,7 +322,8 @@ A request with :path header set to url /new_endpoint/path/2/abc should be routed
 
 To achieve the above results, Envoy config below will create a single trie structure with above path strings and calls findLongestPrefix() match once, for paths in incoming request :path header. 
 
-**Note:** Changing prefix_match_map to exact_match_map in below configuration will result in use of hash based path matching (instead of trie) and will succeed in lookup if :path header in request matches exactly with one of the routes defined.
+.. note::
+   Changing prefix_match_map to exact_match_map in below configuration will result in use of hash based path matching (instead of trie) and will succeed in lookup if :path header in request matches exactly with one of the routes defined.
 
 .. literalinclude:: /_configs/route/sublinear_routing_example1.yaml
     :language: yaml
@@ -334,7 +335,8 @@ To achieve the above results, Envoy config below will create a single trie struc
 
 **Usecase 2:** Configuration for Hierarchical trie structures in example below illustrates how three different trie structures can be created by Envoy using nested prefix_match_map which can do request matching across various headers.:
 
-**Note:** Use of exact_match_map will result in creation of hashmaps instead of tries.
+.. note::
+   Use of exact_match_map will result in creation of hashmaps instead of tries.
 
 .. image:: sublinear_routing_img2.png
 
