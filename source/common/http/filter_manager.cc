@@ -1078,8 +1078,7 @@ void DownstreamFilterManager::executeLocalReplyIfPrepared() {
 }
 
 bool DownstreamFilterManager::createDownstreamFilterChain() {
-  return createFilterChain(filter_chain_factory_, /*allow_upgrade_filter_chain=*/true, false)
-      .upgrade_rejected;
+  return createFilterChain(filter_chain_factory_, false).upgrade_rejected;
 }
 
 void DownstreamFilterManager::sendLocalReplyViaFilterChain(
@@ -1661,19 +1660,23 @@ FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_f
 
 FilterManager::CreateFilterChainResult
 FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
-                                 bool allow_upgrade_filter_chain, bool only_create_if_configured) {
+                                 bool only_create_if_configured) {
   if (state_.created_filter_chain_) {
     return {true, false};
   }
 
+  OptRef<DownstreamStreamFilterCallbacks> downstream_callbacks =
+      filter_manager_callbacks_.downstreamCallbacks();
+
   // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
   // to set valid initial route only when the downstream callbacks is available.
-  FilterChainOptionsImpl options(
-      filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
+  FilterChainOptionsImpl options(downstream_callbacks.has_value() ? streamInfo().route() : nullptr);
 
   bool upgrade_rejected = false;
 
-  if (allow_upgrade_filter_chain) {
+  if (downstream_callbacks.has_value()) {
+    // Only try the upgrade filter chain for downstream filter chains.
+
     const auto upgrade_result = createUpgradeFilterChain(filter_chain_factory, options);
     if (upgrade_result.created) {
       ASSERT(!upgrade_result.upgrade_rejected);

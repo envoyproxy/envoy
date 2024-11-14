@@ -844,14 +844,11 @@ public:
   /**
    * Set up the Encoder/Decoder filter chain.
    * @param filter_chain_factory the factory to create the filter chain.
-   * @param allow_upgrade_filter_chain whether to allow the creation of an upgrade filter chain.
-   *        This only should be set to true for downstream HTTP filter chain.
    * @param only_create_if_configured whether to only create the filter chain if it is configured
    *        explicitly. This only makes sense for upstream HTTP filter chain.
    *
    */
   CreateFilterChainResult createFilterChain(const FilterChainFactory& filter_chain_factory,
-                                            bool allow_upgrade_filter_chain,
                                             bool only_create_if_configured);
 
   OptRef<const Network::Connection> connection() const { return connection_; }
