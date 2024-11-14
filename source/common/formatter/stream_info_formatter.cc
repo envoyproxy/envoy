@@ -1102,7 +1102,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     std::string host_name = host->hostname();
                     if (host_name.empty()) {
                       // If no hostname is available, the main address is used.
-                      return host->address()->ip()->addressAsString();
+                      host_name = host->address()->asString();
                     }
                     Envoy::Http::HeaderUtility::stripPortFromHost(host_name);
                     return absl::make_optional<std::string>(std::move(host_name));
