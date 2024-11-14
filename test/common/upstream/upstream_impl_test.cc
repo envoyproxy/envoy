@@ -1642,7 +1642,7 @@ TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
   EXPECT_THROW_WITH_MESSAGE(
-      auto x = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_),
+      auto x = *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_),
       EnvoyException, "Invalid duration: Expected positive duration: seconds: -1\n");
 }
 TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
@@ -1713,7 +1713,8 @@ TEST_F(StrictDnsClusterImplTest, ExtremeJitter) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster =
+      *makeStrictDnsClusterFromDnsResolver(cluster_config, factory_context, dns_resolver_);
   cluster->initialize([] {});
 
   EXPECT_CALL(*resolver.timer_, enableTimer(testing::Ge(std::chrono::milliseconds(1000)), _));
