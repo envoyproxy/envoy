@@ -311,7 +311,7 @@ These implementations can be used recursively and even combined with each other 
 
 Suppose one wants to route requests with following path prefixes to respective clusters using trie or hashmap for sublinear route searching
 
-.. image:: sublinear_routing_img1.png
+.. image:: /_static/sublinear_routing_img1.png
 
 A request with :path header set to url /new_endpoint/path/2/abc should be routed to cluster_2
 
@@ -333,7 +333,7 @@ To achieve the above results, Envoy config below will create a single trie struc
 .. note::
    Use of exact_match_map will result in creation of hashmaps instead of tries.
 
-.. image:: sublinear_routing_img2.png
+.. image:: /_static/sublinear_routing_img2.png
 
 For an incoming request with :path header set to say /new_endpoint/path/2/video, x-foo-header set to foo-2 and x-bar-header set to bar-2, three longest-prefix-match trie lookups will happen across A, B and C tries in the order of nesting for a successful request match.
 
@@ -347,7 +347,7 @@ For an incoming request with :path header set to say /new_endpoint/path/2/video,
 
 **Example 3:** Mixing sublinear route matching with traditional prefix based inorder linear routing.
 
-.. image:: sublinear_routing_img3.png
+.. image:: /_static/sublinear_routing_img3.png
 
 .. literalinclude:: /_configs/route/sublinear_routing_example3.yaml
     :language: yaml
