@@ -24,11 +24,7 @@ namespace ProxyProtocol {
 using KeyValuePair =
     envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair;
 
-enum class ProxyProtocolVersion {
-  NotFound = static_cast<int>(Envoy::Network::ProxyProtocolVersion::NotFound),
-  V1 = static_cast<int>(Envoy::Network::ProxyProtocolVersion::V1),
-  V2 = static_cast<int>(Envoy::Network::ProxyProtocolVersion::V2)
-};
+using ProxyProtocolVersion = Envoy::Network::ProxyProtocolVersion;
 
 enum class ReadOrParseState { Done, TryAgainLater, Error, Denied };
 

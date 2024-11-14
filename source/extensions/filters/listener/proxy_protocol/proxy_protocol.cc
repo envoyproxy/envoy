@@ -222,18 +222,6 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
       return read_header_state;
     }
     if (header_version_ == ProxyProtocolVersion::NotFound) {
-      if (!cb_->filterState().hasData<Network::ProxyProtocolFilterState>(
-              Network::ProxyProtocolFilterState::key())) {
-        cb_->filterState().setData(
-            Network::ProxyProtocolFilterState::key(),
-            std::make_unique<Network::ProxyProtocolFilterState>(
-                Network::ProxyProtocolDataWithVersion{
-                    {socket.connectionInfoProvider().remoteAddress(),
-                     socket.connectionInfoProvider().localAddress()},
-                    static_cast<Network::ProxyProtocolVersion>(header_version_)}),
-            StreamInfo::FilterState::StateType::Mutable,
-            StreamInfo::FilterState::LifeSpan::Connection);
-      }
       // Filter is skipped and request is allowed through.
       return ReadOrParseState::Done;
     }
@@ -268,7 +256,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
               {socket.connectionInfoProvider().remoteAddress(),
                socket.connectionInfoProvider().localAddress(), parsed_tlvs_},
-              static_cast<Network::ProxyProtocolVersion>(header_version_)}),
+              absl::make_optional(header_version_)}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     } else {
@@ -286,7 +274,7 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
           std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
               {proxy_protocol_header_.value().remote_address_,
                proxy_protocol_header_.value().local_address_, parsed_tlvs_},
-              static_cast<Network::ProxyProtocolVersion>(header_version_)}),
+              absl::make_optional(header_version_)}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }

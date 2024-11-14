@@ -6,6 +6,8 @@
 
 #include "envoy/network/address.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -26,18 +28,10 @@ struct ProxyProtocolData {
   }
 };
 
-enum class ProxyProtocolVersion {
-  // The proxy-protocol filter is not present in the filter chain and another filter has set
-  // the proxy-protocol version.
-  NotUsed = 0,
-  // The proxy-protocol filter did not find any proxy-protocol header and was skipped.
-  NotFound = 1,
-  V1 = 2,
-  V2 = 3
-};
+enum class ProxyProtocolVersion { NotFound = 1, V1 = 2, V2 = 3 };
 
 struct ProxyProtocolDataWithVersion : public ProxyProtocolData {
-  const ProxyProtocolVersion version_;
+  const absl::optional<ProxyProtocolVersion> version_;
 };
 } // namespace Network
 } // namespace Envoy
