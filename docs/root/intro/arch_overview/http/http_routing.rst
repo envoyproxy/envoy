@@ -297,7 +297,7 @@ The only inputs supported are request headers (via :ref:`HttpRequestHeaderMatchI
    See the docs for the :ref:`matching API <arch_overview_matching_api>` for more information about the API as a whole.
 
 Sublinear Route Matching
-------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 An incoming request to Envoy needs to be matched to a cluster based on defined `routes <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-virtualhost>`_. Typically, a well understood, linear route search matching with O(n) search cost (see  `Virtual Host <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-virtualhost>`_ → `Routes <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-route>`_) is employed which can become a scalability issue with higher latencies as the number of routes go up to o(1k+). To overcome these scalability challenges the Generic Matcher API ( `Virtual Host → matcher{} <https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route_components.proto#envoy-v3-api-msg-config-route-v3-virtualhost>`_) → `matcher_tree <https://www.envoyproxy.io/docs/envoy/latest/xds/type/matcher/v3/matcher.proto#envoy-v3-api-msg-xds-type-matcher-v3-matcher-matchertree>`_ can offer a robust and flexible framework for route matching with two distinct sublinear matching implementations:
 
