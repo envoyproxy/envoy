@@ -794,7 +794,7 @@ TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
 
   EXPECT_CALL(initialized_, ready());
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
-  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+  setupFromV3Yaml(config);
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000 + jitter_ms), _));

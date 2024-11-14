@@ -46,7 +46,7 @@ DnsClusterFactory::createClusterWithConfig(
 }
 
 /**
- * Static registration for the strict dns cluster factory. @see RegisterFactory.
+ * Static registration for the dns cluster factory. @see RegisterFactory.
  */
 REGISTER_FACTORY(DnsClusterFactory, Upstream::ClusterFactory);
 

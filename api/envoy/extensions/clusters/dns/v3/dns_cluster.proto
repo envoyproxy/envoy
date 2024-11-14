@@ -21,6 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for strict and logical DNS clusters.
 // [#extension: envoy.clusters.strict_dns]
 // [#extension: envoy.clusters.logical_dns]
+// [#extension: envoy.clusters.dns]
 
 // [#next-free-field: 10]
 message DnsCluster {

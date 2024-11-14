@@ -23,6 +23,7 @@ StrictDnsClusterImpl::create(const envoy::config::cluster::v3::Cluster& cluster,
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<StrictDnsClusterImpl>(new StrictDnsClusterImpl(
       cluster, dns_cluster, context, std::move(dns_resolver), creation_status));
+
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -275,7 +276,7 @@ StrictDnsClusterFactory::createClusterWithConfig(
 /**
  * Static registration for the strict dns cluster factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(StrictDnsClusterFactory, Upstream::ClusterFactory);
+REGISTER_FACTORY(StrictDnsClusterFactory, ClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

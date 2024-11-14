@@ -19,7 +19,6 @@ class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
-
   static absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
          const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
@@ -96,8 +95,7 @@ public:
                     ClusterFactoryContext& context);
 
 private:
-  absl::StatusOr<
-      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
                           const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
                           Upstream::ClusterFactoryContext& context) override;
