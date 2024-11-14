@@ -351,6 +351,13 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
 }
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.allow_metadata_false_disables_metadata") &&
+      !parent_.allow_metadata_) {
+    ENVOY_CONN_LOG(debug, "Stream {} had metadata, but metadata is disabled.", parent_.connection_,
+                   stream_id_);
+    return;
+  }
   parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(parent_.allow_metadata_);
   NewMetadataEncoder& metadata_encoder = getMetadataEncoder();
