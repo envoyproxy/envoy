@@ -22,8 +22,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.clusters.strict_dns]
 // [#extension: envoy.clusters.logical_dns]
 
-// [#next-free-field: 7]
+// [#next-free-field: 10]
 message DnsCluster {
+  enum DnsDiscoveryType {
+    LOGICAL = 0;
+    STRICT = 1;
+  }
+
   message RefreshRate {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
@@ -70,19 +75,14 @@ message DnsCluster {
   // ``Cluster.typed_dns_resolver_config`` exists, Envoy will prefer, ``DnsCluster.typed_dns_resolver_config`` over
   // ``Cluster.typed_dns_resolver_config`` over ``cluster.dns_resolver_config``.
   // [#extension-category: envoy.network.dns_resolver]
-  envoy.config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 7;
+  config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 7;
 
   // The DNS IP address resolution policy. If this setting is not specified, the
   // value defaults to
   // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.dns.v3.DnsCluster.DnsLookupFamily.AUTO>`.
-  envoy.extensions.clusters.common.dns.v3.DnsLookupFamily dns_lookup_family = 8;
+  common.dns.v3.DnsLookupFamily dns_lookup_family = 8;
 
   // Whether to do logical or strict dns resolution.
   // This field is only considered when the ``name`` field of the ``TypedConfig`` is ``envoy.cluster.dns``.
   DnsDiscoveryType dns_discovery_type = 9;
-
-  enum DnsDiscoveryType {
-    LOGICAL = 0;
-    STRICT = 1;
-  }
 }
