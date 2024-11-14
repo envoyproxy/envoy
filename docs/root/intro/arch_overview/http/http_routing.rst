@@ -307,12 +307,7 @@ An incoming request to Envoy needs to be matched to a cluster based on defined `
 
 These implementations can be used recursively and even combined with each other in nested fashion using Generic Matching API. It also enables mixing sublinear and linear route matching for breaking up route matching space for diverse use-cases.
 
-Trie-based Matching in Actions
-------------------------------
-
-The Generic Matching API offers exceptional flexibility, enabling a wide variety of route matching configurations. The following examples showcase its versatility, particularly in the realm of sublinear matching. While some of these may not be ideal for production use, they serve to illustrate the API's vast potential.
-
-**Usecase 1:** A single trie structure for all url paths in :path header
+**Example 1:** A single trie structure for all url paths in :path header
 
 Suppose one wants to route requests with following path prefixes to respective clusters using trie or hashmap for sublinear route searching
 
@@ -333,7 +328,7 @@ To achieve the above results, Envoy config below will create a single trie struc
     :lineno-start: 1
     :caption: :download:`single_trie.yaml </_configs/route/sublinear_routing_example1.yaml>`
 
-**Usecase 2:** Configuration for Hierarchical trie structures in example below illustrates how three different trie structures can be created by Envoy using nested prefix_match_map which can do request matching across various headers.:
+**Example 2:** Configuration for Hierarchical trie structures in example below illustrates how three different trie structures can be created by Envoy using nested prefix_match_map which can do request matching across various headers.:
 
 .. note::
    Use of exact_match_map will result in creation of hashmaps instead of tries.
@@ -350,7 +345,7 @@ For an incoming request with :path header set to say /new_endpoint/path/2/video,
     :lineno-start: 1
     :caption: :download:`nested_trie.yaml </_configs/route/sublinear_routing_example2.yaml>`
 
-**Usecase 3:** Mixing sublinear route matching with traditional prefix based inorder linear routing.
+**Example 3:** Mixing sublinear route matching with traditional prefix based inorder linear routing.
 
 .. image:: sublinear_routing_img3.png
 
@@ -362,7 +357,7 @@ For an incoming request with :path header set to say /new_endpoint/path/2/video,
     :lineno-start: 1
     :caption: :download:`mix_sublinear_linear.yaml </_configs/route/sublinear_routing_example3.yaml>`
 
-**Usecase 4:** This example shows how one can run exact matches first (using hashmap) and if no matches are found then attempt prefix matches (using tries).
+**Example 4:** This example shows how one can run exact matches first (using hashmap) and if no matches are found then attempt prefix matches (using tries).
 
 .. literalinclude:: /_configs/route/sublinear_routing_example4.yaml
     :language: yaml
