@@ -311,7 +311,7 @@ These implementations can be used recursively and even combined with each other 
 
 Suppose one wants to route requests with following path prefixes to respective clusters using trie or hashmap for sublinear route searching
 
-.. image:: /_static/sublinear_routing_img1.png
+.. image:: ../../../_static/sublinear_routing_img1.png
 
 A request with :path header set to url /new_endpoint/path/2/abc should be routed to cluster_2
 
@@ -320,49 +320,49 @@ To achieve the above results, Envoy config below will create a single trie struc
 .. note::
    Changing prefix_match_map to exact_match_map in below configuration will result in use of hash based path matching (instead of trie) and will succeed in lookup if :path header in request matches exactly with one of the routes defined.
 
-.. literalinclude:: /_configs/route/sublinear_routing_example1.yaml
+.. literalinclude:: ../../../_configs/route/sublinear_routing_example1.yaml
     :language: yaml
     :lines: 25-59
     :emphasize-lines: 31-32
     :linenos:
     :lineno-start: 1
-    :caption: :download:`single_trie.yaml </_configs/route/sublinear_routing_example1.yaml>`
+    :caption: :download:`single_trie.yaml <../../../_configs/route/sublinear_routing_example1.yaml>`
 
 **Example 2:** Configuration for Hierarchical trie structures in example below illustrates how three different trie structures can be created by Envoy using nested prefix_match_map which can do request matching across various headers.:
 
 .. note::
    Use of exact_match_map will result in creation of hashmaps instead of tries.
 
-.. image:: /_static/sublinear_routing_img2.png
+.. image:: ../../../_static/sublinear_routing_img2.png
 
 For an incoming request with :path header set to say /new_endpoint/path/2/video, x-foo-header set to foo-2 and x-bar-header set to bar-2, three longest-prefix-match trie lookups will happen across A, B and C tries in the order of nesting for a successful request match.
 
-.. literalinclude:: /_configs/route/sublinear_routing_example2.yaml
+.. literalinclude:: ../../../_configs/route/sublinear_routing_example2.yaml
     :language: yaml
     :lines: 25-115
     :emphasize-lines: 31-32,50-51,69-70
     :linenos:
     :lineno-start: 1
-    :caption: :download:`nested_trie.yaml </_configs/route/sublinear_routing_example2.yaml>`
+    :caption: :download:`nested_trie.yaml <../../../_configs/route/sublinear_routing_example2.yaml>`
 
 **Example 3:** Mixing sublinear route matching with traditional prefix based inorder linear routing.
 
-.. image:: /_static/sublinear_routing_img3.png
+.. image:: ../../../_static/sublinear_routing_img3.png
 
-.. literalinclude:: /_configs/route/sublinear_routing_example3.yaml
+.. literalinclude:: ../../../_configs/route/sublinear_routing_example3.yaml
     :language: yaml
     :lines: 25-80
     :emphasize-lines: 31-32,37-38,46-47,55-56
     :linenos:
     :lineno-start: 1
-    :caption: :download:`mix_sublinear_linear.yaml </_configs/route/sublinear_routing_example3.yaml>`
+    :caption: :download:`mix_sublinear_linear.yaml <../../../_configs/route/sublinear_routing_example3.yaml>`
 
 **Example 4:** This example shows how one can run exact matches first (using hashmap) and if no matches are found then attempt prefix matches (using tries).
 
-.. literalinclude:: /_configs/route/sublinear_routing_example4.yaml
+.. literalinclude:: ../../../_configs/route/sublinear_routing_example4.yaml
     :language: yaml
     :lines: 7-69
     :emphasize-lines: 13-14,42-43
     :linenos:
     :lineno-start: 1
-    :caption: :download:`exact_prefix_mix.yaml </_configs/route/sublinear_routing_example4.yaml>`
+    :caption: :download:`exact_prefix_mix.yaml <../../../_configs/route/sublinear_routing_example4.yaml>`
