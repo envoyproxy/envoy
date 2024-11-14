@@ -39,50 +39,55 @@ convertHeaderEntry(Protobuf::Arena& arena,
 
 // SSL Extractors implementation
 const SslExtractorsValues& SslExtractorsValues::get() {
-  CONSTRUCT_ON_FIRST_USE(
-      SslExtractorsValues,
-      absl::flat_hash_map<absl::string_view, SslExtractor>{
-          {TLSVersion,
-           [](const Ssl::ConnectionInfo& info) {
-             return CelValue::CreateString(&info.tlsVersion());
-           }},
-          {SubjectLocalCertificate,
-           [](const Ssl::ConnectionInfo& info) {
-             return CelValue::CreateString(&info.subjectLocalCertificate());
-           }},
-          {SubjectPeerCertificate,
-           [](const Ssl::ConnectionInfo& info) {
-             return CelValue::CreateString(&info.subjectPeerCertificate());
-           }},
-          {URISanLocalCertificate,
-           [](const Ssl::ConnectionInfo& info) {
-             return !info.uriSanLocalCertificate().empty()
-                        ? CelValue::CreateString(&info.uriSanLocalCertificate()[0])
-                        : CelValue::CreateNull();
-           }},
-          {URISanPeerCertificate,
-           [](const Ssl::ConnectionInfo& info) {
-             return !info.uriSanPeerCertificate().empty()
-                        ? CelValue::CreateString(&info.uriSanPeerCertificate()[0])
-                        : CelValue::CreateNull();
-           }},
-          {DNSSanLocalCertificate,
-           [](const Ssl::ConnectionInfo& info) {
-             return !info.dnsSansLocalCertificate().empty()
-                        ? CelValue::CreateString(&info.dnsSansLocalCertificate()[0])
-                        : CelValue::CreateNull();
-           }},
-          {DNSSanPeerCertificate,
-           [](const Ssl::ConnectionInfo& info) {
-             return !info.dnsSansPeerCertificate().empty()
-                        ? CelValue::CreateString(&info.dnsSansPeerCertificate()[0])
-                        : CelValue::CreateNull();
-           }},
-          {SHA256PeerCertificateDigest, [](const Ssl::ConnectionInfo& info) {
-             return !info.sha256PeerCertificateDigest().empty()
-                        ? CelValue::CreateString(&info.sha256PeerCertificateDigest())
-                        : CelValue::CreateNull();
-           }}});
+  CONSTRUCT_ON_FIRST_USE(SslExtractorsValues,
+                         absl::flat_hash_map<absl::string_view, SslExtractor>{
+                             {TLSVersion,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                return CelValue::CreateString(&info.tlsVersion());
+                              }},
+                             {SubjectLocalCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                return CelValue::CreateString(&info.subjectLocalCertificate());
+                              }},
+                             {SubjectPeerCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                return CelValue::CreateString(&info.subjectPeerCertificate());
+                              }},
+                             {URISanLocalCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.uriSanLocalCertificate().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.uriSanLocalCertificate()[0]);
+                              }},
+                             {URISanPeerCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.uriSanPeerCertificate().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.uriSanPeerCertificate()[0]);
+                              }},
+                             {DNSSanLocalCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.dnsSansLocalCertificate().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.dnsSansLocalCertificate()[0]);
+                              }},
+                             {DNSSanPeerCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.dnsSansPeerCertificate().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.dnsSansPeerCertificate()[0]);
+                              }},
+                             {SHA256PeerCertificateDigest,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.sha256PeerCertificateDigest().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.sha256PeerCertificateDigest());
+                              }}});
 }
 
 namespace {

@@ -121,7 +121,7 @@ using ResponseValueExtractor = std::function<absl::optional<CelValue>(const Resp
 using ConnectionValueExtractor = std::function<absl::optional<CelValue>(const ConnectionWrapper&)>;
 using UpstreamValueExtractor = std::function<absl::optional<CelValue>(const UpstreamWrapper&)>;
 using XDSValueExtractor = std::function<absl::optional<CelValue>(const XDSWrapper&)>;
-using SslExtractor = std::function<CelValue(const Ssl::ConnectionInfo&)>;
+using SslExtractor = std::function<absl::optional<CelValue>(const Ssl::ConnectionInfo&)>;
 
 // Forward declare the singleton value classes
 class RequestLookupValues {

@@ -1133,6 +1133,27 @@ TEST(Context, UpstreamEdgeCases) {
   }
 }
 
+TEST(Context, ExtractSslInfoEmptyValues) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  const std::string sni_name = "kittens.com";
+  info.downstream_connection_info_provider_->setRequestedServerName(sni_name);
+  info.downstream_connection_info_provider_->setSslConnection(downstream_ssl_info);
+
+  Protobuf::Arena arena;
+  ConnectionWrapper connection(arena, info);
+  const std::string empty_str;
+  EXPECT_CALL(*downstream_ssl_info, sha256PeerCertificateDigest())
+      .WillRepeatedly(ReturnRef(empty_str));
+
+  {
+    auto value = connection[CelValue::CreateStringView(SHA256PeerCertificateDigest)];
+    EXPECT_FALSE(value.has_value());
+  }
+}
+
 } // namespace
 } // namespace Expr
 } // namespace Common
