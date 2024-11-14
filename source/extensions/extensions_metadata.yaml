@@ -109,6 +109,11 @@ envoy.clusters.strict_dns:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.clusters.dns:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: wip
 envoy.clusters.original_dst:
   categories:
   - envoy.clusters
