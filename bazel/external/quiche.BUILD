@@ -1945,6 +1945,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":flow_label_lib",
         ":quic_core_batch_writer_batch_writer_base_lib",
         ":quic_core_linux_socket_utils_lib",
         ":quic_platform",
@@ -4263,6 +4264,11 @@ envoy_quic_cc_library(
     ],
 )
 
+envoy_quic_cc_library(
+    name = "flow_label_lib",
+    hdrs = ["quiche/quic/core/flow_label.h"],
+)
+
 envoy_cc_library(
     name = "quic_core_udp_socket_lib",
     srcs = select({
@@ -4285,6 +4291,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":flow_label_lib",
         ":quic_core_io_socket_lib",
         ":quic_core_types_lib",
         ":quic_core_utils_lib",

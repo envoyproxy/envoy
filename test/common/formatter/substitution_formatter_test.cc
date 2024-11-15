@@ -669,6 +669,28 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
   }
 
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAME_WITHOUT_PORT");
+
+    // Hostname includes port.
+    mock_host->hostname_ = "upstream_host_xxx:443";
+    EXPECT_EQ("upstream_host_xxx", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("upstream_host_xxx")));
+
+    // Hostname doesn't include port.
+    mock_host->hostname_ = "upstream_host_xxx";
+    EXPECT_EQ("upstream_host_xxx", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("upstream_host_xxx")));
+
+    // Hostname is not used then the main address (only the ip) is used.
+    mock_host->hostname_.clear();
+    EXPECT_EQ("10.0.0.1", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1")));
+  }
+
   auto test_upstream_remote_address =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("10.0.0.2", 80)};
   auto default_upstream_remote_address = stream_info.upstreamInfo()->upstreamRemoteAddress();

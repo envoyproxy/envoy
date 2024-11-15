@@ -2455,8 +2455,8 @@ PerFilterConfigs::PerFilterConfigs(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status) {
 
-  std::string filter_config_type =
-      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
+  std::string filter_config_type(
+      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName());
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;

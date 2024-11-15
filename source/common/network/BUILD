@@ -247,25 +247,13 @@ envoy_cc_library(
         "io_socket_handle_impl.cc",
         "socket_interface_impl.cc",
         "win32_socket_handle_impl.cc",
-    ] + select({
-        "//bazel:android": [],
-        "//bazel:linux": [
-            "io_uring_socket_handle_impl.cc",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     hdrs = [
         "io_socket_handle_base_impl.h",
         "io_socket_handle_impl.h",
         "socket_interface_impl.h",
         "win32_socket_handle_impl.h",
-    ] + select({
-        "//bazel:android": [],
-        "//bazel:linux": [
-            "io_uring_socket_handle_impl.h",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     deps = [
         ":address_lib",
         ":io_socket_error_lib",
@@ -283,7 +271,36 @@ envoy_cc_library(
     ] + select({
         "//bazel:linux": [
             "//source/common/io:io_uring_impl_lib",
-            "//source/common/io:io_uring_worker_factory_impl_lib",
+            "//source/common/io:io_uring_worker_lib",
+        ],
+        "//conditions:default": [],
+    }),
+    alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "io_uring_socket_lib",
+    srcs =
+        [] + select({
+            "//bazel:android": [],
+            "//bazel:linux": [
+                "io_uring_socket_handle_impl.cc",
+            ],
+            "//conditions:default": [],
+        }),
+    hdrs = [
+    ] + select({
+        "//bazel:android": [],
+        "//bazel:linux": [
+            "io_uring_socket_handle_impl.h",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":default_socket_interface_lib",
+    ] + select({
+        "//bazel:linux": [
+            "//source/common/io:io_uring_impl_lib",
             "//source/common/io:io_uring_worker_lib",
         ],
         "//conditions:default": [],
