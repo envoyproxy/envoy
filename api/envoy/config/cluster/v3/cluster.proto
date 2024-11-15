@@ -1007,7 +1007,7 @@ message Cluster {
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>` cluster.
   // and will be ignored if ``cluster_type.name`` is ``envoy.cluster.dns``, ``envoy.cluster.logical_dns``, or
   // ``envoy.cluster.strict_dns``.
-  // Use :ref:`cluster_type<envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.cluster_type>` instead.
+  // Use :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` instead.
   DnsLookupFamily dns_lookup_family = 17 [(validate.rules).enum = {defined_only: true}];
 
   // If DNS resolvers are specified and the cluster type is either
@@ -1050,7 +1050,7 @@ message Cluster {
   // Also note that this field is deprecated for logical dns and strict dns clusters,
   // and will be ignored if ``cluster_type.name`` is ``envoy.cluster.dns``, ``envoy.cluster.logical_dns``, or
   // ``envoy.cluster.strict_dns``.
-  // Use :ref:`cluster_type<envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.cluster_type>` instead.
+  // Use :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` instead.
   // [#extension-category: envoy.network.dns_resolver]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
 
