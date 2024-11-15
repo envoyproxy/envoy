@@ -54,7 +54,7 @@ static_resources:
                           typed_config:
                             "@type": type.googleapis.com/envoy.config.route.v3.Route
                             match:
-                              prefix: /new_endpoint
+                              prefix: ""
                             route:
                               cluster: cluster_2
                 on_no_match:
