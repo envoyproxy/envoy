@@ -47,6 +47,7 @@ envoy_cc_test_library(
     hdrs = [
         "base_client_integration_test.h",
     ],
+    rbe_pool = "6gig",
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
