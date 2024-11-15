@@ -69,6 +69,8 @@ public:
   std::shared_ptr<OAuth2Client> client_;
 };
 
+using OAuth2ClientDeathTest = OAuth2ClientTest;
+
 TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   std::string json = R"EOF(
     {
@@ -453,7 +455,7 @@ TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenUnhealthyUpstream) {
   client_->asyncRefreshAccessToken("a", "b", "c");
 }
 
-TEST_F(OAuth2ClientTest, RequestRefreshAccessTokenNetworkErrorDoubleCallStateInvalid) {
+TEST_F(OAuth2ClientDeathTest, RequestRefreshAccessTokenNetworkErrorDoubleCallStateInvalid) {
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillRepeatedly(
           Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,

@@ -1600,6 +1600,8 @@ protected:
   DispatcherPtr dispatcher_;
 };
 
+using DispatcherConnectionDeathTest = DispatcherConnectionTest;
+
 TEST_F(DispatcherConnectionTest, CreateTcpConnection) {
   for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
     SCOPED_TRACE(Network::Test::addressVersionAsString(ip_version));
@@ -1615,7 +1617,7 @@ TEST_F(DispatcherConnectionTest, CreateTcpConnection) {
 
 // If the internal connection factory is not linked, envoy will be dead when creating connection to
 // internal address.
-TEST_F(DispatcherConnectionTest, CreateEnvoyInternalConnectionWhenFactoryNotExist) {
+TEST_F(DispatcherConnectionDeathTest, CreateEnvoyInternalConnectionWhenFactoryNotExist) {
   EXPECT_DEATH(
       dispatcher_->createClientConnection(
           std::make_shared<Network::Address::EnvoyInternalInstance>("listener_internal_address"),
