@@ -158,6 +158,9 @@ private:
 class UdpTapSink : public Sink {
 public:
   UdpTapSink(const envoy::config::tap::v3::UDPSink& config);
+  // below one is only for UT
+  UdpTapSink(Network::UdpPacketWriterPtr&& utUdpPacketWriter)
+      : udp_packet_writer_(std::move(utUdpPacketWriter)) {}
   ~UdpTapSink();
 
   // Sink
@@ -167,6 +170,7 @@ public:
     return std::make_unique<UdpTapSinkHandle>(*this, trace_id);
   }
   bool isUdpPacketWriterCreated(void) { return (udp_packet_writer_ != nullptr); }
+
 private:
   struct UdpTapSinkHandle : public PerTapSinkHandle {
     UdpTapSinkHandle(UdpTapSink& parent, uint64_t trace_id)
@@ -183,9 +187,9 @@ private:
   const envoy::config::tap::v3::UDPSink config_;
 
   // Store the configured UDP address and port
-  Network::Address::InstanceConstSharedPtr udp_server_address_;
+  Network::Address::InstanceConstSharedPtr udp_server_address_ = nullptr;
   // UDP client socket
-  Network::SocketPtr udp_socket_;
+  Network::SocketPtr udp_socket_ = nullptr;
   // UDP client writer created with client socket
   Network::UdpPacketWriterPtr udp_packet_writer_ = nullptr;
 };

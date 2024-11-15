@@ -289,7 +289,7 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
 
 // The implemented code for UDP sink
 UdpTapSink::UdpTapSink(const envoy::config::tap::v3::UDPSink& config) : config_(config) {
-  if (config_.udp_address().protocol() != envoy::config::core::v3::SocketAddress_Protocol_UDP) {
+  if (config_.udp_address().protocol() != envoy::config::core::v3::SocketAddress::UDP) {
     ENVOY_LOG_MISC(warn, "{}: Only suport UDP and invalid protocol", __func__);
     return;
   }

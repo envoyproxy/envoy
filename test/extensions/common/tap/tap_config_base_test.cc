@@ -4,20 +4,19 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/network/udp_packet_writer_handler.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/common/tap/tap_config_base.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/mocks/network/mocks.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Tap {
 namespace {
-
 
 TEST(BodyBytesToString, All) {
   {
@@ -165,110 +164,155 @@ TEST(TrimSlice, All) {
 }
 
 // Test Udp sink
-using ::testing::Return; 
-using ::testing::_; 
-// Mock the method of class UdpPacketWriter
-// Ignore other method
-class mockUdpPacketWriter : public UdpPacketWriter {
-public:
-  MOCK_METHOD(Api::IoCallUint64Result,
-              writePacket, (const Buffer::Instance&, const Address::Ip*, const Address::Instance&),
-			  (override));
-};
+using ::testing::_;
+using ::testing::Return;
 
 class UdpTapSinkTest : public testing::Test {
 protected:
   UdpTapSinkTest() {}
   ~UdpTapSinkTest() {}
-  void SetUp() overide {}
-  void TearDown() overide {}
-publish:
+
+public:
   envoy::config::core::v3::SocketAddress socket_address_;
+  using ProtoOutputSink = envoy::config::tap::v3::OutputSink;
 };
 
 TEST_F(UdpTapSinkTest, TestConstructNotSupportTCPprotocol) {
-  socket_address_.set_protocol(envoy::config::core::v3::SocketAddress_Protocol_TCP);
-  envoy::config::tap::v3::UDPSink loc_udp_sink(socket_address_);
-  UdpTapSink loc_udp_sink(loc_udp_sink);
-  EXPECT_TRUE(!loc_udp_sink.isUdpPacketWriterCreated());
+  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+  UdpTapSink loc_udp_tap_sink(loc_udp_sink);
+  EXPECT_TRUE(!loc_udp_tap_sink.isUdpPacketWriterCreated());
 }
 
 TEST_F(UdpTapSinkTest, TestConstructBadUDPAddress) {
-  socket_address_.set_protocol(envoy::config::core::v3::SocketAddress_Protocol_UDP);
-  envoy::config::tap::v3::UDPSink loc_udp_sink(socket_address_);
-  MOCK_METHOD(Address::InstanceConstSharedPtr,
-              mock_parseInternetAddressNoThrow,
-              (const std::string&, uint16_t, bool));
-  ON_CALL(Network::Utility::parseInternetAddressNoThrow, mock_parseInternetAddressNoThrow)
-         .willByDefault(Return(nullptr)); 
-  UdpTapSink loc_udp_sink(loc_udp_sink);
-  EXPECT_TRUE(!loc_udp_sink.isUdpPacketWriterCreated());
+  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(65539);
+  socket_address->set_address("127.800.0.1");
+  UdpTapSink loc_udp_tap_sink(loc_udp_sink);
+  EXPECT_TRUE(!loc_udp_tap_sink.isUdpPacketWriterCreated());
 }
 
 TEST_F(UdpTapSinkTest, TestConstructGoodUDPAddress) {
-  socket_address_.set_protocol(envoy::config::core::v3::SocketAddress_Protocol_UDP);
-  socket_address_.set_port_value(8080);
-  socket_address_.set_allocated_address("127.0.0.1");
-  envoy::config::tap::v3::UDPSink loc_udp_sink(socket_address_);
-  UdpTapSink loc_udp_sink(loc_udp_sink);
-  EXPECT_TRUE(loc_udp_sink.isUdpPacketWriterCreated());
+  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+  UdpTapSink loc_udp_tap_sink(loc_udp_sink);
+  EXPECT_TRUE(loc_udp_tap_sink.isUdpPacketWriterCreated());
 }
 
 TEST_F(UdpTapSinkTest, TestSubmitTraceNotUdpPacketWriter) {
-  socket_address_.set_protocol(envoy::config::core::v3::SocketAddress_Protocol_TCP);
-  envoy::config::tap::v3::UDPSink loc_udp_sink(socket_address_);
-  UdpTapSink loc_udp_sink(loc_udp_sink);
+  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
+  UdpTapSink loc_udp_tap_sink(loc_udp_sink);
 
   // Create UdpTapSinkHandle
-  PerTapSinkHandlePtr local_handle = loc_udp_sink.createPerTapSinkHandle(99,
-       ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
+  PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
 
   Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
-    Extensions::Common::Tap::makeTraceWrapper();
-  local_handle.submitTrace(std::move(local_buffered_trace),
-	envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES);
+      Extensions::Common::Tap::makeTraceWrapper();
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES);
 }
 
-TEST_F(UdpTapSinkTest, TestSubmitTrace) {
+TEST_F(UdpTapSinkTest, TestSubmitTraceForNotSUpportedFormat) {
   // Construct UdpTapSink object
-  socket_address_.set_protocol(envoy::config::core::v3::SocketAddress_Protocol_UDP);
-  socket_address_.set_port_value(8080);
-  socket_address_.set_allocated_address("127.0.0.1");
-  envoy::config::tap::v3::UDPSink loc_udp_sink(socket_address_);
-  UdpTapSink loc_udp_sink(loc_udp_sink);
-  
+  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+  UdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
   // Create UdpTapSinkHandle
-  PerTapSinkHandlePtr local_handle = loc_udp_sink.createPerTapSinkHandle(99,
-       ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
+  PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
 
   Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
-    Extensions::Common::Tap::makeTraceWrapper();
+      Extensions::Common::Tap::makeTraceWrapper();
   // case1 format PROTO_BINARY
-  local_handle.submitTrace(std::move(local_buffered_trace),
-	envoy::config::tap::v3::OutputSink::PROTO_BINARY);
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::PROTO_BINARY);
   // case2 format PROTO_BINARY_LENGTH_DELIMITED
-  local_handle.submitTrace(std::move(local_buffered_trace),
-	envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED);
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED);
   // case3 format PROTO_TEXT
-  local_handle.submitTrace(std::move(local_buffered_trace),
-	envoy::config::tap::v3::OutputSink::PROTO_TEXT);
-  //Test writer
-  mockUdpPacketWriter local_UdpPacketWriter;
-  // case3.1 format JSON_BODY_AS_STRING, write_result.ok()
-  EXPECT_CALL(local_UdpPacketWriter, writePacket(_,_,_))
-           .Times(1)
-	   .WillOnce(Return(Api::ioCallUint64ResultNoError()));
-  local_handle.submitTrace(std::move(local_buffered_trace),
-	envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
-  // case3.2 format JSON_BODY_AS_STRING, not write_result.ok()
-  EXPECT_CALL(local_UdpPacketWriter, writePacket(_,_,_))
-           .Times(1)
-	   .WillOnce(Return(Network::IoSocketError::ioResultSocketInvalidAddress()));
-  local_handle.submitTrace(std::move(local_buffered_trace),
-	envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
-
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::PROTO_TEXT);
 }
 
+// In order to control the return value of writePacket, then
+// re Mock class UdpPacketWriter and not use existing Network::MockUdpPacketWriter
+class MockUdpPacketWriterNew : public Network::UdpPacketWriter {
+public:
+  MockUdpPacketWriterNew(bool isReturnOk) : isReturnOkForwritePacket_(isReturnOk){};
+  ~MockUdpPacketWriterNew() override{};
+
+  Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer,
+                                      const Network::Address::Ip* local_ip,
+                                      const Network::Address::Instance& peer_address) override {
+    (void)buffer;
+    (void)local_ip;
+    (void)peer_address;
+    if (isReturnOkForwritePacket_) {
+      return Api::IoCallUint64Result(99, Api::IoError::none());
+    } else {
+      return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
+    }
+  }
+  MOCK_METHOD(bool, isWriteBlocked, (), (const));
+  MOCK_METHOD(void, setWritable, ());
+  MOCK_METHOD(uint64_t, getMaxPacketSize, (const Network::Address::Instance& peer_address),
+              (const));
+  MOCK_METHOD(bool, isBatchMode, (), (const));
+  MOCK_METHOD(Network::UdpPacketWriterBuffer, getNextWriteLocation,
+              (const Network::Address::Ip* local_ip,
+               const Network::Address::Instance& peer_address));
+  MOCK_METHOD(Api::IoCallUint64Result, flush, ());
+
+private:
+  const bool isReturnOkForwritePacket_;
+};
+
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOk) {
+  // Construct UdpTapSink object
+  std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
+      std::make_unique<MockUdpPacketWriterNew>(true);
+  UdpTapSink loc_udp_tap_sink(std::move(local_UdpPacketWriter));
+
+  // Create UdpTapSinkHandle
+  PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
+
+  Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
+      Extensions::Common::Tap::makeTraceWrapper();
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
+}
+
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOk) {
+  // Construct UdpTapSink object
+  std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
+      std::make_unique<MockUdpPacketWriterNew>(false);
+  UdpTapSink loc_udp_tap_sink(std::move(local_UdpPacketWriter));
+
+  // Create UdpTapSinkHandle
+  PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
+
+  Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
+      Extensions::Common::Tap::makeTraceWrapper();
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
+}
 } // namespace
 } // namespace Tap
 } // namespace Common
