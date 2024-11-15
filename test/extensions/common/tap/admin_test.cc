@@ -235,6 +235,27 @@ TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
   TestConfigImpl(tap_config, nullptr, factory_context);
 }
 
+TEST(TypedExtensionConfigTest, AddUdpSink) {
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: JSON_BODY_AS_STRING
+        udp_sink:
+          udp_address:
+            protocol: UDP
+            address: 127.0.0.1
+            port_value: 8080
+    streaming: true
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl(tap_config, nullptr, factory_context);
+}
+
 // Validates that a BufferedAdmin tap config that is passed without an admin
 // streamer is rejected.
 TEST(TypedExtensionConfigTest, BufferedAdminNoAdminStreamerRejected) {
