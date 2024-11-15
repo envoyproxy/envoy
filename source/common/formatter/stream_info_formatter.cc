@@ -798,6 +798,7 @@ using StreamInfoFormatterProviderLookupTable =
     absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
                                                      StreamInfoFormatterProviderCreateFunc>>;
 
+// clang-format off
 const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProviders() {
   CONSTRUCT_ON_FIRST_USE(
       StreamInfoFormatterProviderLookupTable,
@@ -1838,6 +1839,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
       });
 }
+// clang-format on
 
 class BuiltInStreamInfoCommandParser : public StreamInfoCommandParser {
 public:
