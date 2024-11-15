@@ -252,9 +252,9 @@ during those requests by enabling the :ref:`use_refresh_token <envoy_v3_api_fiel
 This behavior can be useful for AJAX requests which cannot handle redirects correctly.
 
 :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>` provides
-the possibility to update access token by using a refresh token. By default after expiration the user is always redirected to the authorization endpoint to log in again.
-By enabling this flag a new access token is obtained using the refresh token without redirecting the user to log in again. This requires the refresh token to be provided by the authorization_endpoint when the user logs in.
-If the attempt to get an access token by using a refresh token fails then the user is redirected to the authorization endpoint as usual.
+the possibility to update access token by using a refresh token. If this flag is disabled then after access token expiration the user is redirected to the authorization endpoint to log in again.
+A new access token is obtained using the refresh token without redirecting the user to log in again. This requires the refresh token to be provided by the authorization_endpoint when the user logs in.
+If the attempt to get an access token by using a refresh token fails then the user is redirected to the authorization endpoint.
 
 Generally, allowlisting is inadvisable from a security standpoint.
 

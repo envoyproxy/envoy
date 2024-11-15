@@ -188,8 +188,6 @@ public:
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  const envoy::type::matcher::v3::ListMatcher matcher_;
-
   ValueMatcherConstSharedPtr oneof_value_matcher_;
 };
 

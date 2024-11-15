@@ -13,7 +13,12 @@ on:
     - completed
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  group: >-
+    ${{ ((github.event.workflow_run.head_branch == 'main'
+          || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+          && github.event.repository.full_name == github.repository)
+        && github.run_id
+        || github.event.workflow_run.head_branch }}-${{ github.event.repository.full_name }}-${{ github.workflow }}
   cancel-in-progress: true
 
 env:
@@ -41,8 +46,6 @@ jobs:
       # head-sha: ${{ github.sha }}
 
   build:
-    secrets:
-      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read
@@ -75,8 +78,6 @@ jobs:
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
 
   san:
-    secrets:
-      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read

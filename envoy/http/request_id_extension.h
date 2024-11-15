@@ -38,9 +38,11 @@ public:
    * Directly set a request ID into the provided request headers. Override any previous request ID
    * if any.
    * @param request_headers supplies the incoming request headers for setting a request ID.
-   * @param force specifies if a new request ID should be forcefully set if one is already present.
+   * @param edge_request whether the request is an edge request.
+   * @param keep_external_id whether to preserve the request ID from external requests.
    */
-  virtual void set(Http::RequestHeaderMap& request_headers, bool force) PURE;
+  virtual void set(Http::RequestHeaderMap& request_headers, bool edge_request,
+                   bool keep_external_id) PURE;
 
   /**
    * Preserve request ID in response headers if any is set in the request headers.

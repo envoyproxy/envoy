@@ -708,10 +708,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
-TEST_F(HttpConnectionManagerConfigTest, FutureDefaultInternalAddress) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.explicit_internal_address_config", "true"}});
+TEST_F(HttpConnectionManagerConfigTest, DefaultInternalAddress) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   route_config:
@@ -730,7 +727,10 @@ TEST_F(HttpConnectionManagerConfigTest, FutureDefaultInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(default_ip_address));
 }
 
-TEST_F(HttpConnectionManagerConfigTest, DefaultInternalAddress) {
+TEST_F(HttpConnectionManagerConfigTest, LegacyDefaultInternalAddress) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.explicit_internal_address_config", "false"}});
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   route_config:
@@ -2399,7 +2399,7 @@ public:
   TestRequestIDExtension(const test::http_connection_manager::CustomRequestIDExtension& config)
       : config_(config) {}
 
-  void set(Http::RequestHeaderMap&, bool) override {}
+  void set(Http::RequestHeaderMap&, bool, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
   absl::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
     return absl::nullopt;
