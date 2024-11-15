@@ -77,7 +77,7 @@ requests, the filter will behave as follows:
 Statistics
 ----------
 
-The HTTP basic auth filter outputs statistics in the ``http.<stat_prefix>.api_key_auth.`` namespace.
+The HTTP API key auth filter outputs statistics in the ``http.<stat_prefix>.api_key_auth.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description
