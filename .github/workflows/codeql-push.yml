@@ -1,0 +1,117 @@
+name: CodeQL/push
+
+permissions:
+  contents: read
+
+on:
+  push:
+    paths:
+    - include/**
+    - source/common/**
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  SEARCH_FOLDER: //source/common/...
+
+
+jobs:
+  CodeQL-Build:
+    permissions:
+      actions: read
+      contents: read
+      # for github/codeql-action/analyze to upload SARIF results
+      security-events: write
+      pull-requests: read
+    runs-on: ubuntu-20.04
+    if: github.repository == 'envoyproxy/envoy'
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      with:
+        fetch-depth: 2
+
+    - name: Get build targets
+      run: |
+        # TODO(phlax): Shift this to an action
+        compare_head () {
+            while IFS= read -r line; do
+                if [[ -n "$line" ]]; then
+                    bazel query "rdeps($SEARCH_FOLDER, $line, 1)"  2> /dev/null
+                fi
+            done < <(git diff --name-only HEAD "${1}" -- source/* include/*)
+        }
+        if [[ "$GIT_EVENT" == "pull_request" ]]; then
+            git fetch "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" main 2> /dev/null
+            TO_OTHER=FETCH_HEAD
+        else
+            TO_OTHER=HEAD^1
+        fi
+        BUILD_TARGETS="$(compare_head "$TO_OTHER" | grep -v '\.cc\|\.h' | sort -u | head -n 3)"
+        echo 'BUILD_TARGETS<<EOF' >> $GITHUB_ENV
+        echo "$BUILD_TARGETS" >> $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
+      env:
+        GIT_EVENT: ${{ github.event_name }}
+
+    - name: Free disk space
+      if: ${{ env.BUILD_TARGETS != '' }}
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.5
+
+    - name: Initialize CodeQL
+      if: ${{ env.BUILD_TARGETS != '' }}
+      uses: github/codeql-action/init@662472033e021d55d94146f66f6058822b0b39fd  # codeql-bundle-v3.27.0
+      with:
+        languages: cpp
+        trap-caching: false
+
+    - name: Install deps
+      if: ${{ env.BUILD_TARGETS != '' }}
+      shell: bash
+      run: |
+       sudo apt-get update --error-on=any
+       sudo apt-get install --yes \
+           libtool cmake automake autoconf make ninja-build curl \
+           unzip virtualenv openjdk-11-jdk build-essential libc++1
+       # Note: the llvm/clang version should match the version specifed in:
+       #  - bazel/repository_locations.bzl
+       #  - .github/workflows/codeql-daily.yml
+       #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
+       mkdir -p bin/clang14
+       cd bin/clang14
+       wget https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+       tar -xf clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components 1
+
+    - name: Build
+      if: ${{ env.BUILD_TARGETS != '' }}
+      run: |
+       bazel/setup_clang.sh bin/clang14
+       bazel shutdown
+       bazel build \
+           -c fastbuild \
+           --spawn_strategy=local \
+           --discard_analysis_cache \
+           --nouse_action_cache \
+           --features="-layering_check" \
+           --config=clang-libc++ \
+           --config=ci \
+           $BUILD_TARGETS
+       echo -e "Built targets...\n$BUILD_TARGETS"
+
+    - name: Clean Artifacts
+      if: ${{ env.BUILD_TARGETS != '' }}
+      run: |
+        git clean -xdf
+
+    - name: Perform CodeQL Analysis
+      if: ${{ env.BUILD_TARGETS != '' }}
+      uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd  # codeql-bundle-v3.27.0
+      with:
+        trap-caching: false

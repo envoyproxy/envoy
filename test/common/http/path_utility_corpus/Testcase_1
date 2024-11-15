@@ -1,0 +1,12 @@
+    canonical_path {
+        request_headers {
+            headers {
+                key: ":path"
+                value: "/"
+            }
+            headers {
+                key: ":authority"
+                value: "foo.com"
+            }
+        }
+    }

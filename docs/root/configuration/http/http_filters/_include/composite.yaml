@@ -1,0 +1,95 @@
+admin:
+  address:
+    socket_address: {address: 0.0.0.0, port_value: 9901}
+
+static_resources:
+  listeners:
+  - name: listener1
+    address:
+      socket_address: {address: 0.0.0.0, port_value: 51051}
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: grpc_json
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              # NOTE: by default, matching happens based on the gRPC route, and not on the incoming request path.
+              # Reference:
+              # https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_json_transcoder_filter#route-configs-for-transcoded-requests
+              - match: {prefix: "/helloworld.Greeter"}
+                route: {cluster: grpc, timeout: 60s}
+          http_filters:
+          - name: composite
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+              extension_config:
+                name: composite
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+              xds_matcher:
+                matcher_tree:
+                  input:
+                    name: request-headers
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                      header_name: x-fault-category
+                  exact_match_map:
+                    map:
+                      "huge fault":  # inject 10s latency into all requests
+                        action:
+                          name: composite-action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                            typed_config:
+                              name: http-fault
+                              typed_config:
+                                "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                                delay:
+                                  fixed_delay: 10s
+                                  percentage:
+                                    numerator: 100
+                                    denominator: HUNDRED
+                      "tiny fault":  # inject 1s latency into all requests
+                        action:
+                          name: composite-action
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                            typed_config:
+                              name: http-fault
+                              typed_config:
+                                "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                                delay:
+                                  fixed_delay: 1s
+                                  percentage:
+                                    numerator: 100
+                                    denominator: HUNDRED
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: grpc
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: grpc
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 50051

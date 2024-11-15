@@ -1,0 +1,58 @@
+load_balancer_test_case {
+common_lb_config {
+
+}
+actions {
+    update_health_flags {
+        host_priority: 0
+        num_healthy_hosts: 2
+        num_degraded_hosts: 3
+        num_excluded_hosts: 4
+        random_bytestring: 1
+        random_bytestring: 2
+        random_bytestring: 1
+        random_bytestring: 2
+    }
+}
+actions {
+    preconnect {
+
+    }
+}
+actions {
+    preconnect {
+
+    }
+}
+actions {
+    choose_host {
+
+    }
+}
+actions {
+    choose_host {
+
+    }
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 50000
+    num_hosts_locality_a: 1000
+    num_hosts_locality_b: 500
+    num_hosts_locality_c: 1500
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 1
+    random_bytestring: 2
+}
+setup_priority_levels {
+    num_hosts_in_priority_level: 50000
+    num_hosts_locality_a: 300
+    num_hosts_locality_b: 1200
+    num_hosts_locality_c: 1500
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 1
+    random_bytestring: 2
+}
+seed_for_prng: 1
+}

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package test.extensions.filters.common.expr;
+
+import "google/api/expr/v1alpha1/syntax.proto";
+import "test/fuzz/common.proto";
+import "validate/validate.proto";
+
+// Structured input for fuzz test.
+
+message EvaluatorTestCase {
+  google.api.expr.v1alpha1.Expr expression = 1 [(validate.rules).message.required = true];
+  test.fuzz.Headers request_headers = 2;
+  test.fuzz.Headers response_headers = 3;
+  test.fuzz.Headers trailers = 4;
+  test.fuzz.StreamInfo stream_info = 5;
+}

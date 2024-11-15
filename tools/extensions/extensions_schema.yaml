@@ -1,0 +1,156 @@
+builtin:
+- envoy.request_id.uuid
+- envoy.upstreams.tcp.generic
+- envoy.upstreams.tcp.tcp_protocol_options
+- envoy.transport_sockets.tls
+- envoy.upstreams.http.http_protocol_options
+- envoy.upstreams.http.generic
+- envoy.route.early_data_policy.default
+- envoy.matching.inputs.request_headers
+- envoy.matching.inputs.request_trailers
+- envoy.matching.inputs.response_headers
+- envoy.matching.inputs.response_trailers
+- envoy.matching.inputs.query_params
+- envoy.matching.inputs.cel_data_input
+- envoy.matching.inputs.destination_ip
+- envoy.matching.inputs.destination_port
+- envoy.matching.inputs.source_ip
+- envoy.matching.inputs.source_port
+- envoy.matching.inputs.direct_source_ip
+- envoy.matching.inputs.source_type
+- envoy.matching.inputs.server_name
+- envoy.matching.inputs.transport_protocol
+- envoy.matching.inputs.application_protocol
+- envoy.matching.inputs.filter_state
+- envoy.matching.inputs.dynamic_metadata
+- envoy.matching.inputs.uri_san
+- envoy.matching.inputs.dns_san
+- envoy.matching.inputs.subject
+- envoy.regex_engines.google_re2
+- envoy.filters.http.upstream_codec
+- envoy.upstream.local_address_selector.default_local_address_selector
+
+# All Envoy extensions must be tagged with their security hardening stance with
+# respect to downstream and upstream data plane threats. These are verbose
+# labels intended to make clear the trust that operators may place in
+# extensions.
+security_postures:
+- name: robust_to_untrusted_downstream
+  description: |
+    This extension is intended to be robust against untrusted downstream traffic. It
+    assumes that the upstream is trusted.
+- name: robust_to_untrusted_downstream_and_upstream
+  description: |
+    This extension is intended to be robust against both untrusted downstream and
+    upstream traffic.
+- name: requires_trusted_downstream_and_upstream
+  description: |
+    This extension is not hardened and should only be used in deployments
+    where both the downstream and upstream are trusted.
+- name: unknown
+  # This is functionally equivalent to
+  # requires_trusted_downstream_and_upstream, but acts as a placeholder to
+  # allow us to identify extensions that need classifying.
+  description: |
+    This extension has an unknown security posture and should only be
+    used in deployments where both the downstream and upstream are
+    trusted.
+- name: data_plane_agnostic
+  # Not relevant to data plane threats, e.g. stats sinks.
+  description: |
+    This extension does not operate on the data plane and hence is intended to be robust against untrusted traffic.
+
+# Extension categories as defined by factories
+categories:
+- envoy.access_loggers
+- envoy.bootstrap
+- envoy.clusters
+- envoy.compression.compressor
+- envoy.compression.decompressor
+- envoy.config.validators
+- envoy.config_subscription
+- envoy.config_mux
+- envoy.filters.http
+- envoy.filters.listener
+- envoy.filters.network
+- envoy.filters.udp_listener
+- envoy.filters.udp.session
+- envoy.filters.quic_listener
+- envoy.formatter
+- envoy.geoip_providers
+- envoy.grpc_credentials
+- envoy.guarddog_actions
+- envoy.health_checkers
+- envoy.health_check.event_sinks
+- envoy.http.cache
+- envoy.http.header_validators
+- envoy.http.stateful_header_formatters
+- envoy.internal_redirect_predicates
+- envoy.io_socket
+- envoy.http.original_ip_detection
+- envoy.listener_manager_impl
+- envoy.matching.common_inputs
+- envoy.matching.input_matchers
+- envoy.tls.key_providers
+- envoy.quic.connection_debug_visitor
+- envoy.quic.connection_id_generator
+- envoy.quic.proof_source
+- envoy.quic.server.crypto_stream
+- envoy.quic.server_preferred_address
+- envoy.rate_limit_descriptors
+- envoy.regex_engines
+- envoy.request_id
+- envoy.resource_monitors
+- envoy.retry_host_predicates
+- envoy.retry_priorities
+- envoy.route.early_data_policy
+- envoy.stats_sinks
+- envoy.thrift_proxy.filters
+- envoy.tracers
+- envoy.sip_proxy.filters
+- envoy.transport_sockets.downstream
+- envoy.transport_sockets.upstream
+- envoy.tls.cert_validator
+- envoy.upstreams
+- envoy.upstream.local_address_selector
+- envoy.udp_packet_writer
+- envoy.wasm.runtime
+- envoy.xds_delegates
+- envoy.common.key_value
+- envoy.network.dns_resolver
+- envoy.network.connection_balance
+- envoy.rbac.matchers
+- envoy.rbac.audit_loggers
+- envoy.access_loggers.extension_filters
+- envoy.http.stateful_session
+- envoy.http.injected_credentials
+- envoy.matching.action
+- envoy.matching.http.input
+- envoy.matching.http.custom_matchers
+- envoy.matching.network.input
+- envoy.matching.network.custom_matchers
+- envoy.string_matcher
+- envoy.filters.http.upstream
+- envoy.path.match
+- envoy.path.rewrite
+- envoy.tls_handshakers
+- envoy.generic_proxy.filters
+- envoy.generic_proxy.codecs
+- envoy.load_balancing_policies
+- envoy.http.early_header_mutation
+- envoy.http.custom_response
+- envoy.router.cluster_specifier_plugin
+- envoy.tracers.opentelemetry.resource_detectors
+- envoy.tracers.opentelemetry.samplers
+
+status_values:
+- name: stable
+  # This extension is stable and is expected to be production usable.
+  description:
+- name: alpha
+  description: |
+    This extension is functional but has not had substantial production burn time,
+    use only with this caveat.
+- name: wip
+  description: |
+    This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.

@@ -1,0 +1,68 @@
+health_check_config {
+  timeout {
+    seconds: 1
+  }
+  interval {
+    seconds: 1
+  }
+  interval_jitter {
+    seconds: 1
+  }
+  unhealthy_threshold {
+    value: 2
+  }
+  healthy_threshold {
+    value: 2
+  }
+  tcp_health_check {
+      send {
+            text: "01"
+        }
+        receive [{
+            text: "02"
+        }]
+  }
+  no_traffic_interval {
+    seconds: 1
+  }
+  initial_jitter {
+    seconds: 1
+  }
+  transport_socket_match_criteria {
+    fields {
+      key: ""
+      value {
+        bool_value: true
+      }
+    }
+  }
+}
+actions {
+  trigger_interval_timer {
+  }
+}
+actions {
+  respond {
+    http_respond {
+      headers {
+        headers {
+          key: ":status"
+          value: "200"
+        }
+        headers {
+          key: "-upstream-healthchecked-cluster"
+          value: "locations-production-iad"
+        }
+      }
+      status: 200
+    }
+    tcp_respond {
+    }
+    grpc_respond {
+      grpc_respond_headers {
+        
+      }
+    }
+  }
+}
+http_verify_cluster: true

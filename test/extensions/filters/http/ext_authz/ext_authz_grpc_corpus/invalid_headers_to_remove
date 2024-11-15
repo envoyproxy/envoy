@@ -1,0 +1,11 @@
+base {
+  config {
+  }
+  request_data {
+  }
+}
+response {
+  ok_response {
+    headers_to_remove: "*\000\000\000\000\000\000\000"
+  }
+}

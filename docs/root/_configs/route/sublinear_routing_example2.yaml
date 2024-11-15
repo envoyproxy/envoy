@@ -1,0 +1,116 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              matcher:
+                matcher_tree:
+                  input:
+                    name: request-headers
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                      header_name: :path
+                  prefix_match_map:
+                    map:
+                      "/new_endpoint/path/1":
+                        action:
+                          name: route_foo
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.config.route.v3.Route
+                            match:
+                              prefix: /new_endpoint/foo
+                            route:
+                              cluster: cluster_1
+                      "/new_endpoint/path/2":
+                        matcher:
+                          matcher_tree:
+                            input:
+                              name: request-headers
+                              typed_config:
+                                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                                header_name: x-foo-header
+                            prefix_match_map:
+                              map:
+                                "foo-1":
+                                  action:
+                                    name: route_foo
+                                    typed_config:
+                                      "@type": type.googleapis.com/envoy.config.route.v3.Route
+                                      match:
+                                        prefix: ""
+                                      route:
+                                        cluster: cluster_foo_1
+                                "foo-2":
+                                  matcher:
+                                    matcher_tree:
+                                      input:
+                                        name: request-headers
+                                        typed_config:
+                                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                                          header_name: x-bar-header
+                                      prefix_match_map:
+                                        map:
+                                          "bar-1":
+                                            action:
+                                              name: route_foo
+                                              typed_config:
+                                                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                                                match:
+                                                  prefix: ""
+                                                route:
+                                                  cluster: cluster_bar_1
+                                          "bar-2":
+                                            action:
+                                              name: route_foo
+                                              typed_config:
+                                                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                                                match:
+                                                  prefix: ""
+                                                route:
+                                                  cluster: cluster_bar_2
+                                          "bar-3":
+                                            action:
+                                              name: route_foo
+                                              typed_config:
+                                                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                                                match:
+                                                  prefix: ""
+                                                route:
+                                                  cluster: cluster_bar_3
+                                "foo-3":
+                                  action:
+                                    name: route_foo
+                                    typed_config:
+                                      "@type": type.googleapis.com/envoy.config.route.v3.Route
+                                      match:
+                                        prefix: ""
+                                      route:
+                                        cluster: cluster_foo_3
+                      "/new_endpoint/path/3":
+                        action:
+                          name: route_bar
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.config.route.v3.Route
+                            match:
+                              prefix: ""
+                            route:
+                              cluster: cluster_3
+  clusters:

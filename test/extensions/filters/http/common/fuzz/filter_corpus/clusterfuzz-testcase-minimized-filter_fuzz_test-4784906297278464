@@ -1,0 +1,23 @@
+config {
+  name: "envoy.filters.http.admission_control"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.admission_control.v3.AdmissionControl"
+    value: "\022\000\032\002\020\002*\016\n\t\t+\000\000\000\000\000\000\000\022\001$"
+  }
+}
+data {
+  headers {
+  }
+  http_body {
+    data: "\037\000\000\000\000\000\000\000"
+  }
+}
+upstream_data {
+  headers {
+  }
+  http_body {
+    data: "="
+    data: "="
+    data: "?"
+  }
+}

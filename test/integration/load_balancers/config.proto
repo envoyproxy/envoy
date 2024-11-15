@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+package test.integration.custom_lb;
+
+message CustomLbConfig {
+}

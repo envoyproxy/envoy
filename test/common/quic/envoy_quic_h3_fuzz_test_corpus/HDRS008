@@ -1,0 +1,75 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "http"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "connect"
+            }
+            headers {
+              key: "range"
+              value: "empty"
+            }
+            headers {
+              key: "-internal"
+              value: "true"
+            }
+            headers {
+              key: "access-control-allow-headers"
+              value: "empty"
+            }
+            headers {
+              key: "-cluster"
+              value: "empty"
+            }
+            headers {
+              key: "connection"
+              value: "close"
+            }
+            headers {
+              key: "-downstream-service-node"
+              value: "empty"
+            }
+            headers {
+              key: "-upstream-rq-timeout-alt-response"
+              value: "empty"
+            }
+            headers {
+              key: "-expected-rq-timeout-ms"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

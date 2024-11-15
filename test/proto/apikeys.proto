@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package apikeys;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+service ApiKeys {
+  // Creates a new API key.
+  rpc CreateApiKey(CreateApiKeyRequest) returns (ApiKey) {
+  }
+
+  rpc CreateApiKeyInStream(stream CreateApiKeyRequest) returns (ApiKey) {
+  }
+}
+
+// Message for an API key.
+message ApiKey {
+  string name = 1;
+
+  string display_name = 2;
+
+  // The encrypted and signed value held by the key.
+  string current_key = 3;
+
+  // The creation time of the key.
+  google.protobuf.Timestamp create_time = 4;
+
+  // The last update time of the key.
+  google.protobuf.Timestamp update_time = 5;
+
+  // The location of the key.
+  string location = 6;
+
+  string kms_key = 7;
+
+  // The expiration time of the key
+  google.protobuf.Timestamp expire_time = 8;
+}
+
+message SupportedTypes {
+  string string = 1;
+
+  uint32 uint32 = 2;
+
+  uint64 uint64 = 3;
+
+  int32 int32 = 4;
+
+  int64 int64 = 5;
+
+  sint32 sint32 = 6;
+
+  sint64 sint64 = 7;
+
+  fixed32 fixed32 = 8;
+
+  fixed64 fixed64 = 9;
+
+  sfixed32 sfixed32 = 10;
+
+  sfixed64 sfixed64 = 11;
+
+  float float = 12;
+
+  double double = 13;
+}
+
+message RepeatedSupportedTypes {
+  repeated string string = 1;
+
+  repeated uint32 uint32 = 2;
+
+  repeated uint64 uint64 = 3;
+
+  repeated int32 int32 = 4;
+
+  repeated int64 int64 = 5;
+
+  repeated sint32 sint32 = 6;
+
+  repeated sint64 sint64 = 7;
+
+  repeated fixed32 fixed32 = 8;
+
+  repeated fixed64 fixed64 = 9;
+
+  repeated sfixed32 sfixed32 = 10;
+
+  repeated sfixed64 sfixed64 = 11;
+
+  repeated float float = 12;
+
+  repeated double double = 13;
+
+  map<string, string> map = 14;
+}
+
+message UnsupportedTypes {
+  bool bool = 1;
+
+  ApiKey message = 2;
+}
+
+message CreateApiKeyRequest {
+  string parent = 1;
+
+  ApiKey key = 2;
+
+  SupportedTypes supported_types = 3;
+
+  RepeatedSupportedTypes repeated_supported_types = 4;
+
+  UnsupportedTypes unsupported_types = 5;
+
+  google.protobuf.ListValue repeated_intermediate = 6;
+}

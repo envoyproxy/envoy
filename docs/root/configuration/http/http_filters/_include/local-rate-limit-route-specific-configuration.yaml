@@ -1,0 +1,74 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          http_filters:
+          - name: envoy.filters.http.local_ratelimit
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+              stat_prefix: http_local_rate_limiter
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match: {prefix: "/path/with/rate/limit"}
+                route: {cluster: service_protected_by_rate_limit}
+                typed_per_filter_config:
+                  envoy.filters.http.local_ratelimit:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+                    stat_prefix: http_local_rate_limiter
+                    token_bucket:
+                      max_tokens: 10000
+                      tokens_per_fill: 1000
+                      fill_interval: 1s
+                    filter_enabled:
+                      runtime_key: local_rate_limit_enabled
+                      default_value:
+                        numerator: 100
+                        denominator: HUNDRED
+                    filter_enforced:
+                      runtime_key: local_rate_limit_enforced
+                      default_value:
+                        numerator: 100
+                        denominator: HUNDRED
+                    response_headers_to_add:
+                    - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                      header:
+                        key: x-local-rate-limit
+                        value: 'true'
+              - match: {prefix: "/"}
+                route: {cluster: default_service}
+  clusters:
+  - name: default_service
+    load_assignment:
+      cluster_name: default_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8080
+  - name: service_protected_by_rate_limit
+    load_assignment:
+      cluster_name: service_protected_by_rate_limit
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8081

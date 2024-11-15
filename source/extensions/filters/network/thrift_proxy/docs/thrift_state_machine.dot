@@ -1,0 +1,115 @@
+/*
+  graphviz dot file that renders the Thrift Decoder state machine.
+
+  Rendered via: dot -Tsvg -o thrift_state_machine.svg thrift_state_machine.dot
+*/
+digraph {
+  {
+    rank = same;
+    Start;
+    MessageBegin;
+    MessageEnd;
+    Done;
+  };
+
+  {
+    rank = same;
+    StructBegin;
+    StructEnd;
+  };
+
+  {
+    rank = same;
+    FieldBegin;
+    FieldEnd;
+  };
+
+  {
+    rank = same;
+    Value;
+  };
+
+  {
+    rank = same;
+    ListBegin;
+    ListEnd;
+    MapBegin;
+    MapEnd;
+    SetBegin;
+    SetEnd;
+    StructValueBegin;
+    StructValueEnd;
+  };
+
+  {
+    rank = same;
+    StructValueFieldBegin;
+    StructValueFieldEnd;
+  };
+
+  Start -> MessageBegin;
+
+  MessageBegin -> StructBegin;
+
+  StructBegin -> FieldBegin;
+
+  FieldBegin -> Value;
+  FieldBegin -> StructEnd;
+
+  Value -> FieldEnd;
+
+  FieldEnd -> FieldBegin;
+
+  StructEnd -> MessageEnd;
+
+  MessageEnd -> Done;
+
+  ListValue [label="Value"];
+  Value -> ListBegin;
+  ListBegin -> ListValue;
+  ListValue -> ListValue [label="size"];
+  ListValue -> ListEnd;
+  ListEnd -> Value;
+
+  MapKeyValue [label="Key (Value)"];
+  MapValueValue [label="Value"];
+  Value -> MapBegin;
+  MapBegin -> MapKeyValue;
+  MapKeyValue:sw -> MapValueValue:nw;
+  MapKeyValue -> MapEnd;
+  MapValueValue:ne -> MapKeyValue:se [label="size"];
+  MapEnd -> Value;
+
+  SetValue [label="Value"];
+  Value -> SetBegin;
+  SetBegin -> SetValue;
+  SetValue -> SetValue [label="size"];
+  SetValue -> SetEnd;
+  SetEnd -> Value;
+
+  StructValueBegin [label="StructBegin"];
+  StructValueEnd [label="StructEnd"];
+  StructValueFieldBegin [label="FieldBegin"];
+  StructValueFieldEnd [label="FieldEnd"];
+  StructValueValue [label="Value"];
+  Value -> StructValueBegin;
+  StructValueBegin -> StructValueFieldBegin;
+  StructValueFieldBegin -> StructValueValue;
+  StructValueFieldBegin -> StructValueEnd;
+  StructValueValue -> StructValueFieldEnd;
+  StructValueFieldEnd -> StructValueFieldBegin;
+  StructValueEnd -> Value;
+
+  graph [label="Thrift Decoder State Machine.\n\nStates appear in multiple locations to simplify the graph of transitions."];
+
+  Start [style=filled, fillcolor="#cccccc"];
+  Done [style=filled, fillcolor="#cccccc"];
+
+  /* force ordering within ranks */
+  MessageBegin -> MessageEnd [style=invis];
+  StructBegin -> StructEnd [style=invis];
+  FieldBegin -> FieldEnd [style=invis];
+  ListBegin -> ListEnd -> MapBegin -> MapEnd -> SetBegin -> SetEnd -> StructValueBegin ->
+    StructValueEnd [style=invis];
+  StructValueFieldBegin -> StructValueFieldEnd [style=invis];
+}

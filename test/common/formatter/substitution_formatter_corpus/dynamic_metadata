@@ -1,0 +1,25 @@
+format: "%DYNAMIC_METADATA(com.test:test_key)%|%DYNAMIC_METADATA(com.test:test_obj)%|%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"
+stream_info {
+  dynamic_metadata {
+    filter_metadata {
+      key: "com.test"
+      value: {
+        fields {
+          key: "test_key"
+          value: { string_value: "test_value" }
+        }
+        fields {
+          key: "test_obj"
+          value: {
+            struct_value {
+              fields {
+                key: "inner_key"
+                value: { string_value: "inner_value" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

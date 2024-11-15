@@ -1,0 +1,37 @@
+diff --git a/absl/flags/commandlineflag.h b/absl/flags/commandlineflag.h
+index f2fa08977f..8e97fdb0ca 100644
+--- a/absl/flags/commandlineflag.h
++++ b/absl/flags/commandlineflag.h
+@@ -153,7 +153,7 @@ class CommandLineFlag {
+   bool ParseFrom(absl::string_view value, std::string* error);
+ 
+  protected:
+-  ~CommandLineFlag() = default;
++  virtual ~CommandLineFlag() = default;
+ 
+  private:
+   friend class flags_internal::PrivateHandleAccessor;
+diff --git a/absl/debugging/internal/stacktrace_config.h b/absl/debugging/internal/stacktrace_config.h
+--- a/absl/debugging/internal/stacktrace_config.h	2023-06-30 13:00:30.464949167 +0000
++++ b/absl/debugging/internal/stacktrace_config.h	2023-06-30 13:01:11.844904587 +0000
+@@ -40,7 +40,7 @@
+ // Emscripten stacktraces rely on JS. Do not use them in standalone mode.
+ #elif defined(__EMSCRIPTEN__) && !defined(STANDALONE_WASM)
+ #define ABSL_STACKTRACE_INL_HEADER \
+-  "absl/debugging/internal/stacktrace_emscripten-inl.inc"
++  "absl/debugging/internal/stacktrace_unimplemented-inl.inc"
+ 
+ #elif defined(__linux__) && !defined(__ANDROID__)
+ 
+diff --git a/absl/debugging/symbolize.cc b/absl/debugging/symbolize.cc
+--- a/absl/debugging/symbolize.cc	2023-06-30 13:11:48.688535829 +0000
++++ b/absl/debugging/symbolize.cc	2023-06-30 13:12:03.960525578 +0000
+@@ -37,7 +37,7 @@
+ #elif defined(__APPLE__)
+ #include "absl/debugging/symbolize_darwin.inc"
+ #elif defined(ABSL_INTERNAL_HAVE_SYMBOLIZE_WASM)
+-#include "absl/debugging/symbolize_emscripten.inc"
++#include "absl/debugging/symbolize_unimplemented.inc"
+ #else
+ #include "absl/debugging/symbolize_unimplemented.inc"
+ #endif

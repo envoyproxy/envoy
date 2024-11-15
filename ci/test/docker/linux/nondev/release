@@ -1,0 +1,81 @@
+>> BUILDX: install
+> docker run --rm --privileged tonistiigi/binfmt --install all
+> docker buildx rm multi-builder 2> /dev/null || :
+> docker buildx create --use --name multi-builder --platform linux/arm64,linux/amd64
+>> LOGIN
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo:v1.73.3
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy.tar -t mocktest/repo:v1.73.3 .
+>> PUSH: oci-archive:/non/existent/test/path/envoy.tar -> docker://docker.io/mocktest/repo:v1.73.3
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy.tar docker://docker.io/mocktest/repo:v1.73.3
+>> TAG: mocktest/repo:v1.73.3 -> mocktest/repo:v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo:v1.73.3 --tag docker.io/mocktest/repo:v1.73-latest
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD+PUSH: mocktest/repo-debug:v1.73.3
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY_PREFIX=dbg/ --sbom=false --provenance=false --push -t mocktest/repo-debug:v1.73.3 .
+>> TAG: mocktest/repo-debug:v1.73.3 -> mocktest/repo:debug-v1.73.3
+> docker buildx imagetools create docker.io/mocktest/repo-debug:v1.73.3 --tag docker.io/mocktest/repo:debug-v1.73.3
+>> TAG: mocktest/repo-debug:v1.73.3 -> mocktest/repo-debug:v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-debug:v1.73.3 --tag docker.io/mocktest/repo-debug:v1.73-latest
+>> TAG: mocktest/repo-debug:v1.73.3 -> mocktest/repo:debug-v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-debug:v1.73.3 --tag docker.io/mocktest/repo:debug-v1.73-latest
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo-contrib:v1.73.3
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-contrib.tar -t mocktest/repo-contrib:v1.73.3 .
+>> PUSH: oci-archive:/non/existent/test/path/envoy-contrib.tar -> docker://docker.io/mocktest/repo-contrib:v1.73.3
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-contrib.tar docker://docker.io/mocktest/repo-contrib:v1.73.3
+>> TAG: mocktest/repo-contrib:v1.73.3 -> mocktest/repo:contrib-v1.73.3
+> docker buildx imagetools create docker.io/mocktest/repo-contrib:v1.73.3 --tag docker.io/mocktest/repo:contrib-v1.73.3
+>> TAG: mocktest/repo-contrib:v1.73.3 -> mocktest/repo-contrib:v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-contrib:v1.73.3 --tag docker.io/mocktest/repo-contrib:v1.73-latest
+>> TAG: mocktest/repo-contrib:v1.73.3 -> mocktest/repo:contrib-v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-contrib:v1.73.3 --tag docker.io/mocktest/repo:contrib-v1.73-latest
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD+PUSH: mocktest/repo-contrib-debug:v1.73.3
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy --build-arg ENVOY_BINARY=envoy-contrib --build-arg ENVOY_BINARY_PREFIX=dbg/ --sbom=false --provenance=false --push -t mocktest/repo-contrib-debug:v1.73.3 .
+>> TAG: mocktest/repo-contrib-debug:v1.73.3 -> mocktest/repo:contrib-debug-v1.73.3
+> docker buildx imagetools create docker.io/mocktest/repo-contrib-debug:v1.73.3 --tag docker.io/mocktest/repo:contrib-debug-v1.73.3
+>> TAG: mocktest/repo-contrib-debug:v1.73.3 -> mocktest/repo-contrib-debug:v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-contrib-debug:v1.73.3 --tag docker.io/mocktest/repo-contrib-debug:v1.73-latest
+>> TAG: mocktest/repo-contrib-debug:v1.73.3 -> mocktest/repo:contrib-debug-v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-contrib-debug:v1.73.3 --tag docker.io/mocktest/repo:contrib-debug-v1.73-latest
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo-distroless:v1.73.3
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-distroless --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-distroless.tar -t mocktest/repo-distroless:v1.73.3 .
+>> PUSH: oci-archive:/non/existent/test/path/envoy-distroless.tar -> docker://docker.io/mocktest/repo-distroless:v1.73.3
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-distroless.tar docker://docker.io/mocktest/repo-distroless:v1.73.3
+>> TAG: mocktest/repo-distroless:v1.73.3 -> mocktest/repo:distroless-v1.73.3
+> docker buildx imagetools create docker.io/mocktest/repo-distroless:v1.73.3 --tag docker.io/mocktest/repo:distroless-v1.73.3
+>> TAG: mocktest/repo-distroless:v1.73.3 -> mocktest/repo-distroless:v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-distroless:v1.73.3 --tag docker.io/mocktest/repo-distroless:v1.73-latest
+>> TAG: mocktest/repo-distroless:v1.73.3 -> mocktest/repo:distroless-v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-distroless:v1.73.3 --tag docker.io/mocktest/repo:distroless-v1.73-latest
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo-google-vrp:v1.73.3
+> docker buildx build --platform linux/amd64 -f ci/Dockerfile-envoy --target envoy-google-vrp --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-google-vrp.tar -t mocktest/repo-google-vrp:v1.73.3 .
+>> PUSH: oci-archive:/non/existent/test/path/envoy-google-vrp.tar -> docker://docker.io/mocktest/repo-google-vrp:v1.73.3
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-google-vrp.tar docker://docker.io/mocktest/repo-google-vrp:v1.73.3
+>> TAG: mocktest/repo-google-vrp:v1.73.3 -> mocktest/repo:google-vrp-v1.73.3
+> docker buildx imagetools create docker.io/mocktest/repo-google-vrp:v1.73.3 --tag docker.io/mocktest/repo:google-vrp-v1.73.3
+>> TAG: mocktest/repo-google-vrp:v1.73.3 -> mocktest/repo-google-vrp:v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-google-vrp:v1.73.3 --tag docker.io/mocktest/repo-google-vrp:v1.73-latest
+>> TAG: mocktest/repo-google-vrp:v1.73.3 -> mocktest/repo:google-vrp-v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-google-vrp:v1.73.3 --tag docker.io/mocktest/repo:google-vrp-v1.73-latest
+>> BUILDX: use multi-builder
+> docker buildx use multi-builder
+>> BUILD: mocktest/repo-tools:v1.73.3
+> docker buildx build --platform linux/arm64,linux/amd64 -f ci/Dockerfile-envoy --target envoy-tools --sbom=false --provenance=false -o type=oci,dest=/non/existent/test/path/envoy-tools.tar -t mocktest/repo-tools:v1.73.3 .
+>> PUSH: oci-archive:/non/existent/test/path/envoy-tools.tar -> docker://docker.io/mocktest/repo-tools:v1.73.3
+> skopeo copy --all oci-archive:/non/existent/test/path/envoy-tools.tar docker://docker.io/mocktest/repo-tools:v1.73.3
+>> TAG: mocktest/repo-tools:v1.73.3 -> mocktest/repo:tools-v1.73.3
+> docker buildx imagetools create docker.io/mocktest/repo-tools:v1.73.3 --tag docker.io/mocktest/repo:tools-v1.73.3
+>> TAG: mocktest/repo-tools:v1.73.3 -> mocktest/repo-tools:v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-tools:v1.73.3 --tag docker.io/mocktest/repo-tools:v1.73-latest
+>> TAG: mocktest/repo-tools:v1.73.3 -> mocktest/repo:tools-v1.73-latest
+> docker buildx imagetools create docker.io/mocktest/repo-tools:v1.73.3 --tag docker.io/mocktest/repo:tools-v1.73-latest

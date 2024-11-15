@@ -1,0 +1,137 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.router.v3;
+
+import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.router.v3";
+option java_outer_classname = "RouterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3;routerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Router]
+// Router :ref:`configuration overview <config_http_filters_router>`.
+// [#extension: envoy.filters.http.router]
+
+// [#next-free-field: 10]
+message Router {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.router.v2.Router";
+
+  message UpstreamAccessLogOptions {
+    // If set to true, an upstream access log will be recorded when an upstream stream is
+    // associated to an http request. Note: Each HTTP request received for an already established
+    // connection will result in an upstream access log record. This includes, for example,
+    // consecutive HTTP requests over the same connection or a request that is retried.
+    // In case a retry is applied, an upstream access log will be recorded for each retry.
+    bool flush_upstream_log_on_upstream_stream = 1;
+
+    // The interval to flush the upstream access logs. By default, the router will flush an upstream
+    // access log on stream close, when the HTTP request is complete. If this field is set, the router
+    // will flush access logs periodically at the specified interval. This is especially useful in the
+    // case of long-lived requests, such as CONNECT and Websockets.
+    // The interval must be at least 1 millisecond.
+    google.protobuf.Duration upstream_log_flush_interval = 2
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
+  }
+
+  // Whether the router generates dynamic cluster statistics. Defaults to
+  // true. Can be disabled in high performance scenarios.
+  google.protobuf.BoolValue dynamic_stats = 1;
+
+  // Whether to start a child span for egress routed calls. This can be
+  // useful in scenarios where other filters (auth, ratelimit, etc.) make
+  // outbound calls and have child spans rooted at the same ingress
+  // parent. Defaults to false.
+  //
+  // .. attention::
+  //   This field is deprecated by the
+  //   :ref:`spawn_upstream_span <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.spawn_upstream_span>`.
+  //   Please use that ``spawn_upstream_span`` field to control the span creation.
+  bool start_child_span = 2
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Configuration for HTTP upstream logs emitted by the router. Upstream logs
+  // are configured in the same way as access logs, but each log entry represents
+  // an upstream request. Presuming retries are configured, multiple upstream
+  // requests may be made for each downstream (inbound) request.
+  repeated config.accesslog.v3.AccessLog upstream_log = 3;
+
+  // Additional upstream access log options.
+  UpstreamAccessLogOptions upstream_log_options = 9;
+
+  // Do not add any additional ``x-envoy-`` headers to requests or responses. This
+  // only affects the :ref:`router filter generated x-envoy- headers
+  // <config_http_filters_router_headers_set>`, other Envoy filters and the HTTP
+  // connection manager may continue to set ``x-envoy-`` headers.
+  bool suppress_envoy_headers = 4;
+
+  // Specifies a list of HTTP headers to strictly validate. Envoy will reject a
+  // request and respond with HTTP status 400 if the request contains an invalid
+  // value for any of the headers listed in this field. Strict header checking
+  // is only supported for the following headers:
+  //
+  // Value must be a ','-delimited list (i.e. no spaces) of supported retry
+  // policy values:
+  //
+  // * :ref:`config_http_filters_router_x-envoy-retry-grpc-on`
+  // * :ref:`config_http_filters_router_x-envoy-retry-on`
+  //
+  // Value must be an integer:
+  //
+  // * :ref:`config_http_filters_router_x-envoy-max-retries`
+  // * :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`
+  // * :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`
+  repeated string strict_check_headers = 5 [(validate.rules).repeated = {
+    items {
+      string {
+        in: "x-envoy-upstream-rq-timeout-ms"
+        in: "x-envoy-upstream-rq-per-try-timeout-ms"
+        in: "x-envoy-max-retries"
+        in: "x-envoy-retry-grpc-on"
+        in: "x-envoy-retry-on"
+      }
+    }
+  }];
+
+  // If not set, ingress Envoy will ignore
+  // :ref:`config_http_filters_router_x-envoy-expected-rq-timeout-ms` header, populated by egress
+  // Envoy, when deriving timeout for upstream cluster.
+  bool respect_expected_rq_timeout = 6;
+
+  // If set, Envoy will avoid incrementing HTTP failure code stats
+  // on gRPC requests. This includes the individual status code value
+  // (e.g. upstream_rq_504) and group stats (e.g. upstream_rq_5xx).
+  // This field is useful if interested in relying only on the gRPC
+  // stats filter to define success and failure metrics for gRPC requests
+  // as not all failed gRPC requests charge HTTP status code metrics. See
+  // :ref:`gRPC stats filter<config_http_filters_grpc_stats>` documentation
+  // for more details.
+  bool suppress_grpc_request_failure_code_stats = 7;
+
+  // .. note::
+  //   Upstream HTTP filters are currently in alpha.
+  //
+  // Optional HTTP filters for the upstream HTTP filter chain.
+  //
+  // These filters will be applied for all requests that pass through the router.
+  // They will also be applied to shadowed requests.
+  // Upstream HTTP filters cannot change route or cluster.
+  // Upstream HTTP filters specified on the cluster will override these filters.
+  //
+  // If using upstream HTTP filters, please be aware that local errors sent by
+  // upstream HTTP filters will not trigger retries, and local errors sent by
+  // upstream HTTP filters will count as a final response if hedging is configured.
+  // [#extension-category: envoy.filters.http.upstream]
+  repeated network.http_connection_manager.v3.HttpFilter upstream_http_filters = 8;
+}

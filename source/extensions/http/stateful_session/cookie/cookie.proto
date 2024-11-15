@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package envoy;
+
+message Cookie {
+  string address = 1;
+  uint64 expires = 2;
+}

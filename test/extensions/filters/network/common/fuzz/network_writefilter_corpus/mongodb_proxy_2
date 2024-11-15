@@ -1,0 +1,12 @@
+config {
+  name: "envoy.filters.network.mongo_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy"
+    value: "\n\001<"
+  }
+}
+actions {
+  on_write {
+    data: "\016\000\000\000[\000zxid\000)\324\007\000\000D@de$t._eett$_s.\000\024)....\016\001\005\000\000\000\000"
+  }
+}

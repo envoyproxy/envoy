@@ -1,0 +1,357 @@
+date: October 19, 2022
+
+behavior_changes:
+- area: build
+  change: |
+    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
+- area: stats http local_rate_limit
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.stat_prefix>` is properly extracted. This
+    changes the Prometheus name from envoy_http_local_rate_limit_myprefix_rate_limited{} to
+    envoy_http_local_rate_limit_rate_limited{envoy_local_http_ratelimit_prefix="myprefix"}.
+- area: stats network local_rate_limit
+  change: |
+    Fixed metric tag extraction so that :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.network.local_ratelimit.v3.LocalRateLimit.stat_prefix>` is properly extracted.
+    This changes the Prometheus name from envoy_local_rate_limit_myprefix_rate_limited{} to
+    envoy_local_rate_limit_rate_limited{envoy_local_ratelimit_prefix="myprefix"}.
+- area: http
+  change: |
+    Envoy no longer adds ``content-length: 0`` header when proxying UPGRADE requests without ``content-length`` and
+    ``transfer-encoding`` headers. This behavior change can be reverted by setting the
+    ``envoy.reloadable_features.http_skip_adding_content_length_to_upgrade`` runtime flag to false.
+- area: tls
+  change: |
+    Change TLS and QUIC transport sockets to support asynchronous cert validation extension. This behavior change can be
+    reverted by setting runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` to false.
+- area: gcp_authn
+  change: |
+    Add GCP Authentication filter which can be used to fetch authentication tokens from Google Compute Engine(GCE) metadata
+    server.
+- area: http
+  change: |
+    For HTTP/2 and HTTP/3 codecs, all clients now continue sending data upstream after receiving an end of the server
+    stream. This supports the server half-close semantics for TCP tunneling with CONNECT as well as bi-directional streaming
+    calls. This behavior change can be reverted by setting the ``envoy.reloadable_features.http_response_half_close``
+    runtime flag to false.
+- area: original_dst
+  change: |
+    ORIGINAL_DST cluster will not attempt to remove and drain the stale hosts during cleanup if they are still used by the
+    connection pools. For HTTP pools, please set :ref:`idle_timeout <faq_configuration_connection_timeouts>` to limit the
+    duration of the upstream connections (the default value is 1h, and the recommended value is 5min). This behavior change
+    can be reverted by setting runtime guard ``envoy.reloadable_features.original_dst_rely_on_idle_timeout``.
+- area: config
+  change: |
+    Fixed resource tracking when using the Incremental (Delta-xDS) protocol. The protocol state will be updated after the
+    resources are successfully ingested and an ACK is sent. This behavior change can be reverted by setting the
+    ``envoy.reloadable_features.delta_xds_subscription_state_tracking_fix`` runtime flag to false.
+
+minor_behavior_changes:
+- area: logging
+  change: |
+    changed the ``UPSTREAM_REMOTE_ADDRESS``, ``UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT``, and ``UPSTREAM_REMOTE_PORT`` fields
+    to log based on the actual upstream connection rather than the upstream host. This fixes a bug where the address
+    components were not consistently correct for Happy Eyeballs connections and proxied connections, but also means in cases
+    where the host was selected but a connection was not established, the fields will be absent. This change can be
+    temporarily reverted by setting the runtime guard ``envoy.reloadable_features.correct_remote_address`` to false.
+- area: resource_monitors
+  change: |
+    changed behavior of the fixed heap monitor to count pages allocated to TCMalloc as free memory if it's not used by
+    Envoy. This change can be reverted temporarily by setting the runtime guard
+    ``envoy.reloadable_features.do_not_count_mapped_pages_as_free`` to true.
+- area: prometheus_stats
+  change: |
+    removed blank line for being compatible with OpenMetrics.
+- area: quic
+  change: |
+    changed the timing of QUIC connection writing data in response to incoming packets in non-Windowns platforms. This
+    change can be reverted by setting runtime guard ``envoy.reloadable_features.quic_defer_send_in_response_to_packet`` to
+    false.
+- area: original_dst
+  change: |
+    transparent listener can use original_dst filter without nf_conntrack enabled.
+- area: cache_filter
+  change: |
+    added a completion callback to insertHeaders and insertTrailers in cache interface. Any external cache implementation
+    extensions will need to also add this callback, and call it on completion.
+- area: udp_proxy
+  change: |
+    changed behavior of UDP proxy to connect UDP sockets unless ``use_original_src_ip`` is set. This change can be reverted
+    by setting runtime guard ``envoy.reloadable_features.udp_proxy_connect`` to false.
+- area: local_ratelimit
+  change: |
+    added :ref:`virtual host level configuration
+    <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.vh_rate_limits>` support for the local
+    ratelimit filter.
+- area: health_check
+  change: |
+    support custom health check address via :ref:`health_check_config
+    <envoy_v3_api_msg_config.endpoint.v3.endpoint.healthcheckconfig>`.
+- area: http
+  change: |
+    changed shadow requests to more closely behave like the requests they are shadowing. This includes matching the upstream
+    logging for the original request, dynamic stats, suppressing Envoy headers, respecting expected request timeout,
+    suppressing grpc request failure code stats and strict header checks. This behaviorial change can be temporarily
+    reverted by setting runtime guard ``envoy.reloadable_features.closer_shadow_behavior`` to false.
+- area: http
+  change: |
+    changed the filter callback interfaces to make sure that downstream-only functionality is explicit.
+- area: http
+  change: |
+    the upstream remote address is now available to downstream HTTP filters via the ``upstreamRemoteAddress`` function.
+- area: stats
+  change: |
+    Default tag extraction rules were changed for ``worker_id`` extraction. Previously, ``worker_`` was removed from the
+    original name during the extraction. This led to the same base stat name for both the per-worker and overall stat. For
+    instance, in prometheus stats, the following stats were produced: ::    envoy_listener_downstream_cx_total{} 2.
+    envoy_listener_downstream_cx_total{envoy_worker_id="0"} 1.   envoy_listener_downstream_cx_total{envoy_worker_id="1"} 1.
+    This resulted in ``sum(envoy_listener_downstream_cx_total)`` producing 4, even though there are only 2 connections. The
+    new behavior results in stats such as this: ::    envoy_listener_downstream_cx_total{} 2.
+    envoy_listener_worker_downstream_cx_total{envoy_worker_id="0"} 1.
+    envoy_listener_worker_downstream_cx_total{envoy_worker_id="1"} 1.
+- area: dynamic_forward_proxy
+  change: |
+    No longer waiting on DNS responses in the dynamic forward proxy filter if upstream proxying is turned on. This
+    behaviorial change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.skip_dns_lookup_for_proxied_requests`` to false.
+
+bug_fixes:
+- area: http
+  change: |
+    fixed a bug with internal redirects not being performed for drained connections.
+- area: jwt_authn
+  change: |
+    fixed a bug where a negative "exp", "iat", or "nbf" integer in JWT token readed as a large positive value.
+- area: grpc_transcoder
+  change: |
+    fixed a bug where a request with a wrong binding type is not rejected if the request body is empty.
+- area: listener
+  change: |
+    fixed a bug that doesn't handle of an update for a listener with IPv4-mapped address correctly, and that will lead to a
+    memory leak.
+- area: transport_socket
+  change: |
+    fixed a bug that prevented the tcp stats to be retrieved when running on kernels different than the kernel where Envoy
+    was built.
+- area: logger
+  change: |
+    added the %j and %_ format support for fine-grain loggers to make it consistant with default loggers.
+- area: thrift
+  change: |
+    fixed the routing decision when thrift filters change the value of the cluster header.
+- area: router
+  change: |
+    fixed edge-case interaction between weighted clusters, cluster headers and (request|response)_headers_to_(add|remove).
+- area: upstream
+  change: |
+    fixed a bug where custom transport socket hashes might not be respected by wrapper passthrough sockets. This change can
+    be temporarily reverted by setting runtime guard ``envoy.reloadable_features.fix_hash_key`` to false.
+- area: tls
+  change: |
+    fixed a bug where, when runtime guard ``envoy.reloadable_features.tls_async_cert_validation`` is set to false, the wrong
+    TLS alerts would sometimes be sent in response to certificate validation failures.
+
+removed_config_or_runtime:
+- area: auto_config
+  change: |
+    removed ``envoy.reloadable_features.correctly_validate_alpn`` and legacy code paths.
+- area: grpc
+  change: |
+    remove ``envoy.reloadable_features.enable_grpc_async_client_cache`` and legacy code paths.
+- area: hcm
+  change: |
+    removed ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.proxy_120_103`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.http2_allow_capacity_increase_by_settings`` and legacy code paths.
+- area: http
+  change: |
+    removed ``envoy.reloadable_features.sanitize_http_header_referer`` and legacy code paths.
+- area: lightstep
+  change: |
+    removed the Lightstep tracer integration, making way for the native OpenTelemetry integration.
+- area: listener
+  change: |
+    removed ``envoy.reloadable_features.internal_address`` and legacy code paths.
+- area: router
+  change: |
+    removed ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` and legacy code paths.
+- area: tracing
+  change: |
+    removed ``envoy.reloadable_features.update_grpc_response_error_tag`` and legacy code paths.
+
+new_features:
+- area: header_formatters
+  change: |
+    all access log formatters can be used as custom request/response headers. Custom header's syntax is parsed using access
+    logger's parser and header values are obtained using access log's substitution formatters. This feature can be reversed
+    by setting runtime guard ``envoy.reloadable_features.unified_header_formatter`` to false.
+- area: http
+  change: |
+    made the :ref:`admission control <envoy_v3_api_msg_extensions.filters.http.admission_control.v3.AdmissionControl>` work
+    as an upstream HTTP filter.
+- area: http
+  change: |
+    added default-false ``envoy.reloadable_features.http1_use_balsa_parser`` for experimental BalsaParser.
+- area: http
+  change: |
+    added ``envoy.reloadable_features.allow_upstream_filters`` for experimental upstream HTTP filters.
+- area: dns_resolver
+  change: |
+    added DNS stats for c-ares DNS resolver. Detailed documentation is available :ref:`here <arch_overview_dns_resolution>`.
+- area: gzip
+  change: |
+    added support for :ref:`max_inflate_ratio <envoy_v3_api_msg_extensions.compression.gzip.decompressor.v3.Gzip>`.
+- area: access_log
+  change: |
+    added downstream handshake timing to connection streamInfo. Can be accessed by custom access loggers.
+- area: build
+  change: |
+    official released binary is now built on Ubuntu 20.04, requires glibc >= 2.30.
+- area: listener
+  change: |
+    added multiple listening addresses in single listener. :ref:`listener additional addresses
+    <envoy_v3_api_field_config.listener.v3.Listener.additional_addresses>`.
+- area: load balancer
+  change: |
+    added a new field to subset load balancer config: :ref:`metadata_fallback_policy
+    <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.metadata_fallback_policy>`.
+- area: thrift
+  change: |
+    added stats for downstream connection close to detect SR drop.
+- area: compression
+  change: |
+    added support for :ref:`choose_first <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`.
+- area: cors
+  change: |
+    added support for cors PNA. This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy_reloadable_features_cors_private_network_access`` to false. More details refer to
+    https://developer.chrome.com/blog/private-network-access-preflight.
+- area: upstream
+  change: |
+    added a filter state object to control the destination address in :ref:`ORIGINAL_DST clusters
+    <arch_overview_load_balancing_types_original_destination_request_header_filter_state>`.
+- area: upstream
+  change: |
+    added a new field :ref:`extra_source_addresses <envoy_v3_api_field_config.core.v3.BindConfig.extra_source_addresses>` to
+    the BindConfig, it enables to specify multiple source addresses, and the source address selection is based on target
+    host's address' version.
+- area: admin
+  change: |
+    added new :ref:`/heap_dump <operations_admin_interface_heap_dump>` endpoint to dump heap profile of Envoy.
+- area: health check
+  change: |
+    added :ref:`method <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.method>` support to configure http
+    health check http method.
+- area: health check
+  change: |
+    added :ref:`thrift health check <envoy_v3_api_msg_extensions.health_checkers.thrift.v3.Thrift>` as a :ref:`custom health
+    check <envoy_v3_api_msg_config.core.v3.HealthCheck.CustomHealthCheck>`.
+- area: access_log
+  change: |
+    updated command operator ``%GRPC_STATUS%`` to suppoprt the snake case.
+- area: redis
+  change: |
+    added support for redis transactions.
+- area: listener
+  change: |
+    expose the implementation of :ref:`internal listener <config_internal_listener>` in xDS API.
+- area: ratelimit
+  change: |
+    add support for :ref:`adding response headers
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.response_headers_to_add>` to rate-limited responses.
+- area: access_log
+  change: |
+    added support for number values in substitution format string in json_format.
+- area: http
+  change: |
+    added the expected :ref:`receive <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.receive>` payload check
+    for HTTP health check. Added :ref:`response_buffer_size
+    <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.response_buffer_size>` to configure the maximum HTTP
+    health check response buffer size.
+- area: lua
+  change: |
+    added new headers method "setHttp1ReasonPhrase" for lua filter, please see :ref:`lua header wrapper
+    <config_http_filters_lua_header_wrapper>`.
+- area: lua
+  change: |
+    added stats for lua filter, please see :ref:`lua filter stats <config_http_filters_lua_stats>`.
+- area: subset load balancer
+  change: |
+    added multiple keys or multiple selectors support for :ref:`single host per subset mode
+    <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`.
+- area: listener
+  change: |
+    allow network filters other than HTTP Connection Manager to be created for QUIC listeners.
+- area: lua
+  change: |
+    added an alternative function signature to ``httpCall()`` with ``options`` as an argument. This allows to skip sampling
+    the produced trace span by setting ``{["trace_sampled"] = false}`` as the ``options``. And this allows to return
+    multiple header values for same header name by setting ``{["return_duplicate_headers"] = true}`` as the ``options``.
+- area: zipkin
+  change: |
+    added :ref:`split_spans_for_request <envoy_v3_api_field_config.trace.v3.ZipkinConfig.split_spans_for_request>` to make
+    Envoy appear as an independent hop for zipkin tracing.
+- area: cluster
+  change: |
+    added support to override original destination port via setting :ref:`upstream_port_override
+    <envoy_v3_api_field_config.cluster.v3.Cluster.OriginalDstLbConfig.upstream_port_override>`.
+- area: generic_proxy
+  change: |
+    added an new network filter :ref:`generic_proxy filter
+    <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxy>`.
+- area: redis
+  change: |
+    added support for quit command to the redis proxy.
+- area: tcp_proxy
+  change: |
+    added support for propagating the response headers in :ref:`TunnelingConfig
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.propagate_response_headers>` to the
+    downstream info filter state.
+- area: access_log
+  change: |
+    log ``duration``, ``upstream_request_attempt_count``, ``connection_termination_details`` and tls ``ja3`` field in the
+    grpc access log and also log the tls ``sni`` and ``ja3`` field in the grpc access log when envoy is configured as a tls
+    forward proxy.
+- area: grpc_json_transcoder
+  change: |
+    added support for parsing enum value case insensitively enabled by the config :ref:`case_insensitive_enum_parsing
+    <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.case_insensitive_enum_parsing>`.
+- area: grpc_json_transcoder
+  change: |
+    added support for newline-delimited streams in :ref:`stream_newline_delimited
+    <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.PrintOptions.stream_newline_delimited>`.
+- area: grpc_stats
+  change: |
+    added support for replacing dots of gRPC service name with underscores in the gRPC stats by the config
+    :ref:`replace_dots_in_grpc_service_name
+    <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.replace_dots_in_grpc_service_name>`.
+- area: http
+  change: |
+    Added :ref:`HeaderBasedSessionState
+    <envoy_v3_api_msg_extensions.http.stateful_session.header.v3.HeaderBasedSessionState>` to manage :ref:`StatefulSession
+    State <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>` via request/response header.
+
+deprecated:
+- area: http
+  change: |
+    deprecated :ref:`append <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` and please use :ref:`append_action
+    <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` first.
+- area: router
+  change: |
+    deprecated :ref:`total weight <envoy_v3_api_field_config.route.v3.WeightedCluster.total_weight>` for weighted clusters.
+    The sum of the :ref:`clusters' weights <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.weight>` will
+    be used as the total weight.
+- area: cors
+  change: |
+    deprecated :ref:`cors field of virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.cors>` and :ref:`cors field
+    of route action <envoy_v3_api_field_config.route.v3.RouteAction.cors>`. Please use
+    :ref:`VirtualHost.typed_per_filter_config <envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>`,
+    :ref:`Route.typed_per_filter_config <envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>` or
+    :ref:`WeightedCluster.ClusterWeight.typed_per_filter_config
+    <envoy_v3_api_field_config.route.v3.WeightedCluster.ClusterWeight.typed_per_filter_config>` to configure the CORS HTTP
+    filter by the type :ref:`CorsPolicy in filter <envoy_v3_api_msg_extensions.filters.http.cors.v3.CorsPolicy>`.

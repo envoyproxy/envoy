@@ -1,0 +1,71 @@
+frames {
+  qframe {
+    stream {
+      unidirectional: true,
+      type: 0,
+      id: 2,
+      fin: false,
+      offset: 0,
+        h3frame {
+          settings {}
+        }
+    }
+  }
+}
+frames {
+  qframe {
+    stream {
+      unidirectional: false,
+      type: 0,
+      id: 4,
+      fin: false,
+      offset: 0,
+      h3frame {
+        headers {
+          headers {
+            headers {
+              key: ":scheme"
+              value: "http"
+            }
+            headers {
+              key: ":path"
+              value: "/"
+            }
+            headers {
+              key: ":method"
+              value: "get"
+            }
+            headers {
+              key: "connection"
+              value: "close"
+            }
+            headers {
+              key: "-retry-on"
+              value: "retriable-4xx"
+            }
+            headers {
+              key: "cache-control"
+              value: "no-cache"
+            }
+            headers {
+              key: "early-data"
+              value: "empty"
+            }
+            headers {
+              key: "http2-settings"
+              value: "empty"
+            }
+            headers {
+              key: "authorization"
+              value: "empty"
+            }
+            headers {
+              key: "x-squash-debug"
+              value: "empty"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,132 @@
+envoy.filters.http.checksum:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.http.dynamo:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.filters.http.golang:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.compression.qatzip.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+envoy.compression.qatzstd.compressor:
+  categories:
+  - envoy.compression.compressor
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+envoy.filters.http.squash:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.filters.http.sxg:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.filters.network.client_ssl_auth:
+  categories:
+  - envoy.filters.network
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+envoy.filters.network.kafka_broker:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+envoy.filters.network.kafka_mesh:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+envoy.filters.network.golang:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.network.rocketmq_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.network.mysql_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.network.postgres_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+envoy.filters.network.sip_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.sip.router:
+  categories:
+  - envoy.sip_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.tls.key_providers.cryptomb:
+  categories:
+  - envoy.tls.key_providers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.tls.key_providers.qat:
+  categories:
+  - envoy.tls.key_providers
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+envoy.bootstrap.vcl:
+  categories:
+  - envoy.bootstrap
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.matching.input_matchers.hyperscan:
+  categories:
+  - envoy.matching.input_matchers
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.http.language:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.network.connection_balance.dlb:
+  categories:
+  - envoy.network.connection_balance
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.regex_engines.hyperscan:
+  categories:
+  - envoy.regex_engines
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.xds_delegates.kv_store:
+  categories:
+  - envoy.xds_delegates
+  security_posture: data_plane_agnostic
+  status: wip
+envoy.generic_proxy.codecs.kafka:
+  categories:
+  - envoy.generic_proxy.codecs
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.generic_proxy.codecs.kafka.v3.KafkaCodecConfig
+envoy.router.cluster_specifier_plugin.golang:
+  categories:
+  - envoy.router.cluster_specifier_plugin
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha

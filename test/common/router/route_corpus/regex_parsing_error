@@ -1,0 +1,32 @@
+config {
+  virtual_hosts {
+    name: "."
+    domains: "*"
+    request_headers_to_add {
+      header {
+        key: "x-forwarded-proto"
+        value: "%START_TIME((%%%f%\034f%256\\002\\0N\\ss)%"
+      }
+    }
+    matcher {
+      on_no_match {
+        action {
+          name: "."
+          typed_config {
+            type_url: "m/envoy.config.route.v3.Route"
+            value: "\n\002\n\000\022\t\n\001v*\0015\242\002\000J\005\n\003\n\0011JF\nB\n\001$\022=%START_TIME((%%%fenvoy.filters.http.router%\034f%256\\002\\0N\\ss)% \001J\005\n\003\n\001$J\205\001\n\202\001\n\001$\022}%START_TIME((%%%fenvoy%PER_REQUEST_STATE(%fenvoy.type.v3.Int64Ra%TUEST_STATE(%f%ss[%%s.filters.http.router%\034f%256\\002\\0N\\ss)%J\010\n\006\n\0011\022\001\003b\001?b\021x-forwarded-protob\021x-forwarded-protor\001v\202\001\000"
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: "x-forwarded-proto"
+    value: "1"
+  }
+  headers {
+    key: ":path"
+  }
+}

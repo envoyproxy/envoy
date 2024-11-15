@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package envoy.config.trace.v3;
+
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/config/core/v3/http_service.proto";
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.config.trace.v3";
+option java_outer_classname = "OpentelemetryProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/trace/v3;tracev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: OpenTelemetry tracer]
+
+// Configuration for the OpenTelemetry tracer.
+//  [#extension: envoy.tracers.opentelemetry]
+// [#next-free-field: 6]
+message OpenTelemetryConfig {
+  // The upstream gRPC cluster that will receive OTLP traces.
+  // Note that the tracer drops traces if the server does not read data fast enough.
+  // This field can be left empty to disable reporting traces to the gRPC service.
+  // Only one of ``grpc_service``, ``http_service`` may be used.
+  core.v3.GrpcService grpc_service = 1
+      [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
+
+  // The upstream HTTP cluster that will receive OTLP traces.
+  // This field can be left empty to disable reporting traces to the HTTP service.
+  // Only one of ``grpc_service``, ``http_service`` may be used.
+  //
+  // .. note::
+  //
+  //   Note: The ``request_headers_to_add`` property in the OTLP HTTP exporter service
+  //   does not support the :ref:`format specifier <config_access_log_format>` as used for
+  //   :ref:`HTTP access logging <config_access_log>`.
+  //   The values configured are added as HTTP headers on the OTLP export request
+  //   without any formatting applied.
+  core.v3.HttpService http_service = 3
+      [(udpa.annotations.field_migrate).oneof_promotion = "otlp_exporter"];
+
+  // The name for the service. This will be populated in the ResourceSpan Resource attributes.
+  // If it is not provided, it will default to "unknown_service:envoy".
+  string service_name = 2;
+
+  // An ordered list of resource detectors
+  // [#extension-category: envoy.tracers.opentelemetry.resource_detectors]
+  repeated core.v3.TypedExtensionConfig resource_detectors = 4;
+
+  // Specifies the sampler to be used by the OpenTelemetry tracer.
+  // The configured sampler implements the Sampler interface defined by the OpenTelemetry specification.
+  // This field can be left empty. In this case, the default Envoy sampling decision is used.
+  //
+  // See: `OpenTelemetry sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#sampler>`_
+  // [#extension-category: envoy.tracers.opentelemetry.samplers]
+  core.v3.TypedExtensionConfig sampler = 5;
+}

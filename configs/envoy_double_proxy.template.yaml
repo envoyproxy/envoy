@@ -1,0 +1,183 @@
+{%- macro listener(protocol, address, port_value, tls, proxy_proto, tracing) -%}
+- name: listener_created_from_configgen
+  address:
+    socket_address:
+      protocol: {{protocol}}
+      address: {{address}}
+      port_value: {{port_value}}
+  {% if proxy_proto %}
+  listener_filters:
+  - name: envoy.filters.listener.proxy_protocol
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+  {% endif %}
+  filter_chains:
+  - filter_chain_match: {}
+    {% if tls %}
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: certs/servercert.pem
+            private_key:
+              filename: certs/serverkey.pem
+          validation_context: {}
+          alpn_protocols:
+          - h2
+          - http/1.1
+    {% endif %}
+    filters:
+    - name: envoy.filters.network.http_connection_manager
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        codec_type: AUTO
+        stat_prefix: router
+        route_config:
+          name: local_route
+          virtual_hosts:
+          - name: local_service
+            domains: ["*"]
+            routes:
+            - match:
+                prefix: "/"
+              route:
+                cluster: backhaul
+                #Generally allow front proxy to control timeout and use this as a backstop
+                timeout: 20s
+        http_filters:
+        - name: envoy.filters.http.health_check
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+            pass_through_mode: false
+            headers:
+              - string_match:
+                  exact: /healthcheck
+                name: :path
+        - name: envoy.filters.http.buffer
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
+            max_request_bytes: 5242880
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+        common_http_protocol_options:
+          idle_timeout: 840s
+        access_log:
+        - name: envoy.access_loggers.file
+          filter:
+            or_filter:
+              filters:
+                - status_code_filter:
+                    comparison:
+                      op: GE
+                      value:
+                        default_value: 500
+                        runtime_key: access_log.access_error.status
+                - duration_filter:
+                    comparison:
+                      op: GE
+                      value:
+                        default_value: 1000
+                        runtime_key: access_log.access_error.duration
+                - traceable_filter: {}
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+            path: /var/log/envoy/access_error.log
+            log_format:
+              text_format_source:
+                inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
+        {% if proxy_proto %}
+        use_remote_address: true
+        {%endif -%}
+{% endmacro -%}
+static_resources:
+  listeners:
+  # TCP listener for external port 443 (TLS). Assumes a TCP LB in front such as ELB which
+  # supports proxy proto
+  {{ listener("TCP", "0.0.0.0",9300,True, True, tracing)|indent(2) }}
+  # TCP listener for external port 80 (non-TLS). Assumes a TCP LB in front such as ELB which
+  # supports proxy proto.
+  {{ listener("TCP", "0.0.0.0",9301,False, True, tracing)|indent(2) }}
+  clusters:
+  - name: statsd
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: statsd
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 8125
+                protocol: TCP
+  - name: backhaul
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: backhaul
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: front-proxy.yourcompany.net
+                port_value: 9400
+                protocol: TCP
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: certs/clientcert.pem
+            private_key:
+              filename: certs/clientkey.pem
+          validation_context:
+            trusted_ca:
+              filename: certs/cacert.pem
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "front-proxy.yourcompany.net"
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        common_http_protocol_options:
+          # There are so few connections going back
+          # that we can get some imbalance. Until we come up
+          # with a better solution just limit the requests
+          # so we can cycle and get better spread.
+          max_requests_per_connection: 25000
+flags_path: "/etc/envoy/flags"
+stats_sinks:
+- name: envoy.stat_sinks.statsd
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
+    tcp_cluster_name: statsd
+layered_runtime:
+  layers:
+    - name: root
+      disk_layer:
+        symlink_root: /srv/configset/envoydata/current
+        subdirectory: envoy
+    - name: override
+      disk_layer:
+        symlink_root: /srv/configset/envoydata/current
+        subdirectory: envoy_override
+        append_service_cluster: true
+    - name: admin
+      admin_layer: {}
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 9901

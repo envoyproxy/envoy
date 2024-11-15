@@ -1,0 +1,195 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.oauth2.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/http_uri.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+import "envoy/type/matcher/v3/path.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.oauth2.v3";
+option java_outer_classname = "OauthProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/oauth2/v3;oauth2v3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: OAuth]
+// OAuth :ref:`configuration overview <config_http_filters_oauth>`.
+// [#extension: envoy.filters.http.oauth2]
+//
+
+// [#next-free-field: 6]
+message OAuth2Credentials {
+  // [#next-free-field: 7]
+  message CookieNames {
+    // Cookie name to hold OAuth bearer token value. When the authentication server validates the
+    // client and returns an authorization token back to the OAuth filter, no matter what format
+    // that token is, if :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.forward_bearer_token>`
+    // is set to true the filter will send over the bearer token as a cookie with this name to the
+    // upstream. Defaults to ``BearerToken``.
+    string bearer_token = 1
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold OAuth HMAC value. Defaults to ``OauthHMAC``.
+    string oauth_hmac = 2
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold OAuth expiry value. Defaults to ``OauthExpires``.
+    string oauth_expires = 3
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold the id token. Defaults to ``IdToken``.
+    string id_token = 4
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold the refresh token. Defaults to ``RefreshToken``.
+    string refresh_token = 5
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold the nonce value. Defaults to ``OauthNonce``.
+    string oauth_nonce = 6
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+  }
+
+  // The client_id to be used in the authorize calls. This value will be URL encoded when sent to the OAuth server.
+  string client_id = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The secret used to retrieve the access token. This value will be URL encoded when sent to the OAuth server.
+  transport_sockets.tls.v3.SdsSecretConfig token_secret = 2
+      [(validate.rules).message = {required: true}];
+
+  // Configures how the secret token should be created.
+  oneof token_formation {
+    option (validate.required) = true;
+
+    // If present, the secret token will be a HMAC using the provided secret.
+    transport_sockets.tls.v3.SdsSecretConfig hmac_secret = 3
+        [(validate.rules).message = {required: true}];
+  }
+
+  // The cookie names used in OAuth filters flow.
+  CookieNames cookie_names = 4;
+
+  // The domain to set the cookie on. If not set, the cookie will default to the host of the request, not including the subdomains.
+  // This is useful when token cookies need to be shared across multiple subdomains.
+  string cookie_domain = 5;
+}
+
+// OAuth config
+//
+// [#next-free-field: 21]
+message OAuth2Config {
+  enum AuthType {
+    // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
+    // This type should only be used when Auth server does not support Basic authentication.
+    URL_ENCODED_BODY = 0;
+
+    // The ``client_id`` and ``client_secret`` will be sent using HTTP Basic authentication scheme.
+    BASIC_AUTH = 1;
+  }
+
+  // Endpoint on the authorization server to retrieve the access token from.
+  config.core.v3.HttpUri token_endpoint = 1;
+
+  // Specifies the retry policy for requests to the OAuth server. If not specified, then no retries will be performed.
+  config.core.v3.RetryPolicy retry_policy = 18;
+
+  // The endpoint redirect to for authorization in response to unauthorized requests.
+  string authorization_endpoint = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Credentials used for OAuth.
+  OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];
+
+  // The redirect URI passed to the authorization endpoint. Supports header formatting
+  // tokens. For more information, including details on header value syntax, see the
+  // documentation on :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
+  //
+  // This URI should not contain any query parameters.
+  string redirect_uri = 4 [(validate.rules).string = {min_len: 1}];
+
+  // Matching criteria used to determine whether a path appears to be the result of a redirect from the authorization server.
+  type.matcher.v3.PathMatcher redirect_path_matcher = 5
+      [(validate.rules).message = {required: true}];
+
+  // The path to sign a user out, clearing their credential cookies.
+  type.matcher.v3.PathMatcher signout_path = 6 [(validate.rules).message = {required: true}];
+
+  // Forward the OAuth token as a Bearer to upstream web service.
+  bool forward_bearer_token = 7;
+
+  // If set to true, preserve the existing authorization header.
+  // By default the client strips the existing authorization header before forwarding upstream.
+  // Can not be set to true if forward_bearer_token is already set to true.
+  // Default value is false.
+  bool preserve_authorization_header = 16;
+
+  // Any request that matches any of the provided matchers will be passed through without OAuth validation.
+  repeated config.route.v3.HeaderMatcher pass_through_matcher = 8;
+
+  // Optional list of OAuth scopes to be claimed in the authorization request. If not specified,
+  // defaults to "user" scope.
+  // OAuth RFC https://tools.ietf.org/html/rfc6749#section-3.3
+  repeated string auth_scopes = 9;
+
+  // Optional resource parameter for authorization request
+  // RFC: https://tools.ietf.org/html/rfc8707
+  repeated string resources = 10;
+
+  // Defines how ``client_id`` and ``client_secret`` are sent in OAuth client to OAuth server requests.
+  // RFC https://datatracker.ietf.org/doc/html/rfc6749#section-2.3.1
+  AuthType auth_type = 11 [(validate.rules).enum = {defined_only: true}];
+
+  // If set to true, allows automatic access token refresh using the associated refresh token (see
+  // `RFC 6749 section 6 <https://datatracker.ietf.org/doc/html/rfc6749#section-6>`_), provided that the OAuth server supports that.
+  // Default value is true.
+  google.protobuf.BoolValue use_refresh_token = 12;
+
+  // The default lifetime in seconds of the access token, if omitted by the authorization server.
+  //
+  // If this value is not set, it will default to ``0s``. In this case, the expiry must be set by
+  // the authorization server or the OAuth flow will fail.
+  google.protobuf.Duration default_expires_in = 13;
+
+  // Any request that matches any of the provided matchers won't be redirected to OAuth server when tokens are not valid.
+  // Automatic access token refresh will be performed for these requests, if enabled.
+  // This behavior can be useful for AJAX requests.
+  repeated config.route.v3.HeaderMatcher deny_redirect_matcher = 14;
+
+  // The default lifetime in seconds of the refresh token, if the exp (expiration time) claim is omitted in the refresh token or the refresh token is not JWT.
+  //
+  // If this value is not set, it will default to ``604800s``. In this case, the cookie with the refresh token will be expired
+  // in a week.
+  // This setting is only considered if ``use_refresh_token`` is set to true, otherwise the authorization server expiration or ``default_expires_in`` is used.
+  google.protobuf.Duration default_refresh_token_expires_in = 15;
+
+  // If set to true, the client will not set a cookie for ID Token even if one is received from the Identity Provider. This may be useful in cases where the ID
+  // Token is too large for HTTP cookies (longer than 4096 characters). Enabling this option will only disable setting the cookie response header, the filter
+  // will still process incoming ID Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
+  // sessions would not set the IdToken cookie header.
+  bool disable_id_token_set_cookie = 17;
+
+  // If set to true, the client will not set a cookie for Access Token even if one is received from the Identity Provider.
+  // Enabling this option will only disable setting the cookie response header, the filter
+  // will still process incoming Access Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
+  // sessions would not set the Access Token cookie header.
+  bool disable_access_token_set_cookie = 19;
+
+  // If set to true, the client will not set a cookie for Refresh Token even if one is received from the Identity Provider.
+  // Enabling this option will only disable setting the cookie response header, the filter
+  // will still process incoming Refresh Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
+  // sessions would not set the Refresh Token cookie header.
+  bool disable_refresh_token_set_cookie = 20;
+}
+
+// Filter config.
+message OAuth2 {
+  // Leave this empty to disable OAuth2 for a specific route, using per filter config.
+  OAuth2Config config = 1;
+}

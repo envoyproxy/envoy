@@ -1,0 +1,12 @@
+    merge_slashes {
+        request_headers {
+            headers {
+                key: ":path"
+                value: "//path/to/file"
+            }
+            headers {
+                key: ":authority"
+                value: "foo.com"
+            }
+        }
+    }

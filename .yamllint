@@ -1,0 +1,31 @@
+extends: default
+
+rules:
+  document-start: false
+  indentation:
+    spaces: consistent
+    indent-sequences: false
+  line-length:
+    # This can be adjusted if there is a very good reason.
+    max: 140
+    level: error
+    allow-non-breakable-words: true
+  truthy:
+    allowed-values:
+    - "yes"
+    - "no"
+    - "true"
+    - "false"
+    # https://github.com/adrienverge/yamllint/issues/430
+    - "on"
+    - "off"
+
+yaml-files:
+- .clang-format
+- "*.yml"
+- "*.yaml"
+
+ignore:
+- "**/*template.yaml"
+- examples/single-page-app/_github-clusters.yml
+- test/config/integration/server_xds.cds.with_unknown_field.yaml

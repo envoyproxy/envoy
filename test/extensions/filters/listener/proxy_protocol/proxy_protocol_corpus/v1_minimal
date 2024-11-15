@@ -1,0 +1,7 @@
+config {
+
+}
+
+fuzzed {
+  data: "PROXY UNKNOWN\r\n"
+}

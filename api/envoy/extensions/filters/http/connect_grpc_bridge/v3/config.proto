@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.connect_grpc_bridge.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.connect_grpc_bridge.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/connect_grpc_bridge/v3;connect_grpc_bridgev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Connect RPC to gRPC] Connect RPC to gRPC bridge
+// :ref:`configuration overview <config_http_filters_connect_grpc_bridge>`.
+// [#extension: envoy.filters.http.connect_grpc_bridge]
+
+// Connect RPC to gRPC bridge filter configuration
+message FilterConfig {
+}

@@ -1,0 +1,44 @@
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 9901
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: UDP
+        address: 127.0.0.1
+        port_value: 1234
+    udp_listener_config:
+      downstream_socket_config:
+        max_rx_datagram_size: 9000
+    listener_filters:
+    - name: envoy.filters.udp_listener.udp_proxy
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+        stat_prefix: service
+        matcher:
+          on_no_match:
+            action:
+              name: route
+              typed_config:
+                '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                cluster: service_udp
+        upstream_socket_config:
+          max_rx_datagram_size: 9000
+  clusters:
+  - name: service_udp
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service_udp
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 1235

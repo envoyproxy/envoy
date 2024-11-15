@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.input_matchers.hyperscan.v3alpha;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.hyperscan.v3alpha";
+option java_outer_classname = "HyperscanProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Hyperscan matcher]
+// Hyperscan :ref:`configuration overview <config_hyperscan>`.
+// [#extension: envoy.matching.input_matchers.hyperscan]
+
+// `Hyperscan <https://github.com/intel/hyperscan>`_ regex matcher. The matcher uses the Hyperscan
+// engine which exploits x86 SIMD instructions to accelerate matching large numbers of regular
+// expressions simultaneously across streams of data.
+message Hyperscan {
+  // [#next-free-field: 11]
+  message Regex {
+    // The regex expression.
+    //
+    // The expression must represent only the pattern to be matched, with no delimiters or flags.
+    string regex = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The ID of the regex expression.
+    //
+    // This option is designed to be used on the sub-expressions in logical combinations.
+    uint32 id = 2;
+
+    // Matching will be performed case-insensitively.
+    //
+    // The expression may still use PCRE tokens (notably ``(?i)`` and ``(?-i)``) to switch
+    // case-insensitive matching on and off.
+    bool caseless = 3;
+
+    // Matching a ``.`` will not exclude newlines.
+    bool dot_all = 4;
+
+    // ``^`` and ``$`` anchors match any newlines in data.
+    bool multiline = 5;
+
+    // Allow expressions which can match against an empty string.
+    //
+    // This option instructs the compiler to allow expressions that can match against empty buffers,
+    // such as ``.?``, ``.*``, ``(a|)``. Since Hyperscan can return every possible match for an expression,
+    // such expressions generally execute very slowly.
+    bool allow_empty = 6;
+
+    // Treat the pattern as a sequence of UTF-8 characters.
+    bool utf8 = 7;
+
+    // Use Unicode properties for character classes.
+    //
+    // This option instructs Hyperscan to use Unicode properties, rather than the default ASCII
+    // interpretations, for character mnemonics like ``\w`` and ``\s`` as well as the POSIX character
+    // classes. It is only meaningful in conjunction with ``utf8``.
+    bool ucp = 8;
+
+    // Logical combination.
+    //
+    // This option instructs Hyperscan to parse this expression as logical combination syntax.
+    // Logical constraints consist of operands, operators and parentheses. The operands are
+    // expression indices, and operators can be ``!``, ``&`` or ``|``.
+    bool combination = 9;
+
+    // Don’t do any match reporting.
+    //
+    // This option instructs Hyperscan to ignore match reporting for this expression. It is
+    // designed to be used on the sub-expressions in logical combinations.
+    bool quiet = 10;
+  }
+
+  // Specifies a set of regex expressions that the input should match on.
+  repeated Regex regexes = 1 [(validate.rules).repeated = {min_items: 1}];
+}

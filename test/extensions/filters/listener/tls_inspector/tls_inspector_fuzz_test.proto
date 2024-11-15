@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package test.extensions.filters.listener.tls_inspector;
+
+import "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.proto";
+import "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.proto";
+import "validate/validate.proto";
+
+message TlsInspectorTestCase {
+  envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector config = 1
+      [(validate.rules).message.required = true];
+  uint32 max_size = 2 [(validate.rules).uint32.lte = 65536];
+  test.extensions.filters.listener.FilterFuzzWithDataTestCase fuzzed = 3
+      [(validate.rules).message.required = true];
+}

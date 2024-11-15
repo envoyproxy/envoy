@@ -1,0 +1,27 @@
+version: v1
+deps:
+- buf.build/googleapis/googleapis:62f35d8aed1149c291d606d958a7ce32
+- buf.build/opencensus/opencensus
+- buf.build/prometheus/client-model
+- buf.build/opentelemetry/opentelemetry
+- buf.build/gogo/protobuf
+- buf.build/cncf/xds
+- buf.build/envoyproxy/protoc-gen-validate
+breaking:
+  ignore_unstable_packages: true
+  use:
+  - FIELD_SAME_ONEOF
+  - FIELD_SAME_JSON_NAME
+  - FIELD_SAME_NAME
+  - FIELD_SAME_TYPE
+  - FIELD_SAME_LABEL
+  - FILE_SAME_PACKAGE
+  - FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED
+  - FIELD_NO_DELETE_UNLESS_NAME_RESERVED
+lint:
+  use:
+  - IMPORT_USED
+  ignore_only:
+    IMPORT_USED:
+    - envoy/api/v2/listener.proto
+    - envoy/config/bootstrap/v2/bootstrap.proto

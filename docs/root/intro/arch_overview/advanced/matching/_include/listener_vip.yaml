@@ -1,0 +1,53 @@
+static_resources:
+  listeners:
+  - name: outbound
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 15000
+    listener_filters:
+    - name: proxy_protocol
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+    filter_chains:
+    - name: vip
+      filters:
+      - name: tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: vip
+          cluster: original_dst
+    - name: default
+      filters:
+      - name: tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: default
+          cluster: original_dst
+    # Snippet: 29-48
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: destination_ip
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
+        prefix_match_map:
+          map:
+            "10.0.0.":
+              action:
+                name: vip
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: vip
+      on_no_match:
+        action:
+          name: default
+          typed_config:
+            "@type": type.googleapis.com/google.protobuf.StringValue
+            value: default
+
+  clusters:
+  - name: original_dst
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED

@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package Envoy.Extensions.HttpFilters.Cache;
+
+// Cache key for lookups and inserts.
+message Key {
+  string cluster_name = 1;
+  string host = 2;
+  string path = 3;
+  string query = 4;
+  // True for http://, false for https://.
+  bool clear_http = 5 [deprecated = true]; // Use scheme instead.
+  enum Scheme {
+    UNSPECIFIED = 0;
+    HTTP = 1;
+    HTTPS = 2;
+  }
+  // If UNSPECIFIED, the scheme is not included in the cache key, so http and
+  // https will map to the same cache entry. Otherwise, the scheme is included
+  // in the cache key.
+  Scheme scheme = 8;
+  // Cache implementations can store arbitrary content in these fields; never set by cache filter.
+  repeated bytes custom_fields = 6;
+  repeated int64 custom_ints = 7;
+};

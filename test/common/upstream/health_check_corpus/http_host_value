@@ -1,0 +1,49 @@
+health_check_config {
+    timeout {
+        seconds: 1
+    }
+    interval {
+        seconds: 1
+    }
+    no_traffic_interval {
+        seconds: 1
+    }
+    interval_jitter {
+        seconds: 1
+    }
+    unhealthy_threshold {
+        value: 2
+    }
+    healthy_threshold: {
+        value: 2
+    }
+    http_health_check {
+        path: "\005\003"
+        host: "\005\003"
+    }
+}
+actions {
+    respond {
+        http_respond {
+            headers {
+                headers {
+                    key: ":status"
+                    value: "200"
+                }
+                headers {
+                    key: "connection"
+                    value: "close"
+                }
+            }
+            status: 200
+        }
+        tcp_respond {
+            
+        }
+        grpc_respond {
+            grpc_respond_headers {
+                
+            }
+        }
+    }
+}

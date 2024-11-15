@@ -1,0 +1,6 @@
+syntax = "proto3";
+package test.protos.allowed;
+
+message AddFieldMessage {
+  string three = 3;
+}

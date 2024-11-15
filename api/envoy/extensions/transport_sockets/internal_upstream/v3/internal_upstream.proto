@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.internal_upstream.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/type/metadata/v3/metadata.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.internal_upstream.v3";
+option java_outer_classname = "InternalUpstreamProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/internal_upstream/v3;internal_upstreamv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Internal Upstream]
+// [#extension: envoy.transport_sockets.internal_upstream]
+
+// Configuration for the internal upstream address. An internal address defines
+// a loopback user space socket residing in the same proxy instance. This
+// extension allows passing additional structured state across the user space
+// socket in addition to the regular byte stream. The purpose is to facilitate
+// communication between filters on the downstream and the upstream internal
+// connections. All filter state objects that are shared with the upstream
+// connection are also shared with the downstream internal connection using
+// this transport socket.
+message InternalUpstreamTransport {
+  // Describes the location of the imported metadata value.
+  // If the metadata with the given name is not present at the source location,
+  // then no metadata is passed through for this particular instance.
+  message MetadataValueSource {
+    // Specifies what kind of metadata.
+    type.metadata.v3.MetadataKind kind = 1 [(validate.rules).message = {required: true}];
+
+    // Name is the filter namespace used in the dynamic metadata.
+    string name = 2 [(validate.rules).string = {min_len: 1}];
+  }
+
+  // Specifies the metadata namespaces and values to insert into the downstream
+  // internal connection dynamic metadata when an internal address is used as a
+  // host. If the destination name is repeated across two metadata source
+  // locations, and both locations contain the metadata with the given name,
+  // then the latter in the list overrides the former.
+  repeated MetadataValueSource passthrough_metadata = 1;
+
+  // The underlying transport socket being wrapped.
+  config.core.v3.TransportSocket transport_socket = 3 [(validate.rules).message = {required: true}];
+}

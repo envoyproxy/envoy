@@ -1,0 +1,1 @@
+config {   name: "envoy.filters.http.file_system_buffer"   typed_config {     type_url: "                   /envoy.extensions.filters.http.file_system_buffer.v3.FileSystemBufferFilterConfig"     value: "\n\007\022\005\010\200\200ÿ ÿ  "   }             l:    e } 

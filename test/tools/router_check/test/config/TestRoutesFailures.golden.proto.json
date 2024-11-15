@@ -1,0 +1,53 @@
+{
+  "tests":  [
+    {
+      "test_name": "ResponseHeaderMatches Failures",
+      "input": {
+        "authority": "www.lyft.com",
+        "path": "/ping",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "",
+        "host_rewrite": "",
+        "path_redirect": "http://www.lyft.com/ping",
+        "path_rewrite": "",
+        "virtual_cluster_name": "",
+        "virtual_host_name": "",
+        "response_header_matches": [
+          {
+            "name": "content-type",
+            "string_match": {
+              "exact": "text/plain"
+            },
+            "invert_match": true
+          },
+          {
+            "name": "content-length",
+            "range_match":
+            {
+              "start": 100,
+              "end": 1000
+            }
+          },
+          {
+            "name": "x-ping-response",
+            "string_match": {
+              "exact": "pong"
+            }
+          },
+          {
+            "name": "x-ping-response",
+            "present_match": true,
+            "invert_match": true
+          },
+          {
+            "name": "x-pong-response",
+            "present_match": true,
+            "invert_match": false
+          }
+        ]
+      }
+    }
+  ]
+}

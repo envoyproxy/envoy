@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package test.common.http;
+
+import "google/protobuf/empty.proto";
+
+import "test/fuzz/common.proto";
+
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+
+// Structured input for conn_manager_impl_fuzz_test.
+
+message NewStream {
+  test.fuzz.Headers request_headers = 1;
+  bool end_stream = 2;
+  HeaderStatus status = 3;
+}
+
+enum HeaderStatus {
+  HEADER_CONTINUE = 0;
+  HEADER_STOP_ITERATION = 1;
+  reserved 2;
+  HEADER_STOP_ALL_ITERATION_AND_BUFFER = 3;
+  HEADER_STOP_ALL_ITERATION_AND_WATERMARK = 4;
+}
+
+enum DataStatus {
+  DATA_CONTINUE = 0;
+  DATA_STOP_ITERATION_AND_BUFFER = 1;
+  DATA_STOP_ITERATION_AND_WATERMARK = 2;
+  DATA_STOP_ITERATION_NO_BUFFER = 3;
+}
+
+enum TrailerStatus {
+  TRAILER_CONTINUE = 0;
+  TRAILER_STOP_ITERATION = 1;
+}
+
+message DecoderFilterCallbackAction {
+  message AddDecodedData {
+    uint32 size = 1;
+    bool streaming = 2;
+  }
+  oneof decoder_filter_callback_action_selector {
+    // TODO(htuch): More decoder filter callback actions
+    AddDecodedData add_decoded_data = 1;
+  }
+}
+
+message RequestAction {
+  message DataAction {
+    uint32 size = 1;
+    bool end_stream = 2;
+    DataStatus status = 3;
+    DecoderFilterCallbackAction decoder_filter_callback_action = 4;
+  }
+  message TrailerAction {
+    test.fuzz.Headers headers = 1;
+    TrailerStatus status = 2;
+    DecoderFilterCallbackAction decoder_filter_callback_action = 3;
+  }
+  oneof request_action_selector {
+    DataAction data = 1;
+    TrailerAction trailers = 2;
+    google.protobuf.Empty continue_decoding = 3;
+    // Dispatch no longer throws, but rather returns an error status.
+    google.protobuf.Empty throw_decoder_exception = 4 [deprecated = true];
+    google.protobuf.Empty return_decoder_error = 5;
+    // TODO(htuch): Model and fuzz watermark events.
+  }
+}
+
+// TODO(htuch): Model and fuzz encoder filter buffering/resumption and different status returns.
+message ResponseAction {
+  oneof response_action_selector {
+    test.fuzz.Headers continue_headers = 1;
+    test.fuzz.Headers headers = 2;
+    uint32 data = 3;
+    test.fuzz.Headers trailers = 4;
+    // TODO(htuch): Model and fuzz watermark events.
+  }
+  bool end_stream = 7;
+}
+
+message StreamAction {
+  uint32 stream_id = 1;
+  oneof stream_action_selector {
+    RequestAction request = 2;
+    ResponseAction response = 3;
+  }
+}
+
+message Action {
+  oneof action_selector {
+    // Create new stream.
+    NewStream new_stream = 1;
+    // Perform an action on an existing stream.
+    StreamAction stream_action = 2;
+  }
+}
+
+message ConnManagerImplTestCase {
+  repeated Action actions = 1;
+  envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+      .ForwardClientCertDetails forward_client_cert = 2;
+}

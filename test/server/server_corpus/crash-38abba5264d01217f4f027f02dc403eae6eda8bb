@@ -1,0 +1,42 @@
+static_resources {
+  listeners {
+    name: "listener_0"
+    address {
+      pipe {
+        path: "/tmp/admin_access.log"
+      }
+    }
+    filter_chains {
+      tls_context {
+        common_tls_context {
+          tls_certificate_sds_secret_configs {
+            sds_config {
+              ads {
+              }
+            }
+          }
+        }
+      }
+    }
+    use_original_dst {
+    }
+  }
+  listeners {
+    name: "www.google.com"
+    address {
+      socket_address {
+        address: "("
+        named_port: "2"
+      }
+    }
+    filter_chains {
+    }
+  }
+}
+admin {
+  address {
+    pipe {
+      path: "/tmp/admin_access.log"
+    }
+  }
+}

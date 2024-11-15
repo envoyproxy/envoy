@@ -1,0 +1,412 @@
+# TODO(zuercher): determine how we want to deal with auto-assignment
+# By default, @envoyproxy/maintainers own everything.
+#*       @envoyproxy/maintainers
+
+# api
+/api/ @envoyproxy/api-shepherds
+
+# docs/examples
+/docs/ @envoyproxy/docs-shepherds
+/examples/ @envoyproxy/docs-shepherds
+/changelogs/ @envoyproxy/docs-shepherds
+
+# access loggers
+/*/extensions/access_loggers/common @auni53 @zuercher
+/*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
+/*/extensions/access_loggers/stream @mattklein123 @davinci26
+# alternate protocols cache extensions
+/*/extensions/filters/http/alternate_protocols_cache @RyanTheOptimist @alyssawilk
+# csrf extension
+/*/extensions/filters/http/csrf @dschaller @mattklein123
+# original_src http filter extension
+/*/extensions/filters/http/original_src @klarose @mattklein123
+# original_src listener filter extension
+/*/extensions/filters/listener/original_src @klarose @mattklein123
+# original_src common extension
+extensions/filters/common/original_src @klarose @mattklein123
+# dubbo_proxy extension
+/*/extensions/filters/network/dubbo_proxy @zyfjeff @wbpcode
+# cdn_loop extension
+/*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
+# external processing filter
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
+/*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
+# jwt_authn http filter extension
+/*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia @yanavlasov
+# grpc_field_extraction http filter extension
+/*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
+# proto_message_extraction http filter extension
+/*/extensions/filters/http/proto_message_extraction @dchakarwarti @taoxuy @shuoyang2016 @yanavlasov
+# grpc_http1_reverse_bridge http filter extension
+/*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
+# alts transport socket extension
+/*/extensions/transport_sockets/alts @adisuissa @matthewstevenson88
+# tcp_stats transport socket extension
+/*/extensions/transport_sockets/tcp_stats @ggreenway @mattklein123
+# tls transport socket extension
+/*/extensions/transport_sockets/tls @RyanTheOptimist @ggreenway @botengyao
+# tls SPIFFE certificate validator extension
+/*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @botengyao @tyxia
+# proxy protocol socket extension
+/*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
+# common transport socket
+/*/extensions/transport_sockets/common @alyssawilk @wez470
+# starttls transport socket
+/*/extensions/transport_sockets/starttls @cpakulski @botengyao @ggreenway
+# proxy transport socket
+/*extensions/transport_sockets/http_11_proxy @alyssawilk @ryantheoptimist
+# internal upstream transport socket
+/*/extensions/transport_sockets/internal_upstream @kyessenov @alyssawilk
+# sni_cluster extension
+/*/extensions/filters/network/sni_cluster @rshriram @ggreenway
+# sni_dynamic_forward_proxy extension
+/*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @soulxu
+# tracers.datadog extension
+/*/extensions/tracers/datadog @dmehala @mattklein123
+# tracers.xray extension
+/*/extensions/tracers/xray @suniltheta @mattklein123 @nbaws
+# tracers.skywalking extension
+/*/extensions/tracers/skywalking @wbpcode @Shikugawa
+# tracers.opentelemetry extension
+/*/extensions/tracers/opentelemetry @alexanderellis @yanavlasov
+# quic extension
+/*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
+# UDP packet writer
+/*/extensions/udp_packet_writer/ @danzh2010 @RyanTheOptimist @alyssawilk
+# redis cluster extension
+/*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @weisisea
+/*/extensions/common/redis @msukalski @henryyyang @mattklein123 @weisisea
+/*/extensions/health_checkers/redis @weisisea @mattklein123
+/*/extensions/filters/network/redis_proxy @weisisea @mattklein123
+/*/extensions/filters/network/common/redis @weisisea @mattklein123
+# dynamic forward proxy
+/*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/filters/http/composite @mattklein123 @tyxia @yanavlasov
+# omit_canary_hosts retry predicate
+/*/extensions/retry/host/omit_canary_hosts @sriduth @mattklein123
+# previous hosts
+/*/extensions/retry/host/previous_hosts @alyssawilk @mattklein123
+# HTTP caching extension
+/*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
+/*/extensions/http/cache/simple_http_cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
+# aws_iam grpc credentials
+/*/extensions/grpc_credentials/aws_iam @suniltheta @mattklein123 @nbaws
+/*/extensions/common/aws @suniltheta @mattklein123 @nbaws
+# adaptive concurrency limit extension.
+/*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
+# admission control extension.
+/*/extensions/filters/http/admission_control @tonya11en @mattklein123
+# http inspector
+/*/extensions/filters/listener/http_inspector @yxue @wbpcode
+# attribute context
+/*/extensions/filters/common/expr @kyessenov @yangminzhu @tyxia
+# webassembly access logger extensions
+/*/extensions/access_loggers/wasm @mpwarres @kyessenov @lizan
+# webassembly bootstrap extensions
+/*/extensions/bootstrap/wasm @mpwarres @kyessenov @lizan
+# webassembly http extensions
+/*/extensions/filters/http/wasm @mpwarres @kyessenov @lizan
+# webassembly network extensions
+/*/extensions/filters/network/wasm @mpwarres @kyessenov @lizan
+# webassembly common extension
+/*/extensions/common/wasm @mpwarres @kyessenov @lizan
+# webassembly runtimes
+/*/extensions/wasm_runtime/ @mpwarres @kyessenov @lizan
+# common matcher
+/*/extensions/common/matcher @mattklein123 @yangminzhu
+/*/extensions/common/proxy_protocol @alyssawilk @wez470
+/*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
+/*/extensions/filters/http/fault @rshriram @alyssawilk
+/*/extensions/filters/common/fault @rshriram @alyssawilk
+/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @alyssawilk
+/*/extensions/filters/http/router @alyssawilk @mattklein123
+/*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
+/*/extensions/filters/http/grpc_web @fengli79 @lizan @alyssawilk
+/*/extensions/filters/http/grpc_stats @kyessenov @botengyao @nezdolik
+/*/extensions/filters/http/connect_grpc_bridge @jchadwick-buf @mattklein123
+/*/extensions/filters/common/original_src @klarose @mattklein123
+/*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
+/*/extensions/grpc_credentials/example @wozz @yanavlasov
+/*/extensions/grpc_credentials/file_based_metadata @wozz @yanavlasov
+/*/extensions/internal_redirect @alyssawilk @penguingao
+/*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
+/*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
+/*/extensions/stat_sinks/hystrix @trabetti @jmarantz
+/*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
+/*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
+# webassembly stat-sink extensions
+/*/extensions/stat_sinks/wasm @mpwarres @kyessenov @lizan
+/*/extensions/resource_monitors/injected_resource @eziskind @yanavlasov
+/*/extensions/resource_monitors/common @eziskind @yanavlasov @nezdolik
+/*/extensions/resource_monitors/fixed_heap @eziskind @yanavlasov @nezdolik
+/*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
+/*/extensions/resource_monitors/cpu_utilization @cancecen @kbaichoo
+/*/extensions/retry/priority @alyssawilk @mattklein123
+/*/extensions/retry/priority/previous_priorities @alyssawilk @mattklein123
+/*/extensions/retry/host @alyssawilk @mattklein123
+/*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
+/*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
+/*/extensions/filters/network/echo @yanavlasov @alyssawilk
+/*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
+/*/extensions/filters/network/direct_response @kyessenov @zuercher
+/*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
+/*/extensions/clusters/aggregate @yxue @mattklein123
+# support for on-demand VHDS requests
+/*/extensions/filters/http/on_demand @dmitri-d @yanavlasov @kyessenov
+/*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
+/*/extensions/filters/http/aws_request_signing @derekargueta @suniltheta @mattklein123 @marcomagdy @nbaws
+/*/extensions/filters/http/aws_lambda @suniltheta @mattklein123 @marcomagdy @nbaws
+/*/extensions/filters/http/buffer @alyssawilk @mattklein123
+/*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
+# Watchdog Extensions
+/*/extensions/watchdog/profile_action @kbaichoo @alyssawilk
+# Core upstream code
+extensions/upstreams/http @alyssawilk @mattklein123
+extensions/upstreams/tcp @alyssawilk @ggreenway @mattklein123
+# OAuth2
+extensions/filters/http/oauth2 @derekargueta @mattklein123
+# HTTP Local Rate Limit
+/*/extensions/filters/http/local_ratelimit @mattklein123 @wbpcode
+/*/extensions/filters/common/local_ratelimit @mattklein123 @wbpcode
+# HTTP Kill Request
+/*/extensions/filters/http/kill_request @qqustc @yanavlasov
+# Rate limit expression descriptor
+/*/extensions/rate_limit_descriptors/expr @kyessenov @cpakulski
+# hash input matcher
+/*/extensions/matching/input_matchers/consistent_hashing @donyu @mattklein123
+# runtime fraction input matcher
+/*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @sergkir85
+# CEL input matcher
+/*/extensions/matching/input_matchers/cel_matcher @tyxia @yanavlasov
+# dynamic metadata input matcher
+/*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
+# environment generic input
+/*/extensions/matching/common_inputs/environment @donyu @mattklein123
+# format string matching
+/*/extensions/matching/actions/format_string @kyessenov @cpakulski
+# CEL data input
+/*/extensions/matching/http/cel_input @tyxia @yanavlasov
+# dynamic metadata input
+/*/extensions/matching/http/metadata_input @vikaschoudhary16 @kyessenov
+# user space socket pair, event, connection and listener
+/*/extensions/io_socket/user_space @kyessenov @lambdai @soulxu
+/*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
+# Default UUID4 request ID extension
+/*/extensions/request_id/uuid @mattklein123 @alyssawilk
+# HTTP header formatters
+/*/extensions/http/header_formatters/preserve_case @mattklein123 @jmarantz
+# External Rate Limit
+/*/extensions/filters/common/ratelimit @esmet @mattklein123
+/*/extensions/filters/http/ratelimit @esmet @mattklein123
+/*/extensions/filters/network/ratelimit @esmet @mattklein123
+# HTTP Quota Based Rate Limit
+/*/extensions/filters/http/rate_limit_quota @tyxia @yanavlasov
+# HTTP Bandwidth Limit
+/*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
+# HTTP Basic Auth
+/*/extensions/filters/http/basic_auth @zhaohuabing @wbpcode
+# Original IP detection
+/*/extensions/http/original_ip_detection/custom_header @alyssawilk @mattklein123
+/*/extensions/http/original_ip_detection/xff @alyssawilk @mattklein123
+# set_filter_state extension
+/*/extensions/filters/common/set_filter_state @kyessenov @wbpcode
+/*/extensions/filters/http/set_filter_state @kyessenov @wbpcode
+/*/extensions/filters/network/set_filter_state @kyessenov @wbpcode
+# set_metadata extension
+/*/extensions/filters/http/set_metadata @aguinet @mattklein123
+# Formatters
+/*/extensions/formatter/metadata @cpakulski @ravenblackx @nezdolik
+/*/extensions/formatter/cel @kyessenov @zirain
+# IP address input matcher
+/*/extensions/matching/input_matchers/ip @aguinet @mattklein123
+# Key Value store
+/*/extensions/key_value @alyssawilk @ryantheoptimist
+# Config Validators
+/*/extensions/config/validators/minimum_clusters @adisuissa @yanavlasov
+# File system based extensions
+/*/extensions/common/async_files @mattklein123 @ravenblackx
+/*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
+/*/extensions/http/cache/file_system_http_cache @jmarantz @ravenblackx
+# Google Cloud Platform Authentication Filter
+/*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
+# DNS resolution
+/*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
+/*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
+/*/extensions/network/dns_resolver/getaddrinfo @alyssawilk @mattklein123
+# compression code
+/*/extensions/filters/http/decompressor @kbaichoo @mattklein123
+/*/extensions/filters/http/compressor @kbaichoo @mattklein123
+/*/extensions/compression/brotli @kbaichoo @mattklein123
+/*/extensions/compression/common @kbaichoo @mattklein123
+/*/extensions/compression/gzip/decompressor @kbaichoo @mattklein123
+/*/extensions/compression/gzip/compressor @kbaichoo @mattklein123
+/*/extensions/compression/gzip/common @kbaichoo @mattklein123
+/*/extensions/compression/zstd @rainingmaster @mattklein123
+# cel
+/*/extensions/access_loggers/filters/cel @kyessenov @douglas-reid @adisuissa
+# health cehck
+/*/extensions/filters/http/health_check @mattklein123 @adisuissa
+# lua
+/*/extensions/filters/http/lua @mattklein123 @wbpcode
+/*/extensions/filters/common/lua @mattklein123 @wbpcode
+# rbac
+/*/extensions/filters/network/rbac @yangminzhu @yanavlasov
+/*/extensions/filters/http/rbac @yangminzhu @yanavlasov
+/*/extensions/filters/common/rbac @yangminzhu @yanavlasov
+# tap
+/*/extensions/filters/http/tap @mattklein123 @xu1zhou
+/*/extensions/common/tap @mattklein123 @xu1zhou
+/*/extensions/transport_sockets/tap @mattklein123 @xu1zhou
+# local rate limit
+/*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
+/*/extensions/filters/listener/local_ratelimit @mattklein123 @JuniorHsu
+# proxy protocol
+/*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu
+# access loggers
+/*/extensions/access_loggers/fluentd @ohadvano @wbpcode
+/*/extensions/access_loggers/grpc @wbpcode @cpakulski @giantcroc @gyohuangxin
+# stats
+/*/extensions/stat_sinks/statsd @mattklein123 @suniltheta
+/*/extensions/stat_sinks/common @mattklein123 @suniltheta
+/*/extensions/stat_sinks/common/statsd @mattklein123 @suniltheta
+# access loggers
+/*/extensions/access_loggers/file @wbpcode @cpakulski @giantcroc
+# Stateful session
+/*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
+/*/extensions/http/stateful_session/header @ramaraochavali @wbpcode @cpakulski
+/*/extensions/filters/http/stateful_session @wbpcode @cpakulski @adisuissa
+# tracers
+/*/extensions/tracers/zipkin @wbpcode @Shikugawa @basvanbeek
+/*/extensions/tracers/dynamic_ot @wbpcode @Shikugawa @basvanbeek
+/*/extensions/tracers/opencensus @wbpcode @Shikugawa @basvanbeek
+/*/extensions/tracers/common @wbpcode @Shikugawa @basvanbeek
+/*/extensions/tracers/common/ot @wbpcode @Shikugawa @basvanbeek
+# ext_authz
+/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway
+/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
+/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
+# original dst
+/*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai @nezdolik
+# mongo proxy
+/*/extensions/filters/network/mongo_proxy @mythra @giantcroc @mattklein123
+# formatter
+/*/extensions/formatter/req_without_query @alyssawilk @tsaarni @giantcroc
+# cors
+/*/extensions/filters/http/cors @wbpcode @daixiang0
+# Header Validators
+/*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
+# Thrift
+/*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
+/*/extensions/health_checkers/thrift @zuercher @JuniorHsu
+# Thrift to metadata
+/*/extensions/filters/http/thrift_to_metadata @JuniorHsu @zuercher
+# IP tagging
+/*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
+# Header to metadata
+/*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
+# Json to metadata
+/*/extensions/filters/http/json_to_metadata @JuniorHsu @kbaichoo
+# zookeeper
+/*/extensions/filters/network/zookeeper_proxy @JuniorHsu @Winbobob @mattklein123
+# Custom response filter
+/*/extensions/filters/http/custom_response @pradeepcrao @yanavlasov
+/*/extensions/http/custom_response/redirect_policy @pradeepcrao @yanavlasov
+/*/extensions/http/custom_response/local_response_policy @pradeepcrao @yanavlasov
+# path match by pattern
+/*/extensions/path/match/uri_template @alyssawilk @yanjunxiang-google
+# path rewrite by pattern
+/*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
+# Dubbo codec
+/*/extensions/common/dubbo @wbpcode @UNOWNED
+# upstream load balancing policies
+/*/extensions/load_balancing_policies/common @wbpcode @tonya11en @nezdolik
+/*/extensions/load_balancing_policies/least_request @wbpcode @tonya11en @nezdolik
+/*/extensions/load_balancing_policies/random @wbpcode @tonya11en
+/*/extensions/load_balancing_policies/round_robin @wbpcode @tonya11en @nezdolik
+/*/extensions/load_balancing_policies/ring_hash @wbpcode @nezdolik
+/*/extensions/load_balancing_policies/maglev @wbpcode @nezdolik
+/*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
+/*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
+/*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
+# Early header mutation
+/*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
+# Network matching extensions
+/*/extensions/matching/network/ @kyessenov @mattklein123
+# String matching extensions
+/*/extensions/string_matcher/ @ggreenway @cpakulski
+# Header mutation
+/*/extensions/filters/http/header_mutation @wbpcode @yanavlasov @soulxu
+# Health checkers
+/*/extensions/health_checkers/grpc @zuercher @botengyao
+/*/extensions/health_checkers/http @zuercher @botengyao
+/*/extensions/health_checkers/tcp @zuercher @botengyao
+/*/extensions/health_checkers/common @zuercher @botengyao
+# Health check event sinks
+/*/extensions/health_check/event_sinks/file @botengyao @yanavlasov
+# IP Geolocation
+/*/extensions/filters/http/geoip @nezdolik @ravenblackx
+/*/extensions/geoip_providers/common @nezdolik @ravenblackx
+# Maxmind geolocation provider
+/*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
+# Match delegate extension
+/*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
+# Generic proxy and related extensions
+/*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
+# Dynamic Modules
+/*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
+/*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
+
+# HTTP credential injector
+/*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/common @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/generic @zhaohuabing @kyessenov
+/*/extensions/http/injected_credentials/oauth2 @vikaschoudhary16 @wbpcode
+
+# Lua cluster specifier
+/*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
+
+# Intentionally exempt (treated as core code)
+/*/extensions/filters/common @UNOWNED @UNOWNED
+/*/extensions/filters/http/common @UNOWNED @UNOWNED
+/*/extensions/filters/network/common @UNOWNED @UNOWNED
+/*/extensions/clusters/static @UNOWNED @UNOWNED
+/*/extensions/clusters/strict_dns @UNOWNED @UNOWNED
+/*/extensions/clusters/original_dst @UNOWNED @UNOWNED
+/*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
+/*/extensions/clusters/common/ @UNOWNED @UNOWNED
+/*/extensions/clusters/eds/ @UNOWNED @UNOWNED
+/*/source/extensions/listener_managers/listener_manager @alyssawilk @ggreenway
+/*/source/extensions/listener_managers/validation_listener_manager @alyssawilk @ggreenway
+/*/source/extensions/config_subscription/ @adisuissa @UNOWNED
+/*/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
+
+# URL Pattern Match and Rewrite Library
+/*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
+/*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
+
+# mobile
+/mobile/ @RyanTheOptimist @alyssawilk @abeyad @fredyw
+
+# Contrib
+/contrib/exe/ @mattklein123 @alyssawilk
+/contrib/client_ssl_auth/ @ggreenway @UNOWNED
+/contrib/checksum/ @ravenblackx @phlax
+/contrib/common/sqlutils/ @cpakulski @cpakulski
+/contrib/dynamo/ @UNOWNED @UNOWNED
+/contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
+/contrib/squash/ @yuval-k @alyssawilk
+/contrib/kafka/ @mattklein123 @adamkotwasinski
+/contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
+/contrib/mysql_proxy/ @rshriram @venilnoronha
+/contrib/postgres_proxy/ @fabriziomello @cpakulski
+/contrib/sxg/ @cpapazian @alyssawilk
+/contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
+/contrib/cryptomb/ @giantcroc @soulxu
+/contrib/vcl/ @florincoras @KfreeZ
+/contrib/hyperscan/ @zhxie @soulxu
+/contrib/language/ @realtimetodie @realtimetodie
+/contrib/dlb @mattklein123 @daixiang0
+/contrib/qat/ @giantcroc @soulxu
+/contrib/generic_proxy/ @wbpcode @UNOWNED

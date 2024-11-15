@@ -1,0 +1,20 @@
+config {
+  name: "envoy.filters.network.rbac"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC"
+    value: "\032\010\177\177\177\177\177\177\177\177"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  on_data {
+  }
+}
+actions {
+  on_data {
+    end_stream: true
+  }
+}

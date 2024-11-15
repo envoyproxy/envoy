@@ -1,0 +1,44 @@
+static_resources {
+  clusters {
+    name: "ser"
+    connect_timeout {
+      nanos: 813
+    }
+    health_checks {
+      timeout {
+        nanos: 926363914
+      }
+      interval {
+        seconds: 165537
+      }
+      unhealthy_threshold {
+        value: 16
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        host: "h"
+        path: "&"
+      }
+    }
+    load_assignment {
+      cluster_name: "."
+      endpoints {
+        lb_endpoints {
+          endpoint {
+            address {
+              pipe {
+                path: "."
+              }
+            }
+          }
+          health_status: DRAINING
+        }
+      }
+    }
+  }
+}
+hds_config {
+  api_type: REST
+}
+enable_dispatcher_stats: true

@@ -1,0 +1,22 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: "foo"
+        value: "bar"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 0
+    request {
+      throw_decoder_exception {}
+    }
+  }
+}

@@ -1,0 +1,33 @@
+date: October 8, 2019
+
+changes:
+- area: http
+  change: |
+    fixed CVE-2019-15226 by adding a cached byte size in HeaderMap.
+- area: http
+  change: |
+    added :ref:`max headers count <envoy_api_field_core.HttpProtocolOptions.max_headers_count>` for http connections. The
+    default limit is 100.
+- area: upstream
+  change: |
+    runtime feature ``envoy.reloadable_features.max_response_headers_count`` overrides the default limit for upstream
+    :ref:`max headers count <envoy_api_field_Cluster.common_http_protocol_options>`.
+- area: http
+  change: |
+    added :ref:`common_http_protocol_options
+    <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
+    Runtime feature ``envoy.reloadable_features.max_request_headers_count`` overrides the default limit for downstream
+    :ref:`max headers count
+    <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`.
+- area: regex
+  change: |
+    backported safe regex matcher fix for CVE-2019-15225.
+
+deprecated:
+- area: hcm
+  change: |
+    Use of :ref:`idle_timeout
+    <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.idle_timeout>` is deprecated.
+    Use :ref:`common_http_protocol_options
+    <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
+    instead.

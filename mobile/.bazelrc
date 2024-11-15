@@ -1,0 +1,258 @@
+## Any new configs - ie that are not defined in Envoy's bazelrc ...
+#    **should be prefixed with mobile-**
+
+# Envoy Mobile Bazel build/test options.
+try-import ../.bazelrc
+
+# Common flags for all builds
+build --platform_mappings=bazel/platform_mappings
+build --define=hot_restart=disabled
+build --define=tcmalloc=disabled
+build --define=admin_html=disabled
+build --define=static_extension_registration=disabled
+build --define=admin_functionality=disabled
+build --define envoy_mobile_listener=disabled
+build --define=library_autolink=disabled
+build --define=envoy_enable_http_datagrams=disabled
+build --experimental_inmemory_dotd_files
+build --experimental_inmemory_jdeps_files
+build --features=debug_prefix_map_pwd_is_dot
+build --features=swift.cacheable_swiftmodules
+build --features=swift.debug_prefix_map
+build --host_force_python=PY3
+build --macos_minimum_os=10.15
+build --ios_minimum_os=13.0
+build --ios_simulator_version=16.1
+build --verbose_failures
+build --workspace_status_command=../bazel/get_workspace_status
+build --xcode_version=14.1
+build --use_top_level_targets_for_symlinks
+build --experimental_repository_downloader_retries=2
+build --define=google_grpc=disabled
+build --define=nghttp2=disabled
+build --define=envoy_yaml=disabled
+build --define=envoy_full_protos=disabled
+build --define envoy_exceptions=disabled
+build: --copt=-fno-exceptions
+
+# We don't have a ton of Swift in Envoy Mobile, so always build with WMO
+# This also helps work around a bug in rules_swift: https://github.com/bazelbuild/rules_swift/issues/949
+build --swiftcopt=-wmo
+# https://github.com/bazelbuild/rules_jvm_external/issues/445
+build --repo_env=JAVA_HOME=../bazel_tools/jdk
+build --define disable_known_issue_asserts=true
+# Temporarily set to C++17 because Android NDK does not fully support C++20 yet.
+build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+# Unset per_object_debug_info. Causes failures on Android Linux release builds.
+build --features=-per_object_debug_info
+# Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
+build --copt -Wno-deprecated-declarations
+build --define=signal_trace=disabled
+
+build:rules_xcodeproj --config=ios
+build:rules_xcodeproj --define=apple.experimental.tree_artifact_outputs=0
+# Disable global index store to work around https://github.com/buildbuddy-io/rules_xcodeproj/issues/1878
+build:rules_xcodeproj --features=-swift.use_global_index_store
+
+# Override PGV validation with NOP functions for binary size savings.
+build --@com_envoyproxy_protoc_gen_validate//bazel:template-flavor=nop
+
+build:mobile-dbg-common --compilation_mode=dbg
+# Enable source map for debugging in IDEs
+build:mobile-dbg-common --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
+
+# Default flags for builds targeting iOS
+# Manual stamping is necessary in order to get versioning information in the iOS
+# static framework.
+# More information on stamping can be found here:
+# https://github.com/envoyproxy/envoy/tree/master/bazel#enabling-optional-features
+build:ios --define=manual_stamp=manual_stamp
+build:ios --test_timeout=390,750,1500,5700
+build:ios --define=envoy_full_protos=enabled
+
+# Default flags for builds targeting Android
+build:android --define=logger=android
+
+# Default flags for Android debug builds
+build:mobile-dbg-android --config=mobile-dbg-common
+build:mobile-dbg-android --config=android
+
+# Default flags for iOS debug builds
+build:mobile-dbg-ios --config=mobile-dbg-common
+build:mobile-dbg-ios --config=ios
+
+# Default flags for Android tests
+build:mobile-test-android --define=static_extension_registration=disabled
+
+# Default flags for iOS tests.
+build:mobile-test-ios --config=ios
+
+# Clang ASAN.
+build:mobile-clang-asan --config=clang-asan-common
+
+# Clang TSAN.
+build:mobile-clang-tsan --config=clang-tsan
+
+# Clang MSAN.
+build:mobile-clang-msan --config=clang-msan
+
+# Exclude debug info from the release binary since it makes it too large to fit
+# into a zip file. This shouldn't affect crash reports.
+build:mobile-release-common --define=no_debug_info=1
+
+# order matters here to ensure downloads
+build:mobile-remote-release-clang --config=mobile-remote-ci-linux-clang
+build:mobile-remote-release-clang --config=mobile-release-common
+build:mobile-remote-release-clang --remote_download_toplevel
+build:mobile-remote-release-clang --config=ci
+build:mobile-remote-release-clang --config=remote
+
+build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
+build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
+build:mobile-remote-release-clang-android --linkopt=-fuse-ld=lld
+
+build:mobile-remote-release-clang-android-publish --config=mobile-remote-release-clang
+build:mobile-remote-release-clang-android-publish --config=mobile-release-android
+build:mobile-remote-release-clang-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
+build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
+
+# Compile releases optimizing for size (eg -Os, etc).
+build:mobile-release-common --config=sizeopt
+
+# Set default symbols visibility to hidden to reduce .dynstr and the symbol table size
+build:mobile-release-common --copt=-fvisibility=hidden
+
+# Enable automatic extension factory registration for release builds
+build:mobile-release-common --define=static_extension_registration=enabled
+
+# Flags for release builds targeting iOS
+build:mobile-release-ios --config=ios
+build:mobile-release-ios --config=mobile-release-common
+build:mobile-release-ios --compilation_mode=opt
+
+# Flags for release builds targeting Android or the JVM
+# Release does not use the option --define=logger=android
+build:mobile-release-android --config=mobile-release-common
+build:mobile-release-android --compilation_mode=opt
+
+# Instrument Envoy Mobile's C++ code for coverage
+coverage --instrumentation_filter="//library/common[/:]"
+
+#############################################################################
+# Experimental EngFlow Remote Execution Configs
+#############################################################################
+# mobile-remote-ci-common: These options are valid for any platform, use the configs below
+# to add platform-specific options. Avoid using this config directly and
+# instead use a platform-specific config
+#############################################################################
+build:mobile-remote-ci-common --config=rbe-engflow
+build:mobile-remote-ci-common --jobs=40
+build:mobile-remote-ci-common --verbose_failures
+build:mobile-remote-ci-common --spawn_strategy=remote,sandboxed,local
+build:mobile-remote-ci-common --experimental_ui_max_stdouterr_bytes=10485760
+
+#############################################################################
+# mobile-remote-ci-linux: These options are linux-only using GCC by default
+#############################################################################
+# Common Engflow flags
+build:mobile-remote-ci-linux --define=EXECUTOR=remote
+build:mobile-remote-ci-linux --disk_cache=
+build:mobile-remote-ci-linux --incompatible_strict_action_env=true
+# GCC toolchain options
+build:mobile-remote-ci-linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:mobile-remote-ci-linux --crosstool_top=//third_party/rbe_configs/cc:toolchain
+build:mobile-remote-ci-linux --extra_execution_platforms=//third_party/rbe_configs/config:platform
+build:mobile-remote-ci-linux --extra_toolchains=//third_party/rbe_configs/config:cc-toolchain
+build:mobile-remote-ci-linux --host_platform=//third_party/rbe_configs/config:platform
+build:mobile-remote-ci-linux --platforms=//third_party/rbe_configs/config:platform
+build:mobile-remote-ci-linux --config=mobile-remote-ci-common
+
+#############################################################################
+# mobile-remote-ci-linux-clang: These options are linux-only using Clang by default
+#############################################################################
+build:mobile-remote-ci-linux-clang --action_env=CC=/opt/llvm/bin/clang
+build:mobile-remote-ci-linux-clang --action_env=CXX=/opt/llvm/bin/clang++
+build:mobile-remote-ci-linux-clang --config=mobile-remote-ci-linux
+
+#############################################################################
+# mobile-remote-ci-linux-asan: These options are Linux-only using Clang and AddressSanitizer
+#############################################################################
+build:mobile-remote-ci-linux-asan --config=mobile-clang-asan
+build:mobile-remote-ci-linux-asan --config=mobile-remote-ci-linux-clang
+build:mobile-remote-ci-linux-asan --config=remote-ci
+build:mobile-remote-ci-linux-asan --build_tests_only
+test:mobile-remote-ci-linux-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+
+#############################################################################
+# mobile-remote-ci-linux-tsan: These options are Linux-only using Clang and ThreadSanitizer
+#############################################################################
+build:mobile-remote-ci-linux-tsan --config=clang-tsan
+build:mobile-remote-ci-linux-tsan --config=mobile-remote-ci-linux-clang
+build:mobile-remote-ci-linux-tsan --config=remote-ci
+build:mobile-remote-ci-linux-tsan --build_tests_only
+test:mobile-remote-ci-linux-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+
+#############################################################################
+# ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
+#############################################################################
+# Clang environment variables (keep in sync with //third_party/rbe_configs)
+# Coverage environment variables (keep in sync with //third_party/rbe_configs)
+build:mobile-ci-linux-coverage --action_env=GCOV=/opt/llvm/bin/llvm-profdata
+build:mobile-ci-linux-coverage --test_env=GCOV=/opt/llvm/bin/llvm-profdata
+build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
+build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llm/bin/llvm-cov
+build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+build:mobile-ci-linux-coverage --build_tests_only
+
+#############################################################################
+# mobile-remote-ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
+#############################################################################
+# Clang environment variables (keep in sync with //third_party/rbe_configs)
+# Coverage environment variables (keep in sync with //third_party/rbe_configs)
+# Flags to run tests locally which are necessary since Bazel C++ LLVM coverage isn't fully supported for remote builds
+# TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote test execution and LLVM coverage.
+build:mobile-remote-ci-linux-coverage --config=mobile-ci-linux-coverage
+build:mobile-remote-ci-linux-coverage --config=mobile-remote-ci-linux-clang
+build:mobile-remote-ci-linux-coverage --legacy_important_outputs=false
+build:mobile-remote-ci-linux-coverage --config=ci
+build:mobile-remote-ci-linux-coverage --config=remote
+
+# IPv6 tests fail on CI
+build:mobile-remote-ci-linux-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+#############################################################################
+# mobile-remote-ci-macos: These options are macOS-only
+#############################################################################
+build:mobile-remote-ci-macos --config=mobile-remote-ci-common
+build:mobile-remote-ci-macos --host_platform=//ci/platform:macos
+build:mobile-remote-ci-macos --platforms=//ci/platform:macos
+build:mobile-remote-ci-macos --extra_execution_platforms=//ci/platform:macos
+build:mobile-remote-ci-macos --xcode_version_config=//ci:xcode_config
+build:mobile-remote-ci-macos --remote_download_toplevel
+build:mobile-remote-ci-macos --config=ci
+build:mobile-remote-ci-macos --config=remote
+build:mobile-remote-ci-macos --define=envoy_full_protos=disabled
+
+build:mobile-remote-ci --config=mobile-remote-ci-linux-clang
+build:mobile-remote-ci --config=remote-ci
+build:mobile-remote-ci --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+
+build:mobile-remote-ci-android --config=mobile-remote-ci
+test:mobile-remote-ci-android --build_tests_only
+test:mobile-remote-ci-android --config=mobile-remote-ci
+test:mobile-remote-ci-android --config=mobile-test-android
+
+build:mobile-remote-ci-cc --config=mobile-remote-ci
+test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
+
+build:mobile-remote-ci-core --config=mobile-remote-ci
+test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
+
+build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
+build:mobile-remote-ci-macos-ios --config=mobile-test-ios
+
+build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
+test:mobile-remote-ci-macos-ios-swift --build_tests_only
+
+build:mobile-remote-ci-macos-ios-obj-c --config=mobile-remote-ci-macos-ios
+test:mobile-remote-ci-macos-ios-obj-c --build_tests_only

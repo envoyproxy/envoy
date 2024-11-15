@@ -1,0 +1,80 @@
+# This will forward CONNECT-UDP requests from a downstream connecting on 127.0.0.1:10001 to an
+# upstream listening on 127.0.0.1:10002.
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: UDP
+        address: 127.0.0.1
+        port_value: 10001
+    udp_listener_config:
+      quic_options: {}
+      downstream_socket_config:
+        prefer_gro: true
+    filter_chains:
+    - transport_socket:
+        name: envoy.transport_sockets.quic
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicDownstreamTransport
+          downstream_tls_context:
+            common_tls_context:
+              tls_certificates:
+              - certificate_chain:
+                  filename: certs/servercert.pem
+                private_key:
+                  filename: certs/serverkey.pem
+      filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          codec_type: HTTP3
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  connect_matcher:
+                    {}
+                route:
+                  cluster: cluster_0
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          http3_protocol_options:
+            allow_extended_connect: true
+          upgrade_configs:
+          - upgrade_type: CONNECT-UDP
+  clusters:
+  - name: cluster_0
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http3_protocol_options:
+            allow_extended_connect: true
+            quic_protocol_options:
+              # Increase the max packet length for tunneling.
+              # The example value matches the default value used by the MASQUE client in QUICHE.
+              max_packet_length: 1350
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10002
+    transport_socket:
+      name: envoy.transport_sockets.quic
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.quic.v3.QuicUpstreamTransport
+        upstream_tls_context:
+          # SAN of the certs/servercert.pem used for local testing. Update this if using a different certificate.
+          sni: lyft.com

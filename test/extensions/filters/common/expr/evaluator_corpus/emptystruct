@@ -1,0 +1,4 @@
+expression {
+  struct_expr {
+  }
+}

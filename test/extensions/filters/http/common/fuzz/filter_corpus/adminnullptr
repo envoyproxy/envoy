@@ -1,0 +1,7 @@
+config {
+  name: "envoy.filters.http.tap"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap"
+    value: "\n\036\022\034\n\022\022\020\n\n\022\010\n\002B\000\n\002B\000\n\002:\000\022\006\n\004\010\001\022\000"
+  }
+}

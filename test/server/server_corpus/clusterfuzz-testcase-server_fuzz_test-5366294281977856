@@ -1,0 +1,125 @@
+static_resources {
+  clusters {
+    name: "9"
+    connect_timeout {
+      nanos: 1
+    }
+    hosts {
+      pipe {
+        path: "N"
+      }
+    }
+    hosts {
+      pipe {
+        path: "n"
+      }
+    }
+    hosts {
+      pipe {
+        path: "="
+      }
+    }
+    hosts {
+      pipe {
+        path: "s"
+      }
+    }
+    hosts {
+      pipe {
+        path: "n"
+      }
+    }
+    hosts {
+      pipe {
+        path: "N"
+      }
+    }
+    hosts {
+      pipe {
+        path: "W"
+      }
+    }
+    hosts {
+      pipe {
+        path: "="
+      }
+    }
+    hosts {
+      pipe {
+        path: "N"
+      }
+    }
+    hosts {
+      pipe {
+        path: "n"
+      }
+    }
+    health_checks {
+      timeout {
+        nanos: 1
+      }
+      interval {
+        nanos: 1
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+        value: 1701650432
+      }
+      http_health_check {
+        path: "~"
+        request_headers_to_add {
+        }
+        request_headers_to_add {
+          header {
+            value: "W"
+          }
+        }
+        request_headers_to_add {
+        }
+        request_headers_to_add {
+        }
+        request_headers_to_add {
+        }
+        request_headers_to_add {
+        }
+        request_headers_to_add {
+        }
+        request_headers_to_add {
+        }
+        request_headers_to_add {
+        }
+        use_http2: true
+      }
+    }
+    health_checks {
+      timeout {
+        nanos: 1
+      }
+      interval {
+        nanos: 1
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        path: "E"
+        request_headers_to_add {
+        }
+        request_headers_to_add {
+        }
+        request_headers_to_add {
+        }
+      }
+    }
+  }
+}
+admin {
+  address {
+    socket_address {
+      address: "::"
+      port_value: 0
+    }
+  }
+}

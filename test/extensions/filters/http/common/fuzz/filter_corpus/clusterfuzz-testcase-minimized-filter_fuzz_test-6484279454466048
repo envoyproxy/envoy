@@ -1,0 +1,13 @@
+config {
+  name: "envoy.filters.http.ratelimit"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit"
+    value: "\n\001\021(\0010\001:\376\001\022\373\001\022\370\001\n\001T\022\002\n\000\032\003\n\001~\032\256\0012\253\001\032\250\001\nHtype.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit\022\\\n\001\021(\0010\001:Q\022O\022M\n\001T\022\002\n\000\032\005\"\003\n\001!\032\0022\000\032\005\"\003\n\001>\032\007\032\005\"003\n\032\002\022\000\032\n\"\010\n\001>\020\200\200\254\001\"\027envoy\000\000\000\027ters.http.rbac2\000H\001\032\005\"\003\n\001>\032\007\032\005\"003\n\032\002\022\000\032\n\"\010\n\001>\020\200\200\254\001\"\027envoy\000\000\000\027ters.http.rbac2\000H\001"
+  }
+}
+data {
+  http_body {
+    data: "\021"
+    data: "!"
+  }
+}

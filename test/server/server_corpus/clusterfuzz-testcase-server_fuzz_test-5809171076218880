@@ -1,0 +1,11 @@
+admin {
+  address {
+    pipe {
+      path: "@"
+    }
+  }
+}
+hds_config {
+  api_type: REST
+  cluster_names: "+"
+}

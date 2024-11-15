@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package external;
+
+// Type that belongs to a non-envoy package.
+//
+// Part of a test suite that verifies normalization of
+// fully-qualified type names.
+message PackageLevelType {
+}

@@ -1,0 +1,25 @@
+config {
+  name: "envoy.filters.network.sni_cluster"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.sni_cluster.v3.SniCluster"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 268435
+  }
+}
+actions {
+  on_data {
+    data: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 1677721
+  }
+}

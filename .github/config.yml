@@ -1,0 +1,414 @@
+agent-ubuntu: ubuntu-22.04
+build-image:
+  # Authoritative configuration for build image/s
+  repo: envoyproxy/envoy-build-ubuntu
+  sha: 2dd96b6f43c08ccabd5f4747fce5854f5f96af509b32e5cf6493f136e9833649
+  mobile-sha: c9b6001d0c24170ae77b0ad39e1b0fcda49580c72a8578755dc65aec9be85be3
+  # this is authoritative, but is not currently used in github ci
+  gcr-sha: 7adc40c09508f957624c4d2e0f5aeecb73a59207ee6ded53b107eac828c091b2
+  tag: f94a38f62220a2b017878b790b6ea98a0f6c5f9c
+
+config:
+  envoy:
+    icon: >-
+      [![](https://avatars.githubusercontent.com/u/30125649?s=24&v=4)](#)
+
+checks:
+  # Checks: this configures which _checks_ will be activated or skipped
+  #
+  # The configured _names_ need to match the checks configured for the repo
+  #
+  # Any check that is marked as `required` but is not triggered by the run
+  # config above in a given CI run is marked as `skipped`
+  #
+  # For example if macos is marked as `required: true` but then has a path
+  # selection that means its doesnt run the check will be `skipped` and pass
+  checks:
+    name: Envoy/Checks
+    on-run:
+    - check-build
+    - check-coverage
+    - check-san
+    required: true
+  macos:
+    name: Envoy/macOS
+    required: true
+    on-run:
+    - build-macos
+  mobile-android:
+    name: Mobile/Android
+    required: true
+    on-run:
+    - mobile-android
+  mobile-android-tests:
+    name: Mobile/Android tests
+    required: true
+    on-run:
+    - mobile-android-tests
+  mobile-asan:
+    name: Mobile/ASAN
+    required: true
+    on-run:
+    - mobile-asan
+  mobile-cc:
+    name: Mobile/CC
+    required: true
+    on-run:
+    - mobile-cc
+  mobile-coverage:
+    name: Mobile/Coverage
+    required: true
+    on-run:
+    - mobile-coverage
+  mobile-docs:
+    name: Mobile/Docs
+    on-run:
+    - mobile-docs
+  mobile-format:
+    name: Mobile/Format
+    required: true
+    on-run:
+    - mobile-format
+  mobile-ios:
+    name: Mobile/iOS
+    required: true
+    cache:
+    on-run:
+    - mobile-ios
+  mobile-ios-tests:
+    name: Mobile/iOS tests
+    required: true
+    on-run:
+    - mobile-ios-tests
+  mobile-perf:
+    name: Mobile/Perf
+    required: true
+    on-run:
+    - mobile-perf
+  mobile-release-validation:
+    name: Mobile/Release validation
+    required: true
+    on-run:
+    - mobile-release-validation
+  mobile-tsan:
+    name: Mobile/TSAN
+    required: true
+    on-run:
+    - mobile-tsan
+  prechecks:
+    name: Envoy/Prechecks
+    on-run:
+    - precheck-deps
+    - precheck-format
+    - precheck-publish
+    required: true
+    # yamllint disable rule:line-length
+    advice:
+      general: |
+        ### Ensuring your commits are signed off
+
+        You can set up DCO using Envoy's git hooks.
+
+        ### Git hooks
+
+        To set this up, do the following:
+
+          ```console
+          $ ./support/bootstrap
+          ```
+
+          If you only want the DCO check you can do the following to disable the
+          other hooks
+
+          ```console
+          $ echo NO_VERIFY=1 > .env
+          ```
+      deps: |
+        ### Advice on updating dependencies
+
+        General information about Envoy's depdendencies [can be found here](https://github.com/envoyproxy/envoy/blob/main/DEPENDENCY_POLICY.md)
+      format: |
+        ### Advice on correct formatting
+
+        Envoy ensures a minimum standard for all files in the repository.
+
+        You are strongly advised to heed the following CI notice:
+
+          ```console
+            Please fix your editor to ensure:
+
+              - no trailing whitespace
+              - no preceding mixed tabs/spaces
+              - all files end with a newline
+          ```
+    # yamllint enable rule:line-length
+  publish:
+    name: >-
+      Envoy/Publish and verify
+    on-run:
+    - publish
+    - verify
+    required: true
+
+run:
+  build-macos:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/**/*
+    - ci/**/*
+    - configs/**/*
+    - contrib/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
+  check-build:
+    paths:
+    - "**/*"
+  check-coverage:
+    paths:
+    - "**/*"
+  check-san:
+    paths:
+    - "**/*"
+  mobile-android:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-android-all:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+    push: never
+  mobile-android-tests:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-asan:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-cc:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - envoy/**/*
+    - mobile/.bazelrc
+    - mobile/**/*
+    - source/**/*
+    - test/config/**/*
+    - test/integration/*
+    - test/mocks/**/*
+    - test/test_common/**/*
+  mobile-coverage:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-format:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-ios:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-ios-all:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+    push: never
+  mobile-ios-tests:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-perf:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-release-validation:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  mobile-tsan:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - bazel/external/quiche.BUILD
+    - bazel/repository_locations.bzl
+    - mobile/.bazelrc
+    - mobile/**/*
+    - tools/code_format/check_format.py
+  precheck-deps:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - .github/dependabot.yml
+    - bazel/BUILD
+    - tools/dependency/*
+    - "**/*.bzl"
+    - "**/requirements.txt"
+    - "**/go.mod"
+    - "**/Dockerfile*"
+    push: paths
+  precheck-format:
+    paths:
+    - "**/*"
+  precheck-publish:
+    paths:
+    - "**/*"
+  publish:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/**/*
+    - ci/**/*
+    - contrib/**/*
+    - envoy/**/*
+    - examples/**/*
+    - source/**/*
+    - tools/**/*
+    - VERSION.txt
+  verify:
+    paths:
+    - .bazelrc
+    - .bazelversion
+    - .github/config.yml
+    - api/**/*
+    - bazel/**/*
+    - ci/**/*
+    - contrib/**/*
+    - envoy/**/*
+    - examples/**/*
+    - source/**/*
+    - tools/**/*
+    - VERSION.txt
+    push: paths
+
+tables:
+  env:
+    collapse: true
+    title: Environment
+    table-title: Request variables
+    filter: |
+      .request
+      | del(.["build-image" as $prefix | keys[] | select(startswith($prefix))])
+      | del(.["version" as $prefix | keys[] | select(startswith($prefix))])
+      | .actor  = "<img src=\"\(.actor.icon)\" alt=\"\(.actor.name)\" width=\"18\" height=\"18\">  @\(.actor.name)"
+  build-image:
+    collapse: true
+    title: Build image
+    table-title: Container image/s (as used in this CI run)
+    filter: |
+      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      | .request["build-image"]
+      | del(.changed)
+      | with_entries(
+          .value as $v
+          | ($v | split(":") | .[1] | split("@") | .[0]) as $tag
+          | .value = "[\($v | split("@") | .[0])](\($dockerLink)\($tag))")
+  build-image-current:
+    collapse: true
+    title: Build image (current)
+    table-title: Current or previous container image
+    filter: |
+      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      | if .request["build-image"].changed then
+          .request["build-image-current"]
+          | with_entries(
+              .value as $v
+              | ($v | split(":") | .[1] | split("@") | .[0]) as $tag
+              | .value = "[\($v | split("@") | .[0])](\($dockerLink)\($tag))")
+        else {} end
+  version:
+    collapse: true
+    title: Version
+    table-title: Envoy version (as used in this CI run)
+    filter: |
+      .request.version
+      | del(.changed)
+  version-current:
+    collapse: true
+    title: Version (current)
+    table-title: Current or previous version
+    filter: |
+      if .request.version.changed then
+        .request["version-current"]
+      else
+        {}
+      end

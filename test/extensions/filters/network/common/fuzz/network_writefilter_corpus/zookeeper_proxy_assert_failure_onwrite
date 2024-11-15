@@ -1,0 +1,12 @@
+config {
+  name: "envoy.filters.network.zookeeper_proxy"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy"
+    value: "\nVtype.googleapis.com/envoy.extensions.filters.network.zookeeper_proxy.v3.ZooKeeperProxy\022\001!\032\006\010\377\376\377\317\017"
+  }
+}
+actions {
+  on_write {
+    data: "\030\030\030\030\030\030\030\030"
+  }
+}

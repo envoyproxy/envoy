@@ -1,0 +1,322 @@
+node {   id: " "   cluster: "              "   build_version: " " } static_resources {   clusters {     name: "              "     type: STRICT_DNS     connect_timeout {       nanos:  82893184     }     per_connection_buffer_limit_bytes {       value: 268435456     }     lb_policy: RING_HASH     hosts {       pipe {         path: " "       }     }     hosts {       pipe {         path: " "       }     }     tls_context {       common_tls_context {       }     }   }   clusters {     name: " "     connect_timeout {       seconds: 2304     }     lb_policy: RING_HASH     hosts {       pipe {         path: " "       }     }     hosts {       pipe {         path: "             "       }     }     hosts {       pipe {         path: " "       }     }     hosts {       pipe {         path: " "       }     }     hosts {       pipe {         path: " "       }     }     hosts {       pipe {         path: " "       }     }     hosts {       pipe {         path: " "       }     }     hosts {       pipe {         path: " "
+      }
+    }
+    hosts {
+      pipe {
+        path: "2"
+      }
+    }
+    hosts {
+      pipe {
+        path: "s"
+      }
+    }
+    hosts {
+      pipe {
+        path: "4"
+      }
+    }
+    hosts {
+      pipe {
+        path: "5"
+      }
+    }
+    hosts {
+      pipe {
+        path: "1"
+      }
+    }
+    hosts {
+      pipe {
+        path: "0"
+      }
+    }
+    hosts {
+      pipe {
+        path: "]"
+      }
+    }
+    hosts {
+      pipe {
+        path: "8"
+      }
+    }
+    hosts {
+      pipe {
+        path: "{"
+      }
+    }
+    hosts {
+      pipe {
+        path: "*"
+      }
+    }
+    hosts {
+      pipe {
+        path: "4"
+      }
+    }
+    hosts {
+      pipe {
+        path: " "
+      }
+    }
+    hosts {
+      pipe {
+        path: "{"
+      }
+    }
+    health_checks {
+      timeout {
+        seconds: 4294901763
+        nanos: 25
+      }
+      interval {
+        nanos: 25
+      }
+      unhealthy_threshold {
+        value: 268435456
+      }
+      healthy_threshold {
+        value: 655360
+      }
+      http_health_check {
+        path: ":"
+        service_name: "0"
+        use_http2: true
+      }
+    }
+    tls_context {
+      common_tls_context {
+        validation_context {
+        }
+        tls_certificate_sds_secret_configs {
+          sds_config {
+            path: "/"
+          }
+        }
+      }
+    }
+    alt_stat_name: "o"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "tsy.googtati"
+  config {
+    fields {
+      key: "\177"
+      value {
+      }
+    }
+  }
+}
+stats_sinks {
+  name: ","
+}
+stats_sinks {
+  typed_config {
+    type_url: "type.googleapis.com/googlalue"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+  name: ","
+}
+stats_sinks {
+  config {
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "["
+}
+stats_sinks {
+  typed_config {
+    type_url: "["
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "toogti"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "q"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "!"
+}
+stats_sinks {
+  name: ","
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: ","
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "2"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: ","
+}
+stats_sinks {
+}
+stats_sinks {
+  name: ","
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "2"
+}
+stats_sinks {
+}
+stats_sinks {
+  name: ","
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: ","
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "2"
+}
+stats_sinks {
+  name: "6"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}

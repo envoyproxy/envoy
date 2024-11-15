@@ -1,0 +1,35 @@
+base {
+  config {
+  }
+  request_data {
+  }
+}
+response {
+  ok_response {
+    query_parameters_to_set {
+    }
+    query_parameters_to_set {
+      key: " "
+    }
+    query_parameters_to_set {
+      value: " "
+    }
+    query_parameters_to_set {
+      key: "???"
+      value: "&&&&"
+    }
+    query_parameters_to_set {
+      key: "\005\000"
+      value: "blah blah"
+    }
+
+    query_parameters_to_set {
+      key: "no more query params!"
+      value: "#"
+    }
+    query_parameters_to_set {
+      key: "test"
+      value: "testval"
+    }
+  }
+}

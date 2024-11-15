@@ -1,0 +1,1 @@
+static_resources {   clusters {     name: " "     connect_timeout {       nanos: 6     }     load_assignment {       cluster_name: " "       endpoints {         priority: 4       }     }   } } 

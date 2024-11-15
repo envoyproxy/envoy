@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package envoy.extensions.http.custom_response.redirect_policy.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/route/v3/route_components.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.custom_response.redirect_policy.v3";
+option java_outer_classname = "RedirectPolicyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/custom_response/redirect_policy/v3;redirect_policyv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Redirect Policy for Custom Response]
+// [#extension: envoy.http.custom_response.redirect_policy]
+
+// Custom response policy to internally redirect the original response to a different
+// upstream.
+// [#next-free-field: 7]
+message RedirectPolicy {
+  oneof redirect_action_specifier {
+    option (validate.required) = true;
+
+    // The Http URI to redirect the original request to, to get the custom
+    // response.
+    // It should be a full FQDN with protocol, host and path.
+    //
+    // Example:
+    //
+    // .. code-block:: yaml
+    //
+    //    uri: https://www.mydomain.com/path/to/404.txt
+    //
+    string uri = 1 [(validate.rules).string = {min_len: 1}];
+
+    // Specify elements of the redirect url individually.
+    // Note: Do not specify the ``response_code`` field in ``redirect_action``, use
+    // ``status_code`` instead.
+    // The following fields in ``redirect_action`` are currently not supported,
+    // and specifying them will cause the config to be rejected:
+    // - ``prefix_rewrite``
+    // - ``regex_rewrite``
+    config.route.v3.RedirectAction redirect_action = 2;
+  }
+
+  // The new response status code if specified. This is used to override the
+  // status code of the response from the new upstream if it is not an error status.
+  google.protobuf.UInt32Value status_code = 3 [(validate.rules).uint32 = {lte: 999 gte: 200}];
+
+  // HTTP headers to add to the response. This allows the
+  // response policy to append, to add or to override headers of
+  // the original response for local body, or the custom response from the
+  // remote body, before it is sent to a downstream client.
+  // Note that these are not applied if the redirected response is an error
+  // response.
+  repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
+      [(validate.rules).repeated = {max_items: 1000}];
+
+  // HTTP headers to add to the request before it is internally redirected.
+  repeated config.core.v3.HeaderValueOption request_headers_to_add = 5
+      [(validate.rules).repeated = {max_items: 1000}];
+
+  // Custom action to modify request headers before selection of the
+  // redirected route.
+  // [#comment: TODO(pradeepcrao) add an extension category.]
+  config.core.v3.TypedExtensionConfig modify_request_headers_action = 6;
+}

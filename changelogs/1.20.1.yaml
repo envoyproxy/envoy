@@ -1,0 +1,24 @@
+date: November 30, 2021
+
+minor_behavior_changes:
+- area: config
+  change: |
+    the log message for "gRPC config stream closed" now uses the most recent error message, and reports seconds instead of
+    milliseconds for how long the most recent status has been received.
+
+bug_fixes:
+- area: http
+  change: |
+    remove redundant Warn log in HTTP codec.
+- area: listener
+  change: |
+    fix a crash when updating any listener that does not bind to port.
+- area: listener
+  change: |
+    listener add can reuse the listener socket of a draining filter chain listener and fix the request lost.
+- area: mac
+  change: |
+    fix crash on startup on macOS 12 by changing the default allocator.
+- area: tcp
+  change: |
+    fixed a bug where upstream circuit breakers applied HTTP per-request bounds to TCP connections.

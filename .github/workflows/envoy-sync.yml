@@ -1,0 +1,76 @@
+name: 'Sync downstream'
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+    - main
+    - release/v1.28
+    - release/v1.31
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-22.04
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.ref_name == 'main')
+          && (github.event.push
+              || !contains(github.actor, '[bot]'))
+      }}
+    strategy:
+      fail-fast: false
+      matrix:
+        downstream:
+        - go-control-plane
+        - envoy-filter-example
+        - data-plane-api
+        - mobile-website
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.5
+      id: appauth
+      with:
+        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.5
+      with:
+        repository: "envoyproxy/${{ matrix.downstream }}"
+        ref: main
+        token: ${{ steps.appauth.outputs.token }}
+        workflow: envoy-sync.yaml
+
+  sync-release:
+    runs-on: ubuntu-22.04
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && contains(fromJSON('["main", "release/v1.28", "release/v1.31"]'), github.ref_name)
+          && (github.event.push
+              || !contains(github.actor, '[bot]'))
+      }}
+    strategy:
+      fail-fast: false
+      matrix:
+        downstream:
+        - envoy-openssl
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.5
+      id: appauth
+      with:
+        app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.5
+      with:
+        repository: "envoyproxy/${{ matrix.downstream }}"
+        ref: release/v1.28
+        token: ${{ steps.appauth.outputs.token }}
+        workflow: envoy-sync-receive.yaml
+        inputs: |
+          branch: ${{ github.ref_name }}

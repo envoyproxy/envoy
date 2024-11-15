@@ -1,0 +1,11 @@
+[run]
+omit =
+     tools/
+     */pytest_*.py
+
+[report]
+exclude_lines =
+        pragma: no cover
+        raise NotImplementedError
+        pass
+        if __name__ == .__main__.:

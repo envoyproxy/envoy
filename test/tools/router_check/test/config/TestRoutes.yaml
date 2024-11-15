@@ -1,0 +1,187 @@
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  - www.lyft.com
+  - w.lyft.com
+  - ww.lyft.com
+  - wwww.lyft.com
+  routes:
+  - match:
+      prefix: /new_endpoint
+    route:
+      cluster: www2
+      prefix_rewrite: /api/new_endpoint
+  - match:
+      prefix: /ping
+    direct_response:
+      status: 200
+      body:
+        inline_string: "{ 'message': 'Success!' }"
+    response_headers_to_add:
+    - header:
+        key: "x-ping-response"
+        value: "yes"
+  - match:
+      path: /
+    route:
+      cluster: root_www2
+  - match:
+      prefix: /
+    route:
+      cluster: www2
+- name: www2_staging
+  domains:
+  - www-staging.lyft.net
+  - www-staging-orca.lyft.com
+  routes:
+  - match:
+      prefix: /
+    route:
+      cluster: www2_staging
+- name: default
+  domains:
+  - '*'
+  routes:
+  - match:
+      prefix: /api/application_data
+    route:
+      cluster: ats
+  - match:
+      path: /api/locations
+      case_sensitive: false
+    route:
+      cluster: locations
+      prefix_rewrite: /rewrote
+  - match:
+      prefix: /api/leads/me
+    route:
+      cluster: ats
+  - match:
+      prefix: /host/rewrite/me
+    route:
+      cluster: ats
+      host_rewrite_literal: new_host
+  - match:
+      prefix: /oldhost/rewrite/me
+    route:
+      cluster: ats
+      host_rewrite_literal: new_oldhost
+  - match:
+      path: /foo
+      case_sensitive: true
+    route:
+      prefix_rewrite: /bar
+      cluster: instant-server
+  - match:
+      path: /tar
+      case_sensitive: false
+    route:
+      prefix_rewrite: /car
+      cluster: instant-server
+  - match:
+      prefix: /newhost/rewrite/me
+      case_sensitive: false
+    route:
+      cluster: ats
+      host_rewrite_literal: new_host
+  - match:
+      path: /FOOD
+      case_sensitive: false
+    route:
+      prefix_rewrite: /cAndy
+      cluster: ats
+  - match:
+      path: /ApplEs
+      case_sensitive: true
+    route:
+      prefix_rewrite: /oranGES
+      cluster: instant-server
+  - match:
+      prefix: /customheaders
+    route:
+      cluster: ats
+      host_rewrite_literal: new_host
+    request_headers_to_add:
+    - header:
+        key: X-Client-IP
+        value: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
+  - match:
+      prefix: /
+    route:
+      cluster: instant-server
+      timeout:
+        seconds: 30
+  virtual_clusters:
+  - headers:
+    - name: :path
+      string_match:
+        safe_regex:
+          regex: ^/rides$
+    - name: :method
+      string_match:
+        exact: POST
+    name: ride_request
+  - headers:
+    - name: :path
+      string_match:
+        safe_regex:
+          regex: ^/rides/\d+$
+    - name: :method
+      string_match:
+        exact: PUT
+    name: update_ride
+  - headers:
+    - name: :path
+      string_match:
+        safe_regex:
+          regex: ^/users/\d+/chargeaccounts$
+    - name: :method
+      string_match:
+        exact: POST
+    name: cc_add
+  - headers:
+    - name: :path
+      string_match:
+        safe_regex:
+          regex: ^/users/\d+/chargeaccounts/[^validate]\w+$
+    - name: :method
+      string_match:
+        exact: PUT
+    name: cc_add
+  - headers:
+    - name: :path
+      string_match:
+        safe_regex:
+          regex: ^/users$
+    - name: :method
+      string_match:
+        exact: POST
+    name: create_user_login
+  - headers:
+    - name: :path
+      string_match:
+        safe_regex:
+          regex: ^/users/\d+$
+    - name: :method
+      string_match:
+        exact: PUT
+    name: update_user
+  - headers:
+    - name: :path
+      string_match:
+        safe_regex:
+          regex: ^/users/\d+/location$
+    - name: :method
+      string_match:
+        exact: POST
+    name: ulu
+internal_only_headers:
+- x-lyft-user-id
+response_headers_to_add:
+- header:
+    key: x-envoy-upstream-canary
+    value: "true"
+response_headers_to_remove:
+- x-envoy-upstream-canary
+- x-envoy-virtual-cluster

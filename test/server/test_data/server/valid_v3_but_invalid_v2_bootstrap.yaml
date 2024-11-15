@@ -1,0 +1,5 @@
+static_resources:
+  clusters:
+    name: "cluster"
+    ignore_health_on_host_removal: true
+    connect_timeout: 1s

@@ -1,0 +1,105 @@
+# 1. Use already imported python dependencies
+# 2. Disable pointer compression (limits the maximum number of WasmVMs).
+# 3. Add support for --define=no_debug_info=1.
+# 4. Allow compiling v8 on macOS 10.15 to 13.0. TODO(dio): Will remove this patch when https://bugs.chromium.org/p/v8/issues/detail?id=13428 is fixed.
+# 5. Don't expose Wasm C API (only Wasm C++ API).
+
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 4e89f90..0df4f67 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -4,7 +4,7 @@
+ 
+ load("@bazel_skylib//lib:selects.bzl", "selects")
+ load("@rules_python//python:defs.bzl", "py_binary")
+-load("@v8_python_deps//:requirements.bzl", "requirement")
++load("@base_pip3//:requirements.bzl", "requirement")
+ load(
+     "@v8//:bazel/defs.bzl",
+     "v8_binary",
+@@ -157,7 +157,7 @@ v8_int(
+ # If no explicit value for v8_enable_pointer_compression, we set it to 'none'.
+ v8_string(
+     name = "v8_enable_pointer_compression",
+-    default = "none",
++    default = "False",
+ )
+ 
+ # Default setting for v8_enable_pointer_compression.
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index e957c0f..0327669 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -116,6 +116,7 @@ def _default_args():
+         }) + select({
+             "@v8//bazel/config:is_clang": [
+                 "-Wno-invalid-offsetof",
++                "-Wno-unneeded-internal-declaration",
+                 "-std=c++17",
+             ],
+             "@v8//bazel/config:is_gcc": [
+@@ -131,6 +132,8 @@ def _default_args():
+                 "-Wno-redundant-move",
+                 "-Wno-return-type",
+                 "-Wno-stringop-overflow",
++                "-Wno-nonnull",
++                "-Wno-pessimizing-move",
+                 # Use GNU dialect, because GCC doesn't allow using
+                 # ##__VA_ARGS__ when in standards-conforming mode.
+                 "-std=gnu++17",
+@@ -151,6 +154,23 @@ def _default_args():
+                 "-fno-integrated-as",
+             ],
+             "//conditions:default": [],
++        }) + select({
++            "@envoy//bazel:no_debug_info": [
++                "-g0",
++            ],
++            "//conditions:default": [],
++        }) + select({
++            "@v8//bazel/config:is_macos": [
++                # The clang available on macOS catalina has a warning that isn't clean on v8 code.
++                "-Wno-range-loop-analysis",
++
++                # To supress warning on deprecated declaration on v8 code. For example:
++                # external/v8/src/base/platform/platform-darwin.cc:56:22: 'getsectdatafromheader_64'
++                # is deprecated: first deprecated in macOS 13.0.
++                # https://bugs.chromium.org/p/v8/issues/detail?id=13428.
++                "-Wno-deprecated-declarations",
++            ],
++            "//conditions:default": [],
+         }),
+         includes = ["include"],
+         linkopts = select({
+diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
+index 4473e20..65a6ec7 100644
+--- a/src/wasm/c-api.cc
++++ b/src/wasm/c-api.cc
+@@ -2247,6 +2247,8 @@ auto Instance::exports() const -> ownvec<Extern> {
+ 
+ }  // namespace wasm
+ 
++#if 0
++
+ // BEGIN FILE wasm-c.cc
+ 
+ extern "C" {
+@@ -3274,3 +3276,5 @@ wasm_instance_t* wasm_frame_instance(const wasm_frame_t* frame) {
+ #undef WASM_DEFINE_SHARABLE_REF
+ 
+ }  // extern "C"
++
++#endif
+diff --git a/third_party/inspector_protocol/code_generator.py b/third_party/inspector_protocol/code_generator.py
+index c3768b8..d4a1dda 100755
+--- a/third_party/inspector_protocol/code_generator.py
++++ b/third_party/inspector_protocol/code_generator.py
+@@ -16,6 +16,8 @@ try:
+ except ImportError:
+   import simplejson as json
+ 
++sys.path += [os.path.dirname(__file__)]
++
+ import pdl
+ 
+ try:

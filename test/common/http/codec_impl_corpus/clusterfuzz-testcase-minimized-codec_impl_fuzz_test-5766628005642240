@@ -1,0 +1,192 @@
+actions {
+  server_drain {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "E"
+      }
+      headers {
+        key: ":authority"
+        value: "V"
+      }
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  swap_buffer {
+  }
+}
+actions {
+  swap_buffer {
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+      }
+    }
+  }
+}
+actions {
+  server_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 1751212400
+    }
+  }
+}
+actions {
+  swap_buffer {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 8963
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 9
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 9
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 3
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 3
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 0
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 9
+      end_stream: true
+    }
+  }
+}
+actions {
+  quiesce_drain {
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 3
+    }
+  }
+}
+actions {
+  client_drain {
+  }
+}
+actions {
+  stream_action {
+    request {
+      data: 7
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 2097152
+    response {
+      data: 9
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      data: 0
+    }
+  }
+}
+actions {
+  mutate {
+  }
+}
+actions {
+  swap_buffer {
+  }
+}

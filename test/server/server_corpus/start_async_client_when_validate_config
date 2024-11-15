@@ -1,0 +1,227 @@
+static_resources {
+  clusters {
+    name: "z"
+    type: STRICT_DNS
+    connect_timeout {
+      seconds: 1000000
+    }
+    lb_policy: MAGLEV
+    dns_lookup_family: V4_ONLY
+    metadata {
+      filter_metadata {
+        key: "V"
+        value {
+        }
+      }
+    }
+    ignore_health_on_host_removal: true
+  }
+  clusters {
+    name: "+"
+    connect_timeout {
+      nanos: 55040
+    }
+    lb_policy: RING_HASH
+    dns_lookup_family: V4_ONLY
+    metadata {
+    }
+    load_balancing_policy {
+    }
+  }
+  clusters {
+    name: "V"
+    connect_timeout {
+      seconds: 256
+    }
+    lb_policy: RING_HASH
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        http2_protocol_options {
+          allow_metadata: true
+        }
+      }
+    }
+    dns_lookup_family: V4_ONLY
+    outlier_detection {
+    }
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options {
+          max_connection_duration {
+            nanos: 55040
+          }
+        }
+      }
+    }
+    upstream_connection_options {
+      tcp_keepalive {
+        keepalive_probes {
+          value: 589951
+        }
+      }
+    }
+    close_connections_on_host_health_failure: true
+    ignore_health_on_host_removal: true
+    use_tcp_for_dns_lookups: true
+  }
+  clusters {
+    name: "0"
+    connect_timeout {
+      seconds: 2304
+    }
+    lb_policy: RING_HASH
+    http2_protocol_options {
+      initial_connection_window_size {
+        value: 67110913
+      }
+      max_inbound_window_update_frames_per_data_frame_sent {
+        value: 589951
+      }
+    }
+    cleanup_interval {
+      seconds: 2304
+    }
+    alt_stat_name: "\r\002\000\000"
+    upstream_connection_options {
+      tcp_keepalive {
+        keepalive_interval {
+          value: 268435456
+        }
+      }
+    }
+    maglev_lb_config {
+    }
+  }
+  clusters {
+    name: "a"
+    type: STRICT_DNS
+    connect_timeout {
+      seconds: 1000000
+      nanos: 96
+    }
+    lb_policy: RING_HASH
+    dns_lookup_family: V6_ONLY
+    metadata {
+      filter_metadata {
+        key: "V"
+        value {
+        }
+      }
+    }
+    upstream_connection_options {
+    }
+    least_request_lb_config {
+    }
+    connection_pool_per_downstream_connection: true
+  }
+  clusters {
+    name: ";"
+    connect_timeout {
+      seconds: 256
+    }
+    lb_policy: RING_HASH
+    metadata {
+    }
+    alt_stat_name: "+"
+    upstream_connection_options {
+      tcp_keepalive {
+      }
+    }
+    respect_dns_ttl: true
+  }
+  clusters {
+    name: "\000\000\000\017~"
+    connect_timeout {
+      seconds: 2324
+    }
+    lb_policy: RING_HASH
+    circuit_breakers {
+    }
+    http2_protocol_options {
+      initial_connection_window_size {
+        value: 67110913
+      }
+      max_inbound_window_update_frames_per_data_frame_sent {
+        value: 589951
+      }
+    }
+    dns_lookup_family: V6_ONLY
+    lb_subset_config {
+    }
+    metadata {
+    }
+    upstream_connection_options {
+      tcp_keepalive {
+        keepalive_time {
+          value: 2
+        }
+      }
+    }
+    track_timeout_budgets: true
+    track_cluster_stats {
+      timeout_budgets: true
+    }
+  }
+}
+dynamic_resources {
+  ads_config {
+    grpc_services {
+      envoy_grpc {
+        cluster_name: "+"
+      }
+    }
+    set_node_on_first_message_only: true
+  }
+}
+flags_path: "+"
+stats_sinks {
+}
+stats_sinks {
+  name: "h"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "\026"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.api.v2.route.Route"
+    value: "\022\000B\023\n\000\022\017\n\r\n\000\022\t*\007\n\005\n\001\026\022\000R\000R\000R\000R\000R\000R\000b\000b\000"
+  }
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "?\026"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "\r\002\000\000"
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "\026"
+}
+stats_sinks {
+  name: "\r\002\000\000"
+}
+stats_sinks {
+}
+stats_sinks {
+  name: "\026"
+}
+config_sources {
+  path: "+"
+}
+

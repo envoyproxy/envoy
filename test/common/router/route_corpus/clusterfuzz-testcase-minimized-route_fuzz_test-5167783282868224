@@ -1,0 +1,29 @@
+config {
+  name: "\237L"
+  virtual_hosts {
+    name: "&"
+    domains: "*"
+    matcher {
+      on_no_match {
+        matcher {
+          on_no_match {
+            action {
+              name: "+envoy.lb"
+              typed_config {
+                type_url: "typ-62488625co5m.si/envoy.config.route.v3.Route"
+                value: "\n\002\n\000\222\001\000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: "x-forwarded-proto"
+    value: "i-"
+  }
+}
+random_value: 50

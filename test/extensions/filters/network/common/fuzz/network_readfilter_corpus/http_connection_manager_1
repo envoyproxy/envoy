@@ -1,0 +1,21 @@
+config {
+  name: "envoy.filters.network.http_connection_manager"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+    value: "\022\002B\001\"\000J\004(\001J\000z\002\010\001\220\001\001"
+  }
+}
+actions {
+  on_data {
+    data: "y"
+  }
+}
+actions {
+  on_new_connection {
+  }
+}
+actions {
+  advance_time {
+    milliseconds: 655360
+  }
+}

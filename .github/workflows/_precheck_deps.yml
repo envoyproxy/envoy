@@ -1,0 +1,59 @@
+name: Precheck/deps
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      dependency-review:
+        type: boolean
+        default: false
+      request:
+        type: string
+        required: true
+      trusted:
+        type: boolean
+        required: true
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-deps
+  cancel-in-progress: true
+
+
+jobs:
+  deps:
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/_run.yml
+    name: ${{ matrix.target }}
+    with:
+      bazel-extra: '--config=remote-envoy-engflow'
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      concurrency-suffix: -${{ matrix.target }}
+      request: ${{ inputs.request }}
+      error-match: |
+        ERROR
+        error:
+        Error:
+      rbe: ${{ matrix.rbe }}
+      target: ${{ matrix.target }}
+      trusted: ${{ inputs.trusted }}
+    strategy:
+      matrix:
+        include:
+        - target: deps
+          rbe: false
+
+  dependency-review:
+    runs-on: ubuntu-22.04
+    if: ${{ inputs.dependency-review }}
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      with:
+        ref: ${{ fromJSON(inputs.request).request.sha }}
+        persist-credentials: false
+    - name: Dependency Review
+      uses: actions/dependency-review-action@4081bf99e2866ebe428fc0477b69eb4fcda7220a  # v4.4.0

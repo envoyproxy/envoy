@@ -1,0 +1,80 @@
+headers_to_add {
+  header {
+    key: "P"
+    value: "%PER_REQUEST_STATE(oB]$T)%"
+  }
+}
+headers_to_add {
+  header {
+    key: "A"
+    value: "%START_TIME(B%444ssa4%s4%>TME(B%128sY$T_)%"
+  }
+}
+headers_to_add {
+  header {
+    key: "A"
+    value: "%PER_REQUEST_STATE(dB]$T)%"
+  }
+}
+headers_to_add {
+  header {
+    key: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+    value: "%PER_REQUEST_STATE(dB]$T)%"
+  }
+  append {
+    value: true
+  }
+}
+headers_to_add {
+  header {
+    key: "]"
+    value: "%UPSTREAM_METADATA([\"\", \"\"])%"
+  }
+}
+stream_info {
+  dynamic_metadata {
+    filter_metadata {
+      key: "\000\000{\000+p"
+      value {
+      }
+    }
+    filter_metadata {
+      key: "\000}"
+      value {
+      }
+    }
+    filter_metadata {
+      key: "\000}"
+      value {
+      }
+    }
+    filter_metadata {
+      key: "K"
+      value {
+        fields {
+          key: ""
+          value {
+          }
+        }
+      }
+    }
+  }
+  upstream_metadata {
+    filter_metadata {
+      key: ""
+      value {
+        fields {
+          key: ""
+          value {
+            string_value: "c\000\000\000\000\000\000\000"
+          }
+        }
+      }
+    }
+    filter_metadata {
+      key: "-"
+      value {
+      }
+    }
+  }
+}

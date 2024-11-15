@@ -1,0 +1,10 @@
+config {
+  bind_port: false
+  mark: 0
+}
+
+fuzzed {
+  sock {
+    remote_address: "tcp://1.2.3.4:0"
+  }
+}

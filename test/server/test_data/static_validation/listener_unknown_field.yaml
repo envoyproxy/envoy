@@ -1,0 +1,10 @@
+static_resources:
+  listeners:
+    name: foo
+    address:
+      socket_address:
+        address: "{{ ntop_ip_loopback_address }}"
+        port_value: 0
+    foo: bar
+    filter_chains:
+    - filters:

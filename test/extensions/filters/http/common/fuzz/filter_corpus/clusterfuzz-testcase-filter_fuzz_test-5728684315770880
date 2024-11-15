@@ -1,0 +1,13 @@
+config {
+  name: "envoy.filters.http.adaptive_concurrency"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency"
+    value: "\n\024\022\010\022\002\010\010\032\002\020\010\032\010\n\002\020\010\022\002\010\001"
+  }
+}
+data {
+}
+upstream_data {
+  trailers {
+  }
+}

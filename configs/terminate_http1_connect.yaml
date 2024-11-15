@@ -1,0 +1,86 @@
+# This configuration terminates a CONNECT request and sends the CONNECT payload upstream.
+# It can be used to test TCP tunneling as described in
+# https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
+# or used to test CONNECT to domain such as www.google.com, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com.
+#
+# To test the CONNECT to tcp address 127.0.0.1:10003, run
+# `curl -k -v -x 127.0.0.1:10001 --proxy-header "foo: bar" https://127.0.0.1:10003`.
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 9902
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 10001
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains:
+              - "*"
+              routes:
+              - match:
+                  connect_matcher:
+                    {}
+                  headers:
+                  - name: foo
+                    string_match:
+                      exact: bar
+                route:
+                  cluster: local_original_dst
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config:
+                      {}
+              - match:
+                  connect_matcher:
+                    {}
+                route:
+                  cluster: service_google
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config:
+                      {}
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          http_protocol_options: {}
+          upgrade_configs:
+          - upgrade_type: CONNECT
+  clusters:
+  - name: service_google
+    connect_timeout: 0.25s
+    type: LOGICAL_DNS
+    # Comment out the following line to test on v6 networks
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: service_google
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: www.google.com
+                port_value: 443
+  - name: local_original_dst
+    connect_timeout: 0.25s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      use_http_header: true
+      http_header_name: ":authority"

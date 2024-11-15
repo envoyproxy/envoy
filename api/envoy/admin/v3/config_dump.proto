@@ -1,0 +1,135 @@
+syntax = "proto3";
+
+package envoy.admin.v3;
+
+import "envoy/admin/v3/config_dump_shared.proto";
+import "envoy/config/bootstrap/v3/bootstrap.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.admin.v3";
+option java_outer_classname = "ConfigDumpProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/admin/v3;adminv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: ConfigDump]
+
+// The :ref:`/config_dump <operations_admin_interface_config_dump>` admin endpoint uses this wrapper
+// message to maintain and serve arbitrary configuration information from any component in Envoy.
+message ConfigDump {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ConfigDump";
+
+  // This list is serialized and dumped in its entirety at the
+  // :ref:`/config_dump <operations_admin_interface_config_dump>` endpoint.
+  //
+  // The following configurations are currently supported and will be dumped in the order given
+  // below:
+  //
+  // * ``bootstrap``: :ref:`BootstrapConfigDump <envoy_v3_api_msg_admin.v3.BootstrapConfigDump>`
+  // * ``clusters``: :ref:`ClustersConfigDump <envoy_v3_api_msg_admin.v3.ClustersConfigDump>`
+  // * ``ecds_filter_http``: :ref:`EcdsConfigDump <envoy_v3_api_msg_admin.v3.EcdsConfigDump>`
+  // * ``ecds_filter_quic_listener``: :ref:`EcdsConfigDump <envoy_v3_api_msg_admin.v3.EcdsConfigDump>`
+  // * ``ecds_filter_tcp_listener``: :ref:`EcdsConfigDump <envoy_v3_api_msg_admin.v3.EcdsConfigDump>`
+  // * ``endpoints``:  :ref:`EndpointsConfigDump <envoy_v3_api_msg_admin.v3.EndpointsConfigDump>`
+  // * ``listeners``: :ref:`ListenersConfigDump <envoy_v3_api_msg_admin.v3.ListenersConfigDump>`
+  // * ``scoped_routes``: :ref:`ScopedRoutesConfigDump <envoy_v3_api_msg_admin.v3.ScopedRoutesConfigDump>`
+  // * ``routes``:  :ref:`RoutesConfigDump <envoy_v3_api_msg_admin.v3.RoutesConfigDump>`
+  // * ``secrets``:  :ref:`SecretsConfigDump <envoy_v3_api_msg_admin.v3.SecretsConfigDump>`
+  //
+  // EDS Configuration will only be dumped by using parameter ``?include_eds``
+  //
+  // Currently ECDS is supported in HTTP and listener filters. Note, ECDS configuration for
+  // either HTTP or listener filter will only be dumped if it is actually configured.
+  //
+  // You can filter output with the resource and mask query parameters.
+  // See :ref:`/config_dump?resource={} <operations_admin_interface_config_dump_by_resource>`,
+  // :ref:`/config_dump?mask={} <operations_admin_interface_config_dump_by_mask>`,
+  // or :ref:`/config_dump?resource={},mask={}
+  // <operations_admin_interface_config_dump_by_resource_and_mask>` for more information.
+  repeated google.protobuf.Any configs = 1;
+}
+
+// This message describes the bootstrap configuration that Envoy was started with. This includes
+// any CLI overrides that were merged. Bootstrap configuration information can be used to recreate
+// the static portions of an Envoy configuration by reusing the output as the bootstrap
+// configuration for another Envoy.
+message BootstrapConfigDump {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.BootstrapConfigDump";
+
+  config.bootstrap.v3.Bootstrap bootstrap = 1;
+
+  // The timestamp when the BootstrapConfig was last updated.
+  google.protobuf.Timestamp last_updated = 2;
+}
+
+// Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
+message SecretsConfigDump {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.SecretsConfigDump";
+
+  // DynamicSecret contains secret information fetched via SDS.
+  // [#next-free-field: 7]
+  message DynamicSecret {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.SecretsConfigDump.DynamicSecret";
+
+    // The name assigned to the secret.
+    string name = 1;
+
+    // This is the per-resource version information.
+    string version_info = 2;
+
+    // The timestamp when the secret was last updated.
+    google.protobuf.Timestamp last_updated = 3;
+
+    // The actual secret information.
+    // Security sensitive information is redacted (replaced with "[redacted]") for
+    // private keys and passwords in TLS certificates.
+    google.protobuf.Any secret = 4;
+
+    // Set if the last update failed, cleared after the next successful update.
+    // The *error_state* field contains the rejected version of this particular
+    // resource along with the reason and timestamp. For successfully updated or
+    // acknowledged resource, this field should be empty.
+    // [#not-implemented-hide:]
+    UpdateFailureState error_state = 5;
+
+    // The client status of this resource.
+    // [#not-implemented-hide:]
+    ClientResourceStatus client_status = 6;
+  }
+
+  // StaticSecret specifies statically loaded secret in bootstrap.
+  message StaticSecret {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.SecretsConfigDump.StaticSecret";
+
+    // The name assigned to the secret.
+    string name = 1;
+
+    // The timestamp when the secret was last updated.
+    google.protobuf.Timestamp last_updated = 2;
+
+    // The actual secret information.
+    // Security sensitive information is redacted (replaced with "[redacted]") for
+    // private keys and passwords in TLS certificates.
+    google.protobuf.Any secret = 3;
+  }
+
+  // The statically loaded secrets.
+  repeated StaticSecret static_secrets = 1;
+
+  // The dynamically loaded active secrets. These are secrets that are available to service
+  // clusters or listeners.
+  repeated DynamicSecret dynamic_active_secrets = 2;
+
+  // The dynamically loaded warming secrets. These are secrets that are currently undergoing
+  // warming in preparation to service clusters or listeners.
+  repeated DynamicSecret dynamic_warming_secrets = 3;
+}

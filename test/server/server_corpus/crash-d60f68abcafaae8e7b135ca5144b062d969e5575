@@ -1,0 +1,44 @@
+static_resources {
+  clusters {
+    name: "service_google"
+    type: LOGICAL_DNS
+    connect_timeout {
+      nanos: 250000000
+    }
+    hosts {
+      socket_address {
+        address: "google.com"
+        port_value: 0
+      }
+    }
+    tls_context {
+      sni: "www.google.com"
+    }
+    dns_lookup_family: V4_ONLY
+  }
+  clusters {
+    name: "service_google"
+    type: LOGICAL_DNS
+    connect_timeout {
+      nanos: 250000000
+    }
+    hosts {
+      socket_address {
+        address: "google.com"
+        port_value: 0
+      }
+    }
+    tls_context {
+      sni: "www.google.com"
+    }
+    dns_lookup_family: V4_ONLY
+  }
+}
+admin {
+  address {
+    socket_address {
+      address: "127.0.0.1"
+      port_value: 0
+    }
+  }
+}

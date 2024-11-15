@@ -1,0 +1,27 @@
+expression {
+  comprehension_expr {
+    iter_range {
+      ident_expr {
+        name: "request"
+      }
+    }
+    result {
+      id: 3530822107858468864
+    }
+  }
+}
+trailers {
+  headers {
+    key: "\r\000"
+  }
+}
+stream_info {
+  dynamic_metadata {
+    filter_metadata {
+      key: ""
+      value {
+      }
+    }
+  }
+  requested_server_name: "/"
+}

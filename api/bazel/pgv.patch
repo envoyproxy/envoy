@@ -1,0 +1,13 @@
+--- a/templates/cc/register.go	2023-06-22 14:25:05.776175085 +0000
++++ b/templates/cc/register.go	2023-06-22 14:26:33.008090583 +0000
+@@ -116,6 +116,10 @@
+ func (fns CCFuncs) methodName(name interface{}) string {
+ 	nameStr := fmt.Sprintf("%s", name)
+ 	switch nameStr {
++	case "concept":
++		return "concept_"
++	case "requires":
++		return "requires_"
+ 	case "const":
+ 		return "const_"
+ 	case "inline":

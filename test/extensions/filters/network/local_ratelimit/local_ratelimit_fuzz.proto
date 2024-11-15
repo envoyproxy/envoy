@@ -1,0 +1,28 @@
+syntax = "proto3";
+package envoy.extensions.filters.network.local_ratelimit;
+
+import "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.proto";
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+
+message OnData {
+  bytes data = 1;
+  bool end_stream = 2;
+}
+
+message Action {
+  oneof action_selector {
+    option (validate.required) = true;
+    // Call onNewConnection().
+    google.protobuf.Empty on_new_connection = 1;
+    // Call onData().
+    OnData on_data = 2;
+    // Timer ends and refill the bucket.
+    google.protobuf.Empty refill = 3;
+  }
+}
+message LocalRateLimitTestCase {
+  envoy.extensions.filters.network.local_ratelimit.v3.LocalRateLimit config = 1
+      [(validate.rules).message = {required: true}];
+  repeated Action actions = 2;
+}

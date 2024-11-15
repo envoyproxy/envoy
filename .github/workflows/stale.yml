@@ -1,0 +1,56 @@
+name: Prune stale
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+  - cron: '0 */4 * * *'
+
+jobs:
+  prune_stale:
+    if: >-
+      ${{
+          github.repository == 'envoyproxy/envoy'
+          && (github.event.schedule
+              || !contains(github.actor, '[bot]'))
+      }}
+    permissions:
+      issues: write  # for actions/stale to close stale issues
+      pull-requests: write  # for actions/stale to close stale PRs
+    name: Prune stale
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Prune Stale
+      uses: actions/stale@28ca1036281a5e5922ead5184a1bbf96e5fc984e  # v9.0.0
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        # Different amounts of days for issues/PRs are not currently supported but there is a PR
+        # open for it: https://github.com/actions/stale/issues/214
+        days-before-stale: 30
+        days-before-close: 7
+        stale-issue-message: >
+          This issue has been automatically marked as stale because it has not had activity in the
+          last 30 days. It will be closed in the next 7 days unless it is tagged "help wanted" or "no stalebot" or other activity
+          occurs. Thank you for your contributions.
+        close-issue-message: >
+          This issue has been automatically closed because it has not had activity in the
+          last 37 days. If this issue is still valid, please ping a maintainer and ask them to label it as "help wanted" or "no stalebot".
+          Thank you for your contributions.
+        stale-pr-message: >
+          This pull request has been automatically marked as stale because it has not had
+          activity in the last 30 days. It will be closed in 7 days if no further activity occurs. Please
+          feel free to give a status update now, ping for review, or re-open when it's ready.
+          Thank you for your contributions!
+        close-pr-message: >
+          This pull request has been automatically closed because it has not had
+          activity in the last 37 days. Please feel free to give a status update now, ping for review, or re-open when it's ready.
+          Thank you for your contributions!
+        stale-issue-label: 'stale'
+        exempt-issue-labels: 'no stalebot,help wanted'
+        stale-pr-label: 'stale'
+        exempt-pr-labels: 'no stalebot'
+        operations-per-run: 500
+        ascending: true

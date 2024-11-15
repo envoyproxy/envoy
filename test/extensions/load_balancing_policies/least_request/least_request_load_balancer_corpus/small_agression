@@ -1,0 +1,85 @@
+zone_aware_load_balancer_test_case {
+  load_balancer_test_case {
+    common_lb_config {
+    }
+    actions {
+      preconnect {
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 28
+        zum_degraded_hosts: 1811939328
+        random_bytestring: 1870266368
+        random_bytestring: 8
+      }
+    }
+    actions {
+      preconnect {
+      }
+    }
+    actions {
+      preconnect {
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 33
+        random_bytestring: 4
+      }
+    }
+    actions {
+      preconnect {
+      }
+    }
+    actions {
+      preconnect {
+      }
+    }
+    actions {
+      choose_host {
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 1195853345
+        num_degraded_hosts: 95
+        num_excluded_hosts: 9
+        random_bytestring: 4
+      }
+    }
+    actions {
+      update_health_flags {
+        num_healthy_hosts: 1195853345
+        num_degraded_hosts: 95
+        num_excluded_hosts: 9
+        random_bytestring: 4
+      }
+    }
+    setup_priority_levels {
+      num_hosts_in_priority_level: 8
+      num_hosts_locality_a: 4
+      random_bytestring: 2
+    }
+    seed_for_prng: 5
+  }
+  random_bytestring_for_weights: "$/"
+}
+least_request_lb_config {
+  active_requTrueest_bias {
+    runtime_key: "envoy_"
+  }
+  slow_start_config {
+    slow_start_window {
+      seconds: 2
+    }
+    aggression {
+      default_value: 5.05429155695595e-321
+      runtime_key: "envoy_"
+    }
+    min_weight_percent {
+      value: 5.05429155695595e-321
+    }
+  }
+}
+random_bytestring_for_requests: "@\275"

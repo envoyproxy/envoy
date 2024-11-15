@@ -1,0 +1,32 @@
+actions: {
+  new_stream: {
+    request_headers: {
+      headers: {
+        key: ":path"
+        value: "/"
+      }
+    }
+  }
+}
+actions: {
+  stream_action: {
+    request: {
+      trailers : {
+        headers: {
+          key: "x-some-trailers-that-stop"
+          value: "iteration"
+        }
+        status: TRAILER_STOP_ITERATION
+      }
+    }
+  }
+}
+actions: {
+  stream_action: {
+    request: {
+      continue_decoding: {
+      }
+    }
+  }
+}
+

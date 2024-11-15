@@ -1,0 +1,28 @@
+static_resources {
+  clusters {
+    name: "-2353373969551157135775236"
+    connect_timeout {
+      seconds: 12884901890
+    }
+    hosts {
+      pipe {
+        path: "@"
+      }
+    }
+    outlier_detection {
+    }
+    common_lb_config {
+      healthy_panic_threshold {
+        value: nan
+      }
+    }
+  }
+}
+admin {
+  address {
+    pipe {
+      path: "W"
+    }
+  }
+}
+

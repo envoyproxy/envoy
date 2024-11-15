@@ -1,0 +1,53 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "http"
+      }
+      headers {
+        key: ":authority"
+        value: "host"
+      }
+      headers {
+        key: "connection"
+        value: "upgrade"
+      }
+      headers {
+        key: "upgrade"
+        value: "WebSocket"
+      }
+    }
+  }
+}
+
+
+actions {
+  stream_action {
+    stream_id: 0
+    response {
+      headers {
+        headers {
+          key: "connection"
+          value: "upgrade"
+        }
+        headers {
+          key: "upgrade"
+          value: "WebSocket"
+        }
+        headers {
+          key: ":status"
+          value: "101"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+stats_flush_interval: 500s
+
+node:
+  id: node_id
+  cluster: node_cluster
+
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 9901
+
+layered_runtime:
+  layers:
+  - name: rtds
+    rtds_layer:
+      name: rtds
+      rtds_config:
+        path_config_source:
+          path: /config_map/rtds/rtds.yaml
+          watched_directory:
+            path: /config_map/rtds
+
+dynamic_resources:
+  cds_config:
+    path_config_source:
+      path: /config_map/cds/cds.yaml
+      watched_directory:
+        path: /config_map/cds
+  lds_config:
+    path_config_source:
+      path: /config_map/lds/lds.yaml
+      watched_directory:
+        path: /config_map/lds

@@ -1,0 +1,193 @@
+# TODO(dio): Consider to remove compiler specific part of this patch when we solely compile the
+# project using clang-cl. Tracked in https://github.com/envoyproxy/envoy/issues/11974.
+
+diff --git a/base/compiler_specific.h b/base/compiler_specific.h
+index 0174b6d..fb5b80d 100644
+--- a/base/compiler_specific.h
++++ b/base/compiler_specific.h
+@@ -7,10 +7,6 @@
+
+ #include "build/build_config.h"
+
+-#if defined(COMPILER_MSVC) && !defined(__clang__)
+-#error "Only clang-cl is supported on Windows, see https://crbug.com/988071"
+-#endif
+-
+ // This is a wrapper around `__has_cpp_attribute`, which can be used to test for
+ // the presence of an attribute. In case the compiler does not support this
+ // macro it will simply evaluate to 0.
+@@ -398,7 +394,7 @@ inline constexpr bool AnalyzerAssumeTrue(bool arg) {
+ #define CONSTINIT
+ #endif
+
+-#if defined(__clang__)
++#if defined(__clang__) && HAS_CPP_ATTRIBUTE(gsl::Pointer)
+ #define GSL_OWNER [[gsl::Owner]]
+ #define GSL_POINTER [[gsl::Pointer]]
+ #else
+diff --git a/base/containers/checked_iterators.h b/base/containers/checked_iterators.h
+index dc8d2ba..9306697 100644
+--- a/base/containers/checked_iterators.h
++++ b/base/containers/checked_iterators.h
+@@ -237,9 +237,32 @@ using CheckedContiguousConstIterator = CheckedContiguousIterator<const T>;
+ // [3] https://wg21.link/pointer.traits.optmem
+-namespace std {
+
++#ifdef SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
++#if defined(_LIBCPP_VERSION)
++
++// TODO(crbug.com/1284275): Remove when C++20 is on by default, as the use
++// of `iterator_concept` above should suffice.
++_LIBCPP_BEGIN_NAMESPACE_STD
++
++// TODO(crbug.com/1449299): https://reviews.llvm.org/D150801 renamed this from
++// `__is_cpp17_contiguous_iterator` to `__libcpp_is_contiguous_iterator`. Clean
++// up the old spelling after libc++ rolls.
++template <typename T>
++struct __is_cpp17_contiguous_iterator;
+ template <typename T>
+ struct __is_cpp17_contiguous_iterator<::gurl_base::CheckedContiguousIterator<T>>
+     : true_type {};
++template <typename T>
++struct __libcpp_is_contiguous_iterator;
++template <typename T>
++struct __libcpp_is_contiguous_iterator<::gurl_base::CheckedContiguousIterator<T>>
++    : true_type {};
++
++_LIBCPP_END_NAMESPACE_STD
++
++#endif
++#endif
++
++namespace std {
+
+ template <typename T>
+ struct pointer_traits<::gurl_base::CheckedContiguousIterator<T>> {
+
+# TODO(keith): Remove unused parameter workarounds when https://quiche-review.googlesource.com/c/googleurl/+/11180 lands
+
+diff --git a/base/numerics/clamped_math_impl.h b/base/numerics/clamped_math_impl.h
+index 10023f0..783f5da 100644
+--- a/base/numerics/clamped_math_impl.h
++++ b/base/numerics/clamped_math_impl.h
+@@ -36,6 +36,7 @@ template <typename T,
+           typename std::enable_if<std::is_integral<T>::value &&
+                                   !std::is_signed<T>::value>::type* = nullptr>
+ constexpr T SaturatedNegWrapper(T value) {
++  (void)value; // unused
+   return T(0);
+ }
+
+diff --git a/base/numerics/safe_conversions.h b/base/numerics/safe_conversions.h
+index 4a9494e..ba44fa0 100644
+--- a/base/numerics/safe_conversions.h
++++ b/base/numerics/safe_conversions.h
+@@ -45,6 +45,7 @@ template <typename Dst, typename Src, typename Enable = void>
+ struct IsValueInRangeFastOp {
+   static constexpr bool is_supported = false;
+   static constexpr bool Do(Src value) {
++    (void)value; // unused
+     // Force a compile failure if instantiated.
+     return CheckOnFailure::template HandleFailure<bool>();
+   }
+@@ -164,6 +165,7 @@ template <typename Dst, typename Src, typename Enable = void>
+ struct SaturateFastOp {
+   static constexpr bool is_supported = false;
+   static constexpr Dst Do(Src value) {
++    (void)value; // unused
+     // Force a compile failure if instantiated.
+     return CheckOnFailure::template HandleFailure<Dst>();
+   }
+diff --git a/base/containers/span.h b/base/containers/span.h
+index 40e325f..c66c183 100644
+--- a/base/containers/span.h
++++ b/base/containers/span.h
+@@ -125,7 +125,7 @@ using EnableIfSpanCompatibleContainerAndSpanIsDynamic =
+ template <size_t Extent>
+ class ExtentStorage {
+  public:
+-  constexpr explicit ExtentStorage(size_t size) noexcept {}
++  constexpr explicit ExtentStorage(size_t /*size*/) noexcept {}
+   constexpr size_t size() const noexcept { return Extent; }
+ };
+
+diff --git a/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h b/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h
+index 6d059f7..6339fa5 100644
+--- a/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h
++++ b/polyfills/third_party/perfetto/include/perfetto/tracing/traced_value.h
+@@ -13,7 +13,7 @@ class TracedValue {
+ };
+
+ template <typename T>
+-void WriteIntoTracedValue(TracedValue context, T&& value) {}
++void WriteIntoTracedValue(TracedValue /*context*/, T&& /*value*/) {}
+
+ template <typename T, typename ResultType = void, class = void>
+ struct check_traced_value_support {
+diff --git a/build_config/build_config.bzl b/build_config/build_config.bzl
+index 5960d2a..08295ff 100644
+--- a/build_config/build_config.bzl
++++ b/build_config/build_config.bzl
+@@ -7,6 +7,7 @@ _default_copts = select({
+     "//conditions:default": [
+         "-std=c++17",
+         "-fno-strict-aliasing",
++        "-Wno-unused-parameter",
+     ],
+ })
+
+diff --git a/url/url_canon_internal.h b/url/url_canon_internal.h
+index 58ae144..467da0b 100644
+--- a/url/url_canon_internal.h
++++ b/url/url_canon_internal.h
+@@ -305,6 +305,7 @@ inline bool AppendUTF8EscapedChar(const char* str,
+ // through it will point to the next character to be considered. On failure,
+ // |*begin| will be unchanged.
+ inline bool Is8BitChar(char c) {
++  (void)c; // unused
+   return true;  // this case is specialized to avoid a warning
+ }
+ inline bool Is8BitChar(char16_t c) {
+
+# TODO(keith): Remove when https://quiche-review.googlesource.com/c/googleurl/+/11200 lands
+
+diff --git a/base/memory/raw_ptr_exclusion.h b/base/memory/raw_ptr_exclusion.h
+index f881c04..4e4f7df 100644
+--- a/base/memory/raw_ptr_exclusion.h
++++ b/base/memory/raw_ptr_exclusion.h
+@@ -8,7 +8,7 @@
+ #include "polyfills/base/allocator/buildflags.h"
+ #include "build/build_config.h"
+
+-#if defined(OFFICIAL_BUILD) && !BUILDFLAG(FORCE_ENABLE_RAW_PTR_EXCLUSION)
++#if !defined(__clang__) || (defined(OFFICIAL_BUILD) && !BUILDFLAG(FORCE_ENABLE_RAW_PTR_EXCLUSION))
+ // The annotation changed compiler output and increased binary size so disable
+ // for official builds.
+ // TODO(crbug.com/1320670): Remove when issue is resolved.
+
+# TODO(keith): Remove when https://quiche-review.googlesource.com/c/googleurl/+/11300/1 lands
+
+diff --git a/build_config/BUILD b/build_config/BUILD
+index 78ac01d..eeef238 100644
+--- a/build_config/BUILD
++++ b/build_config/BUILD
+@@ -5,11 +5,13 @@
+ config_setting(
+     name = "windows_x86_64",
+     values = {"cpu": "x64_windows"},
++    visibility = ["//visibility:public"],
+ )
+
+ bool_flag(
+     name = "system_icu",
+     build_setting_default = True,
++    visibility = ["//visibility:public"],
+ )
+
+ config_setting(
+@@ -17,4 +19,5 @@
+     flag_values = {
+         ":system_icu": "True",
+     },
++    visibility = ["//visibility:public"],
+ )

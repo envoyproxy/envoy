@@ -1,0 +1,23 @@
+health_check_config {
+  timeout {
+    nanos: 9
+  }
+  interval {
+    seconds: 32768
+    nanos: 426
+  }
+  unhealthy_threshold {
+    value: 491516
+  }
+  healthy_threshold {
+    value: 524284
+  }
+  http_health_check {
+    path: "("
+  }
+}
+actions {
+  raise_event: 355888746
+}
+http_verify_cluster: true
+start_failed: true

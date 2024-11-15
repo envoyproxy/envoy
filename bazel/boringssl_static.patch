@@ -1,0 +1,20 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index d3b66ee5f..b0791b0df 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -63,6 +63,7 @@ bssl_cc_library(
+         ],
+         "//conditions:default": ["-pthread"],
+     }),
++    linkstatic = True,
+     visibility = ["//visibility:public"],
+ )
+ 
+@@ -72,6 +73,7 @@ bssl_cc_library(
+     hdrs = ssl_headers,
+     copts = ["-DBORINGSSL_IMPLEMENTATION"],
+     internal_hdrs = ssl_internal_headers,
++    linkstatic = True,
+     visibility = ["//visibility:public"],
+     deps = [":crypto_internal"],
+ )

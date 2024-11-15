@@ -1,0 +1,544 @@
+syntax = "proto3";
+
+package envoy.data.accesslog.v3;
+
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+import "envoy/annotations/deprecation.proto";
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.data.accesslog.v3";
+option java_outer_classname = "AccesslogProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3;accesslogv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: gRPC access logs]
+// Envoy access logs describe incoming interaction with Envoy over a fixed
+// period of time, and typically cover a single request/response exchange,
+// (e.g. HTTP), stream (e.g. over HTTP/gRPC), or proxied connection (e.g. TCP).
+// Access logs contain fields defined in protocol-specific protobuf messages.
+//
+// Except where explicitly declared otherwise, all fields describe
+// *downstream* interaction between Envoy and a connected client.
+// Fields describing *upstream* interaction will explicitly include ``upstream``
+// in their name.
+
+enum AccessLogType {
+  NotSet = 0;
+  TcpUpstreamConnected = 1;
+  TcpPeriodic = 2;
+  TcpConnectionEnd = 3;
+  DownstreamStart = 4;
+  DownstreamPeriodic = 5;
+  DownstreamEnd = 6;
+  UpstreamPoolReady = 7;
+  UpstreamPeriodic = 8;
+  UpstreamEnd = 9;
+  DownstreamTunnelSuccessfullyEstablished = 10;
+  UdpTunnelUpstreamConnected = 11;
+  UdpPeriodic = 12;
+  UdpSessionEnd = 13;
+}
+
+message TCPAccessLogEntry {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.TCPAccessLogEntry";
+
+  // Common properties shared by all Envoy access logs.
+  AccessLogCommon common_properties = 1;
+
+  // Properties of the TCP connection.
+  ConnectionProperties connection_properties = 2;
+}
+
+message HTTPAccessLogEntry {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.HTTPAccessLogEntry";
+
+  // HTTP version
+  enum HTTPVersion {
+    PROTOCOL_UNSPECIFIED = 0;
+    HTTP10 = 1;
+    HTTP11 = 2;
+    HTTP2 = 3;
+    HTTP3 = 4;
+  }
+
+  // Common properties shared by all Envoy access logs.
+  AccessLogCommon common_properties = 1;
+
+  HTTPVersion protocol_version = 2;
+
+  // Description of the incoming HTTP request.
+  HTTPRequestProperties request = 3;
+
+  // Description of the outgoing HTTP response.
+  HTTPResponseProperties response = 4;
+}
+
+// Defines fields for a connection
+message ConnectionProperties {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.ConnectionProperties";
+
+  // Number of bytes received from downstream.
+  uint64 received_bytes = 1;
+
+  // Number of bytes sent to downstream.
+  uint64 sent_bytes = 2;
+}
+
+// Defines fields that are shared by all Envoy access logs.
+// [#next-free-field: 34]
+message AccessLogCommon {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.AccessLogCommon";
+
+  // [#not-implemented-hide:]
+  // This field indicates the rate at which this log entry was sampled.
+  // Valid range is (0.0, 1.0].
+  double sample_rate = 1 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
+
+  // This field is the remote/origin address on which the request from the user was received.
+  // Note: This may not be the physical peer. E.g, if the remote address is inferred from for
+  // example the x-forwarder-for header, proxy protocol, etc.
+  config.core.v3.Address downstream_remote_address = 2;
+
+  // This field is the local/destination address on which the request from the user was received.
+  config.core.v3.Address downstream_local_address = 3;
+
+  // If the connection is secure,S this field will contain TLS properties.
+  TLSProperties tls_properties = 4;
+
+  // The time that Envoy started servicing this request. This is effectively the time that the first
+  // downstream byte is received.
+  google.protobuf.Timestamp start_time = 5;
+
+  // Interval between the first downstream byte received and the last
+  // downstream byte received (i.e. time it takes to receive a request).
+  google.protobuf.Duration time_to_last_rx_byte = 6;
+
+  // Interval between the first downstream byte received and the first upstream byte sent. There may
+  // by considerable delta between ``time_to_last_rx_byte`` and this value due to filters.
+  // Additionally, the same caveats apply as documented in ``time_to_last_downstream_tx_byte`` about
+  // not accounting for kernel socket buffer time, etc.
+  google.protobuf.Duration time_to_first_upstream_tx_byte = 7;
+
+  // Interval between the first downstream byte received and the last upstream byte sent. There may
+  // by considerable delta between ``time_to_last_rx_byte`` and this value due to filters.
+  // Additionally, the same caveats apply as documented in ``time_to_last_downstream_tx_byte`` about
+  // not accounting for kernel socket buffer time, etc.
+  google.protobuf.Duration time_to_last_upstream_tx_byte = 8;
+
+  // Interval between the first downstream byte received and the first upstream
+  // byte received (i.e. time it takes to start receiving a response).
+  google.protobuf.Duration time_to_first_upstream_rx_byte = 9;
+
+  // Interval between the first downstream byte received and the last upstream
+  // byte received (i.e. time it takes to receive a complete response).
+  google.protobuf.Duration time_to_last_upstream_rx_byte = 10;
+
+  // Interval between the first downstream byte received and the first downstream byte sent.
+  // There may be a considerable delta between the ``time_to_first_upstream_rx_byte`` and this field
+  // due to filters. Additionally, the same caveats apply as documented in
+  // ``time_to_last_downstream_tx_byte`` about not accounting for kernel socket buffer time, etc.
+  google.protobuf.Duration time_to_first_downstream_tx_byte = 11;
+
+  // Interval between the first downstream byte received and the last downstream byte sent.
+  // Depending on protocol, buffering, windowing, filters, etc. there may be a considerable delta
+  // between ``time_to_last_upstream_rx_byte`` and this field. Note also that this is an approximate
+  // time. In the current implementation it does not include kernel socket buffer time. In the
+  // current implementation it also does not include send window buffering inside the HTTP/2 codec.
+  // In the future it is likely that work will be done to make this duration more accurate.
+  google.protobuf.Duration time_to_last_downstream_tx_byte = 12;
+
+  // The upstream remote/destination address that handles this exchange. This does not include
+  // retries.
+  config.core.v3.Address upstream_remote_address = 13;
+
+  // The upstream local/origin address that handles this exchange. This does not include retries.
+  config.core.v3.Address upstream_local_address = 14;
+
+  // The upstream cluster that ``upstream_remote_address`` belongs to.
+  string upstream_cluster = 15;
+
+  // Flags indicating occurrences during request/response processing.
+  ResponseFlags response_flags = 16;
+
+  // All metadata encountered during request processing, including endpoint
+  // selection.
+  //
+  // This can be used to associate IDs attached to the various configurations
+  // used to process this request with the access log entry. For example, a
+  // route created from a higher level forwarding rule with some ID can place
+  // that ID in this field and cross reference later. It can also be used to
+  // determine if a canary endpoint was used or not.
+  config.core.v3.Metadata metadata = 17;
+
+  // If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
+  // failure reason from the transport socket. The format of this field depends on the configured
+  // upstream transport socket. Common TLS failures are in
+  // :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  string upstream_transport_failure_reason = 18;
+
+  // The name of the route
+  string route_name = 19;
+
+  // This field is the downstream direct remote address on which the request from the user was
+  // received. Note: This is always the physical peer, even if the remote address is inferred from
+  // for example the x-forwarder-for header, proxy protocol, etc.
+  config.core.v3.Address downstream_direct_remote_address = 20;
+
+  // Map of filter state in stream info that have been configured to be logged. If the filter
+  // state serialized to any message other than ``google.protobuf.Any`` it will be packed into
+  // ``google.protobuf.Any``.
+  map<string, google.protobuf.Any> filter_state_objects = 21;
+
+  // A list of custom tags, which annotate logs with additional information.
+  // To configure this value, users should configure
+  // :ref:`custom_tags <envoy_v3_api_field_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.custom_tags>`.
+  map<string, string> custom_tags = 22;
+
+  // For HTTP: Total duration in milliseconds of the request from the start time to the last byte out.
+  // For TCP: Total duration in milliseconds of the downstream connection.
+  // This is the total duration of the request (i.e., when the request's ActiveStream is destroyed)
+  // and may be longer than ``time_to_last_downstream_tx_byte``.
+  google.protobuf.Duration duration = 23;
+
+  // For HTTP: Number of times the request is attempted upstream. Note that the field is omitted when the request was never attempted upstream.
+  // For TCP: Number of times the connection request is attempted upstream. Note that the field is omitted when the connect request was never attempted upstream.
+  uint32 upstream_request_attempt_count = 24;
+
+  // Connection termination details may provide additional information about why the connection was terminated by Envoy for L4 reasons.
+  string connection_termination_details = 25;
+
+  // Optional unique id of stream (TCP connection, long-live HTTP2 stream, HTTP request) for logging and tracing.
+  // This could be any format string that could be used to identify one stream.
+  string stream_id = 26;
+
+  // If this log entry is final log entry that flushed after the stream completed or
+  // intermediate log entry that flushed periodically during the stream.
+  // There may be multiple intermediate log entries and only one final log entry for each
+  // long-live stream (TCP connection, long-live HTTP2 stream).
+  // And if it is necessary, unique ID or identifier can be added to the log entry
+  // :ref:`stream_id <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.stream_id>` to
+  // correlate all these intermediate log entries and final log entry.
+  //
+  // .. attention::
+  //
+  //   This field is deprecated in favor of ``access_log_type`` for better indication of the
+  //   type of the access log record.
+  bool intermediate_log_entry = 27
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // If downstream connection in listener failed due to transport socket (e.g. TLS handshake), provides the
+  // failure reason from the transport socket. The format of this field depends on the configured downstream
+  // transport socket. Common TLS failures are in :ref:`TLS trouble shooting <arch_overview_ssl_trouble_shooting>`.
+  string downstream_transport_failure_reason = 28;
+
+  // For HTTP: Total number of bytes sent to the downstream by the http stream.
+  // For TCP: Total number of bytes sent to the downstream by the tcp proxy.
+  uint64 downstream_wire_bytes_sent = 29;
+
+  // For HTTP: Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
+  // For TCP: Total number of bytes received from the downstream by the tcp proxy.
+  uint64 downstream_wire_bytes_received = 30;
+
+  // For HTTP: Total number of bytes sent to the upstream by the http stream. This value accumulates during upstream retries.
+  // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
+  uint64 upstream_wire_bytes_sent = 31;
+
+  // For HTTP: Total number of bytes received from the upstream by the http stream.
+  // For TCP: Total number of bytes sent to the upstream by the tcp proxy.
+  uint64 upstream_wire_bytes_received = 32;
+
+  // The type of the access log, which indicates when the log was recorded.
+  // See :ref:`ACCESS_LOG_TYPE <config_access_log_format_access_log_type>` for the available values.
+  // In case the access log was recorded by a flow which does not correspond to one of the supported
+  // values, then the default value will be ``NotSet``.
+  // For more information about how access log behaves and when it is being recorded,
+  // please refer to :ref:`access logging <arch_overview_access_logs>`.
+  AccessLogType access_log_type = 33;
+}
+
+// Flags indicating occurrences during request/response processing.
+// [#next-free-field: 29]
+message ResponseFlags {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.ResponseFlags";
+
+  message Unauthorized {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.data.accesslog.v2.ResponseFlags.Unauthorized";
+
+    // Reasons why the request was unauthorized
+    enum Reason {
+      REASON_UNSPECIFIED = 0;
+
+      // The request was denied by the external authorization service.
+      EXTERNAL_SERVICE = 1;
+    }
+
+    Reason reason = 1;
+  }
+
+  // Indicates local server healthcheck failed.
+  bool failed_local_healthcheck = 1;
+
+  // Indicates there was no healthy upstream.
+  bool no_healthy_upstream = 2;
+
+  // Indicates an there was an upstream request timeout.
+  bool upstream_request_timeout = 3;
+
+  // Indicates local codec level reset was sent on the stream.
+  bool local_reset = 4;
+
+  // Indicates remote codec level reset was received on the stream.
+  bool upstream_remote_reset = 5;
+
+  // Indicates there was a local reset by a connection pool due to an initial connection failure.
+  bool upstream_connection_failure = 6;
+
+  // Indicates the stream was reset due to an upstream connection termination.
+  bool upstream_connection_termination = 7;
+
+  // Indicates the stream was reset because of a resource overflow.
+  bool upstream_overflow = 8;
+
+  // Indicates no route was found for the request.
+  bool no_route_found = 9;
+
+  // Indicates that the request was delayed before proxying.
+  bool delay_injected = 10;
+
+  // Indicates that the request was aborted with an injected error code.
+  bool fault_injected = 11;
+
+  // Indicates that the request was rate-limited locally.
+  bool rate_limited = 12;
+
+  // Indicates if the request was deemed unauthorized and the reason for it.
+  Unauthorized unauthorized_details = 13;
+
+  // Indicates that the request was rejected because there was an error in rate limit service.
+  bool rate_limit_service_error = 14;
+
+  // Indicates the stream was reset due to a downstream connection termination.
+  bool downstream_connection_termination = 15;
+
+  // Indicates that the upstream retry limit was exceeded, resulting in a downstream error.
+  bool upstream_retry_limit_exceeded = 16;
+
+  // Indicates that the stream idle timeout was hit, resulting in a downstream 408.
+  bool stream_idle_timeout = 17;
+
+  // Indicates that the request was rejected because an envoy request header failed strict
+  // validation.
+  bool invalid_envoy_request_headers = 18;
+
+  // Indicates there was an HTTP protocol error on the downstream request.
+  bool downstream_protocol_error = 19;
+
+  // Indicates there was a max stream duration reached on the upstream request.
+  bool upstream_max_stream_duration_reached = 20;
+
+  // Indicates the response was served from a cache filter.
+  bool response_from_cache_filter = 21;
+
+  // Indicates that a filter configuration is not available.
+  bool no_filter_config_found = 22;
+
+  // Indicates that request or connection exceeded the downstream connection duration.
+  bool duration_timeout = 23;
+
+  // Indicates there was an HTTP protocol error in the upstream response.
+  bool upstream_protocol_error = 24;
+
+  // Indicates no cluster was found for the request.
+  bool no_cluster_found = 25;
+
+  // Indicates overload manager terminated the request.
+  bool overload_manager = 26;
+
+  // Indicates a DNS resolution failed.
+  bool dns_resolution_failure = 27;
+
+  // Indicates a downstream remote codec level reset was received on the stream
+  bool downstream_remote_reset = 28;
+}
+
+// Properties of a negotiated TLS connection.
+// [#next-free-field: 8]
+message TLSProperties {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.TLSProperties";
+
+  enum TLSVersion {
+    VERSION_UNSPECIFIED = 0;
+    TLSv1 = 1;
+    TLSv1_1 = 2;
+    TLSv1_2 = 3;
+    TLSv1_3 = 4;
+  }
+
+  message CertificateProperties {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.data.accesslog.v2.TLSProperties.CertificateProperties";
+
+    message SubjectAltName {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.data.accesslog.v2.TLSProperties.CertificateProperties.SubjectAltName";
+
+      oneof san {
+        string uri = 1;
+
+        // [#not-implemented-hide:]
+        string dns = 2;
+      }
+    }
+
+    // SANs present in the certificate.
+    repeated SubjectAltName subject_alt_name = 1;
+
+    // The subject field of the certificate.
+    string subject = 2;
+
+    // The issuer field of the certificate.
+    string issuer = 3;
+  }
+
+  // Version of TLS that was negotiated.
+  TLSVersion tls_version = 1;
+
+  // TLS cipher suite negotiated during handshake. The value is a
+  // four-digit hex code defined by the IANA TLS Cipher Suite Registry
+  // (e.g. ``009C`` for ``TLS_RSA_WITH_AES_128_GCM_SHA256``).
+  //
+  // Here it is expressed as an integer.
+  google.protobuf.UInt32Value tls_cipher_suite = 2;
+
+  // SNI hostname from handshake.
+  string tls_sni_hostname = 3;
+
+  // Properties of the local certificate used to negotiate TLS.
+  CertificateProperties local_certificate_properties = 4;
+
+  // Properties of the peer certificate used to negotiate TLS.
+  CertificateProperties peer_certificate_properties = 5;
+
+  // The TLS session ID.
+  string tls_session_id = 6;
+
+  // The ``JA3`` fingerprint when ``JA3`` fingerprinting is enabled.
+  string ja3_fingerprint = 7;
+}
+
+// [#next-free-field: 16]
+message HTTPRequestProperties {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.HTTPRequestProperties";
+
+  // The request method (RFC 7231/2616).
+  config.core.v3.RequestMethod request_method = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The scheme portion of the incoming request URI.
+  string scheme = 2;
+
+  // HTTP/2 ``:authority`` or HTTP/1.1 ``Host`` header value.
+  string authority = 3;
+
+  // The port of the incoming request URI
+  // (unused currently, as port is composed onto authority).
+  google.protobuf.UInt32Value port = 4;
+
+  // The path portion from the incoming request URI.
+  string path = 5;
+
+  // Value of the ``User-Agent`` request header.
+  string user_agent = 6;
+
+  // Value of the ``Referer`` request header.
+  string referer = 7;
+
+  // Value of the ``X-Forwarded-For`` request header.
+  string forwarded_for = 8;
+
+  // Value of the ``X-Request-Id`` request header
+  //
+  // This header is used by Envoy to uniquely identify a request.
+  // It will be generated for all external requests and internal requests that
+  // do not already have a request ID.
+  string request_id = 9;
+
+  // Value of the ``X-Envoy-Original-Path`` request header.
+  string original_path = 10;
+
+  // Size of the HTTP request headers in bytes.
+  //
+  // This value is captured from the OSI layer 7 perspective, i.e. it does not
+  // include overhead from framing or encoding at other networking layers.
+  uint64 request_headers_bytes = 11;
+
+  // Size of the HTTP request body in bytes.
+  //
+  // This value is captured from the OSI layer 7 perspective, i.e. it does not
+  // include overhead from framing or encoding at other networking layers.
+  uint64 request_body_bytes = 12;
+
+  // Map of additional headers that have been configured to be logged.
+  map<string, string> request_headers = 13;
+
+  // Number of header bytes sent to the upstream by the http stream, including protocol overhead.
+  //
+  // This value accumulates during upstream retries.
+  uint64 upstream_header_bytes_sent = 14;
+
+  // Number of header bytes received from the downstream by the http stream, including protocol overhead.
+  uint64 downstream_header_bytes_received = 15;
+}
+
+// [#next-free-field: 9]
+message HTTPResponseProperties {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.HTTPResponseProperties";
+
+  // The HTTP response code returned by Envoy.
+  google.protobuf.UInt32Value response_code = 1;
+
+  // Size of the HTTP response headers in bytes.
+  //
+  // This value is captured from the OSI layer 7 perspective, i.e. it does not
+  // include protocol overhead or overhead from framing or encoding at other networking layers.
+  uint64 response_headers_bytes = 2;
+
+  // Size of the HTTP response body in bytes.
+  //
+  // This value is captured from the OSI layer 7 perspective, i.e. it does not
+  // include overhead from framing or encoding at other networking layers.
+  uint64 response_body_bytes = 3;
+
+  // Map of additional headers configured to be logged.
+  map<string, string> response_headers = 4;
+
+  // Map of trailers configured to be logged.
+  map<string, string> response_trailers = 5;
+
+  // The HTTP response code details.
+  string response_code_details = 6;
+
+  // Number of header bytes received from the upstream by the http stream, including protocol overhead.
+  uint64 upstream_header_bytes_received = 7;
+
+  // Number of header bytes sent to the downstream by the http stream, including protocol overhead.
+  uint64 downstream_header_bytes_sent = 8;
+}

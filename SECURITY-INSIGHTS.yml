@@ -1,0 +1,67 @@
+header:
+  schema-version: '1.0.0'
+  expiration-date: '2025-01-24T01:00:00.000Z'
+  last-updated: '2024-01-24'
+  last-reviewed: '2024-01-24'
+  project-url: https://github.com/envoyproxy/envoy
+  changelog: https://www.envoyproxy.io/docs/envoy/latest/version_history/version_history#version-history
+  license: https://github.com/envoyproxy/envoy/blob/main/LICENSE
+project-lifecycle:
+  status: active
+  bug-fixes-only: false
+  core-maintainers:  # from https://github.com/envoyproxy/envoy/blob/main/OWNERS.md
+  # Senior maintainers
+  - github:mattklein123
+  - github:alyssawilk
+  - github:zuercher
+  - github:lizan
+  - github:ggreenway
+  - github:yanavlasov
+  - github:phlax
+  - github:RyanTheOptimist
+  - github:wbpcode
+  # Maintainers
+  - github:jmarantz
+  - github:adisuissa
+  - github:KBaichoo
+  - github:keith
+  - github:kyessenov
+  - github:ravenblackx
+  - github:soulxu
+  - github:nezdolik
+  - github:tyxia
+contribution-policy:
+  accepts-pull-requests: true
+  accepts-automated-pull-requests: true
+  code-of-conduct: https://github.com/envoyproxy/envoy/blob/main/CODE_OF_CONDUCT.md
+dependencies:
+  third-party-packages: true
+  dependencies-lists:
+  - https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/security/external_deps
+  env-dependencies-policy:
+    policy-url: https://github.com/envoyproxy/envoy/blob/main/DEPENDENCY_POLICY.md
+distribution-points:
+- https://github.com/envoyproxy/envoy
+documentation:
+- https://www.envoyproxy.io/docs
+security-contacts:
+- type: email
+  value: envoy-security@googlegroups.com
+security-testing:
+- tool-type: sca
+  tool-name: Dependabot
+  tool-version: latest
+  integration:
+    ad-hoc: false
+    ci: true
+    before-release: true
+- tool-type: sast
+  tool-name: CodeQL
+  tool-version: '2.13.4'
+  integration:
+    ad-hoc: false
+    ci: true
+    before-release: true
+vulnerability-reporting:
+  accepts-vulnerability-reports: true
+  security-policy: https://github.com/envoyproxy/envoy/security/policy

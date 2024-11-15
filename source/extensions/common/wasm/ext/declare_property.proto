@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.source.extensions.common.wasm;
+
+enum WasmType {
+  Bytes = 0;
+  String = 1;
+  FlatBuffers = 2;
+  Protobuf = 3;
+};
+
+enum LifeSpan {
+  FilterChain = 0;
+  DownstreamRequest = 1;
+  DownstreamConnection = 2;
+};
+
+message DeclarePropertyArguments {
+  string name = 1;
+  bool readonly = 2;
+  WasmType type = 3;
+  bytes schema = 4;
+  LifeSpan span = 5;
+};

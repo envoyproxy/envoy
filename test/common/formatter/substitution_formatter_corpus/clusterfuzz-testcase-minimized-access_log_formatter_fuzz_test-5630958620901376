@@ -1,0 +1,9 @@
+format: "%RESP(\n )% %REQ(\n)%"
+response_trailers {
+}
+stream_info {
+  start_time: 7313138969067071779
+  response_code {
+    value: 262144
+  }
+}

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package request;
+
+message Request {
+  message Info {
+    string version = 1;
+  }
+  string data = 1;
+  Info info = 2;
+}

@@ -1,0 +1,207 @@
+expression {
+  id: 17179869184
+  struct_expr {
+    entries {
+      map_key {
+        id: 27424471945274724
+        list_expr {
+        }
+      }
+    }
+    entries {
+      map_key {
+        id: 27424471945274724
+        list_expr {
+          elements {
+            id: 50331648
+          }
+        }
+      }
+    }
+    entries {
+      map_key {
+        id: 27424471945274724
+        list_expr {
+          elements {
+            id: 50331648
+          }
+        }
+      }
+    }
+    entries {
+      map_key {
+        id: 27424471945274724
+        list_expr {
+          elements {
+            id: 50331648
+          }
+        }
+      }
+    }
+    entries {
+      map_key {
+        id: 27424471945274724
+        list_expr {
+          elements {
+            select_expr {
+              operand {
+                ident_expr {
+                  name: "\004\000\000\000"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    entries {
+      map_key {
+        id: 27424471945274724
+        list_expr {
+          elements {
+            id: 50331648
+          }
+        }
+      }
+    }
+    entries {
+      map_key {
+        id: 27424471945274724
+        list_expr {
+          elements {
+            id: 50331648
+          }
+        }
+      }
+    }
+    entries {
+      map_key {
+        id: 27424471945274724
+      }
+      value {
+        comprehension_expr {
+          iter_var: "\001\000\000\000\000\000\000\031"
+        }
+      }
+    }
+  }
+}
+request_headers {
+  headers {
+    key: "\t\000\000\000"
+    value: "&&"
+  }
+}
+response_headers {
+}
+trailers {
+  headers {
+    key: "\000\000\000\001"
+    value: "\000\000\000\001"
+  }
+  headers {
+    key: "\000\000\000\001"
+    value: "\000\000\000\001"
+  }
+  headers {
+    key: "\000\000\000\001"
+    value: "\000\000\000\001"
+  }
+  headers {
+    key: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
+    value: "\000\000\000\0010\000"
+  }
+}
+stream_info {
+  dynamic_metadata {
+    filter_metadata {
+      key: ""
+      value {
+      }
+    }
+    filter_metadata {
+      key: ""
+      value {
+        fields {
+          key: "("
+          value {
+          }
+        }
+      }
+    }
+    filter_metadata {
+      key: ""
+      value {
+        fields {
+          key: "N5Envoy24ProtoValidation"
+          value {
+          }
+        }
+      }
+    }
+    filter_metadata {
+      key: ""
+      value {
+        fields {
+          key: ""
+          value {
+            number_value: 1.3262473693533e-315
+          }
+        }
+        fields {
+          key: "("
+          value {
+          }
+        }
+      }
+    }
+    filter_metadata {
+      key: ""
+      value {
+        fields {
+          key: ""
+          value {
+            number_value: 1.3262473693533e-315
+          }
+        }
+        fields {
+          key: "("
+          value {
+          }
+        }
+      }
+    }
+    filter_metadata {
+      key: ""
+      value {
+        fields {
+          key: ""
+          value {
+            number_value: 1.3262473693533e-315
+          }
+        }
+        fields {
+          key: "("
+          value {
+          }
+        }
+      }
+    }
+  }
+  response_code {
+    value: 134219776
+  }
+  upstream_metadata {
+    filter_metadata {
+      key: ""
+      value {
+        fields {
+          key: ""
+          value {
+            number_value: 9.56944336513491e-315
+          }
+        }
+      }
+    }
+  }
+}

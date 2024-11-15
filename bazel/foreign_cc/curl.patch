@@ -1,0 +1,74 @@
+#commit 743021d6c7abba91c47e5be8035ff0497f2b78bd
+#Author: Jay Satiro <raysatiro@yahoo.com>
+#Date:   Tue Dec 22 15:31:03 2020 -0500
+#
+#    cmake: Add an option to disable libidn2
+#
+#    New option USE_LIBIDN2 defaults to ON for libidn2 detection. Prior to
+#    this change libidn2 detection could not be turned off in cmake builds.
+#
+#    Reported-by: William A Rowe Jr
+#
+#    Fixes https://github.com/curl/curl/issues/6361
+#    Closes #xxxx
+#
+#commit e952764adbb89f37dbf227a48a55cc57c60b537d
+#Author: William A Rowe Jr <wrowe@vmware.com>
+#Date:   Wed Oct 7 14:32:49 2020 -0500
+#
+#    Correct fragile windows assumptions
+#
+#    - Locking CMake to 3.16 breaks all features and corrections applied to
+#      CMake 3.17 and later, including the correction of the poorly designed
+#      and now abandoned Windows CRT election policy CMP0091 (see final para
+#      of the policy description here:
+#      https://cmake.org/cmake/help/v3.18/policy/CMP0091.html). Locking to
+#      rev 3.16 from ensures a more difficult transition to CMake-current
+#
+#    - Windows curl builds previously only adjusted the Release and Debug
+#      builds, and combined with CMP0091 to break other flavors. Update any
+#      /MD* flags with /MT* present in the base and four alternate build
+#      flavors, without introducing conflicting flag values or introducing
+#      a CRT election where one is not present
+#
+#    - Windows clang-cl builds of curl static libs are broken when using
+#      link-lld.exe because curl appended the dynamic run time flags to the
+#      static library lib.exe options. While these were ignored/no-op on
+#      Windows link.exe, they cause link-lld from LLVM/clang-cl compile
+#      toolchain to fail to parse the library command.
+#
+#    Summary exists in this bazel-specific bug report;
+#    https://github.com/bazelbuild/rules_foreign_cc/issues/426
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 580cc4357..13df6ca54 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -44,6 +44,12 @@
+ # variable is NOT DEFINED, the symbol detection will be performed.
+
+ cmake_minimum_required(VERSION 3.7...3.16 FATAL_ERROR)
++
++# Revert CMake bug triggered by curl's defined max CMake policy version, see https://gitlab.kitware.com/cmake/cmake/-/issues/21288
++if(POLICY CMP0091)
++  cmake_policy(SET CMP0091 OLD)
++endif()
++
+ message(STATUS "Using CMake version ${CMAKE_VERSION}")
+
+ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake;${CMAKE_MODULE_PATH}")
+@@ -328,9 +334,12 @@ if(ENABLE_CURL_MANUAL OR BUILD_LIBCURL_DOCS)
+ endif()
+
+ if(CURL_STATIC_CRT)
+-  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+-  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+-  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd")
++  foreach(build_suffix "" _DEBUG _RELEASE _MINSIZEREL _RELWITHDEBINFO)
++    set(flags_var CMAKE_C_FLAGS${build_suffix})
++    if("${${flags_var}}" MATCHES "/MD")
++      string(REGEX REPLACE "/MD" "/MT" ${flags_var} "${${flags_var}}")
++    endif()
++  endforeach()
+ endif()
+
+ # Disable warnings on Borland to avoid changing 3rd party code.

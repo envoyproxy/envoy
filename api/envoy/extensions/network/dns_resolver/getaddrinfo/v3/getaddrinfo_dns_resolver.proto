@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package envoy.extensions.network.dns_resolver.getaddrinfo.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.network.dns_resolver.getaddrinfo.v3";
+option java_outer_classname = "GetaddrinfoDnsResolverProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/network/dns_resolver/getaddrinfo/v3;getaddrinfov3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: getaddrinfo DNS resolver]
+// [#extension: envoy.network.dns_resolver.getaddrinfo]
+
+// Configuration for getaddrinfo DNS resolver. This resolver will use the system's getaddrinfo()
+// function to resolve hosts.
+//
+// .. attention::
+//
+//   This resolver uses a single background thread to do resolutions. As such, it is not currently
+//   advised for use in situations requiring a high resolution rate. A thread pool can be added
+//   in the future if needed.
+//
+// .. attention::
+//
+//   Resolutions currently use a hard coded TTL of 60s because the getaddrinfo() API does not
+//   provide the actual TTL. Configuration for this can be added in the future if needed.
+message GetAddrInfoDnsResolverConfig {
+  // Specifies the number of retries before the resolver gives up. If not specified, the resolver will
+  // retry indefinitely until it succeeds or the DNS query times out.
+  google.protobuf.UInt32Value num_retries = 1;
+}
