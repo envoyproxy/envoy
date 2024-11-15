@@ -512,25 +512,25 @@ build:rbe-engflow --bes_upload_mode=fully_async
 build:rbe-engflow --nolegacy_important_outputs
 
 # RBE (Engflow Envoy)
-build:common-envoy-engflow --google_default_credentials=false
-build:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:common-envoy-engflow --grpc_keepalive_time=30s
+common:common-envoy-engflow --google_default_credentials=false
+common:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
+common:common-envoy-engflow --grpc_keepalive_time=30s
 
-build:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
-build:cache-envoy-engflow --remote_timeout=3600s
-build:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
-build:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
-build:bes-envoy-engflow --bes_timeout=3600s
-build:bes-envoy-engflow --bes_upload_mode=fully_async
-build:bes-envoy-engflow --nolegacy_important_outputs
-build:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:7adc40c09508f957624c4d2e0f5aeecb73a59207ee6ded53b107eac828c091b2
-build:rbe-envoy-engflow --jobs=200
-build:rbe-envoy-engflow --define=engflow_rbe=true
+common:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
+common:cache-envoy-engflow --remote_timeout=3600s
+common:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
+common:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
+common:bes-envoy-engflow --bes_timeout=3600s
+common:bes-envoy-engflow --bes_upload_mode=fully_async
+common:bes-envoy-engflow --nolegacy_important_outputs
+common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
+common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:7adc40c09508f957624c4d2e0f5aeecb73a59207ee6ded53b107eac828c091b2
+common:rbe-envoy-engflow --jobs=200
+common:rbe-envoy-engflow --define=engflow_rbe=true
 
-build:remote-envoy-engflow --config=common-envoy-engflow
-build:remote-envoy-engflow --config=cache-envoy-engflow
-build:remote-envoy-engflow --config=rbe-envoy-engflow
+common:remote-envoy-engflow --config=common-envoy-engflow
+common:remote-envoy-engflow --config=cache-envoy-engflow
+common:remote-envoy-engflow --config=rbe-envoy-engflow
 
 #############################################################################
 # debug: Various Bazel debugging flags
