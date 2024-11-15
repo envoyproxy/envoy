@@ -274,10 +274,14 @@ private:
     }
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
-    void upgradeFilterChainCreated() override {
-      connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
-      connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
-      state_.successful_upgrade_ = true;
+    void upgradeFilterChainCreated(bool created) override {
+      if (created) {
+        connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
+        connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
+        state_.upgrade_accepted_ = true;
+      } else {
+        state_.upgrade_rejected_ = true;
+      }
     }
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
@@ -334,44 +338,42 @@ private:
 
     // All state for the stream. Put here for readability.
     struct State {
-      State()
-          : codec_saw_local_complete_(false), codec_encode_complete_(false),
-            on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
-            is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true), deferred_to_next_io_iteration_(false),
-            deferred_end_stream_(false) {}
-
       // It's possibly for the codec to see the completed response but not fully
       // encode it.
-      bool codec_saw_local_complete_ : 1; // This indicates that local is complete as the completed
-                                          // response has made its way to the codec.
-      bool codec_encode_complete_ : 1;    // This indicates that the codec has
-                                          // completed encoding the response.
-      bool on_reset_stream_called_ : 1;   // Whether the stream has been reset.
-      bool is_zombie_stream_ : 1;         // Whether stream is waiting for signal
-                                          // the underlying codec to be destroyed.
-      bool successful_upgrade_ : 1;
+      bool codec_saw_local_complete_{}; // This indicates that local is complete as the completed
+
+      // response has made its way to the codec.
+      bool codec_encode_complete_{};  // This indicates that the codec has
+                                      // completed encoding the response.
+      bool on_reset_stream_called_{}; // Whether the stream has been reset.
+      bool is_zombie_stream_{};       // Whether stream is waiting for signal
+                                      // the underlying codec to be destroyed.
+
+      // Whether the upgrade request has be accepted or rejected by the filter chain.
+      // Both are false if the request is not an upgrade request.
+      bool upgrade_accepted_{};
+      bool upgrade_rejected_{};
 
       // True if this stream was the original externally created stream, but was
       // destroyed as part of internal redirect.
-      bool is_internally_destroyed_ : 1;
+      bool is_internally_destroyed_{};
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
-      bool is_internally_created_ : 1;
+      bool is_internally_created_{};
 
       // True if the response headers indicate a successful upgrade or connect
       // response.
-      bool is_tunneling_ : 1;
+      bool is_tunneling_{};
 
-      bool decorated_propagate_ : 1;
+      bool decorated_propagate_{true};
 
       // Indicates that sending headers to the filter manager is deferred to the
       // next I/O cycle. If data or trailers are received when this flag is set
       // they are deferred too.
       // TODO(yanavlasov): encapsulate the entire state of deferred streams into a separate
       // structure, so it can be atomically created and cleared.
-      bool deferred_to_next_io_iteration_ : 1;
-      bool deferred_end_stream_ : 1;
+      bool deferred_to_next_io_iteration_{};
+      bool deferred_end_stream_{};
     };
 
     bool canDestroyStream() const {

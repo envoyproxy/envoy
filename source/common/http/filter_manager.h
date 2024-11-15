@@ -461,8 +461,10 @@ public:
 
   /**
    * Called when the FilterManager creates an Upgrade filter chain.
+   * @param created whether the upgrade filter chain was created. If false, the upgrade
+   *                is rejected.
    */
-  virtual void upgradeFilterChainCreated() PURE;
+  virtual void upgradeFilterChainCreated(bool created) PURE;
 
   /**
    * Called when request activity indicates that the request timeout should be disarmed.
@@ -836,11 +838,6 @@ public:
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 
-  struct CreateFilterChainResult {
-    bool created{};
-    bool upgrade_rejected{};
-  };
-
   /**
    * Set up the Encoder/Decoder filter chain.
    * @param filter_chain_factory the factory to create the filter chain.
@@ -848,8 +845,8 @@ public:
    *        explicitly. This only makes sense for upstream HTTP filter chain.
    *
    */
-  CreateFilterChainResult createFilterChain(const FilterChainFactory& filter_chain_factory,
-                                            bool only_create_if_configured);
+  bool createFilterChain(const FilterChainFactory& filter_chain_factory,
+                         bool only_create_if_configured);
 
   OptRef<const Network::Connection> connection() const { return connection_; }
 
@@ -977,8 +974,8 @@ private:
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
-  CreateFilterChainResult createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
-                                                   const FilterChainOptionsImpl& options);
+  bool createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
+                                const FilterChainOptionsImpl& options);
 
   // Returns the encoder filter to start iteration with.
   std::list<ActiveStreamEncoderFilterPtr>::iterator

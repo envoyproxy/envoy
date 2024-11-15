@@ -1078,7 +1078,7 @@ void DownstreamFilterManager::executeLocalReplyIfPrepared() {
 }
 
 bool DownstreamFilterManager::createDownstreamFilterChain() {
-  return createFilterChain(filter_chain_factory_, false).upgrade_rejected;
+  return createFilterChain(filter_chain_factory_, false);
 }
 
 void DownstreamFilterManager::sendLocalReplyViaFilterChain(
@@ -1627,9 +1627,8 @@ void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_st
   tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
-FilterManager::CreateFilterChainResult
-FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
-                                        const FilterChainOptionsImpl& options) {
+bool FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
+                                             const FilterChainOptionsImpl& options) {
   const HeaderEntry* upgrade = nullptr;
   if (filter_manager_callbacks_.requestHeaders()) {
     upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
@@ -1642,27 +1641,26 @@ FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_f
 
   if (upgrade == nullptr) {
     // No upgrade header, no upgrade filter chain.
-    return {false, false};
+    return false;
   }
 
   const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
   if (filter_chain_factory.createUpgradeFilterChain(upgrade->value().getStringView(), upgrade_map,
                                                     *this, options)) {
-    filter_manager_callbacks_.upgradeFilterChainCreated();
-    // The upgrade filter chain is created successfully.
-    return {true, false};
+    filter_manager_callbacks_.upgradeFilterChainCreated(true);
+    return true;
+  } else {
+    filter_manager_callbacks_.upgradeFilterChainCreated(false);
+    // The upgrade filter chain is rejected. Fall through to the default filter chain.
+    // The default filter chain will be used to handle the upgrade failure local reply.
+    return false;
   }
-
-  // The upgrade filter chain is rejected. Fall through to the default filter chain.
-  // The default filter chain will be used to handle the upgrade failure local reply.
-  return {false, true};
 }
 
-FilterManager::CreateFilterChainResult
-FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
-                                 bool only_create_if_configured) {
+bool FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
+                                      bool only_create_if_configured) {
   if (state_.created_filter_chain_) {
-    return {true, false};
+    return true;
   }
 
   OptRef<DownstreamStreamFilterCallbacks> downstream_callbacks =
@@ -1672,27 +1670,15 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
   // to set valid initial route only when the downstream callbacks is available.
   FilterChainOptionsImpl options(downstream_callbacks.has_value() ? streamInfo().route() : nullptr);
 
-  bool upgrade_rejected = false;
-
   if (downstream_callbacks.has_value()) {
     // Only try the upgrade filter chain for downstream filter chains.
-
-    const auto upgrade_result = createUpgradeFilterChain(filter_chain_factory, options);
-    if (upgrade_result.created) {
-      ASSERT(!upgrade_result.upgrade_rejected);
-      state_.created_filter_chain_ = true;
-      return upgrade_result;
+    const bool created = createUpgradeFilterChain(filter_chain_factory, options);
+    if (created) {
+      return true;
     }
-    // The upgrade filter chain may be unnecessary or be rejected. Fall through to the default
-    // filter chain anyway.
-    upgrade_rejected = upgrade_result.upgrade_rejected;
   }
 
-  const bool created =
-      filter_chain_factory.createFilterChain(*this, only_create_if_configured, options);
-  state_.created_filter_chain_ = created;
-
-  return {created, upgrade_rejected};
+  return filter_chain_factory.createFilterChain(*this, only_create_if_configured, options);
 }
 
 void ActiveStreamDecoderFilter::requestDataDrained() {

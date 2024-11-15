@@ -952,7 +952,7 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
         *active_span_, request_headers_.get(), response_headers_.get(), response_trailers_.get(),
         filter_manager_.streamInfo(), *this);
   }
-  if (state_.successful_upgrade_) {
+  if (state_.upgrade_accepted_) {
     connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
   }
 }
@@ -1387,8 +1387,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   }
 
   filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
-
-  const bool upgrade_rejected = filter_manager_.createDownstreamFilterChain();
+  filter_manager_.createDownstreamFilterChain();
 
   if (connection_manager_.config_->flushAccessLogOnNewRequest()) {
     log(AccessLog::AccessLogType::DownstreamStart);
@@ -1398,7 +1397,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   // should return 404. The current returns no response if there is no router filter.
   if (hasCachedRoute()) {
     // Do not allow upgrades if the route does not support it.
-    if (upgrade_rejected) {
+    if (state_.upgrade_rejected_) {
       // While downstream servers should not send upgrade payload without the upgrade being
       // accepted, err on the side of caution and refuse to process any further requests on this
       // connection, to avoid a class of HTTP/1.1 smuggling bugs where Upgrade or CONNECT payload
