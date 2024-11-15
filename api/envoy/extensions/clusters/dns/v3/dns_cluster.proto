@@ -71,7 +71,7 @@ message DnsCluster {
   // :ref:`CaresDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
   // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
   // :ref:`Cluster.dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`
-  // configuration which replaces :ref:`Cluster.dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolver_config>`.
+  // configuration which replaces :ref:`Cluster.dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`.
   // During the transition period when ``DnsCluster.typed_dns_resolver_config``, ``Cluster.dns_resolver_config``, and
   // ``Cluster.typed_dns_resolver_config`` exists, Envoy will prefer, ``DnsCluster.typed_dns_resolver_config`` over
   // ``Cluster.typed_dns_resolver_config`` over ``cluster.dns_resolver_config``.
