@@ -34,9 +34,11 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:well_known_names",
         "//source/common/network:address_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/transport_sockets/common:passthrough_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/proxy_protocol/v3:pkg_cc_proto",
     ],
 )

@@ -310,6 +310,11 @@ new_features:
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and
     cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: proxy_protocol
+  change: |
+    Added support for injecting custom TLVs into the Proxy Protocol v2 (PP2) header for upstream transport sockets.
+    This feature allows dynamic customization of PP2 headersby defining TLV key-value pairs in an endpoint host's
+    typed metadata under the ``envoy.transport_sockets.proxy_protocol`` namespace.
 
 deprecated:
 - area: rbac
