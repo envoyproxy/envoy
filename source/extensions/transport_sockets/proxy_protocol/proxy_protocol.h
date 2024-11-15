@@ -44,6 +44,7 @@ private:
   void generateHeaderV1();
   void generateHeaderV2();
   Network::IoResult writeHeader();
+  std::vector<Envoy::Network::ProxyProtocolTLV> buildCustomTLVs();
 
   Network::TransportSocketOptionsConstSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};

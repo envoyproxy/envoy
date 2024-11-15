@@ -3,13 +3,17 @@
 #include <sstream>
 
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
+#include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.h"
+#include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.validate.h"
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 using envoy::config::core::v3::ProxyProtocolConfig;
@@ -93,7 +97,7 @@ void UpstreamProxyProtocolSocket::generateHeaderV2() {
   } else {
     const auto options = options_->proxyProtocolOptions().value();
     if (!Common::ProxyProtocol::generateV2Header(options, header_buffer_, pass_all_tlvs_,
-                                                 pass_through_tlvs_)) {
+                                                 pass_through_tlvs_, buildCustomTLVs())) {
       // There is a warn log in generateV2Header method.
       stats_.v2_tlvs_exceed_max_length_.inc();
     }
@@ -163,6 +167,49 @@ void UpstreamProxyProtocolSocketFactory::hashKey(
           StringUtil::CaseInsensitiveHash()(proxy_protocol_options.value().asStringForHash()), key);
     }
   }
+}
+
+std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::buildCustomTLVs() {
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs;
+
+  const auto& upstream_info = callbacks_->connection().streamInfo().upstreamInfo();
+  if (upstream_info == nullptr) {
+    return custom_tlvs;
+  }
+  Upstream::HostDescriptionConstSharedPtr host = upstream_info->upstreamHost();
+  if (host == nullptr) {
+    return custom_tlvs;
+  }
+  auto metadata = host->metadata();
+  if (metadata == nullptr) {
+    return custom_tlvs;
+  }
+
+  const auto filter_it = metadata->typed_filter_metadata().find(
+      Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL);
+  if (filter_it == metadata->typed_filter_metadata().end()) {
+    ENVOY_LOG(trace, "no custom TLVs found in upstream host metadata");
+    return custom_tlvs;
+  }
+
+  envoy::extensions::transport_sockets::proxy_protocol::v3::CustomTlvMetadata custom_metadata;
+  if (!filter_it->second.UnpackTo(&custom_metadata)) {
+    ENVOY_LOG(warn, "failed to unpack custom TLVs from upstream host metadata");
+    return custom_tlvs;
+  }
+  for (const auto& tlv : custom_metadata.entries()) {
+    // prevent empty TLV values
+    if (tlv.value().empty()) {
+      ENVOY_LOG(warn, "empty custom TLV value found in upstream host metadata for type {}",
+                tlv.type());
+      continue;
+    }
+    custom_tlvs.emplace_back(Network::ProxyProtocolTLV{
+        static_cast<uint8_t>(tlv.type()),
+        std::vector<unsigned char>(tlv.value().begin(), tlv.value().end())});
+  }
+
+  return custom_tlvs;
 }
 
 } // namespace ProxyProtocol

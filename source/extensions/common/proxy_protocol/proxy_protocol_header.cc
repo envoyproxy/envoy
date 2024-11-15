@@ -111,12 +111,36 @@ void generateV2Header(const Network::Address::Ip& source_address,
 }
 
 bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out,
-                      bool pass_all_tlvs, const absl::flat_hash_set<uint8_t>& pass_through_tlvs) {
-  uint64_t extension_length = 0;
-  for (auto&& tlv : proxy_proto_data.tlv_vector_) {
-    if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
+                      bool pass_all_tlvs, const absl::flat_hash_set<uint8_t>& pass_through_tlvs,
+                      const std::vector<Envoy::Network::ProxyProtocolTLV>& custom_tlvs) {
+  std::vector<Envoy::Network::ProxyProtocolTLV> combined_tlv_vector;
+  combined_tlv_vector.reserve(custom_tlvs.size() + proxy_proto_data.tlv_vector_.size());
+
+  absl::flat_hash_set<uint8_t> seen_types;
+  for (const auto& tlv : custom_tlvs) {
+    if (seen_types.contains(tlv.type)) {
+      ENVOY_LOG_MISC(warn, "Ignoring duplicate custom TLV type {}", tlv.type);
       continue;
     }
+    seen_types.insert(tlv.type);
+    combined_tlv_vector.emplace_back(tlv);
+  }
+  for (const auto& tlv : proxy_proto_data.tlv_vector_) {
+    if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
+      // Skip any TLV when pass_all_tlvs is disabled, or the TLV is not in the pass_through_tlvs.
+      continue;
+    }
+    if (seen_types.contains(tlv.type)) {
+      // Skip any duplicate TLVs from being added to the combined TLV vector.
+      ENVOY_LOG_MISC(warn, "Ignoring duplicate custom TLV type {}", tlv.type);
+      continue;
+    }
+    seen_types.insert(tlv.type);
+    combined_tlv_vector.emplace_back(tlv);
+  }
+
+  uint64_t extension_length = 0;
+  for (auto&& tlv : combined_tlv_vector) {
     extension_length += PROXY_PROTO_V2_TLV_TYPE_LENGTH_LEN + tlv.value.size();
     if (extension_length > std::numeric_limits<uint16_t>::max()) {
       ENVOY_LOG_MISC(
@@ -141,16 +165,13 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
   generateV2Header(src.addressAsString(), dst.addressAsString(), src.port(), dst.port(),
                    src.version(), static_cast<uint16_t>(extension_length), out);
 
-  // Generate the TLV vector.
-  for (auto&& tlv : proxy_proto_data.tlv_vector_) {
-    if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
-      continue;
-    }
+  for (auto&& tlv : combined_tlv_vector) {
     out.add(&tlv.type, 1);
     uint16_t size = htons(static_cast<uint16_t>(tlv.value.size()));
     out.add(&size, sizeof(uint16_t));
     out.add(&tlv.value.front(), tlv.value.size());
   }
+
   return true;
 }
 
