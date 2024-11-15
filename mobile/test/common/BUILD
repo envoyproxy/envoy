@@ -18,6 +18,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "internal_engine_test",
     srcs = ["internal_engine_test.cc"],
+    rbe_pool = "6gig",
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
