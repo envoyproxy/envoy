@@ -205,4 +205,3 @@ static_resources:
               socket_address:
                 address: service3.local
                 port_value: 80
-

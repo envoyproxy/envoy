@@ -315,7 +315,7 @@ Suppose one wants to route requests with following path prefixes to respective c
 
 A request with :path header set to url /new_endpoint/path/2/abc should be routed to cluster_2
 
-To achieve the above results, Envoy config below will create a single trie structure with above path strings and calls findLongestPrefix() match once, for paths in incoming request :path header. 
+To achieve the above results, Envoy config below will create a single trie structure with above path strings and calls findLongestPrefix() match once, for paths in incoming request :path header.
 
 .. note::
    Changing prefix_match_map to exact_match_map in below configuration will result in use of hash based path matching (instead of trie) and will succeed in lookup if :path header in request matches exactly with one of the routes defined.
