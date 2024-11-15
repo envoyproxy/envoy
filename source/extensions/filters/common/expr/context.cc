@@ -29,119 +29,455 @@ convertHeaderEntry(Protobuf::Arena& arena,
                    Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result) {
   if (!result.result().has_value()) {
     return {};
-  } else if (!result.backingString().empty()) {
+  }
+  if (!result.backingString().empty()) {
     return CelValue::CreateString(
         Protobuf::Arena::Create<std::string>(&arena, result.backingString()));
-  } else {
-    return CelValue::CreateStringView(result.result().value());
   }
+  return CelValue::CreateStringView(result.result().value());
+}
+
+// SSL Extractors implementation
+const SslExtractorsValues& SslExtractorsValues::get() {
+  CONSTRUCT_ON_FIRST_USE(SslExtractorsValues,
+                         absl::flat_hash_map<absl::string_view, SslExtractor>{
+                             {TLSVersion,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                return CelValue::CreateString(&info.tlsVersion());
+                              }},
+                             {SubjectLocalCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                return CelValue::CreateString(&info.subjectLocalCertificate());
+                              }},
+                             {SubjectPeerCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                return CelValue::CreateString(&info.subjectPeerCertificate());
+                              }},
+                             {URISanLocalCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.uriSanLocalCertificate().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.uriSanLocalCertificate()[0]);
+                              }},
+                             {URISanPeerCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.uriSanPeerCertificate().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.uriSanPeerCertificate()[0]);
+                              }},
+                             {DNSSanLocalCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.dnsSansLocalCertificate().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.dnsSansLocalCertificate()[0]);
+                              }},
+                             {DNSSanPeerCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.dnsSansPeerCertificate().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.dnsSansPeerCertificate()[0]);
+                              }},
+                             {SHA256PeerCertificateDigest,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                if (info.sha256PeerCertificateDigest().empty()) {
+                                  return {};
+                                }
+                                return CelValue::CreateString(&info.sha256PeerCertificateDigest());
+                              }}});
 }
 
 namespace {
-
 absl::optional<CelValue> extractSslInfo(const Ssl::ConnectionInfo& ssl_info,
                                         absl::string_view value) {
-  if (value == TLSVersion) {
-    return CelValue::CreateString(&ssl_info.tlsVersion());
-  } else if (value == SubjectLocalCertificate) {
-    return CelValue::CreateString(&ssl_info.subjectLocalCertificate());
-  } else if (value == SubjectPeerCertificate) {
-    return CelValue::CreateString(&ssl_info.subjectPeerCertificate());
-  } else if (value == URISanLocalCertificate) {
-    if (!ssl_info.uriSanLocalCertificate().empty()) {
-      return CelValue::CreateString(&ssl_info.uriSanLocalCertificate()[0]);
-    }
-  } else if (value == URISanPeerCertificate) {
-    if (!ssl_info.uriSanPeerCertificate().empty()) {
-      return CelValue::CreateString(&ssl_info.uriSanPeerCertificate()[0]);
-    }
-  } else if (value == DNSSanLocalCertificate) {
-    if (!ssl_info.dnsSansLocalCertificate().empty()) {
-      return CelValue::CreateString(&ssl_info.dnsSansLocalCertificate()[0]);
-    }
-  } else if (value == DNSSanPeerCertificate) {
-    if (!ssl_info.dnsSansPeerCertificate().empty()) {
-      return CelValue::CreateString(&ssl_info.dnsSansPeerCertificate()[0]);
-    }
-  } else if (value == SHA256PeerCertificateDigest) {
-    if (!ssl_info.sha256PeerCertificateDigest().empty()) {
-      return CelValue::CreateString(&ssl_info.sha256PeerCertificateDigest());
-    }
+  const auto& extractors = SslExtractorsValues::get().extractors_;
+  auto it = extractors.find(value);
+  if (it != extractors.end()) {
+    return it->second(ssl_info);
   }
   return {};
 }
-
 } // namespace
 
+// Request lookup implementation
+const RequestLookupValues& RequestLookupValues::get() {
+  CONSTRUCT_ON_FIRST_USE(
+      RequestLookupValues,
+      absl::flat_hash_map<absl::string_view, CelValueExtractor>{
+          {Headers,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateMap(&wrapper.headers_);
+           }},
+          {Time,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateTimestamp(absl::FromChrono(wrapper.info_.startTime()));
+           }},
+          {Size,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.headers_.value_ != nullptr &&
+                 wrapper.headers_.value_->ContentLength() != nullptr) {
+               int64_t length;
+               if (absl::SimpleAtoi(wrapper.headers_.value_->getContentLengthValue(), &length)) {
+                 return CelValue::CreateInt64(length);
+               }
+             }
+             return CelValue::CreateInt64(wrapper.info_.bytesReceived());
+           }},
+          {TotalSize,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateInt64(
+                 wrapper.info_.bytesReceived() +
+                 (wrapper.headers_.value_ ? wrapper.headers_.value_->byteSize() : 0));
+           }},
+          {Duration,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             auto duration = wrapper.info_.requestComplete();
+             if (duration.has_value()) {
+               return CelValue::CreateDuration(absl::FromChrono(duration.value()));
+             }
+             return {};
+           }},
+          {Protocol,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_.protocol().has_value()) {
+               return CelValue::CreateString(
+                   &Http::Utility::getProtocolString(wrapper.info_.protocol().value()));
+             }
+             return {};
+           }},
+          {Path,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->Path())
+                                            : absl::optional<CelValue>{};
+           }},
+          {UrlPath,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.headers_.value_) {
+               return {};
+             }
+             absl::string_view path = wrapper.headers_.value_->getPathValue();
+             size_t query_offset = path.find('?');
+             if (query_offset == absl::string_view::npos) {
+               return CelValue::CreateStringView(path);
+             }
+             return CelValue::CreateStringView(path.substr(0, query_offset));
+           }},
+          {Host,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->Host())
+                                            : absl::optional<CelValue>{};
+           }},
+          {Scheme,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->Scheme())
+                                            : absl::optional<CelValue>{};
+           }},
+          {Method,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->Method())
+                                            : absl::optional<CelValue>{};
+           }},
+          {Referer,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return wrapper.headers_.value_ ? convertHeaderEntry(wrapper.headers_.value_->getInline(
+                                                  referer_handle.handle()))
+                                            : absl::optional<CelValue>{};
+           }},
+          {ID,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return wrapper.headers_.value_
+                        ? convertHeaderEntry(wrapper.headers_.value_->RequestId())
+                        : absl::optional<CelValue>{};
+           }},
+          {UserAgent,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             return wrapper.headers_.value_
+                        ? convertHeaderEntry(wrapper.headers_.value_->UserAgent())
+                        : absl::optional<CelValue>{};
+           }},
+          {Query, [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.headers_.value_) {
+               return {};
+             }
+             absl::string_view path = wrapper.headers_.value_->getPathValue();
+             auto query_offset = path.find('?');
+             if (query_offset == absl::string_view::npos) {
+               return CelValue::CreateStringView(absl::string_view());
+             }
+             path = path.substr(query_offset + 1);
+             auto fragment_offset = path.find('#');
+             return CelValue::CreateStringView(path.substr(0, fragment_offset));
+           }}});
+}
+
+// Response lookup implementation
+const ResponseLookupValues& ResponseLookupValues::get() {
+  CONSTRUCT_ON_FIRST_USE(
+      ResponseLookupValues,
+      absl::flat_hash_map<absl::string_view, ResponseValueExtractor>{
+          {Code,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             auto code = wrapper.info_.responseCode();
+             return code.has_value() ? CelValue::CreateInt64(code.value())
+                                     : absl::optional<CelValue>{};
+           }},
+          {Size,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateInt64(wrapper.info_.bytesSent());
+           }},
+          {Headers,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateMap(&wrapper.headers_);
+           }},
+          {Trailers,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateMap(&wrapper.trailers_);
+           }},
+          {Flags,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateInt64(wrapper.info_.legacyResponseFlags());
+           }},
+          {GrpcStatus,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             auto const& optional_status = Grpc::Common::getGrpcStatus(
+                 wrapper.trailers_.value_ ? *wrapper.trailers_.value_
+                                          : *Http::StaticEmptyHeaders::get().response_trailers,
+                 wrapper.headers_.value_ ? *wrapper.headers_.value_
+                                         : *Http::StaticEmptyHeaders::get().response_headers,
+                 wrapper.info_);
+             return optional_status.has_value() ? CelValue::CreateInt64(optional_status.value())
+                                                : absl::optional<CelValue>{};
+           }},
+          {TotalSize,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateInt64(
+                 wrapper.info_.bytesSent() +
+                 (wrapper.headers_.value_ ? wrapper.headers_.value_->byteSize() : 0) +
+                 (wrapper.trailers_.value_ ? wrapper.trailers_.value_->byteSize() : 0));
+           }},
+          {CodeDetails,
+           [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             const absl::optional<std::string>& details = wrapper.info_.responseCodeDetails();
+             return details.has_value() ? CelValue::CreateString(&details.value())
+                                        : absl::optional<CelValue>{};
+           }},
+          {BackendLatency, [](const ResponseWrapper& wrapper) -> absl::optional<CelValue> {
+             Envoy::StreamInfo::TimingUtility timing(wrapper.info_);
+             const auto last_upstream_rx_byte_received = timing.lastUpstreamRxByteReceived();
+             const auto first_upstream_tx_byte_sent = timing.firstUpstreamTxByteSent();
+             if (last_upstream_rx_byte_received.has_value() &&
+                 first_upstream_tx_byte_sent.has_value()) {
+               return CelValue::CreateDuration(absl::FromChrono(
+                   last_upstream_rx_byte_received.value() - first_upstream_tx_byte_sent.value()));
+             }
+             return {};
+           }}});
+}
+
+// Connection lookup implementation
+const ConnectionLookupValues& ConnectionLookupValues::get() {
+  CONSTRUCT_ON_FIRST_USE(
+      ConnectionLookupValues,
+      absl::flat_hash_map<absl::string_view, ConnectionValueExtractor>{
+          {MTLS,
+           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateBool(
+                 wrapper.info_.downstreamAddressProvider().sslConnection() != nullptr &&
+                 wrapper.info_.downstreamAddressProvider()
+                     .sslConnection()
+                     ->peerCertificatePresented());
+           }},
+          {RequestedServerName,
+           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateStringView(
+                 wrapper.info_.downstreamAddressProvider().requestedServerName());
+           }},
+          {ID,
+           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+             auto id = wrapper.info_.downstreamAddressProvider().connectionID();
+             return id.has_value() ? CelValue::CreateUint64(id.value())
+                                   : absl::optional<CelValue>{};
+           }},
+          {ConnectionTerminationDetails,
+           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_.connectionTerminationDetails().has_value()) {
+               return CelValue::CreateString(&wrapper.info_.connectionTerminationDetails().value());
+             }
+             return {};
+           }},
+          {DownstreamTransportFailureReason,
+           [](const ConnectionWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.info_.downstreamTransportFailureReason().empty()) {
+               return CelValue::CreateStringView(wrapper.info_.downstreamTransportFailureReason());
+             }
+             return {};
+           }}});
+}
+
+// Upstream lookup implementation
+const UpstreamLookupValues& UpstreamLookupValues::get() {
+  CONSTRUCT_ON_FIRST_USE(
+      UpstreamLookupValues,
+      absl::flat_hash_map<absl::string_view, UpstreamValueExtractor>{
+          {Address,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.info_.upstreamInfo().has_value()) {
+               return {};
+             }
+             auto upstream_host = wrapper.info_.upstreamInfo().value().get().upstreamHost();
+             if (upstream_host != nullptr && upstream_host->address() != nullptr) {
+               return CelValue::CreateStringView(upstream_host->address()->asStringView());
+             }
+             return {};
+           }},
+          {Port,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.info_.upstreamInfo().has_value()) {
+               return {};
+             }
+             auto upstream_host = wrapper.info_.upstreamInfo().value().get().upstreamHost();
+             if (upstream_host != nullptr && upstream_host->address() != nullptr &&
+                 upstream_host->address()->ip() != nullptr) {
+               return CelValue::CreateInt64(upstream_host->address()->ip()->port());
+             }
+             return {};
+           }},
+          {UpstreamLocalAddress,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.info_.upstreamInfo().has_value()) {
+               return {};
+             }
+             auto upstream_local_address =
+                 wrapper.info_.upstreamInfo().value().get().upstreamLocalAddress();
+             if (upstream_local_address != nullptr) {
+               return CelValue::CreateStringView(upstream_local_address->asStringView());
+             }
+             return {};
+           }},
+          {UpstreamTransportFailureReason,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.info_.upstreamInfo().has_value()) {
+               return {};
+             }
+             return CelValue::CreateStringView(
+                 wrapper.info_.upstreamInfo().value().get().upstreamTransportFailureReason());
+           }},
+          {UpstreamRequestAttemptCount,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
+           }}});
+}
+
+// XDS lookup implementation
+const XDSLookupValues& XDSLookupValues::get() {
+  CONSTRUCT_ON_FIRST_USE(
+      XDSLookupValues,
+      absl::flat_hash_map<absl::string_view, XDSValueExtractor>{
+          {Node,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.local_info_) {
+               return CelProtoWrapper::CreateMessage(&wrapper.local_info_->node(), &wrapper.arena_);
+             }
+             return {};
+           }},
+          {ClusterName,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr) {
+               return {};
+             }
+             const auto cluster_info = wrapper.info_->upstreamClusterInfo();
+             if (cluster_info && cluster_info.value()) {
+               return CelValue::CreateString(&cluster_info.value()->name());
+             }
+             return {};
+           }},
+          {ClusterMetadata,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr) {
+               return {};
+             }
+             const auto cluster_info = wrapper.info_->upstreamClusterInfo();
+             if (cluster_info && cluster_info.value()) {
+               return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(),
+                                                     &wrapper.arena_);
+             }
+             return {};
+           }},
+          {RouteName,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
+               return {};
+             }
+             return CelValue::CreateString(&wrapper.info_->route()->routeName());
+           }},
+          {RouteMetadata,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
+               return {};
+             }
+             return CelProtoWrapper::CreateMessage(&wrapper.info_->route()->metadata(),
+                                                   &wrapper.arena_);
+           }},
+          {UpstreamHostMetadata,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr) {
+               return {};
+             }
+             const auto upstream_info = wrapper.info_->upstreamInfo();
+             if (upstream_info && upstream_info->upstreamHost()) {
+               return CelProtoWrapper::CreateMessage(
+                   upstream_info->upstreamHost()->metadata().get(), &wrapper.arena_);
+             }
+             return {};
+           }},
+          {FilterChainName,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr) {
+               return {};
+             }
+             const auto filter_chain_info =
+                 wrapper.info_->downstreamAddressProvider().filterChainInfo();
+             const absl::string_view filter_chain_name =
+                 filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
+             return CelValue::CreateStringView(filter_chain_name);
+           }},
+          {ListenerMetadata,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr) {
+               return {};
+             }
+             const auto listener_info = wrapper.info_->downstreamAddressProvider().listenerInfo();
+             if (listener_info) {
+               return CelProtoWrapper::CreateMessage(&listener_info->metadata(), &wrapper.arena_);
+             }
+             return {};
+           }},
+          {ListenerDirection, [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr) {
+               return {};
+             }
+             const auto listener_info = wrapper.info_->downstreamAddressProvider().listenerInfo();
+             if (listener_info) {
+               return CelValue::CreateInt64(listener_info->direction());
+             }
+             return {};
+           }}});
+}
+
+// Wrapper implementations
 absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
   auto value = key.StringOrDie().value();
 
-  if (value == Headers) {
-    return CelValue::CreateMap(&headers_);
-  } else if (value == Time) {
-    return CelValue::CreateTimestamp(absl::FromChrono(info_.startTime()));
-  } else if (value == Size) {
-    // it is important to make a choice whether to rely on content-length vs stream info
-    // (which is not available at the time of the request headers)
-    if (headers_.value_ != nullptr && headers_.value_->ContentLength() != nullptr) {
-      int64_t length;
-      if (absl::SimpleAtoi(headers_.value_->getContentLengthValue(), &length)) {
-        return CelValue::CreateInt64(length);
-      }
-    } else {
-      return CelValue::CreateInt64(info_.bytesReceived());
-    }
-  } else if (value == TotalSize) {
-    return CelValue::CreateInt64(info_.bytesReceived() +
-                                 (headers_.value_ ? headers_.value_->byteSize() : 0));
-  } else if (value == Duration) {
-    auto duration = info_.requestComplete();
-    if (duration.has_value()) {
-      return CelValue::CreateDuration(absl::FromChrono(duration.value()));
-    }
-  } else if (value == Protocol) {
-    if (info_.protocol().has_value()) {
-      return CelValue::CreateString(&Http::Utility::getProtocolString(info_.protocol().value()));
-    } else {
-      return {};
-    }
-  }
-
-  if (headers_.value_ != nullptr) {
-    if (value == Path) {
-      return convertHeaderEntry(headers_.value_->Path());
-    } else if (value == UrlPath) {
-      absl::string_view path = headers_.value_->getPathValue();
-      size_t query_offset = path.find('?');
-      if (query_offset == absl::string_view::npos) {
-        return CelValue::CreateStringView(path);
-      }
-      return CelValue::CreateStringView(path.substr(0, query_offset));
-    } else if (value == Host) {
-      return convertHeaderEntry(headers_.value_->Host());
-    } else if (value == Scheme) {
-      return convertHeaderEntry(headers_.value_->Scheme());
-    } else if (value == Method) {
-      return convertHeaderEntry(headers_.value_->Method());
-    } else if (value == Referer) {
-      return convertHeaderEntry(headers_.value_->getInline(referer_handle.handle()));
-    } else if (value == ID) {
-      return convertHeaderEntry(headers_.value_->RequestId());
-    } else if (value == UserAgent) {
-      return convertHeaderEntry(headers_.value_->UserAgent());
-    } else if (value == Query) {
-      absl::string_view path = headers_.value_->getPathValue();
-      auto query_offset = path.find('?');
-      if (query_offset == absl::string_view::npos) {
-        return CelValue::CreateStringView(absl::string_view());
-      }
-      path = path.substr(query_offset + 1);
-      auto fragment_offset = path.find('#');
-      return CelValue::CreateStringView(path.substr(0, fragment_offset));
-    }
+  const auto& lookup = RequestLookupValues::get().request_lookup_;
+  auto it = lookup.find(value);
+  if (it != lookup.end()) {
+    return it->second(*this);
   }
   return {};
 }
@@ -151,48 +487,11 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
     return {};
   }
   auto value = key.StringOrDie().value();
-  if (value == Code) {
-    auto code = info_.responseCode();
-    if (code.has_value()) {
-      return CelValue::CreateInt64(code.value());
-    }
-    return {};
-  } else if (value == Size) {
-    return CelValue::CreateInt64(info_.bytesSent());
-  } else if (value == Headers) {
-    return CelValue::CreateMap(&headers_);
-  } else if (value == Trailers) {
-    return CelValue::CreateMap(&trailers_);
-  } else if (value == Flags) {
-    return CelValue::CreateInt64(info_.legacyResponseFlags());
-  } else if (value == GrpcStatus) {
-    auto const& optional_status = Grpc::Common::getGrpcStatus(
-        trailers_.value_ ? *trailers_.value_ : *Http::StaticEmptyHeaders::get().response_trailers,
-        headers_.value_ ? *headers_.value_ : *Http::StaticEmptyHeaders::get().response_headers,
-        info_);
-    if (optional_status.has_value()) {
-      return CelValue::CreateInt64(optional_status.value());
-    }
-    return {};
-  } else if (value == TotalSize) {
-    return CelValue::CreateInt64(info_.bytesSent() +
-                                 (headers_.value_ ? headers_.value_->byteSize() : 0) +
-                                 (trailers_.value_ ? trailers_.value_->byteSize() : 0));
-  } else if (value == CodeDetails) {
-    const absl::optional<std::string>& details = info_.responseCodeDetails();
-    if (details.has_value()) {
-      return CelValue::CreateString(&details.value());
-    }
-    return {};
-  } else if (value == BackendLatency) {
-    Envoy::StreamInfo::TimingUtility timing(info_);
-    const auto last_upstream_rx_byte_received = timing.lastUpstreamRxByteReceived();
-    const auto first_upstream_tx_byte_sent = timing.firstUpstreamTxByteSent();
-    if (last_upstream_rx_byte_received.has_value() && first_upstream_tx_byte_sent.has_value()) {
-      return CelValue::CreateDuration(absl::FromChrono(last_upstream_rx_byte_received.value() -
-                                                       first_upstream_tx_byte_sent.value()));
-    }
-    return {};
+
+  const auto& lookup = ResponseLookupValues::get().response_lookup_;
+  auto it = lookup.find(value);
+  if (it != lookup.end()) {
+    return it->second(*this);
   }
   return {};
 }
@@ -202,79 +501,50 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
     return {};
   }
   auto value = key.StringOrDie().value();
-  if (value == MTLS) {
-    return CelValue::CreateBool(
-        info_.downstreamAddressProvider().sslConnection() != nullptr &&
-        info_.downstreamAddressProvider().sslConnection()->peerCertificatePresented());
-  } else if (value == RequestedServerName) {
-    return CelValue::CreateStringView(info_.downstreamAddressProvider().requestedServerName());
-  } else if (value == ID) {
-    auto id = info_.downstreamAddressProvider().connectionID();
-    if (id.has_value()) {
-      return CelValue::CreateUint64(id.value());
-    }
-    return {};
-  } else if (value == ConnectionTerminationDetails) {
-    if (info_.connectionTerminationDetails().has_value()) {
-      return CelValue::CreateString(&info_.connectionTerminationDetails().value());
-    }
-    return {};
-  } else if (value == DownstreamTransportFailureReason) {
-    if (!info_.downstreamTransportFailureReason().empty()) {
-      return CelValue::CreateStringView(info_.downstreamTransportFailureReason());
-    }
-    return {};
+
+  const auto& lookup = ConnectionLookupValues::get().connection_lookup_;
+  auto it = lookup.find(value);
+  if (it != lookup.end()) {
+    return it->second(*this);
   }
 
+  // Handle SSL info separately
   auto ssl_info = info_.downstreamAddressProvider().sslConnection();
   if (ssl_info != nullptr) {
     return extractSslInfo(*ssl_info, value);
   }
-
   return {};
 }
 
 absl::optional<CelValue> UpstreamWrapper::operator[](CelValue key) const {
-  if (!key.IsString() || !info_.upstreamInfo().has_value()) {
+  if (!key.IsString()) {
     return {};
   }
   auto value = key.StringOrDie().value();
-  if (value == Address) {
-    auto upstream_host = info_.upstreamInfo().value().get().upstreamHost();
-    if (upstream_host != nullptr && upstream_host->address() != nullptr) {
-      return CelValue::CreateStringView(upstream_host->address()->asStringView());
-    }
-  } else if (value == Port) {
-    auto upstream_host = info_.upstreamInfo().value().get().upstreamHost();
-    if (upstream_host != nullptr && upstream_host->address() != nullptr &&
-        upstream_host->address()->ip() != nullptr) {
-      return CelValue::CreateInt64(upstream_host->address()->ip()->port());
-    }
-  } else if (value == UpstreamLocalAddress) {
-    auto upstream_local_address = info_.upstreamInfo().value().get().upstreamLocalAddress();
-    if (upstream_local_address != nullptr) {
-      return CelValue::CreateStringView(upstream_local_address->asStringView());
-    }
-  } else if (value == UpstreamTransportFailureReason) {
-    return CelValue::CreateStringView(
-        info_.upstreamInfo().value().get().upstreamTransportFailureReason());
-  } else if (value == UpstreamRequestAttemptCount) {
-    return CelValue::CreateUint64(info_.attemptCount().value_or(0));
+
+  const auto& lookup = UpstreamLookupValues::get().upstream_lookup_;
+  auto it = lookup.find(value);
+  if (it != lookup.end()) {
+    return it->second(*this);
   }
 
-  auto ssl_info = info_.upstreamInfo().value().get().upstreamSslConnection();
-  if (ssl_info != nullptr) {
-    return extractSslInfo(*ssl_info, value);
+  // Handle SSL info if available
+  if (info_.upstreamInfo().has_value()) {
+    auto ssl_info = info_.upstreamInfo().value().get().upstreamSslConnection();
+    if (ssl_info != nullptr) {
+      return extractSslInfo(*ssl_info, value);
+    }
   }
-
   return {};
 }
 
+// PeerWrapper implementation
 absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
   auto value = key.StringOrDie().value();
+
   if (value == Address) {
     if (local_) {
       return CelValue::CreateStringView(
@@ -296,13 +566,13 @@ absl::optional<CelValue> PeerWrapper::operator[](CelValue key) const {
       }
     }
   }
-
   return {};
 }
 
 class FilterStateObjectWrapper : public google::api::expr::runtime::CelMap {
 public:
   FilterStateObjectWrapper(const StreamInfo::FilterState::Object* object) : object_(object) {}
+
   absl::optional<CelValue> operator[](CelValue key) const override {
     if (object_ == nullptr || !key.IsString()) {
       return {};
@@ -310,7 +580,7 @@ public:
     auto field_value = object_->getField(key.StringOrDie().value());
     return absl::visit(Visitor{}, field_value);
   }
-  // Default stubs.
+
   int size() const override { return 0; }
   bool empty() const override { return true; }
   using CelMap::ListKeys;
@@ -329,11 +599,13 @@ private:
   const StreamInfo::FilterState::Object* object_;
 };
 
+// FilterStateWrapper implementation
 absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
   auto value = key.StringOrDie().value();
+
   if (const StreamInfo::FilterState::Object* object = filter_state_.getDataReadOnlyGeneric(value);
       object != nullptr) {
     const CelState* cel_state = dynamic_cast<const CelState*>(object);
@@ -356,59 +628,17 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
   return {};
 }
 
+// XDSWrapper implementation
 absl::optional<CelValue> XDSWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
     return {};
   }
   auto value = key.StringOrDie().value();
-  if (value == Node) {
-    if (local_info_) {
-      return CelProtoWrapper::CreateMessage(&local_info_->node(), &arena_);
-    }
-    return {};
-  }
-  if (info_ == nullptr) {
-    return {};
-  }
-  if (value == ClusterName) {
-    const auto cluster_info = info_->upstreamClusterInfo();
-    if (cluster_info && cluster_info.value()) {
-      return CelValue::CreateString(&cluster_info.value()->name());
-    }
-  } else if (value == ClusterMetadata) {
-    const auto cluster_info = info_->upstreamClusterInfo();
-    if (cluster_info && cluster_info.value()) {
-      return CelProtoWrapper::CreateMessage(&cluster_info.value()->metadata(), &arena_);
-    }
-  } else if (value == RouteName) {
-    if (info_->route()) {
-      return CelValue::CreateString(&info_->route()->routeName());
-    }
-  } else if (value == RouteMetadata) {
-    if (info_->route()) {
-      return CelProtoWrapper::CreateMessage(&info_->route()->metadata(), &arena_);
-    }
-  } else if (value == UpstreamHostMetadata) {
-    const auto upstream_info = info_->upstreamInfo();
-    if (upstream_info && upstream_info->upstreamHost()) {
-      return CelProtoWrapper::CreateMessage(upstream_info->upstreamHost()->metadata().get(),
-                                            &arena_);
-    }
-  } else if (value == FilterChainName) {
-    const auto filter_chain_info = info_->downstreamAddressProvider().filterChainInfo();
-    const absl::string_view filter_chain_name =
-        filter_chain_info.has_value() ? filter_chain_info->name() : absl::string_view{};
-    return CelValue::CreateStringView(filter_chain_name);
-  } else if (value == ListenerMetadata) {
-    const auto listener_info = info_->downstreamAddressProvider().listenerInfo();
-    if (listener_info) {
-      return CelProtoWrapper::CreateMessage(&listener_info->metadata(), &arena_);
-    }
-  } else if (value == ListenerDirection) {
-    const auto listener_info = info_->downstreamAddressProvider().listenerInfo();
-    if (listener_info) {
-      return CelValue::CreateInt64(listener_info->direction());
-    }
+
+  const auto& lookup = XDSLookupValues::get().xds_lookup_;
+  auto it = lookup.find(value);
+  if (it != lookup.end()) {
+    return it->second(*this);
   }
   return {};
 }
