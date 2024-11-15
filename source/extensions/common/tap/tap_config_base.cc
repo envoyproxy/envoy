@@ -8,7 +8,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/matcher/matcher.h"
 

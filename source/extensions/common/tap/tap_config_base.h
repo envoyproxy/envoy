@@ -10,6 +10,7 @@
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
 #include "source/extensions/common/matcher/matcher.h"
 #include "source/extensions/common/tap/tap.h"
 
@@ -160,7 +161,12 @@ public:
   UdpTapSink(const envoy::config::tap::v3::UDPSink& config);
   // below one is only for UT
   UdpTapSink(Network::UdpPacketWriterPtr&& utUdpPacketWriter)
-      : udp_packet_writer_(std::move(utUdpPacketWriter)) {}
+      : udp_packet_writer_(std::move(utUdpPacketWriter)) {
+    // Construct a fake udp_server_address_ to let UT pass
+    std::string utUdpServerAddress("127.0.0.1");
+    udp_server_address_ =
+        Network::Utility::parseInternetAddressNoThrow(utUdpServerAddress, 8080, false);
+  }
   ~UdpTapSink();
 
   // Sink
