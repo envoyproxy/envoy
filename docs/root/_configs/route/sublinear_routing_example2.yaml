@@ -114,3 +114,95 @@ static_resources:
                             route:
                               cluster: cluster_3
   clusters:
+  - name: cluster_1
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: service1_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service1.local
+                port_value: 80
+  - name: cluster_foo_1
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: servicefoo_1_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: servicefoo1.local
+                port_value: 80
+  - name: cluster_bar_1
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: servicebar_1_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: servicebar1.local
+                port_value: 80
+  - name: cluster_bar_2
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: servicebar_2_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: servicebar2.local
+                port_value: 80
+  - name: cluster_bar_3
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: servicebar_3_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: servicebar3.local
+                port_value: 80
+  - name: cluster_foo_3
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: servicefoo_3_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: servicefoo3.local
+                port_value: 80
+  - name: cluster_3
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: service3_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service3.local
+                port_value: 80
+
