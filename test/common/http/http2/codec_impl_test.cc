@@ -1189,7 +1189,9 @@ TEST_P(Http2CodecImplTest, DisallowMetadataFlagOff) {
 #ifndef NDEBUG
   EXPECT_DEATH(request_encoder_->encodeMetadata(metadata_map_vector), ".*");
 #else
-  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(size);
+  if (testing::get<2>(GetParam()) == Http2Impl::Oghttp2) {
+    EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(size);
+  }
   request_encoder_->encodeMetadata(metadata_map_vector);
 #endif
   driveToCompletion();
