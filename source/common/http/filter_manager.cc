@@ -1623,6 +1623,14 @@ void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_st
   tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
+namespace {
+const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgrade() {
+  CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
+                         Http::Headers::get().ConnectionValues.Upgrade);
+}
+
+} // namespace
+
 bool FilterManager::createFilterChain() {
   if (state_.created_filter_chain_) {
     return false;
@@ -1660,6 +1668,8 @@ bool FilterManager::createFilterChain() {
       break;
     case FilterChainFactory::UpgradeAction::Ignored:
       filter_manager_callbacks_.requestHeaders()->removeUpgrade();
+      Http::Utility::removeConnectionUpgrade(filter_manager_callbacks_.requestHeaders().value(),
+                                             caseUnorderdSetContainingUpgrade());
       break;
     }
   }

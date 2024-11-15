@@ -852,16 +852,8 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
                                header_values.UpgradeValues.H2c)) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       request_or_response_headers.removeUpgrade();
-      if (request_or_response_headers.Connection()) {
-        const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
-        std::string new_value = StringUtil::removeTokens(
-            request_or_response_headers.getConnectionValue(), ",", tokens_to_remove, ",");
-        if (new_value.empty()) {
-          request_or_response_headers.removeConnection();
-        } else {
-          request_or_response_headers.setConnection(new_value);
-        }
-      }
+      Utility::removeConnectionUpgrade(request_or_response_headers,
+                                       caseUnorderdSetContainingUpgradeAndHttp2Settings());
       request_or_response_headers.remove(header_values.Http2Settings);
     } else {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
