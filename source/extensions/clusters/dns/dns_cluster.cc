@@ -14,7 +14,6 @@ namespace Envoy {
 namespace Upstream {
 
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-
 DnsClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
