@@ -888,8 +888,6 @@ protected:
     bool is_grpc_request_{};
     // Tracks if headers other than 100-Continue have been encoded to the codec.
     bool non_100_response_headers_encoded_{};
-    // Tracks if 100, 102, 103, or 104 informational headers have been encoded to the codec.
-    bool informational_response_headers_encoded_{};
     // True under the stack of onLocalReply, false otherwise.
     bool under_on_local_reply_{};
     // True when the filter chain iteration was aborted with local reply.
