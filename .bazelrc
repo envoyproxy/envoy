@@ -511,6 +511,7 @@ build:rbe-engflow --remote_timeout=3600s
 build:rbe-engflow --bes_timeout=3600s
 build:rbe-engflow --bes_upload_mode=fully_async
 build:rbe-engflow --nolegacy_important_outputs
+build:rbe-engflow --define=engflow_rbe=true
 
 # RBE (Engflow Envoy)
 build:common-envoy-engflow --google_default_credentials=false
