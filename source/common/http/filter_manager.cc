@@ -1672,13 +1672,16 @@ bool FilterManager::createFilterChain(const FilterChainFactory& filter_chain_fac
 
   if (downstream_callbacks.has_value()) {
     // Only try the upgrade filter chain for downstream filter chains.
-    const bool created = createUpgradeFilterChain(filter_chain_factory, options);
-    if (created) {
+    if (createUpgradeFilterChain(filter_chain_factory, options)) {
+      state_.created_filter_chain_ = true;
       return true;
     }
   }
 
-  return filter_chain_factory.createFilterChain(*this, only_create_if_configured, options);
+  const bool created =
+      filter_chain_factory.createFilterChain(*this, only_create_if_configured, options);
+  state_.created_filter_chain_ = created;
+  return created;
 }
 
 void ActiveStreamDecoderFilter::requestDataDrained() {
