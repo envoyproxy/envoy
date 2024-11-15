@@ -10,11 +10,16 @@ on:
         required: false
       dockerhub-password:
         required: false
+      gcs-cache-key:
+        required: true
       gpg-key:
         required: true
       gpg-key-password:
         required: true
     inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -33,18 +38,22 @@ concurrency:
 
 jobs:
   binary:
+    secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
+      arch: ${{ matrix.arch }}
       bazel-extra: ${{ matrix.bazel-extra }}
       target: ${{ matrix.target }}
       target-suffix: ${{ matrix.arch }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       concurrency-suffix: -${{ matrix.arch }}
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on }}
@@ -78,6 +87,7 @@ jobs:
       contents: read
       packages: read
     secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
       gpg-key: ${{ secrets.gpg-key }}
       gpg-key-password: ${{ secrets.gpg-key-password }}
     name: ${{ matrix.name || matrix.target }}
@@ -85,6 +95,7 @@ jobs:
     - binary
     uses: ./.github/workflows/_run.yml
     with:
+      arch: ${{ matrix.arch }}
       bazel-extra: >-
         --config=cache-envoy-engflow
         --config=common-envoy-engflow
@@ -96,6 +107,7 @@ jobs:
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.cache-build-image-key-suffix }}
       concurrency-suffix: -${{ matrix.arch }}
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       import-gpg: true
       rbe: false
       request: ${{ inputs.request }}
@@ -155,6 +167,7 @@ jobs:
       contents: read
       packages: read
     secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
       gpg-key: ${{ secrets.gpg-key }}
       gpg-key-password: ${{ secrets.gpg-key-password }}
     name: ${{ matrix.name || matrix.target }}
@@ -174,6 +187,7 @@ jobs:
         packages.x64: envoy/x64/
         release.arm64: envoy/arm64/bin/
         release.x64: envoy/x64/bin/
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       import-gpg: true
       request: ${{ inputs.request }}
       runs-on: ubuntu-24.04

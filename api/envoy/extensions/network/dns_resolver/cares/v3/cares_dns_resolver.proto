@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.network.dns_resolver.cares]
 
 // Configuration for c-ares DNS resolver.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message CaresDnsResolverConfig {
   // A list of dns resolver addresses.
   // :ref:`use_resolvers_as_fallback<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
@@ -61,4 +61,11 @@ message CaresDnsResolverConfig {
   // Note: While the c-ares library defaults to 3 attempts, Envoy's default (if this field is unset) is 4 attempts.
   // This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
   google.protobuf.UInt32Value query_tries = 7 [(validate.rules).uint32 = {gte: 1}];
+
+  // Enable round-robin selection of name servers for DNS resolution. When enabled, the resolver will cycle through the
+  // list of name servers for each resolution request. This can help distribute the query load across multiple name
+  // servers. If disabled (default), the resolver will try name servers in the order they are configured.
+  //
+  // Note: This setting overrides any system configuration for name server rotation.
+  bool rotate_nameservers = 8;
 }

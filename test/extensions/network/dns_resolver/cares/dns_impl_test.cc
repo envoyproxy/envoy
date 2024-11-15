@@ -723,6 +723,7 @@ public:
 
     cares.set_filter_unroutable_families(filterUnroutableFamilies());
     cares.set_allocated_udp_max_queries(udpMaxQueries());
+    cares.set_rotate_nameservers(setRotateNameservers());
 
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
@@ -962,6 +963,7 @@ protected:
   virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
+  virtual bool setRotateNameservers() const { return false; }
   virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return 0; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -2240,6 +2242,50 @@ TEST_P(DnsImplAresFlagsForMaxUdpQueriesinTest, UdpMaxQueriesIsSet) {
   EXPECT_TRUE(opts.udp_max_queries == 100);
   EXPECT_NE(nullptr,
             resolveWithUnreferencedParameters("root.cname.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
+class DnsImplAresFlagsForNameserverRotationTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  bool setRotateNameservers() const override { return true; }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForNameserverRotationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DnsImplAresFlagsForNameserverRotationTest, NameserverRotationEnabled) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((optmask & ARES_OPT_ROTATE) == ARES_OPT_ROTATE);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("some.good.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
+class DnsImplAresFlagsForNoNameserverRotationTest : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  bool setRotateNameservers() const override { return false; }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForNoNameserverRotationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DnsImplAresFlagsForNoNameserverRotationTest, NameserverRotationDisabled) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((optmask & ARES_OPT_NOROTATE) == ARES_OPT_NOROTATE);
+  EXPECT_NE(nullptr,
+            resolveWithUnreferencedParameters("some.good.domain", DnsLookupFamily::Auto, true));
   ares_destroy_options(&opts);
 }
 
