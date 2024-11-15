@@ -514,6 +514,9 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_hosts_yaml).message(),
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+  EXPECT_EQ(
+      factorySetupFromV3Yaml<DnsClusterFactory>(multiple_hosts_yaml).message(),
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_lb_endpoints_yaml = R"EOF(
   name: name
@@ -544,6 +547,9 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_lb_endpoints_yaml).message(),
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+  EXPECT_EQ(
+      factorySetupFromV3Yaml<DnsClusterFactory>(multiple_lb_endpoints_yaml).message(),
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_endpoints_yaml = R"EOF(
@@ -578,6 +584,9 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_endpoints_yaml).message(),
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+  EXPECT_EQ(
+      factorySetupFromV3Yaml<DnsClusterFactory>(multiple_endpoints_yaml).message(),
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string custom_resolver_yaml = R"EOF(
   name: name
@@ -601,6 +610,8 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   )EOF";
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_yaml).message(),
+            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+  EXPECT_EQ(factorySetupFromV3Yaml<DnsClusterFactory>(custom_resolver_yaml).message(),
             "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 }
 

@@ -1533,6 +1533,7 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
         dns_refresh_rate: 4s
         dns_jitter: 0s
         respect_dns_ttl: true
+        dns_discovery_type: STRICT
     lb_policy: ROUND_ROBIN
     load_assignment:
         endpoints:
