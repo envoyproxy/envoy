@@ -123,6 +123,8 @@ const RequestLookupValues& RequestLookupValues::get() {
                if (absl::SimpleAtoi(wrapper.headers_.value_->getContentLengthValue(), &length)) {
                  return CelValue::CreateInt64(length);
                }
+               // Invalid content length, return empty.
+               return {};
              }
              return CelValue::CreateInt64(wrapper.info_.bytesReceived());
            }},
