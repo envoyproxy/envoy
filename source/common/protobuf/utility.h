@@ -278,8 +278,9 @@ public:
   // It has somewhat inconsistent handling of invalid file contents,
   // occasionally failing over to try another type of parsing, or silently
   // failing instead of throwing an exception.
-  static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  static absl::Status loadFromFile(const std::string& path, Protobuf::Message& message,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                                   Api::Api& api);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -477,7 +478,6 @@ public:
     const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
     const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
     return reflection->GetString(*reflectable_message, name_field);
-    return name_field->name();
   }
 
 #ifdef ENVOY_ENABLE_YAML

@@ -29,10 +29,16 @@ public:
   MockStream();
   ~MockStream() override;
   MOCK_METHOD(void, send, (envoy::service::ext_proc::v3::ProcessingRequest&&, bool));
-  MOCK_METHOD(bool, close, ());
+  MOCK_METHOD(bool, closeLocalStream, ());
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   MOCK_METHOD(void, notifyFilterDestroy, ());
+  MOCK_METHOD(bool, remoteClosed, (), (const override));
+  MOCK_METHOD(bool, localClosed, (), (const override));
+  MOCK_METHOD(void, resetStream, ());
+  // Whether close() has been called.
+  bool local_closed_ = false;
+  bool remote_closed_ = false;
 };
 
 } // namespace ExternalProcessing

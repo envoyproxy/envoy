@@ -63,11 +63,11 @@ jobs:
 
     - name: Free disk space
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.1
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.5
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/init@662472033e021d55d94146f66f6058822b0b39fd  # codeql-bundle-v3.27.0
+      uses: github/codeql-action/init@ea9e4e37992a54ee68a9622e985e60c8e8f12d9f  # codeql-bundle-v3.27.4
       with:
         languages: cpp
         trap-caching: false
@@ -112,6 +112,6 @@ jobs:
 
     - name: Perform CodeQL Analysis
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd  # codeql-bundle-v3.27.0
+      uses: github/codeql-action/analyze@ea9e4e37992a54ee68a9622e985e60c8e8f12d9f  # codeql-bundle-v3.27.4
       with:
         trap-caching: false

@@ -167,6 +167,10 @@ func (s *processState) RecoverPanic() {
 	}
 }
 
+func (s *processState) AddData(data []byte, isStreaming bool) {
+	cAPI.HttpAddData(unsafe.Pointer(s), data, isStreaming)
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &r.streamInfo
 }

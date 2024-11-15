@@ -22,9 +22,9 @@ abstracts==0.0.12 \
     #   envoy-distribution-repo
     #   envoy-github-abstract
     #   envoy-github-release
-aio-api-bazel==0.0.2 \
-    --hash=sha256:56e36463d236e477b7e282f2d870185a0b978b50e2c3803c1ebf8b8ac4b18f5b \
-    --hash=sha256:d3f563b7698e874437d80538a89dd4d79bc37de2e850c846330ae456e3f21dcc
+aio-api-bazel==0.0.3 \
+    --hash=sha256:97e014123757c41bd4b466725e46c3aca0176ff310d851c951219c8d8ef93998 \
+    --hash=sha256:a20e8b9b62b829b73ba37bec798211de485f07463bec8d215aeb3d1b87bcf5e5
     # via -r requirements.in
 aio-api-github==0.2.10 \
     --hash=sha256:2563ad2cd219352a7933b78190c17ab460b503b437bec348a738c0f804adf45f \
@@ -762,8 +762,8 @@ google-reauth==0.1.1 \
     # via
     #   gcs-oauth2-boto-plugin
     #   gsutil
-gsutil==5.30 \
-    --hash=sha256:ef29d47764d2a3c2436ce50c4e1827626725ba8dbfd3127b42a18641710e7d38
+gsutil==5.31 \
+    --hash=sha256:10700acff3438a486429c47320a1c0b7298e090a6f5aa8ba9e55cc40202ee43b
     # via -r requirements.in
 httplib2==0.20.4 \
     --hash=sha256:58a98e45b4b1a48273073f905d2961666ecf0fbac4250ea5b47aef259eb5c585 \
@@ -792,10 +792,6 @@ imagesize==1.4.1 \
     --hash=sha256:0d8d18d08f840c19d0ee7ca1fd82490fdc3729b7ac93f49870406ddde8ef8d8b \
     --hash=sha256:69150444affb9cb0d5cc5a92b3676f0b2fb7cd9ae39e947a5e11a36b4497cd4a
     # via sphinx
-importlib-metadata==8.5.0 \
-    --hash=sha256:45e54197d28b7a7f1559e60b95e7c567032b602131fbd588f1497f47880aa68b \
-    --hash=sha256:71522656f0abace1d072b9e5481a48f07c138e00f079c38c8f883823f9c26bd7
-    # via yapf
 jinja2==3.1.4 \
     --hash=sha256:4a3aee7acbbe7303aede8e9648d13b8bf88a429282aa6122a993f0ac800cb369 \
     --hash=sha256:bc5dd2abb727a5319567b7a813e6a2e7318c39f4f487cfe6c89c6f9c7d25197d
@@ -1215,9 +1211,9 @@ pyflakes==3.2.0 \
     --hash=sha256:1c61603ff154621fb2a9172037d84dca3500def8c8b630657d1701f026f8af3f \
     --hash=sha256:84b5be138a2dfbb40689ca07e2152deb896a65c3a3e24c251c5c62489568074a
     # via flake8
-pygithub==2.4.0 \
-    --hash=sha256:6601e22627e87bac192f1e2e39c6e6f69a43152cfb8f307cee575879320b3051 \
-    --hash=sha256:81935aa4bdc939fba98fee1cb47422c09157c56a27966476ff92775602b9ee24
+pygithub==2.5.0 \
+    --hash=sha256:b0b635999a658ab8e08720bdd3318893ff20e2275f6446fcf35bf3f44f2c0fd2 \
+    --hash=sha256:e1613ac508a9be710920d26eb18b1905ebd9926aa49398e88151c1b526aad3cf
     # via -r requirements.in
 pygments==2.18.0 \
     --hash=sha256:786ff802f32e91311bff3889f6e9a86e81505fe99f2735bb6d60ae0c5004f199 \
@@ -1480,10 +1476,6 @@ sphinxext-rediraffe==0.2.7 \
 thrift==0.21.0 \
     --hash=sha256:5e6f7c50f936ebfa23e924229afc95eb219f8c8e5a83202dd4a391244803e402
     # via -r requirements.in
-tomli==2.0.1 \
-    --hash=sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc \
-    --hash=sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f
-    # via yapf
 trycast==1.2.0 \
     --hash=sha256:5cece718b5a34378df8577f3b3aa515479611c9a37b4685d4d5aa4e6c1b4b20f \
     --hash=sha256:827a84f702d8a6e7b43bb7ba5e4cccd81b3fb7e59c9b2417e718407781e317a7
@@ -1647,9 +1639,9 @@ yamllint==1.35.1 \
     --hash=sha256:2e16e504bb129ff515b37823b472750b36b6de07963bd74b307341ef5ad8bdc3 \
     --hash=sha256:7a003809f88324fd2c877734f2d575ee7881dd9043360657cc8049c809eba6cd
     # via envoy-code-check
-yapf==0.40.2 \
-    --hash=sha256:4dab8a5ed7134e26d57c1647c7483afb3f136878b579062b786c9ba16b94637b \
-    --hash=sha256:adc8b5dd02c0143108878c499284205adb258aad6db6634e5b869e7ee2bd548b
+yapf==0.43.0 \
+    --hash=sha256:00d3aa24bfedff9420b2e0d5d9f5ab6d9d4268e72afbf59bb3fa542781d5218e \
+    --hash=sha256:224faffbc39c428cb095818cf6ef5511fdab6f7430a10783fdfb292ccf2852ca
     # via
     #   -r requirements.in
     #   envoy-code-check
@@ -1755,10 +1747,6 @@ yarl==1.15.2 \
     # via
     #   -r requirements.in
     #   aiohttp
-zipp==3.20.2 \
-    --hash=sha256:a817ac80d6cf4b23bf7f2828b7cabf326f15a001bea8b1f9b49631780ba28350 \
-    --hash=sha256:bc9eb26f4506fda01b81bcde0ca78103b6e62f991b381fec825435c836edbc29
-    # via importlib-metadata
 zstandard==0.23.0 \
     --hash=sha256:034b88913ecc1b097f528e42b539453fa82c3557e414b3de9d5632c80439a473 \
     --hash=sha256:0a7f0804bb3799414af278e9ad51be25edf67f78f916e08afdb983e74161b916 \
@@ -1860,7 +1848,7 @@ zstandard==0.23.0 \
     # via envoy-base-utils
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==75.3.0 \
-    --hash=sha256:f2504966861356aa38616760c0f66568e535562374995367b4e69c7143cf6bcd \
-    --hash=sha256:fba5dd4d766e97be1b1681d98712680ae8f2f26d7881245f2ce9e40714f1a686
+setuptools==75.5.0 \
+    --hash=sha256:5c4ccb41111392671f02bb5f8436dfc5a9a7185e80500531b133f5775c4163ef \
+    --hash=sha256:87cb777c3b96d638ca02031192d40390e0ad97737e27b6b4fa831bea86f2f829
     # via -r requirements.in

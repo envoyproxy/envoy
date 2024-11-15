@@ -140,6 +140,17 @@ CAPIStatus envoyGoFilterHttpSendPanicReply(void* s, void* details_data, int deta
       });
 }
 
+CAPIStatus envoyGoFilterHttpAddData(void* s, void* data, int data_len, bool is_streaming) {
+  return envoyGoFilterProcessStateHandlerWrapper(
+      s,
+      [data, data_len, is_streaming](std::shared_ptr<Filter>& filter,
+                                     ProcessorState& state) -> CAPIStatus {
+        // Since this is only used for logs we don't need to deep copy.
+        auto dataView = stringViewFromGoPointer(data, data_len);
+        return filter->addData(state, dataView, is_streaming);
+      });
+}
+
 // unsafe API, without copy memory from c to go.
 CAPIStatus envoyGoFilterHttpGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data,
                                       int* value_len) {
