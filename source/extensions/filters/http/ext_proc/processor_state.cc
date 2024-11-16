@@ -272,13 +272,6 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   return absl::FailedPreconditionError("spurious message");
 }
 
-/**
- * Handles responses containing body modifications from an external processor. Supports three modes
- * of operation: buffered, streamed, and buffered partial.
- *
- * @param response The body response received from the external processor
- * @return Status indicating success or failure of the handling operation
- */
 absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   if (!isValidCallbackState()) {
     return absl::FailedPreconditionError("spurious message");
@@ -306,13 +299,6 @@ bool ProcessorState::isValidCallbackState() const {
          callback_state_ == CallbackState::BufferedPartialBodyCallback;
 }
 
-/**
- * Processes the response according to the current callback state.
- *
- * @param common_response The common response portion from the external processor
- * @param should_continue Output parameter indicating if processing should continue
- * @return Status indicating success or failure of processing
- */
 absl::Status ProcessorState::processResponseBasedOnState(const CommonResponse& common_response,
                                                          bool& should_continue) {
   switch (callback_state_) {
@@ -329,8 +315,6 @@ absl::Status ProcessorState::processResponseBasedOnState(const CommonResponse& c
   }
 }
 
-// Handles responses in buffered body callback state. Processes both header and body mutations if
-// present
 absl::Status ProcessorState::handleBufferedBodyCallback(const CommonResponse& common_response,
                                                         bool& should_continue) {
   // Handle header mutations if present
@@ -356,8 +340,6 @@ absl::Status ProcessorState::handleBufferedBodyCallback(const CommonResponse& co
   return absl::OkStatus();
 }
 
-// Handles responses in streamed body callback state. Delegates to handleBodyInStreamedState for
-// actual processing
 absl::Status ProcessorState::handleStreamedBodyCallback(const CommonResponse& common_response,
                                                         bool& should_continue) {
   absl::StatusOr<bool> result = handleBodyInStreamedState(common_response);
@@ -368,8 +350,6 @@ absl::Status ProcessorState::handleStreamedBodyCallback(const CommonResponse& co
   return absl::OkStatus();
 }
 
-// Handles responses in buffered partial body callback state. Processes both header and body
-// mutations for partial body data
 absl::Status
 ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_response,
                                                   bool& should_continue) {
@@ -403,7 +383,6 @@ ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_r
   return absl::OkStatus();
 }
 
-// Processes header mutations if headers are available
 absl::Status
 ProcessorState::processHeaderMutationIfAvailable(const CommonResponse& common_response) {
   if (headers_ != nullptr) {
@@ -413,11 +392,6 @@ ProcessorState::processHeaderMutationIfAvailable(const CommonResponse& common_re
   return absl::OkStatus();
 }
 
-/**
- * Validates content length against body mutation size. When body mutation by external processor is
- * enabled, content-length header is only allowed in BUFFERED mode. If its value doesn't match the
- * length of mutated body, the corresponding body mutation will be rejected.
- */
 absl::Status ProcessorState::validateContentLength(const CommonResponse& common_response) {
   if (!headers_ || !headers_->ContentLength()) {
     return absl::OkStatus();
@@ -436,7 +410,6 @@ absl::Status ProcessorState::validateContentLength(const CommonResponse& common_
   return absl::OkStatus();
 }
 
-// Applies body mutations to buffered data
 void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response) {
   ENVOY_LOG(debug, "Applying body response to buffered data. State = {}",
             static_cast<int>(callback_state_));
@@ -445,7 +418,6 @@ void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_resp
   });
 }
 
-// Processes chunk data and any leftover data in the queue
 void ProcessorState::processChunkDataAndLeftovers(Buffer::OwnedImpl& chunk_data, bool end_stream) {
   if (chunk_data.length() > 0) {
     ENVOY_LOG(trace, "Injecting {} bytes of processed data to filter stream", chunk_data.length());

@@ -162,6 +162,13 @@ public:
   virtual void clearWatermark() PURE;
 
   absl::Status handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  /**
+   * Handles responses containing body modifications from an external processor. Supports three
+   * modes of operation: buffered, streamed, and buffered partial.
+   *
+   * @param response The body response received from the external processor
+   * @return Status indicating success or failure of the handling operation
+   */
   absl::Status handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
   absl::Status
   handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
@@ -298,23 +305,56 @@ private:
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
   bool isValidCallbackState() const;
+  /**
+   * Processes the response according to the current callback state.
+   *
+   * @param common_response The common response portion from the external processor
+   * @param should_continue Output parameter indicating if processing should continue
+   * @return Status indicating success or failure of processing
+   */
   absl::Status
   processResponseBasedOnState(const envoy::service::ext_proc::v3::CommonResponse& common_response,
                               bool& should_continue);
+  /**
+   * Handles responses in buffered body callback state. Processes both header and body mutations if
+   * present in the response.
+   */
   absl::Status
   handleBufferedBodyCallback(const envoy::service::ext_proc::v3::CommonResponse& common_response,
                              bool& should_continue);
+  /**
+   * Handles responses in buffered body callback state. Delegates to handleBodyInStreamedState for
+   * actual processing.
+   */
   absl::Status
   handleStreamedBodyCallback(const envoy::service::ext_proc::v3::CommonResponse& common_response,
                              bool& should_continue);
+  /**
+   * Handles responses in buffered partial body callback state. Processes both header and body
+   * mutations for partial body data.
+   */
   absl::Status handleBufferedPartialBodyCallback(
       const envoy::service::ext_proc::v3::CommonResponse& common_response, bool& should_continue);
+  /**
+   * Processes header mutations if headers are available.
+   */
   absl::Status processHeaderMutationIfAvailable(
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  /**
+   * Validates content length against body mutation size. When body mutation by external processor
+   * is enabled, content-length header is only allowed in BUFFERED mode. If its value doesn't match
+   * the length of mutated body, the corresponding body mutation will be rejected.
+   */
   absl::Status
   validateContentLength(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  /**
+   * Applies body mutations to buffered data.
+   */
   void
   applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  /**
+   * Processes chunk data and any leftover data in the queue.
+   */
   void processChunkDataAndLeftovers(Buffer::OwnedImpl& chunk_data, bool end_stream);
   absl::Status finalizeResponse(bool should_continue);
 };
