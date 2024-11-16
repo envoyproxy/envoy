@@ -57,9 +57,9 @@ test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
+build:linux --copt=-fdebug-types-section
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
-build:linux --copt=-fdebug-types-section
 build:linux --copt=-fPIC
 build:linux --copt=-Wno-deprecated-declarations
 build:linux --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
@@ -95,6 +95,21 @@ build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --test_env=HEAPCHECK=
 build:gcc --action_env=BAZEL_COMPILER=gcc
 build:gcc --action_env=CC=gcc --action_env=CXX=g++
+# This is to work around a bug in GCC that makes debug-types-section
+# option not play well with fission:
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=110885
+build:gcc --copt=-fno-debug-types-section
+# These trigger errors in multiple places both in Envoy dependecies
+# and in Envoy code itself when using GCC.
+# And in all cases the reports appear to be clear false positives.
+build:gcc --copt=-Wno-error=restrict
+build:gcc --copt=-Wno-error=uninitialized
+build:gcc --cxxopt=-Wno-missing-requires
+# We need this because -Wno-missing-requires options is rather new
+# in GCC, so flags -Wno-missing-requires exists in GCC 12, but does
+# not in GCC 11 and GCC 11 is what is used in docker-gcc
+# configuration currently
+build:gcc --cxxopt=-Wno-unknown-warning
 
 # Clang-tidy
 # TODO(phlax): enable this, its throwing some errors as well as finding more issues
@@ -375,6 +390,7 @@ build:docker-clang-libc++ --config=docker-sandbox
 build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
+build:docker-gcc --config=gcc
 build:docker-gcc --config=rbe-toolchain-gcc
 
 build:docker-asan --config=docker-sandbox
