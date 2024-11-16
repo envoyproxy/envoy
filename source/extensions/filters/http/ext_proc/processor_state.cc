@@ -272,111 +272,211 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   return absl::FailedPreconditionError("spurious message");
 }
 
-// TODO(#37048) Refactoring this function by adding one helper function for each callback state.
+/**
+ * Handles responses containing body modifications from an external processor. Supports three modes
+ * of operation: buffered, streamed, and buffered partial.
+ *
+ * @param response The body response received from the external processor
+ * @return Status indicating success or failure of the handling operation
+ */
 absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
-  bool should_continue = false;
+  if (!isValidCallbackState()) {
+    return absl::FailedPreconditionError("spurious message");
+  }
+
+  ENVOY_LOG(debug, "Processing body response");
   const auto& common_response = response.response();
-  if (callback_state_ == CallbackState::BufferedBodyCallback ||
-      callback_state_ == CallbackState::StreamedBodyCallback ||
-      callback_state_ == CallbackState::BufferedPartialBodyCallback) {
-    ENVOY_LOG(debug, "Processing body response");
-    if (callback_state_ == CallbackState::BufferedBodyCallback) {
-      if (common_response.has_header_mutation()) {
-        if (headers_ != nullptr) {
-          const auto mut_status = processHeaderMutation(common_response);
-          if (!mut_status.ok()) {
-            return mut_status;
-          }
-        } else {
-          ENVOY_LOG(debug, "Response had header mutations but headers aren't available");
-        }
-      }
+  bool should_continue = false;
 
-      if (common_response.has_body_mutation()) {
-        if (headers_ != nullptr && headers_->ContentLength() != nullptr) {
-          size_t content_length = 0;
-          // When body mutation by external processor is enabled, content-length header is only
-          // allowed in BUFFERED mode. If its value doesn't match the length of mutated body, the
-          // corresponding body mutation will be rejected and local reply will be sent with an error
-          // message.
-          if (absl::SimpleAtoi(headers_->getContentLengthValue(), &content_length) &&
-              content_length != common_response.body_mutation().body().size()) {
-            return absl::InternalError(
-                "mismatch between content length and the length of the mutated body");
-          }
-        }
-        ENVOY_LOG(debug, "Applying body response to buffered data. State = {}",
-                  static_cast<int>(callback_state_));
-        modifyBufferedData([&common_response](Buffer::Instance& data) {
-          MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
-        });
-      }
-      clearWatermark();
-      onFinishProcessorCall(Grpc::Status::Ok);
-      should_continue = true;
-    } else if (callback_state_ == CallbackState::StreamedBodyCallback) {
-      absl::StatusOr<bool> result = handleBodyInStreamedState(common_response);
-      if (!result.ok()) {
-        return result.status();
-      }
-      should_continue = *result;
-    } else if (callback_state_ == CallbackState::BufferedPartialBodyCallback) {
-      // Apply changes to the buffer that we sent to the server
-      Buffer::OwnedImpl chunk_data;
-      auto chunk = dequeueStreamingChunk(chunk_data);
-      ENVOY_BUG(chunk != nullptr, "Bad partial body callback state");
-      if (common_response.has_header_mutation()) {
-        if (headers_ != nullptr) {
-          const auto mut_status = processHeaderMutation(common_response);
-          if (!mut_status.ok()) {
-            return mut_status;
-          }
-        } else {
-          ENVOY_LOG(debug, "Response had header mutations but headers aren't available");
-        }
-      }
-      if (common_response.has_body_mutation()) {
-        MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
-      }
-      if (chunk_data.length() > 0) {
-        ENVOY_LOG(trace, "Injecting {} bytes of processed data to filter stream",
-                  chunk_data.length());
-        injectDataToFilterChain(chunk_data, chunk->end_stream);
-      }
-      should_continue = true;
-      clearWatermark();
-      onFinishProcessorCall(Grpc::Status::Ok);
-      partial_body_processed_ = true;
+  auto process_status = processResponseBasedOnState(common_response, should_continue);
+  if (!process_status.ok()) {
+    return process_status;
+  }
 
-      // If anything else is left on the queue, inject it too
-      if (chunkQueue().receivedData().length() > 0) {
-        const auto& all_data = consolidateStreamedChunks();
-        ENVOY_LOG(trace, "Injecting {} bytes of leftover data to filter stream",
-                  chunkQueue().receivedData().length());
-        injectDataToFilterChain(chunkQueue().receivedData(), all_data.end_stream);
-      }
-    } else {
-      // Fake a grpc error when processor state and received message type doesn't match, beware this
-      // is not an error from grpc.
-      onFinishProcessorCall(Grpc::Status::FailedPrecondition);
+  // Clear route cache before finalizing
+  clearRouteCache(common_response);
+
+  return finalizeResponse(should_continue);
+}
+
+// Validates if the current callback state is valid for processing body responses
+bool ProcessorState::isValidCallbackState() const {
+  return callback_state_ == CallbackState::BufferedBodyCallback ||
+         callback_state_ == CallbackState::StreamedBodyCallback ||
+         callback_state_ == CallbackState::BufferedPartialBodyCallback;
+}
+
+/**
+ * Processes the response according to the current callback state.
+ *
+ * @param common_response The common response portion from the external processor
+ * @param should_continue Output parameter indicating if processing should continue
+ * @return Status indicating success or failure of processing
+ */
+absl::Status ProcessorState::processResponseBasedOnState(const CommonResponse& common_response,
+                                                         bool& should_continue) {
+  switch (callback_state_) {
+  case CallbackState::BufferedBodyCallback:
+    return handleBufferedBodyCallback(common_response, should_continue);
+  case CallbackState::StreamedBodyCallback:
+    return handleStreamedBodyCallback(common_response, should_continue);
+  case CallbackState::BufferedPartialBodyCallback:
+    return handleBufferedPartialBodyCallback(common_response, should_continue);
+  default:
+    // Fake a grpc error when processor state and received message type doesn't match
+    onFinishProcessorCall(Grpc::Status::FailedPrecondition);
+    return absl::OkStatus();
+  }
+}
+
+// Handles responses in buffered body callback state. Processes both header and body mutations if
+// present
+absl::Status ProcessorState::handleBufferedBodyCallback(const CommonResponse& common_response,
+                                                        bool& should_continue) {
+  // Handle header mutations if present
+  if (common_response.has_header_mutation()) {
+    const auto mut_status = processHeaderMutationIfAvailable(common_response);
+    if (!mut_status.ok()) {
+      return mut_status;
     }
+  }
 
-    clearRouteCache(common_response);
-    headers_ = nullptr;
-
-    // Send trailers if they are available and no data pending for processing.
-    if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
-      filter_.sendTrailers(*this, *trailers_);
-      return absl::OkStatus();
+  // Handle body mutations if present
+  if (common_response.has_body_mutation()) {
+    const auto validation_status = validateContentLength(common_response);
+    if (!validation_status.ok()) {
+      return validation_status;
     }
+    applyBufferedBodyMutation(common_response);
+  }
 
-    if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
-      continueIfNecessary();
+  clearWatermark();
+  onFinishProcessorCall(Grpc::Status::Ok);
+  should_continue = true;
+  return absl::OkStatus();
+}
+
+// Handles responses in streamed body callback state. Delegates to handleBodyInStreamedState for
+// actual processing
+absl::Status ProcessorState::handleStreamedBodyCallback(const CommonResponse& common_response,
+                                                        bool& should_continue) {
+  absl::StatusOr<bool> result = handleBodyInStreamedState(common_response);
+  if (!result.ok()) {
+    return result.status();
+  }
+  should_continue = *result;
+  return absl::OkStatus();
+}
+
+// Handles responses in buffered partial body callback state. Processes both header and body
+// mutations for partial body data
+absl::Status
+ProcessorState::handleBufferedPartialBodyCallback(const CommonResponse& common_response,
+                                                  bool& should_continue) {
+  Buffer::OwnedImpl chunk_data;
+  auto chunk = dequeueStreamingChunk(chunk_data);
+  if (!chunk) {
+    ENVOY_BUG(false, "Bad partial body callback state");
+    return absl::InternalError("Invalid chunk in partial body callback");
+  }
+
+  // Process header mutations if present
+  if (common_response.has_header_mutation()) {
+    const auto mut_status = processHeaderMutationIfAvailable(common_response);
+    if (!mut_status.ok()) {
+      return mut_status;
     }
+  }
+
+  // Apply body mutations and process data
+  if (common_response.has_body_mutation()) {
+    MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
+  }
+
+  processChunkDataAndLeftovers(chunk_data, chunk->end_stream);
+
+  should_continue = true;
+  clearWatermark();
+  onFinishProcessorCall(Grpc::Status::Ok);
+  partial_body_processed_ = true;
+
+  return absl::OkStatus();
+}
+
+// Processes header mutations if headers are available
+absl::Status
+ProcessorState::processHeaderMutationIfAvailable(const CommonResponse& common_response) {
+  if (headers_ != nullptr) {
+    return processHeaderMutation(common_response);
+  }
+  ENVOY_LOG(debug, "Response had header mutations but headers aren't available");
+  return absl::OkStatus();
+}
+
+/**
+ * Validates content length against body mutation size. When body mutation by external processor is
+ * enabled, content-length header is only allowed in BUFFERED mode. If its value doesn't match the
+ * length of mutated body, the corresponding body mutation will be rejected.
+ */
+absl::Status ProcessorState::validateContentLength(const CommonResponse& common_response) {
+  if (!headers_ || !headers_->ContentLength()) {
     return absl::OkStatus();
   }
 
-  return absl::FailedPreconditionError("spurious message");
+  size_t content_length = 0;
+  if (!absl::SimpleAtoi(headers_->getContentLengthValue(), &content_length)) {
+    return absl::OkStatus();
+  }
+
+  if (content_length != common_response.body_mutation().body().size()) {
+    return absl::InternalError(
+        "mismatch between content length and the length of the mutated body");
+  }
+
+  return absl::OkStatus();
+}
+
+// Applies body mutations to buffered data
+void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_response) {
+  ENVOY_LOG(debug, "Applying body response to buffered data. State = {}",
+            static_cast<int>(callback_state_));
+  modifyBufferedData([&common_response](Buffer::Instance& data) {
+    MutationUtils::applyBodyMutations(common_response.body_mutation(), data);
+  });
+}
+
+// Processes chunk data and any leftover data in the queue
+void ProcessorState::processChunkDataAndLeftovers(Buffer::OwnedImpl& chunk_data, bool end_stream) {
+  if (chunk_data.length() > 0) {
+    ENVOY_LOG(trace, "Injecting {} bytes of processed data to filter stream", chunk_data.length());
+    injectDataToFilterChain(chunk_data, end_stream);
+  }
+
+  // If anything else is left on the queue, inject it too
+  if (chunkQueue().receivedData().length() > 0) {
+    const auto& all_data = consolidateStreamedChunks();
+    ENVOY_LOG(trace, "Injecting {} bytes of leftover data to filter stream",
+              chunkQueue().receivedData().length());
+    injectDataToFilterChain(chunkQueue().receivedData(), all_data.end_stream);
+  }
+}
+
+// Finalizes the response processing by handling trailers and continuation
+absl::Status ProcessorState::finalizeResponse(bool should_continue) {
+  // Note: no need to clear route cache here since it's already been cleared
+  // in the main handleBodyResponse method
+  headers_ = nullptr;
+
+  if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
+    filter_.sendTrailers(*this, *trailers_);
+    return absl::OkStatus();
+  }
+
+  if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
+    continueIfNecessary();
+  }
+
+  return absl::OkStatus();
 }
 
 // If the body mode is FULL_DUPLEX_STREAMED, then the trailers response may come back when

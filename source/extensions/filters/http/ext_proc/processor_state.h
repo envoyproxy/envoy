@@ -297,6 +297,26 @@ private:
   void clearStreamingChunk() { chunk_queue_.clear(); }
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
+  bool isValidCallbackState() const;
+  absl::Status
+  processResponseBasedOnState(const envoy::service::ext_proc::v3::CommonResponse& common_response,
+                              bool& should_continue);
+  absl::Status
+  handleBufferedBodyCallback(const envoy::service::ext_proc::v3::CommonResponse& common_response,
+                             bool& should_continue);
+  absl::Status
+  handleStreamedBodyCallback(const envoy::service::ext_proc::v3::CommonResponse& common_response,
+                             bool& should_continue);
+  absl::Status handleBufferedPartialBodyCallback(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response, bool& should_continue);
+  absl::Status processHeaderMutationIfAvailable(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  absl::Status
+  validateContentLength(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  void
+  applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  void processChunkDataAndLeftovers(Buffer::OwnedImpl& chunk_data, bool end_stream);
+  absl::Status finalizeResponse(bool should_continue);
 };
 
 class DecodingProcessorState : public ProcessorState {
