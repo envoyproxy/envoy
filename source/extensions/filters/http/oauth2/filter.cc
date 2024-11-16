@@ -217,7 +217,8 @@ FilterConfig::FilterConfig(
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
       disable_id_token_set_cookie_(proto_config.disable_id_token_set_cookie()),
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
-      disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()) {
+      disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()),
+      disable_nonce_(proto_config.disable_nonce()) {
   if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
@@ -267,7 +268,8 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   secret_.assign(secret.begin(), secret.end());
 }
 
-bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const { return !refresh_token_.empty(); }
+bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const {
+  return !refresh_token_.empty(); }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
   absl::string_view cookie_domain = host_;
@@ -290,7 +292,8 @@ bool OAuth2CookieValidator::timestampIsValid() const {
   return std::chrono::seconds(expires) > current_epoch;
 }
 
-bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
+bool OAuth2CookieValidator::isValid() const {
+  return hmacIsValid() && timestampIsValid(); }
 
 OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
                            std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source)
@@ -298,7 +301,6 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
                                                          config->cookieDomain())),
       oauth_client_(std::move(oauth_client)), config_(std::move(config)),
       time_source_(time_source) {
-
   oauth_client_->setCallbacks(*this);
 }
 
@@ -496,38 +498,43 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string full_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
   const std::string escaped_url = Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
 
-  // Generate a nonce to prevent CSRF attacks
-  std::string nonce;
-  bool nonce_cookie_exists = false;
-  const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
-    return key == config_->cookieNames().oauth_nonce_;
-  });
-  if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) != nonce_cookie.end()) {
-    nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
-    nonce_cookie_exists = true;
-  } else {
-    nonce = generateFixedLengthNonce(time_source_);
-  }
-
-  // Set the nonce cookie if it does not exist.
-  if (!nonce_cookie_exists) {
-    // Expire the nonce cookie in 10 minutes.
-    // This should be enough time for the user to complete the OAuth flow.
-    std::string expire_in = std::to_string(10 * 60);
-    std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
-    if (!config_->cookieDomain().empty()) {
-      cookie_tail_http_only = absl::StrCat(
-          fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
+  std::string state;
+  if (!config_->disableNonce()) {
+    // Generate a nonce to prevent CSRF attacks
+    std::string nonce;
+    bool nonce_cookie_exists = false;
+    const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
+      return key == config_->cookieNames().oauth_nonce_;
+    });
+    if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) != nonce_cookie.end()) {
+      nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
+      nonce_cookie_exists = true;
+    } else {
+      nonce = generateFixedLengthNonce(time_source_);
     }
-    response_headers->addReferenceKey(
-        Http::Headers::get().SetCookie,
-        absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
-  }
 
-  // Encode the original request URL and the nonce to the state parameter
-  const std::string state =
-      absl::StrCat(stateParamsUrl, "=", escaped_url, "&", stateParamsNonce, "=", nonce);
-  const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
+    // Set the nonce cookie if it does not exist.
+    if (!nonce_cookie_exists) {
+      // Expire the nonce cookie in 10 minutes.
+      // This should be enough time for the user to complete the OAuth flow.
+      std::string expire_in = std::to_string(10 * 60);
+      std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
+      if (!config_->cookieDomain().empty()) {
+        cookie_tail_http_only = absl::StrCat(
+            fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
+      }
+      response_headers->addReferenceKey(
+          Http::Headers::get().SetCookie,
+          absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
+    }
+
+    // Encode the original request URL and the nonce to the state parameter
+    state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(
+        absl::StrCat(stateParamsUrl, "=", escaped_url, "&", stateParamsNonce, "=", nonce));
+  } else {
+    state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(
+        absl::StrCat(stateParamsUrl, "=", escaped_url));
+  }
 
   Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
@@ -538,7 +545,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
 
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
-  query_params.overwrite(queryParamsState, escaped_state);
+  query_params.overwrite(queryParamsState, state);
   // Copy the authorization endpoint URL to replace its query params.
   auto authorization_endpoint_url = config_->authorizationEndpointUrl();
   const std::string path_and_query_params = query_params.replaceQueryString(
@@ -837,34 +844,45 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
     return {false, "", ""};
   }
 
-  // Return 401 unauthorized if the state query parameter does not contain the original request URL
-  // and nonce. state is an HTTP URL encoded string that contains the url and nonce, for example:
+  // state is an HTTP URL encoded string that contains the url and nonce, for example:
   // state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%3D1234567890000000".
   std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
+  std::string original_request_url;
   const auto state_parameters = Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
-  auto urlVal = state_parameters.getFirstValue(stateParamsUrl);
-  auto nonceVal = state_parameters.getFirstValue(stateParamsNonce);
-  if (!urlVal.has_value() || !nonceVal.has_value()) {
-    ENVOY_LOG(error, "state query param does not contain url or nonce: \n{}", state);
-    return {false, "", ""};
+  if (!config_->disableNonce()) {
+    // Return 401 unauthorized if the state query parameter does not contain a nonce.
+    auto nonceVal = state_parameters.getFirstValue(stateParamsNonce);
+    if (!nonceVal.has_value()) {
+      ENVOY_LOG(error, "state query param does not contains a nonce: \n{}", state);
+      return {false, "", ""};
+    }
+
+    // Return 401 unauthorized if the nonce cookie does not match the nonce in the state.
+    //
+    // This is to prevent attackers from injecting their own access token into a victim's
+    // sessions via CSRF attack. The attack can result in victims saving their sensitive data
+    // in the attacker's account.
+    // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
+    if (!validateNonce(headers, nonceVal.value())) {
+      ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonceVal.value());
+      return {false, "", ""};
+    }
+
+    // Return 401 unauthorized if the state query parameter does not contain a url.
+    auto urlVal = state_parameters.getFirstValue(stateParamsUrl);
+    if (!urlVal.has_value()) {
+      ENVOY_LOG(error, "state query param does not contain a url: \n{}", state);
+      return {false, "", ""};
+    }
+    original_request_url = urlVal.value();
+  } else {
+    original_request_url = state;
   }
 
-  // Return 401 unauthorized if the URL in the state is not valid.
-  std::string original_request_url = urlVal.value();
+  // Return 401 unauthorized if the state is not a valid url.
   Http::Utility::Url url;
   if (!url.initialize(original_request_url, false)) {
     ENVOY_LOG(error, "state url {} can not be initialized", original_request_url);
-    return {false, "", ""};
-  }
-
-  // Return 401 unauthorized if the nonce cookie does not match the nonce in the state.
-  //
-  // This is to prevent attackers from injecting their own access token into a victim's
-  // sessions via CSRF attack. The attack can result in victims saving their sensitive data
-  // in the attacker's account.
-  // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
-  if (!validateNonce(headers, nonceVal.value())) {
-    ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonceVal.value());
     return {false, "", ""};
   }
 
