@@ -116,7 +116,7 @@ checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_co
 
 absl::Status
 Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
-                             const std::string& cluster_name, const std::string& config_source) {
+                             absl::string_view cluster_name, absl::string_view config_source) {
   const auto& it = primary_clusters.find(cluster_name);
   if (it == primary_clusters.end()) {
     return absl::InvalidArgumentError(
@@ -252,11 +252,11 @@ absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSour
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
-  static const std::string struct_type = ProtobufWkt::Struct::default_instance().GetTypeName();
-  static const std::string typed_struct_type =
-      xds::type::v3::TypedStruct::default_instance().GetTypeName();
-  static const std::string legacy_typed_struct_type =
-      udpa::type::v1::TypedStruct::default_instance().GetTypeName();
+  static const std::string struct_type(ProtobufWkt::Struct::default_instance().GetTypeName());
+  static const std::string typed_struct_type(
+      xds::type::v3::TypedStruct::default_instance().GetTypeName());
+  static const std::string legacy_typed_struct_type(
+      udpa::type::v1::TypedStruct::default_instance().GetTypeName());
   if (!typed_config.value().empty()) {
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87

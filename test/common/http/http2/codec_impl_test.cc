@@ -604,51 +604,6 @@ TEST_P(Http2CodecImplTest, ClientUnexpectedHeaders) {
   EXPECT_THAT(status.message(), testing::HasSubstr("stream 3 is already gone"));
 }
 
-TEST_P(Http2CodecImplTest, SimpleRequestResponseOldApi) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_visitor_for_data", "false"}});
-  initialize();
-
-  InSequence s;
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  request_headers.setMethod("POST");
-
-  // Encode request headers.
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
-
-  // Queue request body.
-  Buffer::OwnedImpl request_body(std::string(1024, 'a'));
-  request_encoder_->encodeData(request_body, true);
-
-  // Flush request body.
-  EXPECT_CALL(request_decoder_, decodeData(_, true)).Times(AtLeast(1));
-  driveToCompletion();
-
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-
-  // Encode response headers.
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
-  response_encoder_->encodeHeaders(response_headers, false);
-
-  // Queue response body.
-  Buffer::OwnedImpl response_body(std::string(1024, 'b'));
-  response_encoder_->encodeData(response_body, true);
-
-  // Flush response body.
-  EXPECT_CALL(response_decoder_, decodeData(_, true)).Times(AtLeast(1));
-  driveToCompletion();
-
-  EXPECT_TRUE(client_wrapper_->status_.ok());
-  EXPECT_TRUE(server_wrapper_->status_.ok());
-
-  if (http2_implementation_ == Http2Impl::Nghttp2) {
-    // Regression test for issue #19761.
-    EXPECT_EQ(0, getClientDataSourcesSize());
-    EXPECT_EQ(0, getServerDataSourcesSize());
-  }
-}
-
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
   initialize();
   EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());

@@ -468,22 +468,37 @@ void Filter::closeStream() {
   if (!config_->grpcService().has_value()) {
     return;
   }
+  // Stream not opened or already cleaned up.
+  if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "Stream already closed or not opened yet.");
+    return;
+  }
 
-  if (stream_) {
+  if (!stream_->localClosed()) {
     ENVOY_LOG(debug, "Calling close on stream");
-    if (stream_->close()) {
+    if (stream_->closeLocalStream()) {
       stats_.streams_closed_.inc();
     }
-    config_->threadLocalStreamManager().erase(stream_);
-    stream_ = nullptr;
-  } else {
-    ENVOY_LOG(debug, "Stream already closed");
   }
 }
 
-void Filter::deferredCloseStream() {
-  ENVOY_LOG(debug, "Calling deferred close on stream");
+void Filter::deferredResetStream() {
+  ENVOY_LOG(debug, "Calling deferred cleanup on stream");
+  if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "Stream already reset or not opened yet.");
+    return;
+  }
   config_->threadLocalStreamManager().deferredErase(stream_, filter_callbacks_->dispatcher());
+  stream_ = nullptr;
+}
+
+void Filter::cleanupStream() {
+  ENVOY_LOG(debug, "Calling cleanup stream");
+  if (stream_ != nullptr) {
+    stream_->resetStream();
+    config_->threadLocalStreamManager().erase(stream_);
+    stream_ = nullptr;
+  }
 }
 
 void Filter::onDestroy() {
@@ -498,23 +513,30 @@ void Filter::onDestroy() {
     client_->cancel();
     return;
   }
-
-  if (config_->observabilityMode()) {
-    // In observability mode where the main stream processing and side stream processing are
-    // asynchronous, it is possible that filter instance is destroyed before the side stream request
-    // arrives at ext_proc server. In order to prevent the data loss in this case, side stream
-    // closure is deferred upon filter destruction with a timer.
-
-    // First, release the referenced filter resource.
-    if (stream_ != nullptr) {
-      stream_->notifyFilterDestroy();
+  if (stream_ != nullptr) {
+    if (!stream_->localClosed()) {
+      // Perform immediate close on the stream otherwise.
+      closeStream();
     }
+    // Defer the resource cleanup if the remote is not closed (no trailers
+    // received).
+    // This means essentially not sending a reset to the server, which
+    // translates into a client CANCELED error on the server side.
+    if (config_->observabilityMode() || !stream_->remoteClosed()) {
+      // In observability mode where the main stream processing and side stream
+      // processing are asynchronous, it is possible that filter instance is
+      // destroyed before the side stream request arrives at ext_proc server. In
+      // order to prevent the data loss in this case, side stream resetting is
+      // deferred upon filter destruction with a timer.
 
-    // Second, perform stream deferred closure.
-    deferredCloseStream();
-  } else {
-    // Perform immediate close on the stream otherwise.
-    closeStream();
+      // First, release the referenced filter resource.
+      stream_->notifyFilterDestroy();
+      // Second, perform stream deferred closure.
+      deferredResetStream();
+    } else {
+      // Server closed the stream, so we can cleanup the stream immediately.
+      cleanupStream();
+    }
   }
 }
 
@@ -1360,6 +1382,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     // make sure that they do not fire now.
     onFinishProcessorCalls(status);
     closeStream();
+    cleanupStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
@@ -1371,10 +1394,14 @@ void Filter::onGrpcClose() {
   ENVOY_LOG(debug, "Received gRPC stream close");
 
   processing_complete_ = true;
-  stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
+  // ExternalProcessorStreamImpl::onRemoteClose will call onGrpcClose in either
+  // happy path or error path.
+  // This will mark remote_closed_ as closed.
+  cleanupStream();
+
   clearAsyncState();
 }
 
@@ -1389,6 +1416,7 @@ void Filter::onMessageTimeout() {
     // the external processor for the rest of the request.
     processing_complete_ = true;
     closeStream();
+    cleanupStream();
     stats_.failure_mode_allowed_.inc();
     clearAsyncState();
 
@@ -1396,6 +1424,7 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
+    cleanupStream();
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
@@ -1537,13 +1566,12 @@ void Filter::mergePerRouteConfig() {
   }
 }
 
-void DeferredDeletableStream::closeStreamOnTimer() {
+void DeferredDeletableStream::cleanupStreamOnTimer() {
   // Close the stream.
-  if (stream_) {
-    ENVOY_LOG(debug, "Closing the stream");
-    if (stream_->close()) {
-      stats.streams_closed_.inc();
-    }
+  if (stream_ != nullptr) {
+    ENVOY_LOG(debug, "Resetting the stream.");
+    // After timeout if still no trailers received, reset the stream.
+    stream_->resetStream();
     // Erase this entry from the map; this will also reset the stream_ pointer.
     parent.erase(stream_.get());
   } else {
@@ -1554,7 +1582,7 @@ void DeferredDeletableStream::closeStreamOnTimer() {
 // In the deferred closure mode, stream closure is deferred upon filter destruction, with a timer
 // to prevent unbounded resource usage growth.
 void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher) {
-  derferred_close_timer = dispatcher.createTimer([this] { closeStreamOnTimer(); });
+  derferred_close_timer = dispatcher.createTimer([this] { cleanupStreamOnTimer(); });
   derferred_close_timer->enableTimer(std::chrono::milliseconds(deferred_close_timeout));
 }
 
