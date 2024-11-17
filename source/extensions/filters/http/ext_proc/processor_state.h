@@ -161,6 +161,12 @@ public:
   virtual void requestWatermark() PURE;
   virtual void clearWatermark() PURE;
 
+  /**
+   * Handles header response processing from an external processor.
+   *
+   * @param response The headers response received from external processor
+   * @return Status indicating success or failure of processing
+   */
   absl::Status handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
   absl::Status handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
   absl::Status
@@ -297,6 +303,20 @@ private:
   void clearStreamingChunk() { chunk_queue_.clear(); }
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
+  absl::Status handleHeadersResponseWithContinueAndReplace(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  void
+  applyReplacementBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+  absl::Status handleHeadersResponseWithContinue();
+  absl::Status handleCompleteBodyAvailable();
+  absl::Status handleBufferedMode();
+  absl::Status handleStreamedMode();
+  absl::Status handleFullDuplexStreamedMode();
+  absl::Status handleBufferedPartialMode();
+  void enqueueBufferedDataToChunkQueue();
+  absl::Status sendBufferedPartialData();
+  absl::Status finalizeContinueResponse();
+  absl::Status finalizeResponse();
 };
 
 class DecodingProcessorState : public ProcessorState {
