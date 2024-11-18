@@ -68,6 +68,14 @@ minor_behavior_changes:
   change: |
     The :ref:`route_configuration <envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>` field
     is supported when the ``ScopedRouteConfiguration`` resource is delivered via SRDS.
+- area: rds
+  change: |
+    When a new RDS provider config is pushed via xDS and the only difference is change to
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`, 
+    the already existing provider will be reused. Envoy will not ask RDS server for routes
+    config because existing provider already has up to date routes config.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.normalize_rds_provider_config`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
