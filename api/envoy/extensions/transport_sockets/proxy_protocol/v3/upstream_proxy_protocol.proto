@@ -19,24 +19,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for PROXY protocol socket
 message ProxyProtocolUpstreamTransport {
-  // ConnectionPool settings for PROXY protocol socket.
-  message ConnectionPoolSettings {
-    // Allow unspecified address in the PROXY protocol header.
-    // If this is set to true, the null addresses are allowed in the PROXY protocol header.
-    // The proxy protocol header encodes the address family to AF_UNSPEC.
-    // Meanwhile, the connection pool will not encode the addresses in the connection pool key.
-    bool allow_unspecified_address = 1;
-
-    // If true, all the TLVs are encoded in the connection pool key.
-    bool tlv_as_pool_key = 2;
-  }
   // The PROXY protocol settings
   config.core.v3.ProxyProtocolConfig config = 1;
 
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 2 [(validate.rules).message = {required: true}];
 
-  // Control the connection pool settings for PROXY protocol socket.
+  // If this is set to true, the null addresses are allowed in the PROXY protocol header.
+  // The proxy protocol header encodes the null addresses to AF_UNSPEC.
   // [#not-implemented-hide:]
-  ConnectionPoolSettings connection_pool_settings = 3;
+  bool allow_unspecified_address = 3;
+
+  // If true, all the TLVs are encoded in the connection pool key.
+  // [#not-implemented-hide:]
+  bool tlv_as_pool_key = 4;
 }
