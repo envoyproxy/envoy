@@ -1,0 +1,60 @@
+filter_config {
+  credentials {
+    entries {
+      entries {
+        key: "fake-key"
+        client: "fake-client"
+      }
+      entries {
+        key: "fake-key-2"
+        client: "fake-client-2"
+      }
+    }
+  }
+  key_sources {
+    entries {
+      entries {
+        header: "authorization"
+      }
+      entries {
+        cookie: "api_key"
+      }
+    }
+  }
+}
+route_config {
+  override_config {
+    credentials {
+      entries {
+        entries {
+          key: "fake-key-3"
+          client: "fake-client-3"
+        }
+      }
+    }
+    key_sources {
+      entries {
+        entries {
+          query: "api_key"
+        }
+      }
+    }
+  }
+  allowed_clients: ["fake-client-3"]
+}
+request_data {
+  headers {
+    headers {
+      key: "authorization"
+      value: "Bearer fake-key"
+    }
+    headers {
+      key: ":path"
+      value: "/foo/bar?api_key=fake-key"
+    }
+    headers {
+      key: "cookie"
+      value: "api_key=fake-key"
+    }
+  }
+}
