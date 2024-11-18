@@ -370,6 +370,7 @@ TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
   expectSendMessage({});
   retry_timer_cb_();
   EXPECT_EQ(load_stats_reporter_->getStats().errors_.value(), 1);
+  EXPECT_EQ(load_stats_reporter_->getStats().retries_.value(), 1);
 }
 
 // Validate that errors stat is not incremented for a graceful stream termination.
@@ -384,6 +385,7 @@ TEST_F(LoadStatsReporterTest, RemoteStreamGracefulClose) {
   expectSendMessage({});
   retry_timer_cb_();
   EXPECT_EQ(load_stats_reporter_->getStats().errors_.value(), 0);
+  EXPECT_EQ(load_stats_reporter_->getStats().retries_.value(), 1);
 }
 } // namespace
 } // namespace Upstream
