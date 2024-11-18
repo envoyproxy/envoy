@@ -479,7 +479,7 @@ ConfigHelper::HttpModifierFunction HttpIntegrationTest::configureProxyStatus() {
   };
 }
 
-IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
+HttpIntegrationTest::Result HttpIntegrationTest::sendRequestAndWaitForResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
     const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
     const std::vector<uint64_t>& upstream_indices, std::chrono::milliseconds timeout) {
@@ -491,7 +491,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
   } else {
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
-  waitForNextUpstreamRequest(upstream_indices, timeout);
+  absl::optional<uint64_t> index = waitForNextUpstreamRequest(upstream_indices, timeout);
   // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(response_headers, response_body_size == 0);
   // Send any response data, with end_stream true.
@@ -501,7 +501,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
   // Wait for the response to be read by the codec client.
   RELEASE_ASSERT(response->waitForEndStream(timeout),
                  fmt::format("unexpected timeout after ", timeout.count(), " ms"));
-  return response;
+  return {std::move(response), index};
 }
 
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
@@ -510,7 +510,8 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     uint64_t upstream_index, std::chrono::milliseconds timeout) {
   return sendRequestAndWaitForResponse(request_headers, request_body_size, response_headers,
                                        response_body_size, std::vector<uint64_t>{upstream_index},
-                                       timeout);
+                                       timeout)
+      .response;
 }
 
 void HttpIntegrationTest::cleanupUpstreamAndDownstream() {

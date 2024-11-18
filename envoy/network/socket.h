@@ -226,6 +226,12 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
+   * @return the direct local address of the socket. This is the listener address and it can not be
+   * modified by listener filters.
+   */
+  virtual const Address::InstanceConstSharedPtr& directLocalAddress() const PURE;
+
+  /**
    * @return true if the local address has been restored to a value that is different from the
    *         address the socket was initially accepted at.
    */

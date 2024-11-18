@@ -334,8 +334,11 @@ EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool val
 }
 
 #if defined(__APPLE__)
-EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
+EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
   respect_system_proxy_settings_ = value;
+  if (refresh_interval_secs > 0) {
+    proxy_settings_refresh_interval_secs_ = refresh_interval_secs;
+  }
   return *this;
 }
 
@@ -905,7 +908,7 @@ EngineSharedPtr EngineBuilder::build() {
 
 #if defined(__APPLE__)
   if (respect_system_proxy_settings_) {
-    registerAppleProxyResolver();
+    registerAppleProxyResolver(proxy_settings_refresh_interval_secs_);
   }
 #endif
 

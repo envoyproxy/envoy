@@ -499,10 +499,7 @@ void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health
   // Clear all old EDS health flags first.
   HostImplBase::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   HostImplBase::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-    HostImplBase::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
-  }
+  HostImplBase::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
 
   // Set the appropriate EDS health flag.
   switch (health_status) {
@@ -512,10 +509,7 @@ void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health
     HostImplBase::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DRAINING:
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-      HostImplBase::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
-    }
+    HostImplBase::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
     break;
   case envoy::config::core::v3::DEGRADED:
     HostImplBase::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
@@ -1412,9 +1406,9 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (http_protocol_options_) {
     Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
     has_configured_http_filters_ = !http_filters.empty();
-    static const std::string upstream_codec_type_url =
+    static const std::string upstream_codec_type_url(
         envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance()
-            .GetTypeName();
+            .GetTypeName());
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
       codec_filter->set_name("envoy.filters.http.upstream_codec");
