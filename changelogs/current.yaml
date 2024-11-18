@@ -91,6 +91,9 @@ bug_fixes:
   change: |
     Fixed bug where setting ``dns_jitter <envoy_v3_api_field_config.cluster.v3.Cluster.dns_jitter>`` to large values caused Envoy Bug
     to fire.
+- area: tracers
+  change: |
+    Avoid possible overflow when setting span attributes in Dynatrace sampler.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
