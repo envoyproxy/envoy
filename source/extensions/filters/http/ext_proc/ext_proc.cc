@@ -72,8 +72,7 @@ initGrpcService(const ExtProcPerRoute& config) {
   return absl::nullopt;
 }
 
-// TODO(#37046) Refactoring the exception throwing logic.
-void verifyProcessingModeConfig(const ExternalProcessor& config) {
+absl::Status verifyProcessingModeConfig(const ExternalProcessor& config) {
   const ProcessingMode& processing_mode = config.processing_mode();
   if (config.has_http_service()) {
     // In case http_service configured, the processing mode can only support sending headers.
@@ -81,7 +80,7 @@ void verifyProcessingModeConfig(const ExternalProcessor& config) {
         processing_mode.response_body_mode() != ProcessingMode::NONE ||
         processing_mode.request_trailer_mode() == ProcessingMode::SEND ||
         processing_mode.response_trailer_mode() == ProcessingMode::SEND) {
-      throw EnvoyException(
+      return absl::InvalidArgumentError(
           "If the ext_proc filter is configured with http_service instead of gRPC service, "
           "then the processing modes of this filter can not be configured to send body or "
           "trailer.");
@@ -90,16 +89,19 @@ void verifyProcessingModeConfig(const ExternalProcessor& config) {
 
   if ((processing_mode.request_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
       (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
         "then the request_trailer_mode has to be set to SEND");
   }
+
   if ((processing_mode.response_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
       (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
         "then the response_trailer_mode has to be set to SEND");
   }
+
+  return absl::OkStatus();
 }
 
 std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
@@ -261,15 +263,22 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
-  // Validate processing mode configuration.
-  verifyProcessingModeConfig(config);
+
+  // Validate processing mode configuration
+  auto status = verifyProcessingModeConfig(config);
+  if (!status.ok()) {
+    throw EnvoyException(std::string(status.message()));
+  }
+
   if (config.disable_clear_route_cache() && (route_cache_action_ != ExternalProcessor::DEFAULT)) {
     throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
                          "be set to none-default at the same time.");
   }
+
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
+
   thread_local_stream_manager_slot_->set(
       [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
 }
