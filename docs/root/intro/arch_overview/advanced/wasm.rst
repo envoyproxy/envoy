@@ -24,7 +24,7 @@ the per-VM overhead and reduce the binary size of the bytecode since the extensi
 
 A Wasm plugin is the link between the context and the VM. It identifies which Wasm VM to use for a context, and which
 extension to invoke within the Wasm VM execution instance (via the :ref:`root_id
-<envoy_v3_api_field_extensions.wasm.v3.Wasm.root_id>` field value).
+<envoy_v3_api_field_extensions.wasm.v3.PluginConfig.root_id>` field value).
 
 
 Execution model for filters
