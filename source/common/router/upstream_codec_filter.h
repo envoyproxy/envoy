@@ -31,7 +31,7 @@ class UpstreamCodecFilter : public Http::StreamDecoderFilter,
                             public Http::UpstreamCallbacks {
 public:
   UpstreamCodecFilter()
-      : bridge_(*this), calling_encode_headers_(false), deferred_reset_status_(absl::OkStatus()) {}
+      : bridge_(*this), deferred_reset_status_(absl::OkStatus()), calling_encode_headers_(false) {}
 
   // Http::DownstreamWatermarkCallbacks
   void onBelowWriteBufferLowWatermark() override;
