@@ -3,10 +3,10 @@
 Wasm
 ====
 
-Envoy supports execution of the Wasm modules implemented against the [Proxy-Wasm specification](https://github.com/proxy-wasm/spec).
-Currently, the [binary interface version 0.2.1](https://github.com/proxy-wasm/spec/tree/main/abi-versions/v0.2.1) is recommended.
+Envoy supports execution of the Wasm modules implemented against the `Proxy-Wasm specification <https://github.com/proxy-wasm/spec>`_.
+Currently, the `binary interface version 0.2.1 <https://github.com/proxy-wasm/spec/tree/main/abi-versions/v0.2.1>`_ is recommended.
 Wasm offers a portable and compact binary executable format that can be compiled once from a variety of languages
-([C++](https://github.com/proxy-wasm/proxy-wasm-cpp-sdk), [Rust](https://github.com/proxy-wasm/proxy-wasm-rust-sdk)) and
+(`C++ <https://github.com/proxy-wasm/proxy-wasm-cpp-sdk>`_, `Rust <https://github.com/proxy-wasm/proxy-wasm-rust-sdk>`_ and
 run anywhere. Please see the :ref:`sandbox example <install_sandboxes_wasm_filter>` for instructions on how to create and deploy
 a Wasm module.
 
@@ -27,10 +27,19 @@ configuration, the main execution instance is cloned to each worker thread.
 Note that this configuration model is distinct for the Wasm filter. Unlike a regular HTTP filter that is instantiated
 independently for each xDS listener, xDS listeners share the same main Wasm execution instance across xDS updates.
 
+Envoy Attributes
+----------------
+
+Wasm ABI exposes Envoy-specific host attributes via the dedicated `proxy_get_property
+<https://github.com/proxy-wasm/spec/tree/main/abi-versions/v0.2.1#proxy_get_property>`_ interface stub. These are the
+standard :ref:`attributes <arch_overview_attributes>` and the values are returned via the type-specific binary
+serialization.
+
 Foreign functions
 -----------------
 
-Envoy offers additional functionality over the Proxy-Wasm ABI via ``proxy_call_foreign_function`` binary interface:
+Envoy offers additional functionality over the Proxy-Wasm ABI via `proxy_call_foreign_function
+<https://github.com/proxy-wasm/spec/tree/main/abi-versions/v0.2.1#proxy_call_foreign_function>`_ binary interface:
 
 * ``verify_signature`` verifies cryptographic signatures.
 * ``compress`` applies ``zlib`` compression.
