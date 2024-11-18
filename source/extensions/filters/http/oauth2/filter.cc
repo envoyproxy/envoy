@@ -268,8 +268,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   secret_.assign(secret.begin(), secret.end());
 }
 
-bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const {
-  return !refresh_token_.empty(); }
+bool OAuth2CookieValidator::canUpdateTokenByRefreshToken() const { return !refresh_token_.empty(); }
 
 bool OAuth2CookieValidator::hmacIsValid() const {
   absl::string_view cookie_domain = host_;
@@ -292,8 +291,7 @@ bool OAuth2CookieValidator::timestampIsValid() const {
   return std::chrono::seconds(expires) > current_epoch;
 }
 
-bool OAuth2CookieValidator::isValid() const {
-  return hmacIsValid() && timestampIsValid(); }
+bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
 OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
                            std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source)
