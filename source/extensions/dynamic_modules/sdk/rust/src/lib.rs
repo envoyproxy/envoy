@@ -109,8 +109,8 @@ pub trait HttpFilter {} // TODO.
 /// This is a shallow wrapper around the raw pointer to the Envoy HTTP filter config object, and it
 /// can be copied and used up until the corresponding [`HttpFilterConfig`] is dropped.
 //
-// TODO(@mathetake): make this only avaialble for non-test code, and provide a mock for testing. So that users
-// can write a unit tests for their HttpFilterConfig implementations.
+// TODO(@mathetake): make this only avaialble for non-test code, and provide a mock for testing so that users
+// can write unit tests for their HttpFilterConfig implementations.
 #[derive(Debug, Clone, Copy)]
 pub struct EnvoyHttpFilterConfig {
     raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
@@ -188,6 +188,11 @@ mod tests {
             &new_fn,
         );
         assert!(!result.is_null());
+
+        // Drop.
+        unsafe {
+            envoy_dynamic_module_on_http_filter_config_destroy(result);
+        }
 
         // None should result in null pointer.
         new_fn = |_, _, _| None;
