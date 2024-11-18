@@ -16,13 +16,14 @@ ExtensionConfigBase::ExtensionConfigBase(
     : proto_config_(proto_config), config_factory_(std::move(config_factory)), tls_slot_(tls) {
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<TlsFilterConfig>(); });
 
-  switch (proto_config_.config_type_case())
+  switch (proto_config_.config_type_case()) {
   case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kAdminConfig: {
     admin_handler_ = AdminHandler::getSingleton(admin, singleton_manager, main_thread_dispatcher);
     admin_handler_->registerConfig(*this, proto_config_.admin_config().config_id());
     ENVOY_LOG(debug, "initializing tap extension with admin endpoint (config_id={})",
               proto_config_.admin_config().config_id());
     break;
+  }
   case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kStaticConfig: {
     // Right now only one sink is supported.
     ASSERT(proto_config_.static_config().output_config().sinks().size() == 1);
