@@ -679,6 +679,125 @@ TEST_P(HttpInspectorTest, Http1WithLargeHeader) {
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
 }
 
+TEST_P(HttpInspectorTest, HttpAssumeHttpValidGet) {
+  std::string data = "GET /index?x=0123456789 HTTP/1.0\r\n";
+  //                  0               16
+
+  envoy::extensions::filters::listener::http_inspector::v3::HttpInspector proto_config;
+  const uint32_t initial_buffer_size = 16;
+  const size_t max_size = 16;
+  proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
+  proto_config.mutable_max_read_buffer_size()->set_value(max_size);
+  proto_config.mutable_assume_http11_for_large_requests()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  init();
+
+  {
+    InSequence s;
+#ifdef WIN32
+    EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+        .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    for (size_t i = 0; i < 16; i++) {
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+          .WillOnce(Invoke(
+              [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= 16);
+                memcpy(buffer, data.data() + i, 1);
+                return Api::SysCallSizeResult{ssize_t(1), 0};
+              }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+    }
+#else
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
+    }));
+
+    for (size_t i = 1; i <= 16; i++) {
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillOnce(Invoke(
+              [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= i);
+                memcpy(buffer, data.data(), i);
+                return Api::SysCallSizeResult{ssize_t(i), 0};
+              }));
+    }
+#endif
+  }
+
+  bool got_continue = false;
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http11};
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  auto accepted = filter_->onAccept(cb_);
+  EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+  while (!got_continue) {
+    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+    auto status = filter_->onData(*buffer_);
+    if (status == Network::FilterStatus::Continue) {
+      got_continue = true;
+    }
+  }
+  EXPECT_EQ(1, cfg_->stats().http11_found_.value());
+}
+
+TEST_P(HttpInspectorTest, HttpAssumeHttpInvalidGet) {
+  std::string data = "GET \0\0\0\0\0/invalid/uri/\0\0\0\0\0 HTTP/1.0 \r\n";
+  envoy::extensions::filters::listener::http_inspector::v3::HttpInspector proto_config;
+  const uint32_t initial_buffer_size = 16;
+  const size_t max_size = 16;
+  proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
+  proto_config.mutable_max_read_buffer_size()->set_value(max_size);
+  proto_config.mutable_assume_http11_for_large_requests()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+
+  init();
+
+  {
+    InSequence s;
+#ifdef WIN32
+      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+          .WillRepeatedly(Invoke(
+              [&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= max_size);
+                memcpy(buffer, data.data() + max_size, 1);
+                return Api::SysCallSizeResult{ssize_t(1), 0};
+              }))
+          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
+      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+          .WillRepeatedly(Invoke(
+              [&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+                ASSERT(length >= max_size);
+                memcpy(buffer, data.data(), max_size);
+                return Api::SysCallSizeResult{ssize_t(max_size), 0};
+              }));
+#endif
+  }
+
+
+  bool got_continue = false;
+  //if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+  //  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http11};
+  //  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  //} else {
+    EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+  //}
+  auto accepted = filter_->onAccept(cb_);
+  EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+  while (!got_continue) {
+    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+    auto status = filter_->onData(*buffer_);
+    if (status == Network::FilterStatus::Continue) {
+      got_continue = true;
+    }
+  }
+  //if (parser_impl_ == Http1ParserImpl::BalsaParser) {
+  //  EXPECT_EQ(1, cfg_->stats().http11_found_.value());
+  //} else {
+    EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
+  //}
+}
+
 } // namespace
 } // namespace HttpInspector
 } // namespace ListenerFilters

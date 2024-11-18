@@ -23,8 +23,19 @@ message HttpInspector {
 
   // The number of bytes of the request the filter will initially buffer and
   // inspect to determine the http version, the filter will iteratively double
-  // the buffer up to 64KiB. If not specified, the initial buffer is 8KiB.
+  // the buffer up to max_read_buffer_size. If not specified, the initial buffer is 8KiB.
   google.protobuf.UInt32Value initial_read_buffer_size = 1
-      [(validate.rules).uint32 = {lt: 65537 gt: 16}];
+      [(validate.rules).uint32 = {lt: 65537 gt: 15}];
+
+  // The maximum number of bytes the request filter will buffer and inspect
+  // to determine the http version. If not specified, the maximum buffer is
+  // 8KiB
+  google.protobuf.UInt32Value max_read_buffer_size = 2
+    [(validate.rules).uint32 = {lt: 65537 gt: 15}];
+
+  // If set, then HTTP/1.1 will be assumed if the maximum_read_buffer_size is
+  // reached and the HTTP parser has not reached the end of the request line or
+  // found malformed HTTP. If not specified, no HTTP will be assumed.
+  google.protobuf.BoolValue assume_http11_for_large_requests = 3;
 
 }
