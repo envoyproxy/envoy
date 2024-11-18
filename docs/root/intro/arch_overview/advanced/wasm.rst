@@ -6,7 +6,7 @@ Wasm
 Envoy supports execution of the Wasm modules implemented against the `Proxy-Wasm specification <https://github.com/proxy-wasm/spec>`_.
 Currently, the `binary interface version 0.2.1 <https://github.com/proxy-wasm/spec/tree/main/abi-versions/v0.2.1>`_ is recommended.
 Wasm offers a portable and compact binary executable format that can be compiled once from a variety of languages
-(`C++ <https://github.com/proxy-wasm/proxy-wasm-cpp-sdk>`_, `Rust <https://github.com/proxy-wasm/proxy-wasm-rust-sdk>`_ and
+(`C++ <https://github.com/proxy-wasm/proxy-wasm-cpp-sdk>`_, `Rust <https://github.com/proxy-wasm/proxy-wasm-rust-sdk>`_) and
 run anywhere. Please see the :ref:`sandbox example <install_sandboxes_wasm_filter>` for instructions on how to create and deploy
 a Wasm module.
 
@@ -15,31 +15,32 @@ Contexts, plugins, and VMs
 
 A Wasm context refers to the interface implementation between the host (Envoy) and the guest (Wasm bytecode). For an
 HTTP filter, there are two types of contexts: a *root context* (context with ID 0) represents the configuration-only
-context, and a *per-request context* that is created once per each requests and can refer to the root context.
+context, and a *per-request context* that is created once per each request.
 
 A Wasm VM refers to the execution instance of a Wasm bytecode. Multiple VMs can be created for the same bytecode when
 using the ``vm_id`` field, and they each would have separate per-VM memory. The opposite is also true, the same VM can
-contain multiple implementations for different extensions, to be used in different contexts. This is done to optimize
-the per-VM overhead and reduce the binary size of the bytecode since the extensions can share the code.
+contain multiple implementations for different extensions, to be used in different contexts. VM sharing optimizes
+the runtime overhead and reduces the total binary size of the bytecode since the extensions can share the code.
 
-A Wasm plugin is the link between the context and the VM. It identifies which Wasm VM to use for a context, and which
+A Wasm plugin is the link between the context and the VM. It identifies which Wasm VM to use for a context, which
 extension to invoke within the Wasm VM execution instance (via the :ref:`root_id
-<envoy_v3_api_field_extensions.wasm.v3.PluginConfig.root_id>` field value).
+<envoy_v3_api_field_extensions.wasm.v3.PluginConfig.root_id>` field value), and how to route the configuration call to
+the extension during the xDS update.
 
 
 Execution model for filters
 ---------------------------
 
 At runtime, the Wasm modules are executed inline in the worker threads via a series of stream callbacks as defined by
-the ABI. The workers operate independently and do not share the Wasm execution instances and their runtime memory.
-Asychronous operations, such as sub-requests, are accomplished via the host delegating calls and the subsequent guest
-callbacks.
+the ABI. The worker threads operate independently and do not share the Wasm execution instances and their runtime
+memory.  Asychronous operations such as sub-requests are accomplished via the host delegating calls and the subsequent
+guest callbacks.
 
 At configuration time, the Wasm modules are loaded into the Wasm engine on the main thread. A separate Wasm execution
 instance is spawned for each combination of the module binary and the :ref:`vm_id
-<envoy_v3_api_field_extensions.wasm.v3.VmConfig.vm_id>` field value. The instance receives the Wasm configuration via a
-callback, possibly repeatedly for each xDS listener encapsulating the Wasm filter. If the callback accepts the
-configuration, the main execution instance is cloned to each worker thread.
+<envoy_v3_api_field_extensions.wasm.v3.VmConfig.vm_id>` field value. The instance receives the Wasm configuration for
+each plugin via a callback, possibly repeatedly for each xDS listener encapsulating the Wasm filter. If the callback
+accepts the configuration, the main execution instance is cloned to each worker thread.
 
 Note that this configuration model is distinct for the Wasm filter. Unlike a regular HTTP filter that is instantiated
 independently for each xDS listener, xDS listeners share the same main Wasm execution instance across xDS updates.
