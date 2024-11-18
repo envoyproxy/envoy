@@ -91,6 +91,11 @@ bug_fixes:
   change: |
     Fixed bug where setting ``dns_jitter <envoy_v3_api_field_config.cluster.v3.Cluster.dns_jitter>`` to large values caused Envoy Bug
     to fire.
+- area: original_ip_detection custom header extension
+  change: |
+    Reverted :ref:`custom header
+    <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension to its
+    original behavior by disabling automatic XFF header appending that was inadvertently introduced in PR #31831.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
