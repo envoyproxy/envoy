@@ -114,7 +114,6 @@ RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
-// TODO(paul-r-gall) Make this enabled by default after additional soak time.
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(birenroy) flip after the security issue is addressed.
