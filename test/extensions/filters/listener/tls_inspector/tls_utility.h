@@ -26,6 +26,24 @@ std::vector<uint8_t> generateClientHello(uint16_t tls_min_version, uint16_t tls_
  */
 std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja3_fingerprint);
 
+/**
+ * Generate a TLS ClientHello in wire-format without any extensions.
+ * This creates a minimal, valid ClientHello message with only the required fields.
+ *
+ * @param tls_max_version Maximum supported TLS version to advertise.
+ * @return A vector containing the wire-format ClientHello message bytes.
+ */
+std::vector<uint8_t> generateClientHelloWithoutExtensions(uint16_t tls_max_version);
+
+/**
+ * Generate a TLS ClientHello in wire-format with empty extensions.
+ * This creates a minimal, valid ClientHello message with only the required fields.
+ *
+ * @param tls_max_version Maximum supported TLS version to advertise.
+ * @return A vector containing the wire-format ClientHello message bytes.
+ */
+std::vector<uint8_t> generateClientHelloEmptyExtensions(uint16_t tls_max_version);
+
 } // namespace Test
 } // namespace Tls
 } // namespace Envoy

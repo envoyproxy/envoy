@@ -54,8 +54,10 @@ filter_disabled:
 
   void initializeWithTlsInspector(bool ssl_client, const std::string& log_format,
                                   absl::optional<bool> listener_filter_disabled = absl::nullopt,
-                                  bool enable_ja3_fingerprinting = false) {
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter(enable_ja3_fingerprinting);
+                                  bool enable_ja3_fingerprinting = false,
+                                  bool enable_ja4_fingerprinting = false) {
+    std::string tls_inspector_config =
+        ConfigHelper::tlsInspectorFilter(enable_ja3_fingerprinting, enable_ja4_fingerprinting);
     if (listener_filter_disabled.has_value()) {
       tls_inspector_config = appendMatcher(tls_inspector_config, listener_filter_disabled.value());
     }
@@ -97,10 +99,10 @@ filter_disabled:
   void setupConnections(bool listener_filter_disabled, bool expect_connection_open, bool ssl_client,
                         const std::string& log_format = "%RESPONSE_CODE_DETAILS%",
                         const Ssl::ClientSslTransportOptions& ssl_options = {},
-                        const std::string& curves_list = "",
-                        bool enable_ja3_fingerprinting = false) {
+                        const std::string& curves_list = "", bool enable_ja3_fingerprinting = false,
+                        bool enable_ja4_fingerprinting = false) {
     initializeWithTlsInspector(ssl_client, log_format, listener_filter_disabled,
-                               enable_ja3_fingerprinting);
+                               enable_ja3_fingerprinting, enable_ja4_fingerprinting);
 
     // Set up the SSL client.
     Network::Address::InstanceConstSharedPtr address =
@@ -198,6 +200,33 @@ TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
 
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::Eq("71d1f47d1125ac53c3c6a4863c087cfe"));
+
+  test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
+  auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
+  EXPECT_EQ(
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *bytes_processed_histogram),
+      1);
+  EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
+                                                        *bytes_processed_histogram)),
+            115);
+}
+
+// The `JA4` fingerprint is correct in the access log.
+TEST_P(TlsInspectorIntegrationTest, JA4FingerprintIsSet) {
+  // These TLS options will create a client hello message with
+  // `JA4` fingerprint:
+  //   `t12i0107en_f06271c2b022_0f3b2bcde21d`
+  Ssl::ClientSslTransportOptions ssl_options;
+  ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
+  ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
+                   /*ssl_client=*/true, /*log_format=*/"%TLS_JA4_FINGERPRINT%",
+                   /*ssl_options=*/ssl_options, /*curves_list=*/"P-256",
+                   /*enable_`ja3`_fingerprinting=*/false, /*enable_`ja4`_fingerprinting=*/true);
+  client_->close(Network::ConnectionCloseType::NoFlush);
+
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::Eq("t12i0107en_f06271c2b022_0f3b2bcde21d"));
 
   test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
   auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
