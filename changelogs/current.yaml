@@ -70,8 +70,7 @@ minor_behavior_changes:
     is supported when the ``ScopedRouteConfiguration`` resource is delivered via SRDS.
 - area: http2
   change: |
-    The :ref:`allow_metadata <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.allow_metadata`
-    field in http2 protocol options will actually prevent metadata from being sent by Envoy.
+    The ``allow_metadata`` field in http2 protocol options will actually prevent metadata from being sent by Envoy.
     Runtime guarded by ``envoy.reloadable_features.allow_metadata_false_disables_metadata``.
 
 bug_fixes:
