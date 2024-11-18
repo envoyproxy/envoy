@@ -144,7 +144,6 @@ paths:
     - source/common/upstream/health_checker_event_logger.h
     - source/common/upstream/outlier_detection_impl.h
     - source/common/grpc/async_client_impl.cc
-    - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
     - source/common/config/watched_directory.cc
