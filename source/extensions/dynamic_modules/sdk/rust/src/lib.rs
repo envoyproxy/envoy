@@ -3,7 +3,7 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-use std::sync::{LazyLock, Mutex};
+use std::sync::OnceLock;
 
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
@@ -46,10 +46,8 @@ macro_rules! declare_init_functions {
     ($f:ident,$new_http_filter_config_fn:expr) => {
         #[no_mangle]
         pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-            let mut lock = envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-                .lock()
-                .unwrap();
-            *lock = $new_http_filter_config_fn;
+            envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
+                .get_or_init(|| $new_http_filter_config_fn);
             if ($f()) {
                 envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
                     as *const ::std::os::raw::c_char
@@ -84,8 +82,7 @@ pub type NewHttpFilterConfigFunction = fn(
 
 /// The global init function for HTTP filter configurations. This is set via the `declare_init_functions` macro,
 /// and is not intended to be set directly.
-pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: LazyLock<Mutex<NewHttpFilterConfigFunction>> =
-    LazyLock::new(|| Mutex::new(|_, _, _| panic!("NEW_HTTP_FILTER_CONFIG_FUNCTION is not set")));
+pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<NewHttpFilterConfigFunction> = OnceLock::new();
 
 /// The trait that represents the configuration for an Envoy Http filter configuration.
 /// This has one to one mapping with the [`EnvoyHttpFilterConfig`] object.
@@ -138,7 +135,9 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
         envoy_filter_config,
         name,
         config,
-        &NEW_HTTP_FILTER_CONFIG_FUNCTION.lock().unwrap(),
+        &NEW_HTTP_FILTER_CONFIG_FUNCTION
+            .get()
+            .expect("NEW_HTTP_FILTER_CONFIG_FUNCTION must be set"),
     )
 }
 
@@ -189,7 +188,6 @@ mod tests {
         );
         assert!(!result.is_null());
 
-        // Drop.
         unsafe {
             envoy_dynamic_module_on_http_filter_config_destroy(result);
         }
@@ -207,14 +205,15 @@ mod tests {
 
     #[test]
     fn test_envoy_dynamic_module_on_http_filter_config_destroy() {
+        use std::sync::atomic::AtomicBool;
+
         // This test is mainly to check if the drop is called correctly after wrapping/unwrapping the Box.
-        static DROPPED: LazyLock<Mutex<bool>> = LazyLock::new(|| Mutex::new(false));
+        static DROPPED: AtomicBool = AtomicBool::new(false);
         struct TestHttpFilterConfig;
         impl HttpFilterConfig for TestHttpFilterConfig {}
         impl Drop for TestHttpFilterConfig {
             fn drop(&mut self) {
-                let mut dropped = DROPPED.lock().unwrap();
-                *dropped = true;
+                DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
             }
         }
 
@@ -233,6 +232,6 @@ mod tests {
             envoy_dynamic_module_on_http_filter_config_destroy(config_ptr);
         }
         // Now that the drop is called, DROPPED must be set to true.
-        assert!(*DROPPED.lock().unwrap());
+        assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
     }
 }
