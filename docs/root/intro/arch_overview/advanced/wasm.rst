@@ -10,13 +10,30 @@ Wasm offers a portable and compact binary executable format that can be compiled
 run anywhere. Please see the :ref:`sandbox example <install_sandboxes_wasm_filter>` for instructions on how to create and deploy
 a Wasm module.
 
+Contexts, plugins, and VMs
+--------------------------
+
+A Wasm context refers to the interface implementation between the host (Envoy) and the guest (Wasm bytecode). For an
+HTTP filter, there are two types of contexts: a *root context* (context with ID 0) represents the configuration-only
+context, and a *per-request context* that is created once per each requests and can refer to the root context.
+
+A Wasm VM refers to the execution instance of a Wasm bytecode. Multiple VMs can be created for the same bytecode when
+using the ``vm_id`` field, and they each would have separate per-VM memory. The opposite is also true, the same VM can
+contain multiple implementations for different extensions, to be used in different contexts. This is done to optimize
+the per-VM overhead and reduce the binary size of the bytecode since the extensions can share the code.
+
+A Wasm plugin is the link between the context and the VM. It identifies which Wasm VM to use for a context, and which
+extension to invoke within the Wasm VM execution instance (via the :ref:`root_id
+<envoy_v3_api_field_extensions.wasm.v3.Wasm.root_id>` field value).
+
+
 Execution model for filters
 ---------------------------
 
 At runtime, the Wasm modules are executed inline in the worker threads via a series of stream callbacks as defined by
-the ABI. The workers operate independently and do not share the Wasm execution instances and their memory. Asychronous
-operations, such as sub-requests, are accomplished via host calls and subsequent guess callbacks since there is no
-concurrency in the Wasm runtime.
+the ABI. The workers operate independently and do not share the Wasm execution instances and their runtime memory.
+Asychronous operations, such as sub-requests, are accomplished via the host delegating calls and the subsequent guest
+callbacks.
 
 At configuration time, the Wasm modules are loaded into the Wasm engine on the main thread. A separate Wasm execution
 instance is spawned for each combination of the module binary and the :ref:`vm_id
