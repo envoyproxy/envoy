@@ -23,8 +23,20 @@ Config::Config(Stats::Scope& scope,
     : initial_read_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config,
                                                                 initial_read_buffer_size,
                                                                 DEFAULT_INITIAL_BUFFER_SIZE)),
+      max_read_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config,
+                                                            max_read_buffer_size,
+                                                            DEFAULT_MAX_INSPECT_SIZE)),
+      assume_http11_for_large_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config,
+                                                                       assume_http11_for_large_requests,
+                                                                       false)),
       stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))}
-{}
+{
+    if (initial_read_buffer_size_ > max_read_buffer_size_) {
+        throw EnvoyException(fmt::format("Invalid configuration: initial_read_buffer_size_ ({}) "
+                                "must be less than or equal to max_read_buffer_size_ ({})",
+                                initial_read_buffer_size_, max_read_buffer_size_));
+    }
+}
 
 const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 
@@ -63,6 +75,11 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     // to allow, then move on; the request is too large to identify the HTTP
     // version
     if (static_cast<size_t>(nread_) == maxConfigReadBytes()) {
+      if (assumeHttp11ForLargeRequests()) {
+        ENVOY_LOG(trace, "http inspector: assuming http");
+        protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
+        done(true);
+      }
       done(false);
       return Network::FilterStatus::Continue;
     }
@@ -141,8 +158,8 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
                 parser_->errorMessage());
 
       // Errors in parsing HTTP.
-      if (parser_->getStatus() != Http::Http1::ParserStatus::Ok &&
-          parser_->getStatus() != Http::Http1::ParserStatus::Paused) {
+      if ((parser_->getStatus() != Http::Http1::ParserStatus::Ok &&
+          parser_->getStatus() != Http::Http1::ParserStatus::Paused)) {
         return ParseState::Error;
       } else {
         return ParseState::Continue;
