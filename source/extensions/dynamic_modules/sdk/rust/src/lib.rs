@@ -3,6 +3,8 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+use std::sync::{LazyLock, Mutex};
+
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
@@ -44,11 +46,10 @@ macro_rules! declare_init_functions {
     ($f:ident,$new_http_filter_config_fn:expr) => {
         #[no_mangle]
         pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-            unsafe {
-                // We can assume that this is only called once at the beginning of the program, so it is safe to set a mutable global variable.
-                envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION =
-                    $new_http_filter_config_fn
-            };
+            let mut lock = envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
+                .lock()
+                .unwrap();
+            *lock = $new_http_filter_config_fn;
             if ($f()) {
                 envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
                     as *const ::std::os::raw::c_char
@@ -83,9 +84,8 @@ pub type NewHttpFilterConfigFunction = fn(
 
 /// The global init function for HTTP filter configurations. This is set via the `declare_init_functions` macro,
 /// and is not intended to be set directly.
-pub static mut NEW_HTTP_FILTER_CONFIG_FUNCTION: NewHttpFilterConfigFunction = |_, _, _| {
-    panic!("NEW_HTTP_FILTER_CONFIG_FUNCTION is not set");
-};
+pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: LazyLock<Mutex<NewHttpFilterConfigFunction>> =
+    LazyLock::new(|| Mutex::new(|_, _, _| panic!("NEW_HTTP_FILTER_CONFIG_FUNCTION is not set")));
 
 /// The trait that represents the configuration for an Envoy Http filter configuration.
 /// This has one to one mapping with the [`EnvoyHttpFilterConfig`] object.
@@ -125,44 +125,109 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
     config_size: usize,
 ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
     // This assumes that the name and config are valid UTF-8 strings. Should we relax? At the moment, both are String at protobuf level.
-    let name = if name_size > 0 {
-        let slice = std::slice::from_raw_parts(name_ptr, name_size);
-        std::str::from_utf8(slice).unwrap()
-    } else {
-        ""
-    };
-    let config = if config_size > 0 {
-        let slice = std::slice::from_raw_parts(config_ptr, config_size);
-        std::str::from_utf8(slice).unwrap()
-    } else {
-        ""
-    };
+    let name =
+        std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default();
+    let config = std::str::from_utf8(std::slice::from_raw_parts(config_ptr, config_size))
+        .unwrap_or_default();
 
     let envoy_filter_config = EnvoyHttpFilterConfig {
         raw_ptr: envoy_filter_config_ptr,
     };
 
-    let filter_config =
-        if let Some(config) = NEW_HTTP_FILTER_CONFIG_FUNCTION(envoy_filter_config, name, config) {
-            config
-        } else {
-            return std::ptr::null();
-        };
+    envoy_dynamic_module_on_http_filter_config_new_impl(
+        envoy_filter_config,
+        name,
+        config,
+        &NEW_HTTP_FILTER_CONFIG_FUNCTION.lock().unwrap(),
+    )
+}
 
-    // We wrap the Box<dyn HttpFilterConfig> in another Box to ensuure that the object is not dropped after being into a raw pointer.
-    // To be honest, this seems like a hack, and we should find a better way to handle this.
-    // See https://users.rust-lang.org/t/sending-a-boxed-trait-over-ffi/21708 for the exact problem.
-    let boxed_filter_config_ptr = Box::into_raw(Box::new(filter_config));
-    boxed_filter_config_ptr as abi::envoy_dynamic_module_type_http_filter_config_module_ptr
+fn envoy_dynamic_module_on_http_filter_config_new_impl(
+    envoy_filter_config: EnvoyHttpFilterConfig,
+    name: &str,
+    config: &str,
+    new_fn: &NewHttpFilterConfigFunction,
+) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
+    if let Some(config) = new_fn(envoy_filter_config, name, config) {
+        let boxed_filter_config_ptr = Box::into_raw(Box::new(config));
+        boxed_filter_config_ptr as abi::envoy_dynamic_module_type_http_filter_config_module_ptr
+    } else {
+        std::ptr::null()
+    }
 }
 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
-    http_filter: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+    config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
-    let config = http_filter as *mut *mut dyn HttpFilterConfig;
+    let config = config_ptr as *mut *mut dyn HttpFilterConfig;
 
-    // Drop the Box<dyn HttpFilterConfig> and the Box<*mut dyn HttpFilterConfig>
+    // Drop the Box<*mut dyn HttpFilterConfig>, and then the Box<dyn HttpFilterConfig>, which also drops the underlying object.
     let _outer = Box::from_raw(config);
     let _inner = Box::from_raw(*config);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
+        struct TestHttpFilterConfig;
+        impl HttpFilterConfig for TestHttpFilterConfig {}
+
+        let envoy_filter_config = EnvoyHttpFilterConfig {
+            raw_ptr: std::ptr::null_mut(),
+        };
+        let mut new_fn: NewHttpFilterConfigFunction =
+            |_, _, _| Some(Box::new(TestHttpFilterConfig));
+        let result = envoy_dynamic_module_on_http_filter_config_new_impl(
+            envoy_filter_config,
+            "test_name",
+            "test_config",
+            &new_fn,
+        );
+        assert!(!result.is_null());
+
+        // None should result in null pointer.
+        new_fn = |_, _, _| None;
+        let result = envoy_dynamic_module_on_http_filter_config_new_impl(
+            envoy_filter_config,
+            "test_name",
+            "test_config",
+            &new_fn,
+        );
+        assert!(result.is_null());
+    }
+
+    #[test]
+    fn test_envoy_dynamic_module_on_http_filter_config_destroy() {
+        // This test is mainly to check if the drop is called correctly after wrapping/unwrapping the Box.
+        static DROPPED: LazyLock<Mutex<bool>> = LazyLock::new(|| Mutex::new(false));
+        struct TestHttpFilterConfig;
+        impl HttpFilterConfig for TestHttpFilterConfig {}
+        impl Drop for TestHttpFilterConfig {
+            fn drop(&mut self) {
+                let mut dropped = DROPPED.lock().unwrap();
+                *dropped = true;
+            }
+        }
+
+        // This is a sort of round-trip to ensure the same control flow as the actual usage.
+        let new_fn: NewHttpFilterConfigFunction = |_, _, _| Some(Box::new(TestHttpFilterConfig));
+        let config_ptr = envoy_dynamic_module_on_http_filter_config_new_impl(
+            EnvoyHttpFilterConfig {
+                raw_ptr: std::ptr::null_mut(),
+            },
+            "test_name",
+            "test_config",
+            &new_fn,
+        );
+
+        unsafe {
+            envoy_dynamic_module_on_http_filter_config_destroy(config_ptr);
+        }
+        // Now that the drop is called, DROPPED must be set to true.
+        assert!(*DROPPED.lock().unwrap());
+    }
 }
