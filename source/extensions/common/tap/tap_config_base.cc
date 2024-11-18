@@ -140,7 +140,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     if (!match.ParseFromString(proto_config.match_config().SerializeAsString())) {
       // This should should generally succeed, but if there are malformed UTF-8 strings in a
       // message, this can fail.
-      throw EnvoyException("Unable to deserialize during wireCast()");
+      throw EnvoyException("Unable to deserialize proto.");
     }
   } else {
     throw EnvoyException(fmt::format("Neither match nor match_config is set in TapConfig: {}",
