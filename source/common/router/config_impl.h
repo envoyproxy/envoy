@@ -633,6 +633,7 @@ private:
   // later on), to copy from the response that triggers the redirect
   // into the following request.
   std::vector<Http::LowerCaseString> response_headers_to_copy_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_internal_redirects_{1};
   const bool enabled_{false};
   const bool allow_cross_scheme_redirect_{false};
