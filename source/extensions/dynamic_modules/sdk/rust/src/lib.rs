@@ -135,7 +135,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
         envoy_filter_config,
         name,
         config,
-        &NEW_HTTP_FILTER_CONFIG_FUNCTION
+        NEW_HTTP_FILTER_CONFIG_FUNCTION
             .get()
             .expect("NEW_HTTP_FILTER_CONFIG_FUNCTION must be set"),
     )
