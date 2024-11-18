@@ -823,6 +823,7 @@ using StreamInfoFormatterProviderLookupTable =
     absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
                                                      StreamInfoFormatterProviderCreateFunc>>;
 
+// clang-format off
 const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProviders() {
   CONSTRUCT_ON_FIRST_USE(
       StreamInfoFormatterProviderLookupTable,
@@ -1298,6 +1299,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.downstreamAddressProvider().localAddress();
                   });
             }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::withPort(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1306,12 +1315,28 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.downstreamAddressProvider().localAddress();
                   });
             }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::withoutPort(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
                   [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                     return stream_info.downstreamAddressProvider().localAddress();
+                  });
+            }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::justPort(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
                   });
             }}},
           {"DOWNSTREAM_REMOTE_ADDRESS",
@@ -1861,6 +1886,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             }}},
       });
 }
+// clang-format on
 
 class BuiltInStreamInfoCommandParser : public StreamInfoCommandParser {
 public:
