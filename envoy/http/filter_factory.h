@@ -4,6 +4,7 @@
 #include <map>
 
 #include "envoy/common/pure.h"
+#include "envoy/http/protocol.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -119,7 +120,7 @@ public:
   using UpgradeMap = std::map<std::string, bool>;
   virtual UpgradeAction createUpgradeFilterChain(
       absl::string_view upgrade, const UpgradeMap* per_route_upgrade_map,
-      FilterChainManager& manager,
+      absl::optional<Http::Protocol> http_version, FilterChainManager& manager,
       const FilterChainOptions& options = EmptyFilterChainOptions{}) const PURE;
 };
 

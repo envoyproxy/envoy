@@ -93,6 +93,7 @@ envoy_cc_library(
     hdrs = ["filter_factory.h"],
     deps = [
         ":header_map_interface",
+        ":protocol_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/grpc:status",
         "@com_google_absl//absl/types:optional",

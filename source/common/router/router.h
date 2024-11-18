@@ -249,7 +249,8 @@ public:
   }
 
   Http::FilterChainFactory::UpgradeAction
-  createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
+  createUpgradeFilterChain(absl::string_view, const UpgradeMap*, absl::optional<Http::Protocol>,
+                           Http::FilterChainManager&,
                            const Http::FilterChainOptions&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
     return FilterChainFactory::UpgradeAction::Rejected;

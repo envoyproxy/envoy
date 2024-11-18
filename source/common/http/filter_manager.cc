@@ -1655,8 +1655,8 @@ bool FilterManager::createFilterChain() {
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
 
-    auto result = filter_chain_factory_.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                                 upgrade_map, *this, options);
+    auto result = filter_chain_factory_.createUpgradeFilterChain(
+        upgrade->value().getStringView(), upgrade_map, streamInfo().protocol(), *this, options);
     switch (result) {
     case FilterChainFactory::UpgradeAction::Accepted:
       filter_manager_callbacks_.upgradeFilterChainCreated();
@@ -1667,6 +1667,10 @@ bool FilterManager::createFilterChain() {
       // will send a local reply indicating that the upgrade failed.
       break;
     case FilterChainFactory::UpgradeAction::Ignored:
+      // Upgrades can only be ignored for HTTP/1.1.
+      ASSERT(streamInfo().protocol().has_value() &&
+             *streamInfo().protocol() == Http::Protocol::Http11);
+
       filter_manager_callbacks_.requestHeaders()->removeUpgrade();
       Http::Utility::removeConnectionUpgrade(filter_manager_callbacks_.requestHeaders().value(),
                                              caseUnorderdSetContainingUpgrade());

@@ -364,8 +364,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
-      ignore_unconfigured_upgrades_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ignore_unconfigured_upgrades, true)),
+      ignore_unconfigured_http11_upgrades_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ignore_unconfigured_http11_upgrades, true)),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
       http3_options_(Http3::Utility::initializeAndValidateOptions(
@@ -731,7 +731,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
-    const bool ignored = PROTOBUF_GET_WRAPPED_OR_DEFAULT(upgrade_config, ignore, false);
+    const bool ignored = PROTOBUF_GET_WRAPPED_OR_DEFAULT(upgrade_config, ignore_on_http11, false);
     const bool enabled = PROTOBUF_GET_WRAPPED_OR_DEFAULT(upgrade_config, enabled, !ignored);
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=
         upgrade_filter_factories_.end()) {
@@ -741,7 +741,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
     if (enabled && ignored) {
       creation_status = absl::InvalidArgumentError(fmt::format(
-          "Error: upgrade config set both `ignored` and `enabled` for upgrade type: '{}'", name));
+          "Error: upgrade config set both `ignore_on_http11` and `enabled` for upgrade type: '{}'",
+          name));
       return;
     }
     if (!upgrade_config.filters().empty()) {
@@ -807,7 +808,8 @@ bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& ma
 Http::FilterChainFactory::UpgradeAction HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainManager& callbacks, const Http::FilterChainOptions& options) const {
+    absl::optional<Http::Protocol> http_version, Http::FilterChainManager& callbacks,
+    const Http::FilterChainOptions& options) const {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
@@ -833,8 +835,17 @@ Http::FilterChainFactory::UpgradeAction HttpConnectionManagerConfig::createUpgra
     return Http::FilterChainFactory::UpgradeAction::Accepted;
   }
 
-  if ((ignore_unconfigured_upgrades_ && it == upgrade_filter_factories_.end()) ||
-      (it != upgrade_filter_factories_.end() && it->second.ignore)) {
+  // Upgrades are handled differently depending on the HTTP version. In version 1.1 only, upgrades
+  // can be ignored by the server and the request processed as if there had not been an upgrade
+  // request.
+  const bool can_ignore = (http_version.has_value() && *http_version == Http::Protocol::Http11);
+
+  const bool ignore_specific_upgrade_type =
+      (it != upgrade_filter_factories_.end() && it->second.ignore_on_http11);
+  const bool no_specific_config_and_ignore_unknown =
+      (it == upgrade_filter_factories_.end() && ignore_unconfigured_http11_upgrades_);
+
+  if (can_ignore && (ignore_specific_upgrade_type || no_specific_config_and_ignore_unknown)) {
     // Either the HCM ignores all unconfigured upgrades, or this upgrade type is configured to be
     // ignored.
     return Http::FilterChainFactory::UpgradeAction::Ignored;
@@ -842,8 +853,9 @@ Http::FilterChainFactory::UpgradeAction HttpConnectionManagerConfig::createUpgra
 
   // Fall-through cases: the HCM does not ignore unconfigured upgrades, or this upgrade type is
   // configured to be disallowed.
-  ASSERT(!ignore_unconfigured_upgrades_ || (it != upgrade_filter_factories_.end() &&
-                                            !it->second.ignore && !it->second.allow_upgrade));
+  ASSERT(!can_ignore || !ignore_unconfigured_http11_upgrades_ ||
+         (it != upgrade_filter_factories_.end() && !it->second.ignore_on_http11 &&
+          !it->second.allow_upgrade));
   return Http::FilterChainFactory::UpgradeAction::Rejected;
 }
 

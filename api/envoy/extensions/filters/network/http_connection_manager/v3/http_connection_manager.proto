@@ -297,10 +297,10 @@ message HttpConnectionManager {
     // :ref:`upgrade documentation <arch_overview_upgrades>`.
     google.protobuf.BoolValue enabled = 3;
 
-    // If enabled, Envoy will ignore upgrade requests of this type. It is invalid to set both this option and
+    // If enabled, Envoy will ignore upgrade requests of this type if the request is HTTP/1.1. It is invalid to set both this option and
     // :ref:`enabled <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.UpgradeConfig.enabled>`
     // to true.
-    google.protobuf.BoolValue ignore = 4;
+    google.protobuf.BoolValue ignore_on_http11 = 4;
   }
 
   // [#not-implemented-hide:] Transformations that apply to path headers. Transformations are applied
@@ -794,12 +794,12 @@ message HttpConnectionManager {
 
   repeated UpgradeConfig upgrade_configs = 23;
 
-  // If enabled, if Envoy receives an Upgrade request from a client and no configuration for
+  // If enabled, if Envoy receives an Upgrade request from a client on an HTTP/1.1 connection and no configuration for
   // the upgrade type is found in
   // :ref:`upgrade_configs <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.upgrade_configs>`,
   // Envoy will ignore the upgrade request. If disabled, Envoy will respond with an error and close the connection.
   // The default is true.
-  google.protobuf.BoolValue ignore_unconfigured_upgrades = 59;
+  google.protobuf.BoolValue ignore_unconfigured_http11_upgrades = 59;
 
   // Should paths be normalized according to RFC 3986 before any processing of
   // requests by HTTP filters or routing? This affects the upstream ``:path`` header

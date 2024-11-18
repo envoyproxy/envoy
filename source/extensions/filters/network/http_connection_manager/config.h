@@ -145,11 +145,12 @@ public:
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     const bool allow_upgrade;
-    const bool ignore;
+    const bool ignore_on_http11;
   };
   Http::FilterChainFactory::UpgradeAction
   createUpgradeFilterChain(absl::string_view upgrade_type,
                            const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
+                           absl::optional<Http::Protocol> http_version,
                            Http::FilterChainManager& manager,
                            const Http::FilterChainOptions& options) const override;
 
@@ -309,7 +310,7 @@ private:
   const uint32_t xff_num_trusted_hops_;
   const bool skip_xff_append_;
   const std::string via_;
-  const bool ignore_unconfigured_upgrades_;
+  const bool ignore_unconfigured_http11_upgrades_;
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Config::ConfigProviderManager* scoped_routes_config_provider_manager_;
