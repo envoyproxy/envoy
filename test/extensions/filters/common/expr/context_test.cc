@@ -234,6 +234,19 @@ TEST(Context, RequestAttributes) {
     auto value = empty_request[CelValue::CreateStringView(Protocol)];
     EXPECT_FALSE(value.has_value());
   }
+
+  {
+    Http::TestRequestHeaderMapImpl invalid_length_headers{
+        {":method", "POST"},
+        {":scheme", "http"},
+        {":path", "/meow?yes=1"},
+        {":authority", "kittens.com"},
+        {"content-length", "invalid"} // Invalid content length value
+    };
+    RequestWrapper invalid_request(arena, &invalid_length_headers, info);
+    auto value = invalid_request[CelValue::CreateStringView(Size)];
+    EXPECT_FALSE(value.has_value());
+  }
 }
 
 TEST(Context, RequestAttributesNoHeaders) {

@@ -121,6 +121,9 @@ removed_config_or_runtime:
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
+- area: upstream
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
 
 new_features:
 - area: wasm
@@ -216,6 +219,12 @@ new_features:
   change: |
     Added support for :ref:`%UPSTREAM_HOST_NAME_WITHOUT_PORT% <config_access_log_format_upstream_host_name_without_port>`
     for the upstream host identifier without the port value.
+- area: udp_proxy
+  change: |
+    Added support for coexistence of dynamic and static clusters in the same udp proxy, so we can use dynamic clusters
+    for some sessions by setting a per-session state object under the key ``envoy.upstream.dynamic_host`` and routing
+    to dynamic cluster, and we can use static clusters for other sessions by setting a per-session state object under
+    the key ``envoy.udp_proxy.cluster`` without setting ``envoy.upstream.dynamic_host``.
 - area: ext_authz
   change: |
     added filter state field latency_us, bytesSent and bytesReceived access for CEL and logging.
