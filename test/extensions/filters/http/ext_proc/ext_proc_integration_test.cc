@@ -638,6 +638,16 @@ protected:
 
     handleUpstreamRequest();
     verifyDownstreamResponse(*response, 200);
+    // Also verify that grpc-status sent via trailers are correctly propagated
+    // and recorded.
+    if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+      const auto& ext_cluster =
+          test_server_->server().clusterManager().clusters().getCluster("ext_proc_server_0");
+      const auto& ext_server_host =
+          ext_cluster.value().get().prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+      EXPECT_EQ(ext_server_host->stats().rq_success_.value(), 1);
+      EXPECT_EQ(ext_server_host->stats().rq_total_.value(), 1);
+    }
   }
 
   void testSendDyanmicMetadata() {
