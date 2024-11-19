@@ -2570,14 +2570,15 @@ TEST_F(HttpConnectionManagerImplTest, TestAccessLogOnTunnelEstablished) {
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   std::shared_ptr<AccessLog::MockInstance> handler(new NiceMock<AccessLog::MockInstance>());
 
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _, _))
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _, _, _))
       .WillOnce(Invoke([&](absl::string_view, const FilterChainFactory::UpgradeMap*,
-                           FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
+                           absl::optional<Http::Protocol>, FilterChainManager& manager,
+                           const Http::FilterChainOptions&) {
         FilterFactoryCb filter_factory = createDecoderFilterFactoryCb(filter);
         FilterFactoryCb handler_factory = createLogHandlerFactoryCb(handler);
         manager.applyFilterFactoryCb({}, filter_factory);
         manager.applyFilterFactoryCb({}, handler_factory);
-        return true;
+        return Http::FilterChainFactory::UpgradeAction::Accepted;
       }));
 
   flush_log_on_tunnel_successfully_established_ = true;
@@ -4081,14 +4082,14 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
   EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _, _))
-      .WillRepeatedly(
-          Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                     FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
-            auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
-            manager.applyFilterFactoryCb({}, factory);
-            return true;
-          }));
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _, _, _))
+      .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                                 absl::optional<Http::Protocol>, FilterChainManager& manager,
+                                 const Http::FilterChainOptions&) {
+        auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return Http::FilterChainFactory::UpgradeAction::Accepted;
+      }));
 
   // When dispatch is called on the codec, we pretend to get a new stream and then fire a headers
   // only request into it. Then we respond into the filter.
@@ -4125,8 +4126,8 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
 TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
   setup(SetupOpts().setTracing(false));
 
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _, _))
-      .WillRepeatedly(Return(true));
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _, _, _))
+      .WillRepeatedly(Return(Http::FilterChainFactory::UpgradeAction::Accepted));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
@@ -4149,8 +4150,8 @@ TEST_F(HttpConnectionManagerImplTest, ConnectAsUpgrade) {
 TEST_F(HttpConnectionManagerImplTest, ConnectWithEmptyPath) {
   setup(SetupOpts().setTracing(false));
 
-  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _, _))
-      .WillRepeatedly(Return(true));
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain("CONNECT", _, _, _, _))
+      .WillRepeatedly(Return(Http::FilterChainFactory::UpgradeAction::Accepted));
 
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {

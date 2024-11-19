@@ -207,9 +207,10 @@ public:
     return createFilterChain(manager);
   }
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
-  MOCK_METHOD(bool, createUpgradeFilterChain,
+  MOCK_METHOD(Http::FilterChainFactory::UpgradeAction, createUpgradeFilterChain,
               (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
-               FilterChainManager& manager, const FilterChainOptions&),
+               absl::optional<Http::Protocol>, FilterChainManager& manager,
+               const FilterChainOptions&),
               (const));
 };
 

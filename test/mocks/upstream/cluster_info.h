@@ -164,10 +164,11 @@ public:
               (Http::FilterChainManager & manager, bool only_create_if_configured,
                const Http::FilterChainOptions& options),
               (const, override));
-  MOCK_METHOD(bool, createUpgradeFilterChain,
+  MOCK_METHOD(Http::FilterChainFactory::UpgradeAction, createUpgradeFilterChain,
               (absl::string_view upgrade_type,
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
-               Http::FilterChainManager& manager, const Http::FilterChainOptions&),
+               absl::optional<Http::Protocol> http_version, Http::FilterChainManager& manager,
+               const Http::FilterChainOptions&),
               (const));
   MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
   MOCK_METHOD(

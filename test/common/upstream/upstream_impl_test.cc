@@ -6251,7 +6251,9 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
   auto cluster = makeCluster(yaml);
   Http::MockFilterChainManager manager;
   const Http::EmptyFilterChainOptions options;
-  EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
+  EXPECT_EQ(
+      cluster->info()->createUpgradeFilterChain("foo", nullptr, absl::nullopt, manager, options),
+      Http::FilterChainFactory::UpgradeAction::Rejected);
 
   EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
   cluster->info()->createFilterChain(manager);
