@@ -1755,8 +1755,8 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 }
 
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
-                                                absl::string_view name_view,
-                                                absl::string_view value_view) {
+                                                               absl::string_view name_view,
+                                                               absl::string_view value_view) {
   // TODO PERF: Can reference count here to avoid copies.
   HeaderString name;
   name.setCopy(name_view.data(), name_view.size());
