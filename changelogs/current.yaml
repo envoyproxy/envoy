@@ -12,6 +12,11 @@ bug_fixes:
   change: |
     Relaxed the restriction on SNI logging to allow the ``_`` character, even if
     ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
+- area: original_ip_detection custom header extension
+  change: |
+    Reverted :ref:`custom header
+    <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension to its
+    original behavior by disabling automatic XFF header appending that was inadvertently introduced in PR #31831.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
