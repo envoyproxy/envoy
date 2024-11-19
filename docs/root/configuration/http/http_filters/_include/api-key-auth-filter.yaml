@@ -26,17 +26,26 @@ static_resources:
                   api_key_auth:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute
                     override_config:
-                      credentials:
-                        entries:
-                        - key: one_key
-                          client: one_client
-                        - key: another_key
-                          client: another_client
                       key_sources:
                         entries:
                         - query: api_key
                     allowed_clients:
                     - another_client
+              - match:
+                  path: "/special"
+                route:
+                  cluster: upstream_com
+                typed_per_filter_config:
+                  api_key_auth:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute
+                    override_config:
+                      credentials:
+                        entries:
+                        - key: special_key
+                          client: special_client
+                      key_sources:
+                        entries:
+                        - header: X-Special-Key
               - match:
                   prefix: "/static"
                 route:
@@ -57,6 +66,8 @@ static_resources:
                 entries:
                 - key: one_key
                   client: one_client
+                - key: another_key
+                  client: another_client
               key_sources:
                 entries:
                 - header: Authorization

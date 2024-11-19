@@ -22,7 +22,7 @@ An example configuration of the filter may look like the following:
 
 .. literalinclude:: _include/api-key-auth-filter.yaml
     :language: yaml
-    :lines: 46-56
+    :lines: 61-73
     :linenos:
     :caption: :download:`api-key-auth-filter.yaml <_include/api-key-auth-filter.yaml>`
 
@@ -40,12 +40,13 @@ An example scope specific configuration of the filter may look like the followin
 
 .. literalinclude:: _include/api-key-auth-filter.yaml
     :language: yaml
-    :lines: 16-45
+    :lines: 16-60
     :linenos:
     :caption: :download:`api-key-auth-filter.yaml <_include/api-key-auth-filter.yaml>`
 
-In this example we customize credential list and key source for ``/admin`` route, and disable
-authentication for ``/static`` prefixed routes.
+In this example we customize key source for ``/admin`` route and only allow limited clients to access
+this route. We also customize the credential list for ``/special`` route and disable the filter for
+``/static`` route.
 
 Combining the per-route configuration example and the filter configuration example, given the following
 requests, the filter will behave as follows:
@@ -64,6 +65,11 @@ requests, the filter will behave as follows:
   # The request will be denied with 401 status code because the API key is invalid.
   GET /admin?api_key=invalid_key HTTP/1.1
   host: example.com
+
+  # The request will be allowed because the API key is valid and no client validation is configured.
+  GET /special HTTP/1.1
+  host: example.com
+  X-Special-Key: "special_key"
 
   # The request will be allowed because the filter is disabled for specific route.
   GET /static HTTP/1.1
