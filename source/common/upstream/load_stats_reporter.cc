@@ -20,7 +20,10 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
-  retry_timer_ = dispatcher.createTimer([this]() -> void { stats_.retries_.inc(); establishNewStream(); });
+  retry_timer_ = dispatcher.createTimer([this]() -> void {
+    stats_.retries_.inc();
+    establishNewStream();
+  });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
 }
