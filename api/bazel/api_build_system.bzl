@@ -18,6 +18,8 @@ def _LibrarySuffix(library_name, suffix):
         library_name += ":" + Label(library_name).name
     return _Suffix(library_name, suffix)
 
+
+
 # TODO(htuch): has_services is currently ignored but will in future support
 # gRPC stub generation.
 # TODO(htuch): Convert this to native py_proto_library once
