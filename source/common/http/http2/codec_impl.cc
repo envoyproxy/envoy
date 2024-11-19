@@ -351,8 +351,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
 }
 
 void ConnectionImpl::StreamImpl::encodeMetadata(const MetadataMapVector& metadata_map_vector) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.allow_metadata_false_disables_metadata") &&
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_disable_metadata") &&
       !parent_.allow_metadata_) {
     ENVOY_CONN_LOG(debug, "Stream {} had metadata, but metadata is disabled.", parent_.connection_,
                    stream_id_);
@@ -828,6 +827,12 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
 }
 
 void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map_ptr) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_disable_metadata") &&
+      !parent_.allow_metadata_) {
+    ENVOY_CONN_LOG(debug, "decode metadata called but metadata disallowed, skipping",
+                   parent_.connection_);
+    return;
+  }
   // Empty metadata maps should not be decoded.
   if (metadata_map_ptr->empty()) {
     ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", parent_.connection_);

@@ -1130,9 +1130,68 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeClientBody) {
   driveToCompletion();
 }
 
+TEST_P(Http2CodecImplTest, DisallowMetadataDecodePath) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_disable_metadata", "true"}});
+  // Do the logic from `initialize` inline in order to have client and server handle
+  // metadata differently.
+  setupHttp2Overrides();
+  allow_metadata_ = true;
+  http2OptionsFromTuple(client_http2_options_, client_settings_);
+  allow_metadata_ = false;
+  http2OptionsFromTuple(server_http2_options_, server_settings_);
+  client_ = std::make_unique<TestClientConnectionImpl>(
+      client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
+      client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
+      ProdNghttp2SessionFactory::get());
+  client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
+  server_ = std::make_unique<TestServerConnectionImpl>(
+      server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
+      server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
+      headers_with_underscores_action_);
+  server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
+  createHeaderValidator();
+  request_encoder_ = &client_->newStream(response_decoder_);
+  setupDefaultConnectionMocks();
+  driveToCompletion();
+
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks_);
+        encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
+        request_decoder_.setResponseEncoder(response_encoder_);
+        return request_decoder_;
+      }));
+
+  ON_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillByDefault(Return(true));
+
+  // Generates a valid stream_id by sending a request header.
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  MetadataMapVector metadata_map_vector;
+  const int size = 10;
+  for (int i = 0; i < size; i++) {
+    MetadataMap metadata_map = {
+        {"header_key1", "header_value1"},
+        {"header_key2", "header_value2"},
+        {"header_key3", "header_value3"},
+        {"header_key4", "header_value4"},
+    };
+    MetadataMapPtr metadata_map_ptr = std::make_unique<MetadataMap>(metadata_map);
+    metadata_map_vector.push_back(std::move(metadata_map_ptr));
+  }
+
+  EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(0);
+  request_encoder_->encodeMetadata(metadata_map_vector);
+  driveToCompletion();
+}
+
 TEST_P(Http2CodecImplTest, DisallowMetadata) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.allow_metadata_false_disables_metadata", "true"}});
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_disable_metadata", "true"}});
   allow_metadata_ = false;
   initialize();
 
@@ -1162,8 +1221,7 @@ TEST_P(Http2CodecImplTest, DisallowMetadata) {
 }
 
 TEST_P(Http2CodecImplTest, DisallowMetadataFlagOff) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.allow_metadata_false_disables_metadata", "false"}});
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_disable_metadata", "false"}});
   allow_metadata_ = false;
   initialize();
 
@@ -1190,6 +1248,7 @@ TEST_P(Http2CodecImplTest, DisallowMetadataFlagOff) {
   EXPECT_DEATH(request_encoder_->encodeMetadata(metadata_map_vector), ".*");
 #else
   if (testing::get<2>(GetParam()) == Http2Impl::Oghttp2) {
+    // nghttp2 already blocks calls to decodeMetadata.
     EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(size);
   }
   request_encoder_->encodeMetadata(metadata_map_vector);
