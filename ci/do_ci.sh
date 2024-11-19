@@ -877,7 +877,10 @@ case $CI_TARGET in
         fi
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //distribution:verify_packages \
-              "$PACKAGE_BUILD"
+              "$PACKAGE_BUILD" \
+              -- \
+              -ldebug \
+              -vdebug
         ;;
 
     verify_examples)
