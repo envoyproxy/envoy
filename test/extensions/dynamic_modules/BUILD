@@ -70,7 +70,7 @@ rust_test(
         # It is a known issue that TSAN detectes a false positive in the test runner of Rust toolchain:
         # https://github.com/rust-lang/rust/issues/39608
         #
-        # To avoid this issue, we need to usee nightly and pass RUSTFLAGS="-Z sanitizer=thread" to this target only
+        # To avoid this issue, we need to use nightly and pass RUSTFLAGS="-Z sanitizer=thread" to this target only
         # when we run the test with TSAN: https://github.com/rust-lang/rust/commit/4b91729df22015bd412f6fc0fa397785d1e2159c
         "no_tsan",
         "nocoverage",
