@@ -1388,9 +1388,9 @@ six==1.16.0 \
     #   pyu2f
     #   sphinxcontrib-httpdomain
     #   thrift
-slack-sdk==3.33.3 \
-    --hash=sha256:0515fb93cd03b18de61f876a8304c4c3cef4dd3c2a3bad62d7394d2eb5a3c8e6 \
-    --hash=sha256:4cc44c9ffe4bb28a01fbe3264c2f466c783b893a4eca62026ab845ec7c176ff1
+slack-sdk==3.33.4 \
+    --hash=sha256:5e109847f6b6a22d227609226ba4ed936109dc00675bddeb7e0bee502d3ee7e0 \
+    --hash=sha256:9f30cb3c9c07b441c49d53fc27f9f1837ad1592a7e9d4ca431f53cdad8826cc6
     # via -r requirements.in
 smmap==5.0.1 \
     --hash=sha256:dceeb6c0028fdb6734471eb07c0cd2aae706ccaecab45965ee83f11c8d3b1f62 \
