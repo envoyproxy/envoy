@@ -170,6 +170,9 @@ new_features:
     :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` access log
     formatter operator. The following time points were added: ``%US_CX_BEG%``,
     ``%US_CX_END%``, ``%US_HS_END%``.
+- area: access log
+  change: |
+    Added fields for :ref:`DOWNSTREAM_DIRECT_LOCAL_ADDRESS and DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT <config_access_log_format>`.
 - area: quic
   change: |
     Added :ref:`QUIC stats debug visitor <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>` to
@@ -191,6 +194,10 @@ new_features:
 - area: lua cluster specifier
   change: |
     Added ability for a Lua script to query clusters for current requests and connections.
+- area: lua
+  change: |
+    Added :ref:`downstreamDirectLocalAddress() <config_http_filters_lua_stream_info_downstream_direct_local_address>`
+    method to the Stream info object API.
 - area: udp_proxy
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
