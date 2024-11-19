@@ -71,7 +71,7 @@ minor_behavior_changes:
 - area: rds
   change: |
     When a new RDS provider config is pushed via xDS and the only difference is change to
-    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`, 
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`,
     the already existing provider will be reused. Envoy will not ask RDS server for routes
     config because existing provider already has up to date routes config.
     This behavioral change can be temporarily reverted by setting runtime guard
