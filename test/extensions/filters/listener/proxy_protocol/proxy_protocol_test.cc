@@ -6,6 +6,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/data/core/v3/tlv_metadata.pb.h"
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -277,6 +278,14 @@ TEST_P(ProxyProtocolTest, V1Basic) {
             "1.2.3.4");
   EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
 
+  auto& filter_state = server_connection_->streamInfo().filterState();
+  EXPECT_TRUE(filter_state->hasData<Network::ProxyProtocolFilterState>(
+      Network::ProxyProtocolFilterState::key()));
+  const auto& proxy_proto_data = filter_state
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V1);
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v1.found").value(), 1);
 }
@@ -724,6 +733,7 @@ TEST_P(ProxyProtocolTest, V2LocalConnectionFilterState) {
              Envoy::Network::Address::IpVersion::v4) {
     EXPECT_EQ(proxy_proto_data.dst_addr_->ip()->addressAsString(), "127.0.0.1");
   }
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
   EXPECT_FALSE(server_connection_->connectionInfoProvider().localAddressRestored());
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
@@ -2045,6 +2055,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterState) {
                                          Network::ProxyProtocolFilterState::key())
                                      ->value();
 
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
   EXPECT_EQ(2, proxy_proto_data.tlv_vector_.size());
   EXPECT_EQ(0x0, proxy_proto_data.tlv_vector_[0].type);
   EXPECT_EQ(0xFF, proxy_proto_data.tlv_vector_[0].value[0]);
@@ -2089,6 +2100,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeEmpty) {
                                          Network::ProxyProtocolFilterState::key())
                                      ->value();
 
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
   EXPECT_EQ(0, proxy_proto_data.tlv_vector_.size());
   disconnect();
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
@@ -2127,6 +2139,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTLVToFilterStateIncludeTlV) {
                                          Network::ProxyProtocolFilterState::key())
                                      ->value();
 
+  EXPECT_EQ(proxy_proto_data.version_, Envoy::Network::ProxyProtocolVersion::V2);
   EXPECT_EQ(1, proxy_proto_data.tlv_vector_.size());
   EXPECT_EQ(0x02, proxy_proto_data.tlv_vector_[0].type);
   EXPECT_EQ("foo.com", std::string(proxy_proto_data.tlv_vector_[0].value.begin(),
