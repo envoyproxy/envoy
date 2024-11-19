@@ -537,9 +537,9 @@ envoy-dependency-check==0.1.13 \
     --hash=sha256:4337b9c4129ae723dc92f70733b167a8dde187368d873687c6c54732d6fb5e48 \
     --hash=sha256:795e885eccd072d7878dc8ce11fe9f84761f0e449603e583fdab5e9e17111af2
     # via -r requirements.in
-envoy-distribution-distrotest==0.0.11 \
-    --hash=sha256:44e1359f4a320e33be982ca09ca016a65b3758fa4643c2ccb500ba6d0cf1333f \
-    --hash=sha256:d0f14eea69acad1891156d7179fa86c43a2b42fe1cb3d5fe32a991df3da19569
+envoy-distribution-distrotest==0.0.12 \
+    --hash=sha256:04f2f5302c039aca82eb4e7d1e8a6fee5fc274a1cdae27130d15754eb3abb4b4 \
+    --hash=sha256:2762ff531715c1e8d057f10f0fc6c79807f0f67930fc5032fa5a2f239498a7d7
     # via
     #   -r requirements.in
     #   envoy-distribution-verify
