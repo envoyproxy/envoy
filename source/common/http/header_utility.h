@@ -406,6 +406,11 @@ public:
                                                     absl::optional<uint32_t> listener_port);
 
   /**
+   * @brief Remove the port part from host if it exists.
+   */
+  static void stripPortFromHost(std::string& host);
+
+  /**
    * @brief Return the index of the port, or npos if the host has no port
    *
    * Note this does not do validity checks on the port, it just finds the

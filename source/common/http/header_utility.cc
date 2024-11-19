@@ -415,6 +415,14 @@ absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& head
   return port;
 }
 
+void HeaderUtility::stripPortFromHost(std::string& host) {
+  const absl::string_view::size_type port_start = getPortStart(host);
+  if (port_start == absl::string_view::npos) {
+    return;
+  }
+  host = host.substr(0, port_start);
+}
+
 absl::string_view::size_type HeaderUtility::getPortStart(absl::string_view host) {
   const absl::string_view::size_type port_start = host.rfind(':');
   if (port_start == absl::string_view::npos) {

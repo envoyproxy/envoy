@@ -51,6 +51,7 @@ public:
   const std::string hostname3_ = "hostname3";
   const uint32_t port1_ = 1;
   const uint32_t port2_ = 2;
+  const uint32_t port3_ = 3;
   const std::string https_ = "https";
   const std::string http_ = "http";
 
@@ -379,7 +380,7 @@ TEST_P(HttpServerPropertiesCacheImplTest, GetOrCreateHttp3StatusTracker) {
   initialize();
   EXPECT_EQ(0u, protocols_->size());
 
-  protocols_->getOrCreateHttp3StatusTracker(origin1_).markHttp3Broken();
+  protocols_->markHttp3Broken(origin1_);
   EXPECT_EQ(1u, protocols_->size());
   EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
   EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
@@ -395,9 +396,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, ClearBrokenness) {
   initialize();
   EXPECT_EQ(0u, protocols_->size());
 
-  protocols_->getOrCreateHttp3StatusTracker(origin1_).markHttp3Broken();
+  protocols_->markHttp3Broken(origin1_);
   protocols_->getOrCreateHttp3StatusTracker(origin2_).markHttp3Confirmed();
-  protocols_->getOrCreateHttp3StatusTracker(origin3_).markHttp3Broken();
+  protocols_->markHttp3Broken(origin3_);
 
   EXPECT_EQ(3u, protocols_->size());
   EXPECT_TRUE(protocols_->getOrCreateHttp3StatusTracker(origin1_).isHttp3Broken());
@@ -412,6 +413,8 @@ TEST_P(HttpServerPropertiesCacheImplTest, ClearBrokenness) {
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
   std::string suffix = ".example.com";
   std::string host1 = "first.example.com";
   std::string host2 = "www.second.example.com";
@@ -422,6 +425,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
   initialize();
   protocols_->setAlternatives(origin1, protocols1_);
 
+  protocols_->markHttp3Broken(origin1);
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin2));
+
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin2);
   ASSERT_TRUE(protocols.has_value());
@@ -429,6 +435,8 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffix) {
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
   std::string suffix = ".example.com";
   std::string host1 = "www.example.com";
   std::string host2 = "www.other.com";
@@ -439,9 +447,74 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixNoMatch) {
   initialize();
   protocols_->setAlternatives(origin1, protocols1_);
 
+  protocols_->markHttp3Broken(origin1);
+  EXPECT_FALSE(protocols_->isHttp3Broken(origin2));
+
   OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
       protocols_->findAlternatives(origin2);
   ASSERT_FALSE(protocols.has_value());
+}
+
+TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokenness) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
+  std::string suffix = ".example.com";
+  std::string host1 = "first.example.com";
+  std::string host2 = "www.second.example.com";
+  std::string host3 = "www.third.example.com";
+  const HttpServerPropertiesCacheImpl::Origin origin1 = {https_, host1, port1_};
+  const HttpServerPropertiesCacheImpl::Origin origin2 = {https_, host2, port2_};
+  const HttpServerPropertiesCacheImpl::Origin origin3 = {https_, host3, port3_};
+
+  suffixes_.push_back(suffix);
+  initialize();
+  protocols_->setAlternatives(origin1, protocols1_);
+
+  OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
+      protocols_->findAlternatives(origin2);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols1_, protocols.ref());
+  EXPECT_FALSE(protocols_->isHttp3Broken(origin1));
+  EXPECT_FALSE(protocols_->isHttp3Broken(origin2));
+
+  // Marking origin2 broken will promote it to being canonical. origin3 will use this canonical
+  // origin to determine QUIC brokenness. Since origin1's http3 status is unknown, it's also
+  // considered broken.
+  protocols_->markHttp3Broken(origin2);
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin2));
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin3));
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin1));
+}
+
+TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokennessNoBackPropagation) {
+  Runtime::maybeSetRuntimeGuard(
+      "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness", true);
+  std::string suffix = ".example.com";
+  std::string host1 = "first.example.com";
+  std::string host2 = "www.second.example.com";
+  std::string host3 = "www.third.example.com";
+  const HttpServerPropertiesCacheImpl::Origin origin1 = {https_, host1, port1_};
+  const HttpServerPropertiesCacheImpl::Origin origin2 = {https_, host2, port2_};
+  const HttpServerPropertiesCacheImpl::Origin origin3 = {https_, host3, port3_};
+
+  suffixes_.push_back(suffix);
+  initialize();
+  protocols_->setAlternatives(origin1, protocols1_);
+
+  OptRef<const std::vector<HttpServerPropertiesCacheImpl::AlternateProtocol>> protocols =
+      protocols_->findAlternatives(origin2);
+  ASSERT_TRUE(protocols.has_value());
+  EXPECT_EQ(protocols1_, protocols.ref());
+  EXPECT_FALSE(protocols_->isHttp3Broken(origin1));
+  EXPECT_FALSE(protocols_->isHttp3Broken(origin2));
+  protocols_->getOrCreateHttp3StatusTracker(origin1).markHttp3Confirmed();
+  protocols_->markHttp3Broken(origin2);
+
+  // Marking origin2 broken will promote it to being canonical. origin3 will use this canonical
+  // origin to determine QUIC brokenness, while origin1 has its own tracker already and is exempt.
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin2));
+  EXPECT_TRUE(protocols_->isHttp3Broken(origin3));
+  EXPECT_FALSE(protocols_->isHttp3Broken(origin1));
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCanonicalSuffix) {
