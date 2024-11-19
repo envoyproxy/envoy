@@ -24,6 +24,7 @@
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -267,8 +268,8 @@ void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout,
 }
 
 Http::RequestMessagePtr
-Common::prepareHeaders(const std::string& host_name, const std::string& service_full_name,
-                       const std::string& method_name,
+Common::prepareHeaders(absl::string_view host_name, absl::string_view service_full_name,
+                       absl::string_view method_name,
                        const absl::optional<std::chrono::milliseconds>& timeout) {
   Http::RequestMessagePtr message(new Http::RequestMessageImpl());
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
@@ -289,8 +290,8 @@ const std::string& Common::typeUrlPrefix() {
   CONSTRUCT_ON_FIRST_USE(std::string, "type.googleapis.com");
 }
 
-std::string Common::typeUrl(const std::string& qualified_name) {
-  return typeUrlPrefix() + "/" + qualified_name;
+std::string Common::typeUrl(absl::string_view qualified_name) {
+  return absl::StrCat(typeUrlPrefix(), "/", qualified_name);
 }
 
 void Common::prependGrpcFrameHeader(Buffer::Instance& buffer) {

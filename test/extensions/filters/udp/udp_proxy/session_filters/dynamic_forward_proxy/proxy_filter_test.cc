@@ -109,11 +109,11 @@ TEST_F(DynamicProxyFilterTest, CustomBufferConfig) {
   EXPECT_EQ(20, filter_config_->maxBufferedBytes());
 }
 
-TEST_F(DynamicProxyFilterTest, StopIterationOnMissingHostAndPort) {
+TEST_F(DynamicProxyFilterTest, ContinueOnMissingHostAndPort) {
   setup();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onNewSession());
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(recv_data_stub1_));
 }
 
 TEST_F(DynamicProxyFilterTest, StopIterationOnMissingPort) {
@@ -124,25 +124,25 @@ TEST_F(DynamicProxyFilterTest, StopIterationOnMissingPort) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, StopIterationOnMissingHost) {
+TEST_F(DynamicProxyFilterTest, ContinueOnMissingHost) {
   setup();
   setFilterStatePort(50);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onNewSession());
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, StopIterationOnEmptyHost) {
+TEST_F(DynamicProxyFilterTest, ContinueOnEmptyHost) {
   setup();
   setFilterState("", 50);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onNewSession());
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(recv_data_stub1_));
 }
 
 TEST_F(DynamicProxyFilterTest, StopIterationOnPortIsZero) {
   setup();
-  setFilterState("", 0);
+  setFilterState("host", 0);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
@@ -150,7 +150,7 @@ TEST_F(DynamicProxyFilterTest, StopIterationOnPortIsZero) {
 
 TEST_F(DynamicProxyFilterTest, StopIterationOnPortOutOfRange) {
   setup();
-  setFilterState("", 65536);
+  setFilterState("host", 65536);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));

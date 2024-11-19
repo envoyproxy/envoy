@@ -579,6 +579,9 @@ public:
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddress();
   }
+  const Network::Address::InstanceConstSharedPtr& directLocalAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().directLocalAddress();
+  }
   bool localAddressRestored() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddressRestored();
   }
@@ -703,7 +706,7 @@ public:
     }
   }
 
-  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() { return access_log_handlers_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogHandlers() { return access_log_handlers_; }
 
   void onStreamComplete() {
     for (auto filter : filters_) {
@@ -1038,7 +1041,7 @@ private:
   std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
   std::list<StreamFilterBase*> filters_;
-  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+  AccessLog::InstanceSharedPtrVector access_log_handlers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata

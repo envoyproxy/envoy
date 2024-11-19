@@ -478,7 +478,6 @@ public:
     const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
     const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
     return reflection->GetString(*reflectable_message, name_field);
-    return name_field->name();
   }
 
 #ifdef ENVOY_ENABLE_YAML
