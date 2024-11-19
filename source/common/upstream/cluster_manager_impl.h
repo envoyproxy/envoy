@@ -39,7 +39,6 @@
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/load_stats_reporter.h"
-#include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -253,7 +252,8 @@ public:
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                          const std::string& version_info) override;
+                          const std::string& version_info,
+                          const bool avoid_cds_removal = false) override;
 
   void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
     init_helper_.setPrimaryClustersInitializedCb(callback);
@@ -287,7 +287,7 @@ public:
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
-  bool removeCluster(const std::string& cluster) override;
+  bool removeCluster(const std::string& cluster, const bool remove_ignored = false) override;
   void shutdown() override {
     shutdown_ = true;
     if (resume_cds_ != nullptr) {
@@ -308,6 +308,7 @@ public:
   }
 
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
+  absl::Status replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) override;
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const absl::optional<std::string>& localClusterName() const override {
@@ -318,7 +319,8 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
   OdCdsApiHandlePtr
-  allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+  allocateOdCdsApi(OdCdsCreationFunction creation_function,
+                   const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
@@ -752,11 +754,12 @@ private:
     ClusterData(const envoy::config::cluster::v3::Cluster& cluster_config,
                 const uint64_t cluster_config_hash, const std::string& version_info,
                 bool added_via_api, bool required_for_ads, ClusterSharedPtr&& cluster,
-                TimeSource& time_source)
+                TimeSource& time_source, const bool avoid_cds_removal = false)
         : cluster_config_(cluster_config), config_hash_(cluster_config_hash),
           version_info_(version_info), cluster_(std::move(cluster)),
-          last_updated_(time_source.systemTime()),
-          added_via_api_(added_via_api), added_or_updated_{}, required_for_ads_(required_for_ads) {}
+          last_updated_(time_source.systemTime()), added_via_api_(added_via_api),
+          avoid_cds_removal_(avoid_cds_removal), added_or_updated_{},
+          required_for_ads_(required_for_ads) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -789,6 +792,7 @@ private:
     Common::CallbackHandlePtr priority_update_cb_;
     // Keep smaller fields near the end to reduce padding
     const bool added_via_api_ : 1;
+    const bool avoid_cds_removal_ : 1;
     bool added_or_updated_ : 1;
     const bool required_for_ads_ : 1;
   };
@@ -866,7 +870,8 @@ private:
   absl::StatusOr<ClusterDataPtr> loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                              const uint64_t cluster_hash,
                                              const std::string& version_info, bool added_via_api,
-                                             bool required_for_ads, ClusterMap& cluster_map);
+                                             bool required_for_ads, ClusterMap& cluster_map,
+                                             bool avoid_cds_removal = false);
   void onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();

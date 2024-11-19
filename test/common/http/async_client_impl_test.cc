@@ -163,6 +163,31 @@ TEST_F(AsyncClientImplTest, BasicStream) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
 
+  {
+    // Senseless but improves coverage.
+    Http::StreamDecoderFilterCallbacks* filter_callbacks =
+        dynamic_cast<Http::AsyncStreamImpl*>(stream);
+    filter_callbacks->continueDecoding(); // No-op.
+    Buffer::OwnedImpl buffer;
+    filter_callbacks->injectDecodedDataToFilterChain(buffer, true);   // No-op.
+    filter_callbacks->modifyDecodingBuffer([](Buffer::Instance&) {}); // No-op.
+    filter_callbacks->encodeMetadata(nullptr);                        // No-op.
+    EXPECT_EQ(false, filter_callbacks->recreateStream(nullptr));      // No-op.
+    filter_callbacks->getUpstreamSocketOptions();                     // No-op.
+    filter_callbacks->addUpstreamSocketOptions(nullptr);              // No-op.
+    filter_callbacks->mostSpecificPerFilterConfig();                  // No-op.
+    filter_callbacks->perFilterConfigs();                             // No-op.
+    filter_callbacks->http1StreamEncoderOptions();                    // No-op.
+    filter_callbacks->downstreamCallbacks();                          // No-op.
+    filter_callbacks->upstreamCallbacks();                            // No-op.
+    filter_callbacks->resetIdleTimer();                               // No-op.
+    filter_callbacks->setUpstreamOverrideHost({});                    // No-op.
+    filter_callbacks->filterConfigName();                             // No-op.
+    filter_callbacks->informationalHeaders();                         // No-op.
+    filter_callbacks->responseHeaders();                              // No-op.
+    filter_callbacks->responseTrailers();                             // No-op.
+  }
+
   response_decoder_->decode1xxHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
   response_decoder_->decodeHeaders(
@@ -472,6 +497,8 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   EXPECT_NE(request, nullptr);
 
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
+
   // Registering a new watermark callback should note that the high watermark has already been hit.
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   request->setWatermarkCallbacks(watermark_callbacks);
@@ -529,9 +556,9 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
       client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
 
-  // StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   request->setWatermarkCallbacks(watermark_callbacks);
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
   request->sendData(data, false);

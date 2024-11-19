@@ -5,10 +5,16 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      gcs-cache-key:
+        required: true
     inputs:
       dependency-review:
         type: boolean
         default: false
+      gcs-cache-bucket:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -23,6 +29,8 @@ concurrency:
 
 jobs:
   deps:
+    secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
       contents: read
       packages: read
@@ -32,6 +40,7 @@ jobs:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.request }}
       error-match: |
         ERROR
@@ -51,9 +60,9 @@ jobs:
     if: ${{ inputs.dependency-review }}
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938  # v4.2.0
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
       with:
         ref: ${{ fromJSON(inputs.request).request.sha }}
         persist-credentials: false
     - name: Dependency Review
-      uses: actions/dependency-review-action@5a2ce3f5b92ee19cbb1541a4984c76d921601d7c  # v4.3.4
+      uses: actions/dependency-review-action@4081bf99e2866ebe428fc0477b69eb4fcda7220a  # v4.4.0

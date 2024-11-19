@@ -62,9 +62,16 @@ protected:
           Trace{trace, std::chrono::steady_clock::now()}); // NO_CHECK_FORMAT(real_time)
     }
 
-    OptRef<const std::vector<Trace>> getTraces() override {
+    std::string getTraces() override {
       absl::MutexLock lock(&mutex_);
-      return traces_;
+      std::vector<std::string> string_traces;
+      string_traces.reserve(traces_.size());
+      std::transform(traces_.begin(), traces_.end(), std::back_inserter(string_traces),
+                     [](const Trace& trace) {
+                       return absl::StrCat(trace.trace_, "=",
+                                           trace.time_.time_since_epoch().count());
+                     });
+      return absl::StrJoin(string_traces, ",");
     }
 
     bool isCancelled() {

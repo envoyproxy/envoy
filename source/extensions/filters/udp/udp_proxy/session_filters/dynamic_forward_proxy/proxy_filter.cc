@@ -49,6 +49,12 @@ ReadFilterStatus ProxyFilter::onNewSession() {
     host = host_filter_state->asString();
   }
 
+  if (host.empty()) {
+    // The session may be routed to a non-dynamic cluster.
+    load_dns_cache_completed_ = true;
+    return ReadFilterStatus::Continue;
+  }
+
   absl::optional<uint32_t> port;
   const auto* port_filter_state =
       read_callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
@@ -58,8 +64,8 @@ ReadFilterStatus ProxyFilter::onNewSession() {
     port = port_filter_state->value();
   }
 
-  if (host.empty() || !port.has_value()) {
-    ENVOY_LOG(trace, "new session missing host or port");
+  if (!port.has_value()) {
+    ENVOY_LOG(trace, "port value missed or out of range");
     // TODO(ohadvano): add callback to remove session.
     return ReadFilterStatus::StopIteration;
   }

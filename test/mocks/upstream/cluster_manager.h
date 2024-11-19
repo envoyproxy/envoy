@@ -38,8 +38,8 @@ public:
   MOCK_METHOD(absl::Status, initialize, (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(bool, initialized, ());
   MOCK_METHOD(bool, addOrUpdateCluster,
-              (const envoy::config::cluster::v3::Cluster& cluster,
-               const std::string& version_info));
+              (const envoy::config::cluster::v3::Cluster& cluster, const std::string& version_info,
+               const bool avoid_cds_removal));
   MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback));
   MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback));
   MOCK_METHOD(absl::Status, initializeSecondaryClusters,
@@ -48,11 +48,13 @@ public:
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
-  MOCK_METHOD(bool, removeCluster, (const std::string& cluster));
+  MOCK_METHOD(bool, removeCluster, (const std::string& cluster, const bool remove_ignored));
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(bool, isShutdown, ());
   MOCK_METHOD(const absl::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
   MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, ());
+  MOCK_METHOD(absl::Status, replaceAdsMux,
+              (const envoy::config::core::v3::ApiConfigSource& ads_config));
   MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
   MOCK_METHOD(const std::string, versionInfo, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, localClusterName, (), (const));
@@ -84,7 +86,8 @@ public:
   MOCK_METHOD(void, drainConnections, (DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(absl::Status, checkActiveStaticCluster, (const std::string& cluster));
   MOCK_METHOD(OdCdsApiHandlePtr, allocateOdCdsApi,
-              (const envoy::config::core::v3::ConfigSource& odcds_config,
+              (OdCdsCreationFunction creation_function,
+               const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                ProtobufMessage::ValidationVisitor& validation_visitor));
   std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(

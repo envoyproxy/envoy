@@ -85,8 +85,7 @@ protected:
         absl::get<0>(state_)->getNextRequestAckless());
   }
 
-  UpdateAck
-  handleResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& response_proto) {
+  UpdateAck handleResponse(envoy::service::discovery::v3::DeltaDiscoveryResponse& response_proto) {
     if (should_use_unified_) {
       return absl::get<1>(state_)->handleResponse(response_proto);
     }
@@ -111,6 +110,28 @@ protected:
           if (updated_resources) {
             EXPECT_EQ(added.size(), *updated_resources);
           }
+        }));
+    return handleResponse(message);
+  }
+
+  UpdateAck deliverDiscoveryResponse(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      absl::string_view version_info, absl::string_view nonce,
+      const std::vector<envoy::service::discovery::v3::Resource>& updated_resources) {
+    envoy::service::discovery::v3::DeltaDiscoveryResponse message;
+    *message.mutable_resources() = added_resources;
+    *message.mutable_removed_resources() = removed_resources;
+    message.set_system_version_info(version_info);
+    message.set_nonce(nonce);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, _))
+        .WillOnce(Invoke([&updated_resources](const auto& added, const auto&, const auto&) {
+          EXPECT_TRUE(std::equal(updated_resources.begin(), updated_resources.end(), added.begin(),
+                                 added.end(),
+                                 [](const envoy::service::discovery::v3::Resource& a,
+                                    const envoy::service::discovery::v3::Resource* const b) {
+                                   return TestUtility::protoEqual(a, *b, /*ignore_ordering=*/false);
+                                 }));
         }));
     return handleResponse(message);
   }
@@ -1223,6 +1244,177 @@ TEST_P(DeltaSubscriptionStateTest, ResourceTTL) {
 
   // Invoke the TTL.
   ttl_timer_->invokeCallback();
+}
+
+// Validates that when both heartbeat and non-heartbeat resources are sent, only
+// the non-heartbeat resources are processed.
+TEST_P(DeltaSubscriptionStateTest, HeartbeatResourcesNotProcessed) {
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+
+  auto create_resource_with_ttl = [](absl::string_view name, absl::string_view version,
+                                     absl::optional<std::chrono::seconds> ttl_s,
+                                     bool include_resource) {
+    envoy::service::discovery::v3::Resource resource;
+    resource.set_name(name);
+    resource.set_version(version);
+
+    if (include_resource) {
+      resource.mutable_resource();
+    }
+
+    if (ttl_s) {
+      ProtobufWkt::Duration ttl;
+      ttl.set_seconds(ttl_s->count());
+      resource.mutable_ttl()->CopyFrom(ttl);
+    }
+
+    return resource;
+  };
+
+  // Add 3 resources.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    const auto r1 = create_resource_with_ttl("name1", "version1", std::chrono::seconds(1), true);
+    const auto r2 = create_resource_with_ttl("name2", "version1", std::chrono::seconds(1), true);
+    const auto r3 = create_resource_with_ttl("name3", "version1", std::chrono::seconds(1), true);
+    added_resources.Add()->CopyFrom(r1);
+    added_resources.Add()->CopyFrom(r2);
+    added_resources.Add()->CopyFrom(r3);
+    EXPECT_CALL(*ttl_timer_, enabled());
+    EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+    deliverDiscoveryResponse(added_resources, {}, "sys_version1", "nonce1", {r1, r2, r3});
+  }
+
+  // Update 3 resources, the second is a heartbeat. Validate that only the other
+  // two are passed to onConfigUpdate.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    const auto r1 = create_resource_with_ttl("name1", "version2", std::chrono::seconds(1), true);
+    const auto r2 = create_resource_with_ttl("name2", "version1", std::chrono::seconds(1), false);
+    const auto r3 = create_resource_with_ttl("name3", "version2", std::chrono::seconds(1), true);
+    added_resources.Add()->CopyFrom(r1);
+    added_resources.Add()->CopyFrom(r2);
+    added_resources.Add()->CopyFrom(r3);
+    EXPECT_CALL(*ttl_timer_, enabled());
+    deliverDiscoveryResponse(added_resources, {}, "sys_version2", "nonce2", {r1, r3});
+  }
+
+  // Update 3 resources, the first is a heartbeat. Validate that only the other
+  // two are passed to onConfigUpdate.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    const auto r1 = create_resource_with_ttl("name1", "version2", std::chrono::seconds(1), false);
+    const auto r2 = create_resource_with_ttl("name2", "version3", std::chrono::seconds(1), true);
+    const auto r3 = create_resource_with_ttl("name3", "version3", std::chrono::seconds(1), true);
+    added_resources.Add()->CopyFrom(r1);
+    added_resources.Add()->CopyFrom(r2);
+    added_resources.Add()->CopyFrom(r3);
+    EXPECT_CALL(*ttl_timer_, enabled());
+    deliverDiscoveryResponse(added_resources, {}, "sys_version3", "nonce3", {r2, r3});
+  }
+
+  // Update 3 resources, the last is a heartbeat. Validate that only the other
+  // two are passed to onConfigUpdate.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    const auto r1 = create_resource_with_ttl("name1", "version4", std::chrono::seconds(1), true);
+    const auto r2 = create_resource_with_ttl("name2", "version4", std::chrono::seconds(1), true);
+    const auto r3 = create_resource_with_ttl("name3", "version3", std::chrono::seconds(1), false);
+    added_resources.Add()->CopyFrom(r1);
+    added_resources.Add()->CopyFrom(r2);
+    added_resources.Add()->CopyFrom(r3);
+    EXPECT_CALL(*ttl_timer_, enabled());
+    deliverDiscoveryResponse(added_resources, {}, "sys_version4", "nonce4", {r1, r2});
+  }
+}
+
+// Validates that when both heartbeat and non-heartbeat resources are sent, only
+// the non-heartbeat resources are processed.
+// Once "envoy.reloadable_features.xds_prevent_resource_copy" is removed, this
+// test should be removed (the HeartbeatResourcesNotProcessed will validate the
+// required aspects).
+TEST_P(DeltaSubscriptionStateTest, HeartbeatResourcesNotProcessedWithResourceCopy) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.xds_prevent_resource_copy", "false"}});
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(0));
+
+  auto create_resource_with_ttl = [](absl::string_view name, absl::string_view version,
+                                     absl::optional<std::chrono::seconds> ttl_s,
+                                     bool include_resource) {
+    envoy::service::discovery::v3::Resource resource;
+    resource.set_name(name);
+    resource.set_version(version);
+
+    if (include_resource) {
+      resource.mutable_resource();
+    }
+
+    if (ttl_s) {
+      ProtobufWkt::Duration ttl;
+      ttl.set_seconds(ttl_s->count());
+      resource.mutable_ttl()->CopyFrom(ttl);
+    }
+
+    return resource;
+  };
+
+  // Add 3 resources.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    const auto r1 = create_resource_with_ttl("name1", "version1", std::chrono::seconds(1), true);
+    const auto r2 = create_resource_with_ttl("name2", "version1", std::chrono::seconds(1), true);
+    const auto r3 = create_resource_with_ttl("name3", "version1", std::chrono::seconds(1), true);
+    added_resources.Add()->CopyFrom(r1);
+    added_resources.Add()->CopyFrom(r2);
+    added_resources.Add()->CopyFrom(r3);
+    EXPECT_CALL(*ttl_timer_, enabled());
+    EXPECT_CALL(*ttl_timer_, enableTimer(std::chrono::milliseconds(1000), _));
+    deliverDiscoveryResponse(added_resources, {}, "sys_version1", "nonce1", {r1, r2, r3});
+  }
+
+  // Update 3 resources, the second is a heartbeat. Validate that only the other
+  // two are passed to onConfigUpdate.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    const auto r1 = create_resource_with_ttl("name1", "version2", std::chrono::seconds(1), true);
+    const auto r2 = create_resource_with_ttl("name2", "version1", std::chrono::seconds(1), false);
+    const auto r3 = create_resource_with_ttl("name3", "version2", std::chrono::seconds(1), true);
+    added_resources.Add()->CopyFrom(r1);
+    added_resources.Add()->CopyFrom(r2);
+    added_resources.Add()->CopyFrom(r3);
+    EXPECT_CALL(*ttl_timer_, enabled());
+    deliverDiscoveryResponse(added_resources, {}, "sys_version2", "nonce2", {r1, r3});
+  }
+
+  // Update 3 resources, the first is a heartbeat. Validate that only the other
+  // two are passed to onConfigUpdate.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    const auto r1 = create_resource_with_ttl("name1", "version2", std::chrono::seconds(1), false);
+    const auto r2 = create_resource_with_ttl("name2", "version3", std::chrono::seconds(1), true);
+    const auto r3 = create_resource_with_ttl("name3", "version3", std::chrono::seconds(1), true);
+    added_resources.Add()->CopyFrom(r1);
+    added_resources.Add()->CopyFrom(r2);
+    added_resources.Add()->CopyFrom(r3);
+    EXPECT_CALL(*ttl_timer_, enabled());
+    deliverDiscoveryResponse(added_resources, {}, "sys_version3", "nonce3", {r2, r3});
+  }
+
+  // Update 3 resources, the last is a heartbeat. Validate that only the other
+  // two are passed to onConfigUpdate.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
+    const auto r1 = create_resource_with_ttl("name1", "version4", std::chrono::seconds(1), true);
+    const auto r2 = create_resource_with_ttl("name2", "version4", std::chrono::seconds(1), true);
+    const auto r3 = create_resource_with_ttl("name3", "version3", std::chrono::seconds(1), false);
+    added_resources.Add()->CopyFrom(r1);
+    added_resources.Add()->CopyFrom(r2);
+    added_resources.Add()->CopyFrom(r3);
+    EXPECT_CALL(*ttl_timer_, enabled());
+    deliverDiscoveryResponse(added_resources, {}, "sys_version4", "nonce4", {r1, r2});
+  }
 }
 
 TEST_P(DeltaSubscriptionStateTest, TypeUrlMismatch) {

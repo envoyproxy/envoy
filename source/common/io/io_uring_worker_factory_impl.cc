@@ -1,6 +1,7 @@
 #include "source/common/io/io_uring_worker_factory_impl.h"
 
 #include "source/common/io/io_uring_worker_impl.h"
+#include "source/common/network/io_uring_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Io {
@@ -33,6 +34,13 @@ void IoUringWorkerFactoryImpl::onWorkerThreadInitialized() {
 
 bool IoUringWorkerFactoryImpl::currentThreadRegistered() {
   return !tls_.isShutdown() && tls_.currentThreadRegistered();
+}
+
+Network::IoHandlePtr
+IoUringWorkerFactoryImpl::createIoUringSocketHandle(int socket_fd, bool socket_v6only,
+                                                    absl::optional<int> domain) {
+  return std::make_unique<Network::IoUringSocketHandleImpl>(*this, socket_fd, socket_v6only,
+                                                            domain);
 }
 
 } // namespace Io

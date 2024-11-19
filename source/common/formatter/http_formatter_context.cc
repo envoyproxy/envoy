@@ -49,10 +49,10 @@ static constexpr absl::string_view DEFAULT_FORMAT =
     "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
     "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
 
-FormatterPtr HttpSubstitutionFormatUtils::defaultSubstitutionFormatter() {
+absl::StatusOr<FormatterPtr> HttpSubstitutionFormatUtils::defaultSubstitutionFormatter() {
   // It is possible that failed to parse the default format string if the required formatters
   // are compiled out.
-  return std::make_unique<Envoy::Formatter::FormatterImpl>(DEFAULT_FORMAT, false);
+  return Envoy::Formatter::FormatterImpl::create(DEFAULT_FORMAT, false);
 }
 
 } // namespace Formatter

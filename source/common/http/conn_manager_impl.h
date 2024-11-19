@@ -189,18 +189,27 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
-    std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-      std::list<AccessLog::InstanceSharedPtr> combined_log_handlers(
-          filter_manager_.accessLogHandlers());
-      std::list<AccessLog::InstanceSharedPtr> config_log_handlers_(
-          connection_manager_.config_->accessLogs());
+    AccessLog::InstanceSharedPtrVector accessLogHandlers() override {
+      const AccessLog::InstanceSharedPtrVector& config_log_handlers =
+          connection_manager_.config_->accessLogs();
+      const AccessLog::InstanceSharedPtrVector& filter_log_handlers =
+          filter_manager_.accessLogHandlers();
+
+      AccessLog::InstanceSharedPtrVector combined_log_handlers;
+      combined_log_handlers.reserve(config_log_handlers.size() + filter_log_handlers.size());
+
       if (!Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.filter_access_loggers_first")) {
-        combined_log_handlers.insert(combined_log_handlers.begin(), config_log_handlers_.begin(),
-                                     config_log_handlers_.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+
       } else {
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers_.begin(),
-                                     config_log_handlers_.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
       }
       return combined_log_handlers;
     }
@@ -338,7 +347,8 @@ private:
           : codec_saw_local_complete_(false), codec_encode_complete_(false),
             on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
             is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true), deferred_to_next_io_iteration_(false) {}
+            decorated_propagate_(true), deferred_to_next_io_iteration_(false),
+            deferred_end_stream_(false) {}
 
       // It's possibly for the codec to see the completed response but not fully
       // encode it.

@@ -71,13 +71,12 @@ struct ConfigOption {
   int fallback_ttl_sec = 15;
 };
 
-// These tests exercise the rate limit quota filter through Envoy's integration
-// test environment by configuring an instance of the Envoy server and driving
-// it through the mock network stack.
-class RateLimitQuotaIntegrationTest
-    : public Event::TestUsingSimulatedTime,
-      public HttpIntegrationTest,
-      public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
+// These tests exercise the rate limit quota filter through Envoy's integration test
+// environment by configuring an instance of the Envoy server and driving it
+// through the mock network stack.
+class RateLimitQuotaIntegrationTest : public Event::TestUsingSimulatedTime,
+                                      public HttpIntegrationTest,
+                                      public Grpc::GrpcClientIntegrationParamTest {
 protected:
   RateLimitQuotaIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {
     deny_all_strategy.set_blanket_rule(RateLimitStrategy::DENY_ALL);
@@ -176,11 +175,6 @@ protected:
       rate_limit_quota_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(
           MessageUtil::getJsonStringFromMessageOrError(rate_limit_quota_filter));
-
-      // Parameterize with defer processing to prevent bit rot as filter
-      // made assumptions of data flow, prior relying on eager processing.
-      config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                        deferredProcessing() ? "true" : "false");
     });
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -255,10 +249,9 @@ protected:
   RateLimitStrategy allow_all_strategy;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientTypeDeferredProcessing, RateLimitQuotaIntegrationTest,
-    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
-    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, RateLimitQuotaIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 TEST_P(RateLimitQuotaIntegrationTest, StartFailed) {
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);

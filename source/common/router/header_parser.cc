@@ -45,7 +45,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
   final_header_value = HeaderParser::translatePerRequestState(final_header_value);
 
   // Let the substitution formatter parse the final_header_value.
-  return std::make_unique<Envoy::Formatter::FormatterImpl>(final_header_value, true);
+  return Envoy::Formatter::FormatterImpl::create(final_header_value, true);
 }
 
 } // namespace
@@ -87,6 +87,7 @@ HeadersToAddEntry::HeadersToAddEntry(const HeaderValue& header_value,
 absl::StatusOr<HeaderParserPtr>
 HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& headers_to_add) {
   HeaderParserPtr header_parser(new HeaderParser());
+  header_parser->headers_to_add_.reserve(headers_to_add.size());
   for (const auto& header_value_option : headers_to_add) {
     auto entry_or_error = HeadersToAddEntry::create(header_value_option);
     RETURN_IF_NOT_OK_REF(entry_or_error.status());
@@ -103,6 +104,7 @@ absl::StatusOr<HeaderParserPtr> HeaderParser::configure(
     HeaderAppendAction append_action) {
   HeaderParserPtr header_parser(new HeaderParser());
 
+  header_parser->headers_to_add_.reserve(headers_to_add.size());
   for (const auto& header_value : headers_to_add) {
     auto entry_or_error = HeadersToAddEntry::create(header_value, append_action);
     RETURN_IF_NOT_OK_REF(entry_or_error.status());
@@ -120,6 +122,7 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
   RETURN_IF_NOT_OK_REF(parser_or_error.status());
   HeaderParserPtr header_parser = std::move(parser_or_error.value());
 
+  header_parser->headers_to_remove_.reserve(headers_to_remove.size());
   for (const auto& header : headers_to_remove) {
     // We reject :-prefix (e.g. :path) removal here. This is dangerous, since other aspects of
     // request finalization assume their existence and they are needed for well-formedness in most

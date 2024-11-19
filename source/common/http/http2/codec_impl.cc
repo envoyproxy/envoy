@@ -105,6 +105,7 @@ int reasonToReset(StreamResetReason reason) {
 }
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
+using OnHeaderResult = http2::adapter::Http2VisitorInterface::OnHeaderResult;
 
 enum Settings {
   // SETTINGS_HEADER_TABLE_SIZE = 0x01,
@@ -202,8 +203,6 @@ ConnectionImpl::StreamImpl::StreamImpl(ConnectionImpl& parent, uint32_t buffer_l
       data_deferred_(false), received_noninformational_headers_(false),
       pending_receive_buffer_high_watermark_called_(false),
       pending_send_buffer_high_watermark_called_(false), reset_due_to_messaging_error_(false),
-      defer_processing_backedup_streams_(
-          Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)),
       extend_stream_lifetime_flag_(false) {
   parent_.stats_.streams_active_.inc();
   if (buffer_limit > 0) {
@@ -442,7 +441,7 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData(bool schedule_next_iteration) {
-  if (defer_processing_backedup_streams_ && stream_manager_.hasBufferedBodyOrTrailers()) {
+  if (stream_manager_.hasBufferedBodyOrTrailers()) {
     if (!process_buffered_data_callback_) {
       process_buffered_data_callback_ = parent_.connection_.dispatcher().createSchedulableCallback(
           [this]() { processBufferedData(); });
@@ -459,36 +458,24 @@ void ConnectionImpl::StreamImpl::scheduleProcessingOfBufferedData(bool schedule_
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferHighWatermark() {
-  // If `defer_processing_backedup_streams_`, read disabling here can become
-  // dangerous as it can prevent us from processing buffered data.
-  if (!defer_processing_backedup_streams_) {
-    ENVOY_CONN_LOG(debug, "recv buffer over limit ", parent_.connection_);
-    ASSERT(!pending_receive_buffer_high_watermark_called_);
-    pending_receive_buffer_high_watermark_called_ = true;
-    readDisable(true);
-  }
+  // Due to deferred processing of backed up streams, this is a NOP: read
+  // disabling here can become dangerous as it can prevent us from processing
+  // buffered data.
 }
 
 void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
-  // If `defer_processing_backedup_streams_`, we don't read disable on
+  // Due to deferred processing of backed up streams, we don't read disable on
   // high watermark, so we shouldn't read disable here.
-  if (defer_processing_backedup_streams_) {
-    if (shouldAllowPeerAdditionalStreamWindow()) {
-      // We should grant additional stream window here, in case the
-      // `pending_recv_buffer_` was blocking flow control updates
-      // from going to the peer.
-      grantPeerAdditionalStreamWindow();
-    }
-  } else {
-    ENVOY_CONN_LOG(debug, "recv buffer under limit ", parent_.connection_);
-    ASSERT(pending_receive_buffer_high_watermark_called_);
-    pending_receive_buffer_high_watermark_called_ = false;
-    readDisable(false);
+  if (shouldAllowPeerAdditionalStreamWindow()) {
+    // We should grant additional stream window here, in case the
+    // `pending_recv_buffer_` was blocking flow control updates
+    // from going to the peer.
+    grantPeerAdditionalStreamWindow();
   }
 }
 
 void ConnectionImpl::StreamImpl::decodeData() {
-  if (defer_processing_backedup_streams_ && buffersOverrun()) {
+  if (buffersOverrun()) {
     ENVOY_CONN_LOG(trace, "Stream {} buffering decodeData() call.", parent_.connection_,
                    stream_id_);
     stream_manager_.body_buffered_ = true;
@@ -508,7 +495,7 @@ void ConnectionImpl::StreamImpl::decodeData() {
     // data than the defer_processing_segment_size. Otherwise, push the
     // entire buffer through.
     const bool decode_data_in_chunk =
-        defer_processing_backedup_streams_ && stream_manager_.decodeAsChunks() &&
+        stream_manager_.decodeAsChunks() &&
         pending_recv_data_->length() > stream_manager_.defer_processing_segment_size_;
 
     if (decode_data_in_chunk) {
@@ -580,7 +567,7 @@ bool ConnectionImpl::StreamImpl::maybeDeferDecodeTrailers() {
   // 1) Buffers are overrun
   // 2) There's buffered body which should get processed before these trailers
   //    to avoid losing data.
-  if (defer_processing_backedup_streams_ && (buffersOverrun() || stream_manager_.body_buffered_)) {
+  if (buffersOverrun() || stream_manager_.body_buffered_) {
     stream_manager_.trailers_buffered_ = true;
     ENVOY_CONN_LOG(trace, "Stream {} buffering decodeTrailers() call.", parent_.connection_,
                    stream_id_);
@@ -661,56 +648,9 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   parent_.adapter_->SubmitTrailer(stream_id_, final_headers);
 }
 
-std::pair<int64_t, bool>
-ConnectionImpl::StreamDataFrameSource::SelectPayloadLength(size_t max_length) {
-  if (stream_.pending_send_data_->length() == 0 && !stream_.local_end_stream_) {
-    ASSERT(!stream_.data_deferred_);
-    stream_.data_deferred_ = true;
-    return {kBlocked, false};
-  } else {
-    const size_t length = std::min<size_t>(max_length, stream_.pending_send_data_->length());
-    bool end_data = false;
-    if (stream_.local_end_stream_ && length == stream_.pending_send_data_->length()) {
-      end_data = true;
-      if (stream_.pending_trailers_to_encode_) {
-        stream_.submitTrailers(*stream_.pending_trailers_to_encode_);
-        stream_.pending_trailers_to_encode_.reset();
-      } else {
-        send_fin_ = true;
-      }
-    }
-    return {static_cast<int64_t>(length), end_data};
-  }
-}
-
-bool ConnectionImpl::StreamDataFrameSource::Send(absl::string_view frame_header,
-                                                 size_t payload_length) {
-  stream_.parent_.protocol_constraints_.incrementOutboundDataFrameCount();
-
-  Buffer::OwnedImpl output;
-  stream_.parent_.addOutboundFrameFragment(
-      output, reinterpret_cast<const uint8_t*>(frame_header.data()), frame_header.size());
-  if (!stream_.parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
-    ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
-                   stream_.parent_.connection_);
-    stream_.setDetails(Http2ResponseCodeDetails::get().outbound_frame_flood);
-  }
-
-  stream_.parent_.stats_.pending_send_bytes_.sub(payload_length);
-  output.move(*stream_.pending_send_data_, payload_length);
-  stream_.parent_.connection_.write(output, false);
-  return true;
-}
-
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ == -1);
-  const bool skip_frame_source =
-      end_stream ||
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_visitor_for_data");
-  stream_id_ = parent_.adapter_->SubmitRequest(
-      buildHeaders(headers),
-      skip_frame_source ? nullptr : std::make_unique<StreamDataFrameSource>(*this), end_stream,
-      base());
+  stream_id_ = parent_.adapter_->SubmitRequest(buildHeaders(headers), nullptr, end_stream, base());
   ASSERT(stream_id_ > 0);
 }
 
@@ -730,12 +670,7 @@ void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
 
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ != -1);
-  const bool skip_frame_source =
-      end_stream ||
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_use_visitor_for_data");
-  parent_.adapter_->SubmitResponse(
-      stream_id_, buildHeaders(headers),
-      skip_frame_source ? nullptr : std::make_unique<StreamDataFrameSource>(*this), end_stream);
+  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers), nullptr, end_stream);
 }
 
 Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
@@ -1484,7 +1419,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
 
       stream->runResetCallbacks(reason, absl::string_view());
 
-    } else if (stream->defer_processing_backedup_streams_ && !stream->reset_reason_.has_value() &&
+    } else if (!stream->reset_reason_.has_value() &&
                stream->stream_manager_.hasBufferedBodyOrTrailers()) {
       ENVOY_CONN_LOG(debug, "buffered onStreamClose for stream: {}", connection_, stream_id);
       // Buffer the call, rely on the stream->process_buffered_data_callback_
@@ -1729,15 +1664,9 @@ void ConnectionImpl::onProtocolConstraintViolation() {
 }
 
 void ConnectionImpl::onUnderlyingConnectionBelowWriteBufferLowWatermark() {
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // Notify the streams based on least recently encoding to the connection.
-    for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
-      (*it)->runLowWatermarkCallbacks();
-    }
-  } else {
-    for (auto& stream : active_streams_) {
-      stream->runLowWatermarkCallbacks();
-    }
+  // Notify the streams based on least recently encoding to the connection.
+  for (auto it = active_streams_.rbegin(); it != active_streams_.rend(); ++it) {
+    (*it)->runLowWatermarkCallbacks();
   }
 }
 
@@ -1825,10 +1754,9 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
-http2::adapter::Http2VisitorInterface::OnHeaderResult
-ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
-                                                absl::string_view name_view,
-                                                absl::string_view value_view) {
+OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
+                                                               absl::string_view name_view,
+                                                               absl::string_view value_view) {
   // TODO PERF: Can reference count here to avoid copies.
   HeaderString name;
   name.setCopy(name_view.data(), name_view.size());
@@ -1837,11 +1765,11 @@ ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
   const int result = connection_->onHeader(stream_id, std::move(name), std::move(value));
   switch (result) {
   case 0:
-    return HEADER_OK;
+    return OnHeaderResult::HEADER_OK;
   case ERR_TEMPORAL_CALLBACK_FAILURE:
-    return HEADER_RST_STREAM;
+    return OnHeaderResult::HEADER_RST_STREAM;
   default:
-    return HEADER_CONNECTION_ERROR;
+    return OnHeaderResult::HEADER_CONNECTION_ERROR;
   }
 }
 
@@ -2232,7 +2160,10 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& decoder) {
 
 Status ClientConnectionImpl::onBeginHeaders(int32_t stream_id) {
   StreamImpl* stream = getStream(stream_id);
-  return stream->onBeginHeaders();
+  if (stream != nullptr) {
+    return stream->onBeginHeaders();
+  }
+  return codecClientError(absl::StrFormat("stream %d is already gone", stream_id));
 }
 
 int ClientConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {

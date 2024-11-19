@@ -118,9 +118,10 @@ void LogicalDnsCluster::startResolve() {
           auto address_list = DnsUtils::generateAddressList(response, dns_port_);
 
           if (!logical_host_) {
-            logical_host_ = std::make_shared<LogicalHost>(info_, hostname_, new_address,
-                                                          address_list, localityLbEndpoint(),
-                                                          lbEndpoint(), nullptr, time_source_);
+            logical_host_ = THROW_OR_RETURN_VALUE(
+                LogicalHost::create(info_, hostname_, new_address, address_list,
+                                    localityLbEndpoint(), lbEndpoint(), nullptr, time_source_),
+                std::unique_ptr<LogicalHost>);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
             PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
@@ -151,7 +152,14 @@ void LogicalDnsCluster::startResolve() {
             final_refresh_rate = addrinfo.ttl_;
           }
           if (dns_jitter_ms_.count() != 0) {
-            final_refresh_rate += std::chrono::milliseconds(random_.random()) % dns_jitter_ms_;
+            // Note that `random_.random()` returns a uint64 while
+            // `dns_jitter_ms_.count()` returns a signed long that gets cast into a uint64.
+            // Thus, the modulo of the two will be a positive as long as
+            // `dns_jitter_ms_.count()` is positive.
+            // It is important that this be positive, otherwise `final_refresh_rate` could be
+            // negative causing Envoy to crash.
+            final_refresh_rate +=
+                std::chrono::milliseconds(random_.random() % dns_jitter_ms_.count());
           }
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
                     final_refresh_rate.count());

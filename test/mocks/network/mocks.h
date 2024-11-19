@@ -44,7 +44,7 @@ public:
   // Network::ActiveDnsQuery
   MOCK_METHOD(void, cancel, (CancelReason reason));
   MOCK_METHOD(void, addTrace, (uint8_t));
-  MOCK_METHOD(OptRef<const std::vector<Trace>>, getTraces, ());
+  MOCK_METHOD(std::string, getTraces, ());
 };
 
 class MockFilterManager : public FilterManager {
@@ -507,7 +507,7 @@ public:
   MOCK_METHOD(bool, ignoreGlobalConnLimit, (), (const));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
     return empty_access_logs_;
   }
 
@@ -519,7 +519,7 @@ public:
   ListenerInfoConstSharedPtr listener_info_;
   Stats::IsolatedStoreImpl store_;
   std::string name_;
-  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  const AccessLog::InstanceSharedPtrVector empty_access_logs_;
 };
 
 class MockListener : public Listener {

@@ -42,14 +42,16 @@ absl::Status validateDurationUnifiedNoThrow(const ProtobufWkt::Duration& duratio
 
   if (duration.seconds() < 0 || duration.nanos() < 0) {
     return absl::OutOfRangeError(
-        fmt::format("Expected positive duration: {}", duration.DebugString()));
+        fmt::format("Invalid duration: Expected positive duration: {}", duration.DebugString()));
   }
   if (!Protobuf::util::TimeUtil::IsDurationValid(duration)) {
     return absl::OutOfRangeError(
-        fmt::format("Duration out-of-range according to Protobuf: {}", duration.DebugString()));
+        fmt::format("Invalid duration: Duration out-of-range according to Protobuf: {}",
+                    duration.DebugString()));
   }
   if (duration.nanos() > 999999999 || duration.seconds() > kMaxSecondsValue) {
-    return absl::OutOfRangeError(fmt::format("Duration out-of-range: {}", duration.DebugString()));
+    return absl::OutOfRangeError(
+        fmt::format("Invalid duration: Duration out-of-range: {}", duration.DebugString()));
   }
   return absl::OkStatus();
 }
@@ -159,7 +161,7 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
 
   THROW_IF_NOT_OK(validation_visitor.onDeprecatedField(
-      "type " + message.GetTypeName() + " " + with_overridden, warn_only));
+      absl::StrCat("type ", message.GetTypeName(), " ", with_overridden), warn_only));
 }
 
 } // namespace
@@ -214,18 +216,7 @@ void ProtoExceptionUtil::throwProtoValidationException(const std::string& valida
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_fast_protobuf_hash")) {
-    return DeterministicProtoHash::hash(message);
-  } else {
-    std::string text_format;
-    Protobuf::TextFormat::Printer printer;
-    printer.SetExpandAny(true);
-    printer.SetUseFieldNumber(true);
-    printer.SetSingleLineMode(true);
-    printer.SetHideUnknownFields(true);
-    printer.PrintToString(message, &text_format);
-    return HashUtil::xxHash64(text_format);
-  }
+  return DeterministicProtoHash::hash(message);
 #else
   return HashUtil::xxHash64(message.SerializeAsString());
 #endif
@@ -325,8 +316,8 @@ public:
     }
   }
 
-  void onMessage(const Protobuf::Message& message,
-                 absl::Span<const Protobuf::Message* const> parents, bool) override {
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const> parents, bool) override {
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     if (reflectable_message->GetDescriptor()
             ->options()
@@ -357,7 +348,7 @@ public:
         absl::StrAppend(&error_msg, n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
       if (!error_msg.empty()) {
-        THROW_IF_NOT_OK(validation_visitor_.onUnknownField(
+        RETURN_IF_NOT_OK(validation_visitor_.onUnknownField(
             fmt::format("type {}({}) with unknown field set {{{}}}", message.GetTypeName(),
                         !parents.empty()
                             ? absl::StrJoin(parents, "::",
@@ -368,6 +359,7 @@ public:
                         error_msg)));
       }
     }
+    return absl::OkStatus();
   }
 
 private:
@@ -396,8 +388,8 @@ class DurationFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
   void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
 
-  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
-                 bool) override {
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const>, bool) override {
     const Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     if (reflectable_message->GetDescriptor()->full_name() == "google.protobuf.Duration") {
       ProtobufWkt::Duration duration_message;
@@ -407,11 +399,9 @@ public:
       duration_message.MergeFromCord(message.SerializeAsCord());
 #endif
       // Validate the value of the duration.
-      absl::Status status = validateDurationUnifiedNoThrow(duration_message);
-      if (!status.ok()) {
-        throwEnvoyExceptionOrPanic(fmt::format("Invalid duration: {}", status.message()));
-      }
+      RETURN_IF_NOT_OK(validateDurationUnifiedNoThrow(duration_message));
     }
+    return absl::OkStatus();
   }
 };
 
@@ -429,8 +419,9 @@ namespace {
 
 class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
-  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
-                 bool was_any_or_top_level) override {
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const>,
+                         bool was_any_or_top_level) override {
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     std::string err;
     // PGV verification is itself recursive up to the point at which it hits an Any message. As
@@ -438,8 +429,11 @@ public:
     // at which PGV would have stopped because it does not itself check within Any messages.
     if (was_any_or_top_level &&
         !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
-      ProtoExceptionUtil::throwProtoValidationException(err, *reflectable_message);
+      std::string error = fmt::format("Proto constraint validation failed ({}): {}", err,
+                                      reflectable_message->DebugString());
+      return absl::InvalidArgumentError(error);
     }
+    return absl::OkStatus();
   }
 
   void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
@@ -459,20 +453,6 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
   any_message.set_type_url(message.GetTypeName());
   any_message.set_value(message.SerializeAsString());
 #endif
-}
-
-void MessageUtil::unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-#if defined(ENVOY_ENABLE_FULL_PROTOS)
-  if (!any_message.UnpackTo(&message)) {
-    throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}",
-                                           message.GetDescriptor()->full_name(),
-                                           any_message.DebugString()));
-#else
-  if (!message.ParseFromString(any_message.value())) {
-    throwEnvoyExceptionOrPanic(
-        fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
-#endif
-  }
 }
 
 absl::Status MessageUtil::unpackTo(const ProtobufWkt::Any& any_message,
@@ -726,14 +706,6 @@ void MessageUtil::redact(Protobuf::Message& message) {
   ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
 }
 
-void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst) {
-  // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
-  // this can fail.
-  if (!dst.ParseFromString(src.SerializeAsString())) {
-    throwEnvoyExceptionOrPanic("Unable to deserialize during wireCast()");
-  }
-}
-
 std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   std::string text_format;
@@ -932,11 +904,11 @@ void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& wit
   }
 }
 
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api) {
+absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Api::Api& api) {
   auto file_or_error = api.fileSystem().fileReadToEnd(path);
-  THROW_IF_NOT_OK_REF(file_or_error.status());
+  RETURN_IF_NOT_OK_REF(file_or_error.status());
   const std::string contents = file_or_error.value();
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
@@ -944,20 +916,21 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     if (message.ParseFromString(contents)) {
       MessageUtil::checkForUnexpectedFields(message, validation_visitor);
     }
-    // Ideally this would throw an error if ParseFromString fails for consistency
+    // Ideally this would return an error if ParseFromString fails for consistency
     // but instead it will silently fail.
-    return;
+    return absl::OkStatus();
   }
 
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
     if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-      return;
+      return absl::OkStatus();
     }
 #endif
-    throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                               message.GetTypeName() + ")");
+    return absl::InvalidArgumentError(absl::StrCat("Unable to parse file \"", path,
+                                                   "\" as a text protobuf (type ",
+                                                   message.GetTypeName(), ")"));
   }
 #ifdef ENVOY_ENABLE_YAML
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
@@ -970,9 +943,10 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     loadFromJson(contents, message, validation_visitor);
   }
 #else
-  throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" (type " +
-                             message.GetTypeName() + ")");
+  return absl::InvalidArgumentError("Unable to parse file \"" + path + "\" (type " +
+                                    message.GetTypeName() + ")");
 #endif
+  return absl::OkStatus();
 }
 
 } // namespace Envoy

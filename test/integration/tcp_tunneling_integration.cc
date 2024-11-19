@@ -28,13 +28,11 @@ std::vector<TcpTunnelingTestParams> BaseTcpTunnelingIntegrationTest::getProtocol
         }
 
         std::vector<Http2Impl> http2_implementations = {Http2Impl::Nghttp2};
-        std::vector<bool> http2_bool_values = {false};
         if ((!handled_http2_special_cases_downstream &&
              downstream_protocol == Http::CodecType::HTTP2) ||
             (!handled_http2_special_cases_upstream &&
              upstream_protocol == Http::CodecType::HTTP2)) {
           http2_implementations.push_back(Http2Impl::Oghttp2);
-          http2_bool_values.push_back(true);
 
           if (downstream_protocol == Http::CodecType::HTTP2) {
             handled_http2_special_cases_downstream = true;
@@ -53,13 +51,10 @@ std::vector<TcpTunnelingTestParams> BaseTcpTunnelingIntegrationTest::getProtocol
         for (const bool tunneling_with_upstream_filters : {false, true}) {
           for (Http1ParserImpl http1_implementation : http1_implementations) {
             for (Http2Impl http2_implementation : http2_implementations) {
-              for (bool defer_processing : http2_bool_values) {
-                for (bool use_header_validator : use_header_validator_values) {
-                  ret.push_back(TcpTunnelingTestParams{
-                      ip_version, downstream_protocol, upstream_protocol, http1_implementation,
-                      http2_implementation, defer_processing, use_header_validator,
-                      tunneling_with_upstream_filters});
-                }
+              for (bool use_header_validator : use_header_validator_values) {
+                ret.push_back(TcpTunnelingTestParams{
+                    ip_version, downstream_protocol, upstream_protocol, http1_implementation,
+                    http2_implementation, use_header_validator, tunneling_with_upstream_filters});
               }
             }
           }
@@ -77,8 +72,6 @@ std::string BaseTcpTunnelingIntegrationTest::protocolTestParamsToString(
                       upstreamToString(params.param.upstream_protocol),
                       TestUtility::http1ParserImplToString(params.param.http1_implementation),
                       http2ImplementationToString(params.param.http2_implementation),
-                      params.param.defer_processing_backedup_streams ? "WithDeferredProcessing"
-                                                                     : "NoDeferredProcessing",
                       params.param.use_universal_header_validator ? "Uhv" : "Legacy",
                       params.param.tunneling_with_upstream_filters ? "WithUpstreamHttpFilters"
                                                                    : "WithoutUpstreamHttpFilters");

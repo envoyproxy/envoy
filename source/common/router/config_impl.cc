@@ -403,7 +403,9 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     auto& factory =
         Envoy::Config::Utility::getAndCheckFactory<InternalRedirectPredicateFactory>(predicate);
     auto config = factory.createEmptyConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), validator, *config);
+    SET_AND_RETURN_IF_NOT_OK(
+        Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), validator, *config),
+        creation_status);
     predicate_factories_.emplace_back(&factory, std::move(config));
   }
   for (const auto& header : policy_config.response_headers_to_copy()) {
@@ -670,7 +672,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
                                        factory_context, validator, cluster),
           std::unique_ptr<WeightedClusterEntry>);
       weighted_clusters.emplace_back(std::move(cluster_entry));
-      total_weight += weighted_clusters.back()->clusterWeight();
+      total_weight += weighted_clusters.back()->clusterWeight(loader_);
       if (total_weight > std::numeric_limits<uint32_t>::max()) {
         creation_status = absl::InvalidArgumentError(
             fmt::format("The sum of weights of all weighted clusters of route {} exceeds {}",
@@ -748,22 +750,17 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
       return;
     }
-    if (absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
-                               Http::Headers::get().MethodValues.Connect) ||
-        absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
-                               Http::Headers::get().UpgradeValues.ConnectUdp)) {
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.http_route_connect_proxy_by_default")) {
-        if (upgrade_config.has_connect_config()) {
-          connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
-        }
-      } else {
+    if (upgrade_config.has_connect_config()) {
+      if (absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
+                                 Http::Headers::get().MethodValues.Connect) ||
+          absl::EqualsIgnoreCase(upgrade_config.upgrade_type(),
+                                 Http::Headers::get().UpgradeValues.ConnectUdp)) {
         connect_config_ = std::make_unique<ConnectConfig>(upgrade_config.connect_config());
+      } else {
+        creation_status = absl::InvalidArgumentError(absl::StrCat(
+            "Non-CONNECT upgrade type ", upgrade_config.upgrade_type(), " has ConnectConfig"));
+        return;
       }
-    } else if (upgrade_config.has_connect_config()) {
-      creation_status = absl::InvalidArgumentError(absl::StrCat(
-          "Non-CONNECT upgrade type ", upgrade_config.upgrade_type(), " has ConnectConfig"));
-      return;
     }
   }
 
@@ -806,7 +803,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (redirect_config_ != nullptr && redirect_config_->path_redirect_has_query_ &&
       redirect_config_->strip_query_) {
-    ENVOY_LOG(warn,
+    ENVOY_LOG(debug,
               "`strip_query` is set to true, but `path_redirect` contains query string and it will "
               "not be stripped: {}",
               redirect_config_->path_redirect_);
@@ -1427,7 +1424,7 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     total_cluster_weight = 0;
     for (const WeightedClusterEntrySharedPtr& cluster :
          weighted_clusters_config_->weighted_clusters_) {
-      auto cluster_weight = cluster->clusterWeight();
+      auto cluster_weight = cluster->clusterWeight(loader_);
       cluster_weights.push_back(cluster_weight);
       if (cluster_weight > std::numeric_limits<uint32_t>::max() - total_cluster_weight) {
         IS_ENVOY_BUG("Sum of weight cannot overflow 2^32");
@@ -1457,7 +1454,7 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     if (runtime_key_prefix_configured) {
       end = begin + *cluster_weight++;
     } else {
-      end = begin + cluster->clusterWeight();
+      end = begin + cluster->clusterWeight(loader_);
     }
 
     if (selected_value >= begin && selected_value < end) {
@@ -1562,7 +1559,6 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     ProtobufMessage::ValidationVisitor& validator,
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster)
     : DynamicRouteEntry(parent, nullptr, cluster.name()), runtime_key_(runtime_key),
-      loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       per_filter_configs_(THROW_OR_RETURN_VALUE(
           PerFilterConfigs::create(cluster.typed_per_filter_config(), factory_context, validator),
@@ -2439,7 +2435,8 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config);
+  RETURN_IF_NOT_OK(
+      Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config));
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
     if (is_optional) {
@@ -2461,8 +2458,8 @@ PerFilterConfigs::PerFilterConfigs(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status) {
 
-  std::string filter_config_type =
-      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
+  std::string filter_config_type(
+      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName());
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;
@@ -2471,8 +2468,11 @@ PerFilterConfigs::PerFilterConfigs(
     if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
         filter_config_type) {
       envoy::config::route::v3::FilterConfig filter_config;
-      Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second, validator,
-                                                    filter_config);
+      creation_status = Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second,
+                                                                      validator, filter_config);
+      if (!creation_status.ok()) {
+        return;
+      }
 
       // The filter is marked as disabled explicitly and the config is ignored directly.
       if (filter_config.disabled()) {

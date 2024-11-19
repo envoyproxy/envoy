@@ -11,6 +11,8 @@
 #include "envoy/http/protocol.h"
 #include "envoy/type/v3/range.pb.h"
 
+#include "source/common/common/matchers.h"
+#include "source/common/common/regex.h"
 #include "source/common/http/status.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -65,30 +67,195 @@ public:
                                                              const Http::LowerCaseString& key,
                                                              absl::string_view separator = ",");
 
-  // A HeaderData specifies one of exact value or regex or range element
-  // to match in a request's header, specified in the header_match_type_ member.
-  // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
-  struct HeaderData : public HeaderMatcher {
-    HeaderData(const envoy::config::route::v3::HeaderMatcher& config,
-               Server::Configuration::CommonFactoryContext& factory_context);
+  // Corresponds to the present_match from the HeaderMatchSpecifier proto in the RDS API.
+  class HeaderDataPresentMatch : public HeaderMatcher {
+  public:
+    HeaderDataPresentMatch(const envoy::config::route::v3::HeaderMatcher& config)
+        : HeaderDataPresentMatch(config, config.present_match()) {}
 
+    // Creates a new present-matcher with an explicit setting of the present field.
+    HeaderDataPresentMatch(const envoy::config::route::v3::HeaderMatcher& config,
+                           bool explicit_present)
+        : name_(config.name()), invert_match_(config.invert_match()),
+          treat_missing_as_empty_(config.treat_missing_header_as_empty()),
+          present_(explicit_present) {}
+
+    bool matchesHeaders(const HeaderMap& request_headers) const override {
+      const auto header_value = getAllOfHeaderAsString(request_headers, name_);
+
+      // If treat_missing_as_empty is false, and the header_value is empty,
+      // return true iff invert_match is the same as present_.
+      if (!header_value.result().has_value() && !treat_missing_as_empty_) {
+        return invert_match_ == present_;
+      }
+
+      return present_ != invert_match_;
+    };
+
+  private:
     const LowerCaseString name_;
-    HeaderMatchType header_match_type_;
-    std::string value_;
-    Regex::CompiledMatcherPtr regex_;
-    envoy::type::v3::Int64Range range_;
-    Matchers::StringMatcherPtr string_match_;
     const bool invert_match_;
     const bool treat_missing_as_empty_;
-    bool present_;
-
-    // HeaderMatcher
-    bool matchesHeaders(const HeaderMap& headers) const override {
-      return HeaderUtility::matchHeaders(headers, *this);
-    };
+    const bool present_;
   };
 
-  using HeaderDataPtr = std::unique_ptr<HeaderData>;
+  // A shared behavior for HeaderDataMatcher types (exact, regex, etc.) that
+  // correspond to the HeaderMatchSpecifier proto in RDS API.
+  class HeaderDataBaseImpl : public HeaderMatcher {
+  public:
+    HeaderDataBaseImpl(const envoy::config::route::v3::HeaderMatcher& config)
+        : name_(config.name()), invert_match_(config.invert_match()),
+          treat_missing_as_empty_(config.treat_missing_header_as_empty()) {}
+
+    // HeaderMatcher
+    bool matchesHeaders(const HeaderMap& request_headers) const override {
+      const auto header_value = getAllOfHeaderAsString(request_headers, name_);
+      // If treat_missing_as_empty_ is false and there is no header value, most
+      // matchers (other than HeaderDataPresentMatch) will just return false here.
+      if (!treat_missing_as_empty_ && !header_value.result().has_value()) {
+        return false;
+      }
+
+      // If the header does not have value and the result is not returned in the
+      // code above, it means treat_missing_as_empty_ is set to true and we should
+      // treat the header value as empty.
+      absl::string_view value =
+          header_value.result().has_value() ? header_value.result().value() : EMPTY_STRING;
+      // Execute the specific matcher's code and invert if invert_match_ is set.
+      return specificMatchesHeaders(value) != invert_match_;
+    };
+
+  protected:
+    // A matcher specific implementation to match the given header_value.
+    virtual bool specificMatchesHeaders(absl::string_view header_value) const PURE;
+    const LowerCaseString name_;
+    const bool invert_match_;
+    const bool treat_missing_as_empty_;
+  };
+
+  // Corresponds to the exact_match from the HeaderMatchSpecifier proto in the RDS API.
+  class HeaderDataExactMatch : public HeaderDataBaseImpl {
+  public:
+    HeaderDataExactMatch(const envoy::config::route::v3::HeaderMatcher& config)
+        : HeaderDataBaseImpl(config), expected_value_(config.exact_match()) {}
+
+  private:
+    bool specificMatchesHeaders(absl::string_view header_value) const override {
+      return expected_value_.empty() || header_value == expected_value_;
+    };
+    const std::string expected_value_;
+  };
+
+  // Corresponds to the safe_regex_match from the HeaderMatchSpecifier proto in the RDS API.
+  class HeaderDataRegexMatch : public HeaderDataBaseImpl {
+  public:
+    HeaderDataRegexMatch(const envoy::config::route::v3::HeaderMatcher& config,
+                         Server::Configuration::CommonFactoryContext& factory_context)
+        : HeaderDataBaseImpl(config),
+          regex_(Regex::Utility::parseRegex(config.safe_regex_match(),
+                                            factory_context.regexEngine())) {}
+
+  private:
+    bool specificMatchesHeaders(absl::string_view header_value) const override {
+      return regex_->match(header_value);
+    };
+    const Regex::CompiledMatcherPtr regex_;
+  };
+
+  // Corresponds to the range_match from the HeaderMatchSpecifier proto in the RDS API.
+  class HeaderDataRangeMatch : public HeaderDataBaseImpl {
+  public:
+    HeaderDataRangeMatch(const envoy::config::route::v3::HeaderMatcher& config)
+        : HeaderDataBaseImpl(config), range_start_(config.range_match().start()),
+          range_end_(config.range_match().end()) {}
+
+  private:
+    bool specificMatchesHeaders(absl::string_view header_value) const override {
+      int64_t header_int_value = 0;
+      return absl::SimpleAtoi(header_value, &header_int_value) &&
+             header_int_value >= range_start_ && header_int_value < range_end_;
+    };
+
+    const int64_t range_start_;
+    const int64_t range_end_;
+  };
+
+  // Corresponds to the prefix_match from the HeaderMatchSpecifier proto in the RDS API.
+  class HeaderDataPrefixMatch : public HeaderDataBaseImpl {
+  public:
+    HeaderDataPrefixMatch(const envoy::config::route::v3::HeaderMatcher& config)
+        : HeaderDataBaseImpl(config), prefix_(config.prefix_match()) {}
+
+  private:
+    bool specificMatchesHeaders(absl::string_view header_value) const override {
+      return absl::StartsWith(header_value, prefix_);
+    };
+    const std::string prefix_;
+  };
+
+  // Corresponds to the suffix_match from the HeaderMatchSpecifier proto in the RDS API.
+  class HeaderDataSuffixMatch : public HeaderDataBaseImpl {
+  public:
+    HeaderDataSuffixMatch(const envoy::config::route::v3::HeaderMatcher& config)
+        : HeaderDataBaseImpl(config), suffix_(config.suffix_match()) {}
+
+  private:
+    bool specificMatchesHeaders(absl::string_view header_value) const override {
+      return absl::EndsWith(header_value, suffix_);
+    };
+    const std::string suffix_;
+  };
+
+  // Corresponds to the contains_match from the HeaderMatchSpecifier proto in the RDS API.
+  class HeaderDataContainsMatch : public HeaderDataBaseImpl {
+  public:
+    HeaderDataContainsMatch(const envoy::config::route::v3::HeaderMatcher& config)
+        : HeaderDataBaseImpl(config), expected_substr_(config.contains_match()) {}
+
+  private:
+    bool specificMatchesHeaders(absl::string_view header_value) const override {
+      return absl::StrContains(header_value, expected_substr_);
+    };
+    const std::string expected_substr_;
+  };
+
+  // Corresponds to the string_match from the HeaderMatchSpecifier proto in the RDS API.
+  class HeaderDataStringMatch : public HeaderDataBaseImpl {
+  public:
+    HeaderDataStringMatch(const envoy::config::route::v3::HeaderMatcher& config,
+                          Server::Configuration::CommonFactoryContext& factory_context)
+        : HeaderDataBaseImpl(config),
+          string_match_(std::make_unique<
+                        Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              config.string_match(), factory_context)) {}
+
+  private:
+    bool specificMatchesHeaders(absl::string_view header_value) const override {
+      return string_match_->match(header_value);
+    };
+    const Matchers::StringMatcherPtr string_match_;
+  };
+
+  using HeaderDataPtr = std::unique_ptr<HeaderMatcher>;
+
+  /**
+   * Creates a Header Data matcher data structure according to the given HeaderMatcher config.
+   * HeaderMatcher will consist of:
+   *   header_match_specifier which can be any one of exact_match, regex_match, range_match,
+   *   present_match, prefix_match or suffix_match.
+   *   Each of these also can be inverted with the invert_match option.
+   *   Absence of these options implies empty header value match based on header presence.
+   *   a.exact_match: value will be used for exact string matching.
+   *   b.regex_match: Match will succeed if header value matches the value specified here.
+   *   c.range_match: Match will succeed if header value lies within the range specified
+   *     here, using half open interval semantics [start,end).
+   *   d.present_match: Match will succeed if the header is present.
+   *   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
+   *   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
+   */
+  static HeaderDataPtr
+  createHeaderData(const envoy::config::route::v3::HeaderMatcher& config,
+                   Server::Configuration::CommonFactoryContext& factory_context);
 
   /**
    * Build a vector of HeaderDataPtr given input config.
@@ -98,7 +265,7 @@ public:
       Server::Configuration::CommonFactoryContext& context) {
     std::vector<HeaderUtility::HeaderDataPtr> ret;
     for (const auto& header_matcher : header_matchers) {
-      ret.emplace_back(std::make_unique<HeaderUtility::HeaderData>(header_matcher, context));
+      ret.emplace_back(HeaderUtility::createHeaderData(header_matcher, context));
     }
     return ret;
   }
@@ -111,7 +278,7 @@ public:
       Server::Configuration::CommonFactoryContext& context) {
     std::vector<Http::HeaderMatcherSharedPtr> ret;
     for (const auto& header_matcher : header_matchers) {
-      ret.emplace_back(std::make_shared<HeaderUtility::HeaderData>(header_matcher, context));
+      ret.emplace_back(HeaderUtility::createHeaderData(header_matcher, context));
     }
     return ret;
   }
@@ -125,8 +292,6 @@ public:
    */
   static bool matchHeaders(const HeaderMap& request_headers,
                            const std::vector<HeaderDataPtr>& config_headers);
-
-  static bool matchHeaders(const HeaderMap& request_headers, const HeaderData& config_header);
 
   /**
    * Validates that a header value is valid, according to RFC 7230, section 3.2.
@@ -239,6 +404,11 @@ public:
    */
   static absl::optional<uint32_t> stripPortFromHost(RequestHeaderMap& headers,
                                                     absl::optional<uint32_t> listener_port);
+
+  /**
+   * @brief Remove the port part from host if it exists.
+   */
+  static void stripPortFromHost(std::string& host);
 
   /**
    * @brief Return the index of the port, or npos if the host has no port

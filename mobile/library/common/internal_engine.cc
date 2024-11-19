@@ -10,6 +10,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/notification.h"
+#include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
@@ -130,6 +131,14 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
       main_common = std::make_unique<EngineCommon>(options);
       server_ = main_common->server();
       event_dispatcher_ = &server_->dispatcher();
+
+      // If proxy resolution APIs are configured on the Engine, set the main thread's dispatcher
+      // on the proxy resolver for handling callbacks.
+      auto* proxy_resolver = static_cast<Network::ProxyResolverApi*>(
+          Api::External::retrieveApi("envoy_proxy_resolver", /*allow_absent=*/true));
+      if (proxy_resolver != nullptr) {
+        proxy_resolver->resolver->setDispatcher(event_dispatcher_);
+      }
 
       cv_.notifyAll();
     }
@@ -293,6 +302,14 @@ void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
       Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
           [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
       cache_manager.forEachThreadLocalCache(clear_brokenness);
+    }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
+      Http::HttpServerPropertiesCacheManager& cache_manager =
+          server_->httpServerPropertiesCacheManager();
+
+      Http::HttpServerPropertiesCacheManager::CacheFn reset_status =
+          [](Http::HttpServerPropertiesCache& cache) { cache.resetStatus(); };
+      cache_manager.forEachThreadLocalCache(reset_status);
     }
     connectivity_manager_->refreshDns(configuration, true);
   });

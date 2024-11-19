@@ -84,6 +84,7 @@ constexpr absl::string_view Destination = "destination";
 constexpr absl::string_view Upstream = "upstream";
 constexpr absl::string_view UpstreamLocalAddress = "local_address";
 constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_reason";
+constexpr absl::string_view UpstreamRequestAttemptCount = "request_attempt_count";
 
 // xDS configuration context properties
 constexpr absl::string_view XDS = "xds";
@@ -105,12 +106,65 @@ public:
 
 using WrapperFields = ConstSingleton<WrapperFieldValues>;
 
+// Forward declarations
 class RequestWrapper;
+class ResponseWrapper;
+class ConnectionWrapper;
+class UpstreamWrapper;
+class PeerWrapper;
+class FilterStateWrapper;
+class XDSWrapper;
 
-absl::optional<CelValue> convertHeaderEntry(const ::Envoy::Http::HeaderEntry* header);
+// Type aliases for value extractors
+using CelValueExtractor = std::function<absl::optional<CelValue>(const RequestWrapper&)>;
+using ResponseValueExtractor = std::function<absl::optional<CelValue>(const ResponseWrapper&)>;
+using ConnectionValueExtractor = std::function<absl::optional<CelValue>(const ConnectionWrapper&)>;
+using UpstreamValueExtractor = std::function<absl::optional<CelValue>(const UpstreamWrapper&)>;
+using XDSValueExtractor = std::function<absl::optional<CelValue>(const XDSWrapper&)>;
+using SslExtractor = std::function<absl::optional<CelValue>(const Ssl::ConnectionInfo&)>;
+
+// Forward declare the singleton value classes
+class RequestLookupValues {
+public:
+  const absl::flat_hash_map<absl::string_view, CelValueExtractor> request_lookup_;
+  static const RequestLookupValues& get();
+};
+
+class ResponseLookupValues {
+public:
+  const absl::flat_hash_map<absl::string_view, ResponseValueExtractor> response_lookup_;
+  static const ResponseLookupValues& get();
+};
+
+class ConnectionLookupValues {
+public:
+  const absl::flat_hash_map<absl::string_view, ConnectionValueExtractor> connection_lookup_;
+  static const ConnectionLookupValues& get();
+};
+
+class UpstreamLookupValues {
+public:
+  const absl::flat_hash_map<absl::string_view, UpstreamValueExtractor> upstream_lookup_;
+  static const UpstreamLookupValues& get();
+};
+
+class XDSLookupValues {
+public:
+  const absl::flat_hash_map<absl::string_view, XDSValueExtractor> xds_lookup_;
+  static const XDSLookupValues& get();
+};
+
+class SslExtractorsValues {
+public:
+  const absl::flat_hash_map<absl::string_view, SslExtractor> extractors_;
+  static const SslExtractorsValues& get();
+};
+
+// Helper functions declarations
+absl::optional<CelValue> convertHeaderEntry(const Http::HeaderEntry* header);
 absl::optional<CelValue>
 convertHeaderEntry(Protobuf::Arena& arena,
-                   ::Envoy::Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
+                   Http::HeaderUtility::GetAllOfHeaderAsStringResult&& result);
 
 template <class T> class HeadersWrapper : public google::api::expr::runtime::CelMap {
 public:
@@ -156,9 +210,9 @@ public:
                                                                                         values);
   }
 
-private:
-  friend class RequestWrapper;
-  friend class ResponseWrapper;
+protected:
+  friend class RequestLookupValues;
+  friend class ResponseLookupValues;
   Protobuf::Arena& arena_;
   const T* value_;
 };
@@ -186,7 +240,8 @@ public:
       : BaseWrapper(arena), headers_(arena, headers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
-private:
+protected:
+  friend class RequestLookupValues;
   const HeadersWrapper<::Envoy::Http::RequestHeaderMap> headers_;
   const StreamInfo::StreamInfo& info_;
 };
@@ -199,7 +254,8 @@ public:
       : BaseWrapper(arena), headers_(arena, headers), trailers_(arena, trailers), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
-private:
+protected:
+  friend class ResponseLookupValues;
   const HeadersWrapper<::Envoy::Http::ResponseHeaderMap> headers_;
   const HeadersWrapper<::Envoy::Http::ResponseTrailerMap> trailers_;
   const StreamInfo::StreamInfo& info_;
@@ -211,7 +267,8 @@ public:
       : BaseWrapper(arena), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
-private:
+protected:
+  friend class ConnectionLookupValues;
   const StreamInfo::StreamInfo& info_;
 };
 
@@ -221,7 +278,8 @@ public:
       : BaseWrapper(arena), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
-private:
+protected:
+  friend class UpstreamLookupValues;
   const StreamInfo::StreamInfo& info_;
 };
 
@@ -253,7 +311,8 @@ public:
       : BaseWrapper(arena), info_(info), local_info_(local_info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
-private:
+protected:
+  friend class XDSLookupValues;
   const StreamInfo::StreamInfo* info_;
   const LocalInfo::LocalInfo* local_info_;
 };

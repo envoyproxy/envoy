@@ -421,18 +421,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   std::string details_with_maybe_trace = std::string(details);
   if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
     if (enable_dfp_dns_trace_) {
-      OptRef<const std::vector<Network::ActiveDnsQuery::Trace>> traces =
-          primary_host_info->active_query_->getTraces();
-      if (traces.has_value()) {
-        std::vector<std::string> string_traces;
-        string_traces.reserve(traces.ref().size());
-        std::transform(traces.ref().begin(), traces.ref().end(), std::back_inserter(string_traces),
-                       [](const auto& trace) {
-                         return absl::StrCat(trace.trace_, "=",
-                                             trace.time_.time_since_epoch().count());
-                       });
-        details_with_maybe_trace = absl::StrCat(details, ":", absl::StrJoin(string_traces, ","));
-      }
+      std::string traces = primary_host_info->active_query_->getTraces();
+      details_with_maybe_trace = absl::StrCat(details, ":", traces);
     }
     // `cancel` must be called last because the `ActiveQuery` will be destroyed afterward.
     if (is_timeout) {
@@ -505,7 +495,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
     primary_host_info->host_info_->setDetails(details_with_maybe_trace);
 
-    runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    THROW_IF_NOT_OK(runAddUpdateCallbacks(host, primary_host_info->host_info_));
     primary_host_info->host_info_->setFirstResolveComplete();
     address_changed = true;
     stats_.host_address_changed_.inc();
@@ -540,11 +530,12 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   }
 }
 
-void DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
-                                         const DnsHostInfoSharedPtr& host_info) {
+absl::Status DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
+                                                 const DnsHostInfoSharedPtr& host_info) {
   for (auto* callbacks : update_callbacks_) {
-    callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info);
+    RETURN_IF_NOT_OK(callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info));
   }
+  return absl::OkStatus();
 }
 
 void DnsCacheImpl::runResolutionCompleteCallbacks(const std::string& host,

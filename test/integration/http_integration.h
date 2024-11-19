@@ -196,7 +196,12 @@ protected:
       const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
       uint64_t upstream_index = 0, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
+  struct Result {
+    IntegrationStreamDecoderPtr response;
+    absl::optional<uint64_t> upstream_index;
+  };
+
+  Result sendRequestAndWaitForResponse(
       const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
       const std::vector<uint64_t>& upstream_indices,
@@ -366,8 +371,6 @@ protected:
   testing::NiceMock<Random::MockRandomGenerator> random_;
   Quic::QuicStatNames quic_stat_names_;
   std::string san_to_match_{"spiffe://lyft.com/backend-team"};
-  bool enable_quic_early_data_{true};
-  std::vector<absl::string_view> custom_alpns_;
   // Set this to true when sending malformed requests to avoid test client codec rejecting it.
   // This flag is only valid when UHV build flag is enabled.
   bool disable_client_header_validation_{false};

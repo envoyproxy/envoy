@@ -1,33 +1,14 @@
 **Summary of changes**:
 
-* Added new `access_log` command operators to retrieve upstream connection information.
-* Enhanced ext_authz to be configured to ignore dynamic metadata in ext_authz responses.
-* Ext_authz: added a block list for headers that should never be send to the external auth service.
-* Ext_authz: added the ability to configure what decoder header mutations are allowed from the ext_authz with the option to fail if disallowed mutations are requested.
-* Ext_proc support for observability mode which is "Send and Go" mode that can be used by external processor to observe Envoy data and status.
-* Added support for flow control in Envoy gRPC side stream.
-* TCP Healthchecks can now leverage ProxyProtocol.
-* Hot restart: Added new command-line flag to skip hot restart stats transfer.
-* HTTP: Added the ability when request mirroring to disable appending of the `-shadow` suffix to the shadowed `host`/`authority` header.
-* HTTP: Added the ability to set the downstream request `:scheme` to match the upstream transport protocol.
-* HTTP: Envoy now supports proxying `104` headers from upstream.
-* Added the ability to bypass the overload manager for a listener.
-* Added support for local cluster rate limit shared across all Envoy instances in the local cluster.
-* Added Filter State Input for matching HTTP input based on filter state objects.
-* Oauth: Added an option to disable setting the ID Token cookie.
-* OpenTelemetry enhancements to support extension formatter and stats prefix configuration for the OpenTelemetry logger.
-* QUIC stream reset errors are now captured in transport failure reason. Added support for QUIC server preferred address when there is a DNAT between the client and Envoy.
-* Added support for Redis inline commands, Bloom 1.0.0 commands, among other commands.
-* Added a new retry policy: `reset-before-request`.
-* Added support for dynamic direct response for files.
-* Added TLS support to match against `OtherName` SAN-type under `match_typed_subject_alt_names`.
-* Upstream: Added a new field to `LocalityLbEndpoints`, `LocalityLbEndpoints.Metadata`, that may be used for transport socket matching groups of endpoints.
-* Update WASM filter to support use as an upstream filter.
-* Disabled OpenCensus by default as it is no longer maintained upstream.
-* Ext_proc support for `route_cache_action` which specifies the route action to be taken when an external processor response is received in response to request headers.
-* Golang: Move `Continue`, `SendLocalReply` and `RecoverPanic` to `DecoderFilterCallbacks` and `EncoderFilterCallbacks`, to support full-duplex processing.
-* Http2 uses Oghttp2 by default.
-* Added a "happy eyeballs" feature to HTTP/3 upstream, where it assuming happy eyeballs sorting results in alternating address families will attempt the first v4 and v6 address before giving up on HTTP/3.
-* Populate typed metadata by default in ProxyProtocol listener.
-* Datadog: Disabled remote configuration by default.
-* Reject invalid runtime YAML instead of supporting corner cases of bad YAML.
+* Envoy now logs warnings when `internal_address_config` is not set.  If you see this logged warning and wish to retain trusted status for internal addresses you must explicitly configure `internal_address_config` (which will turn off the warning) before the next Envoy release.
+* Removed support for (long deprecated) opentracing.
+* Added a configuration setting for the maximum size of response headers in responses.
+* Added support for `connection_pool_per_downstream_connection` flag in tcp connection pool.
+* For the strict DNS and logical DNS cluster types, the `dns_jitter` field allows spreading out DNS refresh requests
+* Added dynamic metadata matcher support `dynamic metadata input` and `dynamic metadata input matcher`.
+* The xff original IP detection method now supports using a list of trusted CIDRs when parsing `x-forwarded-for`.
+* QUIC server and client support certificate compression, which can in some cases reduce the number of round trips required to setup a connection.
+* Added the ability to monitor CPU utilization in Linux based systems via `cpu utilization monitor` in overload manager.
+* Added new access log command operators (`%START_TIME_LOCAL%` and `%EMIT_TIME_LOCAL%`) formatters (`%UPSTREAM_CLUSTER_RAW%` `%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256%`, and `%DOWNSTREAM_PEER_CHAIN_SERIALS%`) as well as significant boosts to json parsing. See release notes for details
+* Added support for `%BYTES_RECEIVED%`, `%BYTES_SENT%`, `%UPSTREAM_HEADER_BYTES_SENT%`, `%UPSTREAM_HEADER_BYTES_RECEIVED%`,`%UPSTREAM_WIRE_BYTES_SENT%`, `%UPSTREAM_WIRE_BYTES_RECEIVED%` and access log substitution strings for UDP tunneling flows.
+* Added ECDS support for UDP session filters.

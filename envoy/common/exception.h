@@ -66,6 +66,6 @@ template <class Type> Type returnOrThrow(absl::StatusOr<Type> type_or_error) {
   return std::move(type_or_error.value());
 }
 
-#define THROW_OR_RETURN_VALUE(expression, type) returnOrThrow<type>(expression)
+#define THROW_OR_RETURN_VALUE(expression, type) ::Envoy::returnOrThrow<type>(expression)
 
 } // namespace Envoy

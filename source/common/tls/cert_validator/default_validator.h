@@ -104,7 +104,7 @@ public:
                                   const std::vector<SanMatcherPtr>& subject_alt_name_matchers);
 
 private:
-  bool verifyCertAndUpdateStatus(X509* leaf_cert,
+  bool verifyCertAndUpdateStatus(X509* leaf_cert, absl::string_view sni,
                                  const Network::TransportSocketOptions* transport_socket_options,
                                  Envoy::Ssl::ClientValidationStatus& detailed_status,
                                  std::string* error_details, uint8_t* out_alert);
@@ -113,13 +113,14 @@ private:
   SslStats& stats_;
   Server::Configuration::CommonFactoryContext& context_;
 
-  bool allow_untrusted_certificate_{false};
   bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
+  bool allow_untrusted_certificate_{false};
   bool verify_trusted_ca_{false};
+  const bool auto_sni_san_match_{false};
 };
 
 DECLARE_FACTORY(DefaultCertValidatorFactory);

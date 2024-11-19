@@ -148,15 +148,19 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               continue;
             }
 
-            new_hosts.emplace_back(new HostImpl(
-                parent_.info_, hostname_, address,
-                // TODO(zyfjeff): Created through metadata shared pool
-                std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
-                std::make_shared<const envoy::config::core::v3::Metadata>(
-                    locality_lb_endpoints_.metadata()),
-                lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
-                lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
-                lb_endpoint_.health_status(), parent_.time_source_));
+            new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
+                HostImpl::create(parent_.info_, hostname_, address,
+                                 // TODO(zyfjeff): Created through metadata shared pool
+                                 std::make_shared<const envoy::config::core::v3::Metadata>(
+                                     lb_endpoint_.metadata()),
+                                 std::make_shared<const envoy::config::core::v3::Metadata>(
+                                     locality_lb_endpoints_.metadata()),
+                                 lb_endpoint_.load_balancing_weight().value(),
+                                 locality_lb_endpoints_.locality(),
+                                 lb_endpoint_.endpoint().health_check_config(),
+                                 locality_lb_endpoints_.priority(), lb_endpoint_.health_status(),
+                                 parent_.time_source_),
+                std::unique_ptr<HostImpl>));
             all_new_hosts.emplace(address->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
           }
@@ -193,8 +197,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                    final_refresh_rate.count() > 0);
           }
           if (parent_.dns_jitter_ms_.count() > 0) {
-            final_refresh_rate +=
-                std::chrono::milliseconds(parent_.random_.random()) % parent_.dns_jitter_ms_;
+            // Note that `parent_.random_.random()` returns a uint64 while
+            // `parent_.dns_jitter_ms_.count()` returns a signed long that gets cast into a uint64.
+            // Thus, the modulo of the two will be a positive as long as
+            // `parent_dns_jitter_ms_.count()` is positive.
+            // It is important that this be positive, otherwise `final_refresh_rate` could be
+            // negative causing Envoy to crash.
+            final_refresh_rate += std::chrono::milliseconds(parent_.random_.random() %
+                                                            parent_.dns_jitter_ms_.count());
           }
 
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
