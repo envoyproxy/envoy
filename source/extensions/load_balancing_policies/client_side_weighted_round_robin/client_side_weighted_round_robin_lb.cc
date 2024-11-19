@@ -143,7 +143,7 @@ bool ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
     // If `client_side_weight` is valid, then set it as the host weight and store it in
     // `weights` to calculate median valid weight across all hosts.
     if (client_side_weight.has_value()) {
-      uint32_t new_weight = client_side_weight.value();
+      const uint32_t new_weight = client_side_weight.value();
       weights.push_back(new_weight);
       if (new_weight != host_ptr->weight()) {
         host_ptr->weight(new_weight);
@@ -156,27 +156,32 @@ bool ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
       hosts_with_default_weight.push_back(host_ptr);
     }
   }
-  // Calculate the default weight as median of all valid weights.
-  uint32_t default_weight = 1;
-  if (!weights.empty()) {
-    auto median_it = weights.begin() + weights.size() / 2;
-    std::nth_element(weights.begin(), median_it, weights.end());
-    if (weights.size() % 2 == 1) {
-      default_weight = *median_it;
-    } else {
-      // If the number of weights is even, then the median is the average of the two middle
-      // elements.
-      const auto lower_median_it = std::max_element(weights.begin(), median_it);
-      default_weight = (*lower_median_it + *median_it) / 2;
+  // If some hosts don't have valid weight, then update them with default weight.
+  if (!hosts_with_default_weight.empty()) {
+    // Calculate the default weight as median of all valid weights.
+    uint32_t default_weight = 1;
+    if (!weights.empty()) {
+      const auto median_it = weights.begin() + weights.size() / 2;
+      std::nth_element(weights.begin(), median_it, weights.end());
+      if (weights.size() % 2 == 1) {
+        default_weight = *median_it;
+      } else {
+        // If the number of weights is even, then the median is the average of the two middle
+        // elements.
+        const auto lower_median_it = std::max_element(weights.begin(), median_it);
+        // Use uint64_t to avoid potential overflow of the weights sum.
+        default_weight = static_cast<uint32_t>(
+            (static_cast<uint64_t>(*lower_median_it) + static_cast<uint64_t>(*median_it)) / 2);
+      }
     }
-  }
-  // Update the hosts with default weight.
-  for (const auto& host_ptr : hosts_with_default_weight) {
-    if (default_weight != host_ptr->weight()) {
-      host_ptr->weight(default_weight);
-      ENVOY_LOG(trace, "updateWeights default hostWeight {} = {}", getHostAddress(host_ptr.get()),
-                host_ptr->weight());
-      weights_updated = true;
+    // Update the hosts with default weight.
+    for (const auto& host_ptr : hosts_with_default_weight) {
+      if (default_weight != host_ptr->weight()) {
+        host_ptr->weight(default_weight);
+        ENVOY_LOG(trace, "updateWeights default hostWeight {} = {}", getHostAddress(host_ptr.get()),
+                  host_ptr->weight());
+        weights_updated = true;
+      }
     }
   }
   return weights_updated;

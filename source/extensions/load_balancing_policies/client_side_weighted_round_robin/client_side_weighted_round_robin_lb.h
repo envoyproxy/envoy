@@ -139,8 +139,6 @@ public:
   // Thread local shim to store callbacks for weight updates of worker local lb.
   class ThreadLocalShim : public Envoy::ThreadLocal::ThreadLocalObject {
   public:
-    ThreadLocalShim() = default;
-    virtual ~ThreadLocalShim() = default;
     Common::CallbackManager<uint32_t> apply_weights_cb_helper_;
   };
 
