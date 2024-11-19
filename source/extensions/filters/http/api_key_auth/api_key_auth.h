@@ -33,7 +33,7 @@ struct ApiKeyAuthStats {
 using ApiKeyAuthProto = envoy::extensions::filters::http::api_key_auth::v3::ApiKeyAuth;
 using ApiKeyAuthPerRouteProto =
     envoy::extensions::filters::http::api_key_auth::v3::ApiKeyAuthPerRoute;
-using KeySourcesProto = envoy::extensions::filters::http::api_key_auth::v3::KeySources;
+using KeySourceProto = envoy::extensions::filters::http::api_key_auth::v3::KeySource;
 
 // Credentials is a map of API key to client ID.
 using Credentials = absl::flat_hash_map<std::string, std::string>;
@@ -43,7 +43,7 @@ using Credentials = absl::flat_hash_map<std::string, std::string>;
  */
 class KeySources {
 public:
-  KeySources(const KeySourcesProto& proto_config);
+  KeySources(const Protobuf::RepeatedPtrField<KeySourceProto>& proto_config);
 
   /**
    * To get the API key from the incoming request.
@@ -93,13 +93,13 @@ public:
    * To get the optional reference of the credentials.
    */
   OptRef<const Credentials> credentials() const {
-    return credentials_.has_value() ? makeOptRef<const Credentials>(credentials_.value())
-                                    : OptRef<const Credentials>{};
+    return !credentials_.empty() ? makeOptRef<const Credentials>(credentials_)
+                                 : OptRef<const Credentials>{};
   }
 
 private:
   const KeySources key_sources_;
-  absl::optional<Credentials> credentials_;
+  Credentials credentials_;
 };
 
 class RouteConfig : public Router::RouteSpecificFilterConfig {

@@ -16,14 +16,11 @@ namespace ApiKeyAuth {
 
 ApiKeyAuthConfig::ApiKeyAuthConfig(const ApiKeyAuthProto& proto_config)
     : key_sources_(proto_config.key_sources()) {
-  if (!proto_config.has_credentials()) {
-    return;
-  }
 
   Credentials credentials;
-  credentials.reserve(proto_config.credentials().entries_size());
+  credentials.reserve(proto_config.credentials().size());
 
-  for (const auto& credential : proto_config.credentials().entries()) {
+  for (const auto& credential : proto_config.credentials()) {
     if (credentials.contains(credential.key())) {
       throw EnvoyException("Duplicate API key.");
     }
@@ -52,9 +49,9 @@ KeySources::Source::Source(absl::string_view header, absl::string_view query,
   }
 }
 
-KeySources::KeySources(const KeySourcesProto& proto_config) {
-  key_sources_.reserve(proto_config.entries_size());
-  for (const auto& source : proto_config.entries()) {
+KeySources::KeySources(const Protobuf::RepeatedPtrField<KeySourceProto>& proto_config) {
+  key_sources_.reserve(proto_config.size());
+  for (const auto& source : proto_config) {
     key_sources_.emplace_back(source.header(), source.query(), source.cookie());
   }
 }

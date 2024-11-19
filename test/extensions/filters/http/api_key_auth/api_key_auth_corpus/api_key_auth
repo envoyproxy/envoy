@@ -1,27 +1,23 @@
 filter_config {
   credentials {
-    entries {
-      entries {
-        key: "fake-key"
-        client: "fake-client"
-      }
-      entries {
-        key: "fake-key-2"
-        client: "fake-client-2"
-      }
+    credentials {
+      key: "fake-key"
+      client: "fake-client"
+    }
+    credentials {
+      key: "fake-key-2"
+      client: "fake-client-2"
     }
   }
   key_sources {
-    entries {
-      entries {
-        header: "authorization"
-      }
-      entries {
-        cookie: "api_key"
-      }
-      entries {
-        query: "api_key"
-      }
+    key_sources {
+      header: "authorization"
+    }
+    key_sources {
+      cookie: "api_key"
+    }
+    key_sources {
+      query: "api_key"
     }
   }
 }

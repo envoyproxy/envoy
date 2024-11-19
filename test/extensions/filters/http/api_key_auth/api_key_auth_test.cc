@@ -42,12 +42,10 @@ public:
 TEST_F(FilterTest, NoHeaderApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - header: "Authorization"
+  - header: "Authorization"
   )EOF";
 
   setup(config_yaml, {});
@@ -66,12 +64,10 @@ TEST_F(FilterTest, NoHeaderApiKey) {
 TEST_F(FilterTest, HeaderApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - header: "Authorization"
+  - header: "Authorization"
   )EOF";
 
   setup(config_yaml, {});
@@ -87,12 +83,10 @@ TEST_F(FilterTest, HeaderApiKey) {
 TEST_F(FilterTest, NoQueryApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - query: "api_key"
+  - query: "api_key"
   )EOF";
   setup(config_yaml, {});
   Http::TestRequestHeaderMapImpl request_headers{
@@ -108,12 +102,10 @@ TEST_F(FilterTest, NoQueryApiKey) {
 TEST_F(FilterTest, QueryApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - query: "api_key"
+  - query: "api_key"
   )EOF";
   setup(config_yaml, {});
   Http::TestRequestHeaderMapImpl request_headers{
@@ -126,12 +118,10 @@ TEST_F(FilterTest, QueryApiKey) {
 TEST_F(FilterTest, NoCookieApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - cookie: "api_key"
+  - cookie: "api_key"
   )EOF";
   setup(config_yaml, {});
   Http::TestRequestHeaderMapImpl request_headers{
@@ -148,12 +138,10 @@ TEST_F(FilterTest, NoCookieApiKey) {
 TEST_F(FilterTest, CookieApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - cookie: "api_key"
+  - cookie: "api_key"
   )EOF";
 
   setup(config_yaml, {});
@@ -167,13 +155,11 @@ TEST_F(FilterTest, CookieApiKey) {
 TEST_F(FilterTest, FallbackToQueryApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - header: "Authorization"
-      - query: "api_key"
+  - header: "Authorization"
+  - query: "api_key"
   )EOF";
 
   setup(config_yaml, {});
@@ -188,14 +174,12 @@ TEST_F(FilterTest, FallbackToQueryApiKey) {
 TEST_F(FilterTest, FallbackToCookieApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - header: "Authorization"
-      - query: "api_key"
-      - cookie: "api_key"
+  - header: "Authorization"
+  - query: "api_key"
+  - cookie: "api_key"
   )EOF";
 
   setup(config_yaml, {});
@@ -209,14 +193,12 @@ TEST_F(FilterTest, FallbackToCookieApiKey) {
 TEST_F(FilterTest, OrderOfKeySources) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - header: "Authorization"
-      - query: "api_key"
-      - cookie: "api_key"
+  - header: "Authorization"
+  - query: "api_key"
+  - cookie: "api_key"
   )EOF";
 
   setup(config_yaml, {});
@@ -271,12 +253,10 @@ TEST_F(FilterTest, OrderOfKeySources) {
 TEST_F(FilterTest, UnkonwnApiKey) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - header: "Authorization"
+  - header: "Authorization"
   )EOF";
   setup(config_yaml, {});
 
@@ -296,20 +276,17 @@ TEST_F(FilterTest, UnkonwnApiKey) {
 TEST_F(FilterTest, RouteConfigOverrideCredentials) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - header: "Authorization"
+  - header: "Authorization"
   )EOF";
 
   const std::string route_config_yaml = R"EOF(
   override_config:
     credentials:
-      entries:
-        - key: key2
-          client: user2
+    - key: key2
+      client: user2
   )EOF";
 
   setup(config_yaml, route_config_yaml);
@@ -343,19 +320,16 @@ TEST_F(FilterTest, RouteConfigOverrideCredentials) {
 TEST_F(FilterTest, RouteConfigOverrideKeySource) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - header: "Authorization"
+  - header: "Authorization"
   )EOF";
 
   const std::string route_config_yaml = R"EOF(
   override_config:
     key_sources:
-      entries:
-        - query: "api_key"
+    - query: "api_key"
   )EOF";
 
   setup(config_yaml, route_config_yaml);
@@ -387,22 +361,18 @@ TEST_F(FilterTest, RouteConfigOverrideKeySource) {
 TEST_F(FilterTest, RouteConfigOverrideKeySourceAndCredentials) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   key_sources:
-    entries:
-      - header: "Authorization"
+  - header: "Authorization"
   )EOF";
   const std::string route_config_yaml = R"EOF(
   override_config:
     credentials:
-      entries:
-        - key: key2
-          client: user2
+    - key: key2
+      client: user2
     key_sources:
-      entries:
-        - query: "api_key"
+    - query: "api_key"
   )EOF";
 
   setup(config_yaml, route_config_yaml);
@@ -443,8 +413,7 @@ TEST_F(FilterTest, RouteConfigOverrideKeySourceAndCredentials) {
 TEST_F(FilterTest, NoCredentials) {
   const std::string config_yaml = R"EOF(
   key_sources:
-    entries:
-      - header: "Authorization"
+  - header: "Authorization"
   )EOF";
 
   setup(config_yaml, {});
@@ -462,9 +431,8 @@ TEST_F(FilterTest, NoCredentials) {
 TEST_F(FilterTest, NoKeySource) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
+  - key: key1
+    client: user1
   )EOF";
   setup(config_yaml, {});
   // No key source is provided.
@@ -480,18 +448,16 @@ TEST_F(FilterTest, NoKeySource) {
 TEST_F(FilterTest, KnownApiKeyButNotAllowed) {
   const std::string config_yaml = R"EOF(
   credentials:
-    entries:
-      - key: key1
-        client: user1
-      - key: key2
-        client: user2
+  - key: key1
+    client: user1
+  - key: key2
+    client: user2
   key_sources:
-    entries:
-      - header: "Authorization"
+  - header: "Authorization"
   )EOF";
   const std::string route_config_yaml = R"EOF(
   allowed_clients:
-    - user2
+  - user2
   )EOF";
 
   setup(config_yaml, route_config_yaml);

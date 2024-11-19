@@ -20,20 +20,18 @@ name: envoy.filters.http.api_key_auth
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth
   credentials:
-    entries:
-      - key: key1
-        client: user1
-      - key: key2
-        client: user2
+  - key: key1
+    client: user1
+  - key: key2
+    client: user2
   key_sources:
-    entries:
-      - header: "Authorization"
+  - header: "Authorization"
 )EOF";
 
 const std::string ApiKeyAuthScopeConfig =
     R"EOF(
 allowed_clients:
-  - user1
+- user1
 )EOF";
 
 class ApiKeyAuthIntegrationTest : public HttpProtocolIntegrationTest {

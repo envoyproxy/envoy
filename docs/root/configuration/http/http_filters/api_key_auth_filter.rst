@@ -22,7 +22,7 @@ An example configuration of the filter may look like the following:
 
 .. literalinclude:: _include/api-key-auth-filter.yaml
     :language: yaml
-    :lines: 61-73
+    :lines: 59-68
     :linenos:
     :caption: :download:`api-key-auth-filter.yaml <_include/api-key-auth-filter.yaml>`
 
@@ -40,7 +40,7 @@ An example scope specific configuration of the filter may look like the followin
 
 .. literalinclude:: _include/api-key-auth-filter.yaml
     :language: yaml
-    :lines: 16-60
+    :lines: 16-57
     :linenos:
     :caption: :download:`api-key-auth-filter.yaml <_include/api-key-auth-filter.yaml>`
 

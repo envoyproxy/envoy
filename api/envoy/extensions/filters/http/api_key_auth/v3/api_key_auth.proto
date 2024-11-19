@@ -28,19 +28,17 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // .. code-block:: yaml
 //
 //    credentials:
-//      entries:
-//      - key: real-key
-//        client: user
+//    - key: real-key
+//      client: user
 //    key_sources:
-//      entries:
-//      - header: "X-API-KEY"
+//     - header: "X-API-KEY"
 //
 message ApiKeyAuth {
   // The credentials that are used to authenticate the clients.
-  Credentials credentials = 1 [(udpa.annotations.sensitive) = true];
+  repeated Credential credentials = 1 [(udpa.annotations.sensitive) = true];
 
   // The key sources to fetch the key from the coming request.
-  KeySources key_sources = 2;
+  repeated KeySource key_sources = 2;
 }
 
 // API key auth configuration of per route or per virtual host or per route configuration.
@@ -72,12 +70,6 @@ message Credential {
   string client = 2 [(validate.rules).string = {min_len: 1}];
 }
 
-// The credentials that are used to authenticate the clients.
-message Credentials {
-  // The list of credentials.
-  repeated Credential entries = 1 [(validate.rules).repeated = {min_items: 1}];
-}
-
 message KeySource {
   // The header name to fetch the key. If multiple header values are present, the first one will be
   // used. If the header value starts with 'Bearer ', this prefix will be stripped to get the
@@ -100,11 +92,4 @@ message KeySource {
   string cookie = 3
       [(validate.rules).string =
            {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
-}
-
-// The key sources to fetch the key from the coming request.
-message KeySources {
-  // The list of key sources. The order of the key sources is important and the filter will try to
-  // fetch the key one by one from the key sources in the order they are defined. The first matched key source will be used (regardless of whether the credentials match or not).
-  repeated KeySource entries = 1 [(validate.rules).repeated = {min_items: 1}];
 }
