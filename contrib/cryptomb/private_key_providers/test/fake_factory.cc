@@ -156,8 +156,8 @@ FakeCryptoMbPrivateKeyMethodFactory::createPrivateKeyMethodProviderInstance(
       std::make_unique<envoy::extensions::private_key_providers::cryptomb::v3alpha::
                            CryptoMbPrivateKeyMethodConfig>();
 
-  Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
-                                         ProtobufMessage::getNullValidationVisitor(), *message);
+  THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+      proto_config.typed_config(), ProtobufMessage::getNullValidationVisitor(), *message));
   const envoy::extensions::private_key_providers::cryptomb::v3alpha::CryptoMbPrivateKeyMethodConfig
       conf =
           MessageUtil::downcastAndValidate<const envoy::extensions::private_key_providers::
