@@ -40,16 +40,32 @@ public:
                    Server::Configuration::CommonFactoryContext& context,
                    bssl::UniquePtr<ASN1_OBJECT>&& general_name_oid = nullptr)
       : general_name_type_(general_name_type), matcher_(matcher, context),
-        general_name_oid_(std::move(general_name_oid)) {}
-
-  StringSanMatcher(absl::string_view dns_exact_match)
-      : general_name_type_(GEN_DNS),
-        matcher_(StringMatcherImpl::createExactMatcher(dns_exact_match)) {}
+        general_name_oid_(std::move(general_name_oid)) {
+    // For DNS SAN, if the StringMatcher type is exact, we have to follow DNS matching semantics.
+    // The DnsStringSanMatcher should be used in this case.
+    ASSERT(general_name_type != GEN_DNS ||
+           matcher.match_pattern_case() !=
+               envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact);
+  }
 
 private:
   const int general_name_type_;
   const StringMatcherImpl matcher_;
   bssl::UniquePtr<ASN1_OBJECT> general_name_oid_;
+};
+
+// A DNS string SAN matcher that uses the dnsNameMatch() function.
+// This should be used for DNS SAN where the StringMatcher type is exact,
+// and the DNS matching semantics must be followed.
+class DnsStringSanMatcher : public SanMatcher {
+public:
+  bool match(const GENERAL_NAME* general_name) const override;
+  ~DnsStringSanMatcher() override = default;
+
+  DnsStringSanMatcher(absl::string_view dns_exact_match) : dns_exact_match_(dns_exact_match) {}
+
+private:
+  const std::string dns_exact_match_;
 };
 
 SanMatcherPtr createStringSanMatcher(

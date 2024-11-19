@@ -23,13 +23,14 @@ bool StringSanMatcher::match(const GENERAL_NAME* general_name) const {
       return false;
     }
   }
-  // For DNS SAN, if the StringMatcher type is exact, we have to follow DNS matching semantics.
-  const std::string san = Utility::generalNameAsString(general_name);
-  return general_name->type == GEN_DNS &&
-                 matcher_.matcher().match_pattern_case() ==
-                     envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-             ? Utility::dnsNameMatch(matcher_.matcher().exact(), absl::string_view(san))
-             : matcher_.match(san);
+  return matcher_.match(Utility::generalNameAsString(general_name));
+}
+
+bool DnsStringSanMatcher::match(const GENERAL_NAME* general_name) const {
+  if (general_name->type != GEN_DNS) {
+    return false;
+  }
+  return Utility::dnsNameMatch(dns_exact_match_, Utility::generalNameAsString(general_name));
 }
 
 SanMatcherPtr createStringSanMatcher(
@@ -42,7 +43,13 @@ SanMatcherPtr createStringSanMatcher(
   switch (matcher.san_type()) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS:
-    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher.matcher(), context)};
+    // For DNS SAN, if the StringMatcher type is exact, we have to follow DNS matching semantics.
+    if (matcher.matcher().match_pattern_case() ==
+        envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact) {
+      return SanMatcherPtr{std::make_unique<DnsStringSanMatcher>(matcher.matcher().exact())};
+    } else {
+      return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher.matcher(), context)};
+    }
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL:
     return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_EMAIL, matcher.matcher(), context)};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI:
