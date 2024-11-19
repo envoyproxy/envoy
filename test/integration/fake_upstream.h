@@ -509,9 +509,11 @@ public:
   // Update the maximum number of concurrent streams.
   void updateConcurrentStreams(uint64_t max_streams);
 
+  // Wait for the first occurrence of data, and strip the leading data up to the first occurrence.
+  // The out parameter will contain the stripped pieces.
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  waitForInexactRawData(const char* data, std::string* out = nullptr,
+  waitForInexactRawData(absl::string_view data, std::string& out,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   void writeRawData(absl::string_view data);
