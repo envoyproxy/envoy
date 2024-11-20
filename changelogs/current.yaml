@@ -124,6 +124,9 @@ removed_config_or_runtime:
 - area: upstream
   change: |
     Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
+- area: http
+  change: |
+    Set ``envoy.reloadable_features.streaming_shadow`` to default true.
 
 new_features:
 - area: wasm
