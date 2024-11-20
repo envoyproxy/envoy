@@ -292,18 +292,10 @@ bool CorsFilter::allowPrivateNetworkAccess() {
 }
 
 bool CorsFilter::shadowEnabled() {
-  for (const Router::CorsPolicy& policy : policies_) {
-    return policy.shadowEnabled();
-  }
-  return false;
+  return (policies_.size() > 0) ? policies_[0].get().shadowEnabled() : false;
 }
 
-bool CorsFilter::enabled() {
-  for (const Router::CorsPolicy& policy : policies_) {
-    return policy.enabled();
-  }
-  return false;
-}
+bool CorsFilter::enabled() { return (policies_.size() > 0) ? policies_[0].get().enabled() : false; }
 
 } // namespace Cors
 } // namespace HttpFilters
