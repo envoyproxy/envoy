@@ -1023,6 +1023,9 @@ void DownstreamFilterManager::sendLocalReply(
                      *this, details);
     // TODO(snowp): This means we increment the tx_reset stat which we weren't doing previously.
     // Intended?
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+      streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::ResetWithNoError);
+    }
     filter_manager_callbacks_.resetStream();
   }
 }
