@@ -127,10 +127,6 @@ func (r *httpRequest) LogLevel() api.LogType {
 	return cAPI.LogLevel()
 }
 
-func (r *httpRequest) Finalize(reason int) {
-	cAPI.Finalize(unsafe.Pointer(r), reason)
-}
-
 func (r *httpRequest) GetRouteName() string {
 	name, _ := cAPI.GetStringValue(unsafe.Pointer(r), ValueRouteName)
 	return name
@@ -139,22 +135,4 @@ func (r *httpRequest) GetVirtualClusterName() string {
 	// in upstream stage, cluster has been determined.
 	name, _ := cAPI.GetStringValue(unsafe.Pointer(r), ValueClusterName)
 	return name
-}
-
-type tcpUpstreamConfig struct {
-	config *C.httpConfig
-}
-
-func (c *tcpUpstreamConfig) Finalize() {
-	cAPI.ConfigFinalize(unsafe.Pointer(c.config))
-}
-
-// TODO(duxin40) support this in the near future
-func (c *tcpUpstreamConfig) DefineCounterMetric(name string) api.CounterMetric {
-	panic("do not support this action for now")
-}
-
-// TODO(duxin40) support this in the near future
-func (c *tcpUpstreamConfig) DefineGaugeMetric(name string) api.GaugeMetric {
-	panic("do not support this action for now")
 }

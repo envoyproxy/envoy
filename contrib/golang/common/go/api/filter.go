@@ -346,25 +346,25 @@ type TcpUpstreamCallbackHandler interface {
 
 type TcpUpstreamFilter interface {
 	// Invoked when header is delivered from the downstream.
-	EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) SendDataStatus
+	EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) EncodeHeaderStatus
 	// Streaming, Invoked when data is delivered from the downstream.
-	EncodeData(buffer BufferInstance, endOfStream bool) SendDataStatus
+	EncodeData(buffer BufferInstance, endOfStream bool) EncodeDataStatus
 	// Streaming, Called when data is read on from tcp upstream.
-	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) ReceiveDataStatus
+	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) DecodeDataStatus
 	// destroy filter
 	OnDestroy(DestroyReason)
 }
 
-func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) SendDataStatus {
-	return SendDataWithTunneling
+func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) EncodeHeaderStatus {
+	return EncodeHeaderContinue
 }
 
-func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) SendDataStatus {
-	return SendDataWithTunneling
+func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) EncodeDataStatus {
+	return EncodeDataContinueWithNotHalfClose
 }
 
-func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) ReceiveDataStatus {
-	return ReceiveDataFinish
+func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) DecodeDataStatus {
+	return DecodeDataContinue
 }
 
 func (*EmptyTcpUpstreamFilter) OnDestroy(DestroyReason) {
@@ -373,8 +373,5 @@ func (*EmptyTcpUpstreamFilter) OnDestroy(DestroyReason) {
 type TcpUpstreamFactory func(config interface{}, callbacks TcpUpstreamCallbackHandler) TcpUpstreamFilter
 
 type TcpUpstreamConfigParser interface {
-	// Parse the proto message to any Go value, and return error to reject the config.
-	// This is called when Envoy receives the config from the control plane.
-	// Also, you can define Metrics through the callbacks, and the callbacks will be nil when parsing the route config.
-	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
+	Parse(any *anypb.Any) (interface{}, error)
 }

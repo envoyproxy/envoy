@@ -109,11 +109,6 @@ type TcpUpstreamCAPI interface {
 	SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
 	// Get the specified value by key
 	GetStringValue(r unsafe.Pointer, id int) (string, bool)
-	// clean up the resource of upstream request
-	Finalize(r unsafe.Pointer, reason int)
-
-	// /* These APIs are related to config, use the pointer of config. */
-	ConfigFinalize(c unsafe.Pointer)
 
 	/* These APIs have nothing to do with request */
 	Log(level LogType, message string)

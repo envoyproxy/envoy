@@ -1,5 +1,6 @@
 // #include "contrib/golang/filters/network/source/golang.h"
 #include "contrib/golang/upstreams/http/tcp/source/upstream_request.h"
+#include "processor_state.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,57 +25,27 @@ absl::string_view stringViewFromGoPointer(void* p, int len) {
 extern "C" {
 
 CAPIStatus envoyGoTcpUpstreamProcessStateHandlerWrapper(
-    void* s, std::function<CAPIStatus(std::shared_ptr<Filter>&, ProcessorState&)> f) {
+    void* s, std::function<CAPIStatus(TcpUpstream&, ProcessorState&)> f) {
   auto state = static_cast<ProcessorState*>(reinterpret_cast<processState*>(s));
   if (!state->isProcessingInGo()) {
     return CAPIStatus::CAPINotInGo;
   }
-  auto req = static_cast<RequestInternal*>(state->req);
-  auto weak_filter = req->weakFilter();
-  if (auto filter = weak_filter.lock()) {
-    return f(filter, *state);
-  }
-  return CAPIStatus::CAPIFilterIsGone;
+  auto req = static_cast<TcpUpstream*>(state->req);
+  return f(*req, *state);
 }
 
 CAPIStatus envoyGoTcpUpstreamHandlerWrapper(void* r,
-                                       std::function<CAPIStatus(std::shared_ptr<Filter>&)> f) {
-  auto req = reinterpret_cast<RequestInternal*>(r);
-  auto weak_filter = req->weakFilter();
-  if (auto filter = weak_filter.lock()) {
-    // Though it's memory safe without this limitation.
-    // But it's not a good idea to run Go code after continue back to Envoy C++,
-    // so, add this limitation.
-    if (!filter->isProcessingInGo()) {
-      return CAPIStatus::CAPINotInGo;
-    }
-    return f(filter);
-  }
-  return CAPIStatus::CAPIFilterIsGone;
-}
-
-void envoyGoTcpUpstreamFinalize(void* r, int reason) {
-  UNREFERENCED_PARAMETER(reason);
-  // req is used by go, so need to use raw memory and then it is safe to release at the gc finalize
-  // phase of the go object.
-  auto req = reinterpret_cast<RequestInternal*>(r);
-  // TODO defer delete req
-  delete req;
-}
-
-void envoyGoConfigTcpUpstreamFinalize(void* c) {
-  // config is used by go, so need to use raw memory and then it is safe to release at the gc
-  // finalize phase of the go object.
-  auto config = reinterpret_cast<HttpConfigInternal*>(c);
-  delete config;
+                                       std::function<CAPIStatus(TcpUpstream&)> f) {
+  auto req = static_cast<TcpUpstream*>(reinterpret_cast<httpRequest*>(r));
+  return f(*req);
 }
 
 CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [strs, buf](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
+      s, [strs, buf](TcpUpstream& filter, ProcessorState& state) -> CAPIStatus {
         auto go_strs = reinterpret_cast<GoString*>(strs);
         auto go_buf = reinterpret_cast<char*>(buf);
-        return filter->copyHeaders(state, go_strs, go_buf);
+        return filter.copyHeaders(state, go_strs, go_buf);
       });
 }
 
@@ -82,28 +53,28 @@ CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len,
                                             int value_len, headerAction act) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [key_data, key_len, value_data, value_len, act](std::shared_ptr<Filter>& filter,
+      [key_data, key_len, value_data, value_len, act](TcpUpstream& filter,
                                                       ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
         auto value_str = stringViewFromGoPointer(value_data, value_len);
-        return filter->setRespHeader(state, key_str, value_str, act);
+        return filter.setRespHeader(state, key_str, value_str, act);
       });
 }
 
 CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer_ptr, void* data) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [buffer_ptr, data](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
+      s, [buffer_ptr, data](TcpUpstream& filter, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
-        return filter->copyBuffer(state, buffer, reinterpret_cast<char*>(data));
+        return filter.copyBuffer(state, buffer, reinterpret_cast<char*>(data));
       });
 }
 
 CAPIStatus envoyGoTcpUpstreamDrainBuffer(void* s, uint64_t buffer_ptr, uint64_t length) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [buffer_ptr, length](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
+      [buffer_ptr, length](TcpUpstream& filter, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
-        return filter->drainBuffer(state, buffer, length);
+        return filter.drainBuffer(state, buffer, length);
       });
 }
 
@@ -111,18 +82,18 @@ CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* s, uint64_t buffer_ptr, void*
                                             bufferAction action) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [buffer_ptr, data, length, action](std::shared_ptr<Filter>& filter,
+      [buffer_ptr, data, length, action](TcpUpstream& filter,
                                          ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         auto value = stringViewFromGoPointer(data, length);
-        return filter->setBufferHelper(state, buffer, value, action);
+        return filter.setBufferHelper(state, buffer, value, action);
       });
 }
 
 CAPIStatus envoyGoTcpUpstreamGetStringValue(void* r, int id, uint64_t* value_data, int* value_len) {
   return envoyGoTcpUpstreamHandlerWrapper(
-      r, [id, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
-        return filter->getStringValue(id, value_data, value_len);
+      r, [id, value_data, value_len](TcpUpstream& filter) -> CAPIStatus {
+        return filter.getStringValue(id, value_data, value_len);
       });
 }
 

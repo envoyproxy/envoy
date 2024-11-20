@@ -14,7 +14,7 @@
 
 #include "absl/status/status.h"
 #include "contrib/golang/common/dso/dso.h"
-// #include "upstream_request.h"
+#include "upstream_request.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,8 +51,14 @@ private:
 
 // This describes the processor state.
 enum class FilterState {
+  // Waiting header
+  WaitingHeader,
   // Processing header in Go
   ProcessingHeader,
+  // Waiting data
+  WaitingData,
+  // Waiting all data
+  WaitingAllData,
   // Processing data in Go
   ProcessingData,
   // All done
@@ -61,18 +67,29 @@ enum class FilterState {
 
 class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
 public:
-  explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
+  explicit ProcessorState(httpRequest* r) {
     req = r;
+    setFilterState(FilterState::WaitingHeader);
   }
   virtual ~ProcessorState() = default;
+
+  void processData();
+  std::string stateStr();
 
   FilterState filterState() const { return static_cast<FilterState>(state); }
   void setFilterState(FilterState st) { state = static_cast<int>(st); }
   bool isProcessingInGo() {
-    return filterState() == FilterState::ProcessingHeader || filterState() == FilterState::ProcessingData;
+    return filterState() == FilterState::ProcessingHeader || filterState() == FilterState::ProcessingData || filterState() == FilterState::WaitingData || filterState() == FilterState::WaitingAllData || filterState() == FilterState::Done;
   }
 
   /* data buffer */
+  // add data to state buffer
+  virtual void addBufferData(Buffer::Instance& data) {
+    if (data_buffer_ == nullptr) {
+      data_buffer_ = std::make_unique<Buffer::OwnedImpl>();
+    }
+    data_buffer_->move(data);
+  };
   // get state buffer
   Buffer::Instance& getBufferData() { return *data_buffer_.get(); };
   bool isBufferDataEmpty() { return data_buffer_ == nullptr || data_buffer_->length() == 0; };
@@ -84,24 +101,19 @@ public:
 protected:
   Buffer::InstancePtr data_buffer_{nullptr};
 
-protected:
-  Filter& filter_;
 };
 
 class DecodingProcessorState : public ProcessorState {
 public:
-  explicit DecodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {
-    is_encoding = 0;
-  }
+  DecodingProcessorState(TcpUpstream& tcp_upstream);
+  
   // store response header for http
   Envoy::Http::RequestOrResponseHeaderMap* resp_headers{nullptr};
 };
 
 class EncodingProcessorState : public ProcessorState {
 public:
-  explicit EncodingProcessorState(Filter& filter, httpRequest* r) : ProcessorState(filter, r) {
-    is_encoding = 1;
-  }
+  EncodingProcessorState(TcpUpstream& tcp_upstream);
 };
 
 } // namespace Golang

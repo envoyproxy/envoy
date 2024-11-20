@@ -33,7 +33,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -74,10 +73,6 @@ func (f *requestMap) Clear() {
 	})
 }
 
-func requestFinalize(r *httpRequest) {
-	r.Finalize(api.NormalFinalize)
-}
-
 func getOrCreateState(s *C.processState) *processState {
 	r := s.req
 	req := getRequest(r)
@@ -105,8 +100,6 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	req.encodingState.request = req
 
 	req.cond.L = &req.waitingLock
-	// NP: make sure filter will be deleted.
-	runtime.SetFinalizer(req, requestFinalize)
 
 	err := Requests.StoreReq(r, req)
 	if err != nil {
@@ -137,7 +130,8 @@ func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, b
 		length:              length,
 	}
 	if req.pInfo.paniced {
-		return uint64(api.SendDataWithTunneling)
+		buf.SetString(req.pInfo.details)
+		return uint64(api.EncodeHeaderSendDataWithHalfClose)
 	}
 	defer state.RecoverPanic()
 
@@ -166,7 +160,7 @@ func envoyGoEncodeData(s *C.processState, endStream, buffer, length uint64) uint
 	}
 	if req.pInfo.paniced {
 		buf.SetString(req.pInfo.details)
-		return uint64(api.SendDataWithTunneling)
+		return uint64(api.EncodeHeaderSendDataWithNotHalfClose)
 	}
 	defer state.RecoverPanic()
 
@@ -188,7 +182,7 @@ func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes,
 	}
 	if req.pInfo.paniced {
 		buf.SetString(req.pInfo.details)
-		return uint64(api.ReceiveDataFailure)
+		return uint64(api.DecodeDataContinue)
 	}
 	defer state.RecoverPanic()
 

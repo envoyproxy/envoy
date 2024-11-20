@@ -33,24 +33,23 @@ namespace Http {
 namespace Tcp {
 namespace Golang {
 
+class ProcessorState;
+class DecodingProcessorState;
+class EncodingProcessorState;
+
 class TcpUpstream;
 
 class FilterConfig;
 
 class Filter;
 
-struct HttpConfigInternal : httpConfig {
-  std::weak_ptr<FilterConfig> config_;
-  HttpConfigInternal(std::weak_ptr<FilterConfig> c) { config_ = c; }
-  std::weak_ptr<FilterConfig> weakFilterConfig() { return config_; }
-};
-
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * Configuration for the Tcp Upstream golang extension filter.
  */
-class FilterConfig : public std::enable_shared_from_this<FilterConfig>,
+class FilterConfig : httpConfig,
+                     public std::enable_shared_from_this<FilterConfig>,
                      Logger::Loggable<Logger::Id::golang> {
 public:
   FilterConfig(const envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config,
@@ -72,86 +71,31 @@ private:
 
   Dso::TcpUpstreamDsoPtr dso_lib_;
   uint64_t config_id_{0};
-  // filter level config is created in C++ side, and freed by Golang GC finalizer.
-  HttpConfigInternal* config_{nullptr};
 };
 
-// Go code only touch the fields in httpRequest
-class RequestInternal : public httpRequest {
-public:
-  RequestInternal(Filter& filter)
-      : decoding_state_(filter, this), encoding_state_(filter, this) {
-    configId = 0;
-  }
+// // Go code only touch the fields in httpRequest
+// class RequestInternal : public httpRequest {
+// public:
+//   RequestInternal(TcpUpstream& tcp_upstream)
+//       : tcp_upstream_(tcp_upstream), decoding_state_(tcp_upstream, this), encoding_state_(tcp_upstream, this) {
+//     configId = 0;
+//   }
 
-  void setWeakFilter(std::weak_ptr<Filter> f) { filter_ = f; }
-  std::weak_ptr<Filter> weakFilter() { return filter_; }
+//   TcpUpstream& tcpUpstream() { return tcp_upstream_; }
 
-  DecodingProcessorState& decodingState() { return decoding_state_; }
-  EncodingProcessorState& encodingState() { return encoding_state_; }
+//   DecodingProcessorState& decodingState() { return decoding_state_; }
+//   EncodingProcessorState& encodingState() { return encoding_state_; }
 
-  // anchor a string temporarily, make sure it won't be freed before copied to Go.
-  std::string strValue;
+//   // anchor a string temporarily, make sure it won't be freed before copied to Go.
+//   std::string strValue;
 
-private:
-  std::weak_ptr<Filter> filter_;
+// private:
+//   TcpUpstream& tcp_upstream_;
 
-  // The state of the filter on both the encoding and decoding side.
-  DecodingProcessorState decoding_state_;
-  EncodingProcessorState encoding_state_;
-};
-
-class Filter : public std::enable_shared_from_this<Filter>,
-                     Logger::Loggable<Logger::Id::golang> {
-public:
-  Filter(FilterConfigSharedPtr config, const std::string cluster_name, const std::string route_name);
-  ~Filter();
-
-  enum class EnvoyValue {
-    RouteName = 1,
-    ClusterName,
-  };
-
-  bool initRequest();
-  bool initResponse();
-
-  bool isProcessingInGo() {
-    return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();
-  }    
-
-  CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
-  CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
-  CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
-  CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
-  CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
-  CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
-
-  bool hasDestroyed() {
-    Thread::LockGuard lock(mutex_);
-    return has_destroyed_;
-  };
-
-  FilterConfigSharedPtr config_;
-
-  RequestInternal* req_{nullptr};
-
-  EncodingProcessorState& encoding_state_;
-  DecodingProcessorState& decoding_state_;
-
-  // store response header for http
-  std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
-
-  // lock for has_destroyed_/etc, to avoid race between envoy c thread and go thread (when calling
-  // back from go).
-  Thread::MutexBasicLockable mutex_{};
-  bool has_destroyed_ ABSL_GUARDED_BY(mutex_){false};
-
-private:
-  // store cluster_name_ and route_name_ for go side to get
-  const std::string cluster_name_;
-  const std::string route_name_;
-
-};
+//   // The state of the filter on both the encoding and decoding side.
+//   DecodingProcessorState decoding_state_;
+//   EncodingProcessorState encoding_state_;
+// };
 
 class TcpConnPool : public Router::GenericConnPool,
                     public Envoy::Tcp::ConnectionPool::Callbacks,
@@ -204,6 +148,7 @@ using FilterSharedPtr = std::shared_ptr<Filter>;
 
 class TcpUpstream : public Router::GenericUpstream,
                     public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
+                    public httpRequest,
                     Logger::Loggable<Logger::Id::golang>  {
 public:
   TcpUpstream(Router::UpstreamToDownstream* upstream_request,
@@ -215,21 +160,32 @@ public:
     NotEndStream,
     EndStream,
   };
-  enum class SendDataStatus {
+  enum class EncodeHeaderStatus {
     // Send data with upstream conn not half close.
-    SendDataWithTunneling,
+    EncodeHeaderSendDataWithNotHalfClose,
     // Send data with upstream conn half close.
-    SendDataWithNotTunneling,
-    // Not Send data.
-    NotSendData,
+    EncodeHeaderSendDataWithHalfClose,
+    // Continue and not send data to upstream.
+    EncodeHeaderContinue,
+    EncodeHeaderStopAndBuffer, 
   };
-  enum class ReceiveDataStatus {
-    // Continue to deal with further data.
-    ReceiveDataContinue,
-    // Finish dealing with data.
-    ReceiveDataFinish,
-    // Failure when dealing with data.
-    ReceiveDataFailure,
+  enum class EncodeDataStatus {
+    // Continue with upstream conn not half close.
+    EncodeDataContinueWithNotHalfClose,
+    // Continue with upstream conn half close.
+    EncodeDataContinueWithHalfClose,
+    // Buffer current data and wait for further data by next encodeData.
+    EncodeDataStopAndBuffer,
+    // No buffer current data and wait for data by next encodeData.
+    EncodeDataStopNoBuffer,
+  };
+  enum class DecodeDataStatus {
+    // Continue to give data to downstream.
+    DecodeDataContinue,
+    // Buffer current data and wait for further data by next onUpstreamData.
+    DecodeDataStopAndBuffer,
+    // No buffer current data and wait for data by next onUpstreamData.
+    DecodeDataStopNoBuffer,
   };
   enum class DestroyReason {
     Normal,
@@ -237,8 +193,16 @@ public:
   };
   enum class HttpStatusCode : uint64_t {
     Success = 200,
-    UpstreamProtocolError = 500,
   };
+  enum class EnvoyValue {
+    RouteName = 1,
+    ClusterName,
+  };
+
+  void initRequest();
+  void initResponse();
+
+  bool isProcessingInGo();
 
   // GenericUpstream
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers, bool end_stream) override;
@@ -257,7 +221,26 @@ public:
   void onBelowWriteBufferLowWatermark() override;
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+  void encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream);
+
+  CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
+  CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
+  CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
+  CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
+  CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
+  CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
+
+  DecodingProcessorState* decodingState() { return decoding_state_; }
+  EncodingProcessorState* encodingState() { return encoding_state_; }
+
+  EncodingProcessorState* encoding_state_;
+  DecodingProcessorState* decoding_state_;
+
   const Router::RouteEntry* route_entry_;
+  // store response header for http
+  std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
+  // anchor a string temporarily, make sure it won't be freed before copied to Go.
+  std::string strValue;
 
 private:
   Router::UpstreamToDownstream* upstream_request_;
@@ -267,8 +250,6 @@ private:
   Dso::TcpUpstreamDsoPtr dynamic_lib_;
 
   FilterConfigSharedPtr config_;
-  // perform operations and store data for go side
-  FilterSharedPtr filter_;
 
 };
 

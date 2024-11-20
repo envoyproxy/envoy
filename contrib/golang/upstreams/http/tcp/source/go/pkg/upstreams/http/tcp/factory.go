@@ -30,14 +30,14 @@ var httpFilterFactoryAndParser = sync.Map{}
 
 type filterFactoryAndParser struct {
 	filterFactory api.TcpUpstreamFactory
-	configParser  api.StreamFilterConfigParser
+	configParser  api.TcpUpstreamConfigParser
 }
 
-// nullParser is a no-op implementation of the StreamFilterConfigParser interface.
+// nullParser is a no-op implementation of the TcpUpstreamConfigParser interface.
 type nullParser struct{}
 
 // Parse does nothing, returns the input `any` as is.
-func (p *nullParser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
+func (p *nullParser) Parse(any *anypb.Any) (interface{}, error) {
 	return any, nil
 }
 
@@ -46,7 +46,7 @@ var NullParser api.TcpUpstreamConfigParser = &nullParser{}
 // RegisterTcpUpstreamFactoryAndConfigParser registers the http filter factory and config parser for the specified plugin.
 // The factory and parser should not be nil.
 // Use the NullParser if the plugin does not care about config.
-func RegisterTcpUpstreamFactoryAndConfigParser(name string, factory api.TcpUpstreamFactory, parser api.StreamFilterConfigParser) {
+func RegisterTcpUpstreamFactoryAndConfigParser(name string, factory api.TcpUpstreamFactory, parser api.TcpUpstreamConfigParser) {
 	if factory == nil {
 		panic("tcp upstream factory should not be nil")
 	}

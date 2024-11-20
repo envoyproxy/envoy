@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -28,7 +27,7 @@ type parser struct {
 }
 
 // Parse the filter configuration. We can call the ConfigCallbackHandler to control the filter's behavior
-func (p *parser) Parse(any *anypb.Any, callbacks api.ConfigCallbackHandler) (interface{}, error) {
+func (p *parser) Parse(any *anypb.Any) (interface{}, error) {
 	configStruct := &xds.TypedStruct{}
 	if err := any.UnmarshalTo(configStruct); err != nil {
 		return nil, err
@@ -80,11 +79,9 @@ func filterFactory(c interface{}, callbacks api.TcpUpstreamCallbackHandler) api.
 	if !ok {
 		panic("unexpected config type")
 	}
-	buf := make([]byte, 0)
 	return &tcpUpstreamFilter{
-		callbacks:      callbacks,
-		config:         conf,
-		httpReqBodyBuf: bytes.NewBuffer(buf),
+		callbacks: callbacks,
+		config:    conf,
 	}
 }
 

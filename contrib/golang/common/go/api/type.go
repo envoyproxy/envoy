@@ -487,49 +487,80 @@ func (t EndStreamType) String() string {
 }
 
 // Status codes returned in EncodeData by go side.
-type SendDataStatus int
+type EncodeHeaderStatus int
 
 const (
 	// Send data with upstream conn not half close.
-	SendDataWithTunneling SendDataStatus = 0
+	EncodeHeaderSendDataWithNotHalfClose EncodeHeaderStatus = 0
 	// Send data with upstream conn half close.
-	SendDataWithNotTunneling SendDataStatus = 1
-	// Not Send data.
-	NotSendData SendDataStatus = 2
+	EncodeHeaderSendDataWithHalfClose EncodeHeaderStatus = 1
+	// Continue and not send data to upstream.
+	EncodeHeaderContinue      EncodeHeaderStatus = 2
+	EncodeHeaderStopAndBuffer EncodeHeaderStatus = 3
 )
 
-func (s SendDataStatus) String() string {
+func (s EncodeHeaderStatus) String() string {
 	switch s {
-	case SendDataWithTunneling:
-		return "SendDataWithTunneling"
-	case SendDataWithNotTunneling:
-		return "SendDataWithNotTunneling"
-	case NotSendData:
-		return "NotSendData"
+	case EncodeHeaderSendDataWithNotHalfClose:
+		return "EncodeHeaderSendDataWithNotHalfClose"
+	case EncodeHeaderSendDataWithHalfClose:
+		return "EncodeHeaderSendDataWithHalfClose"
+	case EncodeHeaderContinue:
+		return "EncodeHeaderContinue"
+	case EncodeHeaderStopAndBuffer:
+		return "EncodeHeaderStopAndBuffer"
+	}
+	return "unknown"
+}
+
+// Status codes returned in EncodeData by go side.
+type EncodeDataStatus int
+
+const (
+	// Continue with upstream conn not half close.
+	EncodeDataContinueWithNotHalfClose EncodeDataStatus = 0
+	// Continue with upstream conn half close.
+	EncodeDataContinueWithHalfClose EncodeDataStatus = 1
+	// Buffer current data and wait for further data by next encodeData.
+	EncodeDataStopAndBuffer EncodeDataStatus = 2
+	// No buffer current data and wait for data by next encodeData.
+	EncodeDataStopNoBuffer EncodeDataStatus = 3
+)
+
+func (s EncodeDataStatus) String() string {
+	switch s {
+	case EncodeDataContinueWithNotHalfClose:
+		return "EncodeDataContinueWithNotHalfClose"
+	case EncodeDataContinueWithHalfClose:
+		return "EncodeDataContinueWithHalfClose"
+	case EncodeDataStopAndBuffer:
+		return "EncodeDataStopAndBuffer"
+	case EncodeDataStopNoBuffer:
+		return "EncodeDataStopNoBuffer"
 	}
 	return "unknown"
 }
 
 // Status codes returned in OnUpstreamData by go side.
-type ReceiveDataStatus int
+type DecodeDataStatus int
 
 const (
-	// Continue to deal with further data.
-	ReceiveDataContinue ReceiveDataStatus = 0
-	// Finish dealing with data.
-	ReceiveDataFinish ReceiveDataStatus = 1
-	// Failure when dealing with data.
-	ReceiveDataFailure ReceiveDataStatus = 2
+	// Continue to give data to downstream.
+	DecodeDataContinue DecodeDataStatus = 0
+	// Buffer current data and wait for further data by next onUpstreamData.
+	DecodeDataStopAndBuffer DecodeDataStatus = 1
+	// No buffer current data and wait for data by next onUpstreamData.
+	DecodeDataStopNoBuffer DecodeDataStatus = 2
 )
 
-func (s ReceiveDataStatus) String() string {
+func (s DecodeDataStatus) String() string {
 	switch s {
-	case ReceiveDataContinue:
-		return "ReceiveDataContinue"
-	case ReceiveDataFinish:
-		return "ReceiveDataFinish"
-	case ReceiveDataFailure:
-		return "ReceiveDataFailure"
+	case DecodeDataContinue:
+		return "DecodeDataContinue"
+	case DecodeDataStopAndBuffer:
+		return "DecodeDataStopAndBuffer"
+	case DecodeDataStopNoBuffer:
+		return "DecodeDataStopNoBuffer"
 	}
 	return "unknown"
 }

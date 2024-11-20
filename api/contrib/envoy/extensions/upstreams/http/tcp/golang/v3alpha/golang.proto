@@ -4,9 +4,8 @@ package envoy.extensions.upstreams.http.tcp.golang.v3alpha;
 
 import "google/protobuf/any.proto";
 
-import "validate/validate.proto";
-
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.tcp.golang.v3alpha";
 option java_outer_classname = "GolangProto";
@@ -19,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // A connection pool which forwards downstream HTTP as TCP to upstream,
 // [#extension: envoy.upstreams.http.tcp]
 message Config {
-    // Globally unique ID for a dynamic library file.
+  // Globally unique ID for a dynamic library file.
   string library_id = 1 [(validate.rules).string = {min_len: 1}];
 
   // Path to a dynamic library implementing the

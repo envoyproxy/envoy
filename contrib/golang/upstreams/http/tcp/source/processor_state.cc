@@ -48,6 +48,54 @@ bool BufferList::checkExisting(Buffer::Instance* data) {
   return false;
 };
 
+std::string state2Str(FilterState state) {
+  switch (state) {
+  case FilterState::WaitingHeader:
+    return "WaitingHeader";
+  case FilterState::ProcessingHeader:
+    return "ProcessingHeader";
+  case FilterState::WaitingData:
+    return "WaitingData";
+  case FilterState::WaitingAllData:
+    return "WaitingAllData";
+  case FilterState::ProcessingData:
+    return "ProcessingData";
+  case FilterState::Done:
+    return "Done";
+  default:
+    return "unknown(" + std::to_string(static_cast<int>(state)) + ")";
+  }
+}
+
+std::string ProcessorState::stateStr() {
+  std::string prefix = is_encoding == 1 ? "encoder" : "decoder";
+  auto state_str = state2Str(filterState());
+  return prefix + ":" + state_str;
+}
+
+void ProcessorState::processData() {
+  ASSERT(filterState() == FilterState::WaitingData ||
+          (filterState() == FilterState::WaitingAllData));
+  setFilterState(FilterState::ProcessingData);
+}
+void ProcessorState::drainBufferData() {
+  if (data_buffer_ != nullptr) {
+    auto len = data_buffer_->length();
+    if (len > 0) {
+      ENVOY_LOG(debug, "tcp upstream drain buffer data");
+      data_buffer_->drain(len);
+    }
+  }
+}
+
+DecodingProcessorState::DecodingProcessorState(TcpUpstream& tcp_upstream) : ProcessorState(dynamic_cast<httpRequest*>(&tcp_upstream)) {
+    is_encoding = 0;
+}
+
+EncodingProcessorState::EncodingProcessorState(TcpUpstream& tcp_upstream) : ProcessorState(dynamic_cast<httpRequest*>(&tcp_upstream)) {
+    is_encoding = 1;
+  }
+
 } // namespace Golang
 } // namespace Tcp
 } // namespace Http

@@ -33,7 +33,6 @@ import "C"
 
 import (
 	"fmt"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -53,20 +52,6 @@ var (
 	delayDeleteTime = time.Second * 2 // 2s
 )
 
-func configFinalize(c *tcpUpstreamConfig) {
-	c.Finalize()
-}
-
-func createConfig(c *C.httpConfig) *tcpUpstreamConfig {
-	config := &tcpUpstreamConfig{
-		config: c,
-	}
-	// NP: make sure httpConfig will be deleted.
-	runtime.SetFinalizer(config, configFinalize)
-
-	return config
-}
-
 //export envoyGoOnTcpUpstreamConfig
 func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 	buf := utils.BytesToSlice(uint64(c.config_ptr), uint64(c.config_len))
@@ -80,13 +65,13 @@ func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 
 	var parsedConfig interface{}
 	var err error
-	config := createConfig(c)
-	parsedConfig, err = configParser.Parse(&any, config)
+	parsedConfig, err = configParser.Parse(&any)
 
 	if err != nil {
 		cAPI.Log(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
 		return 0
 	}
+	cAPI.Log(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
 	configCache.Store(configNum, parsedConfig)
 
 	return configNum
