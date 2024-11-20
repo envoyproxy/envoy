@@ -75,6 +75,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: lrs
+  change: |
+    Fixes errors stat being incremented and warning log spamming for LoadStatsReporting graceful stream close.
 - area: tls
   change: |
     Support operations on IP SANs when the IP version is not supported by the host operating system, for example
