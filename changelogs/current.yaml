@@ -275,6 +275,14 @@ new_features:
   change: |
     Added a new ``setUpstreamOverrideHost()`` which could be used to set the given host as the upstream host for the
     current request.
+- area: rbac
+  change: |
+    Added RBAC principal matchers
+    :ref:`filter_state_ip <envoy_v3_api_field_config.rbac.v3.Principal.filter_state_ip>` and
+    :ref:`dynamic_metadata_ip <envoy_v3_api_field_config.rbac.v3.Principal.dynamic_metadata_ip>`
+    which are functionally similar to
+    :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` except the downstream
+    IP is fetched from filter state or dynamic metadata, respectively.
 
 deprecated:
 - area: rbac

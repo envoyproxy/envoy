@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         "//envoy/common:base_includes",
         "//envoy/common:pure_lib",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )
 

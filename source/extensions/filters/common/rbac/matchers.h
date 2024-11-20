@@ -171,6 +171,39 @@ private:
   const Type type_;
 };
 
+class DynamicMetadataIPMatcher : public Matcher {
+public:
+  DynamicMetadataIPMatcher(
+      const envoy::config::rbac::v3::Principal::DynamicMetadataIPMatcherConfig& config)
+      : range_(THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(config.ip_range()),
+                                     Network::Address::CidrRange)),
+        filter_(config.filter()),
+        path_(std::vector<std::string>(config.path().begin(), config.path().end())) {}
+
+  bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const Network::Address::CidrRange range_;
+  const std::string filter_;
+  const std::vector<std::string> path_;
+};
+
+class FilterStateIPMatcher : public Matcher {
+public:
+  FilterStateIPMatcher(const envoy::config::rbac::v3::Principal::FilterStateIPMatcherConfig& config)
+      : range_(THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(config.ip_range()),
+                                     Network::Address::CidrRange)),
+        key_(config.key()) {}
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
+               const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const Network::Address::CidrRange range_;
+  const std::string key_;
+};
+
 /**
  * Matches the port number of the destination (local) address.
  */

@@ -1,9 +1,12 @@
+#include "matchers.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
+#include "source/common/network/utility.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
 
 namespace Envoy {
@@ -82,6 +85,10 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   case envoy::config::rbac::v3::Principal::IdentifierCase::kRemoteIp:
     return std::make_shared<const IPMatcher>(principal.remote_ip(),
                                              IPMatcher::Type::DownstreamRemote);
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kFilterStateIp:
+    return std::make_shared<const FilterStateIPMatcher>(principal.filter_state_ip());
+  case envoy::config::rbac::v3::Principal::IdentifierCase::kDynamicMetadataIp:
+    return std::make_shared<const DynamicMetadataIPMatcher>(principal.dynamic_metadata_ip());
   case envoy::config::rbac::v3::Principal::IdentifierCase::kHeader:
     return std::make_shared<const HeaderMatcher>(principal.header(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAny:
@@ -189,6 +196,29 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
     ip = info.downstreamAddressProvider().remoteAddress();
     break;
   }
+  return range_.isInRange(*ip.get());
+}
+
+bool FilterStateIPMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
+                                   const StreamInfo::StreamInfo& info) const {
+  const Network::Address::InstanceConstSharedPtrAccessor* filter_state_object =
+      info.filterState().getDataReadOnly<Network::Address::InstanceConstSharedPtrAccessor>(key_);
+  if (filter_state_object == nullptr) {
+    return false;
+  }
+  Envoy::Network::Address::InstanceConstSharedPtr ip = filter_state_object->getIp();
+  return range_.isInRange(*ip.get());
+}
+
+bool DynamicMetadataIPMatcher::matches(const Network::Connection&,
+                                       const Envoy::Http::RequestHeaderMap&,
+                                       const StreamInfo::StreamInfo& info) const {
+  auto metadata = Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
+  if (metadata.kind_case() != ProtobufWkt::Value::kStringValue) {
+    return false;
+  }
+  Envoy::Network::Address::InstanceConstSharedPtr ip =
+      Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(metadata.string_value());
   return range_.isInRange(*ip.get());
 }
 
