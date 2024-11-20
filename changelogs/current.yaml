@@ -17,6 +17,9 @@ bug_fixes:
     Reverted :ref:`custom header
     <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension to its
     original behavior by disabling automatic XFF header appending that was inadvertently introduced in PR #31831.
+- area: tracers
+  change: |
+    Avoid possible overflow when setting span attributes in Dynatrace sampler.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
