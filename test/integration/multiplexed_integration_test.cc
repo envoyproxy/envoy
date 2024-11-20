@@ -1130,6 +1130,38 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilterContinue) {
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
+// Test GoAway from L7 encoder filters with StopIteration.
+TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterStopIteration) {
+  FakeHttpConnectionPtr fake_upstream_connection;
+  Http::RequestEncoder* encoder;
+  FakeStreamPtr upstream_request;
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"skip-goaway", "true"}});
+
+  encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_request));
+
+  codec_client_->sendData(*encoder, 128, true);
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+
+  upstream_request->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"send-encoder-goaway", "true"},
+                                      {"continue-encoder-filter-chain", "false"}},
+      true);
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 // Test GoAway from L7 encoder filters with Continue.
 TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) {
   FakeHttpConnectionPtr fake_upstream_connection;
