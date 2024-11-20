@@ -68,9 +68,16 @@ minor_behavior_changes:
   change: |
     The :ref:`route_configuration <envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>` field
     is supported when the ``ScopedRouteConfiguration`` resource is delivered via SRDS.
+- area: http
+  change: |
+    Local replies now traverse the filter chain if 1xx headers have been sent to the client. This change can be reverted
+    by setting the runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: lrs
+  change: |
+    Fixes errors stat being incremented and warning log spamming for LoadStatsReporting graceful stream close.
 - area: tls
   change: |
     Support operations on IP SANs when the IP version is not supported by the host operating system, for example
@@ -96,6 +103,9 @@ bug_fixes:
     Reverted :ref:`custom header
     <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension to its
     original behavior by disabling automatic XFF header appending that was inadvertently introduced in PR #31831.
+- area: tracers
+  change: |
+    Avoid possible overflow when setting span attributes in Dynatrace sampler.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
