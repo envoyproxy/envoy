@@ -5,6 +5,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/service/health/v3/hds.pb.h"
 #include "envoy/ssl/context_manager.h"
@@ -32,11 +33,6 @@ using HostsMap = absl::flat_hash_map<LocalityEndpointTuple, HostSharedPtr, Local
 using HealthCheckerMap =
     absl::flat_hash_map<envoy::config::core::v3::HealthCheck, Upstream::HealthCheckerSharedPtr,
                         HealthCheckerHash, HealthCheckerEqualTo>;
-
-class ProdClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
-public:
-  ClusterInfoConstSharedPtr createClusterInfo(const CreateClusterInfoParams& params) override;
-};
 
 // TODO(lilika): Add HdsClusters to the /clusters endpoint to get detailed stats about each HC host.
 
@@ -138,7 +134,7 @@ struct HdsDelegateStats {
  * back the results.
  */
 class HdsDelegate : Grpc::AsyncStreamCallbacks<envoy::service::health::v3::HealthCheckSpecifier>,
-                    Logger::Loggable<Logger::Id::upstream> {
+                    public Server::HdsDelegateApi {
 public:
   HdsDelegate(Server::Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
               Grpc::RawAsyncClientPtr async_client, Envoy::Stats::Store& stats,

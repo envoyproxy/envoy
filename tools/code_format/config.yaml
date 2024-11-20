@@ -136,6 +136,7 @@ paths:
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
     - source/common/upstream/health_discovery_service.cc
+    - source/common/upstream/prod_cluster_info_factory.cc
     - source/common/secret/sds_api.h
     - source/common/secret/sds_api.cc
     - source/common/secret/secret_provider_impl.cc

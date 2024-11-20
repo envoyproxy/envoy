@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
@@ -39,7 +40,7 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/health_discovery_service.h"
+#include "source/common/upstream/prod_cluster_info_factory.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
@@ -259,6 +260,11 @@ public:
   virtual absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() PURE;
   virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
   virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
+  virtual std::unique_ptr<HdsDelegateApi>
+  maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
+                         Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
+                         Ssl::ContextManager& ssl_context_manager,
+                         Upstream::ClusterInfoFactory& info_factory) PURE;
 
   void run() override;
 
@@ -412,7 +418,7 @@ private:
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Config::XdsManagerPtr xds_manager_;
   Upstream::ProdClusterInfoFactory info_factory_;
-  Upstream::HdsDelegatePtr hds_delegate_;
+  std::unique_ptr<HdsDelegateApi> hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
