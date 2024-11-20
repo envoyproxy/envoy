@@ -292,10 +292,10 @@ bool CorsFilter::allowPrivateNetworkAccess() {
 }
 
 bool CorsFilter::shadowEnabled() {
-  return (policies_.size() > 0) ? policies_[0].get().shadowEnabled() : false;
+  return policies_.empty() ? false : policies_[0].get().shadowEnabled();
 }
 
-bool CorsFilter::enabled() { return (policies_.size() > 0) ? policies_[0].get().enabled() : false; }
+bool CorsFilter::enabled() { return policies_.empty() ? false : policies_[0].get().enabled(); }
 
 } // namespace Cors
 } // namespace HttpFilters
