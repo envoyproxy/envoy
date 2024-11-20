@@ -109,10 +109,6 @@ type TcpUpstreamCAPI interface {
 	SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
 	// Get the specified value by key
 	GetStringValue(r unsafe.Pointer, id int) (string, bool)
-
-	/* These APIs have nothing to do with request */
-	Log(level LogType, message string)
-	LogLevel() LogType
 }
 
 type CommonCAPI interface {

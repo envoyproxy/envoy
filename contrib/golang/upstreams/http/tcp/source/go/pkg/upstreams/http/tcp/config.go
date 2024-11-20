@@ -32,7 +32,6 @@ package tcp
 import "C"
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -68,10 +67,10 @@ func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 	parsedConfig, err = configParser.Parse(&any)
 
 	if err != nil {
-		cAPI.Log(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
+		api.LogErrorf("failed to parse golang plugin config: %v", err)
 		return 0
 	}
-	cAPI.Log(api.Error, fmt.Sprintf("failed to parse golang plugin config: %v", err))
+	api.LogErrorf("failed to parse golang plugin config: %v", err)
 	configCache.Store(configNum, parsedConfig)
 
 	return configNum

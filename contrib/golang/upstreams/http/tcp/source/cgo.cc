@@ -27,9 +27,6 @@ extern "C" {
 CAPIStatus envoyGoTcpUpstreamProcessStateHandlerWrapper(
     void* s, std::function<CAPIStatus(TcpUpstream&, ProcessorState&)> f) {
   auto state = static_cast<ProcessorState*>(reinterpret_cast<processState*>(s));
-  if (!state->isProcessingInGo()) {
-    return CAPIStatus::CAPINotInGo;
-  }
   auto req = static_cast<TcpUpstream*>(state->req);
   return f(*req, *state);
 }

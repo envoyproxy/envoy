@@ -73,30 +73,6 @@ private:
   uint64_t config_id_{0};
 };
 
-// // Go code only touch the fields in httpRequest
-// class RequestInternal : public httpRequest {
-// public:
-//   RequestInternal(TcpUpstream& tcp_upstream)
-//       : tcp_upstream_(tcp_upstream), decoding_state_(tcp_upstream, this), encoding_state_(tcp_upstream, this) {
-//     configId = 0;
-//   }
-
-//   TcpUpstream& tcpUpstream() { return tcp_upstream_; }
-
-//   DecodingProcessorState& decodingState() { return decoding_state_; }
-//   EncodingProcessorState& encodingState() { return encoding_state_; }
-
-//   // anchor a string temporarily, make sure it won't be freed before copied to Go.
-//   std::string strValue;
-
-// private:
-//   TcpUpstream& tcp_upstream_;
-
-//   // The state of the filter on both the encoding and decoding side.
-//   DecodingProcessorState decoding_state_;
-//   EncodingProcessorState encoding_state_;
-// };
-
 class TcpConnPool : public Router::GenericConnPool,
                     public Envoy::Tcp::ConnectionPool::Callbacks,
                     Logger::Loggable<Logger::Id::golang> {
@@ -201,8 +177,6 @@ public:
 
   void initRequest();
   void initResponse();
-
-  bool isProcessingInGo();
 
   // GenericUpstream
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers, bool end_stream) override;

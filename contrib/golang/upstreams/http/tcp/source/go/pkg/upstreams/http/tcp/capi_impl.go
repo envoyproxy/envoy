@@ -68,22 +68,13 @@ type cgoApiImpl struct{}
 // panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
-	case C.CAPIFilterIsGone,
-		C.CAPIFilterIsDestroy,
-		C.CAPINotInGo,
-		C.CAPIInvalidPhase:
+	case C.CAPIInvalidPhase:
 		panic(capiStatusToStr(status))
 	}
 }
 
 func capiStatusToStr(status C.CAPIStatus) string {
 	switch status {
-	case C.CAPIFilterIsGone:
-		return errRequestFinished
-	case C.CAPIFilterIsDestroy:
-		return errFilterDestroyed
-	case C.CAPINotInGo:
-		return errNotInGo
 	case C.CAPIInvalidPhase:
 		return errInvalidPhase
 	}
@@ -186,19 +177,8 @@ func (c *cgoApiImpl) GetStringValue(r unsafe.Pointer, id int) (string, bool) {
 	var valueData C.uint64_t
 	var valueLen C.int
 	res := C.envoyGoTcpUpstreamGetStringValue(unsafe.Pointer(req.req), C.int(id), &valueData, &valueLen)
-	if res == C.CAPIValueNotFound {
-		return "", false
-	}
 	handleCApiStatus(res)
 	value := unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
 	// copy the memory from c to Go.
 	return strings.Clone(value), true
-}
-
-func (c *cgoApiImpl) Log(level api.LogType, message string) {
-	C.envoyGoFilterLog(C.uint32_t(level), unsafe.Pointer(unsafe.StringData(message)), C.int(len(message)))
-}
-
-func (c *cgoApiImpl) LogLevel() api.LogType {
-	return api.GetLogLevel()
 }

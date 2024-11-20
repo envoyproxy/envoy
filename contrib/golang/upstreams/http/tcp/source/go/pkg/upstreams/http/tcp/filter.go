@@ -115,18 +115,6 @@ func (r *httpRequest) recoverPanic() {
 	}
 }
 
-func (r *httpRequest) Log(level api.LogType, message string) {
-	// TODO performance optimization points:
-	// Add a new goroutine to write logs asynchronously and avoid frequent cgo calls
-	cAPI.Log(level, fmt.Sprintf("[tcp upstream][%v] %v", r.pluginName(), message))
-	// The default log format is:
-	// [2023-08-09 03:04:16.179][1390][error][golang] [contrib/golang/common/log/cgo.cc:24] [http][plugin_name] msg
-}
-
-func (r *httpRequest) LogLevel() api.LogType {
-	return cAPI.LogLevel()
-}
-
 func (r *httpRequest) GetRouteName() string {
 	name, _ := cAPI.GetStringValue(unsafe.Pointer(r), ValueRouteName)
 	return name

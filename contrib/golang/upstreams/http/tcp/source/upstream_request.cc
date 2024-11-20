@@ -114,7 +114,7 @@ TcpUpstream::~TcpUpstream() {
     return;
   }              
 
-  auto reason = isProcessingInGo()
+  auto reason = (decoding_state_->isProcessingInGo() || encoding_state_->isProcessingInGo())
                 ? DestroyReason::Terminate
                 : DestroyReason::Normal;
   dynamic_lib_->envoyGoOnTcpUpstreamDestroy(this, int(reason));
@@ -132,10 +132,6 @@ void TcpUpstream::initResponse() {
     resp_headers_ = std::move(headers);
   }
 }
-
-bool TcpUpstream::isProcessingInGo() {
-  return decoding_state_->isProcessingInGo() || encoding_state_->isProcessingInGo();
-}  
 
 Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
                                                bool end_stream) {
@@ -404,10 +400,6 @@ void copyHeaderMapToGo(const Envoy::Http::HeaderMap& m, GoString* go_strs, char*
 }
 
 CAPIStatus TcpUpstream::copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf) {
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "tcp upstream is not processing Go, {}", state.stateStr());
-    return CAPIStatus::CAPINotInGo;
-  }
   auto headers = state.headers;
   if (headers == nullptr) {
     ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
@@ -421,11 +413,6 @@ CAPIStatus TcpUpstream::copyHeaders(ProcessorState& state, GoString* go_strs, ch
 // callback to run in the envoy worker thread.
 CAPIStatus TcpUpstream::setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
                              headerAction act) {                          
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "tcp upstream is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-
   auto* s = dynamic_cast<DecodingProcessorState*>(&state);
   if (s == nullptr) {
     ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {} when dynamic_cast state", __func__);
@@ -454,10 +441,6 @@ CAPIStatus TcpUpstream::setRespHeader(ProcessorState& state, absl::string_view k
 }
 
 CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data) {
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "tcp upstream is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
   if (!state.doDataList.checkExisting(buffer)) {
     ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
@@ -472,10 +455,6 @@ CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buff
 }
 
 CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length) {
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "tcp upstream is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
   if (!state.doDataList.checkExisting(buffer)) {
     ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
@@ -487,10 +466,6 @@ CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buf
 
 CAPIStatus TcpUpstream::setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
                                    absl::string_view& value, bufferAction action) {                                   
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "tcp upstream is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
   if (!state.doDataList.checkExisting(buffer)) {
     ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;

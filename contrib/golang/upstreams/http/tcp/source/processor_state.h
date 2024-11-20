@@ -79,7 +79,7 @@ public:
   FilterState filterState() const { return static_cast<FilterState>(state); }
   void setFilterState(FilterState st) { state = static_cast<int>(st); }
   bool isProcessingInGo() {
-    return filterState() == FilterState::ProcessingHeader || filterState() == FilterState::ProcessingData || filterState() == FilterState::WaitingData || filterState() == FilterState::WaitingAllData || filterState() == FilterState::Done;
+    return filterState() == FilterState::ProcessingHeader || filterState() == FilterState::ProcessingData;
   }
 
   /* data buffer */
