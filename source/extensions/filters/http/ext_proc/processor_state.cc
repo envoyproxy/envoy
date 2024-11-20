@@ -301,7 +301,10 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
     return result.status();
   }
 
+  // Clear route cache before finalizing
+  clearRouteCache(common_response);
   finalizeBodyResponse(*result);
+
   return absl::OkStatus();
 }
 
@@ -437,16 +440,10 @@ void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_resp
 }
 
 void ProcessorState::finalizeBodyResponse(bool should_continue) {
-  // Clear route cache before finalizing
-  clearRouteCache(common_response);
-
   headers_ = nullptr;
   if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
     filter_.sendTrailers(*this, *trailers_);
-    return absl::OkStatus();
-  }
-
-  if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
+  } else if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
     continueIfNecessary();
   }
 }
