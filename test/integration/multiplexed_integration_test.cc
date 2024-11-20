@@ -36,6 +36,7 @@ using ::testing::HasSubstr;
 using ::testing::MatchesRegex;
 
 namespace Envoy {
+using Http::StreamResetReason;
 namespace {
 std::vector<int> stoiAccessLogString(const std::string& access_log_entry_of_ints) {
   std::vector<int> ret;
@@ -3034,7 +3035,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
     EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
   } else if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), "http2.violation.of.messaging.rule");
   } else {
     EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
@@ -3271,6 +3272,53 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
   test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);
+}
+
+TEST_P(MultiplexedIntegrationTest, ResetPropogation) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
+  ASSERT(downstreamProtocol() != Http::CodecType::HTTP1);
+  std::vector<Http::StreamResetReason> reasons = {StreamResetReason::RemoteResetNoError,
+                                                  StreamResetReason::ProtocolError};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (Http::StreamResetReason reason : reasons) {
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+    upstream_request_->encodeResetStream(reason);
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(reason, response->resetReason())
+        << "Expected code " << static_cast<int>(reason) << " "
+        << " got " << static_cast<int>(response->resetReason()) << "\n";
+  }
+}
+TEST_P(MultiplexedIntegrationTest, LegacyResetPropogation) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    setDownstreamProtocol(Http::CodecType::HTTP2);
+  }
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "true");
+  std::vector<Http::StreamResetReason> reasons = {StreamResetReason::RemoteResetNoError,
+                                                  StreamResetReason::ProtocolError};
+  std::vector<Http::StreamResetReason> result_reasons = {StreamResetReason::RemoteResetNoError,
+                                                         StreamResetReason::RemoteResetNoError};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (size_t i = 0; i == reasons.size(); ++i) {
+    auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+    auto response = std::move(encoder_decoder.second);
+    waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+    upstream_request_->encodeHeaders(default_response_headers_,
+                                     reasons[i] == StreamResetReason::RemoteResetNoError);
+    upstream_request_->encodeResetStream(reasons[i]);
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(result_reasons[i], response->resetReason());
+  }
 }
 
 } // namespace Envoy

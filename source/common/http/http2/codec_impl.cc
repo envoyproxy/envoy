@@ -99,9 +99,38 @@ int reasonToReset(StreamResetReason reason) {
     return OGHTTP2_REFUSED_STREAM;
   case StreamResetReason::ConnectError:
     return OGHTTP2_CONNECT_ERROR;
-  default:
+  case StreamResetReason::RemoteResetNoError:
     return OGHTTP2_NO_ERROR;
+  case StreamResetReason::ProtocolError:
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+      return OGHTTP2_PROTOCOL_ERROR;
+    } else {
+      return OGHTTP2_NO_ERROR;
+    }
+  default:
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+      return OGHTTP2_INTERNAL_ERROR;
+    } else {
+      return OGHTTP2_NO_ERROR;
+    }
   }
+}
+
+StreamResetReason errorCodeToResetReason(int error_code) {
+  if (error_code == OGHTTP2_REFUSED_STREAM) {
+    return StreamResetReason::RemoteRefusedStreamReset;
+  }
+  if (error_code == OGHTTP2_CONNECT_ERROR) {
+    return StreamResetReason::ConnectError;
+  }
+  if (error_code == OGHTTP2_NO_ERROR) {
+    return StreamResetReason::RemoteResetNoError;
+  }
+  if (error_code == OGHTTP2_PROTOCOL_ERROR) {
+    return StreamResetReason::ProtocolError;
+  }
+  // Legacy default
+  return StreamResetReason::RemoteReset;
 }
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
@@ -799,6 +828,7 @@ void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   if (codec_callbacks_) {
     codec_callbacks_->onCodecLowLevelReset();
   }
+
   parent_.adapter_->SubmitRst(stream_id_,
                               static_cast<http2::adapter::Http2ErrorCode>(reasonToReset(reason)));
 }
@@ -1403,19 +1433,27 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
         // depending whether the connection is upstream or downstream.
         reason = getMessagingErrorResetReason();
       } else {
-        if (error_code == OGHTTP2_REFUSED_STREAM) {
-          reason = StreamResetReason::RemoteRefusedStreamReset;
-          stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
-        } else {
-          if (error_code == OGHTTP2_CONNECT_ERROR) {
-            reason = StreamResetReason::ConnectError;
-          } else {
-            reason = StreamResetReason::RemoteReset;
-          }
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+
+          reason = errorCodeToResetReason(error_code);
           stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+          if (error_code == OGHTTP2_REFUSED_STREAM) {
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+          }
+        } else {
+          if (error_code == OGHTTP2_REFUSED_STREAM) {
+            reason = StreamResetReason::RemoteRefusedStreamReset;
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_refused);
+          } else {
+            if (error_code == OGHTTP2_CONNECT_ERROR) {
+              reason = StreamResetReason::ConnectError;
+            } else {
+              reason = StreamResetReason::RemoteReset;
+            }
+            stream->setDetails(Http2ResponseCodeDetails::get().remote_reset);
+          }
         }
       }
-
       stream->runResetCallbacks(reason, absl::string_view());
 
     } else if (!stream->reset_reason_.has_value() &&

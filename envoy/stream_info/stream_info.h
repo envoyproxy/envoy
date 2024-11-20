@@ -95,8 +95,10 @@ enum CoreResponseFlag : uint16_t {
   DropOverLoad,
   // Downstream remote codec level reset was received on the stream.
   DownstreamRemoteReset,
+  // The request was reset with the "NO_ERROR" code
+  ResetWithNoError,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DownstreamRemoteReset,
+  LastFlag = ResetWithNoError,
 };
 
 class ResponseFlagUtils;
