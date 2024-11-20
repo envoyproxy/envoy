@@ -274,15 +274,6 @@ private:
     }
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
-    void upgradeFilterChainCreated(bool created) override {
-      if (created) {
-        connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
-        connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
-        state_.upgrade_accepted_ = true;
-      } else {
-        state_.upgrade_rejected_ = true;
-      }
-    }
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
     void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
@@ -351,7 +342,7 @@ private:
 
       // Whether the upgrade request has be accepted or rejected by the filter chain.
       // Both are false if the request is not an upgrade request.
-      bool upgrade_accepted_{};
+      bool successful_upgrade_{};
       bool upgrade_rejected_{};
 
       // True if this stream was the original externally created stream, but was

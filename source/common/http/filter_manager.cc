@@ -1077,7 +1077,7 @@ void DownstreamFilterManager::executeLocalReplyIfPrepared() {
   Utility::encodeLocalReply(state_.destroyed_, std::move(prepared_local_reply_));
 }
 
-bool DownstreamFilterManager::createDownstreamFilterChain() {
+FilterManager::CreateChainResult DownstreamFilterManager::createDownstreamFilterChain() {
   return createFilterChain(filter_chain_factory_, false);
 }
 
@@ -1645,22 +1645,15 @@ bool FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_ch
   }
 
   const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
-  if (filter_chain_factory.createUpgradeFilterChain(upgrade->value().getStringView(), upgrade_map,
-                                                    *this, options)) {
-    filter_manager_callbacks_.upgradeFilterChainCreated(true);
-    return true;
-  } else {
-    filter_manager_callbacks_.upgradeFilterChainCreated(false);
-    // The upgrade filter chain is rejected. Fall through to the default filter chain.
-    // The default filter chain will be used to handle the upgrade failure local reply.
-    return false;
-  }
+  return filter_chain_factory.createUpgradeFilterChain(upgrade->value().getStringView(),
+                                                       upgrade_map, *this, options);
 }
 
-bool FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
-                                      bool only_create_if_configured) {
-  if (state_.created_filter_chain_) {
-    return true;
+FilterManager::CreateChainResult
+FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
+                                 bool only_create_if_configured) {
+  if (state_.create_chain_result_.created()) {
+    return state_.create_chain_result_;
   }
 
   OptRef<DownstreamStreamFilterCallbacks> downstream_callbacks =
@@ -1670,18 +1663,24 @@ bool FilterManager::createFilterChain(const FilterChainFactory& filter_chain_fac
   // to set valid initial route only when the downstream callbacks is available.
   FilterChainOptionsImpl options(downstream_callbacks.has_value() ? streamInfo().route() : nullptr);
 
+  absl::optional<bool> upgrade = absl::nullopt;
+
+  // Only try the upgrade filter chain for downstream filter chains.
   if (downstream_callbacks.has_value()) {
-    // Only try the upgrade filter chain for downstream filter chains.
     if (createUpgradeFilterChain(filter_chain_factory, options)) {
-      state_.created_filter_chain_ = true;
-      return true;
+      // Upgrade filter chain is created. Return the result directly.
+      state_.create_chain_result_ = CreateChainResult(true, true);
+      return state_.create_chain_result_;
+    } else {
+      // Set the upgrade flag to false if the upgrade filter chain is rejected and fall through to
+      // the default filter chain.
+      upgrade = false;
     }
   }
 
-  const bool created =
-      filter_chain_factory.createFilterChain(*this, only_create_if_configured, options);
-  state_.created_filter_chain_ = created;
-  return created;
+  state_.create_chain_result_ = CreateChainResult(
+      filter_chain_factory.createFilterChain(*this, only_create_if_configured, options), upgrade);
+  return state_.create_chain_result_;
 }
 
 void ActiveStreamDecoderFilter::requestDataDrained() {

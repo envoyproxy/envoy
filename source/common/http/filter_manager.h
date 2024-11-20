@@ -460,13 +460,6 @@ public:
   virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
 
   /**
-   * Called when the FilterManager creates an Upgrade filter chain.
-   * @param created whether the upgrade filter chain was created. If false, the upgrade
-   *                is rejected.
-   */
-  virtual void upgradeFilterChainCreated(bool created) PURE;
-
-  /**
    * Called when request activity indicates that the request timeout should be disarmed.
    */
   virtual void disarmRequestTimeout() PURE;
@@ -831,12 +824,45 @@ public:
    * a local reply without the overhead of creating and traversing the filters.
    */
   void skipFilterChainCreation() {
-    ASSERT(!state_.created_filter_chain_);
-    state_.created_filter_chain_ = true;
+    ASSERT(!state_.create_chain_result_.created());
+    state_.create_chain_result_ = CreateChainResult(true, absl::nullopt);
   }
 
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+  /**
+   * Filter chain creation result.
+   */
+  class CreateChainResult {
+  public:
+    CreateChainResult() = default;
+
+    /**
+     * @param created whether the filter chain was created.
+     * @param upgrade whether the upgrade was accepted or rejected. absl::nullopt if no upgrade
+     *        was requested. True if the upgrade was accepted, false if it was rejected.
+     */
+    CreateChainResult(bool created, absl::optional<bool> upgrade)
+        : created_(created), upgrade_(upgrade) {}
+
+    /**
+     * @return whether the filter chain was created.
+     */
+    bool created() const { return created_; }
+    /**
+     * @return whether the upgrade was accepted.
+     */
+    bool upgradeAccepted() const { return upgrade_.has_value() ? upgrade_.value() : false; }
+    /**
+     * @return whether the upgrade was rejected.
+     */
+    bool upgradeRejected() const { return upgrade_.has_value() ? !upgrade_.value() : false; }
+
+  private:
+    bool created_{};
+    absl::optional<bool> upgrade_{};
+  };
 
   /**
    * Set up the Encoder/Decoder filter chain.
@@ -845,8 +871,8 @@ public:
    *        explicitly. This only makes sense for upstream HTTP filter chain.
    *
    */
-  bool createFilterChain(const FilterChainFactory& filter_chain_factory,
-                         bool only_create_if_configured);
+  CreateChainResult createFilterChain(const FilterChainFactory& filter_chain_factory,
+                                      bool only_create_if_configured);
 
   OptRef<const Network::Connection> connection() const { return connection_; }
 
@@ -889,7 +915,6 @@ protected:
     // By default, we will assume there are no 1xx. If encode1xxHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 1xx.
     bool has_1xx_headers_{};
-    bool created_filter_chain_{};
     // These two are latched on initial header read, to determine if the original headers
     // constituted a HEAD or gRPC request, respectively.
     bool is_head_request_{};
@@ -911,6 +936,9 @@ protected:
     bool encoder_filters_streaming_{true};
     bool decoder_filters_streaming_{true};
     bool destroyed_{false};
+
+    // Result of filter chain creation.
+    CreateChainResult create_chain_result_{};
 
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
@@ -1146,7 +1174,7 @@ public:
     stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
   }
 
-  bool createDownstreamFilterChain();
+  CreateChainResult createDownstreamFilterChain();
 
   /**
    * Called before local reply is made by the filter manager.
