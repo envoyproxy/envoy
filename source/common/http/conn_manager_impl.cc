@@ -760,7 +760,11 @@ void ConnectionManagerImpl::onDrainTimeout() {
 void ConnectionManagerImpl::sendGoAwayAndClose() {
   ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
                  read_callbacks_->connection());
+  if (go_away_sent_) {
+    return;
+  }
   codec_->goAway();
+  go_away_sent_ = true;
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
                     "forced_goaway");
 }
