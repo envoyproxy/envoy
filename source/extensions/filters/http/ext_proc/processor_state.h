@@ -377,9 +377,8 @@ private:
    * Finalizes body response processing by handling trailers and continuation.
    *
    * @param should_continue Indicates if processing should continue after finalization
-   * @return Status Returns Ok if finalization succeeds, or an error status on failure
    */
-  absl::Status finalizeBodyResponse(bool should_continue);
+  void finalizeBodyResponse(bool should_continue);
 };
 
 class DecodingProcessorState : public ProcessorState {

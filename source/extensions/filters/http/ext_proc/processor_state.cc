@@ -294,17 +294,15 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   default:
     // Fake a grpc error when processor state and received message type doesn't match
     onFinishProcessorCall(Grpc::Status::FailedPrecondition);
-    return absl::OkStatus();
+    break;
   }
 
   if (!result.ok()) {
     return result.status();
   }
 
-  // Clear route cache before finalizing
-  clearRouteCache(common_response);
-
-  return finalizeBodyResponse(*result);
+  finalizeBodyResponse(*result);
+  return absl::OkStatus();
 }
 
 bool ProcessorState::isValidBodyCallbackState() const {
@@ -438,11 +436,11 @@ void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_resp
   });
 }
 
-absl::Status ProcessorState::finalizeBodyResponse(bool should_continue) {
-  // Note: no need to clear route cache here since it's already been cleared
-  // in the main handleBodyResponse method
-  headers_ = nullptr;
+void ProcessorState::finalizeBodyResponse(bool should_continue) {
+  // Clear route cache before finalizing
+  clearRouteCache(common_response);
 
+  headers_ = nullptr;
   if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
     filter_.sendTrailers(*this, *trailers_);
     return absl::OkStatus();
@@ -451,8 +449,6 @@ absl::Status ProcessorState::finalizeBodyResponse(bool should_continue) {
   if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
     continueIfNecessary();
   }
-
-  return absl::OkStatus();
 }
 
 // If the body mode is FULL_DUPLEX_STREAMED, then the trailers response may come back when
