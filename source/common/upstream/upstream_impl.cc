@@ -111,8 +111,8 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
         fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(
-      typed_config, factory_context.messageValidationVisitor(), *proto_config);
+  RETURN_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
+      typed_config, factory_context.messageValidationVisitor(), *proto_config));
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
@@ -499,10 +499,7 @@ void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health
   // Clear all old EDS health flags first.
   HostImplBase::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   HostImplBase::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-    HostImplBase::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
-  }
+  HostImplBase::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
 
   // Set the appropriate EDS health flag.
   switch (health_status) {
@@ -512,10 +509,7 @@ void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health
     HostImplBase::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DRAINING:
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-      HostImplBase::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
-    }
+    HostImplBase::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
     break;
   case envoy::config::core::v3::DEGRADED:
     HostImplBase::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
@@ -1400,8 +1394,10 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
     auto message = factory.createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
-                                           factory_context.messageValidationVisitor(), *message);
+    SET_AND_RETURN_IF_NOT_OK(
+        Config::Utility::translateOpaqueConfig(
+            proto_config.typed_config(), factory_context.messageValidationVisitor(), *message),
+        creation_status);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, upstream_context_);
     filter_factories_.push_back(
@@ -1475,8 +1471,9 @@ ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& 
     if (factory != nullptr) {
       // Load and validate the configuration.
       auto proto_message = factory->createEmptyConfigProto();
-      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                             context.messageValidationVisitor(), *proto_message);
+      RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+          policy.typed_extension_config().typed_config(), context.messageValidationVisitor(),
+          *proto_message));
 
       load_balancer_factory_ = factory;
       load_balancer_config_ = factory->loadConfig(context, *proto_message);
