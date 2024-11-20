@@ -34,6 +34,7 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/version:version_lib",
+        "//source/extensions/filters/http/match_delegate:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
