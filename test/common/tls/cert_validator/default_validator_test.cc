@@ -430,6 +430,9 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameIncorrectTypeMatched) {
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameExactDNSFailure) {
+  // This will only be tested under debug (assertion is triggered) to ensure
+  // that the class will not be initialized in the DNS-exact mode.
+#ifndef NDEBUG
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   envoy::type::matcher::v3::StringMatcher matcher;
@@ -437,6 +440,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameExactDNSFailure) {
   EXPECT_DEATH(std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context),
                "general_name_type != 2 || matcher.match_pattern_case() != "
                "envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact");
+#endif
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameWildcardDNSMatched) {
