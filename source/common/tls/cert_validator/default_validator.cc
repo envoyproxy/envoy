@@ -214,7 +214,7 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
     // validated as a DNS SAN, but this change will require a runtime flag for the behavior change.
     verify_san_override = transport_socket_options->verifySubjectAltNameListOverride();
   } else if (auto_sni_san_match_ && !sni.empty()) {
-    match_sni_san.emplace_back(std::make_unique<DnsStringSanMatcher>(sni));
+    match_sni_san.emplace_back(std::make_unique<DnsExactStringSanMatcher>(sni));
     match_san_override = match_sni_san;
   }
   Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(

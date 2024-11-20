@@ -26,7 +26,7 @@ bool StringSanMatcher::match(const GENERAL_NAME* general_name) const {
   return matcher_.match(Utility::generalNameAsString(general_name));
 }
 
-bool DnsStringSanMatcher::match(const GENERAL_NAME* general_name) const {
+bool DnsExactStringSanMatcher::match(const GENERAL_NAME* general_name) const {
   if (general_name->type != GEN_DNS) {
     return false;
   }
@@ -46,7 +46,7 @@ SanMatcherPtr createStringSanMatcher(
     // For DNS SAN, if the StringMatcher type is exact, we have to follow DNS matching semantics.
     if (matcher.matcher().match_pattern_case() ==
         envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact) {
-      return SanMatcherPtr{std::make_unique<DnsStringSanMatcher>(matcher.matcher().exact())};
+      return SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>(matcher.matcher().exact())};
     } else {
       return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher.matcher(), context)};
     }

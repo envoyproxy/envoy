@@ -57,12 +57,12 @@ private:
 // A DNS string SAN matcher that uses the dnsNameMatch() function.
 // This should be used for DNS SAN where the StringMatcher type is exact,
 // and the DNS matching semantics must be followed.
-class DnsStringSanMatcher : public SanMatcher {
+class DnsExactStringSanMatcher : public SanMatcher {
 public:
   bool match(const GENERAL_NAME* general_name) const override;
-  ~DnsStringSanMatcher() override = default;
+  ~DnsExactStringSanMatcher() override = default;
 
-  DnsStringSanMatcher(absl::string_view dns_exact_match) : dns_exact_match_(dns_exact_match) {}
+  DnsExactStringSanMatcher(absl::string_view dns_exact_match) : dns_exact_match_(dns_exact_match) {}
 
 private:
   const std::string dns_exact_match_;

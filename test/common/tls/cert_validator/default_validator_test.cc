@@ -449,7 +449,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameWildcardDNSMatched) {
                                   "}}/test/common/tls/test_data/san_multiple_dns_cert.pem"));
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<DnsStringSanMatcher>("api.example.com")});
+      SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>("api.example.com")});
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
@@ -460,7 +460,7 @@ TEST(DefaultCertValidatorTest, TestMultiLevelMatch) {
                                   "}}/test/common/tls/test_data/san_multiple_dns_cert.pem"));
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<DnsStringSanMatcher>("foo.api.example.com")});
+      SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>("foo.api.example.com")});
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
@@ -546,7 +546,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
   matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
   std::vector<SanMatcherPtr> invalid_san_matchers;
   invalid_san_matchers.push_back(
-      SanMatcherPtr{std::make_unique<DnsStringSanMatcher>(matcher.exact())});
+      SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>(matcher.exact())});
   std::string error;
   // Verify the certificate with incorrect SAN exact matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
