@@ -53,14 +53,9 @@ absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config)
 
 absl::optional<envoy::config::core::v3::GrpcService>
 getFilterGrpcService(const ExternalProcessor& config) {
-  if (config.has_grpc_service() != config.has_http_service()) {
-    if (config.has_grpc_service()) {
-      return config.grpc_service();
-    }
-  } else {
-    throw EnvoyException("One and only one of grpc_service or http_service must be configured");
+  if (config.has_grpc_service()) {
+    return config.grpc_service();
   }
-
   return absl::nullopt;
 }
 
@@ -70,38 +65,6 @@ initGrpcService(const ExtProcPerRoute& config) {
     return config.overrides().grpc_service();
   }
   return absl::nullopt;
-}
-
-absl::Status verifyProcessingModeConfig(const ExternalProcessor& config) {
-  const ProcessingMode& processing_mode = config.processing_mode();
-  if (config.has_http_service()) {
-    // In case http_service configured, the processing mode can only support sending headers.
-    if (processing_mode.request_body_mode() != ProcessingMode::NONE ||
-        processing_mode.response_body_mode() != ProcessingMode::NONE ||
-        processing_mode.request_trailer_mode() == ProcessingMode::SEND ||
-        processing_mode.response_trailer_mode() == ProcessingMode::SEND) {
-      return absl::InvalidArgumentError(
-          "If the ext_proc filter is configured with http_service instead of gRPC service, "
-          "then the processing modes of this filter can not be configured to send body or "
-          "trailer.");
-    }
-  }
-
-  if ((processing_mode.request_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
-      (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
-    return absl::InvalidArgumentError(
-        "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
-        "then the request_trailer_mode has to be set to SEND");
-  }
-
-  if ((processing_mode.response_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
-      (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
-    return absl::InvalidArgumentError(
-        "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
-        "then the response_trailer_mode has to be set to SEND");
-  }
-
-  return absl::OkStatus();
 }
 
 std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
@@ -263,17 +226,6 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
-
-  // Validate processing mode configuration
-  auto status = verifyProcessingModeConfig(config);
-  if (!status.ok()) {
-    throw EnvoyException(std::string(status.message()));
-  }
-
-  if (config.disable_clear_route_cache() && (route_cache_action_ != ExternalProcessor::DEFAULT)) {
-    throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
-                         "be set to none-default at the same time.");
-  }
 
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
@@ -1269,22 +1221,22 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       (config_->processingMode().response_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
       inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
-    const auto& mode_overide = response->mode_override();
+    const auto& mode_override = response->mode_override();
     // First, check if mode override allow-list is configured
     if (!config_->allowedOverrideModes().empty()) {
       // Second, check if mode override from response is allowed.
       mode_override_allowed = absl::c_any_of(
           config_->allowedOverrideModes(),
-          [&mode_overide](
+          [&mode_override](
               const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& other) {
-            return Protobuf::util::MessageDifferencer::Equals(mode_overide, other);
+            return Protobuf::util::MessageDifferencer::Equals(mode_override, other);
           });
     }
 
     if (mode_override_allowed) {
       ENVOY_LOG(debug, "Processing mode overridden by server for this request");
-      decoding_state_.setProcessingMode(mode_overide);
-      encoding_state_.setProcessingMode(mode_overide);
+      decoding_state_.setProcessingMode(mode_override);
+      encoding_state_.setProcessingMode(mode_override);
     } else {
       ENVOY_LOG(debug, "Processing mode overridden by server is disallowed");
     }

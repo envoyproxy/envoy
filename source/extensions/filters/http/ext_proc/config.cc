@@ -10,11 +10,79 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+namespace {
+
+absl::Status verifyProcessingModeConfig(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+  const auto& processing_mode = config.processing_mode();
+  if (config.has_http_service()) {
+    // In case http_service configured, the processing mode can only support sending headers.
+    if (processing_mode.request_body_mode() !=
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE ||
+        processing_mode.response_body_mode() !=
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE ||
+        processing_mode.request_trailer_mode() ==
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SEND ||
+        processing_mode.response_trailer_mode() ==
+            envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SEND) {
+      return absl::InvalidArgumentError(
+          "If the ext_proc filter is configured with http_service instead of gRPC service, "
+          "then the processing modes of this filter can not be configured to send body or "
+          "trailer.");
+    }
+  }
+
+  if ((processing_mode.request_body_mode() ==
+       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED) &&
+      (processing_mode.request_trailer_mode() !=
+       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SEND)) {
+    return absl::InvalidArgumentError(
+        "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
+        "then the request_trailer_mode has to be set to SEND");
+  }
+
+  if ((processing_mode.response_body_mode() ==
+       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED) &&
+      (processing_mode.response_trailer_mode() !=
+       envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SEND)) {
+    return absl::InvalidArgumentError(
+        "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
+        "then the response_trailer_mode has to be set to SEND");
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status verifyFilterConfig(
+    const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config) {
+  if (config.has_grpc_service() == config.has_http_service()) {
+    return absl::InvalidArgumentError(
+        "One and only one of grpc_service or http_service must be configured");
+  }
+
+  if (config.disable_clear_route_cache() &&
+      (config.route_cache_action() !=
+       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::DEFAULT)) {
+    return absl::InvalidArgumentError("disable_clear_route_cache and route_cache_action can not "
+                                      "be set to none-default at the same time.");
+  }
+
+  return verifyProcessingModeConfig(config);
+}
+
+} // namespace
+
 absl::StatusOr<Http::FilterFactoryCb>
 ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
     const std::string& stats_prefix, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {
+  // Verify configuration before creating FilterConfig
+  absl::Status result = verifyFilterConfig(proto_config);
+  if (!result.ok()) {
+    return result;
+  }
+
   const uint32_t message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const uint32_t max_message_timeout_ms =
