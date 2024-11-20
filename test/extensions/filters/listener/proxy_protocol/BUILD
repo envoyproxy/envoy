@@ -20,6 +20,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.listener.proxy_protocol"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/network:proxy_protocol_options_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",

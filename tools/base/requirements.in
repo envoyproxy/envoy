@@ -3,7 +3,7 @@ aio.api.bazel
 aio.api.github>=0.2.5
 aio.core>=0.10.2
 aiodocker>=0.22.2
-aiohttp>=3.8.1
+aiohttp>=3.11.6
 aioquic>=0.9.21
 cffi>=1.15.0
 clang-format==14.0.6
@@ -16,6 +16,7 @@ envoy.base.utils>=0.5.0
 envoy.ci.report>=0.0.3
 envoy.code.check>=0.5.12
 envoy.dependency.check>=0.1.10
+envoy.distribution.distrotest>=0.0.11
 envoy.distribution.release>=0.0.9
 envoy.distribution.repo>=0.0.8
 envoy.distribution.verify>=0.0.11
@@ -52,4 +53,4 @@ sphinxcontrib-serializinghtml>=1.1.10
 thrift
 verboselogs
 yapf
-yarl>=1.7.2
+yarl>=1.17.2

@@ -66,14 +66,14 @@ public:
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) override {
     if (config.has_on_demand()) {
       EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
-                  allocateOdCdsApi(_, _, _))
+                  allocateOdCdsApi(_, _, _, _))
           .WillOnce(
               Invoke([this]() { return Upstream::MockOdCdsApiHandlePtr(mock_odcds_api_handle_); }));
     }
 
     configure(config);
     mock_access_logger_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
-    const_cast<std::vector<AccessLog::InstanceSharedPtr>&>(config_->accessLogs())
+    const_cast<AccessLog::InstanceSharedPtrVector&>(config_->accessLogs())
         .push_back(mock_access_logger_);
     upstream_local_address_ = *Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = *Network::Utility::resolveUrl("tcp://127.0.0.1:80");

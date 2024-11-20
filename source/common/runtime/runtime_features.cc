@@ -40,7 +40,6 @@ RUNTIME_GUARD(envoy_reloadable_features_dns_details);
 RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
-RUNTIME_GUARD(envoy_reloadable_features_exclude_host_in_eds_status_draining);
 RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_timeout_error);
 RUNTIME_GUARD(envoy_reloadable_features_extend_h3_accept_untrusted);
@@ -54,8 +53,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_ex
 RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_no_protocol_error_upon_clean_close);
-// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
-RUNTIME_GUARD(envoy_reloadable_features_http2_use_visitor_for_data);
 RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
 RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
@@ -155,6 +152,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change)
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
 // Adding runtime flag to use balsa_parser for http_inspector.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
+// TODO(renjietang): Evaluate and make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.

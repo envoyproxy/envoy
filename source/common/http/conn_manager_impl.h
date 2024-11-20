@@ -192,18 +192,27 @@ private:
 
     void sendGoAwayAndClose() override { return connection_manager_.sendGoAwayAndClose(); }
 
-    std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-      std::list<AccessLog::InstanceSharedPtr> combined_log_handlers(
-          filter_manager_.accessLogHandlers());
-      std::list<AccessLog::InstanceSharedPtr> config_log_handlers_(
-          connection_manager_.config_->accessLogs());
+    AccessLog::InstanceSharedPtrVector accessLogHandlers() override {
+      const AccessLog::InstanceSharedPtrVector& config_log_handlers =
+          connection_manager_.config_->accessLogs();
+      const AccessLog::InstanceSharedPtrVector& filter_log_handlers =
+          filter_manager_.accessLogHandlers();
+
+      AccessLog::InstanceSharedPtrVector combined_log_handlers;
+      combined_log_handlers.reserve(config_log_handlers.size() + filter_log_handlers.size());
+
       if (!Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.filter_access_loggers_first")) {
-        combined_log_handlers.insert(combined_log_handlers.begin(), config_log_handlers_.begin(),
-                                     config_log_handlers_.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+
       } else {
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers_.begin(),
-                                     config_log_handlers_.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
       }
       return combined_log_handlers;
     }

@@ -252,8 +252,8 @@ std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers) const {
 }
 
 HedgePolicyImpl::HedgePolicyImpl(const envoy::config::route::v3::HedgePolicy& hedge_policy)
-    : initial_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, initial_requests, 1)),
-      additional_request_chance_(hedge_policy.additional_request_chance()),
+    : additional_request_chance_(hedge_policy.additional_request_chance()),
+      initial_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, initial_requests, 1)),
       hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
 HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
@@ -403,7 +403,9 @@ InternalRedirectPolicyImpl::InternalRedirectPolicyImpl(
     auto& factory =
         Envoy::Config::Utility::getAndCheckFactory<InternalRedirectPredicateFactory>(predicate);
     auto config = factory.createEmptyConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), validator, *config);
+    SET_AND_RETURN_IF_NOT_OK(
+        Envoy::Config::Utility::translateOpaqueConfig(predicate.typed_config(), validator, *config),
+        creation_status);
     predicate_factories_.emplace_back(&factory, std::move(config));
   }
   for (const auto& header : policy_config.response_headers_to_copy()) {
@@ -2433,7 +2435,8 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
   }
 
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config);
+  RETURN_IF_NOT_OK(
+      Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config));
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
     if (is_optional) {
@@ -2455,8 +2458,8 @@ PerFilterConfigs::PerFilterConfigs(
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status) {
 
-  std::string filter_config_type =
-      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
+  std::string filter_config_type(
+      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName());
 
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;
@@ -2465,8 +2468,11 @@ PerFilterConfigs::PerFilterConfigs(
     if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
         filter_config_type) {
       envoy::config::route::v3::FilterConfig filter_config;
-      Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second, validator,
-                                                    filter_config);
+      creation_status = Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second,
+                                                                      validator, filter_config);
+      if (!creation_status.ok()) {
+        return;
+      }
 
       // The filter is marked as disabled explicitly and the config is ignored directly.
       if (filter_config.disabled()) {
