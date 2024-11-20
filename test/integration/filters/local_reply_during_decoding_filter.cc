@@ -18,7 +18,13 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_headers, bool) override {
     auto result = request_headers.get(Http::LowerCaseString("skip-local-reply"));
     if (!result.empty() && result[0]->value() == "true") {
-      local_reply_skipped_ = true;
+      header_local_reply_skipped_ = true;
+      return Http::FilterHeadersStatus::Continue;
+    }
+    result = request_headers.get(Http::LowerCaseString("local-reply-during-data"));
+    if (!result.empty() && result[0]->value() == "true") {
+      local_reply_during_data_ = true;
+      header_local_reply_skipped_ = true;
       return Http::FilterHeadersStatus::Continue;
     }
     decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr, absl::nullopt,
@@ -26,20 +32,23 @@ public:
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Due to the above local reply, this method should never be invoked in tests.
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    ASSERT(local_reply_skipped_);
+    ASSERT(header_local_reply_skipped_);
+    if (local_reply_during_data_) {
+      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr,
+                                         absl::nullopt, "");
+    }
     return Http::FilterDataStatus::Continue;
   }
 
-  // Due to the above local reply, this method should never be invoked in tests.
   Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap&) override {
-    ASSERT(local_reply_skipped_);
+    ASSERT(header_local_reply_skipped_);
     return Http::FilterMetadataStatus::Continue;
   }
 
 private:
-  bool local_reply_skipped_ = false;
+  bool header_local_reply_skipped_ = false;
+  bool local_reply_during_data_ = false;
 };
 
 constexpr char LocalReplyDuringDecode::name[];

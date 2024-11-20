@@ -252,8 +252,8 @@ std::string SslRedirector::newUri(const Http::RequestHeaderMap& headers) const {
 }
 
 HedgePolicyImpl::HedgePolicyImpl(const envoy::config::route::v3::HedgePolicy& hedge_policy)
-    : initial_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, initial_requests, 1)),
-      additional_request_chance_(hedge_policy.additional_request_chance()),
+    : additional_request_chance_(hedge_policy.additional_request_chance()),
+      initial_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(hedge_policy, initial_requests, 1)),
       hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
 HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
