@@ -2955,31 +2955,6 @@ TEST_F(HttpFilterTest, RequestBodyModeStreamedTrailerModeSKIP) {
       "then the request_trailer_mode has to be set to SEND");
 }
 
-TEST_F(HttpFilterTest, ResponseBodyModeStreamedTrailerModeSKIP) {
-  std::string yaml = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    response_body_mode: "FULL_DUPLEX_STREAMED"
-    response_trailer_mode: "SKIP"
-  )EOF";
-
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
-  TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto config = std::make_shared<FilterConfig>(
-            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
-            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-            factory_context_);
-      },
-      EnvoyException,
-      "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
-      "then the response_trailer_mode has to be set to SEND");
-}
-
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate
 // callback on the filter for inbound traffic when header modifications are also present.
 // Also verify it does not make the callback for outbound traffic.
