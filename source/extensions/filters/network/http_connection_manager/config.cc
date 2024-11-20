@@ -848,6 +848,7 @@ Http::FilterChainFactory::UpgradeAction HttpConnectionManagerConfig::createUpgra
   if (can_ignore && (ignore_specific_upgrade_type || no_specific_config_and_ignore_unknown)) {
     // Either the HCM ignores all unconfigured upgrades, or this upgrade type is configured to be
     // ignored.
+    ENVOY_LOG(trace, "Ignoring upgrade for requested type: {}", upgrade_type);
     return Http::FilterChainFactory::UpgradeAction::Ignored;
   }
 

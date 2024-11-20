@@ -288,6 +288,101 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   }
 }
 
+TEST_F(FilterChainTest, CreateUpgradeFilterChainIgnoreUpgrades) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(basic_config_);
+  auto* upgrade_ignore = hcm_config.add_upgrade_configs();
+  upgrade_ignore->set_upgrade_type("ignore");
+  upgrade_ignore->mutable_ignore_on_http11()->set_value(true);
+  auto* upgrade_reject = hcm_config.add_upgrade_configs();
+  upgrade_reject->set_upgrade_type("reject");
+  upgrade_reject->mutable_enabled()->set_value(false);
+
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  NiceMock<Http::MockFilterChainManager> manager;
+  const Http::EmptyFilterChainOptions options;
+
+  // Reject configured upgrade when protocol isn't HTTP/1.1.
+  EXPECT_EQ(
+      Http::FilterChainFactory::UpgradeAction::Rejected,
+      config.createUpgradeFilterChain("ignore", nullptr, Http::Protocol::Http10, manager, options));
+  EXPECT_EQ(
+      Http::FilterChainFactory::UpgradeAction::Rejected,
+      config.createUpgradeFilterChain("ignore", nullptr, Http::Protocol::Http2, manager, options));
+  EXPECT_EQ(
+      Http::FilterChainFactory::UpgradeAction::Rejected,
+      config.createUpgradeFilterChain("ignore", nullptr, Http::Protocol::Http3, manager, options));
+
+  // Ignore configured upgrade when protocol is HTTP/1.1.
+  EXPECT_EQ(
+      Http::FilterChainFactory::UpgradeAction::Ignored,
+      config.createUpgradeFilterChain("ignore", nullptr, Http::Protocol::Http11, manager, options));
+
+  // A route-specific override causes the type to be rejected instead of ignored.
+  {
+    std::map<std::string, bool> upgrade_map{{"ignore", false}};
+    EXPECT_EQ(Http::FilterChainFactory::UpgradeAction::Rejected,
+              config.createUpgradeFilterChain("ignore", &upgrade_map, Http::Protocol::Http11,
+                                              manager, options));
+  }
+
+  // Reject unknown upgrade when protocol isn't HTTP/1.1.
+  EXPECT_EQ(
+      Http::FilterChainFactory::UpgradeAction::Rejected,
+      config.createUpgradeFilterChain("unknown", nullptr, Http::Protocol::Http2, manager, options));
+
+  // Ignore unknown upgrade when protocol is HTTP/1.1.
+  EXPECT_EQ(Http::FilterChainFactory::UpgradeAction::Ignored,
+            config.createUpgradeFilterChain("unknown", nullptr, Http::Protocol::Http11, manager,
+                                            options));
+
+  // Reject a disabled upgrade type when unknown types are ignored.
+  EXPECT_EQ(
+      Http::FilterChainFactory::UpgradeAction::Rejected,
+      config.createUpgradeFilterChain("reject", nullptr, Http::Protocol::Http11, manager, options));
+}
+
+TEST_F(FilterChainTest, CreateUpgradeFilterChainIgnoreUpgradesUnknownDisabled) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(basic_config_);
+  hcm_config.mutable_ignore_unconfigured_http11_upgrades()->set_value(false);
+  auto* upgrade_ignore = hcm_config.add_upgrade_configs();
+  upgrade_ignore->set_upgrade_type("ignore");
+  upgrade_ignore->mutable_ignore_on_http11()->set_value(true);
+
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  NiceMock<Http::MockFilterChainManager> manager;
+  const Http::EmptyFilterChainOptions options;
+
+  // Reject configured upgrade when protocol isn't HTTP/1.1.
+  EXPECT_EQ(
+      Http::FilterChainFactory::UpgradeAction::Rejected,
+      config.createUpgradeFilterChain("ignore", nullptr, Http::Protocol::Http2, manager, options));
+
+  // Ignore configured upgrade when protocol is HTTP/1.1.
+  EXPECT_EQ(
+      Http::FilterChainFactory::UpgradeAction::Ignored,
+      config.createUpgradeFilterChain("ignore", nullptr, Http::Protocol::Http11, manager, options));
+
+  // Reject unknown upgrade when protocol isn't HTTP/1.1.
+  EXPECT_EQ(
+      Http::FilterChainFactory::UpgradeAction::Rejected,
+      config.createUpgradeFilterChain("unknown", nullptr, Http::Protocol::Http2, manager, options));
+
+  // Reject unknown upgrade when protocol is HTTP/1.1.
+  EXPECT_EQ(Http::FilterChainFactory::UpgradeAction::Rejected,
+            config.createUpgradeFilterChain("unknown", nullptr, Http::Protocol::Http11, manager,
+                                            options));
+}
+
 TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
   auto hcm_config = parseHttpConnectionManagerFromYaml(basic_config_);
   auto websocket_config = hcm_config.add_upgrade_configs();
@@ -380,6 +475,21 @@ TEST_F(FilterChainTest, InvalidConfig) {
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
             "Error: multiple upgrade configs with the same name: 'websocket'");
+}
+
+TEST_F(FilterChainTest, UpgradeSettingsConflict) {
+  auto hcm_config = parseHttpConnectionManagerFromYaml(basic_config_);
+  auto* upgrade = hcm_config.add_upgrade_configs();
+  upgrade->set_upgrade_type("websocket");
+  upgrade->mutable_ignore_on_http11()->set_value(true);
+  upgrade->mutable_enabled()->set_value(true);
+
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_EQ(creation_status_.message(), "Error: upgrade config set both `ignore_on_http11` and "
+                                        "`enabled` for upgrade type: 'websocket'");
 }
 
 } // namespace

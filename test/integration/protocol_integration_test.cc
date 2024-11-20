@@ -5485,4 +5485,30 @@ TEST_P(DownstreamProtocolIntegrationTest, UnknownPseudoHeader) {
   }
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, UnknownHttpUpgrade) {
+  disable_client_header_validation_ = true;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Envoy::LogLevelSetter save_levels(spdlog::level::trace);
+
+  // Start the request.
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"connection", "upgrade"},
+                                     {"upgrade", "unknown-type"}});
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    waitForNextUpstreamRequest();
+    EXPECT_EQ(nullptr, upstream_request_->headers().Upgrade());
+    EXPECT_EQ(nullptr, upstream_request_->headers().Connection());
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    EXPECT_TRUE(response->waitForEndStream());
+  } else {
+    EXPECT_TRUE(response->waitForReset());
+  }
+}
+
 } // namespace Envoy
