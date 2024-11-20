@@ -794,6 +794,8 @@ protocol()
 Returns the string representation of :repo:`HTTP protocol <envoy/http/protocol.h>`
 used by the current request. The possible values are: ``HTTP/1.0``, ``HTTP/1.1``, ``HTTP/2`` and ``HTTP/3*``.
 
+.. _config_http_filters_lua_stream_info_downstream_direct_local_address:
+
 downstreamDirectLocalAddress()
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
