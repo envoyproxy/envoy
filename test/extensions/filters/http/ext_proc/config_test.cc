@@ -304,6 +304,30 @@ TEST(HttpExtProcConfigTest, InvalidRouteCacheConfig) {
                                        "be set to none-default at the same time.");
 }
 
+TEST(HttpExtProcConfigTest, InvalidServiceConfigServerContext) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          seconds: 500
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context),
+      EnvoyException, "One and only one of grpc_service or http_service must be configured");
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

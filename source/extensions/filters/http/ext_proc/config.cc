@@ -121,6 +121,12 @@ Http::FilterFactoryCb
 ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& proto_config,
     const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+  // Verify configuration before creating FilterConfig
+  absl::Status result = verifyFilterConfig(proto_config);
+  if (!result.ok()) {
+    throw EnvoyException(std::string(result.message()));
+  }
+
   const uint32_t message_timeout_ms =
       PROTOBUF_GET_MS_OR_DEFAULT(proto_config, message_timeout, DefaultMessageTimeoutMs);
   const uint32_t max_message_timeout_ms =
