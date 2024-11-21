@@ -1627,8 +1627,9 @@ void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_st
   tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
-bool FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
-                                             const FilterChainOptionsImpl& options) {
+absl::optional<bool>
+FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
+                                        const FilterChainOptionsImpl& options) {
   const HeaderEntry* upgrade = nullptr;
   if (filter_manager_callbacks_.requestHeaders()) {
     upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
@@ -1641,7 +1642,7 @@ bool FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_ch
 
   if (upgrade == nullptr) {
     // No upgrade header, no upgrade filter chain.
-    return false;
+    return absl::nullopt;
   }
 
   const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
@@ -1667,15 +1668,14 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
 
   // Only try the upgrade filter chain for downstream filter chains.
   if (downstream_callbacks.has_value()) {
-    if (createUpgradeFilterChain(filter_chain_factory, options)) {
+    upgrade = createUpgradeFilterChain(filter_chain_factory, options);
+    if (upgrade.value_or(false)) {
       // Upgrade filter chain is created. Return the result directly.
       state_.create_chain_result_ = CreateChainResult(true, true);
       return state_.create_chain_result_;
-    } else {
-      // Set the upgrade flag to false if the upgrade filter chain is rejected and fall through to
-      // the default filter chain.
-      upgrade = false;
     }
+    // If the upgrade is unnecessary or the upgrade filter chain is rejected, fall through to
+    // create the default filter chain.
   }
 
   state_.create_chain_result_ = CreateChainResult(

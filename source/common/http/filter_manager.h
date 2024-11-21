@@ -1002,8 +1002,8 @@ private:
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
-  bool createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
-                                const FilterChainOptionsImpl& options);
+  absl::optional<bool> createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
+                                                const FilterChainOptionsImpl& options);
 
   // Returns the encoder filter to start iteration with.
   std::list<ActiveStreamEncoderFilterPtr>::iterator
