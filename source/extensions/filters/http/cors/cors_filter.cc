@@ -292,10 +292,18 @@ bool CorsFilter::allowPrivateNetworkAccess() {
 }
 
 bool CorsFilter::shadowEnabled() {
+  // The policies_ vector is ordered from most-specific (route-entry) to the
+  // most-generic (virtual-host). This will return the most-specific
+  // shadow-enabled value (if exists).
   return policies_.empty() ? false : policies_[0].get().shadowEnabled();
 }
 
-bool CorsFilter::enabled() { return policies_.empty() ? false : policies_[0].get().enabled(); }
+bool CorsFilter::enabled() {
+  // The policies_ vector is ordered from most-specific (route-entry) to the
+  // most-generic (virtual-host). This will return the most-specific enabled
+  // value (if exists).
+  return policies_.empty() ? false : policies_[0].get().enabled();
+}
 
 } // namespace Cors
 } // namespace HttpFilters
