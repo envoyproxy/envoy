@@ -372,8 +372,8 @@ to the next filter.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
-log*()
-^^^^^^
+``log*()``
+^^^^^^^^^^
 
 .. code-block:: lua
 
