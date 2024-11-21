@@ -105,6 +105,7 @@ int reasonToReset(StreamResetReason reason) {
 }
 
 using Http2ResponseCodeDetails = ConstSingleton<Http2ResponseCodeDetailValues>;
+using OnHeaderResult = http2::adapter::Http2VisitorInterface::OnHeaderResult;
 
 enum Settings {
   // SETTINGS_HEADER_TABLE_SIZE = 0x01,
@@ -1753,10 +1754,9 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
   return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
 }
 
-http2::adapter::Http2VisitorInterface::OnHeaderResult
-ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
-                                                absl::string_view name_view,
-                                                absl::string_view value_view) {
+OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
+                                                               absl::string_view name_view,
+                                                               absl::string_view value_view) {
   // TODO PERF: Can reference count here to avoid copies.
   HeaderString name;
   name.setCopy(name_view.data(), name_view.size());
@@ -1765,11 +1765,11 @@ ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
   const int result = connection_->onHeader(stream_id, std::move(name), std::move(value));
   switch (result) {
   case 0:
-    return HEADER_OK;
+    return OnHeaderResult::HEADER_OK;
   case ERR_TEMPORAL_CALLBACK_FAILURE:
-    return HEADER_RST_STREAM;
+    return OnHeaderResult::HEADER_RST_STREAM;
   default:
-    return HEADER_CONNECTION_ERROR;
+    return OnHeaderResult::HEADER_CONNECTION_ERROR;
   }
 }
 

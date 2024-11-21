@@ -30,6 +30,10 @@ public:
   PerSessionClusterSetterFilter(const std::string cluster) : cluster_(cluster) {}
 
   ReadFilterStatus onNewSession() override {
+    if (cluster_.empty()) {
+      return ReadFilterStatus::Continue;
+    }
+
     read_callbacks_->streamInfo().filterState()->setData(
         "envoy.udp_proxy.cluster", std::make_shared<UdpProxy::PerSessionCluster>(cluster_),
         StreamInfo::FilterState::StateType::Mutable);

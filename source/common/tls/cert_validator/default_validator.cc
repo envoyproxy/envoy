@@ -163,7 +163,7 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
           return absl::InvalidArgumentError(
               absl::StrCat("Failed to create string SAN matcher of type ", matcher.san_type()));
         }
-        subject_alt_name_matchers_.push_back(std::move(san_matcher));
+        subject_alt_name_matchers_.emplace_back(std::move(san_matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
@@ -214,7 +214,7 @@ bool DefaultCertValidator::verifyCertAndUpdateStatus(
     // validated as a DNS SAN, but this change will require a runtime flag for the behavior change.
     verify_san_override = transport_socket_options->verifySubjectAltNameListOverride();
   } else if (auto_sni_san_match_ && !sni.empty()) {
-    match_sni_san.push_back(std::make_unique<StringSanMatcher>(sni));
+    match_sni_san.emplace_back(std::make_unique<DnsExactStringSanMatcher>(sni));
     match_san_override = match_sni_san;
   }
   Envoy::Ssl::ClientValidationStatus validated = verifyCertificate(

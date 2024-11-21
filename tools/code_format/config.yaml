@@ -98,7 +98,8 @@ paths:
     - source/common/protobuf/utility.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
-    - source/common/config/utility.cc
+    - source/common/watchdog/abort_action_config.cc
+    - source/extensions/watchdog/profile_action/config.cc
     - source/common/router/route_config_update_receiver_impl.cc
     - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
@@ -135,16 +136,15 @@ paths:
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
     - source/common/upstream/health_discovery_service.cc
+    - source/common/upstream/prod_cluster_info_factory.cc
     - source/common/secret/sds_api.h
     - source/common/secret/sds_api.cc
     - source/common/secret/secret_provider_impl.cc
     - source/common/router/router.cc
     - source/common/config/config_provider_impl.h
     - source/common/common/logger_delegates.cc
-    - source/common/upstream/health_checker_event_logger.h
     - source/common/upstream/outlier_detection_impl.h
     - source/common/grpc/async_client_impl.cc
-    - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
     - source/common/config/watched_directory.cc
@@ -329,6 +329,7 @@ paths:
     - test/common/grpc/codec_fuzz_test.cc
     - test/common/grpc/codec_test.cc
     - test/common/protobuf/utility_test.cc
+    - source/extensions/common/tap/tap_config_base.cc
     - test/extensions/bootstrap/wasm/test_data/speed_cpp.cc
     - test/extensions/filters/common/expr/context_test.cc
     - test/extensions/filters/http/common/fuzz/uber_filter.h

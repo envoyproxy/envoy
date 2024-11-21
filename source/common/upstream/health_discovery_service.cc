@@ -534,32 +534,6 @@ void HdsCluster::updateHosts(
 
 ClusterSharedPtr HdsCluster::create() { return nullptr; }
 
-ClusterInfoConstSharedPtr
-ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
-  Envoy::Stats::ScopeSharedPtr scope =
-      params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
-
-  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      params.server_context_, params.ssl_context_manager_, *scope,
-      params.server_context_.clusterManager(), params.server_context_.messageValidationVisitor());
-
-  // TODO(JimmyCYJ): Support SDS for HDS cluster.
-  Network::UpstreamTransportSocketFactoryPtr socket_factory = THROW_OR_RETURN_VALUE(
-      Upstream::createTransportSocketFactory(params.cluster_, factory_context),
-      Network::UpstreamTransportSocketFactoryPtr);
-  auto socket_matcher = THROW_OR_RETURN_VALUE(
-      TransportSocketMatcherImpl::create(params.cluster_.transport_socket_matches(),
-                                         factory_context, socket_factory, *scope),
-      std::unique_ptr<TransportSocketMatcherImpl>);
-
-  return THROW_OR_RETURN_VALUE(
-      ClusterInfoImpl::create(params.server_context_.initManager(), params.server_context_,
-                              params.cluster_, params.bind_config_,
-                              params.server_context_.runtime(), std::move(socket_matcher),
-                              std::move(scope), params.added_via_api_, factory_context),
-      std::unique_ptr<ClusterInfoImpl>);
-}
-
 void HdsCluster::initHealthchecks() {
   for (auto& health_check : cluster_.health_checks()) {
     auto health_checker_or_error =
