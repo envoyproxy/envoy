@@ -20,6 +20,10 @@ on:
         options:
         - create-release
         - sync-version-histories
+        - deprecate-guards
+      dry-run:
+        type: boolean
+        default: false
       pr:
         type: boolean
         default: true
@@ -174,6 +178,39 @@ jobs:
         title: >-
           ${{ steps.checkout.outputs.branch-name != 'main' && format('[{0}]', steps.checkout.outputs.branch-name) || '' }}
           repo: Sync version histories
+
+  deprecate_guards:
+    runs-on: ubuntu-22.04
+    if: >-
+      ${{ (github.event_name == 'workflow_dispatch'
+           && inputs.task == 'deprecate-guards')
+          || (github.event_name == 'release'
+              && endsWith(github.ref, '.0')) }}
+    name: Deprecate guards
+    steps:
+    - id: appauth
+      name: App auth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.36
+      with:
+        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.36
+      with:
+        config: |
+          fetch-depth: 0
+    - name: Run deprecation tool
+      run: |
+        bazel run --config=ci \
+            //tools/deprecate_guards \
+            -- \
+            ${{ ! inputs.dry-run && ' --create-issues' || '' }} \
+            ${{ github.repository != 'envoyproxy/envoy'
+                && format('--staging-repo {0}', github.repository)
+                || '' }}
+      env:
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
 
   ## Triggered actions
 
