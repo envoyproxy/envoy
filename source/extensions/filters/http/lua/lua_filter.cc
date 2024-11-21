@@ -657,42 +657,6 @@ int StreamHandleWrapper::luaConnection(lua_State* state) {
   return 1;
 }
 
-int StreamHandleWrapper::luaLogTrace(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::trace, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogDebug(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::debug, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogInfo(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::info, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogWarn(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::warn, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogErr(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::err, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogCritical(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::critical, message);
-  return 0;
-}
-
 int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   // Step 1: Get hash function.
   absl::string_view hash = luaL_checkstring(state, 2);
@@ -933,34 +897,6 @@ void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
   scriptLog(spdlog::level::err, e.what());
   request_stream_wrapper_.reset();
   response_stream_wrapper_.reset();
-}
-
-void Filter::scriptLog(spdlog::level::level_enum level, absl::string_view message) {
-  switch (level) {
-  case spdlog::level::trace:
-    ENVOY_LOG(trace, "script log: {}", message);
-    return;
-  case spdlog::level::debug:
-    ENVOY_LOG(debug, "script log: {}", message);
-    return;
-  case spdlog::level::info:
-    ENVOY_LOG(info, "script log: {}", message);
-    return;
-  case spdlog::level::warn:
-    ENVOY_LOG(warn, "script log: {}", message);
-    return;
-  case spdlog::level::err:
-    ENVOY_LOG(error, "script log: {}", message);
-    return;
-  case spdlog::level::critical:
-    ENVOY_LOG(critical, "script log: {}", message);
-    return;
-  case spdlog::level::off:
-    PANIC("unsupported");
-    return;
-  case spdlog::level::n_levels:
-    PANIC("unsupported");
-  }
 }
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,

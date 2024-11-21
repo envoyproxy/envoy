@@ -180,6 +180,9 @@ new_features:
     :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` access log
     formatter operator. The following time points were added: ``%US_CX_BEG%``,
     ``%US_CX_END%``, ``%US_HS_END%``.
+- area: lua
+  change: |
+    Add logging functions to all lua objects. Previously these were only available on the Lua http filter request handle.
 - area: quic
   change: |
     Added :ref:`QUIC stats debug visitor <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>` to
