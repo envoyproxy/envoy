@@ -18,6 +18,12 @@ behavior_changes:
     to retain the prior behavior.
     This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.explicit_internal_address_config`` to ``false``.
+- area: http
+  change: |
+    Added streaming shadow functionality. This allows for streaming the shadow request in parallel with the original request
+    rather than waiting for the original request to complete. This allows shadowing requests larger than the buffer limit,
+    but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
+    temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
