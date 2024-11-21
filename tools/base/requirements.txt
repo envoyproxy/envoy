@@ -80,9 +80,9 @@ aio-run-runner==0.3.4 \
     #   envoy-github-abstract
     #   envoy-github-release
     #   envoy-gpg-sign
-aiodocker==0.23.0 \
-    --hash=sha256:45ede291063c7d1c24e78a766013c25e85b354a3bdcca68fe2bca64348e4dee2 \
-    --hash=sha256:8c7ff2fc9e557898ae77bc9c1af8916f269285f230aedf1abbb81436054baed4
+aiodocker==0.24.0 \
+    --hash=sha256:2199b7b01f8ce68f9cabab7910ecb26192f6f3494163f1ccffe527b4c3875689 \
+    --hash=sha256:661a6f9a479951f11f793031dcd5d55337e232c4ceaee69d51ceb885e5f16fac
     # via
     #   -r requirements.in
     #   envoy-distribution-verify
