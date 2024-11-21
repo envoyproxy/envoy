@@ -40,7 +40,7 @@ void ProcessorState::onStartProcessorCall(Event::TimerCb cb, std::chrono::millis
 void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
                                            CallbackState next_state) {
   ENVOY_LOG(debug, "Finish external processing call");
-  filter_.logGrpcStreamInfo();
+  filter_.logStreamInfo();
 
   stopMessageTimer();
 

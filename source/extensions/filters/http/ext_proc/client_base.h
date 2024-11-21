@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,6 +18,7 @@ public:
   virtual ~RequestCallbacks() = default;
   virtual void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) PURE;
   virtual void onError() PURE;
+  virtual void setStreamInfo(Envoy::StreamInfo::StreamInfo* stream_info) PURE;
 };
 
 /**

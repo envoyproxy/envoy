@@ -1078,21 +1078,35 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::logGrpcStreamInfo() {
+void Filter::logStreamInfoBase(Envoy::StreamInfo::StreamInfo* stream_info) {
+  if (stream_info == nullptr) {
+    return;
+  }
+  const auto& upstream_meter = stream_info->getUpstreamBytesMeter();
+  if (upstream_meter != nullptr) {
+    logging_info_->setBytesSent(upstream_meter->wireBytesSent());
+    logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+  }
+  // Only set upstream host in logging info once.
+  if (logging_info_->upstreamHost() == nullptr) {
+    logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+  }
+}
+
+void Filter::logStreamInfo() {
   if (!config().grpcService().has_value()) {
+    logStreamInfoBase(stream_info_http_);
     return;
   }
 
   if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
-    const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
-    if (upstream_meter != nullptr) {
-      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
-      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
-    }
-    // Only set upstream host in logging info once.
-    if (logging_info_->upstreamHost() == nullptr) {
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-    }
+    logStreamInfoBase(&stream_->streamInfo());
+  }
+}
+
+void Filter::logGrpcStreamInfo() {
+  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
+    logStreamInfoBase(&stream_->streamInfo());
   }
 }
 
@@ -1407,7 +1421,7 @@ void Filter::onGrpcClose() {
 
 void Filter::onMessageTimeout() {
   ENVOY_LOG(debug, "message timeout reached");
-  logGrpcStreamInfo();
+  logStreamInfo();
   stats_.message_timeouts_.inc();
   if (config_->failureModeAllow()) {
     // The user would like a timeout to not cause message processing to fail.

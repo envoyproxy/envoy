@@ -68,6 +68,7 @@ protected:
   void logGrpcStreamInfo() override {}
   void onComplete(envoy::service::ext_proc::v3::ProcessingResponse&) override {}
   void onError() override {}
+  void setStreamInfo(Envoy::StreamInfo::StreamInfo*) override {}
 
   std::unique_ptr<ProcessingResponse> last_response_;
   Grpc::Status::GrpcStatus grpc_status_ = Grpc::Status::WellKnownGrpcStatus::Ok;

@@ -42,7 +42,7 @@ private:
   void onError();
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   Server::Configuration::ServerFactoryContext& context_;
-  Http::AsyncClient::Request* active_request_{};
+  Http::AsyncClient::OngoingRequest* active_request_{};
   RequestCallbacks* callbacks_{};
 };
 
