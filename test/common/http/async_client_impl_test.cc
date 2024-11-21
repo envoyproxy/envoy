@@ -2252,7 +2252,7 @@ public:
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
-    route_impl_ = std::make_unique<NullRouteImpl>(
+    route_impl_ = *NullRouteImpl::create(
         client_.cluster_->name(), *retry_policy_, regex_engine_, absl::nullopt,
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>());
   }
