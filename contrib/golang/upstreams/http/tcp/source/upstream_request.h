@@ -136,33 +136,6 @@ public:
     NotEndStream,
     EndStream,
   };
-  enum class EncodeHeaderStatus {
-    // Send data with upstream conn not half close.
-    EncodeHeaderSendDataWithNotHalfClose,
-    // Send data with upstream conn half close.
-    EncodeHeaderSendDataWithHalfClose,
-    // Continue and not send data to upstream.
-    EncodeHeaderContinue,
-    EncodeHeaderStopAndBuffer, 
-  };
-  enum class EncodeDataStatus {
-    // Continue with upstream conn not half close.
-    EncodeDataContinueWithNotHalfClose,
-    // Continue with upstream conn half close.
-    EncodeDataContinueWithHalfClose,
-    // Buffer current data and wait for further data by next encodeData.
-    EncodeDataStopAndBuffer,
-    // No buffer current data and wait for data by next encodeData.
-    EncodeDataStopNoBuffer,
-  };
-  enum class DecodeDataStatus {
-    // Continue to give data to downstream.
-    DecodeDataContinue,
-    // Buffer current data and wait for further data by next onUpstreamData.
-    DecodeDataStopAndBuffer,
-    // No buffer current data and wait for data by next onUpstreamData.
-    DecodeDataStopNoBuffer,
-  };
   enum class DestroyReason {
     Normal,
     Terminate,
@@ -203,6 +176,7 @@ public:
   CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
   CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
+  CAPIStatus setSelfHalfCloseForUpstreamConn(int enabled);
 
   DecodingProcessorState* decodingState() { return decoding_state_; }
   EncodingProcessorState* encodingState() { return encoding_state_; }
@@ -225,6 +199,7 @@ private:
 
   FilterConfigSharedPtr config_;
 
+  bool upstream_conn_self_half_close_{false};
 };
 
 

@@ -88,13 +88,82 @@ void ProcessorState::drainBufferData() {
   }
 }
 
+// headers_ should set to nullptr when return true.
+void ProcessorState::handleHeaderGolangStatus(TcpUpstreamStatus status) {
+  ENVOY_LOG(debug, "tcp upstream handleHeaderGolangStatus handle header status, state: {}, status: {}", stateStr(),
+            int(status));
+
+  ASSERT(filterState() == FilterState::ProcessingHeader);
+
+  switch (status) {
+  case TcpUpstreamStatus::TcpUpstreamSendData:
+    setFilterState(FilterState::Done);
+    break;
+
+  case TcpUpstreamStatus::TcpUpstreamContinue:
+    setFilterState(FilterState::WaitingData);
+    break;
+  
+  case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
+    setFilterState(FilterState::WaitingAllData);
+    break;
+
+  default:
+    ENVOY_LOG(error, "tcp upstream handleHeaderGolangStatus unexpected go_tatus: {}", int(status));
+    PANIC("unreachable");
+    break;
+  }
+
+  ENVOY_LOG(debug, "tcp upstream handleHeaderGolangStatus after handle header status, state: {}, status: {}", stateStr(), int(status));
+};
+
+void ProcessorState::handleDataGolangStatus(const TcpUpstreamStatus status, bool end_stream) {
+  ENVOY_LOG(debug, "tcp upstream handleDataGolangStatus handle data status, state: {}, status: {}", stateStr(),
+            int(status));
+
+  ASSERT(filterState() == FilterState::ProcessingData);
+
+  switch (status) {
+    case TcpUpstreamStatus::TcpUpstreamContinue:
+      setFilterState(FilterState::Done);
+      break;
+
+    case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
+      if (end_stream) {
+        ENVOY_LOG(error, "tcp upstream handleDataGolangStatus unexpected go_tatus when end_stream is true: {}", int(status));
+        PANIC("unreachable");
+        break;
+      }
+      setFilterState(FilterState::WaitingAllData);
+      break;
+
+    case TcpUpstreamStatus::TcpUpstreamStopNoBuffer:
+      if (end_stream) {
+        ENVOY_LOG(error, "tcp upstream handleDataGolangStatus unexpected go_tatus when end_stream is true: {}", int(status));
+        PANIC("unreachable");
+        break;
+      }
+      drainBufferData();
+      doDataList.clearAll();
+      setFilterState(FilterState::WaitingData);
+      break;
+
+    default:
+      ENVOY_LOG(error, "tcp upstream handleDataGolangStatus unexpected go_tatus: {}", int(status));
+      PANIC("unreachable");
+      break;
+    }
+
+    ENVOY_LOG(debug, "tcp upstream handleDataGolangStatus handle data status, state: {}, status: {}", stateStr(), int(status));
+};
+
 DecodingProcessorState::DecodingProcessorState(TcpUpstream& tcp_upstream) : ProcessorState(dynamic_cast<httpRequest*>(&tcp_upstream)) {
     is_encoding = 0;
 }
 
 EncodingProcessorState::EncodingProcessorState(TcpUpstream& tcp_upstream) : ProcessorState(dynamic_cast<httpRequest*>(&tcp_upstream)) {
     is_encoding = 1;
-  }
+}
 
 } // namespace Golang
 } // namespace Tcp

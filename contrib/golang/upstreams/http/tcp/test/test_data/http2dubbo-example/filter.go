@@ -27,9 +27,8 @@ const (
 type tcpUpstreamFilter struct {
 	api.EmptyTcpUpstreamFilter
 
-	callbacks       api.TcpUpstreamCallbackHandler
-	config          *config
-	alreadySendData bool
+	callbacks api.TcpUpstreamCallbackHandler
+	config    *config
 
 	dubboMethod    string
 	dubboInterface string
@@ -51,15 +50,13 @@ type tcpUpstreamFilter struct {
 
 *
 */
-func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, bufferForUpstreamData api.BufferInstance, endOfStream bool) api.EncodeHeaderStatus {
-
+func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, bufferForUpstreamData api.BufferInstance, endOfStream bool) api.TcpUpstreamStatus {
 	// =========== step 1: get dubbo method and interface from http header =========== //
 	dubboMethod, _ := headerMap.Get("dubbo_method")
 	dubboInterface, _ := headerMap.Get("dubbo_interface")
 
 	// =========== step 2: if body is empty, or get unexpected header, directly send data to upstream =========== //
-	contentLength, _ := headerMap.Get("content-length")
-	if contentLength == "" || (dubboMethod == "" || dubboInterface == "") {
+	if endOfStream || (dubboMethod == "" || dubboInterface == "") {
 		// get mock dubbo frame
 		buf := transformToDubboFrame("", "", map[string]string{"name": "mock"})
 		// directly send data to upstream without EncodeData
@@ -68,24 +65,22 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, buffer
 			api.LogInfof("EncodeHeaders key: %s, value: %s", key, value)
 			return true
 		})
-		f.alreadySendData = true
-		return api.EncodeHeaderSendDataWithNotHalfClose
+		return api.TcpUpstreamSendData
 	}
 
 	f.dubboMethod = dubboMethod
 	f.dubboInterface = dubboInterface
 
-	return api.EncodeHeaderStopAndBuffer
+	return api.TcpUpstreamStopAndBuffer
 }
 
 /*
 *
   - EncodeData Usages:
-  - 1. append data when streaming get data from downstream
-  - 2. get dubboArgs from http body
-  - 3. change dubboInterface for gray_traffic by router_name
-  - 4. construct & set data for sending to upstream
-  - 5. set envoy-self half close for conn
+  - 1. get dubboArgs from http body
+  - 2. change dubboInterface for gray_traffic by router_name
+  - 3. construct & set data for sending to upstream
+  - 4. set envoy-self half close for conn
     *
   - @param bufferForUpstreamData supplies data to be set for sending to upstream.
   - @param endOfStream if end of stream.
@@ -96,29 +91,27 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, buffer
 
 *
 */
-func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bool) api.EncodeDataStatus {
-	// =========== step 1: append data when streaming get data from downstream =========== //
+func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bool) api.TcpUpstreamStatus {
 	api.LogInfof("[EncodeData] come, buf: %s, len: %d, endStream: %v", buffer, buffer.Len(), endOfStream)
-
-	// =========== step 2: get dubboArgs from http body =========== //
+	// =========== step 1: get dubboArgs from http body =========== //
 	dubboArgs := make(map[string]string, 0)
 	_ = json.Unmarshal(buffer.Bytes(), &dubboArgs)
 
-	// =========== step 3: assign dubboInterface for gray traffic by router =========== //
+	// =========== step 2: assign dubboInterface for gray traffic by router =========== //
 	if f.callbacks.GetRouteName() == f.config.routerNameForGrayTraffic {
 		f.dubboInterface = GrayInterfaceName
 	}
 
-	// =========== step 4: construct dubbo frame with dubboMethod, dubboInterface, dubboArgs for upstream req =========== //
+	// =========== step 3: construct dubbo frame with dubboMethod, dubboInterface, dubboArgs for upstream req =========== //
 	buf := transformToDubboFrame(f.dubboMethod, f.dubboInterface, dubboArgs)
 	_ = buffer.Set(buf.Bytes())
 
-	// =========== step 5: set upstream conn tunneling =========== //
+	// =========== step 4: set self half close for upstream conn =========== //
 	if !f.config.enableTunneling {
-		return api.EncodeDataContinueWithHalfClose
+		f.callbacks.SetSelfHalfCloseForUpstreamConn(true)
 	}
 
-	return api.EncodeDataContinueWithNotHalfClose
+	return api.TcpUpstreamContinue
 }
 
 const (
@@ -127,8 +120,7 @@ const (
 	DUBBO_HEADER_SIZE   = 16
 
 	DUBBO_PROTOCOL_UPSTREAM_MAGIN_ERROR string = "protocol_magic_error"
-	DUBBO_PROTOCOL_HEADER_LENGTH_ERROR  string = "magin_error"
-	DUBBO_PROTOCOL_TOO_MANY_DATA        string = "too_many_data"
+	DUBBO_PROTOCOL_HEADER_LENGTH_ERROR  string = "header_length_error"
 )
 
 /*
@@ -150,27 +142,28 @@ const (
 
 *
 */
-func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHeaderMap, buffer api.BufferInstance, endOfStream bool) api.DecodeDataStatus {
+func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHeaderMap, buffer api.BufferInstance, endOfStream bool) api.TcpUpstreamStatus {
 	api.LogInfof("[OnUpstreamData] receive body, len: %d", buffer.Len())
+
 	// =========== step 1: verify dubbo frame format =========== //
 	if buffer.Len() < DUBBO_MAGIC_SIZE || binary.BigEndian.Uint16(buffer.Bytes()) != hessian.MAGIC {
-		api.LogErrorf("[OnUpstreamData] Protocol Magic error")
+		api.LogErrorf("[OnUpstreamData] Protocol Magic error, %s", buffer.Bytes())
 		responseHeaderForSet.Set(":status", "500")
 		buffer.SetString(DUBBO_PROTOCOL_UPSTREAM_MAGIN_ERROR)
-		return api.DecodeDataContinue
+		return api.TcpUpstreamContinue
 	}
 	if buffer.Len() < hessian.HEADER_LENGTH {
 		api.LogErrorf("[OnUpstreamData] Protocol Header length error")
 		responseHeaderForSet.Set(":status", "500")
 		buffer.SetString(DUBBO_PROTOCOL_HEADER_LENGTH_ERROR)
-		return api.DecodeDataContinue
+		return api.TcpUpstreamContinue
 	}
 	bodyLength := binary.BigEndian.Uint32(buffer.Bytes()[DUBBO_LENGTH_OFFSET:])
 
 	// =========== step 2: aggregate multi dubbo frame when server has big response =========== //
 	if buffer.Len() < (int(bodyLength) + hessian.HEADER_LENGTH) {
 		api.LogInfof("[OnUpstreamData] NeedMoreData for Body")
-		return api.DecodeDataStopAndBuffer
+		return api.TcpUpstreamStopAndBuffer
 	}
 	api.LogInfof("[OnUpstreamData] finish Aggregation for Body")
 
@@ -192,7 +185,7 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 		responseHeaderForSet.Set("lable-for-special-cluster", f.config.clusterNameForSpecialLabel)
 	}
 
-	return api.DecodeDataContinue
+	return api.TcpUpstreamContinue
 }
 
 /*

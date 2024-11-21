@@ -146,38 +146,12 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
   auto s = dynamic_cast<processState*>(state);
   state->setFilterState(FilterState::ProcessingHeader);
   ENVOY_LOG(debug, "tcp upstream encodeHeaders, state: {}", state->stateStr());
-  GoUint64 go_tatus = dynamic_lib_->envoyGoEncodeHeader(
+  GoUint64 go_status = dynamic_lib_->envoyGoEncodeHeader(
     s, end_stream ? 1 : 0, headers.size(), headers.byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
-  state->doDataList.moveOut(buf);
 
-  bool upstream_conn_half_close;
-  switch (static_cast<EncodeHeaderStatus>(go_tatus)) {
-  case EncodeHeaderStatus::EncodeHeaderSendDataWithNotHalfClose:
-    state->setFilterState(FilterState::Done);
-    upstream_conn_half_close = false;
-    upstream_conn_data_->connection().write(buf, upstream_conn_half_close);
-    break;
+  state->handleHeaderGolangStatus(static_cast<TcpUpstreamStatus>(go_status));
 
-  case EncodeHeaderStatus::EncodeHeaderSendDataWithHalfClose:
-    state->setFilterState(FilterState::Done);
-    upstream_conn_half_close = true;
-    upstream_conn_data_->connection().write(buf, upstream_conn_half_close);
-    break;
-
-  case EncodeHeaderStatus::EncodeHeaderContinue:
-    state->setFilterState(FilterState::WaitingData);
-    break;
-  
-  case EncodeHeaderStatus::EncodeHeaderStopAndBuffer:
-    state->setFilterState(FilterState::WaitingAllData);
-    break;
-
-  default:
-    ENVOY_LOG(error, "tcp upstream encodeHeaders, unexpected go_tatus: {}", go_tatus);
-    PANIC("unreachable");
-    break;
-  }
-
+  bool send_data = (state->filterState() == FilterState::Done);
   // Headers should only happen once, so use this opportunity to add the proxy header, if configured.
   ASSERT(route_entry_ != nullptr);
   if (route_entry_->connectConfig().has_value()) {
@@ -190,13 +164,15 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
     }
 
     if (data.length() != 0 || end_stream) {
-      ENVOY_LOG(error, "tcp upstream encodeHeaders, encodeData send proxy : {}", data.toString());
-      upstream_conn_data_->connection().write(data, upstream_conn_half_close);
+      bool self_half_close_connection = end_stream && !send_data ? upstream_conn_self_half_close_ : false;
+      upstream_conn_data_->connection().write(data, self_half_close_connection);
     }
   }
 
-  if (buf.length() != 0) {
-    upstream_conn_data_->connection().write(buf, false);
+  if (send_data) {
+    // when go side decide to send data to upstream in encodeHeaders, here will directly send and encodeData will not send.
+    state->doDataList.moveOut(buf);
+    upstream_conn_data_->connection().write(buf, upstream_conn_self_half_close_);
   }
 
   return Envoy::Http::okStatus();
@@ -244,46 +220,14 @@ void TcpUpstream::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bo
 
   Buffer::Instance& buffer = state->doDataList.push(data);
   auto s = dynamic_cast<processState*>(state);
-  GoUint64 go_tatus = dynamic_lib_->envoyGoEncodeData(
+  GoUint64 go_status = dynamic_lib_->envoyGoEncodeData(
     s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
+    
+  state->handleDataGolangStatus(static_cast<TcpUpstreamStatus>(go_status), end_stream);
 
-  switch (static_cast<EncodeDataStatus>(go_tatus)) {
-  case EncodeDataStatus::EncodeDataContinueWithNotHalfClose:
+  if (state->filterState() == FilterState::Done) {
     state->doDataList.moveOut(data);
-    state->setFilterState(FilterState::Done);
-    upstream_conn_data_->connection().write(data, false);
-    break;
-
-  case EncodeDataStatus::EncodeDataContinueWithHalfClose:
-    state->doDataList.moveOut(data);
-    state->setFilterState(FilterState::Done);
-    upstream_conn_data_->connection().write(data, true);
-    break;
-
-  case EncodeDataStatus::EncodeDataStopAndBuffer:
-    if (end_stream) {
-      ENVOY_LOG(error, "tcp upstream encodeDataGo, unexpected go_tatus when end_stream is true: {}", go_tatus);
-      PANIC("unreachable");
-      break;
-    }
-    state->setFilterState(FilterState::WaitingAllData);
-    break;
-
-  case EncodeDataStatus::EncodeDataStopNoBuffer:
-    if (end_stream) {
-      ENVOY_LOG(error, "tcp upstream encodeDataGo, unexpected go_tatus when end_stream is true: {}", go_tatus);
-      PANIC("unreachable");
-      break;
-    }
-    state->drainBufferData();
-    state->doDataList.clearAll();
-    state->setFilterState(FilterState::WaitingData);
-    break;
-
-  default:
-    ENVOY_LOG(error, "tcp upstream encodeDataGo, unexpected go_tatus: {}", go_tatus);
-    PANIC("unreachable");
-    break;
+    upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
   }
 }
 
@@ -316,13 +260,13 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   auto s = dynamic_cast<processState*>(state);
   state->setFilterState(FilterState::ProcessingData);
 
-  GoUint64 go_tatus = dynamic_lib_->envoyGoOnUpstreamData(
+  GoUint64 go_status = dynamic_lib_->envoyGoOnUpstreamData(
     s, end_stream ? 1 : 0, (*resp_headers_).size(), (*resp_headers_).byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
   state->doDataList.moveOut(data);
   state->setFilterState(FilterState::Done);
 
-  switch (static_cast<DecodeDataStatus>(go_tatus)) {
-  case DecodeDataStatus::DecodeDataContinue:
+  switch (static_cast<TcpUpstreamStatus>(go_status)) {
+  case TcpUpstreamStatus::TcpUpstreamContinue:
     end_stream = true;
     if (!resp_headers_->Status()) {
       // if go side not set status, c++ side set default status
@@ -333,16 +277,16 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     upstream_request_->decodeData(data, end_stream);
     break;
 
-  case DecodeDataStatus::DecodeDataStopAndBuffer:
-    // before we set end_stream=true, if onUpstreamData is called multiple times, data is gradually appended by default.
+  case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
+    // if onUpstreamData is called multiple times, data is gradually appended by default.
     break;
 
-  case DecodeDataStatus::DecodeDataStopNoBuffer:
+  case TcpUpstreamStatus::TcpUpstreamStopNoBuffer:
     data.drain(data.length());
     break;
 
   default:
-    ENVOY_LOG(error, "tcp upstream onUpstreamData, unexpected go_tatus: {}", go_tatus);
+    ENVOY_LOG(error, "tcp upstream onUpstreamData, unexpected go_tatus: {}", go_status);
     PANIC("unreachable");
     break;
   }
@@ -499,6 +443,15 @@ CAPIStatus TcpUpstream::getStringValue(int id, uint64_t* value_data, int* value_
 
   *value_data = reinterpret_cast<uint64_t>(strValue.data());
   *value_len = strValue.length();
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus TcpUpstream::setSelfHalfCloseForUpstreamConn(int enabled) {                                   
+  if (enabled == 1) {
+    upstream_conn_self_half_close_ = true;
+  } else {
+    upstream_conn_self_half_close_ = false;
+  }
   return CAPIStatus::CAPIOK;
 }
 

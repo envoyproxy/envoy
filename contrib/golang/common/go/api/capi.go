@@ -109,6 +109,8 @@ type TcpUpstreamCAPI interface {
 	SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
 	// Get the specified value by key
 	GetStringValue(r unsafe.Pointer, id int) (string, bool)
+
+	SetSelfHalfCloseForUpstreamConn(r unsafe.Pointer, enabled int)
 }
 
 type CommonCAPI interface {

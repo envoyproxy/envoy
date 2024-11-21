@@ -49,7 +49,9 @@ private:
   uint32_t bytes_{0};
 };
 
-// This describes the processor state.
+/**
+  * This describes the processor state.
+*/
 enum class FilterState {
   // Waiting header
   WaitingHeader,
@@ -63,6 +65,53 @@ enum class FilterState {
   ProcessingData,
   // All done
   Done,
+};
+/**
+  * An enum specific for Golang status.
+*/
+enum class TcpUpstreamStatus {
+  /** 
+  * Area of status: encodeHeaders, encodeData, onUpstreamData
+  *
+  * Used when you want to leave the current func area and continue further func.(when streaming, go side only th current data, not get the rest data of streaming)
+  *
+  * Here is the specific explanation in different funcs:
+  * encodeHeaders: will go to encodeData.
+  * encodeData: send data to upstream.
+  * onUpstreamData: pass data and headers to downstream.
+  */
+  TcpUpstreamContinue,
+
+  /** 
+  * Area of status: encodeHeaders, encodeData, onUpstreamData
+  *
+  * Used when you want to buffer data.
+  *
+  * Here is the specific explanation in different funcs:
+  * encodeHeaders: will go to encodeData and will buffer whole data(when streaming, only last time will call go side encodeData which means end_stream=true).
+  * encodeData: buffer whole data, only last_data_piece will call go side which means end_stream=true.
+  * onUpstreamData: buffer whole data, each_data_piece will call go side.
+  */
+  TcpUpstreamStopAndBuffer,
+
+  /** Area of status: encodeData, onUpstreamData
+  *
+  * Used when you do not want to buffer data.
+  *
+  * Here is the specific explanation in different funcs:
+  * encodeData: not buffer data, each_data_piece will call go side.
+  * onUpstreamData: not buffer data, each_data_piece will call go side.
+  */
+  TcpUpstreamStopNoBuffer,
+
+  /** Area of status: encodeHeaders
+  *
+  * Used when you do not want to send data to upstream in encodeHeaders.
+  *
+  * Here is the specific explanation in different funcs:
+  * encodeHeaders: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
+  */
+  TcpUpstreamSendData,
 };
 
 class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
@@ -94,6 +143,9 @@ public:
   Buffer::Instance& getBufferData() { return *data_buffer_.get(); };
   bool isBufferDataEmpty() { return data_buffer_ == nullptr || data_buffer_->length() == 0; };
   void drainBufferData();
+
+  void handleHeaderGolangStatus(TcpUpstreamStatus status);
+  void handleDataGolangStatus(const TcpUpstreamStatus status, bool end_stream);
 
   const Envoy::Http::RequestOrResponseHeaderMap* headers{nullptr};
   BufferList doDataList;

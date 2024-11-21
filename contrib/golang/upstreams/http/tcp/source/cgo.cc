@@ -39,10 +39,10 @@ CAPIStatus envoyGoTcpUpstreamHandlerWrapper(void* r,
 
 CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [strs, buf](TcpUpstream& filter, ProcessorState& state) -> CAPIStatus {
+      s, [strs, buf](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
         auto go_strs = reinterpret_cast<GoString*>(strs);
         auto go_buf = reinterpret_cast<char*>(buf);
-        return filter.copyHeaders(state, go_strs, go_buf);
+        return t.copyHeaders(state, go_strs, go_buf);
       });
 }
 
@@ -50,28 +50,28 @@ CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len,
                                             int value_len, headerAction act) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [key_data, key_len, value_data, value_len, act](TcpUpstream& filter,
+      [key_data, key_len, value_data, value_len, act](TcpUpstream& t,
                                                       ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
         auto value_str = stringViewFromGoPointer(value_data, value_len);
-        return filter.setRespHeader(state, key_str, value_str, act);
+        return t.setRespHeader(state, key_str, value_str, act);
       });
 }
 
 CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer_ptr, void* data) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [buffer_ptr, data](TcpUpstream& filter, ProcessorState& state) -> CAPIStatus {
+      s, [buffer_ptr, data](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
-        return filter.copyBuffer(state, buffer, reinterpret_cast<char*>(data));
+        return t.copyBuffer(state, buffer, reinterpret_cast<char*>(data));
       });
 }
 
 CAPIStatus envoyGoTcpUpstreamDrainBuffer(void* s, uint64_t buffer_ptr, uint64_t length) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [buffer_ptr, length](TcpUpstream& filter, ProcessorState& state) -> CAPIStatus {
+      [buffer_ptr, length](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
-        return filter.drainBuffer(state, buffer, length);
+        return t.drainBuffer(state, buffer, length);
       });
 }
 
@@ -79,18 +79,25 @@ CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* s, uint64_t buffer_ptr, void*
                                             bufferAction action) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s,
-      [buffer_ptr, data, length, action](TcpUpstream& filter,
+      [buffer_ptr, data, length, action](TcpUpstream& t,
                                          ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         auto value = stringViewFromGoPointer(data, length);
-        return filter.setBufferHelper(state, buffer, value, action);
+        return t.setBufferHelper(state, buffer, value, action);
       });
 }
 
 CAPIStatus envoyGoTcpUpstreamGetStringValue(void* r, int id, uint64_t* value_data, int* value_len) {
   return envoyGoTcpUpstreamHandlerWrapper(
-      r, [id, value_data, value_len](TcpUpstream& filter) -> CAPIStatus {
-        return filter.getStringValue(id, value_data, value_len);
+      r, [id, value_data, value_len](TcpUpstream& t) -> CAPIStatus {
+        return t.getStringValue(id, value_data, value_len);
+      });
+}
+
+CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* r, int enabled) {
+  return envoyGoTcpUpstreamHandlerWrapper(
+      r, [enabled](TcpUpstream& t) {
+        return t.setSelfHalfCloseForUpstreamConn(enabled);
       });
 }
 

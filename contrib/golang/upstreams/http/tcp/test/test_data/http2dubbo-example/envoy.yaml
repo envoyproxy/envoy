@@ -30,6 +30,8 @@ static_resources:
                   - upgrade_type: "CONNECT"
                     connect_config: 
                       allow_post: true
+                      # proxy_protocol_config: 
+                      #   version: 0
           
   clusters:
   - name: local_service          

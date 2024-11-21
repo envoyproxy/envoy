@@ -131,7 +131,7 @@ func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, b
 	}
 	if req.pInfo.paniced {
 		buf.SetString(req.pInfo.details)
-		return uint64(api.EncodeHeaderSendDataWithHalfClose)
+		return uint64(api.TcpUpstreamSendData)
 	}
 	defer state.RecoverPanic()
 
@@ -160,7 +160,7 @@ func envoyGoEncodeData(s *C.processState, endStream, buffer, length uint64) uint
 	}
 	if req.pInfo.paniced {
 		buf.SetString(req.pInfo.details)
-		return uint64(api.EncodeHeaderSendDataWithNotHalfClose)
+		return uint64(api.TcpUpstreamContinue)
 	}
 	defer state.RecoverPanic()
 
@@ -182,7 +182,7 @@ func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes,
 	}
 	if req.pInfo.paniced {
 		buf.SetString(req.pInfo.details)
-		return uint64(api.DecodeDataContinue)
+		return uint64(api.TcpUpstreamContinue)
 	}
 	defer state.RecoverPanic()
 

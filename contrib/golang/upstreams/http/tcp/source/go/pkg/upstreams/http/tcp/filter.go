@@ -124,3 +124,13 @@ func (r *httpRequest) GetVirtualClusterName() string {
 	name, _ := cAPI.GetStringValue(unsafe.Pointer(r), ValueClusterName)
 	return name
 }
+
+func (r *httpRequest) SetSelfHalfCloseForUpstreamConn(enabled bool) {
+	var enabledInt int
+	if enabled {
+		enabledInt = 1
+	} else {
+		enabledInt = 0
+	}
+	cAPI.SetSelfHalfCloseForUpstreamConn(unsafe.Pointer(r), enabledInt)
+}

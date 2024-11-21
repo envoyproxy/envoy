@@ -486,81 +486,64 @@ func (t EndStreamType) String() string {
 	return "unknown"
 }
 
-// Status codes returned in EncodeData by go side.
-type EncodeHeaderStatus int
+// Status codes returned by tcp upstream extension.
+type TcpUpstreamStatus int
 
 const (
-	// Send data with upstream conn not half close.
-	EncodeHeaderSendDataWithNotHalfClose EncodeHeaderStatus = 0
-	// Send data with upstream conn half close.
-	EncodeHeaderSendDataWithHalfClose EncodeHeaderStatus = 1
-	// Continue and not send data to upstream.
-	EncodeHeaderContinue      EncodeHeaderStatus = 2
-	EncodeHeaderStopAndBuffer EncodeHeaderStatus = 3
+	/**
+	* Area of status: encodeHeaders, encodeData, onUpstreamData
+	*
+	* Used when you want to leave the current func area and continue further func.(when streaming, go side only th current data, not get the rest data of streaming)
+	*
+	* Here is the specific explanation in different funcs:
+	* encodeHeaders: will go to encodeData.
+	* encodeData: send data to upstream.
+	* onUpstreamData: pass data and headers to downstream.
+	 */
+	TcpUpstreamContinue TcpUpstreamStatus = 0
+
+	/**
+	* Area of status: encodeHeaders, encodeData, onUpstreamData
+	*
+	* Used when you want to buffer data.
+	*
+	* Here is the specific explanation in different funcs:
+	* encodeHeaders: will go to encodeData and will buffer whole data(when streaming, only last time will call go side encodeData which means end_stream=true).
+	* encodeData: buffer whole data, only last_data_piece will call go side which means end_stream=true.
+	* onUpstreamData: buffer whole data, each_data_piece will call go side.
+	 */
+	TcpUpstreamStopAndBuffer TcpUpstreamStatus = 1
+
+	/** Area of status: encodeData, onUpstreamData
+	*
+	* Used when you do not want to buffer data.
+	*
+	* Here is the specific explanation in different funcs:
+	* encodeData: not buffer data, each_data_piece will call go side.
+	* onUpstreamData: not buffer data, each_data_piece will call go side.
+	 */
+	TcpUpstreamStopNoBuffer TcpUpstreamStatus = 2
+
+	/** Area of status: encodeHeaders
+	*
+	* Used when you do not want to send data to upstream in encodeHeaders.
+	*
+	* Here is the specific explanation in different funcs:
+	* encodeHeaders: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
+	 */
+	TcpUpstreamSendData TcpUpstreamStatus = 3
 )
 
-func (s EncodeHeaderStatus) String() string {
+func (s TcpUpstreamStatus) String() string {
 	switch s {
-	case EncodeHeaderSendDataWithNotHalfClose:
-		return "EncodeHeaderSendDataWithNotHalfClose"
-	case EncodeHeaderSendDataWithHalfClose:
-		return "EncodeHeaderSendDataWithHalfClose"
-	case EncodeHeaderContinue:
-		return "EncodeHeaderContinue"
-	case EncodeHeaderStopAndBuffer:
-		return "EncodeHeaderStopAndBuffer"
-	}
-	return "unknown"
-}
-
-// Status codes returned in EncodeData by go side.
-type EncodeDataStatus int
-
-const (
-	// Continue with upstream conn not half close.
-	EncodeDataContinueWithNotHalfClose EncodeDataStatus = 0
-	// Continue with upstream conn half close.
-	EncodeDataContinueWithHalfClose EncodeDataStatus = 1
-	// Buffer current data and wait for further data by next encodeData.
-	EncodeDataStopAndBuffer EncodeDataStatus = 2
-	// No buffer current data and wait for data by next encodeData.
-	EncodeDataStopNoBuffer EncodeDataStatus = 3
-)
-
-func (s EncodeDataStatus) String() string {
-	switch s {
-	case EncodeDataContinueWithNotHalfClose:
-		return "EncodeDataContinueWithNotHalfClose"
-	case EncodeDataContinueWithHalfClose:
-		return "EncodeDataContinueWithHalfClose"
-	case EncodeDataStopAndBuffer:
-		return "EncodeDataStopAndBuffer"
-	case EncodeDataStopNoBuffer:
-		return "EncodeDataStopNoBuffer"
-	}
-	return "unknown"
-}
-
-// Status codes returned in OnUpstreamData by go side.
-type DecodeDataStatus int
-
-const (
-	// Continue to give data to downstream.
-	DecodeDataContinue DecodeDataStatus = 0
-	// Buffer current data and wait for further data by next onUpstreamData.
-	DecodeDataStopAndBuffer DecodeDataStatus = 1
-	// No buffer current data and wait for data by next onUpstreamData.
-	DecodeDataStopNoBuffer DecodeDataStatus = 2
-)
-
-func (s DecodeDataStatus) String() string {
-	switch s {
-	case DecodeDataContinue:
-		return "DecodeDataContinue"
-	case DecodeDataStopAndBuffer:
-		return "DecodeDataStopAndBuffer"
-	case DecodeDataStopNoBuffer:
-		return "DecodeDataStopNoBuffer"
+	case TcpUpstreamContinue:
+		return "TcpUpstreamContinue"
+	case TcpUpstreamStopAndBuffer:
+		return "TcpUpstreamStopAndBuffer"
+	case TcpUpstreamStopNoBuffer:
+		return "TcpUpstreamStopNoBuffer"
+	case TcpUpstreamSendData:
+		return "TcpUpstreamSendData"
 	}
 	return "unknown"
 }

@@ -342,29 +342,31 @@ type TcpUpstreamCallbackHandler interface {
 	GetRouteName() string
 	// GetVirtualClusterName returns the name of the virtual cluster which got matched
 	GetVirtualClusterName() string
+	// SetSelfHalfCloseForUpstreamConn default is false
+	SetSelfHalfCloseForUpstreamConn(enabled bool)
 }
 
 type TcpUpstreamFilter interface {
 	// Invoked when header is delivered from the downstream.
-	EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) EncodeHeaderStatus
+	EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) TcpUpstreamStatus
 	// Streaming, Invoked when data is delivered from the downstream.
-	EncodeData(buffer BufferInstance, endOfStream bool) EncodeDataStatus
+	EncodeData(buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
 	// Streaming, Called when data is read on from tcp upstream.
-	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) DecodeDataStatus
+	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
 	// destroy filter
 	OnDestroy(DestroyReason)
 }
 
-func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) EncodeHeaderStatus {
-	return EncodeHeaderContinue
+func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) TcpUpstreamStatus {
+	return TcpUpstreamContinue
 }
 
-func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) EncodeDataStatus {
-	return EncodeDataContinueWithNotHalfClose
+func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) TcpUpstreamStatus {
+	return TcpUpstreamContinue
 }
 
-func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) DecodeDataStatus {
-	return DecodeDataContinue
+func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) TcpUpstreamStatus {
+	return TcpUpstreamContinue
 }
 
 func (*EmptyTcpUpstreamFilter) OnDestroy(DestroyReason) {
