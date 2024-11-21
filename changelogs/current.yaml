@@ -106,6 +106,11 @@ bug_fixes:
 - area: tracers
   change: |
     Avoid possible overflow when setting span attributes in Dynatrace sampler.
+- area: load_balancing
+  change: |
+    Fixed default host weight calculation of :ref:`client_side_weighted_round_robin
+    <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
+    to properly handle even number of valid host weights.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
