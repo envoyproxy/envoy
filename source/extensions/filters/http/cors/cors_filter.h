@@ -50,9 +50,6 @@ public:
 
   void initializeCorsPolicies();
 
-  // Http::StreamFilterBase
-  void onDestroy() override {}
-
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
