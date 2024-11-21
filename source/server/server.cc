@@ -840,7 +840,7 @@ void InstanceBase::onRuntimeReady() {
       hds_delegate_ =
           maybeCreateHdsDelegate(serverFactoryContext(), *stats_store_.rootScope(),
                                  factory_or_error.value()->createUncachedRawAsyncClient(),
-                                 stats_store_, *ssl_context_manager_, info_factory_);
+                                 stats_store_, *ssl_context_manager_);
     }
     END_TRY
     CATCH(const EnvoyException& e,

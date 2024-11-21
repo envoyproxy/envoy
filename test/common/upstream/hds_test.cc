@@ -54,6 +54,9 @@ public:
     ASSERT_TRUE(hd.processMessage(std::move(message)).ok());
   };
   HdsDelegateStats getStats(HdsDelegate& hd) { return hd.stats_; };
+  static void swapFactory(HdsDelegate& hd, std::unique_ptr<ClusterInfoFactory>&& factory) {
+    hd.info_factory_ = std::move(factory);
+  }
 };
 
 class HdsTest : public testing::Test {
@@ -93,9 +96,12 @@ protected:
         }))
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
 
-    hds_delegate_ = std::make_unique<HdsDelegate>(
-        server_context_, *stats_store_.rootScope(), Grpc::RawAsyncClientPtr(async_client_),
-        stats_store_, ssl_context_manager_, test_factory_);
+    hds_delegate_ = std::make_unique<HdsDelegate>(server_context_, *stats_store_.rootScope(),
+                                                  Grpc::RawAsyncClientPtr(async_client_),
+                                                  stats_store_, ssl_context_manager_);
+    test_factory_ = new MockClusterInfoFactory();
+    HdsDelegateFriend::swapFactory(*hds_delegate_,
+                                   std::unique_ptr<ClusterInfoFactory>(test_factory_));
   }
 
   void expectCreateClientConnection() {
@@ -237,7 +243,7 @@ transport_socket_match_criteria:
   Event::SimulatedTimeSystem time_system_;
   envoy::config::core::v3::Node node_;
   Stats::IsolatedStoreImpl stats_store_;
-  MockClusterInfoFactory test_factory_;
+  MockClusterInfoFactory* test_factory_;
 
   std::unique_ptr<Upstream::HdsDelegate> hds_delegate_;
   HdsDelegateFriend hds_delegate_friend_;
@@ -298,7 +304,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).Times(2).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).Times(2).WillRepeatedly(Return(cluster_info_));
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
@@ -328,7 +334,7 @@ TEST_F(HdsTest, TestHdsCluster) {
   address->mutable_socket_address()->set_port_value(1234);
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   EXPECT_EQ(hds_delegate_->hdsClusters()[0]->initializePhase(),
@@ -372,7 +378,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
 
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
@@ -423,7 +429,7 @@ TEST_F(HdsTest, TestProcessMessageMissingFieldsWithFallback) {
       .WillRepeatedly(Return(connection));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   EXPECT_CALL(*connection, setBufferLimits(_));
   EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
   // Process message
@@ -480,7 +486,7 @@ TEST_F(HdsTest, TestProcessMessageInvalidFieldsWithFallback) {
   EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
       .WillRepeatedly(Return(connection));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   EXPECT_CALL(*connection, setBufferLimits(_));
   EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
   // Process message
@@ -525,7 +531,7 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
 
   // Carry over cluster name on a call to createClusterInfo,
   // in the same way that the prod factory does.
-  EXPECT_CALL(test_factory_, createClusterInfo(_))
+  EXPECT_CALL(*test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([](const ClusterInfoFactory::CreateClusterInfoParams& params) {
         std::shared_ptr<Upstream::MockClusterInfo> cluster_info{
             new NiceMock<Upstream::MockClusterInfo>()};
@@ -610,7 +616,7 @@ TEST_F(HdsTest, TestSocketContext) {
   // Pull out socket_matcher object normally internal to createClusterInfo, to test that a matcher
   // would match the expected socket.
   std::unique_ptr<TransportSocketMatcherImpl> socket_matcher;
-  EXPECT_CALL(test_factory_, createClusterInfo(_))
+  EXPECT_CALL(*test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
         // Build scope, factory_context as does ProdClusterInfoFactory.
         Envoy::Stats::ScopeSharedPtr scope =
@@ -737,7 +743,7 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
       .WillRepeatedly(Return(connection_));
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   EXPECT_CALL(*connection_, setBufferLimits(_));
   EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
   // Process message
@@ -781,7 +787,7 @@ TEST_F(HdsTest, TestSameSpecifier) {
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
   EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
@@ -816,7 +822,7 @@ TEST_F(HdsTest, TestClusterChange) {
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
   EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
@@ -881,7 +887,7 @@ TEST_F(HdsTest, TestUpdateEndpoints) {
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
   EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
@@ -949,7 +955,7 @@ TEST_F(HdsTest, TestUpdateEndpointsWithActiveHCflag) {
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
   EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
@@ -987,7 +993,7 @@ TEST_F(HdsTest, TestUpdateHealthCheckers) {
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
   EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
@@ -1041,7 +1047,7 @@ TEST_F(HdsTest, TestClusterSameName) {
 
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillRepeatedly(Return(cluster_info_));
   EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
@@ -1101,7 +1107,7 @@ TEST_F(HdsTest, TestUpdateSocketContext) {
   // Pull out socket_matcher object normally internal to createClusterInfo, to test that a matcher
   // would match the expected socket.
   std::vector<std::unique_ptr<TransportSocketMatcherImpl>> socket_matchers;
-  EXPECT_CALL(test_factory_, createClusterInfo(_))
+  EXPECT_CALL(*test_factory_, createClusterInfo(_))
       .WillRepeatedly(Invoke([&](const ClusterInfoFactory::CreateClusterInfoParams& params) {
         // Build scope, factory_context as does ProdClusterInfoFactory.
         Envoy::Stats::ScopeSharedPtr scope =
@@ -1223,7 +1229,7 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenCreate) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
@@ -1256,7 +1262,7 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenUpdate) {
   }
 
   // Process message
-  EXPECT_CALL(test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
   hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   for (int i = 0; i < 3; i++) {
