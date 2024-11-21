@@ -45,7 +45,7 @@ private:
 };
 using CorsFilterConfigSharedPtr = std::shared_ptr<CorsFilterConfig>;
 
-class CorsFilter : public Envoy::Http::PassThroughFilter {
+class CorsFilter : public Http::PassThroughFilter {
 public:
   CorsFilter(CorsFilterConfigSharedPtr config);
 
