@@ -40,7 +40,6 @@ RUNTIME_GUARD(envoy_reloadable_features_dns_details);
 RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
-RUNTIME_GUARD(envoy_reloadable_features_exclude_host_in_eds_status_draining);
 RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_timeout_error);
 RUNTIME_GUARD(envoy_reloadable_features_extend_h3_accept_untrusted);
@@ -63,6 +62,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_internal_authority_header_validator);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_remove_jwt_from_query_params);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_validate_uri);
+RUNTIME_GUARD(envoy_reloadable_features_local_reply_traverses_filter_chain_after_1xx);
 RUNTIME_GUARD(envoy_reloadable_features_logging_with_fast_json_formatter);
 RUNTIME_GUARD(envoy_reloadable_features_lua_flow_control_while_http_call);
 RUNTIME_GUARD(envoy_reloadable_features_mmdb_files_reload_enabled);
@@ -89,6 +89,7 @@ RUNTIME_GUARD(envoy_reloadable_features_sanitize_http2_headers_without_nghttp2);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_sni_in_access_log);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_te);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
+RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
 RUNTIME_GUARD(envoy_reloadable_features_strict_duration_validation);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunneling_send_downstream_fin_on_upstream_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
@@ -115,8 +116,6 @@ RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
-// TODO(paul-r-gall) Make this enabled by default after additional soak time.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(birenroy) flip after the security issue is addressed.

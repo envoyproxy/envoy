@@ -8,6 +8,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/common/stream_info/upstream_address.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 
 namespace Envoy {
@@ -20,7 +21,8 @@ ProxyFilterConfig::ProxyFilterConfig(
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     Upstream::ClusterManager&)
     : port_(static_cast<uint16_t>(proto_config.port_value())),
-      dns_cache_manager_(cache_manager_factory.get()) {
+      dns_cache_manager_(cache_manager_factory.get()),
+      save_upstream_address_(proto_config.save_upstream_address()) {
   auto cache_or_error = dns_cache_manager_->getCache(proto_config.dns_cache_config());
   THROW_IF_NOT_OK_REF(cache_or_error.status());
   dns_cache_ = std::move(cache_or_error.value());
@@ -84,11 +86,16 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
   }
 
   switch (result.status_) {
-  case LoadDnsCacheEntryStatus::InCache:
+  case LoadDnsCacheEntryStatus::InCache: {
     ASSERT(cache_load_handle_ == nullptr);
     ENVOY_CONN_LOG(debug, "DNS cache entry already loaded, continuing",
                    read_callbacks_->connection());
+    auto const& host_info = result.host_info_;
+    if (host_info.has_value() && host_info.value()->address()) {
+      addHostAddressToFilterState(host_info.value()->address());
+    }
     return Network::FilterStatus::Continue;
+  }
   case LoadDnsCacheEntryStatus::Loading:
     ASSERT(cache_load_handle_ != nullptr);
     ENVOY_CONN_LOG(debug, "waiting to load DNS cache entry", read_callbacks_->connection());
@@ -104,12 +111,37 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
+void ProxyFilter::onLoadDnsCacheComplete(
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_CONN_LOG(debug, "load DNS cache complete, continuing", read_callbacks_->connection());
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
+
+  if (host_info && host_info->address()) {
+    addHostAddressToFilterState(host_info->address());
+  }
+
   read_callbacks_->connection().readDisable(false);
   read_callbacks_->continueReading();
+}
+
+void ProxyFilter::addHostAddressToFilterState(
+    const Network::Address::InstanceConstSharedPtr& address) {
+  ASSERT(address); // null pointer checks must be done before calling this function.
+
+  if (!config_->saveUpstreamAddress()) {
+    return;
+  }
+
+  ENVOY_CONN_LOG(trace, "Adding resolved host {} to filter state", read_callbacks_->connection(),
+                 address->asString());
+
+  auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
+  address_obj->address_ = address;
+
+  read_callbacks_->connection().streamInfo().filterState()->setData(
+      StreamInfo::UpstreamAddress::key(), std::move(address_obj),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 } // namespace SniDynamicForwardProxy

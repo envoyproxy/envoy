@@ -62,6 +62,7 @@ public:
 
 protected:
   CertificateValidationContextConfigImpl(
+      std::string ca_cert, std::string certificate_revocation_list,
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
       bool auto_sni_san_match, Api::Api& api);
 

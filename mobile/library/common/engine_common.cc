@@ -68,6 +68,12 @@ public:
   std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view) override {
     return nullptr;
   }
+  std::unique_ptr<Server::HdsDelegateApi>
+  maybeCreateHdsDelegate(Server::Configuration::ServerFactoryContext&, Stats::Scope&,
+                         Grpc::RawAsyncClientPtr&&, Envoy::Stats::Store&, Ssl::ContextManager&,
+                         Upstream::ClusterInfoFactory&) override {
+    return nullptr;
+  }
 };
 
 EngineCommon::EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options) : options_(options) {

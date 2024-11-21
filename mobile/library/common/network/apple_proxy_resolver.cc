@@ -6,9 +6,9 @@
 namespace Envoy {
 namespace Network {
 
-AppleProxyResolver::AppleProxyResolver()
-    : proxy_settings_monitor_(
-          std::make_unique<AppleSystemProxySettingsMonitor>(proxySettingsUpdater())),
+AppleProxyResolver::AppleProxyResolver(int proxy_settings_refresh_interval_secs)
+    : proxy_settings_monitor_(std::make_unique<AppleSystemProxySettingsMonitor>(
+          proxySettingsUpdater(), proxy_settings_refresh_interval_secs)),
       pac_proxy_resolver_(std::make_unique<ApplePacProxyResolver>()),
       thread_factory_(Thread::PosixThreadFactory::create()) {}
 
