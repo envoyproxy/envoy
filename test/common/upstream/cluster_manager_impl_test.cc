@@ -1417,6 +1417,39 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, MaglevLoadBalancerThreadAwareUpdate)
   doTest("envoy.load_balancing_policies.maglev");
 }
 
+// Validate that load balancing policy can update request's dynamic metadata
+TEST_F(ClusterManagerImplThreadAwareLbTest, LoadBalancerCanUpdateMetadata) {
+  NiceMock<MockLoadBalancerContext> load_balancer_context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
+                                        clustersJson({defaultStaticClusterJson("cluster_0")}));
+
+  std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
+  cluster1->info_->name_ = "cluster_0";
+  cluster1->info_->lb_factory_ =
+      Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
+          "envoy.load_balancers.custom_lb");
+
+  InSequence s;
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+      .WillOnce(Return(std::make_pair(cluster1, nullptr)));
+  ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
+  create(parseBootstrapFromV3Json(json));
+
+  EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
+
+  cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_)};
+  cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
+      cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
+  cluster1->initialize_callback_();
+  ON_CALL(load_balancer_context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  EXPECT_CALL(stream_info, setDynamicMetadata("envoy.load_balancers.custom_lb", _));
+  cluster_manager_->getThreadLocalCluster("cluster_0")
+      ->loadBalancer()
+      .chooseHost(&load_balancer_context);
+}
+
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   const std::string yaml = R"EOF(
  static_resources:

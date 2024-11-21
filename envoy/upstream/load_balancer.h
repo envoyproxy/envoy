@@ -57,7 +57,7 @@ public:
    * @return const StreamInfo* the incoming request stream info or nullptr to use during load
    * balancing.
    */
-  virtual const StreamInfo::StreamInfo* requestStreamInfo() const PURE;
+  virtual StreamInfo::StreamInfo* requestStreamInfo() const PURE;
 
   /**
    * @return const Http::HeaderMap* the incoming headers or nullptr to use during load
