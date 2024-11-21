@@ -40,21 +40,19 @@ public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& certificate_provider,
                   Secret::GenericSecretConfigProviderSharedPtr&& private_key_provider,
                   ThreadLocal::SlotAllocator& tls, Api::Api& api)
-      : certificate_(
-            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                      std::move(certificate_provider), tls, api),
-                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
-        private_key_(
-            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                      std::move(private_key_provider), tls, api),
-                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)) {}
+      : certificate_(THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                               std::move(certificate_provider), tls, api),
+                                           Secret::ThreadLocalGenericSecretProvider)),
+        private_key_(THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                               std::move(private_key_provider), tls, api),
+                                           Secret::ThreadLocalGenericSecretProvider)) {}
   // SecretReader
-  const std::string& certificate() const override { return certificate_->secret(); }
-  const std::string& privateKey() const override { return private_key_->secret(); }
+  const std::string& certificate() const override { return certificate_.secret(); }
+  const std::string& privateKey() const override { return private_key_.secret(); }
 
 private:
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> certificate_;
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> private_key_;
+  Secret::ThreadLocalGenericSecretProvider certificate_;
+  Secret::ThreadLocalGenericSecretProvider private_key_;
 };
 
 class FilterConfig : public Logger::Loggable<Logger::Id::filter> {

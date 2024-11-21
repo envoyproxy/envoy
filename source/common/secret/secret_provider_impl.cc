@@ -37,15 +37,15 @@ GenericSecretConfigProviderImpl::GenericSecretConfigProviderImpl(
           std::make_unique<envoy::extensions::transport_sockets::tls::v3::GenericSecret>(
               generic_secret)) {}
 
-absl::StatusOr<std::unique_ptr<ThreadLocalGenericSecretProvider>>
+absl::StatusOr<ThreadLocalGenericSecretProvider>
 ThreadLocalGenericSecretProvider::create(GenericSecretConfigProviderSharedPtr&& provider,
                                          ThreadLocal::SlotAllocator& tls, Api::Api& api) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<ThreadLocalGenericSecretProvider>(
-      new ThreadLocalGenericSecretProvider(std::move(provider), tls, api, creation_status));
+  ThreadLocalGenericSecretProvider ret(std::move(provider), tls, api, creation_status);
   RETURN_IF_NOT_OK(creation_status);
-  return ret;
+  return std::move(ret);
 }
+
 ThreadLocalGenericSecretProvider::ThreadLocalGenericSecretProvider(
     GenericSecretConfigProviderSharedPtr&& provider, ThreadLocal::SlotAllocator& tls, Api::Api& api,
     absl::Status& creation_status)

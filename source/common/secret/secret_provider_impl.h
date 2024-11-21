@@ -120,7 +120,7 @@ private:
  **/
 class ThreadLocalGenericSecretProvider {
 public:
-  static absl::StatusOr<std::unique_ptr<ThreadLocalGenericSecretProvider>>
+  static absl::StatusOr<ThreadLocalGenericSecretProvider>
   create(GenericSecretConfigProviderSharedPtr&& provider, ThreadLocal::SlotAllocator& tls,
          Api::Api& api);
   const std::string& secret() const;
