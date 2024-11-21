@@ -1668,6 +1668,51 @@ TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
   ASSERT_TRUE(response->complete());
 }
 
+TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeadersWithLocalReplyDuringData) {
+  std::string local_reply_during_decode_config = R"EOF(
+  name: local-reply-during-decode
+  )EOF";
+  std::string add_response_metadata_config = R"EOF(
+  name: response-metadata-filter
+  )EOF";
+  config_helper_.prependFilter(local_reply_during_decode_config);
+  config_helper_.prependFilter(add_response_metadata_config);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.set_proxy_100_continue(true);
+        hcm.mutable_http2_protocol_options()->set_allow_metadata(true);
+        hcm.mutable_http3_protocol_options()->set_allow_metadata(true);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"expect", "100-contINUE"},
+                                     {"local-reply-during-data", "true"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Wait for the request headers to be received upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  response->waitFor1xxHeaders();
+  codec_client_->sendData(*request_encoder_, 10, false);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  ASSERT(response->informationalHeaders() != nullptr);
+  EXPECT_EQ(response->headers().getStatusValue(), "500");
+  std::set<std::string> expected_metadata_keys = {"local-reply", "duplicate", "headers",
+                                                  "100-continue"};
+  verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
+}
+
 class MultiplexedRingHashIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   MultiplexedRingHashIntegrationTest();

@@ -28,9 +28,9 @@ PlatformBridgeCertValidator::PlatformBridgeCertValidator(
             "Invalid certificate validation context config.");
   if (config != nullptr && config->customValidatorConfig().has_value()) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator cfg;
-    Envoy::Config::Utility::translateOpaqueConfig(
+    THROW_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
         config->customValidatorConfig().value().typed_config(),
-        ProtobufMessage::getStrictValidationVisitor(), cfg);
+        ProtobufMessage::getStrictValidationVisitor(), cfg));
     if (cfg.has_thread_priority()) {
       thread_priority_ = cfg.thread_priority().value();
     }

@@ -306,6 +306,9 @@ message ExtAuthz {
   //
   // If this is false the filter will not emit stats, but filter_metadata will still be respected if
   // it has a value.
+  //
+  // Field ``latency_us`` is exposed for CEL and logging when using gRPC or HTTP service.
+  // Fields ``bytesSent`` and ``bytesReceived`` are exposed for CEL and logging only when using gRPC service.
   bool emit_filter_state_stats = 29;
 }
 

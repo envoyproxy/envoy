@@ -249,9 +249,9 @@ absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSour
   return async_client_manager.factoryForGrpcService(grpc_service, scope, skip_cluster_check);
 }
 
-void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    ProtobufMessage::ValidationVisitor& validation_visitor,
-                                    Protobuf::Message& out_proto) {
+absl::Status Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+                                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                                            Protobuf::Message& out_proto) {
   static const std::string struct_type(ProtobufWkt::Struct::default_instance().GetTypeName());
   static const std::string typed_struct_type(
       xds::type::v3::TypedStruct::default_instance().GetTypeName());
@@ -264,7 +264,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
 
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetTypeName() == struct_type) {
         out_proto.CheckTypeAndMergeFrom(typed_struct.value());
@@ -279,7 +279,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetTypeName() == struct_type) {
         out_proto.CheckTypeAndMergeFrom(typed_struct.value());
@@ -295,17 +295,18 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } // out_proto is expecting Struct, unpack directly
     else if (type != struct_type || out_proto.GetTypeName() == struct_type) {
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, out_proto));
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, out_proto));
     } else {
 #ifdef ENVOY_ENABLE_YAML
       ProtobufWkt::Struct struct_config;
-      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, struct_config));
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, struct_config));
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
 #else
       IS_ENVOY_BUG("Attempting to use JSON structs with JSON compiled out");
 #endif
     }
   }
+  return absl::OkStatus();
 }
 
 absl::StatusOr<JitteredExponentialBackOffStrategyPtr>
