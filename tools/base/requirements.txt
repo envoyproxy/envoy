@@ -80,9 +80,9 @@ aio-run-runner==0.3.4 \
     #   envoy-github-abstract
     #   envoy-github-release
     #   envoy-gpg-sign
-aiodocker==0.23.0 \
-    --hash=sha256:45ede291063c7d1c24e78a766013c25e85b354a3bdcca68fe2bca64348e4dee2 \
-    --hash=sha256:8c7ff2fc9e557898ae77bc9c1af8916f269285f230aedf1abbb81436054baed4
+aiodocker==0.24.0 \
+    --hash=sha256:2199b7b01f8ce68f9cabab7910ecb26192f6f3494163f1ccffe527b4c3875689 \
+    --hash=sha256:661a6f9a479951f11f793031dcd5d55337e232c4ceaee69d51ceb885e5f16fac
     # via
     #   -r requirements.in
     #   envoy-distribution-verify
@@ -1819,7 +1819,7 @@ zstandard==0.23.0 \
     # via envoy-base-utils
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==75.5.0 \
-    --hash=sha256:5c4ccb41111392671f02bb5f8436dfc5a9a7185e80500531b133f5775c4163ef \
-    --hash=sha256:87cb777c3b96d638ca02031192d40390e0ad97737e27b6b4fa831bea86f2f829
+setuptools==75.6.0 \
+    --hash=sha256:8199222558df7c86216af4f84c30e9b34a61d8ba19366cc914424cdbd28252f6 \
+    --hash=sha256:ce74b49e8f7110f9bf04883b730f4765b774ef3ef28f722cce7c273d253aaf7d
     # via -r requirements.in

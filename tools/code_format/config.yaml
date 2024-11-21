@@ -143,7 +143,6 @@ paths:
     - source/common/router/router.cc
     - source/common/config/config_provider_impl.h
     - source/common/common/logger_delegates.cc
-    - source/common/upstream/outlier_detection_impl.h
     - source/common/grpc/async_client_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc

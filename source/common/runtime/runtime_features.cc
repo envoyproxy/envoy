@@ -88,6 +88,7 @@ RUNTIME_GUARD(envoy_reloadable_features_sanitize_http2_headers_without_nghttp2);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_sni_in_access_log);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_te);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
+RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
 RUNTIME_GUARD(envoy_reloadable_features_strict_duration_validation);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_tunneling_send_downstream_fin_on_upstream_trailers);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
@@ -114,8 +115,6 @@ RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
-// TODO(paul-r-gall) Make this enabled by default after additional soak time.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
 // TODO(birenroy) flip after the security issue is addressed.
