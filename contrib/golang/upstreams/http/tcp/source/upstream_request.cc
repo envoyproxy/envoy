@@ -225,7 +225,7 @@ void TcpUpstream::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bo
     
   state->handleDataGolangStatus(static_cast<TcpUpstreamStatus>(go_status), end_stream);
 
-  if (state->filterState() == FilterState::Done) {
+  if (state->filterState() == FilterState::Done || state->filterState() == FilterState::WaitingData) {
     state->doDataList.moveOut(data);
     upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
   }
@@ -266,22 +266,22 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   state->setFilterState(FilterState::Done);
 
   switch (static_cast<TcpUpstreamStatus>(go_status)) {
-  case TcpUpstreamStatus::TcpUpstreamContinue:
+  case TcpUpstreamStatus::TcpUpstreamSendData:
     end_stream = true;
-    if (!resp_headers_->Status()) {
-      // if go side not set status, c++ side set default status
-      resp_headers_->setStatus(static_cast<uint64_t>(HttpStatusCode::Success));
-    }
 
-    upstream_request_->decodeHeaders(std::move(resp_headers_), false);
-    upstream_request_->decodeData(data, end_stream);
+    sendDataToDownstream(data, end_stream);
     break;
 
   case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
-    // if onUpstreamData is called multiple times, data is gradually appended by default.
+    if (end_stream) {
+      // if conn is close by upstream, directly send data to downstream.
+      sendDataToDownstream(data, end_stream);
+    }
+    // if onUpstreamData is called multiple times, data is gradually appended by default, so here do nothing.
     break;
 
-  case TcpUpstreamStatus::TcpUpstreamStopNoBuffer:
+  case TcpUpstreamStatus::TcpUpstreamContinue:
+    sendDataToDownstream(data, end_stream);
     data.drain(data.length());
     break;
 
@@ -290,6 +290,18 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     PANIC("unreachable");
     break;
   }
+}
+
+void TcpUpstream::sendDataToDownstream(Buffer::Instance& data, bool end_stream) {
+  if (!already_send_resp_headers_) {
+    if (!resp_headers_->Status()) {
+      // if go side not set status, c++ side set default status
+      resp_headers_->setStatus(static_cast<uint64_t>(HttpStatusCode::Success));
+    }
+    upstream_request_->decodeHeaders(std::move(resp_headers_), false);
+    already_send_resp_headers_ = true;
+  }
+  upstream_request_->decodeData(data, end_stream);
 }
 
 void TcpUpstream::onEvent(Network::ConnectionEvent event) {

@@ -124,10 +124,6 @@ void ProcessorState::handleDataGolangStatus(const TcpUpstreamStatus status, bool
   ASSERT(filterState() == FilterState::ProcessingData);
 
   switch (status) {
-    case TcpUpstreamStatus::TcpUpstreamContinue:
-      setFilterState(FilterState::Done);
-      break;
-
     case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
       if (end_stream) {
         ENVOY_LOG(error, "tcp upstream handleDataGolangStatus unexpected go_tatus when end_stream is true: {}", int(status));
@@ -137,10 +133,9 @@ void ProcessorState::handleDataGolangStatus(const TcpUpstreamStatus status, bool
       setFilterState(FilterState::WaitingAllData);
       break;
 
-    case TcpUpstreamStatus::TcpUpstreamStopNoBuffer:
+    case TcpUpstreamStatus::TcpUpstreamContinue:
       if (end_stream) {
-        ENVOY_LOG(error, "tcp upstream handleDataGolangStatus unexpected go_tatus when end_stream is true: {}", int(status));
-        PANIC("unreachable");
+        setFilterState(FilterState::Done);
         break;
       }
       drainBufferData();

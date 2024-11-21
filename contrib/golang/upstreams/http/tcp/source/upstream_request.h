@@ -169,6 +169,7 @@ public:
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
   void encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream);
+  void sendDataToDownstream(Buffer::Instance& data, bool end_stream);
 
   CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
   CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
@@ -200,6 +201,8 @@ private:
   FilterConfigSharedPtr config_;
 
   bool upstream_conn_self_half_close_{false};
+
+  bool already_send_resp_headers_{false};
 };
 
 

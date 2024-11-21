@@ -71,7 +71,7 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, buffer
 	f.dubboMethod = dubboMethod
 	f.dubboInterface = dubboInterface
 
-	return api.TcpUpstreamStopAndBuffer
+	return api.TcpUpstreamContinue
 }
 
 /*
@@ -150,13 +150,13 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 		api.LogErrorf("[OnUpstreamData] Protocol Magic error, %s", buffer.Bytes())
 		responseHeaderForSet.Set(":status", "500")
 		buffer.SetString(DUBBO_PROTOCOL_UPSTREAM_MAGIN_ERROR)
-		return api.TcpUpstreamContinue
+		return api.TcpUpstreamSendData
 	}
 	if buffer.Len() < hessian.HEADER_LENGTH {
 		api.LogErrorf("[OnUpstreamData] Protocol Header length error")
 		responseHeaderForSet.Set(":status", "500")
 		buffer.SetString(DUBBO_PROTOCOL_HEADER_LENGTH_ERROR)
-		return api.TcpUpstreamContinue
+		return api.TcpUpstreamSendData
 	}
 	bodyLength := binary.BigEndian.Uint32(buffer.Bytes()[DUBBO_LENGTH_OFFSET:])
 
@@ -185,7 +185,7 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 		responseHeaderForSet.Set("lable-for-special-cluster", f.config.clusterNameForSpecialLabel)
 	}
 
-	return api.TcpUpstreamContinue
+	return api.TcpUpstreamSendData
 }
 
 /*
