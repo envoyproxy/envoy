@@ -68,9 +68,16 @@ minor_behavior_changes:
   change: |
     The :ref:`route_configuration <envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>` field
     is supported when the ``ScopedRouteConfiguration`` resource is delivered via SRDS.
+- area: http
+  change: |
+    Local replies now traverse the filter chain if 1xx headers have been sent to the client. This change can be reverted
+    by setting the runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: lrs
+  change: |
+    Fixes errors stat being incremented and warning log spamming for LoadStatsReporting graceful stream close.
 - area: tls
   change: |
     Support operations on IP SANs when the IP version is not supported by the host operating system, for example
@@ -96,6 +103,9 @@ bug_fixes:
     Reverted :ref:`custom header
     <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension to its
     original behavior by disabling automatic XFF header appending that was inadvertently introduced in PR #31831.
+- area: tracers
+  change: |
+    Avoid possible overflow when setting span attributes in Dynatrace sampler.
 - area: load_balancing
   change: |
     Fixed default host weight calculation of :ref:`client_side_weighted_round_robin
@@ -175,6 +185,9 @@ new_features:
     :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` access log
     formatter operator. The following time points were added: ``%US_CX_BEG%``,
     ``%US_CX_END%``, ``%US_HS_END%``.
+- area: access log
+  change: |
+    Added fields for :ref:`DOWNSTREAM_DIRECT_LOCAL_ADDRESS and DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT <config_access_log_format>`.
 - area: quic
   change: |
     Added :ref:`QUIC stats debug visitor <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>` to
@@ -196,6 +209,10 @@ new_features:
 - area: lua cluster specifier
   change: |
     Added ability for a Lua script to query clusters for current requests and connections.
+- area: lua
+  change: |
+    Added :ref:`downstreamDirectLocalAddress() <config_http_filters_lua_stream_info_downstream_direct_local_address>`
+    method to the Stream info object API.
 - area: udp_proxy
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
@@ -238,6 +255,10 @@ new_features:
 - area: ext_authz
   change: |
     added filter state field latency_us, bytesSent and bytesReceived access for CEL and logging.
+- area: sni_dynamic_forward_proxy
+  change: |
+    Added support in SNI dynamic forward proxy for saving the resolved upstream address in the filter state.
+    The state is saved with the key ``envoy.stream.upstream_address``.
 
 deprecated:
 - area: rbac

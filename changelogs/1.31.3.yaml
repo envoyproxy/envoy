@@ -1,0 +1,6 @@
+date: October 29, 2024
+
+bug_fixes:
+- area: tracing
+  change: |
+    Fixed a bug where the OpenTelemetry tracer exports the OTLP request even when no spans are present.

@@ -81,8 +81,9 @@ class ScopedExecutionContext : NonCopyable {
 public:
   ScopedExecutionContext() : ScopedExecutionContext(nullptr) {}
   ScopedExecutionContext(const ScopeTrackedObject* object)
-      : context_(object != nullptr ? ExecutionContext::fromStreamInfo(object->trackedStream())
-                                   : nullptr) {
+      : context_((object != nullptr && ExecutionContext::isEnabled())
+                     ? ExecutionContext::fromStreamInfo(object->trackedStream())
+                     : nullptr) {
     if (context_ != nullptr) {
       context_->activate();
     }

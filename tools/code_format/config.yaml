@@ -136,16 +136,15 @@ paths:
     - source/server/hot_restarting_base.cc
     - source/server/hot_restart_impl.cc
     - source/common/upstream/health_discovery_service.cc
+    - source/common/upstream/prod_cluster_info_factory.cc
     - source/common/secret/sds_api.h
     - source/common/secret/sds_api.cc
     - source/common/secret/secret_provider_impl.cc
     - source/common/router/router.cc
     - source/common/config/config_provider_impl.h
     - source/common/common/logger_delegates.cc
-    - source/common/upstream/health_checker_event_logger.h
     - source/common/upstream/outlier_detection_impl.h
     - source/common/grpc/async_client_impl.cc
-    - source/common/ssl/certificate_validation_context_config_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
     - source/common/config/watched_directory.cc
