@@ -50,6 +50,7 @@ const static bool should_log = true;
   FUNCTION(decompression)                                                                          \
   FUNCTION(dns)                                                                                    \
   FUNCTION(dubbo)                                                                                  \
+  FUNCTION(dynamic_modules)                                                                        \
   FUNCTION(envoy_bug)                                                                              \
   FUNCTION(ext_authz)                                                                              \
   FUNCTION(ext_proc)                                                                               \
