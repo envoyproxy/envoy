@@ -280,17 +280,24 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const
   return absl::nullopt;
 }
 
+template <typename T> T getUnsignedIntFromHeader(const cmsghdr& cmsg) {
+  static_assert(std::is_unsigned_v<T>, "return type must be unsigned integral");
+  T value;
+  memcpy(&value, CMSG_DATA(&cmsg), sizeof(value));
+  return value;
+}
+
 template <typename T> absl::optional<T> maybeGetUnsignedIntFromHeader(const cmsghdr& cmsg) {
   static_assert(std::is_unsigned_v<T>, "return type must be unsigned integral");
   switch (cmsg.cmsg_len) {
   case CMSG_LEN(sizeof(uint8_t)):
-    return static_cast<T>(*reinterpret_cast<const uint8_t*>(CMSG_DATA(&cmsg)));
+    return static_cast<T>(getUnsignedIntFromHeader<uint8_t>(cmsg));
   case CMSG_LEN(sizeof(uint16_t)):
-    return static_cast<T>(*reinterpret_cast<const uint16_t*>(CMSG_DATA(&cmsg)));
+    return static_cast<T>(getUnsignedIntFromHeader<uint16_t>(cmsg));
   case CMSG_LEN(sizeof(uint32_t)):
-    return static_cast<T>(*reinterpret_cast<const uint32_t*>(CMSG_DATA(&cmsg)));
+    return static_cast<T>(getUnsignedIntFromHeader<uint32_t>(cmsg));
   case CMSG_LEN(sizeof(uint64_t)):
-    return static_cast<T>(*reinterpret_cast<const uint64_t*>(CMSG_DATA(&cmsg)));
+    return static_cast<T>(getUnsignedIntFromHeader<uint64_t>(cmsg));
   default:;
   }
   IS_ENVOY_BUG(
