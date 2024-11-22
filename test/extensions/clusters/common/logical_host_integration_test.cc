@@ -91,6 +91,7 @@ TEST_P(LogicalHostIntegrationTest, LogicalDNSRaceCrashTest) {
     envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
     // Make the refresh rate fast to hit the R/W race.
     dns_cluster.mutable_dns_refresh_rate()->set_nanos(1000001);
+    dns_cluster.set_logical(true);
     cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(dns_cluster);
   });
   config_helper_.addConfigModifier(

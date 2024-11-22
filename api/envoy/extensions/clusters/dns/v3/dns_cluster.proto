@@ -23,11 +23,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 10]
 message DnsCluster {
-  enum DnsDiscoveryType {
-    LOGICAL = 0;
-    STRICT = 1;
-  }
-
   message RefreshRate {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
@@ -68,11 +63,19 @@ message DnsCluster {
   // For example, an object of
   // :ref:`CaresDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
   // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
-  // :ref:`Cluster.dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`
-  // configuration which replaces :ref:`Cluster.dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`.
-  // During the transition period when ``DnsCluster.typed_dns_resolver_config``, ``Cluster.dns_resolver_config``, and
-  // ``Cluster.typed_dns_resolver_config`` exists, Envoy will prefer, ``DnsCluster.typed_dns_resolver_config`` over
-  // ``Cluster.typed_dns_resolver_config`` over ``cluster.dns_resolver_config``.
+  // :ref:`Cluster.typed_dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`
+  // configuration which replaces :ref:`Cluster.dns_resolution_config<envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`.
+  // During the transition period when
+  // :ref:`DnsCluster.typed_dns_resolver_config<envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.typed_dns_resolver_config>`,
+  // :ref:`Cluster.typed_dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`,
+  // and :ref:`Cluster.dns_resolution_config<envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
+  // exist, Envoy will use
+  // :ref:`DnsCluster.typed_dns_resolver_config<envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.typed_dns_resolver_config>`
+  // and ignore
+  // DNS resolver-related fields in :ref:`Cluster<envoy_v3_api_msg_config.cluster.v3.Cluster>` if the cluster is configured via the
+  // :ref:`Cluster.cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` extension point with the
+  // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>` extension type.
+  // Otherwise, see  :ref:`Cluster.typed_dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`.
   // [#extension-category: envoy.network.dns_resolver]
   config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 7;
 
@@ -81,7 +84,6 @@ message DnsCluster {
   // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.AUTO>`.
   common.dns.v3.DnsLookupFamily dns_lookup_family = 8;
 
-  // Required. Whether to do logical or strict dns resolution.
-  // This field is only considered when the ``name`` field of the ``TypedConfig`` is ``envoy.cluster.dns``.
-  DnsDiscoveryType dns_discovery_type = 9;
+  // If true, perform logical DNS resolution. Otherwise, perform strict DNS resolution.
+  bool logical = 9;
 }

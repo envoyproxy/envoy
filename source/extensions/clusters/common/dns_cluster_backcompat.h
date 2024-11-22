@@ -9,6 +9,7 @@ namespace Upstream {
 /**
  * create a DnsCluster from the legacy Cluster options so that we only have to worry about one API.
  * NOTE: this does not consider the `typed_dns_resolver_config` field.
+ * because choosing the dns resolver is done by the factory.
  */
 void createDnsClusterFromLegacyFields(
     const envoy::config::cluster::v3::Cluster& cluster,

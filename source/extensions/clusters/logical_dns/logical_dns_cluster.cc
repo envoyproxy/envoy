@@ -213,39 +213,17 @@ void LogicalDnsCluster::startResolve() {
       });
 }
 
-absl::StatusOr<Network::DnsResolverSharedPtr> LogicalDnsClusterFactory::selectDnsResolver(
-    const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
-    ClusterFactoryContext& context) {
-  if (proto_config.has_typed_dns_resolver_config()) {
-    Network::DnsResolverFactory& dns_resolver_factory =
-        Network::createDnsResolverFactoryFromTypedConfig(proto_config.typed_dns_resolver_config());
-    auto& server_context = context.serverFactoryContext();
-    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
-                                                  server_context.api(),
-                                                  proto_config.typed_dns_resolver_config());
-  }
-  return ClusterFactoryImplBase::selectDnsResolver(cluster, context);
-}
-
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-LogicalDnsClusterFactory::createClusterWithConfig(
-    const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
-    ClusterFactoryContext& context) {
-  auto dns_resolver_or_error = selectDnsResolver(cluster, proto_config, context);
-  THROW_IF_NOT_OK(dns_resolver_or_error.status());
+LogicalDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                                            ClusterFactoryContext& context) {
+  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
+  THROW_IF_NOT_OK_REF(dns_resolver_or_error.status());
 
   absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> cluster_or_error;
-  if (cluster.has_cluster_type()) {
-    cluster_or_error = LogicalDnsCluster::create(cluster, proto_config, context,
-                                                 std::move(*dns_resolver_or_error));
-  } else {
-    envoy::extensions::clusters::dns::v3::DnsCluster proto_config_legacy{};
-    createDnsClusterFromLegacyFields(cluster, proto_config_legacy);
-    cluster_or_error = LogicalDnsCluster::create(cluster, proto_config_legacy, context,
-                                                 std::move(*dns_resolver_or_error));
-  }
+  envoy::extensions::clusters::dns::v3::DnsCluster proto_config_legacy{};
+  createDnsClusterFromLegacyFields(cluster, proto_config_legacy);
+  cluster_or_error = LogicalDnsCluster::create(cluster, proto_config_legacy, context,
+                                               std::move(*dns_resolver_or_error));
 
   RETURN_IF_NOT_OK(cluster_or_error.status());
   return std::make_pair(std::shared_ptr<LogicalDnsCluster>(std::move(*cluster_or_error)), nullptr);

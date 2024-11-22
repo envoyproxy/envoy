@@ -93,22 +93,15 @@ private:
   const envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
 };
 
-class LogicalDnsClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                                     envoy::extensions::clusters::dns::v3::DnsCluster> {
+class LogicalDnsClusterFactory : public Upstream::ClusterFactoryImplBase {
 public:
-  LogicalDnsClusterFactory() : ConfigurableClusterFactoryBase("envoy.cluster.logical_dns") {}
-
-  absl::StatusOr<Network::DnsResolverSharedPtr>
-  selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
-                    const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
-                    ClusterFactoryContext& context);
+  LogicalDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.logical_dns") {}
 
 private:
   friend class LogicalDnsClusterTest;
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
-                          const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
-                          Upstream::ClusterFactoryContext& context) override;
+  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                    Upstream::ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(LogicalDnsClusterFactory);

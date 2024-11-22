@@ -19,6 +19,7 @@ behavior_changes:
     This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.explicit_internal_address_config`` to ``false``.
 
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: access_log
@@ -72,7 +73,15 @@ minor_behavior_changes:
   change: |
     Local replies now traverse the filter chain if 1xx headers have been sent to the client. This change can be reverted
     by setting the runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` to false.
-
+- area: cluster
+  change: |
+      Clusters can no longer use unregistered extension types in
+      :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`.
+- area: cluster
+  change: |
+      Clusters factories are registered by configurtion type for
+      :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
+      and will use configuration type to lookup the corresponding factory when available.
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: lrs
@@ -260,11 +269,9 @@ deprecated:
   change: |
     metadata :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
     favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.
-- area: dns
+- area: cluster
   change: |
     `DNS-related fields in :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster> are deprecated when using
     strict and logical dns clusters. Instead, use the :ref:`cluster_type <envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type`
-    extension point with
-    with :ref:`name=envoy.cluster.dns<envoy_v3_api_field_config.cluster.v3.Cluster.CustomClusterType.name>`
-    and :ref:`typed_config<envoy_v3_api_field_config.cluster.v3.Cluster.CustomClusterType.typed_config>` of type
-    :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
+    extension point with :ref:`typed_config<envoy_v3_api_field_config.cluster.v3.Cluster.CustomClusterType.typed_config>` of type
+    :ref:`DnsCluster <envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
