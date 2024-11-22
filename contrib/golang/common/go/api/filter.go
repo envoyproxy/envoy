@@ -352,6 +352,7 @@ type TcpUpstreamFilter interface {
 	// Streaming, Invoked when data is delivered from the downstream.
 	EncodeData(buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
 	// Streaming, Called when data is read on from tcp upstream.
+	// (Be careful: when return TcpUpstreamContinue, resp headers will be send to http, from then on, further resp headers will not be send)
 	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
 	// destroy filter
 	OnDestroy(DestroyReason)

@@ -96,16 +96,16 @@ void ProcessorState::handleHeaderGolangStatus(TcpUpstreamStatus status) {
   ASSERT(filterState() == FilterState::ProcessingHeader);
 
   switch (status) {
-  case TcpUpstreamStatus::TcpUpstreamSendData:
-    setFilterState(FilterState::Done);
-    break;
-
   case TcpUpstreamStatus::TcpUpstreamContinue:
     setFilterState(FilterState::WaitingData);
     break;
   
   case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
     setFilterState(FilterState::WaitingAllData);
+    break;
+
+  case TcpUpstreamStatus::TcpUpstreamSendData:
+    setFilterState(FilterState::Done);
     break;
 
   default:
@@ -117,13 +117,23 @@ void ProcessorState::handleHeaderGolangStatus(TcpUpstreamStatus status) {
   ENVOY_LOG(debug, "tcp upstream handleHeaderGolangStatus after handle header status, state: {}, status: {}", stateStr(), int(status));
 };
 
-void ProcessorState::handleDataGolangStatus(const TcpUpstreamStatus status, bool end_stream) {
+void ProcessorState::handleDataGolangStatus(const TcpUpstreamStatus status, Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "tcp upstream handleDataGolangStatus handle data status, state: {}, status: {}", stateStr(),
             int(status));
 
   ASSERT(filterState() == FilterState::ProcessingData);
 
   switch (status) {
+    case TcpUpstreamStatus::TcpUpstreamContinue:
+      doDataList.moveOut(data);
+      if (end_stream) {
+        setFilterState(FilterState::Done);
+        break;
+      }
+      drainBufferData();
+      setFilterState(FilterState::WaitingData);
+      break;
+
     case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
       if (end_stream) {
         ENVOY_LOG(error, "tcp upstream handleDataGolangStatus unexpected go_tatus when end_stream is true: {}", int(status));
@@ -131,16 +141,6 @@ void ProcessorState::handleDataGolangStatus(const TcpUpstreamStatus status, bool
         break;
       }
       setFilterState(FilterState::WaitingAllData);
-      break;
-
-    case TcpUpstreamStatus::TcpUpstreamContinue:
-      if (end_stream) {
-        setFilterState(FilterState::Done);
-        break;
-      }
-      drainBufferData();
-      doDataList.clearAll();
-      setFilterState(FilterState::WaitingData);
       break;
 
     default:

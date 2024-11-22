@@ -168,6 +168,7 @@ public:
   void onBelowWriteBufferLowWatermark() override;
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
+  void trySendProxyData(bool send_data_to_upstream, bool end_stream);
   void encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream);
   void sendDataToDownstream(Buffer::Instance& data, bool end_stream);
 

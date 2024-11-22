@@ -493,45 +493,36 @@ const (
 	/**
 	* Area of status: encodeHeaders, encodeData, onUpstreamData
 	*
-	* Used when you want to leave the current func area and continue further func.(when streaming, go side only th current data, not get the rest data of streaming)
+	* Used when you want to leave the current func area and continue further func. (when streaming, go side get each_data_piece, may be called multipled times)
 	*
 	* Here is the specific explanation in different funcs:
-	* encodeHeaders: will go to encodeData.
-	* encodeData: send data to upstream.
-	* onUpstreamData: pass data and headers to downstream.
+	* encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
+	* encodeData: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
+	* onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
 	 */
 	TcpUpstreamContinue TcpUpstreamStatus = 0
 
 	/**
-	* Area of status: encodeHeaders, encodeData, onUpstreamData
-	*
-	* Used when you want to buffer data.
-	*
-	* Here is the specific explanation in different funcs:
-	* encodeHeaders: will go to encodeData and will buffer whole data(when streaming, only last time will call go side encodeData which means end_stream=true).
-	* encodeData: buffer whole data, only last_data_piece will call go side which means end_stream=true.
-	* onUpstreamData: buffer whole data, each_data_piece will call go side.
+	 * Area of status: encodeHeaders, encodeData, onUpstreamData
+	 *
+	 * Used when you want to buffer data.
+	 *
+	 * Here is the specific explanation in different funcs:
+	 * encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
+	 * encodeData: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot bed used when end_stream=true)
+	 * onUpstreamData: every data trigger will call go side, and go side get buffer data from start.
 	 */
 	TcpUpstreamStopAndBuffer TcpUpstreamStatus = 1
 
-	/** Area of status: encodeData, onUpstreamData
-	*
-	* Used when you do not want to buffer data.
-	*
-	* Here is the specific explanation in different funcs:
-	* encodeData: not buffer data, each_data_piece will call go side.
-	* onUpstreamData: not buffer data, each_data_piece will call go side.
+	/** Area of status: encodeHeaders, onUpstreamData
+	 *
+	 * Used when you do not want to send data to upstream in encodeHeaders, or send data to downstream in onUpstreamData.
+	 *
+	 * Here is the specific explanation in different funcs:
+	 * encodeHeaders: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
+	 * onUpstreamData: pass data and headers to downstream which means the whole resp to http is finished.
 	 */
-	TcpUpstreamStopNoBuffer TcpUpstreamStatus = 2
-
-	/** Area of status: encodeHeaders
-	*
-	* Used when you do not want to send data to upstream in encodeHeaders.
-	*
-	* Here is the specific explanation in different funcs:
-	* encodeHeaders: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
-	 */
-	TcpUpstreamSendData TcpUpstreamStatus = 3
+	TcpUpstreamSendData TcpUpstreamStatus = 2
 )
 
 func (s TcpUpstreamStatus) String() string {
@@ -540,8 +531,6 @@ func (s TcpUpstreamStatus) String() string {
 		return "TcpUpstreamContinue"
 	case TcpUpstreamStopAndBuffer:
 		return "TcpUpstreamStopAndBuffer"
-	case TcpUpstreamStopNoBuffer:
-		return "TcpUpstreamStopNoBuffer"
 	case TcpUpstreamSendData:
 		return "TcpUpstreamSendData"
 	}

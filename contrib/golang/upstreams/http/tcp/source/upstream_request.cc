@@ -151,25 +151,11 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
 
   state->handleHeaderGolangStatus(static_cast<TcpUpstreamStatus>(go_status));
 
-  bool send_data = (state->filterState() == FilterState::Done);
-  // Headers should only happen once, so use this opportunity to add the proxy header, if configured.
-  ASSERT(route_entry_ != nullptr);
-  if (route_entry_->connectConfig().has_value()) {
-    Buffer::OwnedImpl data;
-    const auto& connect_config = route_entry_->connectConfig();
-    if (connect_config->has_proxy_protocol_config() &&
-        upstream_request_->connection().has_value()) {
-      Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
-          connect_config->proxy_protocol_config(), *upstream_request_->connection(), data);
-    }
+  bool send_data_to_upstream = (state->filterState() == FilterState::Done);
 
-    if (data.length() != 0 || end_stream) {
-      bool self_half_close_connection = end_stream && !send_data ? upstream_conn_self_half_close_ : false;
-      upstream_conn_data_->connection().write(data, self_half_close_connection);
-    }
-  }
+  trySendProxyData(send_data_to_upstream, end_stream);
 
-  if (send_data) {
+  if (send_data_to_upstream) {
     // when go side decide to send data to upstream in encodeHeaders, here will directly send and encodeData will not send.
     state->doDataList.moveOut(buf);
     upstream_conn_data_->connection().write(buf, upstream_conn_self_half_close_);
@@ -213,24 +199,6 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void TcpUpstream::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "tcp upstream encodeDataGo, passing data to golang, state: {}, end_stream: {}", state->stateStr(), end_stream);
-
-  state->processData();
-
-  Buffer::Instance& buffer = state->doDataList.push(data);
-  auto s = dynamic_cast<processState*>(state);
-  GoUint64 go_status = dynamic_lib_->envoyGoEncodeData(
-    s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
-    
-  state->handleDataGolangStatus(static_cast<TcpUpstreamStatus>(go_status), end_stream);
-
-  if (state->filterState() == FilterState::Done || state->filterState() == FilterState::WaitingData) {
-    state->doDataList.moveOut(data);
-    upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
-  }
-}
-
 // TODO(duxin40): use golang to convert trailers to data buffer.
 void TcpUpstream::encodeTrailers(const Envoy::Http::RequestTrailerMap&) {
   Buffer::OwnedImpl data;
@@ -266,10 +234,9 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   state->setFilterState(FilterState::Done);
 
   switch (static_cast<TcpUpstreamStatus>(go_status)) {
-  case TcpUpstreamStatus::TcpUpstreamSendData:
-    end_stream = true;
-
+  case TcpUpstreamStatus::TcpUpstreamContinue:
     sendDataToDownstream(data, end_stream);
+    data.drain(data.length());
     break;
 
   case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
@@ -280,9 +247,9 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     // if onUpstreamData is called multiple times, data is gradually appended by default, so here do nothing.
     break;
 
-  case TcpUpstreamStatus::TcpUpstreamContinue:
+  case TcpUpstreamStatus::TcpUpstreamSendData:
+    end_stream = true;
     sendDataToDownstream(data, end_stream);
-    data.drain(data.length());
     break;
 
   default:
@@ -292,8 +259,45 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
+void TcpUpstream::trySendProxyData(bool send_data_to_upstream, bool end_stream) {
+    // Headers should only happen once, so use this opportunity to add the proxy header, if configured.
+  ASSERT(route_entry_ != nullptr);
+  if (route_entry_->connectConfig().has_value()) {
+    Buffer::OwnedImpl data;
+    const auto& connect_config = route_entry_->connectConfig();
+    if (connect_config->has_proxy_protocol_config() &&
+        upstream_request_->connection().has_value()) {
+      Extensions::Common::ProxyProtocol::generateProxyProtoHeader(
+          connect_config->proxy_protocol_config(), *upstream_request_->connection(), data);
+    }
+
+    if (data.length() != 0 || end_stream) {
+      bool self_half_close_connection = end_stream && !send_data_to_upstream ? upstream_conn_self_half_close_ : false;
+      upstream_conn_data_->connection().write(data, self_half_close_connection);
+    }
+  }
+}
+
+void TcpUpstream::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream) {
+  ENVOY_LOG(debug, "tcp upstream encodeDataGo, passing data to golang, state: {}, end_stream: {}", state->stateStr(), end_stream);
+
+  state->processData();
+
+  Buffer::Instance& buffer = state->doDataList.push(data);
+  auto s = dynamic_cast<processState*>(state);
+  GoUint64 go_status = dynamic_lib_->envoyGoEncodeData(
+    s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
+    
+  state->handleDataGolangStatus(static_cast<TcpUpstreamStatus>(go_status), data, end_stream);
+
+  if (state->filterState() == FilterState::Done || state->filterState() == FilterState::WaitingData) {
+    upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
+  }
+}
+
 void TcpUpstream::sendDataToDownstream(Buffer::Instance& data, bool end_stream) {
   if (!already_send_resp_headers_) {
+    // we can send resp headers only one time.
     if (!resp_headers_->Status()) {
       // if go side not set status, c++ side set default status
       resp_headers_->setStatus(static_cast<uint64_t>(HttpStatusCode::Success));

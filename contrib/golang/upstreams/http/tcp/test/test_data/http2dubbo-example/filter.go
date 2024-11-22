@@ -71,7 +71,11 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, buffer
 	f.dubboMethod = dubboMethod
 	f.dubboInterface = dubboInterface
 
-	return api.TcpUpstreamContinue
+	// for full-buffer
+	return api.TcpUpstreamStopAndBuffer
+
+	// for streaming
+	// return api.TcpUpstreamContinue
 }
 
 /*
@@ -95,7 +99,10 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 	api.LogInfof("[EncodeData] come, buf: %s, len: %d, endStream: %v", buffer, buffer.Len(), endOfStream)
 	// =========== step 1: get dubboArgs from http body =========== //
 	dubboArgs := make(map[string]string, 0)
-	_ = json.Unmarshal(buffer.Bytes(), &dubboArgs)
+	err := json.Unmarshal(buffer.Bytes(), &dubboArgs)
+	if err != nil {
+		api.LogInfof("[EncodeData] json Unmarshal err: %s", err)
+	}
 
 	// =========== step 2: assign dubboInterface for gray traffic by router =========== //
 	if f.callbacks.GetRouteName() == f.config.routerNameForGrayTraffic {
@@ -111,7 +118,15 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 		f.callbacks.SetSelfHalfCloseForUpstreamConn(true)
 	}
 
+	// for full-buffer from encodeHeaders TcpUpstreamStopAndBuffer
 	return api.TcpUpstreamContinue
+
+	// for streaming from encodeHeaders TcpUpstreamContinue
+	// if endOfStream {
+	// 	return api.TcpUpstreamContinue
+	// } else {
+	// 	return api.TcpUpstreamStopAndBuffer
+	// }
 }
 
 const (
