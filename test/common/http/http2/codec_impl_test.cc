@@ -1216,7 +1216,7 @@ TEST_P(Http2CodecImplTest, DisallowMetadata) {
   }
 
   EXPECT_CALL(request_decoder_, decodeMetadata_(_)).Times(0);
-  request_encoder_->encodeMetadata(metadata_map_vector);
+  EXPECT_ENVOY_BUG(request_encoder_->encodeMetadata(metadata_map_vector), "metadata is disabled");
   driveToCompletion();
 }
 

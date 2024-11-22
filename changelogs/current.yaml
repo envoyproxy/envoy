@@ -80,8 +80,8 @@ minor_behavior_changes:
     by setting the runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` to false.
 - area: http2
   change: |
-    The ``allow_metadata`` field in http2 protocol options will actually prevent metadata from being sent by Envoy.
-    Runtime guarded by ``envoy.reloadable_features.http2_disable_metadata``.
+    The ``allow_metadata`` field in http2 protocol options will actually prevent metadata from being sent by Envoy. It will
+    trigger an ENVOY_BUG if metadata is attempted. Runtime guarded by ``envoy.reloadable_features.http2_disable_metadata``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
