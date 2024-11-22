@@ -39,6 +39,11 @@ Checks: >
   readability-redundant-smartptr-get,
   readability-redundant-string-cstr
 
+Checks: '-modernize-use-using'
+Exclude:
+  # The ABI of dynamic modules is a pure C header, not C++.
+  - './source/extensions/dynamic_modules/abi.h'
+
 CheckOptions:
 - key: cppcoreguidelines-unused-variable.IgnorePattern
   value: "^_$"
