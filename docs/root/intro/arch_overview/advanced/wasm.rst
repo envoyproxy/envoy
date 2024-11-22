@@ -14,11 +14,11 @@ and deploy a Wasm module.
 
 Envoy provides several extension points at which Wasm plugins can be invoked:
 
-* As an :ref:`HTTP filter <envoy.extensions.filters.http.wasm.v3.Wasm>`
-* As a :ref:`network-level (L4) filter <envoy.extensions.filters.network.wasm.v3.Wasm>`
-* As a :ref:`StatsSink <envoy.extensions.stat_sinks.wasm.v3.Wasm>`
-* As an :ref:`AccessLogger <envoy.extensions.access_loggers.wasm.v3.WasmAccessLog>`
-* As a :ref:`background service <envoy.extensions.wasm.v3.WasmService>`
+* As an :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.wasm.v3.Wasm>`
+* As a :ref:`network-level (L4) filter <envoy_v3_api_msg_extensions.filters.network.wasm.v3.Wasm>`
+* As a :ref:`StatsSink <envoy_v3_api_msg_extensions.stat_sinks.wasm.v3.Wasm>`
+* As an :ref:`AccessLogger <envoy_v3_api_msg_extensions.access_loggers.wasm.v3.WasmAccessLog>`
+* As a :ref:`background service <envoy_v3_api_msg_extensions.wasm.v3.WasmService>`
 
 The particular functions that Envoy invokes on a Wasm plugin depend on the extension point at which it is configured.
 
@@ -85,8 +85,8 @@ Envoy offers additional functionality over the Proxy-Wasm ABI via `proxy_call_fo
 Wasm runtime
 ------------
 
-Envoy Wasm can be :ref:`configured <envoy.extensions.wasm.v3.VmConfig.runtime>` to use one of several Wasm runtime
-implementations: ``V8``, ``WAMR``, or ``Wasmtime``, as long as the runtime is included in the Envoy distribution.  There
-is also a special pseudo-Wasm runtime, called the "Null VM", in which Wasm plugin code is compiled to native (non-Wasm)
-code and statically linked directly into the Envoy binary.
+Envoy Wasm can be :ref:`configured <envoy_v3_api_field_extensions.wasm.v3.VmConfig.runtime>` to use one of several Wasm
+runtime implementations: ``V8``, ``WAMR``, or ``Wasmtime``, as long as the runtime is included in the Envoy
+distribution.  There is also a special pseudo-Wasm runtime, called the "Null VM", in which Wasm plugin code is compiled
+to native (non-Wasm) code and statically linked directly into the Envoy binary.
 
