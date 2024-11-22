@@ -10,7 +10,6 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
-namespace {
 /**
  * Read contents of the file.
  * @param path file path.
@@ -48,7 +47,6 @@ absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, boo
 
   return file_content_or_error.value();
 }
-} // namespace
 
 absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& source,
                                  bool allow_empty, Api::Api& api, uint64_t max_size) {
