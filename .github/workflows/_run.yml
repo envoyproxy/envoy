@@ -214,7 +214,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.6
       id: started
       name: Create timestamp
       with:
@@ -222,7 +222,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.6
       name: Context
       id: context
       with:
@@ -243,18 +243,18 @@ jobs:
           | . * {$config, $check}
 
     # Caches
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.6
       name: Setup GCP (cache)
       if: ${{ inputs.gcs-cache-bucket }}
       with:
         key: ${{ secrets.gcs-cache-key }}
     - if: ${{ inputs.cache-build-image }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.5
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.6
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
-    - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.6
       if: ${{ inputs.gcs-cache-bucket }}
       name: >-
         Restore Bazel cache
@@ -264,7 +264,7 @@ jobs:
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch || 'x64' }}
         path: ${{ runner.temp }}/bazel_root
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.6
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -275,7 +275,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.6
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -292,7 +292,7 @@ jobs:
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.6
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -301,7 +301,7 @@ jobs:
         ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
 
     - name: Import GPG key
-      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.3.5
+      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.3.6
       if: ${{ inputs.import-gpg }}
       with:
         key: ${{ secrets.gpg-key }}
@@ -323,7 +323,7 @@ jobs:
         echo "e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9" > .BAZEL_FAKE_SCM_REVISION
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.6
       name: Setup GCP (artefacts/rbe)
       id: gcp
       with:
@@ -344,7 +344,7 @@ jobs:
         echo "${{ vars.ENVOY_CI_BAZELRC }}" > repo.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
 
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.6
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}
