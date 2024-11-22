@@ -18,8 +18,19 @@ class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public std::enable_shared_from_this<DynamicModuleHttpFilter> {
 public:
   DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr dynamic_module)
-      : dynamic_module_(dynamic_module){};
+      : dynamic_module_(dynamic_module) {}
   ~DynamicModuleHttpFilter() override = default;
+
+  /**
+   * Initializes the in-module filter.
+   */
+  void initializeInModuleFilter();
+
+  /**
+   * This is a helper function to get the `this` pointer as a void pointer which is passed to the
+   * various event hooks.
+   */
+  void* thisAsVoidPtr() { return static_cast<void*>(this); }
 
   // ---------- Http::StreamFilterBase ------------
   void onStreamComplete() override;
@@ -52,6 +63,7 @@ public:
 
 private:
   const DynamicModuleHttpFilterConfigSharedPtr dynamic_module_ = nullptr;
+  envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
 };
 
 } // namespace HttpFilters

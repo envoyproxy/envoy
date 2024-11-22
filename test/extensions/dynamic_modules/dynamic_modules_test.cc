@@ -26,10 +26,10 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   EXPECT_TRUE(module.ok());
   const auto getSomeVariable =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
-  EXPECT_NE(getSomeVariable, nullptr);
-  EXPECT_EQ(getSomeVariable(), 1);
-  EXPECT_EQ(getSomeVariable(), 2);
-  EXPECT_EQ(getSomeVariable(), 3);
+  EXPECT_TRUE(getSomeVariable.ok());
+  EXPECT_EQ(getSomeVariable.value()(), 1);
+  EXPECT_EQ(getSomeVariable.value()(), 2);
+  EXPECT_EQ(getSomeVariable.value()(), 3);
 
   // Release the module, and reload it.
   module->reset();
@@ -40,10 +40,10 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   // This module must be reloaded and the variable must be reset.
   const auto getSomeVariable2 =
       (module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable"));
-  EXPECT_NE(getSomeVariable2, nullptr);
-  EXPECT_EQ(getSomeVariable2(), 1); // Start from 1 again.
-  EXPECT_EQ(getSomeVariable2(), 2);
-  EXPECT_EQ(getSomeVariable2(), 3);
+  EXPECT_TRUE(getSomeVariable2.ok());
+  EXPECT_EQ(getSomeVariable2.value()(), 1); // Start from 1 again.
+  EXPECT_EQ(getSomeVariable2.value()(), 2);
+  EXPECT_EQ(getSomeVariable2.value()(), 3);
 
   // Release the module, and reload it.
   module->reset();
@@ -53,8 +53,8 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   // This module must be the already loaded one, and the variable must be kept.
   const auto getSomeVariable3 =
       module->get()->getFunctionPointer<GetSomeVariableFuncType>("getSomeVariable");
-  EXPECT_NE(getSomeVariable3, nullptr);
-  EXPECT_EQ(getSomeVariable3(), 4); // Start from 4.
+  EXPECT_TRUE(getSomeVariable3.ok());
+  EXPECT_EQ(getSomeVariable3.value()(), 4); // Start from 4.
 }
 
 TEST_P(DynamicModuleTestLanguages, LoadNoOp) {

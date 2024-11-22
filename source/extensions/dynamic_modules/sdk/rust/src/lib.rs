@@ -95,13 +95,95 @@ pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<NewHttpFilterConfigFunction
 /// imlementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
 pub trait HttpFilterConfig {
   /// This is called when a HTTP filter chain is created for a new stream.
-  fn new_http_filter(&self) -> Box<dyn HttpFilter> {
-    unimplemented!() // TODO.
+  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter> {
+    panic!("not implemented");
   }
 }
 
-/// The trait that represents an Envoy Http filter for each stream.
-pub trait HttpFilter {} // TODO.
+/// The trait that corresponds to an Envoy Http filter for each stream
+/// created via the [`HttpFilterConfig::new_http_filter`] method.
+pub trait HttpFilter {
+  /// This is called when the request headers are received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_request_headers_status`] to
+  /// indicate the status of the request headers processing.
+  fn on_request_headers(
+    &mut self,
+    _envoy_filter: EnvoyHttpFilter,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  /// This is called when the request body is received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_request_body_status`] to
+  /// indicate the status of the request body processing.
+  fn on_request_body(
+    &mut self,
+    _envoy_filter: EnvoyHttpFilter,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+    abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  }
+
+  /// This is called when the request trailers are received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status`] to
+  /// indicate the status of the request trailers processing.
+  fn on_request_trailers(
+    &mut self,
+    _envoy_filter: EnvoyHttpFilter,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+    abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
+  }
+
+  /// This is called when the response headers are received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_response_headers_status`] to
+  /// indicate the status of the response headers processing.
+  fn on_response_headers(
+    &mut self,
+    _envoy_filter: EnvoyHttpFilter,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  /// This is called when the response body is received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_response_body_status`] to
+  /// indicate the status of the response body processing.
+  fn on_response_body(
+    &mut self,
+    _envoy_filter: EnvoyHttpFilter,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
+    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+  }
+
+  /// This is called when the response trailers are received.
+  /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// The `end_of_stream` indicates whether the request is the last message in the stream.
+  ///
+  /// This must return [`abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status`] to
+  /// indicate the status of the response trailers processing.
+  fn on_response_trailers(
+    &mut self,
+    _envoy_filter: EnvoyHttpFilter,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
+    abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
+  }
+}
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
@@ -114,6 +196,23 @@ pub trait HttpFilter {} // TODO.
 #[derive(Debug, Clone, Copy)]
 pub struct EnvoyHttpFilterConfig {
   raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
+}
+
+impl EnvoyHttpFilterConfig {
+  // TODO: add methods like defining metrics, etc.
+}
+
+/// An opaque object that represents the underlying Envoy Http filter. This has one to one mapping
+/// with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
+///
+/// This is a shallow wrapper around the raw pointer to the Envoy HTTP filter object, and it can be
+/// copied and used up until the corresponding [`HttpFilter`] is dropped.
+pub struct EnvoyHttpFilter {
+  raw_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+}
+
+impl EnvoyHttpFilterConfig {
+  // TODO: add methods like getters for headers, etc.
 }
 
 #[no_mangle]
@@ -171,9 +270,110 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   let _inner = Box::from_raw(*config);
 }
 
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_new(
+  filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
+  let envoy_filter_config = EnvoyHttpFilterConfig {
+    raw_ptr: filter_envoy_ptr,
+  };
+  let filter_config = {
+    let raw = filter_config_ptr as *mut *mut dyn HttpFilterConfig;
+    &**raw
+  };
+  envoy_dynamic_module_on_http_filter_new_impl(envoy_filter_config, filter_config)
+}
+
+fn envoy_dynamic_module_on_http_filter_new_impl(
+  envoy_filter_config: EnvoyHttpFilterConfig,
+  filter_config: &dyn HttpFilterConfig,
+) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
+  let filter = filter_config.new_http_filter(envoy_filter_config);
+  let boxed = Box::into_raw(Box::new(filter));
+  boxed as abi::envoy_dynamic_module_type_http_filter_module_ptr
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_destroy(
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter;
+
+  // Drop the Box<*mut dyn HttpFilter>, and then the Box<dyn HttpFilter>, which also drops the
+  // underlying object.
+  let _outer = Box::from_raw(filter);
+  let _inner = Box::from_raw(*filter);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_headers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter;
+  let filter = &mut **filter;
+  filter.on_request_headers(EnvoyHttpFilter { raw_ptr: envoy_ptr }, end_of_stream)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter;
+  let filter = &mut **filter;
+  filter.on_request_body(EnvoyHttpFilter { raw_ptr: envoy_ptr }, end_of_stream)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_trailers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter;
+  let filter = &mut **filter;
+  filter.on_request_trailers(EnvoyHttpFilter { raw_ptr: envoy_ptr })
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter;
+  let filter = &mut **filter;
+  filter.on_response_headers(EnvoyHttpFilter { raw_ptr: envoy_ptr }, end_of_stream)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  end_of_stream: bool,
+) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter;
+  let filter = &mut **filter;
+  filter.on_response_body(EnvoyHttpFilter { raw_ptr: envoy_ptr }, end_of_stream)
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter;
+  let filter = &mut **filter;
+  filter.on_response_trailers(EnvoyHttpFilter { raw_ptr: envoy_ptr })
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
+  use std::sync::atomic::AtomicBool; // This is used for testing the drop, not for the actual concurrency.
 
   #[test]
   fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
@@ -209,8 +409,6 @@ mod tests {
 
   #[test]
   fn test_envoy_dynamic_module_on_http_filter_config_destroy() {
-    use std::sync::atomic::AtomicBool;
-
     // This test is mainly to check if the drop is called correctly after wrapping/unwrapping the
     // Box.
     static DROPPED: AtomicBool = AtomicBool::new(false);
@@ -238,5 +436,157 @@ mod tests {
     }
     // Now that the drop is called, DROPPED must be set to true.
     assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+  }
+
+  #[test]
+  // This tests the round-trip of the envoy_dynamic_module_on_http_filter_new_impl and
+  // envoy_dynamic_module_on_http_filter_destroy.
+  fn test_envoy_dynamic_module_on_http_filter_new_destroy() {
+    static DROPPED: AtomicBool = AtomicBool::new(false);
+    struct TestHttpFilterConfig;
+    impl HttpFilterConfig for TestHttpFilterConfig {
+      fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter> {
+        Box::new(TestHttpFilter)
+      }
+    }
+
+    struct TestHttpFilter;
+    impl HttpFilter for TestHttpFilter {}
+    impl Drop for TestHttpFilter {
+      fn drop(&mut self) {
+        DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+      }
+    }
+
+    let filter_config = TestHttpFilterConfig;
+    let result = envoy_dynamic_module_on_http_filter_new_impl(
+      EnvoyHttpFilterConfig {
+        raw_ptr: std::ptr::null_mut(),
+      },
+      &filter_config,
+    );
+    assert!(!result.is_null());
+
+    unsafe {
+      envoy_dynamic_module_on_http_filter_destroy(result);
+    }
+
+    assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+  }
+
+  #[test]
+  // This tests all the on_* methods on the HttpFilter trait through the actual entry points.
+  fn test_envoy_dynamic_module_on_http_filter_callbacks() {
+    struct TestHttpFilterConfig;
+    impl HttpFilterConfig for TestHttpFilterConfig {
+      fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter> {
+        Box::new(TestHttpFilter)
+      }
+    }
+
+    static ON_REQUEST_HEADERS_CALLED: AtomicBool = AtomicBool::new(false);
+    static ON_REQUEST_BODY_CALLED: AtomicBool = AtomicBool::new(false);
+    static ON_REQUEST_TRAILERS_CALLED: AtomicBool = AtomicBool::new(false);
+    static ON_RESPONSE_HEADERS_CALLED: AtomicBool = AtomicBool::new(false);
+    static ON_RESPONSE_BODY_CALLED: AtomicBool = AtomicBool::new(false);
+    static ON_RESPONSE_TRAILERS_CALLED: AtomicBool = AtomicBool::new(false);
+
+    struct TestHttpFilter;
+    impl HttpFilter for TestHttpFilter {
+      fn on_request_headers(
+        &mut self,
+        _envoy_filter: EnvoyHttpFilter,
+        _end_of_stream: bool,
+      ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+        ON_REQUEST_HEADERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+        abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+      }
+
+      fn on_request_body(
+        &mut self,
+        _envoy_filter: EnvoyHttpFilter,
+        _end_of_stream: bool,
+      ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+        ON_REQUEST_BODY_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+        abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+      }
+
+      fn on_request_trailers(
+        &mut self,
+        _envoy_filter: EnvoyHttpFilter,
+      ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+        ON_REQUEST_TRAILERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+        abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
+      }
+
+      fn on_response_headers(
+        &mut self,
+        _envoy_filter: EnvoyHttpFilter,
+        _end_of_stream: bool,
+      ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+        ON_RESPONSE_HEADERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+        abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+      }
+
+      fn on_response_body(
+        &mut self,
+        _envoy_filter: EnvoyHttpFilter,
+        _end_of_stream: bool,
+      ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
+        ON_RESPONSE_BODY_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+        abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+      }
+
+      fn on_response_trailers(
+        &mut self,
+        _envoy_filter: EnvoyHttpFilter,
+      ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
+        ON_RESPONSE_TRAILERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+        abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
+      }
+    }
+
+    let filter_config = TestHttpFilterConfig;
+    let filter = envoy_dynamic_module_on_http_filter_new_impl(
+      EnvoyHttpFilterConfig {
+        raw_ptr: std::ptr::null_mut(),
+      },
+      &filter_config,
+    );
+
+
+    unsafe {
+      assert_eq!(
+        envoy_dynamic_module_on_http_filter_request_headers(std::ptr::null_mut(), filter, false),
+        abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+      );
+      assert_eq!(
+        envoy_dynamic_module_on_http_filter_request_body(std::ptr::null_mut(), filter, false),
+        abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+      );
+      assert_eq!(
+        envoy_dynamic_module_on_http_filter_request_trailers(std::ptr::null_mut(), filter),
+        abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
+      );
+      assert_eq!(
+        envoy_dynamic_module_on_http_filter_response_headers(std::ptr::null_mut(), filter, false),
+        abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+      );
+      assert_eq!(
+        envoy_dynamic_module_on_http_filter_response_body(std::ptr::null_mut(), filter, false),
+        abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+      );
+      assert_eq!(
+        envoy_dynamic_module_on_http_filter_response_trailers(std::ptr::null_mut(), filter),
+        abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
+      );
+    }
+
+    assert!(ON_REQUEST_HEADERS_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(ON_REQUEST_BODY_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(ON_REQUEST_TRAILERS_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(ON_RESPONSE_HEADERS_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(ON_RESPONSE_BODY_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(ON_RESPONSE_TRAILERS_CALLED.load(std::sync::atomic::Ordering::SeqCst));
   }
 }

@@ -26,14 +26,13 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+  filter->initializeInModuleFilter();
 
   // The followings are mostly for coverage at the moment.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
   filter->setEncoderFilterCallbacks(encoder_callbacks);
-  filter->onStreamComplete();
-  filter->onDestroy();
   TestRequestHeaderMapImpl headers{{}};
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(headers, false));
   Buffer::OwnedImpl data;
@@ -51,6 +50,8 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
   EXPECT_EQ(FilterMetadataStatus::Continue, filter->encodeMetadata(metadata));
   filter->encodeComplete();
+  filter->onStreamComplete();
+  filter->onDestroy();
 }
 
 } // namespace HttpFilters
