@@ -340,10 +340,9 @@ private:
       bool is_zombie_stream_{};       // Whether stream is waiting for signal
                                       // the underlying codec to be destroyed.
 
-      // Whether the upgrade request has be accepted or rejected by the filter chain.
-      // Both are false if the request is not an upgrade request.
+      // Whether the upgrade request has be accepted by the filter chain.
+      // False if the request is not an upgrade request or upgrade is rejected by the filter chain.
       bool successful_upgrade_{};
-      bool upgrade_rejected_{};
 
       // True if this stream was the original externally created stream, but was
       // destroyed as part of internal redirect.
