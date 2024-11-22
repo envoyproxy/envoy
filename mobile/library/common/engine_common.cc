@@ -70,8 +70,8 @@ public:
   }
   std::unique_ptr<Server::HdsDelegateApi>
   maybeCreateHdsDelegate(Server::Configuration::ServerFactoryContext&, Stats::Scope&,
-                         Grpc::RawAsyncClientPtr&&, Envoy::Stats::Store&, Ssl::ContextManager&,
-                         Upstream::ClusterInfoFactory&) override {
+                         Grpc::RawAsyncClientPtr&&, Envoy::Stats::Store&,
+                         Ssl::ContextManager&) override {
     return nullptr;
   }
 };
