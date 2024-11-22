@@ -224,5 +224,38 @@ StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtension
   return factory->createStringMatcher(*message, context);
 }
 
+template <class StringMatcherType>
+std::unique_ptr<StringMatcherImplBase>
+createStringMatcher(const StringMatcherType& config,
+                    Server::Configuration::CommonFactoryContext& context) {
+  switch (config.match_pattern_case()) {
+  case StringMatcherType::MatchPatternCase::kExact:
+    return std::make_unique<ExactStringMatcher>(config.exact(), config.ignore_case());
+  case StringMatcherType::MatchPatternCase::kPrefix:
+    return std::make_unique<PrefixStringMatcher>(config.prefix(), config.ignore_case());
+  case StringMatcherType::MatchPatternCase::kSuffix:
+    return std::make_unique<SuffixStringMatcher>(config.suffix(), config.ignore_case());
+  case StringMatcherType::MatchPatternCase::kSafeRegex:
+    if (config.ignore_case()) {
+      ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
+    }
+    return std::make_unique<RegexStringMatcher>(config.safe_regex(), context);
+  case StringMatcherType::MatchPatternCase::kContains:
+    return std::make_unique<ContainsStringMatcher>(config.contains(), config.ignore_case());
+  case StringMatcherType::MatchPatternCase::kCustom:
+    return std::make_unique<CustomStringMatcher>(config.custom(), context);
+  default:
+    PANIC("unexpected");
+  }
+}
+
+// Explicit instantiation of the `createStringMatcher` function to allow the
+// implementation to be in the cc file instead of the header file.
+template std::unique_ptr<StringMatcherImplBase>
+createStringMatcher(const envoy::type::matcher::v3::StringMatcher& config,
+                    Server::Configuration::CommonFactoryContext& context);
+template std::unique_ptr<StringMatcherImplBase>
+createStringMatcher(const xds::type::matcher::v3::StringMatcher& config,
+                    Server::Configuration::CommonFactoryContext& context);
 } // namespace Matchers
 } // namespace Envoy

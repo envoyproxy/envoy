@@ -140,6 +140,17 @@ TEST(Utility, ParseRegex) {
   }
 }
 
+// Validates that the returned string representation matches the pattern.
+TEST(Utility, CompiledMatcherStringRepresentation) {
+  Regex::GoogleReEngine engine;
+
+  envoy::type::matcher::v3::RegexMatcher matcher;
+  matcher.set_regex("/aS?df/.*");
+  matcher.mutable_google_re2();
+  const CompiledMatcherPtr re_matcher = Utility::parseRegex(matcher, engine);
+  EXPECT_EQ(re_matcher->stringRepresentation(), "/aS?df/.*");
+}
+
 } // namespace
 } // namespace Regex
 } // namespace Envoy
