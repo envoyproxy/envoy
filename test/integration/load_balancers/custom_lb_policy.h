@@ -24,12 +24,7 @@ private:
   public:
     LbImpl(const Upstream::HostSharedPtr& host) : host_(host) {}
 
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override {
-      if (context && context->requestStreamInfo()) {
-        ProtobufWkt::Struct value;
-        (*value.mutable_fields())["foo"] = ValueUtil::stringValue("bar");
-        context->requestStreamInfo()->setDynamicMetadata("envoy.load_balancers.custom_lb", value);
-      }
+    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override {
       return host_;
     }
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {

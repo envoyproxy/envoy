@@ -13,6 +13,7 @@
 #include "source/extensions/load_balancing_policies/subset/subset_lb.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 
+#include "test/common/upstream/metadata_writer_lb.pb.h"
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/mocks/config/mocks.h"
@@ -1417,8 +1418,78 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, MaglevLoadBalancerThreadAwareUpdate)
   doTest("envoy.load_balancing_policies.maglev");
 }
 
+// Test load balancing policy that validates that request metadata can be mutated
+// during host picking.
+class MetadataWriterLbImpl : public Upstream::ThreadAwareLoadBalancer {
+public:
+  MetadataWriterLbImpl() = default;
+
+  Upstream::LoadBalancerFactorySharedPtr factory() override {
+    return std::make_shared<LbFactory>();
+  }
+  absl::Status initialize() override { return absl::OkStatus(); }
+
+private:
+  class LbImpl : public Upstream::LoadBalancer {
+  public:
+    LbImpl() = default;
+
+    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override {
+      if (context && context->requestStreamInfo()) {
+        ProtobufWkt::Struct value;
+        (*value.mutable_fields())["foo"] = ValueUtil::stringValue("bar");
+        context->requestStreamInfo()->setDynamicMetadata("envoy.load_balancers.metadata_writer",
+                                                         value);
+      }
+      return nullptr;
+    }
+    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext*, const Upstream::Host&,
+                             std::vector<uint8_t>&) override {
+      return {};
+    }
+  };
+
+  class LbFactory : public Upstream::LoadBalancerFactory {
+  public:
+    LbFactory() = default;
+
+    Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
+      return std::make_unique<LbImpl>();
+    }
+  };
+};
+
+class MetadataWriterLbFactory
+    : public Upstream::TypedLoadBalancerFactoryBase<
+          ::test::load_balancing_policies::metadata_writer::MetadataWriterLbConfig> {
+public:
+  MetadataWriterLbFactory()
+      : TypedLoadBalancerFactoryBase("envoy.load_balancers.metadata_writer") {}
+
+  Upstream::ThreadAwareLoadBalancerPtr create(OptRef<const Upstream::LoadBalancerConfig>,
+                                              const Upstream::ClusterInfo&,
+                                              const Upstream::PrioritySet&, Runtime::Loader&,
+                                              Random::RandomGenerator&, TimeSource&) override {
+    return std::make_unique<MetadataWriterLbImpl>();
+  }
+
+  Upstream::LoadBalancerConfigPtr loadConfig(Server::Configuration::ServerFactoryContext&,
+                                             const Protobuf::Message&) override {
+    return std::make_unique<Upstream::LoadBalancerConfig>();
+  }
+};
+
 // Validate that load balancing policy can update request's dynamic metadata
 TEST_F(ClusterManagerImplThreadAwareLbTest, LoadBalancerCanUpdateMetadata) {
+  MetadataWriterLbFactory lb_factory;
+  Registry::InjectFactory<Envoy::Upstream::TypedLoadBalancerFactory> registered(lb_factory);
   NiceMock<MockLoadBalancerContext> load_balancer_context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   const std::string json = fmt::sprintf("{\"static_resources\":{%s}}",
@@ -1428,7 +1499,7 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, LoadBalancerCanUpdateMetadata) {
   cluster1->info_->name_ = "cluster_0";
   cluster1->info_->lb_factory_ =
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
-          "envoy.load_balancers.custom_lb");
+          "envoy.load_balancers.metadata_writer");
 
   InSequence s;
   EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
@@ -1444,7 +1515,7 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, LoadBalancerCanUpdateMetadata) {
       cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
   cluster1->initialize_callback_();
   ON_CALL(load_balancer_context, requestStreamInfo()).WillByDefault(Return(&stream_info));
-  EXPECT_CALL(stream_info, setDynamicMetadata("envoy.load_balancers.custom_lb", _));
+  EXPECT_CALL(stream_info, setDynamicMetadata("envoy.load_balancers.metadata_writer", _));
   cluster_manager_->getThreadLocalCluster("cluster_0")
       ->loadBalancer()
       .chooseHost(&load_balancer_context);

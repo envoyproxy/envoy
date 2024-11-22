@@ -105,7 +105,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 Network::Address::InstanceConstSharedPtr
 OriginalDstCluster::LoadBalancer::filterStateOverrideHost(LoadBalancerContext* context) {
   const auto streamInfos = {
-      static_cast<const StreamInfo::StreamInfo*>(context->requestStreamInfo()),
+      const_cast<const StreamInfo::StreamInfo*>(context->requestStreamInfo()),
       context->downstreamConnection() ? &context->downstreamConnection()->streamInfo() : nullptr};
   for (const auto streamInfo : streamInfos) {
     if (streamInfo == nullptr) {
@@ -154,7 +154,7 @@ OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* cont
     return nullptr;
   }
   const auto streamInfos = {
-      static_cast<const StreamInfo::StreamInfo*>(context->requestStreamInfo()),
+      const_cast<const StreamInfo::StreamInfo*>(context->requestStreamInfo()),
       context->downstreamConnection() ? &context->downstreamConnection()->streamInfo() : nullptr};
   const ProtobufWkt::Value* value = nullptr;
   for (const auto streamInfo : streamInfos) {
