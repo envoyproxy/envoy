@@ -52,11 +52,17 @@ jobs:
       rbe: true
       request: ${{ inputs.request }}
       steps-post: |
-        - run: ci/run_envoy_docker.sh 'ci/do_ci.sh ${{ matrix.target }}-upload'
-          shell: bash
-          env:
-            GCS_ARTIFACT_BUCKET: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
-            GCS_REDIRECT_PATH: ${{ fromJSON(inputs.request).request.pr || fromJSON(inputs.request).request.target-branch }}
+        - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/upload@actions-v0.3.6
+          with:
+            bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
+            path: generated/${{ matrix.target }}
+            path-upload: ${{ matrix.target }}
+            sha: ${{ fromJSON(inputs.request).request.sha }}
+            redirect: >-
+              ${{ vars.GCS_ARTIFACT_PREFIX
+                  && format('{0}-', vars.GCS_ARTIFACT_PREFIX)
+              }}${{ fromJSON(inputs.request).request.pr
+                    || fromJSON(inputs.request).request.target-branch }}
       target: ${{ matrix.target }}
       timeout-minutes: 180
       trusted: ${{ inputs.trusted }}

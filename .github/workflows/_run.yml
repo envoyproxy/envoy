@@ -328,18 +328,16 @@ jobs:
       id: gcp
       with:
         key: ${{ secrets.gcp-key }}
-        boto: false
-        boto-rm: true
+        key-copy: ${{ runner.temp }}
     - run: |
-        mv "${{ steps.gcp.outputs.key-path }}" "${{ runner.temp }}"
-        GCP_SERVICE_ACCOUNT_KEY_FILE="$(basename "${{ steps.gcp.outputs.key-path }}")"
+        GCP_SERVICE_ACCOUNT_KEY_FILE="$(basename "${{ steps.gcp.outputs.key-copy-path }}")"
         echo "GCP_SERVICE_ACCOUNT_KEY_PATH=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE}" >> "$GITHUB_ENV"
         if [[ "${{ inputs.gcs-only }}" != "" ]]; then
             exit 0
         fi
         BAZEL_BUILD_EXTRA_OPTIONS="--google_credentials=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE} --config=rbe-google"
         echo "BAZEL_BUILD_EXTRA_OPTIONS=${BAZEL_BUILD_EXTRA_OPTIONS}" >> "$GITHUB_ENV"
-      if: ${{ steps.gcp.outputs.key-path }}
+      if: ${{ steps.gcp.outputs.key-copy-path }}
     - run: |
         echo "${{ vars.ENVOY_CI_BAZELRC }}" > repo.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
