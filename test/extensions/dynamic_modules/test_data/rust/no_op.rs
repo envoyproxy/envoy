@@ -55,7 +55,6 @@ impl Drop for NopHttpFilterConfig {
   }
 }
 
-
 /// A no-op HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`]
 /// as well as the [`Drop`] to test the cleanup of the filter.
 struct NopHttpFilter {

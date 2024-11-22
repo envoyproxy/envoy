@@ -76,10 +76,10 @@ using DynamicModuleHttpFilterConfigSharedPtr = std::shared_ptr<DynamicModuleHttp
  * @param dynamic_module the dynamic module to use.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
-absl::StatusOr<std::shared_ptr<DynamicModuleHttpFilterConfig>>
+absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr>
 newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
                                  const absl::string_view filter_config,
-                                 DynamicModulePtr dynamic_module);
+                                 Extensions::DynamicModules::DynamicModulePtr dynamic_module);
 
 } // namespace HttpFilters
 } // namespace DynamicModules
