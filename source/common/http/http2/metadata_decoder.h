@@ -22,7 +22,7 @@ public:
    * @param cb is the decoder's callback function. The callback function is called when the decoder
    * finishes decoding metadata.
    */
-  MetadataDecoder(MetadataCallback cb);
+  MetadataDecoder(MetadataCallback cb, uint64_t max_payload_size_bound);
   ~MetadataDecoder();
 
   /**
@@ -75,7 +75,7 @@ private:
   Buffer::OwnedImpl payload_;
 
   // Payload size limit. If the total payload received exceeds the limit, fails the connection.
-  const uint64_t max_payload_size_bound_ = 1024 * 1024;
+  const uint64_t max_payload_size_bound_;
 
   uint64_t total_payload_size_ = 0;
 
