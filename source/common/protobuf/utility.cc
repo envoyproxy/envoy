@@ -706,14 +706,6 @@ void MessageUtil::redact(Protobuf::Message& message) {
   ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
 }
 
-void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst) {
-  // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
-  // this can fail.
-  if (!dst.ParseFromString(src.SerializeAsString())) {
-    throwEnvoyExceptionOrPanic("Unable to deserialize during wireCast()");
-  }
-}
-
 std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   std::string text_format;

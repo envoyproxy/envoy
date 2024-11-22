@@ -75,7 +75,7 @@ SamplingState SamplingController::getSamplingState(const std::string& sampling_k
   }
   absl::ReaderMutexLock ss_lock{&stream_summary_mutex_};
   const uint32_t exp = stream_summary_->getN() / divisor;
-  return SamplingState{exp};
+  return SamplingState{std::min(exp, MAX_SAMPLING_EXPONENT)};
 }
 
 std::string SamplingController::getSamplingKey(const absl::string_view path_query,

@@ -493,20 +493,24 @@ private:
 
 class EventLoggerImpl : public EventLogger {
 public:
-  EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
-                  TimeSource& time_source)
-      : time_source_(time_source) {
+  static absl::StatusOr<std::unique_ptr<EventLoggerImpl>>
+  create(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
+         TimeSource& time_source) {
     auto file_or_error = log_manager.createAccessLog(
         Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
-    THROW_IF_NOT_OK_REF(file_or_error.status());
-    file_ = file_or_error.value();
+    RETURN_IF_NOT_OK_REF(file_or_error.status());
+    return std::unique_ptr<EventLoggerImpl>(
+        new EventLoggerImpl(std::move(*file_or_error), time_source));
   }
-
   // Upstream::Outlier::EventLogger
   void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
                 envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) override;
 
   void logUneject(const HostDescriptionConstSharedPtr& host) override;
+
+protected:
+  EventLoggerImpl(AccessLog::AccessLogFileSharedPtr&& file, TimeSource& time_source)
+      : file_(std::move(file)), time_source_(time_source) {}
 
 private:
   void setCommonEventParams(envoy::data::cluster::v3::OutlierDetectionEvent& event,

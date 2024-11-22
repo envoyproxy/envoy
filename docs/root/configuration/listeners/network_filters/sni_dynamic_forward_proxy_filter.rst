@@ -36,6 +36,6 @@ dynamically set by other network filters on a per-connection basis by setting a 
 state object under the key ``envoy.upstream.dynamic_host``. Additionally, the SNI dynamic forward
 proxy uses the default port filter configuration as target port, but it can by dynamically set,
 by setting a per-connection state object under the key ``envoy.upstream.dynamic_port``. If these
-objects are set, they take precedence over the SNI value and default port. In case that the overrided
+objects are set, they take precedence over the SNI value and default port. In case that the overridden
 port is out of the valid port range, the overriding value will be ignored and the default port
 configured will be used. See the implementation for the details.
