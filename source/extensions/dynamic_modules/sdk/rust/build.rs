@@ -2,7 +2,6 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-  println!("cargo:rerun-if-changed=abi.h");
   let bindings = bindgen::Builder::default()
     .header("../../abi.h")
     .header("../../abi_version.h")
@@ -36,7 +35,6 @@ impl bindgen::callbacks::ParseCallbacks for TrimEnumNameFromVariantName {
     original_variant_name: &str,
     _variant_value: bindgen::callbacks::EnumVariantValue,
   ) -> Option<String> {
-    // Trims the enum name from the variant name.
     let variant_name = match enum_name {
       Some(enum_name) => original_variant_name
         .trim_start_matches(enum_name)
