@@ -21,7 +21,7 @@ fn main() {
 
 #[derive(Debug)]
 // This allows us to simplify the enum variant names.
-// Otherwise, the generated enum result would be `EnumName_VariantName`. E.g.
+// Otherwise, the generated enum result would be `EnumName::EnumName_VariantName`. E.g.
 // `envoy_dynamic_module_type_on_http_filter_response_trailers_status::envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue`
 // instead of `envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue`.
 //
