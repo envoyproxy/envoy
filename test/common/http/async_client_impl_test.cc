@@ -935,8 +935,9 @@ TEST_F(AsyncClientImplTest, WithFilterState) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
       .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                            Upstream::LoadBalancerContext* context) {
-        const StreamInfo::FilterState& filter_state = context->requestStreamInfo()->filterState();
-        const TestStateObject* state = filter_state.getDataReadOnly<TestStateObject>("test-filter");
+        StreamInfo::FilterStateSharedPtr filter_state = context->requestStreamInfo()->filterState();
+        const TestStateObject* state =
+            filter_state->getDataReadOnly<TestStateObject>("test-filter");
         EXPECT_NE(state, nullptr);
         EXPECT_EQ(state->value(), "stored-test-state");
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
