@@ -211,7 +211,7 @@ pub struct EnvoyHttpFilter {
   raw_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
 }
 
-impl EnvoyHttpFilterConfig {
+impl EnvoyHttpFilter {
   // TODO: add methods like getters for headers, etc.
 }
 
@@ -554,7 +554,6 @@ mod tests {
       &filter_config,
     );
 
-
     unsafe {
       assert_eq!(
         envoy_dynamic_module_on_http_filter_request_headers(std::ptr::null_mut(), filter, false),
@@ -580,6 +579,7 @@ mod tests {
         envoy_dynamic_module_on_http_filter_response_trailers(std::ptr::null_mut(), filter),
         abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
       );
+      envoy_dynamic_module_on_http_filter_destroy(filter);
     }
 
     assert!(ON_REQUEST_HEADERS_CALLED.load(std::sync::atomic::Ordering::SeqCst));

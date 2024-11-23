@@ -26,12 +26,6 @@ public:
    */
   void initializeInModuleFilter();
 
-  /**
-   * This is a helper function to get the `this` pointer as a void pointer which is passed to the
-   * various event hooks.
-   */
-  void* thisAsVoidPtr() { return static_cast<void*>(this); }
-
   // ---------- Http::StreamFilterBase ------------
   void onStreamComplete() override;
   void onDestroy() override;
@@ -62,6 +56,12 @@ public:
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
 
 private:
+  /**
+   * This is a helper function to get the `this` pointer as a void pointer which is passed to the
+   * various event hooks.
+   */
+  void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
   const DynamicModuleHttpFilterConfigSharedPtr dynamic_module_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
 };
