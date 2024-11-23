@@ -111,6 +111,12 @@ public:
    * @return const Tracing::Span& the current tracing active span.
    */
   virtual Tracing::Span& activeSpan() PURE;
+
+  /**
+   * Set the upstream host override.
+   * @param host_and_strict supplies the host and whether the host should be treated as strict.
+   */
+  virtual void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) PURE;
 };
 
 class Filter;
@@ -187,7 +193,8 @@ public:
             {"base64Escape", static_luaBase64Escape},
             {"timestamp", static_luaTimestamp},
             {"timestampString", static_luaTimestampString},
-            {"connectionStreamInfo", static_luaConnectionStreamInfo}};
+            {"connectionStreamInfo", static_luaConnectionStreamInfo},
+            {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost}};
   }
 
 private:
@@ -318,6 +325,13 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaTimestampString);
 
+  /**
+   * Set the upstream override host.
+   * @param 1 (string): The host address to override with.
+   * @param 2 (bool): Optional strict flag. Defaults to false.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaSetUpstreamOverrideHost);
+
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
@@ -351,6 +365,7 @@ private:
   // Coroutine resumption MUST use resumeCoroutine.
   Filters::Common::Lua::Coroutine& coroutine_;
   Http::RequestOrResponseHeaderMap& headers_;
+  std::string override_host_;
   bool end_stream_;
   bool headers_continued_{};
   bool buffered_body_{};
@@ -571,6 +586,9 @@ private:
       return callbacks_->connection().ptr();
     }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
+    void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
+      callbacks_->setUpstreamOverrideHost(host_and_strict);
+    }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -595,6 +613,9 @@ private:
       return callbacks_->connection().ptr();
     }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
+    void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
+      UNREFERENCED_PARAMETER(host_and_strict);
+    }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
