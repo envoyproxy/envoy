@@ -43,21 +43,25 @@ message ApiKeyAuth {
 
 // API key auth configuration of per route or per virtual host or per route configuration.
 message ApiKeyAuthPerRoute {
-  // Route specific APIKeyAuth configuration. This is optional and could be used to override the
+  // Route specific APIKeyAuth configuration. This is optional and could be used to **override** the
   // filter level ApiKeyAuth configuration **partly**.
   //
-  // For example, if route specific ``authentication_header`` is set, then the filter will fetch
-  // the key from route specific ``authentication_header``. But the filter level ``keys`` will
-  // still be used. If route specific non-empty ``keys`` is set, then the filter will use the
-  // route specific ``keys`` to authenticate the client but the filter level ``authentication_header``
-  // will still be used. If both ``authentication_header`` and ``keys`` are set, then the filter
-  // will use the route specific ``authentication_header`` and ``keys`` to authenticate the client.
+  // For example, if non-empty ``credentials`` is set in the ``override_config``, then the
+  // ``credentials`` in the filter level configuration will be ignored and the ``credentials`` in
+  // this configuration will be used.
   ApiKeyAuth override_config = 1;
 
-  // A list of client ids that are allowed to access the routes of the scope. If the list is empty,
-  // then all authenticated clients are allowed. This provides very limited but simple authorization.
-  // If more complex authorization is required, then use the :ref:`HTTP RBAC filter
-  // <config_http_filters_rbac>` instead.
+  // A list of clients that are allowed to access the route or vhost. The clients listed here
+  // should be subset of the clients listed in the ``credentials`` to provide authorization control
+  // after the authentication is successful. If the list is empty, then all authenticated clients
+  // are allowed. This provides very limited but simple authorization. If more complex authorization
+  // is required, then use the :ref:`HTTP RBAC filter <config_http_filters_rbac>` instead.
+  //
+  // .. note::
+  //   Setting this field and ``override_config.credentials`` at the same configuration entry is not
+  //   an error but also makes no sense because they provide similar functionality. Please only use
+  //   one of them at same configuration entry.
+  //
   repeated string allowed_clients = 2;
 }
 
