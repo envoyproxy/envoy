@@ -292,17 +292,17 @@ bool CorsFilter::allowPrivateNetworkAccess() {
 }
 
 bool CorsFilter::shadowEnabled() {
-  for (const Router::CorsPolicy& policy : policies_) {
-    return policy.shadowEnabled();
-  }
-  return false;
+  // The policies_ vector is ordered from most-specific (route-entry) to the
+  // most-generic (virtual-host). This will return the most-specific
+  // shadow-enabled value (if exists).
+  return policies_.empty() ? false : policies_[0].get().shadowEnabled();
 }
 
 bool CorsFilter::enabled() {
-  for (const Router::CorsPolicy& policy : policies_) {
-    return policy.enabled();
-  }
-  return false;
+  // The policies_ vector is ordered from most-specific (route-entry) to the
+  // most-generic (virtual-host). This will return the most-specific enabled
+  // value (if exists).
+  return policies_.empty() ? false : policies_[0].get().enabled();
 }
 
 } // namespace Cors

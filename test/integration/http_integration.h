@@ -4,8 +4,13 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/early_data/v3/default_early_data_policy_descriptor.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+
 #include "source/common/http/codec_client.h"
 #include "source/common/network/filter_impl.h"
+#include "source/extensions/early_data/default_early_data_policy.h"
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"

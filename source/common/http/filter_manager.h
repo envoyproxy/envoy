@@ -579,6 +579,9 @@ public:
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddress();
   }
+  const Network::Address::InstanceConstSharedPtr& directLocalAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().directLocalAddress();
+  }
   bool localAddressRestored() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddressRestored();
   }
