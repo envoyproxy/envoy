@@ -23,8 +23,8 @@ fn main() {
 #[derive(Debug)]
 // This allows us to simplify the enum variant names.
 // Otherwise, the generated enum result would be `EnumName_VariantName`. E.g.
-// `envoy_dynamic_module_type_on_http_filter_response_trailers_status_envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue`
-// instead of `envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue`.
+// `envoy_dynamic_module_type_on_http_filter_response_trailers_status::envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue`
+// instead of `envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue`.
 //
 // See https://github.com/rust-lang/rust-bindgen/issues/777
 struct TrimEnumNameFromVariantName;
@@ -38,12 +38,9 @@ impl bindgen::callbacks::ParseCallbacks for TrimEnumNameFromVariantName {
   ) -> Option<String> {
     // Trims the enum name from the variant name.
     let variant_name = match enum_name {
-      Some(enum_name) => {
-        let enum_name = enum_name.trim_end_matches("_enum");
-        original_variant_name
-          .trim_start_matches(enum_name)
-          .trim_start_matches('_')
-      },
+      Some(enum_name) => original_variant_name
+        .trim_start_matches(enum_name)
+        .trim_start_matches('_'),
       None => original_variant_name,
     };
     Some(variant_name.to_string())
