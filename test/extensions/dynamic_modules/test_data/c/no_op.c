@@ -60,7 +60,7 @@ envoy_dynamic_module_on_http_filter_response_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
     envoy_dynamic_module_type_bool end_of_stream) {
-  return envoy_dynamic_module_type_on_http_filter_response_headers_statusContinue;
+  return envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue;
 }
 
 envoy_dynamic_module_type_on_http_filter_response_body_status
