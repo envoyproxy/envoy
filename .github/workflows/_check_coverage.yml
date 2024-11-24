@@ -41,8 +41,6 @@ jobs:
       # bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
-      diskspace-hack: ${{ matrix.diskspace-hack || false }}
-      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths || '' }}
       error-match: |
         ERROR
         error:
@@ -52,6 +50,7 @@ jobs:
       rbe: true
       rbe-google: true
       request: ${{ inputs.request }}
+      runs-on: ubuntu-24.04
       steps-post: |
         - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.11
           with:
@@ -73,9 +72,5 @@ jobs:
         include:
         - target: coverage
           name: Coverage
-          diskspace-hack: true
-          diskspace-hack-paths: |
-            /opt/hostedtoolcache
-            /usr/local
         - target: fuzz_coverage
           name: Fuzz coverage

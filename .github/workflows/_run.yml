@@ -243,18 +243,23 @@ jobs:
              "job-started": ${{ steps.started.outputs.value }}}
           | . * {$config, $check}
 
+
+    - run: |
+        sudo mkdir -p /etc/docker
+        echo '{
+          "ipv6": true,
+          "fixed-cidr-v6": "2001:db8:1::/64"
+          }' | sudo tee /etc/docker/daemon.json
+        sudo service docker restart
+      name: Configure Docker ipv6
+      if: ${{ inputs.docker-ipv6 }}
+
     # Caches
     - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.11
       name: Setup GCP (cache)
       if: ${{ inputs.gcs-cache-bucket }}
       with:
         key: ${{ secrets.gcs-cache-key }}
-    - if: ${{ inputs.cache-build-image }}
-      name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.11
-      with:
-        image-tag: ${{ inputs.cache-build-image }}
-        key-suffix: ${{ inputs.cache-build-image-key-suffix }}
     - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.11
       if: ${{ inputs.gcs-cache-bucket }}
       name: >-
@@ -264,6 +269,12 @@ jobs:
         gcs-bucket: ${{ inputs.gcs-cache-bucket }}
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch || 'x64' }}
         path: ${{ runner.temp }}/bazel_root
+    - if: ${{ inputs.cache-build-image }}
+      name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.11
+      with:
+        image-tag: ${{ inputs.cache-build-image }}
+        key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
     - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.11
       id: appauth
@@ -309,16 +320,6 @@ jobs:
         passphrase: ${{ secrets.gpg-key-password }}
         passphrase-path: "${{ runner.temp }}/gpg-passphrase"
         configured-passphrase-path: /build/gpg-passphrase
-
-    - run: |
-        sudo mkdir -p /etc/docker
-        echo '{
-          "ipv6": true,
-          "fixed-cidr-v6": "2001:db8:1::/64"
-          }' | sudo tee /etc/docker/daemon.json
-        sudo service docker restart
-      name: Configure Docker ipv6
-      if: ${{ inputs.docker-ipv6 }}
 
     - run: |
         echo "e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9" > .BAZEL_FAKE_SCM_REVISION
