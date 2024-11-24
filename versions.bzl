@@ -1,10 +1,10 @@
 VERSIONS = {
-    "python": "3.10",
+    "python": "3.12",
     "envoy": {
         "type": "github_archive",
         "repo": "envoyproxy/envoy",
-        "version": "81d66f1d8247c2282351e42becfa7777fc359d61",
-        "sha256": "6f8b2bc0e86b4b10c9f9e0559d563576e1bdd2ebbc5cbc012fc029d108b97fe3",
+        "version": "2a83ddce2badd4ab890433df42248cfa78ae6ef0",
+        "sha256": "c2b0891316b630ff68af147e3f4c6920d313a427605484293c6f178c05181288",
         "urls": ["https://github.com/{repo}/archive/{version}.tar.gz"],
         "strip_prefix": "envoy-{version}",
     },
