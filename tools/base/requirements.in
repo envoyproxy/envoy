@@ -26,7 +26,6 @@ envoy.gpg.sign>=0.2.0
 flake8>=6
 frozendict>=2.3.7
 gitpython
-gsutil
 icalendar
 jinja2
 kafka-python-ng
