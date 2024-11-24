@@ -50,6 +50,7 @@ jobs:
         lower than limit
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
+      rbe-google: true
       request: ${{ inputs.request }}
       steps-post: |
         - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.10

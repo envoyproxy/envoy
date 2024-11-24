@@ -72,8 +72,6 @@ on:
         type: string
       gcs-cache-bucket:
         type: string
-      gcs-only:
-        type: string
       import-gpg:
         type: boolean
         default: false
@@ -88,6 +86,9 @@ on:
       rbe:
         type: boolean
         default: true
+      rbe-google:
+        type: boolean
+        default: false
       repo-fetch-depth:
         type: number
         default: 1
@@ -321,6 +322,7 @@ jobs:
 
     - run: |
         echo "e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9" > .BAZEL_FAKE_SCM_REVISION
+      name: Configure PR Bazel settings
       if: >-
         ${{ fromJSON(inputs.request).request.pr != '' }}
     - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.10
@@ -328,19 +330,18 @@ jobs:
       id: gcp
       with:
         key: ${{ secrets.gcp-key }}
-        key-copy: ${{ runner.temp }}
+        key-copy: ${{ inputs.rbe-google && runner.temp || '' }}
     - run: |
         GCP_SERVICE_ACCOUNT_KEY_FILE="$(basename "${{ steps.gcp.outputs.key-copy-path }}")"
         echo "GCP_SERVICE_ACCOUNT_KEY_PATH=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE}" >> "$GITHUB_ENV"
-        if [[ "${{ inputs.gcs-only }}" != "" ]]; then
-            exit 0
-        fi
         BAZEL_BUILD_EXTRA_OPTIONS="--google_credentials=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE} --config=rbe-google"
         echo "BAZEL_BUILD_EXTRA_OPTIONS=${BAZEL_BUILD_EXTRA_OPTIONS}" >> "$GITHUB_ENV"
       if: ${{ steps.gcp.outputs.key-copy-path }}
+      name: Setup Google RBE
     - run: |
         echo "${{ vars.ENVOY_CI_BAZELRC }}" > repo.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
+      name: Configure repo Bazel settings
 
     - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.10
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}

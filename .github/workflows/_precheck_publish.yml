@@ -43,7 +43,6 @@ jobs:
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && '-arm64' || '' }}
       concurrency-suffix: -${{ matrix.target }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
-      gcs-only: "true"
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
