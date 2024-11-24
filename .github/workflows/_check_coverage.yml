@@ -50,9 +50,10 @@ jobs:
         lower than limit
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
+      rbe-google: true
       request: ${{ inputs.request }}
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.9
+        - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.10
           with:
             bucket: ${{ inputs.trusted && vars.GCS_ARTIFACT_BUCKET_POST || vars.GCS_ARTIFACT_BUCKET_PRE }}
             path: generated/${{ matrix.target }}
