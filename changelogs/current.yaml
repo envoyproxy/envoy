@@ -23,6 +23,9 @@ bug_fixes:
 - area: tracers
   change: |
     Avoid possible overflow when setting span attributes in Dynatrace sampler.
+- area: validation/tools
+  change: |
+    Add back missing extension for ``schema_validator_tool``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
