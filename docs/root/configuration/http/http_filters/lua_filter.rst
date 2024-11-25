@@ -572,9 +572,12 @@ set to true, Envoy responds with a 503 Service Unavailable error.
 
 The function takes two arguments:
 
-* ``host`` (string): The host address to be used for upstream requests.
-* ``strict`` (boolean, optional): If set to true, the request is strictly routed to the overridden host. If the host is
-  unavailable, Envoy returns a 503 error. Defaults to false.
+* ``host`` (string): The upstream host address to use for the request. This must be a valid IP address; otherwise, the
+  Lua script will throw an error.
+* ``strict`` (boolean, optional): Determines whether the HTTP request must be strictly routed to the requested
+  destination. When set to ``true``, if the requested destination is unavailable, Envoy will return a 503 status code.
+  The default value is ``false``, which allows Envoy to fall back to its load balancing mechanism. In this case, if the
+  requested destination is not found, the request will be routed according to the load balancing algorithm.
 
 Example:
 
