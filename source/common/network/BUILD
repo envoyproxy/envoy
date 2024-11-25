@@ -268,13 +268,7 @@ envoy_cc_library(
         "@com_github_google_quiche//:quic_core_lru_cache_lib",
         "@com_github_google_quiche//:quic_platform_socket_address",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
-    ] + select({
-        "//bazel:linux": [
-            "//source/common/io:io_uring_impl_lib",
-            "//source/common/io:io_uring_worker_lib",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     alwayslink = LEGACY_ALWAYSLINK,
 )
 
