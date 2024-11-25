@@ -265,6 +265,10 @@ new_features:
   change: |
     Added support in SNI dynamic forward proxy for saving the resolved upstream address in the filter state.
     The state is saved with the key ``envoy.stream.upstream_address``.
+- area: lua
+  change: |
+    Added a new ``setUpstreamOverrideHost()`` which could be used to set the given host as the upstream host for the
+    current request.
 
 deprecated:
 - area: rbac
