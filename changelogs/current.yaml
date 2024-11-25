@@ -15,6 +15,9 @@ bug_fixes:
   change: |
     Relaxed the restriction on SNI logging to allow the ``_`` character, even if
     ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
+- area: validation/tools
+  change: |
+    Add back missing extension for ``schema_validator_tool``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
