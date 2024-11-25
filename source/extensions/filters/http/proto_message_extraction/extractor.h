@@ -57,7 +57,7 @@ public:
   // is the last message. It only keeps the result from the first one the last.
   virtual void processResponse(Protobuf::field_extraction::MessageData& message) = 0;
 
-  virtual const ExtractedMessageResult& GetResult() const = 0;
+  virtual ExtractedMessageResult GetResult() = 0;
 };
 
 using ExtractorPtr = std::unique_ptr<Extractor>;

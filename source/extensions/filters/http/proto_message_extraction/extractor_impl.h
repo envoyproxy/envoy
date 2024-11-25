@@ -40,7 +40,12 @@ public:
 
   void processResponse(Protobuf::field_extraction::MessageData& message) override;
 
-  const ExtractedMessageResult& GetResult() const override { return result_; }
+  ExtractedMessageResult GetResult() const override {
+    ExtractedMessageResult result = result_;
+    result_.request_data.clear();
+    result_.response_data.clear();
+    return result;
+  }
 
 private:
   const envoy::extensions::filters::http::proto_message_extraction::v3::MethodExtraction&
