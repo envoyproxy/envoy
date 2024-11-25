@@ -44,6 +44,10 @@ public:
   // Envoy::Matcher::InputMatcher
   bool match(const ::Envoy::Matcher::MatchingDataType& input) override;
 
+  const std::string& stringRepresentation() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "Optimized for HyperScan");
+  }
+
 private:
   hs_database_t* database_{};
   hs_database_t* start_of_match_database_{};
