@@ -161,20 +161,66 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       rejected_mutations.inc();
       return absl::InvalidArgumentError("Invalid character in set_headers mutation.");
     }
+
+    auto check_op = CheckOperation::SET;
+    auto should_append = false;
     const LowerCaseString header_name(sh.header().key());
-    const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
-    const auto check_op = (append && !headers.get(header_name).empty()) ? CheckOperation::APPEND
-                                                                        : CheckOperation::SET;
-    auto check_result = checker.check(check_op, header_name, header_value);
-    if (replacing_message && header_name == Http::Headers::get().Method) {
-      // Special handling to allow changing ":method" when the
-      // CONTINUE_AND_REPLACE option is selected, to stay compatible.
-      check_result = CheckResult::OK;
+    const auto header_exists = !headers.get(header_name).empty();
+
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.ext_proc_legacy_append")) {
+      // Legacy append behavior
+      should_append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(sh, append, false);
+      check_op = (should_append && header_exists) ? CheckOperation::APPEND : CheckOperation::SET;
+    } else {
+      if (sh.has_append()) {
+        // 'append' is set and ensure the 'append_action' value is equal to the default value.
+        if (sh.append_action() !=
+            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD) {
+          return absl::InvalidArgumentError(
+              "Both append and append_action are set and it's not allowed");
+        }
+
+        // Legacy append behavior
+        should_append = sh.append().value();
+        check_op = (should_append && header_exists) ? CheckOperation::APPEND : CheckOperation::SET;
+      } else {
+        switch (sh.append_action()) {
+          PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+        case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
+          should_append = true;
+          check_op = CheckOperation::APPEND;
+          break;
+        case envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT:
+          if (header_exists) {
+            continue; // Skip if header exists
+          }
+          should_append = false;
+          check_op = CheckOperation::SET;
+          break;
+        case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
+          if (!header_exists) {
+            continue; // Skip if header doesn't exist
+          }
+          should_append = false;
+          check_op = CheckOperation::SET;
+          break;
+        case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+          should_append = false;
+          check_op = CheckOperation::SET;
+          break;
+        }
+      }
     }
-    switch (check_result) {
+
+    const auto check_result = checker.check(check_op, header_name, header_value);
+    const auto final_result = replacing_message && header_name == Http::Headers::get().Method
+                                  ? CheckResult::OK
+                                  : check_result;
+
+    switch (final_result) {
     case CheckResult::OK:
-      ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), append);
-      if (append) {
+      ENVOY_LOG(trace, "Setting header {} append = {}", sh.header().key(), should_append);
+      if (should_append) {
         headers.addCopy(header_name, header_value);
       } else {
         headers.setCopy(header_name, header_value);

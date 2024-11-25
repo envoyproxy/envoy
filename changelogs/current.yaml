@@ -24,6 +24,14 @@ behavior_changes:
     rather than waiting for the original request to complete. This allows shadowing requests larger than the buffer limit,
     but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
+- area: ext_proc
+  change: |
+    The default behavior for header mutations in ext_proc changed. Previously, header values would be replaced by default,
+    and setting append to true was required for appending. Now, header values will be appended by default if append is
+    not specified. The old behavior can be temporarily restored by setting runtime guard
+    ``envoy.reloadable_features.ext_proc_legacy_append`` to ``true``. For more control over header mutation behavior,
+    use the :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>` field which will
+    be the only supported option in the future.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -265,6 +273,11 @@ new_features:
   change: |
     Added support in SNI dynamic forward proxy for saving the resolved upstream address in the filter state.
     The state is saved with the key ``envoy.stream.upstream_address``.
+- area: ext_proc
+  change: |
+    Added support for ``HeaderAppendAction`` in ext_proc mutation utils, allowing more granular control over header
+    modifications using ``APPEND_IF_EXISTS_OR_ADD``, ``ADD_IF_ABSENT``, ``OVERWRITE_IF_EXISTS``, and
+    ``OVERWRITE_IF_EXISTS_OR_ADD`` actions. The existing append behavior continues to work as before.
 
 deprecated:
 - area: rbac
