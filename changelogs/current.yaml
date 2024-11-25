@@ -106,8 +106,8 @@ bug_fixes:
     to fire.
 - area: OAuth2
   change: |
-    Fixed ID token and refresh token don't respect the :ref:`cookie_domain
-    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.credentials.cookie_domain>` field.
+    Fixed an issue where ID token and refresh token did not adhere to the :ref:`cookie_domain
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_domain>` field.
 - area: original_ip_detection custom header extension
   change: |
     Reverted :ref:`custom header
@@ -121,7 +121,6 @@ bug_fixes:
     Fixed default host weight calculation of :ref:`client_side_weighted_round_robin
     <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
     to properly handle even number of valid host weights.
->>>>>>> origin/main
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
