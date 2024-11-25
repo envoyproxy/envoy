@@ -9,6 +9,7 @@
 
 #include "test/common/http/common.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
+#include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
 
@@ -42,6 +43,7 @@ struct ConfigOptions {
   bool failure_mode_allow = false;
   int64_t timeout = 900000000;
   std::string cluster = "ext_proc_server_0";
+  bool add_log_filter = false;
 };
 
 struct ExtProcHttpTestParams {
@@ -121,6 +123,18 @@ public:
         ext_proc_filter.set_name(ext_proc_filter_name);
         ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
         config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+      }
+
+      if (config_option.add_log_filter) {
+        test::integration::filters::LoggingTestFilterConfig logging_filter_config;
+        logging_filter_config.set_logging_id(ext_proc_filter_name);
+        logging_filter_config.set_upstream_cluster_name(config_option.cluster);
+        logging_filter_config.set_check_received_bytes(true);
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter logging_filter;
+        logging_filter.set_name("logging-test-filter");
+        logging_filter.mutable_typed_config()->PackFrom(logging_filter_config);
+
+        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(logging_filter));
       }
     });
 
@@ -484,6 +498,43 @@ TEST_P(ExtProcHttpClientIntegrationTest, WrongClusterConfigWithFailOpen) {
   handleUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
+}
+
+// Using logging filter to test stats in onSuccess case.
+TEST_P(ExtProcHttpClientIntegrationTest, StatsTestOnSuccess) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  ConfigOptions config_option = {};
+  config_option.add_log_filter = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("foo"), "yes"); });
+
+  // The side stream get the request and sends back the response.
+  processRequestHeadersMessage(http_side_upstreams_[0], true, absl::nullopt);
+
+  // The request is sent to the upstream.
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Using logging filter to test stats in onFailure case.
+TEST_P(ExtProcHttpClientIntegrationTest, StatsTestOnFailure) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  ConfigOptions config_option = {};
+  config_option.add_log_filter = true;
+  initializeConfig(config_option);
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(
+      http_side_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse&) { return true; },
+      true);
+
+  verifyDownstreamResponse(*response, 500);
 }
 
 } // namespace

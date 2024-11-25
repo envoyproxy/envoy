@@ -1082,6 +1082,7 @@ void Filter::logStreamInfoBase(Envoy::StreamInfo::StreamInfo* stream_info) {
   if (stream_info == nullptr) {
     return;
   }
+
   const auto& upstream_meter = stream_info->getUpstreamBytesMeter();
   if (upstream_meter != nullptr) {
     logging_info_->setBytesSent(upstream_meter->wireBytesSent());
@@ -1099,12 +1100,6 @@ void Filter::logStreamInfo() {
     return;
   }
 
-  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
-    logStreamInfoBase(&stream_->streamInfo());
-  }
-}
-
-void Filter::logGrpcStreamInfo() {
   if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
     logStreamInfoBase(&stream_->streamInfo());
   }

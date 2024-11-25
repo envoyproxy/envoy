@@ -436,8 +436,7 @@ public:
   void onGrpcError(Grpc::Status::GrpcStatus error) override;
   void onGrpcClose() override;
   void logStreamInfoBase(Envoy::StreamInfo::StreamInfo* stream_info);
-  void logGrpcStreamInfo() override;
-  void logStreamInfo();
+  void logStreamInfo() override;
 
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);

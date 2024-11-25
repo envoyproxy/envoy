@@ -44,7 +44,7 @@ public:
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) PURE;
   virtual void onGrpcError(Grpc::Status::GrpcStatus error) PURE;
   virtual void onGrpcClose() PURE;
-  virtual void logGrpcStreamInfo() PURE;
+  virtual void logStreamInfo() PURE;
 };
 
 class ExternalProcessorClient : public ClientBase {
