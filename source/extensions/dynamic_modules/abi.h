@@ -33,8 +33,7 @@ extern "C" {
  *
  * OWNERSHIP: Envoy owns the pointer.
  */
-typedef const char* // NOLINT(modernize-use-using)
-    envoy_dynamic_module_type_abi_version_envoy_ptr;
+typedef const char* envoy_dynamic_module_type_abi_version_envoy_ptr;
 
 /**
  * envoy_dynamic_module_type_http_filter_config_envoy_ptr is a raw pointer to
@@ -47,8 +46,7 @@ typedef const char* // NOLINT(modernize-use-using)
  *
  * OWNERSHIP: Envoy owns the pointer.
  */
-typedef const void* // NOLINT(modernize-use-using)
-    envoy_dynamic_module_type_http_filter_config_envoy_ptr;
+typedef const void* envoy_dynamic_module_type_http_filter_config_envoy_ptr;
 
 /**
  * envoy_dynamic_module_type_http_filter_config_module_ptr is a pointer to an in-module HTTP
@@ -60,8 +58,7 @@ typedef const void* // NOLINT(modernize-use-using)
  * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
  * released when envoy_dynamic_module_on_http_filter_config_destroy is called for the same pointer.
  */
-typedef const void* // NOLINT(modernize-use-using)
-    envoy_dynamic_module_type_http_filter_config_module_ptr;
+typedef const void* envoy_dynamic_module_type_http_filter_config_module_ptr;
 
 // -----------------------------------------------------------------------------
 // ------------------------------- Event Hooks ---------------------------------
