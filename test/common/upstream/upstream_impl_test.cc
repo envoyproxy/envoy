@@ -1479,11 +1479,9 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig) {
       [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, ssl_context_manager_,
       nullptr, false);
 
-  auto factory = StrictDnsClusterFactory();
-  auto cluster = factory.create(cluster_config, factory_context);
-  ASSERT_TRUE(cluster.ok());
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
-  cluster->first->initialize([] {});
+  cluster->initialize([] {});
 
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
   ON_CALL(random_, random()).WillByDefault(Return(8000));
@@ -1524,17 +1522,56 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
       [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, ssl_context_manager_,
       nullptr, false);
 
-  auto factory = StrictDnsClusterFactory();
-  auto cluster = factory.create(cluster_config, factory_context);
-  ASSERT_TRUE(cluster.ok());
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
-  cluster->first->initialize([] {});
+  cluster->initialize([] {});
 
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
   ON_CALL(random_, random()).WillByDefault(Return(8000));
   resolver.dns_callback_(
       Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(30)));
+}
+
+TEST_F(StrictDnsClusterImplTest, ClusterTypeConfigTypedDnsResolverConfig) {
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  EXPECT_CALL(dns_resolver_factory, createDnsResolver(_, _, _)).WillOnce(Return(dns_resolver_));
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.cluster.dns
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        dns_refresh_rate: 4s
+        dns_jitter: 0s
+        respect_dns_ttl: true
+        logical: false
+        typed_dns_resolver_config:
+          name: envoy.network.dns_resolver.cares
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  // No `dns_resolver_fn` so test segfaults if trying to use default Dns resolver rather than
+  // creating one from the function>
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, nullptr);
 }
 
 TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {

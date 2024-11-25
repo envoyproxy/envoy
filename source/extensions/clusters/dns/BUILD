@@ -12,6 +12,7 @@ envoy_cc_extension(
     name = "dns_cluster_lib",
     srcs = ["dns_cluster.cc"],
     hdrs = ["dns_cluster.h"],
+    visibility = ["//visibility:public"],
     deps = [
         "//source/common/upstream:cluster_factory_includes",
         "//source/common/upstream:upstream_includes",

@@ -478,23 +478,23 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
   load_assignment:
-        cluster_name: name
-        endpoints:
-          - lb_endpoints:
-            - endpoint:
-                address:
-                  socket_address:
-                    address: foo.bar.com
-                    port_value: 443
-                health_check_config:
-                  port_value: 8000
-            - endpoint:
-                address:
-                  socket_address:
-                    address: hello.world.com
-                    port_value: 443
-                health_check_config:
-                  port_value: 8000
+    cluster_name: name
+    endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: foo.bar.com
+                port_value: 443
+            health_check_config:
+              port_value: 8000
+        - endpoint:
+            address:
+              socket_address:
+                address: hello.world.com
+                port_value: 443
+            health_check_config:
+              port_value: 8000
   )EOF";
 
   EXPECT_EQ(

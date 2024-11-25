@@ -84,9 +84,9 @@ private:
 /**
  * Factory for StrictDnsClusterImpl
  */
-class StrictDnsClusterFactory : public Upstream::ClusterFactoryImplBase {
+class StrictDnsClusterFactory : public ClusterFactoryImplBase {
 public:
-  StrictDnsClusterFactory() : Upstream::ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
+  StrictDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
 
 private:
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
