@@ -100,7 +100,9 @@ public:
       if (matcher.ignore_case()) {
         ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
       }
-      regex_ = Regex::Utility::parseRegex(matcher_.safe_regex(), context.regexEngine());
+      regex_ = THROW_OR_RETURN_VALUE(
+          Regex::Utility::parseRegex(matcher_.safe_regex(), context.regexEngine()),
+          Regex::CompiledMatcherPtr);
     } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {
       if (matcher_.ignore_case()) {
         // Cache the lowercase conversion of the Contains matcher for future use

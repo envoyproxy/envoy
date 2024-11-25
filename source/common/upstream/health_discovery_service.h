@@ -20,6 +20,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/common/upstream/locality_endpoint.h"
+#include "source/common/upstream/prod_cluster_info_factory.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -138,7 +139,7 @@ class HdsDelegate : Grpc::AsyncStreamCallbacks<envoy::service::health::v3::Healt
 public:
   HdsDelegate(Server::Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
               Grpc::RawAsyncClientPtr async_client, Envoy::Stats::Store& stats,
-              Ssl::ContextManager& ssl_context_manager, ClusterInfoFactory& info_factory);
+              Ssl::ContextManager& ssl_context_manager);
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
@@ -180,7 +181,7 @@ private:
   Server::Configuration::ServerFactoryContext& server_context_;
   Envoy::Stats::Store& store_stats_;
   Ssl::ContextManager& ssl_context_manager_;
-  ClusterInfoFactory& info_factory_;
+  std::unique_ptr<ClusterInfoFactory> info_factory_;
   ThreadLocal::SlotAllocator& tls_;
 
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse health_check_request_;

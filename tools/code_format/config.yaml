@@ -126,8 +126,9 @@ paths:
     - source/common/router/config_impl.cc
     - source/common/router/scoped_config_impl.cc
     - source/common/common/utility.cc
-    - source/common/common/regex.h
     - source/exe/stripped_main_base.cc
+    - source/common/http/header_utility.cc
+    - source/common/common/matchers.h
     - source/server/options_impl.cc
     - source/server/config_validation/server.cc
     - source/server/admin/html/active_stats.js
@@ -139,11 +140,8 @@ paths:
     - source/common/upstream/prod_cluster_info_factory.cc
     - source/common/secret/sds_api.h
     - source/common/secret/sds_api.cc
-    - source/common/secret/secret_provider_impl.cc
     - source/common/router/router.cc
     - source/common/config/config_provider_impl.h
-    - source/common/common/logger_delegates.cc
-    - source/common/upstream/outlier_detection_impl.h
     - source/common/grpc/async_client_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc

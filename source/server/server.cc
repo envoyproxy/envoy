@@ -386,8 +386,10 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
                               ComponentFactory& component_factory) {
   std::function set_up_logger = [&] {
     TRY_ASSERT_MAIN_THREAD {
-      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-          options_.logPath(), access_log_manager_, Logger::Registry::getSink());
+      file_logger_ = THROW_OR_RETURN_VALUE(
+          Logger::FileSinkDelegate::create(options_.logPath(), access_log_manager_,
+                                           Logger::Registry::getSink()),
+          std::unique_ptr<Logger::FileSinkDelegate>);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
@@ -840,7 +842,7 @@ void InstanceBase::onRuntimeReady() {
       hds_delegate_ =
           maybeCreateHdsDelegate(serverFactoryContext(), *stats_store_.rootScope(),
                                  factory_or_error.value()->createUncachedRawAsyncClient(),
-                                 stats_store_, *ssl_context_manager_, info_factory_);
+                                 stats_store_, *ssl_context_manager_);
     }
     END_TRY
     CATCH(const EnvoyException& e,
