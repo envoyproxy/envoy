@@ -62,9 +62,7 @@ jobs:
           target-suffix: arm64
           arch: arm64
           bazel-extra: >-
-            --config=common-envoy-engflow
-            --config=cache-envoy-engflow
-            --config=bes-envoy-engflow
+            --config=remote-cache-envoy-engflow
           rbe: false
           runs-on: envoy-arm64-large
           timeout-minutes: 180
