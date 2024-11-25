@@ -365,7 +365,6 @@ private:
   // Coroutine resumption MUST use resumeCoroutine.
   Filters::Common::Lua::Coroutine& coroutine_;
   Http::RequestOrResponseHeaderMap& headers_;
-  std::string override_host_;
   bool end_stream_;
   bool headers_continued_{};
   bool buffered_body_{};
@@ -587,7 +586,7 @@ private:
     }
     Tracing::Span& activeSpan() override { return callbacks_->activeSpan(); }
     void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
-      callbacks_->setUpstreamOverrideHost(host_and_strict);
+      callbacks_->setUpstreamOverrideHost(std::move(host_and_strict));
     }
 
     Filter& parent_;

@@ -984,8 +984,7 @@ int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
   }
 
   // Set the upstream override host
-  override_host_ = std::string(host, len);
-  callbacks_.setUpstreamOverrideHost(std::make_pair(override_host_, strict));
+  callbacks_.setUpstreamOverrideHost(std::make_pair(std::string(host, len), strict));
 
   return 0;
 }
