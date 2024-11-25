@@ -1194,6 +1194,23 @@ TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) 
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
+// Test sending GoAway during SendLocalReply from L7 encoder filters.
+TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter) {
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"send-local-reply", "true"},
+  });
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
 TEST_P(MultiplexedIntegrationTest, GoAway) {

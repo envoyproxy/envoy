@@ -4,6 +4,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
@@ -16,6 +18,13 @@ public:
   constexpr static char name[] = "send-goaway-during-decode-filter";
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& request_headers, bool) override {
+    auto local_reply = request_headers.get(Http::LowerCaseString("send-local-reply"));
+    if (!local_reply.empty()) {
+      decoder_callbacks_->sendLocalReply(Http::Code::Gone, "", nullptr, std::nullopt,
+                                         "local_reply_test");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+
     auto result = request_headers.get(Http::LowerCaseString("skip-goaway"));
     if (!result.empty() && result[0]->value() == "true") {
       go_away_skiped_ = true;
@@ -40,6 +49,12 @@ public:
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
+    if (auto status = Http::Utility::getResponseStatus(headers);
+        status == enumToInt(Http::Code::Gone)) {
+      decoder_callbacks_->sendGoAwayAndClose();
+      return Http::FilterHeadersStatus::Continue;
+    }
+
     auto result = headers.get(Http::LowerCaseString("send-encoder-goaway"));
     if (result.empty()) {
       return Http::FilterHeadersStatus::Continue;
