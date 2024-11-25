@@ -7,14 +7,11 @@ fn main() {
     eprintln!("{}: {}", key, value);
   }
 
-  // Check if it has CC environment variable, and if that matches clang,
-  // then set the CLANG_PATH to the value of CC to instruct bindgen to use
-  // clang as the compiler.
-  // https://github.com/KyleMayes/clang-sys?tab=readme-ov-file#environment-variables
-  if let Some(cc) = env::var("CC").ok() {
-    if cc.contains("clang") {
-      env::set_var("CLANG_PATH", cc);
-    }
+  // Check if '/opt/llvm/bin/clang' exists, and if it does, set the CLANG_PATH environment variable.
+  // This matches how our CI containers are set up. If the clang doesn't exist there, bindgen will
+  // try to use the system clang. In any case, clang must be found to build the bindings.
+  if std::fs::metadata("/opt/llvm/bin/clang").is_ok() {
+    env::set_var("CLANG_PATH", "/opt/llvm/bin/clang");
   }
 
   println!("cargo:rerun-if-changed=abi.h");
