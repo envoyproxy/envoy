@@ -54,9 +54,11 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
     if (thread_local_cluster) {
       active_request_ =
           thread_local_cluster->httpAsyncClient().startRequest(std::move(headers), *this, options);
-      Buffer::OwnedImpl body(req_in_json.value());
-      active_request_->sendData(body, true);
-      callbacks_->setStreamInfo(&active_request_->streamInfo());
+      if (active_request_ != nullptr) {
+        Buffer::OwnedImpl body(req_in_json.value());
+        active_request_->sendData(body, true);
+        callbacks_->setStreamInfo(&active_request_->streamInfo());
+      }
     } else {
       ENVOY_LOG(error, "ext_proc cluster {} does not exist in the config", cluster);
     }

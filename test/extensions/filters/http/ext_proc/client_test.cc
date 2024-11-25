@@ -65,7 +65,7 @@ protected:
   void onGrpcError(Grpc::Status::GrpcStatus status) override { grpc_status_ = status; }
 
   void onGrpcClose() override { grpc_closed_ = true; }
-  void logGrpcStreamInfo() override {}
+  void logStreamInfo() override {}
   void onComplete(envoy::service::ext_proc::v3::ProcessingResponse&) override {}
   void onError() override {}
   void setStreamInfo(Envoy::StreamInfo::StreamInfo*) override {}

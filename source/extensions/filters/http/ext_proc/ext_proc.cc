@@ -1079,7 +1079,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
 }
 
 void Filter::logStreamInfoBase(Envoy::StreamInfo::StreamInfo* stream_info) {
-  if (stream_info == nullptr) {
+  if (stream_info == nullptr || logging_info_ == nullptr) {
     return;
   }
 
@@ -1096,11 +1096,13 @@ void Filter::logStreamInfoBase(Envoy::StreamInfo::StreamInfo* stream_info) {
 
 void Filter::logStreamInfo() {
   if (!config().grpcService().has_value()) {
+    // HTTP service
     logStreamInfoBase(stream_info_http_);
     return;
   }
 
-  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
+  if (stream_ != nullptr &&  grpc_service_.has_envoy_grpc()) {
+    // Envoy gRPC service
     logStreamInfoBase(&stream_->streamInfo());
   }
 }
