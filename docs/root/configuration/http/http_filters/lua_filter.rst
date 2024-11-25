@@ -558,6 +558,36 @@ Returns connection-level :repo:`information <envoy/stream_info/stream_info.h>` r
 
 Returns a connection-level :ref:`stream info object <config_http_filters_lua_cx_stream_info_wrapper>`.
 
+``setUpstreamOverrideHost()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  handle:setUpstreamOverrideHost(host, strict)
+
+Sets an upstream address override for the request. When the overridden host is available and can be selected directly,
+the load balancer bypasses its algorithm and routes traffic directly to the specified host. The strict flag determines
+whether the HTTP request must strictly use the overridden destination. If the destination is unavailable and strict is
+set to true, Envoy responds with a 503 Service Unavailable error.
+
+The function takes two arguments:
+
+* ``host`` (string): The host address to be used for upstream requests.
+* ``strict`` (boolean, optional): If set to true, the request is strictly routed to the overridden host. If the host is
+  unavailable, Envoy returns a 503 error. Defaults to false.
+
+Example:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Override upstream host without strict mode
+    request_handle:setUpstreamOverrideHost("192.168.21.13", false)
+
+    -- Override upstream host with strict mode
+    request_handle:setUpstreamOverrideHost("192.168.21.13", true)
+  end
+
 ``importPublicKey()``
 ^^^^^^^^^^^^^^^^^^^^^
 
