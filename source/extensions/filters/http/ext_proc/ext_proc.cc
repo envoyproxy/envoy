@@ -1101,7 +1101,7 @@ void Filter::logStreamInfo() {
     return;
   }
 
-  if (stream_ != nullptr &&  grpc_service_.has_envoy_grpc()) {
+  if (stream_ != nullptr && grpc_service_.has_envoy_grpc()) {
     // Envoy gRPC service
     logStreamInfoBase(&stream_->streamInfo());
   }
