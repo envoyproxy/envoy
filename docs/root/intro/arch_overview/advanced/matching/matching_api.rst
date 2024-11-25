@@ -193,6 +193,8 @@ and specifying a :ref:`Route <envoy_v3_api_msg_config.route.v3.Route>` or :ref:`
 <envoy_v3_api_msg_config.route.v3.RouteList>` as the resulting action. See :ref:`the examples
 <arch_overview_http_routing_matcher>` for how the match tree can be configured.
 
+.. _arch_overview_sublinear_routing:
+
 Sublinear Route Matching
 ~~~~~~~~~~~~~~~~~~~~~~~
 
