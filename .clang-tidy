@@ -111,6 +111,9 @@ UseColor: true
 
 WarningsAsErrors: '*'
 
+# The ABI header file is a pure C header file, and clang-tidy is only for C++.
+ExcludeHeaderFilterRegex: 'source/extensions/dynamic_modules/abi.h'
+
 ## The version here is arbitrary since any change to this file will
 ## trigger a full run of clang-tidy against all files.
 ## It can be useful as it seems some header changes may not trigger the
