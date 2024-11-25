@@ -79,7 +79,7 @@ minor_behavior_changes:
       :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`.
 - area: cluster
   change: |
-      Clusters factories are registered by configurtion type for
+      Clusters factories are registered by configuration type for
       :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
       and will use configuration type to lookup the corresponding factory when available.
 bug_fixes:
