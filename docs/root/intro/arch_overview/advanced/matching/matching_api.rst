@@ -196,7 +196,7 @@ and specifying a :ref:`Route <envoy_v3_api_msg_config.route.v3.Route>` or :ref:`
 .. _arch_overview_sublinear_routing:
 
 Sublinear Route Matching
-------------------------
+########################
 
 An incoming request to Envoy needs to be matched to a cluster based on defined :ref:`routes <envoy_v3_api_msg_config.route.v3.VirtualHost>`. Typically, a well understood, linear route search matching with O(n) search cost is employed which can become a scalability issue with higher latencies as the number of routes go up to O(1k+).
 
