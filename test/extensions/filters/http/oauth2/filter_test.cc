@@ -1655,7 +1655,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
 }
 
 /**
- * Testing oauth state disabled nonce.
+ * Testing oauth state when nonce is disabled.
  *
  * Expected behavior: The nonce should not be set in the state.
  */

@@ -496,7 +496,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   const std::string full_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
   const std::string escaped_url = Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
 
-  std::string state;
+  std::string state = escaped_url;
   if (!config_->disableNonce()) {
     // Generate a nonce to prevent CSRF attacks
     std::string nonce;
@@ -529,8 +529,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     // Encode the original request URL and the nonce to the state parameter
     state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(
         absl::StrCat(stateParamsUrl, "=", escaped_url, "&", stateParamsNonce, "=", nonce));
-  } else {
-    state = escaped_url;
   }
 
   Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
@@ -844,7 +842,7 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // state is an HTTP URL encoded string that contains the url and nonce, for example:
   // state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%3D1234567890000000".
   std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
-  std::string original_request_url;
+  std::string original_request_url = state;
   const auto state_parameters = Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
   if (!config_->disableNonce()) {
     // Return 401 unauthorized if the state query parameter does not contain a nonce.
@@ -872,8 +870,6 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
       return {false, "", ""};
     }
     original_request_url = urlVal.value();
-  } else {
-    original_request_url = state;
   }
 
   // Return 401 unauthorized if the state is not a valid url.
