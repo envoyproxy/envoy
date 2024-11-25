@@ -66,6 +66,8 @@ minor_behavior_changes:
     :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
     is now enabled by default. This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.oauth2_use_refresh_token`` to false.
+    Added :ref:`disable_nonce <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_nonce>`
+    to disable nonce parameter in the authorization request.
 - area: quic
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
