@@ -1,7 +1,5 @@
 #pragma once
 
-// NOLINT(namespace-envoy)
-
 // This is a pure C header file that defines the ABI of the core of dynamic modules used by Envoy.
 //
 // This must not contain any dependencies besides standard library since it is not only used by

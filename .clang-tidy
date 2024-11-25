@@ -39,11 +39,6 @@ Checks: >
   readability-redundant-smartptr-get,
   readability-redundant-string-cstr
 
-Checks: '-modernize-use-using'
-Exclude:
-  # The ABI of dynamic modules is a pure C header, not C++.
-  - './source/extensions/dynamic_modules/abi.h'
-
 CheckOptions:
 - key: cppcoreguidelines-unused-variable.IgnorePattern
   value: "^_$"
@@ -115,6 +110,9 @@ HeaderFilterRegex: '^./source/.*|^./contrib/.*|^./test/.*|^./envoy/.*'
 UseColor: true
 
 WarningsAsErrors: '*'
+
+# The ABI header file is a pure C header file, and clang-tidy is only for C++.
+ExcludeHeaderFilterRegex: 'source/extensions/dynamic_modules/abi.h'
 
 ## The version here is arbitrary since any change to this file will
 ## trigger a full run of clang-tidy against all files.
