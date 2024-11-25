@@ -78,6 +78,9 @@ minor_behavior_changes:
   change: |
     Local replies now traverse the filter chain if 1xx headers have been sent to the client. This change can be reverted
     by setting the runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` to false.
+- area: dns
+  change: |
+    Patched c-ares to address CVE-2024-25629.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
