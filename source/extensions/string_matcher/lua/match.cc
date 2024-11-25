@@ -89,6 +89,9 @@ public:
   }
 
   bool match(const absl::string_view value) const override { return (*tls_slot_)->match(value); }
+  const std::string& stringRepresentation() const override {
+    return (*tls_slot_)->stringRepresentation();
+  }
 
 private:
   ThreadLocal::TypedSlotPtr<LuaStringMatcher> tls_slot_;
