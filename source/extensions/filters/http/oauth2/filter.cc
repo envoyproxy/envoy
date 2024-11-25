@@ -530,8 +530,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(
         absl::StrCat(stateParamsUrl, "=", escaped_url, "&", stateParamsNonce, "=", nonce));
   } else {
-    state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(
-        absl::StrCat(stateParamsUrl, "=", escaped_url));
+    state = escaped_url;
   }
 
   Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
