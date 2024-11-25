@@ -273,14 +273,14 @@ build:rbe-toolchain-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_cla
 build:rbe-toolchain-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
 build:rbe-toolchain-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
 build:rbe-toolchain-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain
-build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++
+build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++ --host_action_env=CC=clang --host_action_env=CXX=clang++
 
 build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
 build:rbe-toolchain-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_libcxx_platform
 build:rbe-toolchain-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_libcxx_platform
 build:rbe-toolchain-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain
-build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
+build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --host_action_env=CC=clang --host_action_env=CXX=clang++
 build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
