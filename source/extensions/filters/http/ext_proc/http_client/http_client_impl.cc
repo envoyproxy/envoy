@@ -43,8 +43,7 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
   auto req_in_json = MessageUtil::getJsonStringFromMessage(req);
   if (req_in_json.ok()) {
     const auto http_uri = config_.http_service().http_service().http_uri();
-    Http::RequestHeaderMapPtr headers =
-        buildHttpRequestHeaders(http_uri.uri(), stream_id);
+    Http::RequestHeaderMapPtr headers = buildHttpRequestHeaders(http_uri.uri(), stream_id);
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(std::chrono::milliseconds(
                            DurationUtil::durationToMilliseconds(http_uri.timeout())))

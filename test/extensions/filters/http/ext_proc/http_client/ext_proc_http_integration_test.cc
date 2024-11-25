@@ -8,8 +8,8 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/common/http/common.h"
-#include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
+#include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
 

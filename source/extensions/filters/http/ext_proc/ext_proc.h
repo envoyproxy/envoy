@@ -457,7 +457,9 @@ public:
   const ProcessorState& decodingState() { return decoding_state_; }
   void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) override;
   void onError() override;
-  void setStreamInfo(Envoy::StreamInfo::StreamInfo* stream_info) override { stream_info_http_ = stream_info; }
+  void setStreamInfo(Envoy::StreamInfo::StreamInfo* stream_info) override {
+    stream_info_http_ = stream_info;
+  }
 
 private:
   void mergePerRouteConfig();
