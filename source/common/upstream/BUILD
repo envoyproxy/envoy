@@ -297,12 +297,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "prod_cluster_info_factory_lib",
+    srcs = ["prod_cluster_info_factory.cc"],
+    hdrs = ["prod_cluster_info_factory.h"],
+    deps = [
+        ":upstream_includes",
+    ],
+)
+
+envoy_cc_library(
     name = "health_discovery_service_lib",
     srcs = ["health_discovery_service.cc"],
     hdrs = ["health_discovery_service.h"],
     deps = [
         ":health_checker_lib",
         ":locality_endpoint_lib",
+        ":prod_cluster_info_factory_lib",
         ":upstream_includes",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",

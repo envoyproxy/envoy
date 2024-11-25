@@ -20,11 +20,13 @@ class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr secret_provider,
                   ThreadLocal::SlotAllocator& tls, Api::Api& api)
-      : credential_(std::move(secret_provider), tls, api) {}
-  const std::string& credential() const override { return credential_.secret(); }
+      : credential_(THROW_OR_RETURN_VALUE(
+            Secret::ThreadLocalGenericSecretProvider::create(std::move(secret_provider), tls, api),
+            std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)) {}
+  const std::string& credential() const override { return credential_->secret(); }
 
 private:
-  Secret::ThreadLocalGenericSecretProvider credential_;
+  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> credential_;
 };
 
 } // namespace Common
