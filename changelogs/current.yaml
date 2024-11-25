@@ -5,6 +5,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: dns
+  change: |
+    Patched c-ares to address CVE-2024-25629.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
