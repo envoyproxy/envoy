@@ -6,6 +6,7 @@ fn main() {
   let bindings = bindgen::Builder::default()
     .header("../../abi.h")
     .header("../../abi_version.h")
+    .clang_arg("-v")
     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
     .generate()
     .expect("Unable to generate bindings");
