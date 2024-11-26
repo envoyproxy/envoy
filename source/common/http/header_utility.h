@@ -149,11 +149,20 @@ public:
   // Corresponds to the safe_regex_match from the HeaderMatchSpecifier proto in the RDS API.
   class HeaderDataRegexMatch : public HeaderDataBaseImpl {
   public:
+    static absl::StatusOr<std::unique_ptr<HeaderDataRegexMatch>>
+    create(const envoy::config::route::v3::HeaderMatcher& config,
+           Server::Configuration::CommonFactoryContext& factory_context) {
+      auto regex_or_error =
+          Regex::Utility::parseRegex(config.safe_regex_match(), factory_context.regexEngine());
+      RETURN_IF_NOT_OK_REF(regex_or_error.status());
+      return std::unique_ptr<HeaderDataRegexMatch>(
+          new HeaderDataRegexMatch(config, std::move(*regex_or_error)));
+    }
+
+  protected:
     HeaderDataRegexMatch(const envoy::config::route::v3::HeaderMatcher& config,
-                         Server::Configuration::CommonFactoryContext& factory_context)
-        : HeaderDataBaseImpl(config),
-          regex_(Regex::Utility::parseRegex(config.safe_regex_match(),
-                                            factory_context.regexEngine())) {}
+                         Regex::CompiledMatcherPtr&& regex)
+        : HeaderDataBaseImpl(config), regex_(std::move(regex)) {}
 
   private:
     bool specificMatchesHeaders(absl::string_view header_value) const override {

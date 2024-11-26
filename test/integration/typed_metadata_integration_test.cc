@@ -1,3 +1,5 @@
+#include "envoy/access_log/access_log_config.h"
+
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_protocol_integration.h"

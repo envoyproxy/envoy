@@ -423,27 +423,6 @@ case $CI_TARGET in
         collect_build_profile coverage
         ;;
 
-    coverage-upload|fuzz_coverage-upload)
-        setup_clang_toolchain
-        if [[ "$CI_TARGET" == "fuzz_coverage-upload" ]]; then
-            TARGET=fuzz_coverage
-        else
-            TARGET=coverage
-        fi
-        GCS_LOCATION=$(
-            bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
-                  "${BAZEL_BUILD_OPTIONS[@]}" \
-                  //tools/gcs:upload \
-                  "${GCS_ARTIFACT_BUCKET}" \
-                  "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-                  "/source/generated/${TARGET}" \
-                  "$TARGET" \
-                  "${GCS_REDIRECT_PATH}")
-        if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
-            echo "##vso[task.logissue type=error]Coverage failed, check artifact at: ${GCS_LOCATION}"
-        fi
-        ;;
-
     debug)
         setup_clang_toolchain
         echo "Testing ${TEST_TARGETS[*]}"
@@ -601,18 +580,6 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/ci/docker_ci.sh"
         ;;
 
-    docker-upload)
-        setup_clang_toolchain
-        bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
-              "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/gcs:upload \
-              "${GCS_ARTIFACT_BUCKET}" \
-              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-              "${BUILD_DIR}/build_images" \
-              "docker" \
-              "${GCS_REDIRECT_PATH}"
-        ;;
-
     dockerhub-publish)
         setup_clang_toolchain
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -648,18 +615,6 @@ case $CI_TARGET in
               --//tools/tarball:target=//docs:html \
               //tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
-        ;;
-
-    docs-upload)
-        setup_clang_toolchain
-        bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
-              "${BAZEL_BUILD_OPTIONS[@]}" \
-              //tools/gcs:upload \
-              "${GCS_ARTIFACT_BUCKET}" \
-              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-              /source/generated/docs \
-              docs \
-              "${GCS_REDIRECT_PATH}"
         ;;
 
     fix_proto_format)

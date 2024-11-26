@@ -6,6 +6,7 @@
 #include "source/common/common/base64.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
