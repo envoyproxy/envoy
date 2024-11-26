@@ -40,7 +40,7 @@ public:
 
   void processResponse(Protobuf::field_extraction::MessageData& message) override;
 
-  ExtractedMessageResult GetResult() const override {
+  ExtractedMessageResult GetResult() override {
     ExtractedMessageResult result = result_;
     result_.request_data.clear();
     result_.response_data.clear();
