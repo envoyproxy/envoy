@@ -43,8 +43,7 @@ struct MetadataDecoder::HpackDecoderContext {
   http2::HpackDecoder decoder;
 };
 
-MetadataDecoder::MetadataDecoder(MetadataCallback cb,
-                                 uint64_t max_payload_size_bound)
+MetadataDecoder::MetadataDecoder(MetadataCallback cb, uint64_t max_payload_size_bound)
     : max_payload_size_bound_(max_payload_size_bound) {
   ASSERT(cb != nullptr);
   callback_ = std::move(cb);

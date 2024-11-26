@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "envoy/http/metadata_interface.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -11,7 +13,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <cstdint>
 #include "http2_frame.h"
 #include "quiche/http2/adapter/data_source.h"
 #include "quiche/http2/adapter/mock_http2_visitor.h"
