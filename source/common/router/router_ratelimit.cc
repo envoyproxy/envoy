@@ -51,7 +51,7 @@ bool MatchInputRateLimitDescriptor::populateDescriptor(RateLimit::DescriptorEntr
     return false;
   }
   if (absl::string_view str = absl::get<std::string>(result.data_); !str.empty()) {
-    descriptor_entry = {descriptor_key_, std::string(str)};
+    descriptor_entry = {descriptor_key_, std::string(str), 0};
   }
   return true;
 }
@@ -87,7 +87,7 @@ bool SourceClusterAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
                                              const std::string& local_service_cluster,
                                              const Http::RequestHeaderMap&,
                                              const StreamInfo::StreamInfo&) const {
-  descriptor_entry = {"source_cluster", local_service_cluster};
+  descriptor_entry = {"source_cluster", local_service_cluster, 0};
   return true;
 }
 
@@ -97,7 +97,7 @@ bool DestinationClusterAction::populateDescriptor(RateLimit::DescriptorEntry& de
   if (info.route() == nullptr || info.route()->routeEntry() == nullptr) {
     return false;
   }
-  descriptor_entry = {"destination_cluster", info.route()->routeEntry()->clusterName()};
+  descriptor_entry = {"destination_cluster", info.route()->routeEntry()->clusterName(), 0};
   return true;
 }
 
@@ -114,7 +114,7 @@ bool RequestHeadersAction::populateDescriptor(RateLimit::DescriptorEntry& descri
     return skip_if_absent_;
   }
   // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  descriptor_entry = {descriptor_key_, std::string(header_value[0]->value().getStringView())};
+  descriptor_entry = {descriptor_key_, std::string(header_value[0]->value().getStringView()), 0};
   return true;
 }
 
@@ -127,7 +127,7 @@ bool RemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& descrip
     return false;
   }
 
-  descriptor_entry = {"remote_address", remote_address->ip()->addressAsString()};
+  descriptor_entry = {"remote_address", remote_address->ip()->addressAsString(), 0};
 
   return true;
 }
@@ -152,7 +152,7 @@ bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& d
   // from addressAsString this is a valid address.
   Network::Address::CidrRange cidr_entry =
       *Network::Address::CidrRange::create(remote_address->ip()->addressAsString(), mask_len);
-  descriptor_entry = {"masked_remote_address", cidr_entry.asString()};
+  descriptor_entry = {"masked_remote_address", cidr_entry.asString(), 0};
 
   return true;
 }
@@ -160,7 +160,7 @@ bool MaskedRemoteAddressAction::populateDescriptor(RateLimit::DescriptorEntry& d
 bool GenericKeyAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
                                           const std::string&, const Http::RequestHeaderMap&,
                                           const StreamInfo::StreamInfo&) const {
-  descriptor_entry = {descriptor_key_, descriptor_value_};
+  descriptor_entry = {descriptor_key_, descriptor_value_, 0};
   return true;
 }
 
@@ -195,10 +195,10 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
       Envoy::Config::Metadata::metadataValue(metadata_source, metadata_key_).string_value();
 
   if (!metadata_string_value.empty()) {
-    descriptor_entry = {descriptor_key_, metadata_string_value};
+    descriptor_entry = {descriptor_key_, metadata_string_value, 0};
     return true;
   } else if (metadata_string_value.empty() && !default_value_.empty()) {
-    descriptor_entry = {descriptor_key_, default_value_};
+    descriptor_entry = {descriptor_key_, default_value_, 0};
     return true;
   }
 
@@ -221,7 +221,7 @@ bool HeaderValueMatchAction::populateDescriptor(RateLimit::DescriptorEntry& desc
                                                 const Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo&) const {
   if (expect_match_ == Http::HeaderUtility::matchHeaders(headers, action_headers_)) {
-    descriptor_entry = {descriptor_key_, descriptor_value_};
+    descriptor_entry = {descriptor_key_, descriptor_value_, 0};
     return true;
   } else {
     return false;
@@ -244,7 +244,7 @@ bool QueryParameterValueMatchAction::populateDescriptor(
       Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
   if (expect_match_ ==
       ConfigUtility::matchQueryParams(query_parameters, action_query_parameters_)) {
-    descriptor_entry = {descriptor_key_, descriptor_value_};
+    descriptor_entry = {descriptor_key_, descriptor_value_, 0};
     return true;
   } else {
     return false;

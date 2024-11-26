@@ -47,6 +47,7 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
           new_descriptor->add_entries();
       new_entry->set_key(entry.key_);
       new_entry->set_value(entry.value_);
+      new_entry->set_hits_addend(entry.hits_addend_);
     }
     if (descriptor.limit_) {
       envoy::extensions::common::ratelimit::v3::RateLimitDescriptor_RateLimitOverride* new_limit =
