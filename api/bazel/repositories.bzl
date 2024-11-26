@@ -24,13 +24,14 @@ def api_dependencies(bzlmod = False):
     external_http_archive(
         name = "envoy_toolshed",
     )
+
+    if bzlmod:
+        return
+
     external_http_archive(
         name = "opentelemetry_proto",
         build_file_content = OPENTELEMETRY_BUILD_CONTENT,
     )
-
-    if bzlmod:
-        return
 
     external_http_archive(
         name = "bazel_skylib",
