@@ -147,8 +147,9 @@ TEST(Utility, CompiledMatcherStringRepresentation) {
   envoy::type::matcher::v3::RegexMatcher matcher;
   matcher.set_regex("/aS?df/.*");
   matcher.mutable_google_re2();
-  const CompiledMatcherPtr re_matcher = Utility::parseRegex(matcher, engine);
-  EXPECT_EQ(re_matcher->stringRepresentation(), "/aS?df/.*");
+  const absl::StatusOr<CompiledMatcherPtr> re_matcher = Utility::parseRegex(matcher, engine);
+  EXPECT_TRUE(re_matcher.status().ok());
+  EXPECT_EQ(re_matcher.value()->stringRepresentation(), "/aS?df/.*");
 }
 
 } // namespace
