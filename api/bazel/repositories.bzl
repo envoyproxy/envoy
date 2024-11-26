@@ -29,11 +29,6 @@ def api_dependencies(bzlmod = False):
         return
 
     external_http_archive(
-        name = "opentelemetry_proto",
-        build_file_content = OPENTELEMETRY_BUILD_CONTENT,
-    )
-
-    external_http_archive(
         name = "bazel_skylib",
     )
     external_http_archive(
@@ -61,6 +56,10 @@ def api_dependencies(bzlmod = False):
     external_http_archive(
         name = "com_github_openzipkin_zipkinapi",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "opentelemetry_proto",
+        build_file_content = OPENTELEMETRY_BUILD_CONTENT,
     )
     external_http_archive(
         name = "dev_cel",
