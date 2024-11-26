@@ -1,5 +1,5 @@
 # See bazel/README.md for details on how this system works.
-DEFAULT_EXTENSIONS = {
+EXTENSIONS = {
     #
     # Access loggers
     #
@@ -538,14 +538,8 @@ DEFAULT_EXTENSIONS = {
     "envoy.generic_proxy.codecs.http1":                         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
 }
 
-EXTENSIONS = {}
-
 def _update_extensions_impl(ctx):
-    EXTENSIONS = dict(
-        [(key, value) for key, value in DEFAULT_EXTENSIONS.items()]
-    )
     additional_extensions = ctx.attr.additional_extensions
-
     if additional_extensions:
         EXTENSIONS.update(
             dict(
