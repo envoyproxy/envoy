@@ -23,6 +23,12 @@
 #include "absl/container/inlined_vector.h"
 
 namespace Envoy {
+namespace Server {
+class ListenerImpl;
+}
+namespace Upstream {
+class ClusterManager;
+}
 namespace Event {
 
 // The tracked object stack likely won't grow larger than this initial
@@ -98,6 +104,10 @@ public:
   void onFatalError(std::ostream& os) const override;
   void
   runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override;
+  virtual void setConnectionHandler(Network::ConnectionHandler* connection_handler) override;
+  virtual Network::ConnectionHandler* connectionHandler() override { return connection_handler_; }
+  virtual void setClusterManager(Upstream::ClusterManager* cluster_manager) override;
+  Upstream::ClusterManager* getClusterManager() override;
 
 private:
   // Holds a reference to the watchdog registered with this dispatcher and the timer used to ensure
@@ -150,7 +160,6 @@ private:
   Buffer::WatermarkFactorySharedPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
-
   SchedulableCallbackPtr thread_local_delete_cb_;
   Thread::MutexBasicLockable thread_local_deletable_lock_;
   // `deletables_in_dispatcher_thread` must be destroyed last to allow other callbacks populate.
@@ -174,6 +183,9 @@ private:
   MonotonicTime approximate_monotonic_time_;
   WatchdogRegistrationPtr watchdog_registration_;
   const ScaledRangeTimerManagerPtr scaled_timer_manager_;
+  Network::ConnectionHandler* connection_handler_;
+  // Dispatcher holds a raw pointer to the cluster manager to obtain thread local cluster, etc.
+  Upstream::ClusterManager* cluster_manager_;
 };
 
 } // namespace Event

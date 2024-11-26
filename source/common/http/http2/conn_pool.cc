@@ -37,11 +37,13 @@ uint32_t ActiveClient::calculateInitialStreamsLimit(
 }
 
 ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
-                           OptRef<Upstream::Host::CreateConnectionData> data)
+                           OptRef<Upstream::Host::CreateConnectionData> data,
+                           CreateConnectionDataFn connection_fn)
     : MultiplexedActiveClientBase(
           parent, calculateInitialStreamsLimit(parent.cache(), parent.origin(), parent.host()),
           parent.host()->cluster().http2Options().max_concurrent_streams().value(),
-          parent.host()->cluster().trafficStats()->upstream_cx_http2_total_, data) {}
+          parent.host()->cluster().trafficStats()->upstream_cx_http2_total_, data,
+          connection_fn) {}
 
 ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,

@@ -94,7 +94,7 @@ public:
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 };
 
-using ConnectionSocketPtr = std::unique_ptr<ConnectionSocket>;
+using ConnectionSocketPtr = std::shared_ptr<ConnectionSocket>;
 
 } // namespace Network
 } // namespace Envoy

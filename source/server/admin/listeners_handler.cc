@@ -17,6 +17,14 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
                                                    AdminStream& admin_query) {
   const Http::Utility::QueryParamsMulti params = admin_query.queryParams();
 
+  const absl::optional<std::string> resource = Utility::nonEmptyQueryParam(params, "name");
+  if (resource.has_value()) {
+    ENVOY_LOG_MISC(debug, "Received call to remove listener: {}", resource.value());
+    server_.listenerManager().removeListener(resource.value());
+    response.add("OK\n");
+    return Http::Code::OK;
+  }
+
   ListenerManager::StopListenersType stop_listeners_type =
       params.getFirstValue("inboundonly").has_value()
           ? ListenerManager::StopListenersType::InboundOnly

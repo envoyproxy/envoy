@@ -55,6 +55,7 @@ ActiveTcpListener::~ActiveTcpListener() {
     ASSERT(active_connections != nullptr);
     auto& connections = active_connections->connections_;
     while (!connections.empty()) {
+      connections.front()->connection_->setActiveConnectionReused(false);
       connections.front()->connection_->close(
           Network::ConnectionCloseType::NoFlush,
           "purging_socket_that_have_not_progressed_to_connections");

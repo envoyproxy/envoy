@@ -189,10 +189,10 @@ uint64_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint64_t max_strea
 MultiplexedActiveClientBase::MultiplexedActiveClientBase(
     HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
     uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
-    OptRef<Upstream::Host::CreateConnectionData> data)
+    OptRef<Upstream::Host::CreateConnectionData> data, CreateConnectionDataFn connection_fn)
     : Envoy::Http::ActiveClient(
           parent, maxStreamsPerConnection(parent.host()->cluster().maxRequestsPerConnection()),
-          effective_concurrent_streams, max_configured_concurrent_streams, data) {
+          effective_concurrent_streams, max_configured_concurrent_streams, data, connection_fn) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
   cx_total.inc();

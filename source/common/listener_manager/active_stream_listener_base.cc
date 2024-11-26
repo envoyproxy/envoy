@@ -128,7 +128,9 @@ void ActiveTcpConnection::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::LocalClose ||
       event == Network::ConnectionEvent::RemoteClose) {
     stream_info_->setDownstreamTransportFailureReason(connection_->transportFailureReason());
-    active_connections_.listener_.removeConnection(*this);
+    if (!connection_->isActiveConnectionReused()) {
+      active_connections_.listener_.removeConnection(*this);
+    }
   }
 }
 

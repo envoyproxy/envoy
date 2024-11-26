@@ -230,7 +230,7 @@ void EnvoyQuicClientConnection::onPathValidationFailure(
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
   OnPathValidationFailureAtClient(/*is_multi_port=*/false, *context);
-  std::unique_ptr<Network::ConnectionSocket> probing_socket =
+  auto probing_socket =
       static_cast<EnvoyQuicPathValidationContext*>(context.get())->releaseSocket();
   // Extend the socket life time till the end of the current event loop.
   dispatcher_.deferredDelete(std::make_unique<DeferredDeletableSocket>(std::move(probing_socket)));
@@ -287,8 +287,7 @@ void EnvoyQuicClientConnection::setNumPtosForPortMigration(uint32_t num_ptos_for
 
 EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::EnvoyQuicPathValidationContext(
     const quic::QuicSocketAddress& self_address, const quic::QuicSocketAddress& peer_address,
-    std::unique_ptr<EnvoyQuicPacketWriter> writer,
-    std::unique_ptr<Network::ConnectionSocket> probing_socket)
+    std::unique_ptr<EnvoyQuicPacketWriter> writer, Network::ConnectionSocketPtr probing_socket)
     : QuicPathValidationContext(self_address, peer_address), writer_(std::move(writer)),
       socket_(std::move(probing_socket)) {}
 
@@ -303,7 +302,7 @@ EnvoyQuicPacketWriter* EnvoyQuicClientConnection::EnvoyQuicPathValidationContext
   return writer_.release();
 }
 
-std::unique_ptr<Network::ConnectionSocket>
+Network::ConnectionSocketPtr
 EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseSocket() {
   return std::move(socket_);
 }

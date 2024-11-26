@@ -794,9 +794,20 @@ std::string Factory::serialize(absl::string_view str) {
   return j.dump(-1, ' ', false, nlohmann::detail::error_handler_t::replace);
 }
 
+template <typename T> std::string Factory::serialize(const T& items) {
+  nlohmann::json j = nlohmann::json(items);
+  return j.dump();
+}
+
 std::vector<uint8_t> Factory::jsonToMsgpack(const std::string& json_string) {
   return nlohmann::json::to_msgpack(nlohmann::json::parse(json_string, nullptr, false));
 }
+
+// Template instantiation for serialize function.
+template std::string Factory::serialize(const std::list<std::string>& items);
+template std::string Factory::serialize(const absl::flat_hash_set<std::string>& items);
+template std::string Factory::serialize(
+    const absl::flat_hash_map<std::string, absl::flat_hash_map<std::string, int>>& items);
 
 } // namespace Nlohmann
 } // namespace Json

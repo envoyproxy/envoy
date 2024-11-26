@@ -384,6 +384,12 @@ public:
   virtual FilterStatus onData(Network::ListenerFilterBuffer& buffer) PURE;
 
   /**
+   * Called when the connection is closed. Only the current filter that has stopped filter
+   * chain iteration will get the callback.
+   */
+  virtual void onClose(){};
+
+  /**
    * Return the size of data the filter want to inspect from the connection.
    * The size can be increased after filter need to inspect more data.
    * @return maximum number of bytes of the data consumed by the filter. 0 means filter does not

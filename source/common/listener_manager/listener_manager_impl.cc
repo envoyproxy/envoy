@@ -371,6 +371,26 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(worker_factory.createWorker(
         i, server.overloadManager(), server.nullOverloadManager(), absl::StrCat("worker_", i)));
+    ENVOY_LOG(debug, "Starting worker {}", i);
+  }
+}
+
+void ListenerManagerImpl::setClusterManagerForWorkers(Upstream::ClusterManager* cluster_manager) {
+  ASSERT(cluster_manager != nullptr);
+  for (const auto& worker : workers_) {
+    worker->getDispatcher().setClusterManager(cluster_manager);
+  }
+}
+
+void ListenerManagerImpl::enableReverseConnections(
+    Network::RevConnRegistry& reverse_conn_registry) {
+  for (const auto& worker : workers_) {
+    ENVOY_LOG(debug, "Enabling reverse connections for dispatcher: {}",
+              worker->getDispatcher().name());
+    worker->getDispatcher().post([&worker, &reverse_conn_registry]() {
+      ENVOY_LOG(debug, "Calling enableReverseConnections: {}", worker->getDispatcher().name());
+      worker->getDispatcher().connectionHandler()->enableReverseConnections(reverse_conn_registry);
+    });
   }
 }
 

@@ -49,6 +49,7 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
       api_(api), reset_streams_counter_(
                      api_.rootScope().counterFromStatName(stat_names.reset_high_memory_stream_)) {
+  dispatcher_->setConnectionHandler(handler_.get());
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -84,11 +85,17 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
                                 std::function<void()> completion) {
   ASSERT(thread_);
   const uint64_t listener_tag = listener.listenerTag();
+  ENVOY_LOG(debug, "worker:{} Removing listener name:{} tag:{} ", dispatcher_->name(),
+            listener.name(), listener.listenerTag());
+  dispatcher_->connectionHandler()->reverseConnRegistry().getRCManager().unregisterRCInitiator(
+      listener);
   dispatcher_->post([this, listener_tag, completion]() -> void {
     handler_->removeListeners(listener_tag);
     completion();
     hooks_.onWorkerListenerRemoved();
   });
+  ENVOY_LOG(debug, "worker:{} Removed listener name:{} tag:{} ", dispatcher_->name(),
+            listener.name(), listener.listenerTag());
 }
 
 void WorkerImpl::removeFilterChains(uint64_t listener_tag,

@@ -1000,7 +1000,6 @@ void DownstreamFilterManager::sendLocalReply(
       // route refreshment in the response filter chain.
       cb->route(nullptr);
     }
-
     // We only prepare a local reply to execute later if we're actively
     // invoking filters to avoid re-entrant in filters.
     if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
