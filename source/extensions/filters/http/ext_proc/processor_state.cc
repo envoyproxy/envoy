@@ -294,6 +294,7 @@ absl::Status ProcessorState::handleBodyResponse(const BodyResponse& response) {
   default:
     // Fake a grpc error when processor state and received message type doesn't match
     onFinishProcessorCall(Grpc::Status::FailedPrecondition);
+    IS_ENVOY_BUG("Unexpected callback_state in handleBodyResponse() of ext_proc filter");
     break;
   }
 
