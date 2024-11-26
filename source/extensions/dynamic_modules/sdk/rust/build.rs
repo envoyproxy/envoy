@@ -2,6 +2,10 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+  if std::fs::metadata("/opt/llvm/bin/clang").is_ok() {
+    env::set_var("CLANG_PATH", "/opt/llvm/bin/clang");
+  }
+
   let bindings = bindgen::Builder::default()
     .header("../../abi.h")
     .header("../../abi_version.h")
