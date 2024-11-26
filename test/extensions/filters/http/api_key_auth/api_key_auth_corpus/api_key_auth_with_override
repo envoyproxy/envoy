@@ -19,17 +19,15 @@ filter_config {
   }
 }
 route_config {
-  override_config {
+  credentials {
     credentials {
-      credentials {
-        key: "fake-key-3"
-        client: "fake-client-3"
-      }
+      key: "fake-key-3"
+      client: "fake-client-3"
     }
+  }
+  key_sources {
     key_sources {
-      key_sources {
-        query: "api_key"
-      }
+      query: "api_key"
     }
   }
   allowed_clients: ["fake-client-3"]

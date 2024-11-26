@@ -80,7 +80,17 @@ private:
  */
 struct ApiKeyAuthConfig {
 public:
-  ApiKeyAuthConfig(const ApiKeyAuthProto& proto_config);
+  template <class ProtoType>
+  ApiKeyAuthConfig(const ProtoType& proto_config) : key_sources_(proto_config.key_sources()) {
+    credentials_.reserve(proto_config.credentials().size());
+
+    for (const auto& credential : proto_config.credentials()) {
+      if (credentials_.contains(credential.key())) {
+        throw EnvoyException("Duplicate API key.");
+      }
+      credentials_[credential.key()] = credential.client();
+    }
+  }
 
   /**
    * To get the optional reference of the key sources.

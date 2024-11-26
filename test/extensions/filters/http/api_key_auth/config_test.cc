@@ -73,10 +73,9 @@ TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {
   TestUtility::loadFromYaml(yaml, proto_config);
 
   const std::string scope_yaml = R"(
-  override_config:
-    credentials:
-    - key: key3
-      client: user3
+  credentials:
+  - key: key3
+    client: user3
   allowed_clients:
   - user1
   )";

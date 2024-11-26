@@ -14,24 +14,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ApiKeyAuth {
 
-ApiKeyAuthConfig::ApiKeyAuthConfig(const ApiKeyAuthProto& proto_config)
-    : key_sources_(proto_config.key_sources()) {
-
-  Credentials credentials;
-  credentials.reserve(proto_config.credentials().size());
-
-  for (const auto& credential : proto_config.credentials()) {
-    if (credentials.contains(credential.key())) {
-      throw EnvoyException("Duplicate API key.");
-    }
-    credentials[credential.key()] = credential.client();
-  }
-
-  credentials_ = std::move(credentials);
-}
-
-RouteConfig::RouteConfig(const ApiKeyAuthPerRouteProto& proto)
-    : override_config_(proto.override_config()) {
+RouteConfig::RouteConfig(const ApiKeyAuthPerRouteProto& proto) : override_config_(proto) {
   allowed_clients_.insert(proto.allowed_clients().begin(), proto.allowed_clients().end());
 }
 

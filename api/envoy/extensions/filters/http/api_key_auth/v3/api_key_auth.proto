@@ -43,13 +43,15 @@ message ApiKeyAuth {
 
 // API key auth configuration of per route or per virtual host or per route configuration.
 message ApiKeyAuthPerRoute {
-  // Route specific APIKeyAuth configuration. This is optional and could be used to **override** the
-  // filter level ApiKeyAuth configuration **partly**.
-  //
-  // For example, if non-empty ``credentials`` is set in the ``override_config``, then the
-  // ``credentials`` in the filter level configuration will be ignored and the ``credentials`` in
-  // this configuration will be used.
-  ApiKeyAuth override_config = 1;
+  // The credentials that are used to authenticate the clients. If this field is non-empty, then the
+  // credentials in the filter level configuration will be ignored and the credentials in this
+  // configuration will be used.
+  repeated Credential credentials = 1 [(udpa.annotations.sensitive) = true];
+
+  // The key sources to fetch the key from the coming request. If this field is non-empty, then the
+  // key sources in the filter level configuration will be ignored and the key sources in this
+  // configuration will be used.
+  repeated KeySource key_sources = 2;
 
   // A list of clients that are allowed to access the route or vhost. The clients listed here
   // should be subset of the clients listed in the ``credentials`` to provide authorization control
@@ -58,11 +60,13 @@ message ApiKeyAuthPerRoute {
   // is required, then use the :ref:`HTTP RBAC filter <config_http_filters_rbac>` instead.
   //
   // .. note::
-  //   Setting this field and ``override_config.credentials`` at the same configuration entry is not
-  //   an error but also makes no sense because they provide similar functionality. Please only use
-  //   one of them at same configuration entry.
+  //   Setting this field and ``credentials`` at the same configuration entry is not an error but
+  //   also makes no much sense because they provide similar functionality. Please only use
+  //   one of them at same configuration entry except for the case that you want to share the same
+  //   credentials list across multiple routes but still use different allowed clients for each
+  //   route.
   //
-  repeated string allowed_clients = 2;
+  repeated string allowed_clients = 3;
 }
 
 // Single credential entry that contains the API key and the related client id.

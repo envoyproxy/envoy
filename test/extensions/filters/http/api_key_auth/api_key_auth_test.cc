@@ -283,10 +283,9 @@ TEST_F(FilterTest, RouteConfigOverrideCredentials) {
   )EOF";
 
   const std::string route_config_yaml = R"EOF(
-  override_config:
-    credentials:
-    - key: key2
-      client: user2
+  credentials:
+  - key: key2
+    client: user2
   )EOF";
 
   setup(config_yaml, route_config_yaml);
@@ -327,9 +326,8 @@ TEST_F(FilterTest, RouteConfigOverrideKeySource) {
   )EOF";
 
   const std::string route_config_yaml = R"EOF(
-  override_config:
-    key_sources:
-    - query: "api_key"
+  key_sources:
+  - query: "api_key"
   )EOF";
 
   setup(config_yaml, route_config_yaml);
@@ -367,12 +365,11 @@ TEST_F(FilterTest, RouteConfigOverrideKeySourceAndCredentials) {
   - header: "Authorization"
   )EOF";
   const std::string route_config_yaml = R"EOF(
-  override_config:
-    credentials:
-    - key: key2
-      client: user2
-    key_sources:
-    - query: "api_key"
+  credentials:
+  - key: key2
+    client: user2
+  key_sources:
+  - query: "api_key"
   )EOF";
 
   setup(config_yaml, route_config_yaml);
