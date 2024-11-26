@@ -26,7 +26,6 @@ envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_fi
 envoy_dynamic_module_type_on_http_filter_request_headers_status
 envoy_dynamic_module_on_http_filter_request_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_bool end_of_stream) {
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream) {
   return envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
 }

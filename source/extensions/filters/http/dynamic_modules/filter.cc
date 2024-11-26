@@ -18,21 +18,17 @@ void DynamicModuleHttpFilter::onDestroy() {
   dynamic_module_->on_http_filter_destroy_(in_module_filter_);
 };
 
-envoy_dynamic_module_type_bool convertBool(bool value) {
-  return value ? envoy_dynamic_module_type_bool_true : envoy_dynamic_module_type_bool_false;
-}
-
 FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
   const envoy_dynamic_module_type_on_http_filter_request_headers_status status =
       dynamic_module_->on_http_filter_request_headers_(thisAsVoidPtr(), in_module_filter_,
-                                                       convertBool(end_of_stream));
+                                                       end_of_stream);
   return static_cast<FilterHeadersStatus>(status);
 };
 
 FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance&, bool end_of_stream) {
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       dynamic_module_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_,
-                                                    convertBool(end_of_stream));
+                                                    end_of_stream);
   return static_cast<FilterDataStatus>(status);
 };
 
@@ -55,14 +51,14 @@ Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderM
 FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, bool end_of_stream) {
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
       dynamic_module_->on_http_filter_response_headers_(thisAsVoidPtr(), in_module_filter_,
-                                                        convertBool(end_of_stream));
+                                                        end_of_stream);
   return static_cast<FilterHeadersStatus>(status);
 };
 
 FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance&, bool end_of_stream) {
   const envoy_dynamic_module_type_on_http_filter_response_body_status status =
       dynamic_module_->on_http_filter_response_body_(thisAsVoidPtr(), in_module_filter_,
-                                                     convertBool(end_of_stream));
+                                                     end_of_stream);
   return static_cast<FilterDataStatus>(status);
 };
 

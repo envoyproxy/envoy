@@ -14,7 +14,12 @@
 // same version of the ABI.
 
 #ifdef __cplusplus
+#include <cstdbool>
+
 extern "C" {
+#else
+
+#include <stdbool.h>
 #endif
 
 // -----------------------------------------------------------------------------
@@ -25,15 +30,6 @@ extern "C" {
 // Types with "_module_ptr" suffix are pointers owned by the module, i.e. memory space allocated by
 // the module. Types with "_envoy_ptr" suffix are pointers owned by Envoy, i.e. memory space
 // allocated by Envoy.
-
-/**
- * envoy_dynamic_module_type_bool represents a boolean type that can be either true or false. This
- * is mainly to avoid depending on non-built-in types in C like `bool` in the ABI.
- */
-typedef enum {
-  envoy_dynamic_module_type_bool_false = 0,
-  envoy_dynamic_module_type_bool_true = 1,
-} envoy_dynamic_module_type_bool;
 
 /**
  * envoy_dynamic_module_type_abi_version_envoy_ptr represents a null-terminated string that
@@ -251,8 +247,7 @@ envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_fi
 envoy_dynamic_module_type_on_http_filter_request_headers_status
 envoy_dynamic_module_on_http_filter_request_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_bool end_of_stream);
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
 
 /**
  * envoy_dynamic_module_on_http_filter_request_body is called when a new data frame of the HTTP
@@ -268,8 +263,7 @@ envoy_dynamic_module_on_http_filter_request_headers(
 envoy_dynamic_module_type_on_http_filter_request_body_status
 envoy_dynamic_module_on_http_filter_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_bool end_of_stream);
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
 
 /**
  * envoy_dynamic_module_on_http_filter_request_trailers is called when the HTTP request trailers are
@@ -302,8 +296,7 @@ envoy_dynamic_module_on_http_filter_request_trailers(
 envoy_dynamic_module_type_on_http_filter_response_headers_status
 envoy_dynamic_module_on_http_filter_response_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_bool end_of_stream);
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
 
 /**
  * envoy_dynamic_module_on_http_filter_response_body is called when a new data frame of the HTTP
@@ -320,8 +313,7 @@ envoy_dynamic_module_on_http_filter_response_headers(
 envoy_dynamic_module_type_on_http_filter_response_body_status
 envoy_dynamic_module_on_http_filter_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr,
-    envoy_dynamic_module_type_bool end_of_stream);
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
 
 /**
  * envoy_dynamic_module_on_http_filter_response_trailers is called when the HTTP response trailers
