@@ -589,12 +589,12 @@ void StringUtil::escapeToOstream(std::ostream& os, absl::string_view view) {
 std::string StringUtil::sanitizeInvalidHostname(const absl::string_view source) {
   std::string ret_str = std::string(source);
   bool sanitized = false;
-  for (char& i : ret_str) {
-    if (absl::ascii_isalnum(i) || i == '.' || i == '-' || i == '_') {
+  for (char& c : ret_str) {
+    if (absl::ascii_isalnum(c) || c == '.' || c == '-' || c == '_') {
       continue;
     }
     sanitized = true;
-    i = '_';
+    c = '_';
   }
 
   if (sanitized) {
