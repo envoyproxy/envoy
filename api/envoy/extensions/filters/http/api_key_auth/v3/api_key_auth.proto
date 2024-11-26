@@ -91,7 +91,7 @@ message KeySource {
   // The query parameter name to fetch the key. If multiple query values are present, the first one
   // will be used.
   //
-  // Only makes sense if ``header`` is not set. If set, takes precedence over ``cookie``.
+  // The field will be used if ``header`` is not set. If set, takes precedence over ``cookie``.
   string query = 2 [(validate.rules).string = {max_len: 1024}];
 
   // The cookie name to fetch the key.
