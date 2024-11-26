@@ -645,6 +645,11 @@ public:
                               absl::string_view details) PURE;
 
   /**
+   * Attempt to send GOAWAY and close the connection, and no filter chain will move forward.
+   */
+  virtual void sendGoAwayAndClose() PURE;
+
+  /**
    * Adds decoded metadata. This function can only be called in
    * StreamDecoderFilter::decodeHeaders/Data/Trailers(). Do not call in
    * StreamDecoderFilter::decodeMetadata().
