@@ -2139,8 +2139,8 @@ ClientConnectionImpl::ClientConnectionImpl(
   }
   http2_session_factory.init(base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
-  max_metadata_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      http2_options, max_metadata_size, 1024 * 1024);
+  max_metadata_size_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, max_metadata_size, 1024 * 1024);
   idle_session_requires_ping_interval_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
       http2_options.connection_keepalive(), connection_idle_interval, 0));
 }
@@ -2225,8 +2225,8 @@ ServerConnectionImpl::ServerConnectionImpl(
 #endif
   sendSettings(http2_options, false);
   allow_metadata_ = http2_options.allow_metadata();
-  max_metadata_size_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      http2_options, max_metadata_size, 1024 * 1024);
+  max_metadata_size_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, max_metadata_size, 1024 * 1024);
 }
 
 Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
