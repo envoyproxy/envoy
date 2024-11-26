@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.reverse_conn.v2;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/migrate.proto";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.reverse_conn.v2";
+option java_outer_classname = "ReverseConnProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/http/reverse_conn/v2;reverse_connv2";
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.filters.http.reverse_conn.v3";
+option (udpa.annotations.file_status).package_version_status = FROZEN;
+
+// [#protodoc-title: ReverseConn]
+// ReverseConn :ref:`configuration overview <config_http_filters_reverse_conn>`.
+// [#extension: envoy.filters.http.reverse_conn]
+
+message ReverseConn {
+  google.protobuf.UInt32Value ping_interval = 1;
+}

@@ -68,6 +68,20 @@ envoy.bootstrap.internal_listener:
   status: stable
   type_urls:
   - envoy.extensions.bootstrap.internal_listener.v3.InternalListener
+envoy.reverse_connection.reverse_connection_listener_config:
+  categories:
+  - envoy.extensions.reverse_connection
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.reverse_connection.reverse_connection_listener_config.v3.ReverseConnectionListenerConfig
+envoy.bootstrap.reverse_connection:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_connection.v3.ReverseConnection
 envoy.bootstrap.wasm:
   categories:
   - envoy.bootstrap
@@ -1716,6 +1730,20 @@ envoy.http.custom_response.local_response_policy:
   status: wip
   type_urls:
   - envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+envoy.filters.http.reverse_conn:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
+envoy.filters.listener.reverse_connection:
+  categories:
+  - envoy.filters.listener
+  security_posture: robust_to_untrusted_downstream
+  status: stable
+  type_urls:
+  - envoy.extensions.filters.listener.reverse_connection.v3.ReverseConnection
 envoy.config_subscription.rest:
   categories:
   - envoy.config_subscription

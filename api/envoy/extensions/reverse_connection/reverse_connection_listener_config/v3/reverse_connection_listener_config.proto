@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package envoy.extensions.reverse_connection.reverse_connection_listener_config.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.reverse_connection.reverse_connection_listener_config.v3";
+option java_outer_classname = "ReverseConnectionListenerConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/reverse_connection/reverse_connection_listener_config/v3;reverse_connection_listener_configv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Listener Config for Reverse Connections]
+// [#extension: envoy.reverse_connection.reverse_connection_listener_config]
+
+message ReverseConnectionCluster {
+  // Name of the cluster to initiate reverse connections to.
+  string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Number of reverse connections need to cluster. Atleast one reverse connection
+  // has to be requested.
+  google.protobuf.UInt32Value reverse_connection_count = 2 [(validate.rules).uint32 = {gte: 1}];
+}
+
+// Configuration for envoy reverse connection listener. All the future reverse connection listener features
+// should be added here.
+message ReverseConnectionListenerConfig {
+  // The unique name for the initiator envoy while initiating reverse connections. This is
+  // a required field for reverse connections.
+  string src_node_id = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The cluster ID (optional) of the initiator envoy.
+  string src_cluster_id = 2;
+
+  // Tenant ID (optional) of the initiator envoy.
+  string src_tenant_id = 3;
+
+  repeated ReverseConnectionCluster remote_cluster_to_conn_count = 4;
+}

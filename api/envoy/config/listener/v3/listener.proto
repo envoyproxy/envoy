@@ -12,6 +12,7 @@ import "envoy/config/listener/v3/listener_components.proto";
 import "envoy/config/listener/v3/udp_listener_config.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -53,7 +54,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -378,6 +379,11 @@ message Listener {
     // * :ref:`freebind <envoy_v3_api_field_config.listener.v3.Listener.freebind>`
     // * :ref:`transparent <envoy_v3_api_field_config.listener.v3.Listener.transparent>`
     InternalListenerConfig internal_listener = 27;
+  
+    // Used to represent a reverse connection listener which, instead of binding to a port and listening,
+    // initiates reverse connections to a remote endpoint. The used sockets are cached on the remote
+    // endpoint and can be used to send request to local services.
+    google.protobuf.Any reverse_connection_listener_config = 36;
   }
 
   // Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish

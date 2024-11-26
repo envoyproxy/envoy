@@ -1,0 +1,100 @@
+---
+node:
+  id: cloud-node
+  cluster: cloud
+static_resources:
+  listeners:
+    # Services reverse conn APIs
+    - name: rev_conn_api_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9000
+      filter_chains:
+        - filters:
+            - name: envoy.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager 
+                stat_prefix: rev_conn_api
+                # Any dummy route config works
+                route_config:
+                  virtual_hosts:
+                  - name: rev_conn_api_route
+                    domains:
+                      - "*"
+                    routes:
+                      - match:
+                          prefix: '/on_prem_service'
+                        route:
+                          cluster: reverse_connection_cluster
+                http_filters:
+                  # Filter that services reverse conn APIs
+                  - name: envoy.filters.http.reverse_conn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+    # Listener that will route the downstream request to the reverse connection cluster
+    - name: egress_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 80
+      filter_chains:
+        - filters:
+            - name: envoy.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager 
+                stat_prefix: egress_http
+                route_config:
+                  virtual_hosts:
+                    - name: backend
+                      domains:
+                        - "*"
+                      routes:
+                        - match:
+                            prefix: "/on_prem_service"
+                          route:
+                            cluster: reverse_connection_cluster
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  # Cluster used to write requests to cached sockets
+  clusters:
+    - name: reverse_connection_cluster
+      type: REVERSE_CONNECTION
+      connect_timeout: 2s
+      lb_policy: CLUSTER_PROVIDED
+      rev_con_cluster_config:
+        # The following headers are expected in downstream requests
+        # to be sent over reverse connections
+        http_header_names:
+          - x-remote-node-id # Should be set to the node ID of the downstream envoy node, ie., on-prem-node
+          - x-dst-cluster-uuid # Should be set to the cluster ID of the downstream envoy node, ie., on-prem
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            # Right the moment, reverse connections are supported over HTTP/2 only
+            http2_protocol_options: {}
+admin:
+  access_log_path: "/dev/stdout"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: '8888'
+layered_runtime:
+  layers:
+  - name: layer
+    static_layer:
+      re2.max_program_size.error_level: 1000
+      envoy.reloadable_features.http_filter_avoid_reentrant_local_reply: false
+# Enable reverse connection bootstrap extension
+bootstrap_extensions:
+- name: envoy.bootstrap.reverse_connection
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection.v3.ReverseConnection
+

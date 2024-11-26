@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.extensions.bootstrap.reverse_connection.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_connection.v3";
+option java_outer_classname = "ReverseConnectionProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/reverse_connection/v3;reverse_connectionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Bootstrap settings for Reverse Connections]
+// [#extension: envoy.bootstrap.reverse_connection]
+
+// All the future reverse connection settings should be added here.
+message ReverseConnection {
+    // Stat prefix to be used for reverse connection stats.
+    string stat_prefix = 1;
+}

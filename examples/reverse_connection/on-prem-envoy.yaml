@@ -1,0 +1,153 @@
+---
+node:
+  id: on-prem-node
+  cluster: on-prem
+static_resources:
+  listeners:
+    # Services reverse conn APIs
+    - name: rev_conn_api_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: rev_conn_api
+                codec_type: AUTO
+                # Any dummy route config works
+                route_config:
+                  name: rev_conn_api_route
+                  virtual_hosts: []
+                http_filters:
+                  # Filter that services reverse conn APIs
+                  - name: envoy.filters.http.reverse_conn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+    # Forwards incoming http requests to backend
+    - name: ingress_http_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 80
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager 
+                stat_prefix: ingress_http
+                route_config:
+                  name: ingress_http_route
+                  virtual_hosts:
+                    - name: backend
+                      domains:
+                        - "*"
+                      routes:
+                        - match:
+                            prefix: '/on_prem_service'
+                          route:
+                            cluster: on-prem-service
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+    # Initiates reverse connections to cloud
+    - name: reverse_conn_listener
+      listener_filters_timeout: 0s
+      listener_filters:
+        # Filter that responds to keepalives on reverse connection sockets
+        - name: envoy.filters.listener.reverse_connection
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.listener.reverse_connection.v3.ReverseConnection
+            ping_wait_timeout: 4
+      # Any dummy address and port
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8080
+      # Reverse connection metadata
+      reverse_connection_listener_config:
+        "@type": type.googleapis.com/envoy.extensions.reverse_connection.reverse_connection_listener_config.v3.ReverseConnectionListenerConfig
+        src_cluster_id: on-prem
+        src_node_id: on-prem-node
+        src_tenant_id: on-prem
+        remote_cluster_to_conn_count:
+          - cluster_name: cloud
+            reverse_connection_count: 2
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: reverse_conn_listener
+                # Any dummy route
+                route_config:
+                  virtual_hosts:
+                    - name: backend
+                      domains:
+                        - "*"
+                      routes:
+                        - match:
+                            prefix: '/on_prem_service'
+                          route:
+                            cluster: on-prem-service
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  # Cluster designating cloud-envoy
+  clusters:
+    - name: cloud
+      type: STRICT_DNS
+      connect_timeout: 30s
+      load_assignment:
+        cluster_name: cloud
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: cloud-envoy # Container name of cloud-envoy in docker-compose
+                  port_value: 9000 # Port where cloud-envoy's rev_conn_api_listener listens
+
+    # Backend HTTP service behind onprem which
+    # we will access via reverse connections
+    - name: on-prem-service
+      type: STRICT_DNS
+      connect_timeout: 30s
+      load_assignment:
+        cluster_name: on-prem-service
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: on-prem-service
+                    port_value: 80
+
+
+admin:
+  access_log_path: "/dev/stdout"
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 8888
+layered_runtime:
+  layers:
+  - name: layer
+    static_layer:
+      re2.max_program_size.error_level: 1000
+      envoy.reloadable_features.http_filter_avoid_reentrant_local_reply: false
+# Enable reverse connection bootstrap extension
+bootstrap_extensions:
+- name: envoy.bootstrap.reverse_connection
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection.v3.ReverseConnection
