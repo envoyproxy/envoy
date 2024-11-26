@@ -68,9 +68,6 @@ def api_dependencies(bzlmod = False):
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
     )
-    external_http_archive(
-        name = "rules_proto_grpc",
-    )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
