@@ -190,12 +190,6 @@ TEST_F(MatcherTest, ReplaceAll) {
   EXPECT_EQ(matcher_->replaceAll("yabba dabba doo", "d"), "yada dada doo");
 }
 
-TEST_F(MatcherTest, StringRepresentation) {
-  setup("b+", 0, true);
-
-  EXPECT_EQ(matcher_->stringRepresentation(), "Optimized for HyperScan");
-}
-
 } // namespace Hyperscan
 } // namespace InputMatchers
 } // namespace Matching

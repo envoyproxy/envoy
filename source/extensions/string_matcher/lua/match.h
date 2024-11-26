@@ -22,10 +22,6 @@ public:
   // Matchers::StringMatcher
   bool match(const absl::string_view value) const override;
 
-  const std::string& stringRepresentation() const override {
-    CONSTRUCT_ON_FIRST_USE(std::string, "Optimized for LuaStringMatcher");
-  }
-
 private:
   CSmartPtr<lua_State, lua_close> state_;
   int matcher_func_ref_{LUA_NOREF};

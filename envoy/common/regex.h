@@ -22,6 +22,12 @@ public:
    */
   virtual std::string replaceAll(absl::string_view value,
                                  absl::string_view substitution) const PURE;
+
+  /**
+   * Returns a string representation of the Regex matcher (the pattern to be
+   * matched).
+   */
+  virtual const std::string& stringRepresentation() const PURE;
 };
 
 using CompiledMatcherPtr = std::unique_ptr<const CompiledMatcher>;

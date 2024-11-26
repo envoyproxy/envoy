@@ -86,8 +86,6 @@ private:
 class UniversalStringMatcher : public StringMatcher {
 public:
   bool match(absl::string_view) const override { return true; }
-
-  const std::string& stringRepresentation() const override { return EMPTY_STRING; }
 };
 
 StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config,
@@ -181,10 +179,6 @@ public:
     return false;
   }
 
-  // TODO(adiuissa): this will be removed once this entire class is replaced by
-  // StringMatcherImplBase.
-  const std::string& stringRepresentation() const override { return EMPTY_STRING; }
-
 private:
   StringMatcherImpl(absl::string_view exact_match)
       : matcher_([&]() -> StringMatcherType {
@@ -228,6 +222,12 @@ public:
     UNREFERENCED_PARAMETER(prefix);
     return false;
   }
+
+  /**
+   * Returns a string representation of the matcher (the contents to be
+   * matched).
+   */
+  virtual const std::string& stringRepresentation() const PURE;
 };
 
 // A matcher for the `exact` StringMatcher.
@@ -353,9 +353,7 @@ public:
   // StringMatcher
   bool match(const absl::string_view value) const override { return custom_->match(value); }
 
-  const std::string& stringRepresentation() const override {
-    return custom_->stringRepresentation();
-  }
+  const std::string& stringRepresentation() const override { return EMPTY_STRING; }
 
 private:
   const StringMatcherPtr custom_;
@@ -464,9 +462,9 @@ public:
     return matcher_;
   }
   // TODO(adisuissa): This method will replace the `matcher()` call above.
-  const std::string& stringRepresentation() const override {
+  const std::string& stringRepresentation() const {
     // TODO(adisuissa): replace with:  return matcher_->stringRepresentation();
-    // after the type of `matcher_` is replaced.
+    // after the type of `matcher_` is replaced with type StringMatcherImplBase.
     return EMPTY_STRING;
   }
 
