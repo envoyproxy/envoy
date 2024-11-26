@@ -53,6 +53,7 @@ private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
   friend class MetadataEncoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   friend class MetadataEncoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
+  friend class MetadataEncoderTest_VerifyAdjustingMetadataSizeLimit_Test;
 
   struct HpackDecoderContext;
 
