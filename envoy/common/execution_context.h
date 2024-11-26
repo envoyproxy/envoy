@@ -115,7 +115,7 @@ private:
       [execution_context = ExecutionContext::fromStreamInfo(trackedStream),                        \
        scoped_object = (scopedObject)] {                                                           \
         if (execution_context == nullptr) {                                                        \
-          return Envoy::Cleanup::Noop();                                                           \
+          return Envoy::Cleanup::noop();                                                           \
         }                                                                                          \
         return execution_context->onScopeEnter(scoped_object);                                     \
       }()
