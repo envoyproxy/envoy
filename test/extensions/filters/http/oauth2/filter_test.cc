@@ -1634,15 +1634,24 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(config_->clusterName(), "auth.example.com");
 
+  const std::chrono::seconds expiredTime(10);
+  filter_->updateTokens("accessToken", "idToken", "refreshToken", expiredTime);
+
   // Expected response after the callback & validation is complete - verifying we kept the
   // state and method of the original request, including the query string parameters.
   Http::TestRequestHeaderMapImpl second_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthHMAC=aPoIhN7QYMrYc9nTGCCWgd3rJpZIEdjOtxPDdmVDS6E=;"
-       "domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
+       "OauthHMAC=IyFL1rx3SoaHv2rufMo4nRLHPwTCDAY2fnJ1cpIOcpY=;"
+       "domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=;domain=example.com;path=/;Max-Age=;secure;HttpOnly"},
+       "OauthExpires=123456799;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=accessToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=idToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=refreshToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/test?name=admin&level=trace"},
   };
