@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
@@ -283,7 +284,7 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const
 template <typename T> T getUnsignedIntFromHeader(const cmsghdr& cmsg) {
   static_assert(std::is_unsigned_v<T>, "return type must be unsigned integral");
   T value;
-  memcpy(&value, CMSG_DATA(&cmsg), sizeof(value));
+  safeMemcpyUnsafeSrc(&value, CMSG_DATA(&cmsg));
   return value;
 }
 
