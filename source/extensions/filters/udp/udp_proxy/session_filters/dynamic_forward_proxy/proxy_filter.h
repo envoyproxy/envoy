@@ -70,7 +70,8 @@ class ProxyFilter
       public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
       Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(config)), buffer_enabled_(config_->bufferEnabled()){};
+  ProxyFilter(ProxyFilterConfigSharedPtr config)
+      : config_(std::move(config)), buffer_enabled_(config_->bufferEnabled()){};
 
   // Network::ReadFilter
   ReadFilterStatus onNewSession() override;
