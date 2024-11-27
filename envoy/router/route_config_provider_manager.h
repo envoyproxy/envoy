@@ -26,7 +26,7 @@ namespace Router {
  */
 class RouteConfigProviderManager {
 public:
-  virtual ~RouteConfigProviderManager() PURE;
+  virtual ~RouteConfigProviderManager() = default;
 
   /**
    * Get a RouteConfigProviderPtr for a route from RDS. Ownership of the RouteConfigProvider is the
