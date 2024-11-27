@@ -329,7 +329,7 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
         ;;
 
-    clang_tidy)
+    clang_tidy|clang-tidy)
         # clang-tidy will warn on standard library issues with libc++
         ENVOY_STDLIB="libstdc++"
         setup_clang_toolchain
@@ -344,7 +344,7 @@ case $CI_TARGET in
             @envoy_api//...)
         bazel build \
               "${BAZEL_BUILD_OPTIONS[@]}" \
-              --config clang-tidy \
+              --config=clang-tidy \
               "${CLANG_TIDY_TARGETS[@]}"
         ;;
 
