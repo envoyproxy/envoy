@@ -40,6 +40,9 @@ public:
   // Envoy::Regex::CompiledMatcher
   bool match(absl::string_view value) const override;
   std::string replaceAll(absl::string_view value, absl::string_view substitution) const override;
+  const std::string& stringRepresentation() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "Optimized for HyperScan");
+  }
 
   // Envoy::Matcher::InputMatcher
   bool match(const ::Envoy::Matcher::MatchingDataType& input) override;
