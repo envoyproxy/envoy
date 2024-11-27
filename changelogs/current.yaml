@@ -123,6 +123,10 @@ bug_fixes:
 - area: validation/tools
   change: |
     Add back missing extension for ``schema_validator_tool``.
+- area: udp/dynamic_forward_proxy
+  change: |
+    Fixed bug where dynamic_forward_proxy udp session filter disabled buffer in filter config
+    instead of disabling buffer for the filter instance.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
