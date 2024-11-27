@@ -15,11 +15,13 @@
 
 #ifdef __cplusplus
 #include <cstdbool>
+#include <cstddef>
 
 extern "C" {
 #else
 
 #include <stdbool.h>
+#include <stddef.h>
 #endif
 
 // -----------------------------------------------------------------------------
@@ -205,7 +207,7 @@ envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_
 envoy_dynamic_module_type_http_filter_config_module_ptr
 envoy_dynamic_module_on_http_filter_config_new(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    const char* name_ptr, int name_size, const char* config_ptr, int config_size);
+    const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size);
 
 /**
  * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP filter configuration

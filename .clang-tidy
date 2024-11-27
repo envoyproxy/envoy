@@ -67,6 +67,7 @@ CheckOptions:
     |^event_base_free$|
     |^(get|set)EVP_PKEY$|
     |^has_value$|
+    |^value_or$|
     |^Ip6(ntohl|htonl)$|
     |^get_$|
     |^HeaderHasValue(Ref)?$|
@@ -110,9 +111,6 @@ HeaderFilterRegex: '^./source/.*|^./contrib/.*|^./test/.*|^./envoy/.*'
 UseColor: true
 
 WarningsAsErrors: '*'
-
-# The ABI header file is a pure C header file, and clang-tidy is only for C++.
-ExcludeHeaderFilterRegex: 'source/extensions/dynamic_modules/abi.h'
 
 ## The version here is arbitrary since any change to this file will
 ## trigger a full run of clang-tidy against all files.
