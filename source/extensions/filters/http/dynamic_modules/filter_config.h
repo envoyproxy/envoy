@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 namespace Envoy {
@@ -21,9 +22,15 @@ public:
    */
   DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
                                 const absl::string_view filter_config,
-                                Extensions::DynamicModules::DynamicModuleSharedPtr dynamic_module);
+                                Extensions::DynamicModules::DynamicModulePtr dynamic_module);
 
   ~DynamicModuleHttpFilterConfig();
+
+  // The corresponding in-module configuration.
+  envoy_dynamic_module_type_http_filter_config_module_ptr in_module_config_ = nullptr;
+
+  // The function pointer to the module's destroy function, resolved in the constructor.
+  decltype(&envoy_dynamic_module_on_http_filter_config_destroy) in_module_config_destroy_ = nullptr;
 
 private:
   // The name of the filter passed in the constructor.
@@ -33,10 +40,22 @@ private:
   const std::string filter_config_;
 
   // The handle for the module.
-  Extensions::DynamicModules::DynamicModuleSharedPtr dynamic_module_;
+  Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
 };
 
 using DynamicModuleHttpFilterConfigSharedPtr = std::shared_ptr<DynamicModuleHttpFilterConfig>;
+
+/**
+ * Creates a new DynamicModuleHttpFilterConfig for given configuration.
+ * @param filter_name the name of the filter.
+ * @param filter_config the configuration for the module.
+ * @param dynamic_module the dynamic module to use.
+ * @return a shared pointer to the new config object or an error if the module could not be loaded.
+ */
+absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr>
+newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
+                                 const absl::string_view filter_config,
+                                 Extensions::DynamicModules::DynamicModulePtr dynamic_module);
 
 } // namespace HttpFilters
 } // namespace DynamicModules

@@ -150,6 +150,184 @@ TEST(HttpExtProcConfigTest, CorrectRouteMetadataOnlyConfig) {
       *proto_config, context, context.messageValidationVisitor());
 }
 
+TEST(HttpExtProcConfigTest, InvalidServiceConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_REGEX(
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value(), EnvoyException,
+      "Proto constraint validation failed \\(ExternalProcessorValidationError.GrpcService.*");
+}
+
+TEST(HttpExtProcConfigTest, InvalidHttpServiceProcessingMode) {
+  std::string yaml = R"EOF(
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          seconds: 500
+  processing_mode:
+    request_body_mode: streamed
+    response_body_mode: buffered
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(result.status().message(),
+            "If the ext_proc filter is configured with http_service instead of gRPC service, "
+            "then the processing modes of this filter can not be configured to send body or "
+            "trailer.");
+}
+
+TEST(HttpExtProcConfigTest, HttpServiceTrailerProcessingModeNotSKIP) {
+  std::string yaml = R"EOF(
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          seconds: 500
+  processing_mode:
+    request_body_mode: "NONE"
+    response_body_mode: "NONE"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SEND"
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(result.status().message(),
+            "If the ext_proc filter is configured with http_service instead of gRPC service, "
+            "then the processing modes of this filter can not be configured to send body or "
+            "trailer.");
+}
+
+TEST(HttpExtProcConfigTest, InvalidFullDuplexStreamedConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_proc_server
+  processing_mode:
+    request_body_mode: FULL_DUPLEX_STREAMED
+    request_trailer_mode: skip
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(result.status().message(),
+            "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
+            "then the request_trailer_mode has to be set to SEND");
+}
+
+TEST(HttpExtProcConfigTest, GrpcServiceHttpServiceBothSet) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          seconds: 500
+  processing_mode:
+    response_body_mode: "BUFFERED"
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(result.status().message(),
+            "One and only one of grpc_service or http_service must be configured");
+}
+
+// Verify that the "disable_route_cache_clearing" and "route_cache_action"  setting
+// can not be set at the same time.
+TEST(HttpExtProcConfigTest, InvalidRouteCacheConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_proc_server
+  disable_clear_route_cache: true
+  route_cache_action: RETAIN
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(result.status().message(), "disable_clear_route_cache and route_cache_action can not "
+                                       "be set to none-default at the same time.");
+}
+
+TEST(HttpExtProcConfigTest, InvalidServiceConfigServerContext) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  http_service:
+    http_service:
+      http_uri:
+        uri: "ext_proc_server_0:9000"
+        cluster: "ext_proc_server_0"
+        timeout:
+          seconds: 500
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context),
+      EnvoyException, "One and only one of grpc_service or http_service must be configured");
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

@@ -18,6 +18,12 @@ behavior_changes:
     to retain the prior behavior.
     This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.explicit_internal_address_config`` to ``false``.
+- area: http
+  change: |
+    Added streaming shadow functionality. This allows for streaming the shadow request in parallel with the original request
+    rather than waiting for the original request to complete. This allows shadowing requests larger than the buffer limit,
+    but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
+    temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -68,9 +74,19 @@ minor_behavior_changes:
   change: |
     The :ref:`route_configuration <envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>` field
     is supported when the ``ScopedRouteConfiguration`` resource is delivered via SRDS.
+- area: http
+  change: |
+    Local replies now traverse the filter chain if 1xx headers have been sent to the client. This change can be reverted
+    by setting the runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` to false.
+- area: dns
+  change: |
+    Patched c-ares to address CVE-2024-25629.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: lrs
+  change: |
+    Fixes errors stat being incremented and warning log spamming for LoadStatsReporting graceful stream close.
 - area: tls
   change: |
     Support operations on IP SANs when the IP version is not supported by the host operating system, for example
@@ -87,6 +103,30 @@ bug_fixes:
   change: |
     Relaxed the restriction on SNI logging to allow the ``_`` character, even if
     ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
+- area: DNS
+  change: |
+    Fixed bug where setting ``dns_jitter <envoy_v3_api_field_config.cluster.v3.Cluster.dns_jitter>`` to large values caused Envoy Bug
+    to fire.
+- area: OAuth2
+  change: |
+    Fixed an issue where ID token and refresh token did not adhere to the :ref:`cookie_domain
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_domain>` field.
+- area: original_ip_detection custom header extension
+  change: |
+    Reverted :ref:`custom header
+    <envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>` extension to its
+    original behavior by disabling automatic XFF header appending that was inadvertently introduced in PR #31831.
+- area: tracers
+  change: |
+    Avoid possible overflow when setting span attributes in Dynatrace sampler.
+- area: load_balancing
+  change: |
+    Fixed default host weight calculation of :ref:`client_side_weighted_round_robin
+    <envoy_v3_api_msg_extensions.load_balancing_policies.client_side_weighted_round_robin.v3.ClientSideWeightedRoundRobin>`
+    to properly handle even number of valid host weights.
+- area: validation/tools
+  change: |
+    Add back missing extension for ``schema_validator_tool``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -117,6 +157,9 @@ removed_config_or_runtime:
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
+- area: upstream
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
 
 new_features:
 - area: wasm
@@ -152,6 +195,15 @@ new_features:
   change: |
     Added %DOWNSTREAM_LOCAL_EMAIL_SAN%, %DOWNSTREAM_PEER_EMAIL_SAN%, %DOWNSTREAM_LOCAL_OTHERNAME_SAN% and
     %DOWNSTREAM_PEER_OTHERNAME_SAN% substitution formatters.
+- area: access_log
+  change: |
+    Added support for logging upstream connection establishment duration in the
+    :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` access log
+    formatter operator. The following time points were added: ``%US_CX_BEG%``,
+    ``%US_CX_END%``, ``%US_HS_END%``.
+- area: access log
+  change: |
+    Added fields for :ref:`DOWNSTREAM_DIRECT_LOCAL_ADDRESS and DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT <config_access_log_format>`.
 - area: quic
   change: |
     Added :ref:`QUIC stats debug visitor <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>` to
@@ -173,6 +225,10 @@ new_features:
 - area: lua cluster specifier
   change: |
     Added ability for a Lua script to query clusters for current requests and connections.
+- area: lua
+  change: |
+    Added :ref:`downstreamDirectLocalAddress() <config_http_filters_lua_stream_info_downstream_direct_local_address>`
+    method to the Stream info object API.
 - area: udp_proxy
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
@@ -197,6 +253,32 @@ new_features:
   change: |
     added :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` which allows
     specifying an optional source for the metadata to be matched in addition to the metadata matcher.
+- area: c-ares
+  change: |
+    added nameserver rotation option to c-ares resolver. When enabled via :ref:rotate_nameservers
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.rotate_nameservers>, this
+    performs round-robin selection of the configured nameservers for each resolution to help distribute query load.
+- area: access_log
+  change: |
+    Added support for :ref:`%UPSTREAM_HOST_NAME_WITHOUT_PORT% <config_access_log_format_upstream_host_name_without_port>`
+    for the upstream host identifier without the port value.
+- area: udp_proxy
+  change: |
+    Added support for coexistence of dynamic and static clusters in the same udp proxy, so we can use dynamic clusters
+    for some sessions by setting a per-session state object under the key ``envoy.upstream.dynamic_host`` and routing
+    to dynamic cluster, and we can use static clusters for other sessions by setting a per-session state object under
+    the key ``envoy.udp_proxy.cluster`` without setting ``envoy.upstream.dynamic_host``.
+- area: ext_authz
+  change: |
+    added filter state field latency_us, bytesSent and bytesReceived access for CEL and logging.
+- area: sni_dynamic_forward_proxy
+  change: |
+    Added support in SNI dynamic forward proxy for saving the resolved upstream address in the filter state.
+    The state is saved with the key ``envoy.stream.upstream_address``.
+- area: lua
+  change: |
+    Added a new ``setUpstreamOverrideHost()`` which could be used to set the given host as the upstream host for the
+    current request.
 
 deprecated:
 - area: rbac

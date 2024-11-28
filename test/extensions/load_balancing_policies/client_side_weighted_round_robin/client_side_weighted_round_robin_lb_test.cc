@@ -121,12 +121,13 @@ public:
     client_side_weighted_round_robin_config_.mutable_metric_names_for_computing_utilization()->Add(
         "metric2");
 
+    EXPECT_CALL(mock_tls_, allocateSlot());
     lb_ = std::make_shared<ClientSideWeightedRoundRobinLoadBalancerFriend>(
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer>(
             lb_config_, cluster_info_, priority_set_, runtime_, random_, simTime()),
         std::make_shared<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
             priority_set_, local_priority_set_.get(), stats_, runtime_, random_, common_config_,
-            lb_config_, simTime()));
+            lb_config_, simTime(), /*tls_shim=*/absl::nullopt));
 
     // Initialize the thread aware load balancer from config.
     ASSERT_EQ(lb_->initialize(), absl::OkStatus());
@@ -161,9 +162,10 @@ public:
 
   NiceMock<MockLoadBalancerContext> lb_context_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Envoy::ThreadLocal::MockInstance> mock_tls_;
   NiceMock<MockClusterInfo> cluster_info_;
-  ClientSideWeightedRoundRobinLbConfig lb_config_ =
-      ClientSideWeightedRoundRobinLbConfig(client_side_weighted_round_robin_config_, dispatcher_);
+  ClientSideWeightedRoundRobinLbConfig lb_config_ = ClientSideWeightedRoundRobinLbConfig(
+      client_side_weighted_round_robin_config_, dispatcher_, mock_tls_);
 };
 
 //////////////////////////////////////////////////////
@@ -216,7 +218,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsOneHostHasClie
   EXPECT_EQ(hosts[2]->weight(), 42);
 }
 
-TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsMedianWeight) {
+TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsOddMedianWeight) {
   init(false);
   HostVector hosts = {
       makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
@@ -245,6 +247,36 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsMedia
   EXPECT_EQ(hosts[2]->weight(), 5000);
   EXPECT_EQ(hosts[3]->weight(), 42);
   EXPECT_EQ(hosts[4]->weight(), 42);
+}
+
+TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsEvenMedianWeight) {
+  init(false);
+  HostVector hosts = {
+      makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
+  };
+  simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
+  // Set client side weight for first two hosts.
+  setHostClientSideWeight(hosts[0], 5, 5, 10);
+  setHostClientSideWeight(hosts[1], 42, 5, 10);
+  // Setting client side weights should not change the host weights.
+  EXPECT_EQ(hosts[0]->weight(), 1);
+  EXPECT_EQ(hosts[1]->weight(), 1);
+  EXPECT_EQ(hosts[2]->weight(), 1);
+  EXPECT_EQ(hosts[3]->weight(), 1);
+  EXPECT_EQ(hosts[4]->weight(), 1);
+  // Update weights on hosts.
+  lb_->updateWeightsOnHosts(hosts);
+  // First two hosts have client side weight, other hosts get the median
+  // weight which is average of weights of first two hosts.
+  EXPECT_EQ(hosts[0]->weight(), 5);
+  EXPECT_EQ(hosts[1]->weight(), 42);
+  EXPECT_EQ(hosts[2]->weight(), 23);
+  EXPECT_EQ(hosts[3]->weight(), 23);
+  EXPECT_EQ(hosts[4]->weight(), 23);
 }
 
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWeights) {

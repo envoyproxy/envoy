@@ -53,14 +53,9 @@ absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config)
 
 absl::optional<envoy::config::core::v3::GrpcService>
 getFilterGrpcService(const ExternalProcessor& config) {
-  if (config.has_grpc_service() != config.has_http_service()) {
-    if (config.has_grpc_service()) {
-      return config.grpc_service();
-    }
-  } else {
-    throw EnvoyException("One and only one of grpc_service or http_service must be configured");
+  if (config.has_grpc_service()) {
+    return config.grpc_service();
   }
-
   return absl::nullopt;
 }
 
@@ -70,36 +65,6 @@ initGrpcService(const ExtProcPerRoute& config) {
     return config.overrides().grpc_service();
   }
   return absl::nullopt;
-}
-
-// TODO(#37046) Refactoring the exception throwing logic.
-void verifyProcessingModeConfig(const ExternalProcessor& config) {
-  const ProcessingMode& processing_mode = config.processing_mode();
-  if (config.has_http_service()) {
-    // In case http_service configured, the processing mode can only support sending headers.
-    if (processing_mode.request_body_mode() != ProcessingMode::NONE ||
-        processing_mode.response_body_mode() != ProcessingMode::NONE ||
-        processing_mode.request_trailer_mode() == ProcessingMode::SEND ||
-        processing_mode.response_trailer_mode() == ProcessingMode::SEND) {
-      throw EnvoyException(
-          "If the ext_proc filter is configured with http_service instead of gRPC service, "
-          "then the processing modes of this filter can not be configured to send body or "
-          "trailer.");
-    }
-  }
-
-  if ((processing_mode.request_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
-      (processing_mode.request_trailer_mode() != ProcessingMode::SEND)) {
-    throw EnvoyException(
-        "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
-        "then the request_trailer_mode has to be set to SEND");
-  }
-  if ((processing_mode.response_body_mode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
-      (processing_mode.response_trailer_mode() != ProcessingMode::SEND)) {
-    throw EnvoyException(
-        "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
-        "then the response_trailer_mode has to be set to SEND");
-  }
 }
 
 std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::string>& ns) {
@@ -261,15 +226,11 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
-  // Validate processing mode configuration.
-  verifyProcessingModeConfig(config);
-  if (config.disable_clear_route_cache() && (route_cache_action_ != ExternalProcessor::DEFAULT)) {
-    throw EnvoyException("disable_clear_route_cache and route_cache_action can not "
-                         "be set to none-default at the same time.");
-  }
+
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
+
   thread_local_stream_manager_slot_->set(
       [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
 }
@@ -468,22 +429,37 @@ void Filter::closeStream() {
   if (!config_->grpcService().has_value()) {
     return;
   }
+  // Stream not opened or already cleaned up.
+  if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "Stream already closed or not opened yet.");
+    return;
+  }
 
-  if (stream_) {
+  if (!stream_->localClosed()) {
     ENVOY_LOG(debug, "Calling close on stream");
-    if (stream_->close()) {
+    if (stream_->closeLocalStream()) {
       stats_.streams_closed_.inc();
     }
-    config_->threadLocalStreamManager().erase(stream_);
-    stream_ = nullptr;
-  } else {
-    ENVOY_LOG(debug, "Stream already closed");
   }
 }
 
-void Filter::deferredCloseStream() {
-  ENVOY_LOG(debug, "Calling deferred close on stream");
+void Filter::deferredResetStream() {
+  ENVOY_LOG(debug, "Calling deferred cleanup on stream");
+  if (stream_ == nullptr) {
+    ENVOY_LOG(debug, "Stream already reset or not opened yet.");
+    return;
+  }
   config_->threadLocalStreamManager().deferredErase(stream_, filter_callbacks_->dispatcher());
+  stream_ = nullptr;
+}
+
+void Filter::cleanupStream() {
+  ENVOY_LOG(debug, "Calling cleanup stream");
+  if (stream_ != nullptr) {
+    stream_->resetStream();
+    config_->threadLocalStreamManager().erase(stream_);
+    stream_ = nullptr;
+  }
 }
 
 void Filter::onDestroy() {
@@ -498,23 +474,30 @@ void Filter::onDestroy() {
     client_->cancel();
     return;
   }
-
-  if (config_->observabilityMode()) {
-    // In observability mode where the main stream processing and side stream processing are
-    // asynchronous, it is possible that filter instance is destroyed before the side stream request
-    // arrives at ext_proc server. In order to prevent the data loss in this case, side stream
-    // closure is deferred upon filter destruction with a timer.
-
-    // First, release the referenced filter resource.
-    if (stream_ != nullptr) {
-      stream_->notifyFilterDestroy();
+  if (stream_ != nullptr) {
+    if (!stream_->localClosed()) {
+      // Perform immediate close on the stream otherwise.
+      closeStream();
     }
+    // Defer the resource cleanup if the remote is not closed (no trailers
+    // received).
+    // This means essentially not sending a reset to the server, which
+    // translates into a client CANCELED error on the server side.
+    if (config_->observabilityMode() || !stream_->remoteClosed()) {
+      // In observability mode where the main stream processing and side stream
+      // processing are asynchronous, it is possible that filter instance is
+      // destroyed before the side stream request arrives at ext_proc server. In
+      // order to prevent the data loss in this case, side stream resetting is
+      // deferred upon filter destruction with a timer.
 
-    // Second, perform stream deferred closure.
-    deferredCloseStream();
-  } else {
-    // Perform immediate close on the stream otherwise.
-    closeStream();
+      // First, release the referenced filter resource.
+      stream_->notifyFilterDestroy();
+      // Second, perform stream deferred closure.
+      deferredResetStream();
+    } else {
+      // Server closed the stream, so we can cleanup the stream immediately.
+      cleanupStream();
+    }
   }
 }
 
@@ -1238,22 +1221,22 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       (config_->processingMode().response_body_mode() != ProcessingMode::FULL_DUPLEX_STREAMED) &&
       inHeaderProcessState() && response->has_mode_override()) {
     bool mode_override_allowed = true;
-    const auto& mode_overide = response->mode_override();
+    const auto& mode_override = response->mode_override();
     // First, check if mode override allow-list is configured
     if (!config_->allowedOverrideModes().empty()) {
       // Second, check if mode override from response is allowed.
       mode_override_allowed = absl::c_any_of(
           config_->allowedOverrideModes(),
-          [&mode_overide](
+          [&mode_override](
               const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& other) {
-            return Protobuf::util::MessageDifferencer::Equals(mode_overide, other);
+            return Protobuf::util::MessageDifferencer::Equals(mode_override, other);
           });
     }
 
     if (mode_override_allowed) {
       ENVOY_LOG(debug, "Processing mode overridden by server for this request");
-      decoding_state_.setProcessingMode(mode_overide);
-      encoding_state_.setProcessingMode(mode_overide);
+      decoding_state_.setProcessingMode(mode_override);
+      encoding_state_.setProcessingMode(mode_override);
     } else {
       ENVOY_LOG(debug, "Processing mode overridden by server is disallowed");
     }
@@ -1360,6 +1343,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     // make sure that they do not fire now.
     onFinishProcessorCalls(status);
     closeStream();
+    cleanupStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
     errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
@@ -1371,10 +1355,14 @@ void Filter::onGrpcClose() {
   ENVOY_LOG(debug, "Received gRPC stream close");
 
   processing_complete_ = true;
-  stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
+  // ExternalProcessorStreamImpl::onRemoteClose will call onGrpcClose in either
+  // happy path or error path.
+  // This will mark remote_closed_ as closed.
+  cleanupStream();
+
   clearAsyncState();
 }
 
@@ -1389,6 +1377,7 @@ void Filter::onMessageTimeout() {
     // the external processor for the rest of the request.
     processing_complete_ = true;
     closeStream();
+    cleanupStream();
     stats_.failure_mode_allowed_.inc();
     clearAsyncState();
 
@@ -1396,6 +1385,7 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
+    cleanupStream();
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
@@ -1537,13 +1527,12 @@ void Filter::mergePerRouteConfig() {
   }
 }
 
-void DeferredDeletableStream::closeStreamOnTimer() {
+void DeferredDeletableStream::cleanupStreamOnTimer() {
   // Close the stream.
-  if (stream_) {
-    ENVOY_LOG(debug, "Closing the stream");
-    if (stream_->close()) {
-      stats.streams_closed_.inc();
-    }
+  if (stream_ != nullptr) {
+    ENVOY_LOG(debug, "Resetting the stream.");
+    // After timeout if still no trailers received, reset the stream.
+    stream_->resetStream();
     // Erase this entry from the map; this will also reset the stream_ pointer.
     parent.erase(stream_.get());
   } else {
@@ -1554,7 +1543,7 @@ void DeferredDeletableStream::closeStreamOnTimer() {
 // In the deferred closure mode, stream closure is deferred upon filter destruction, with a timer
 // to prevent unbounded resource usage growth.
 void DeferredDeletableStream::deferredClose(Envoy::Event::Dispatcher& dispatcher) {
-  derferred_close_timer = dispatcher.createTimer([this] { closeStreamOnTimer(); });
+  derferred_close_timer = dispatcher.createTimer([this] { cleanupStreamOnTimer(); });
   derferred_close_timer->enableTimer(std::chrono::milliseconds(deferred_close_timeout));
 }
 

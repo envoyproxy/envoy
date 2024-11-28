@@ -79,8 +79,9 @@ Regex::CompiledMatcherPtr generateAllowContentTypeRegexs(
     Regex::Engine& regex_engine) {
 
   Regex::CompiledMatcherPtr allow_content_types_regex;
-  allow_content_types_regex =
-      Regex::Utility::parseRegex(proto_allow_content_types_regex, regex_engine);
+  allow_content_types_regex = THROW_OR_RETURN_VALUE(
+      Regex::Utility::parseRegex(proto_allow_content_types_regex, regex_engine),
+      Regex::CompiledMatcherPtr);
 
   return allow_content_types_regex;
 }
