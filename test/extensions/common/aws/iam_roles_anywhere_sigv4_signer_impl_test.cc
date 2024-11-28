@@ -400,7 +400,7 @@ public:
         message_(new Http::RequestMessageImpl()),
         signer_("service", "region", X509CredentialsProviderSharedPtr{credentials_provider_},
                 time_system_) {
-    SystemTime time = std::chrono::system_clock::now();
+    SystemTime time(std::chrono::seconds(1762900931));
 
     auto credentials_ = X509Credentials("123", X509Credentials::PublicKeySignatureAlgorithm::RSA,
                                         "123", "123", "123", time);
@@ -459,7 +459,7 @@ TEST_F(SigV4SignerImplTest, X509UnsignedPaylowd) {
 
 // HTTP :method header is required
 TEST_F(SigV4SignerImplTest, MissingMethod) {
-  SystemTime time = std::chrono::system_clock::now();
+  SystemTime time(std::chrono::seconds(1762900931));
 
   EXPECT_CALL(*credentials_provider_, getCredentials())
       .WillOnce(Return(X509Credentials("abc", X509Credentials::PublicKeySignatureAlgorithm::ECDSA,
@@ -471,7 +471,7 @@ TEST_F(SigV4SignerImplTest, MissingMethod) {
 
 // HTTP :path header is required
 TEST_F(SigV4SignerImplTest, MissingPath) {
-  SystemTime time = std::chrono::system_clock::now();
+  SystemTime time(std::chrono::seconds(1762900931));
 
   EXPECT_CALL(*credentials_provider_, getCredentials())
       .WillOnce(Return(X509Credentials("abc", X509Credentials::PublicKeySignatureAlgorithm::ECDSA,
@@ -494,7 +494,7 @@ void removeSubstrs(std::string& s, std::string p) {
 // added
 TEST_F(SigV4SignerImplTest, FullSignNoChainECDSA) {
   removeSubstrs(server_root_cert_ecdsa_der_b64, "\n");
-  SystemTime time = std::chrono::system_clock::now();
+  SystemTime time(std::chrono::seconds(1762900931));
 
   EXPECT_CALL(*credentials_provider_, getCredentials())
       .WillOnce(Return(X509Credentials(server_root_cert_ecdsa_der_b64,
@@ -523,7 +523,7 @@ TEST_F(SigV4SignerImplTest, FullSignNoChainECDSA) {
 TEST_F(SigV4SignerImplTest, FullSignWithChainECDSA) {
   removeSubstrs(server_subordinate_cert_ecdsa_der_b64, "\n");
   removeSubstrs(server_subordinate_chain_ecdsa_der_b64, "\n");
-  SystemTime time = std::chrono::system_clock::now();
+  SystemTime time(std::chrono::seconds(1762900931));
 
   EXPECT_CALL(*credentials_provider_, getCredentials())
       .WillOnce(Return(X509Credentials(server_subordinate_cert_ecdsa_der_b64,
@@ -552,7 +552,7 @@ TEST_F(SigV4SignerImplTest, FullSignWithChainECDSA) {
 // X509 Signing with certificate using RSA signing algorithm. Validate we have correct headers added
 TEST_F(SigV4SignerImplTest, FullSignNoChainRSA) {
   removeSubstrs(server_root_cert_rsa_der_b64, "\n");
-  SystemTime time = std::chrono::system_clock::now();
+  SystemTime time(std::chrono::seconds(1762900931));
 
   EXPECT_CALL(*credentials_provider_, getCredentials())
       .WillOnce(Return(X509Credentials(server_root_cert_rsa_der_b64,
@@ -583,7 +583,7 @@ public:
         message_(new Http::RequestMessageImpl()),
         signer_("service", "region", X509CredentialsProviderSharedPtr{credentials_provider_},
                 time_system_) {
-    SystemTime time = std::chrono::system_clock::now();
+    SystemTime time(std::chrono::seconds(1762900931));
 
     auto credentials_ = X509Credentials("123", X509Credentials::PublicKeySignatureAlgorithm::RSA,
                                         "123", "123", "123", time);
