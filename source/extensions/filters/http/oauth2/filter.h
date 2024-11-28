@@ -193,13 +193,13 @@ private:
   const AuthType auth_type_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
-  const bool forward_bearer_token_ : 1;
-  const bool preserve_authorization_header_ : 1;
-  const bool use_refresh_token_ : 1;
-  const bool disable_id_token_set_cookie_ : 1;
-  const bool disable_access_token_set_cookie_ : 1;
-  const bool disable_refresh_token_set_cookie_ : 1;
-  const bool disable_nonce_ : 1;
+  const bool forward_bearer_token_{};
+  const bool preserve_authorization_header_{};
+  const bool use_refresh_token_{};
+  const bool disable_id_token_set_cookie_{};
+  const bool disable_access_token_set_cookie_{};
+  const bool disable_refresh_token_set_cookie_{};
+  const bool disable_nonce_{};
   absl::optional<RouteRetryPolicy> retry_policy_;
 };
 
