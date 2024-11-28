@@ -248,7 +248,7 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithDefaultBufferConfig) {
   EXPECT_CALL(*handle, onDestroy());
 
   // Filter buffer is disabled but the filter config still has the buffer enabled.
-  EXPECT_FALSE(filter_->bufferEnabled());
+  EXPECT_FALSE(filter_->sessionBufferEnabled());
   EXPECT_TRUE(filter_config_->bufferEnabled());
 }
 
@@ -285,7 +285,7 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferSizeOverflow) {
   EXPECT_CALL(*handle, onDestroy());
 
   // Filter buffer is disabled but the filter config still has the buffer enabled.
-  EXPECT_FALSE(filter_->bufferEnabled());
+  EXPECT_FALSE(filter_->sessionBufferEnabled());
   EXPECT_TRUE(filter_config_->bufferEnabled());
 }
 
@@ -322,7 +322,7 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferBytesOverflow) {
   EXPECT_CALL(*handle, onDestroy());
 
   // Filter buffer is disabled but the filter config still has the buffer enabled.
-  EXPECT_FALSE(filter_->bufferEnabled());
+  EXPECT_FALSE(filter_->sessionBufferEnabled());
   EXPECT_TRUE(filter_config_->bufferEnabled());
 }
 

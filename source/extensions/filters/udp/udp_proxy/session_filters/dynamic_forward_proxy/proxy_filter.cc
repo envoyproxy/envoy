@@ -137,12 +137,12 @@ void ProxyFilter::onLoadDnsCacheComplete(
     read_callbacks_->injectDatagramToFilterChain(*buffered_datagram);
   }
 
-  disableBuffer();
+  diableSessionBuffer();
   buffered_bytes_ = 0;
 }
 
 void ProxyFilter::maybeBufferDatagram(Network::UdpRecvData& data) {
-  if (!bufferEnabled()) {
+  if (!sessionBufferEnabled()) {
     return;
   }
 

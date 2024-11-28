@@ -71,7 +71,7 @@ class ProxyFilter
       Logger::Loggable<Logger::Id::forward_proxy> {
 public:
   ProxyFilter(ProxyFilterConfigSharedPtr config)
-      : config_(std::move(config)), buffer_enabled_(config_->bufferEnabled()){};
+      : config_(std::move(config)), session_buffer_enabled_(config_->bufferEnabled()){};
 
   // Network::ReadFilter
   ReadFilterStatus onNewSession() override;
@@ -85,14 +85,14 @@ public:
   void onLoadDnsCacheComplete(
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override;
 
-  bool bufferEnabled() const { return buffer_enabled_; };
+  bool sessionBufferEnabled() const { return session_buffer_enabled_; };
 
 private:
   void maybeBufferDatagram(Network::UdpRecvData& data);
-  void disableBuffer() { buffer_enabled_ = false; }
+  void diableSessionBuffer() { session_buffer_enabled_ = false; }
 
   const ProxyFilterConfigSharedPtr config_;
-  bool buffer_enabled_;
+  bool session_buffer_enabled_;
   Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
   ReadFilterCallbacks* read_callbacks_{};
