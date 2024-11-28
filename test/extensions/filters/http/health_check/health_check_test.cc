@@ -28,10 +28,22 @@ namespace HttpFilters {
 namespace HealthCheck {
 namespace {
 
+class MockHealthCheckCluster : public NiceMock<Upstream::MockThreadLocalCluster> {
+public:
+  MockHealthCheckCluster(uint64_t membership_total, uint64_t membership_healthy,
+                         uint64_t membership_degraded = 0) {
+    info()->endpointStats().membership_total_.set(membership_total);
+    info()->endpointStats().membership_healthy_.set(membership_healthy);
+    info()->endpointStats().membership_degraded_.set(membership_degraded);
+  }
+};
+
 class HealthCheckFilterTest : public testing::Test {
 public:
   HealthCheckFilterTest(bool pass_through, bool caching)
-      : request_headers_{{":path", "/healthcheck"}}, request_headers_no_hc_{{":path", "/foo"}} {
+      : request_headers_{{":path", "/healthcheck"}}, request_headers_no_hc_{{":path", "/foo"}},
+        stats_(std::make_shared<HealthCheckFilterStats>(
+            HealthCheckFilterStats::generateStats("test.", *stats_store_.rootScope()))) {
 
     if (caching) {
       cache_timer_ = new Event::MockTimer(&dispatcher_);
@@ -52,7 +64,8 @@ public:
     matcher.mutable_string_match()->set_exact("/healthcheck");
     header_data_->emplace_back(Http::HeaderUtility::createHeaderData(matcher, context_));
     filter_ = std::make_unique<HealthCheckFilter>(context_, pass_through, cache_manager_,
-                                                  header_data_, cluster_min_healthy_percentages);
+                                                  header_data_, cluster_min_healthy_percentages,
+                                                  stats_); // Pass stats instead of config
     filter_->setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -65,16 +78,8 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestRequestHeaderMapImpl request_headers_no_hc_;
   HeaderDataVectorSharedPtr header_data_;
-
-  class MockHealthCheckCluster : public NiceMock<Upstream::MockThreadLocalCluster> {
-  public:
-    MockHealthCheckCluster(uint64_t membership_total, uint64_t membership_healthy,
-                           uint64_t membership_degraded = 0) {
-      info()->endpointStats().membership_total_.set(membership_total);
-      info()->endpointStats().membership_healthy_.set(membership_healthy);
-      info()->endpointStats().membership_degraded_.set(membership_degraded);
-    }
-  };
+  Stats::TestUtil::TestStore stats_store_;
+  HealthCheckFilterStatsSharedPtr stats_;
 };
 
 class HealthCheckFilterNoPassThroughTest : public HealthCheckFilterTest {
@@ -407,6 +412,104 @@ TEST_F(HealthCheckFilterCachingTest, NotHcRequest) {
   EXPECT_CALL(callbacks_.stream_info_, healthCheck(_)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             filter_->decodeHeaders(request_headers_no_hc_, true));
+}
+
+TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckStats) {
+  // Test that health check request counter increases
+  EXPECT_EQ(0, stats_store_.counter("test.health_check.request_total").value());
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(1, stats_store_.counter("test.health_check.request_total").value());
+
+  // Test failed health check stats
+  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
+  Http::TestResponseHeaderMapImpl failed_response{{":status", "503"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&failed_response), true));
+  filter_->decodeHeaders(request_headers_, true);
+  EXPECT_EQ(1, stats_store_.counter("test.health_check.failed").value());
+
+  // Test healthy response stats
+  EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+  Http::TestResponseHeaderMapImpl healthy_response{{":status", "200"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&healthy_response), true));
+  filter_->decodeHeaders(request_headers_, true);
+  EXPECT_EQ(2, stats_store_.counter("test.health_check.ok").value());
+}
+
+TEST_F(HealthCheckFilterCachingTest, CachedResponseStats) {
+  EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
+
+  // Set cached response and verify stats
+  cache_manager_->setCachedResponse(Http::Code::ServiceUnavailable, false);
+  EXPECT_EQ(0, stats_store_.counter("test.health_check.cached_response").value());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(1, stats_store_.counter("test.health_check.cached_response").value());
+}
+
+TEST_F(HealthCheckFilterNoPassThroughTest, ClusterHealthCheckStats) {
+  prepareFilter(false, ClusterMinHealthyPercentagesConstSharedPtr(
+                           new ClusterMinHealthyPercentages{{"www1", 50.0}, {"www2", 75.0}}));
+
+  // Test cluster not found stats
+  {
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
+        .WillRepeatedly(Return(nullptr));
+
+    EXPECT_EQ(0, stats_store_.counter("test.health_check.failed_cluster_not_found").value());
+    filter_->decodeHeaders(request_headers_, true);
+    EXPECT_EQ(1, stats_store_.counter("test.health_check.failed_cluster_not_found").value());
+  }
+
+  // Test empty cluster stats
+  {
+    MockHealthCheckCluster cluster_empty(0, 0);
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
+        .WillRepeatedly(Return(&cluster_empty));
+
+    EXPECT_EQ(0, stats_store_.counter("test.health_check.failed_cluster_empty").value());
+    filter_->decodeHeaders(request_headers_, true);
+    EXPECT_EQ(1, stats_store_.counter("test.health_check.failed_cluster_empty").value());
+  }
+
+  // Test unhealthy cluster stats
+  {
+    MockHealthCheckCluster cluster_unhealthy(100, 20); // Only 20% healthy, below 50% threshold
+    EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
+    EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq("www1")))
+        .WillRepeatedly(Return(&cluster_unhealthy));
+
+    EXPECT_EQ(0, stats_store_.counter("test.health_check.failed_cluster_unhealthy").value());
+    filter_->decodeHeaders(request_headers_, true);
+    EXPECT_EQ(1, stats_store_.counter("test.health_check.failed_cluster_unhealthy").value());
+  }
+}
+
+TEST_F(HealthCheckFilterCachingTest, DegradedStats) {
+  EXPECT_CALL(callbacks_.stream_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
+
+  // Set up a degraded cached response
+  cache_manager_->setCachedResponse(Http::Code::ServiceUnavailable, true);
+
+  EXPECT_EQ(0, stats_store_.counter("test.health_check.degraded").value());
+
+  Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"},
+                                                        {"x-envoy-degraded", ""}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
+      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+        filter_->encodeHeaders(headers, end_stream);
+      }));
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
+
+  filter_->decodeHeaders(request_headers_, true);
+  EXPECT_EQ(1, stats_store_.counter("test.health_check.degraded").value());
 }
 
 } // namespace

@@ -16,3 +16,21 @@ Health check
   <operations_admin_interface_healthcheck_fail>` admin endpoint has been called. (The
   :ref:`/healthcheck/ok <operations_admin_interface_healthcheck_ok>` admin endpoint reverses this
   behavior).
+
+Statistics
+----------
+
+The health check filter outputs statistics in the ``<stat_prefix>.health_check.`` namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  request_total, Counter, Total number of requests that were served from this health check filter
+  failed, Counter, Total number of health checks that failed (including failures from cluster status)
+  ok, Counter, Total number of health checks that passed
+  cached_response, Counter, Total number of requests that were responded to with cached health check status
+  failed_cluster_not_found, Counter, Total number of failed health checks due to referenced cluster not being found
+  failed_cluster_empty, Counter, Total number of failed health checks due to empty cluster membership when checking cluster health
+  failed_cluster_unhealthy, Counter, Total number of failed health checks due to cluster falling below minimum healthy percentage threshold
+  degraded, Counter, Total number of health check responses that reported degraded status

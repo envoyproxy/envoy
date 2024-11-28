@@ -279,6 +279,10 @@ new_features:
   change: |
     Added a new ``setUpstreamOverrideHost()`` which could be used to set the given host as the upstream host for the
     current request.
+- area: health_check
+  change: |
+    Added new health check filter stats including total requests, successful/failed checks, cached responses, and
+    cluster health status counters. These stats help track health check behavior and cluster health state.
 
 deprecated:
 - area: rbac

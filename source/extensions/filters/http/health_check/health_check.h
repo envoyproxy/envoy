@@ -8,7 +8,10 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/http/header_utility.h"
 
 namespace Envoy {
@@ -17,11 +20,43 @@ namespace HttpFilters {
 namespace HealthCheck {
 
 /**
- * Shared cache manager used by all instances of a health check filter configuration as well as
- * all threads. This sets up a timer that will invalidate the cached response code and allow some
- * requests to go through to the backend. No attempt is made to allow only a single request to go
- * through to the backend, so during the invalidation window some number of requests will get
- * through.
+ * All health check filter stats. @see stats_macros.h
+ */
+#define ALL_HEALTH_CHECK_FILTER_STATS(COUNTER)                                                     \
+  COUNTER(request_total)                                                                           \
+  COUNTER(failed)                                                                                  \
+  COUNTER(ok)                                                                                      \
+  COUNTER(cached_response)                                                                         \
+  COUNTER(failed_cluster_not_found)                                                                \
+  COUNTER(failed_cluster_empty)                                                                    \
+  COUNTER(failed_cluster_unhealthy)                                                                \
+  COUNTER(degraded)
+
+/**
+ * Struct definition for all health check stats. @see stats_macros.h
+ */
+struct HealthCheckFilterStats {
+  ALL_HEALTH_CHECK_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+
+  static HealthCheckFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    const std::string final_prefix = absl::StrCat(prefix, "health_check.");
+    return {ALL_HEALTH_CHECK_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+};
+
+// Forward declarations
+class HealthCheckFilter;
+class HealthCheckCacheManager;
+
+using HealthCheckCacheManagerSharedPtr = std::shared_ptr<HealthCheckCacheManager>;
+using HealthCheckFilterStatsSharedPtr = std::shared_ptr<HealthCheckFilterStats>;
+using ClusterMinHealthyPercentages = std::map<std::string, double>;
+using ClusterMinHealthyPercentagesConstSharedPtr =
+    std::shared_ptr<const ClusterMinHealthyPercentages>;
+using HeaderDataVectorSharedPtr = std::shared_ptr<std::vector<Http::HeaderUtility::HeaderDataPtr>>;
+
+/**
+ * Shared cache manager used by all filter instances.
  */
 class HealthCheckCacheManager {
 public:
@@ -47,14 +82,6 @@ private:
   std::atomic<bool> last_response_degraded_{};
 };
 
-using HealthCheckCacheManagerSharedPtr = std::shared_ptr<HealthCheckCacheManager>;
-
-using ClusterMinHealthyPercentages = std::map<std::string, double>;
-using ClusterMinHealthyPercentagesConstSharedPtr =
-    std::shared_ptr<const ClusterMinHealthyPercentages>;
-
-using HeaderDataVectorSharedPtr = std::shared_ptr<std::vector<Http::HeaderUtility::HeaderDataPtr>>;
-
 /**
  * Health check responder filter.
  */
@@ -63,10 +90,11 @@ public:
   HealthCheckFilter(Server::Configuration::ServerFactoryContext& context, bool pass_through_mode,
                     HealthCheckCacheManagerSharedPtr cache_manager,
                     HeaderDataVectorSharedPtr header_match_data,
-                    ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages)
+                    ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages,
+                    HealthCheckFilterStatsSharedPtr stats)
       : context_(context), pass_through_mode_(pass_through_mode), cache_manager_(cache_manager),
         header_match_data_(std::move(header_match_data)),
-        cluster_min_healthy_percentages_(cluster_min_healthy_percentages) {}
+        cluster_min_healthy_percentages_(cluster_min_healthy_percentages), stats_(stats) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -108,6 +136,7 @@ private:
   HealthCheckCacheManagerSharedPtr cache_manager_;
   const HeaderDataVectorSharedPtr header_match_data_;
   ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages_;
+  const HealthCheckFilterStatsSharedPtr stats_;
 };
 
 } // namespace HealthCheck
