@@ -1,0 +1,20 @@
+# Patch for c-ares CVE-2024-25629
+diff --git a/src/lib/ares__read_line.c b/src/lib/ares__read_line.c
+index d65ac1fcf8..018f55e8b2 100644
+--- a/src/lib/ares__read_line.c
++++ b/src/lib/ares__read_line.c
+@@ -59,6 +59,14 @@ ares_status_t ares__read_line(FILE *fp, char **buf, size_t *bufsize)
+       return (offset != 0) ? 0 : (ferror(fp)) ? ARES_EFILE : ARES_EOF;
+     }
+     len = offset + ares_strlen(*buf + offset);
++
++    /* Probably means there was an embedded NULL as the first character in
++     * the line, throw away line */
++    if (len == 0) {
++      offset = 0;
++      continue;
++    }
++
+     if ((*buf)[len - 1] == '\n') {
+       (*buf)[len - 1] = 0;
+       break;

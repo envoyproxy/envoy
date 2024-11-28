@@ -20,13 +20,12 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   auto dynamic_module = newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(dynamic_module.ok());
 
-  auto filter_config_ptr = std::make_shared<
-      Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfig>(
-      filter_name, filter_config, dynamic_module.value());
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()));
+  EXPECT_TRUE(filter_config_or_status.ok());
 
-  auto filter =
-      std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
-          filter_config_ptr);
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
 
   // The followings are mostly for coverage at the moment.
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;

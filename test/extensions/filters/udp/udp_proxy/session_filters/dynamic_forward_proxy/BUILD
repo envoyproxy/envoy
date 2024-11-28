@@ -61,6 +61,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/udp/udp_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy:config",
         "//source/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy:proxy_filter_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:psc_setter_filter_config_lib",
+        "//test/extensions/filters/udp/udp_proxy/session_filters:psc_setter_filter_proto_cc_proto",
         "//test/integration:integration_lib",
         "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

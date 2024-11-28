@@ -757,6 +757,18 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose(false);
 }
 
+void ConnectionManagerImpl::sendGoAwayAndClose() {
+  ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
+                 read_callbacks_->connection());
+  if (go_away_sent_) {
+    return;
+  }
+  codec_->goAway();
+  go_away_sent_ = true;
+  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+                    "forced_goaway");
+}
+
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
                                                ConnectionManagerTracingStats& tracing_stats) {
   switch (tracing_reason) {
