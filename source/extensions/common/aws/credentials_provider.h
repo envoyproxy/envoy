@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -70,10 +71,11 @@ public:
   X509Credentials(std::string certificate_b64,
                   PublicKeySignatureAlgorithm certificate_signature_algorithm,
                   std::string certificate_serial, absl::optional<std::string> certificate_chain_b64,
-                  std::string certificate_private_key_pem)
+                  std::string certificate_private_key_pem, SystemTime certificate_expiration_time)
       : certificate_b64_(certificate_b64),
         certificate_private_key_pem_(certificate_private_key_pem),
         certificate_serial_(certificate_serial),
+        certificate_expiration_(certificate_expiration_time),
         certificate_signature_algorithm_(certificate_signature_algorithm) {
     if (certificate_chain_b64.has_value()) {
       certificate_chain_b64_ = certificate_chain_b64.value();
@@ -85,6 +87,10 @@ public:
   const absl::optional<std::string>& certificateDerB64() const { return certificate_b64_; }
 
   const absl::optional<std::string>& certificateSerial() const { return certificate_serial_; }
+
+  const absl::optional<SystemTime>& certificateExpiration() const {
+    return certificate_expiration_;
+  }
 
   const absl::optional<std::string>& certificateChainDerB64() const {
     return certificate_chain_b64_;
@@ -104,6 +110,7 @@ private:
   absl::optional<std::string> certificate_chain_b64_ = absl::nullopt;
   absl::optional<std::string> certificate_private_key_pem_ = absl::nullopt;
   absl::optional<std::string> certificate_serial_ = absl::nullopt;
+  absl::optional<SystemTime> certificate_expiration_ = absl::nullopt;
   absl::optional<PublicKeySignatureAlgorithm> certificate_signature_algorithm_ = absl::nullopt;
 };
 

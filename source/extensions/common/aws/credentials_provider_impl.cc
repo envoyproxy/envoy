@@ -553,7 +553,7 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
   X509Credentials::PublicKeySignatureAlgorithm cert_algorithm;
   std::string pem;
   absl::Status status;
-  std::string expiration_str;
+  SystemTime time;
 
   if (certificate_data_source_provider_ == nullptr ||
       private_key_data_source_provider_ == nullptr) {
@@ -570,7 +570,6 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
       return;
     }
 
-    SystemTime time;
     status = pemToAlgorithmSerialExpiration(cert_pem, cert_algorithm, cert_serial, time);
     if (!status.ok()) {
       ENVOY_LOG_MISC(error,
@@ -580,7 +579,6 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
       return;
     }
     expiration_time_ = time;
-    expiration_str = fmt::format("{:%Y-%m-%d %H:%M}", time);
   }
 
   // Certificate Chain
@@ -614,18 +612,18 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
               "(algorithm: {}) "
               "and cert chain, with expiration time {}",
               cert_algorithm == X509Credentials::PublicKeySignatureAlgorithm::RSA ? "RSA" : "ECDSA",
-              expiration_str);
+              fmt::format("{:%Y-%m-%d %H:%M}", time));
 
     cached_credentials_ = X509Credentials(cert_der_b64, cert_algorithm, cert_serial,
-                                          cert_chain_der_b64, private_key_pem);
+                                          cert_chain_der_b64, private_key_pem, time);
   } else {
     ENVOY_LOG(info,
               "IAMRolesAnywhere: Setting certificate credentials with cert, serial and private "
               "key (algorithm: {}) with expiration time {}",
               cert_algorithm == X509Credentials::PublicKeySignatureAlgorithm::RSA ? "RSA" : "ECDSA",
-              expiration_str);
-    cached_credentials_ =
-        X509Credentials(cert_der_b64, cert_algorithm, cert_serial, absl::nullopt, private_key_pem);
+              fmt::format("{:%Y-%m-%d %H:%M}", time));
+    cached_credentials_ = X509Credentials(cert_der_b64, cert_algorithm, cert_serial, absl::nullopt,
+                                          private_key_pem, time);
   }
 }
 

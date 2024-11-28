@@ -24,6 +24,10 @@ behavior_changes:
     rather than waiting for the original request to complete. This allows shadowing requests larger than the buffer limit,
     but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
+- area: aws
+  change: |
+    Adds support for IAM Roles Anywhere to the AWS request signing credential provider configuration :ref:`credential_provider
+    <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>`
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

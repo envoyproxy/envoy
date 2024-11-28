@@ -26,7 +26,6 @@
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::Eq;
-// using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::ReturnRef;
 

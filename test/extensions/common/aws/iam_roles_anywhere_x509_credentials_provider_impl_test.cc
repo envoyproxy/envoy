@@ -619,6 +619,10 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   EXPECT_EQ(credentials.certificateSerial(), "5215639076998761095638506031589467414");
   EXPECT_TRUE(credentials.certificatePrivateKey().has_value());
   EXPECT_EQ(credentials.certificatePrivateKey(), server_root_private_key_ecdsa_pem);
+  // Not After : Nov 11 22:42:11 2025 GMT
+  SystemTime a(std::chrono::seconds(1762900931));
+  EXPECT_EQ(credentials.certificateExpiration(), a);
+  // std::chrono::time_point<std::chrono::system_clock>(std::chrono::milliseconds(1762900931000000)));
 
   // Environment Variables -  Certs issued from a subordinate to test certificate chain. Verify that
   // we read and convert these correctly.
@@ -810,6 +814,9 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   EXPECT_EQ(credentials.certificatePrivateKey(), server_root_private_key_rsa_pem);
   EXPECT_TRUE(credentials.certificateChainDerB64().has_value());
   EXPECT_EQ(credentials.certificateChainDerB64(), server_root_chain_rsa_der_b64);
+  // Not After : Nov 18 00:23:37 2025 GMT
+  SystemTime b(std::chrono::seconds(1763425417));
+  EXPECT_EQ(credentials.certificateExpiration(), b);
 }
 
 } // namespace Aws
