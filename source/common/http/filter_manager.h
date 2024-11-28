@@ -825,11 +825,13 @@ public:
    */
   void skipFilterChainCreation() {
     ASSERT(!state_.create_chain_result_.created());
-    state_.create_chain_result_ = CreateChainResult(true, absl::nullopt);
+    state_.create_chain_result_ = CreateChainResult(true);
   }
 
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+  enum class UpgradeResult : uint8_t { UpgradeUnneeded, UpgradeAccepted, UpgradeRejected };
 
   /**
    * Filter chain creation result.
@@ -840,10 +842,9 @@ public:
 
     /**
      * @param created whether the filter chain was created.
-     * @param upgrade whether the upgrade was accepted or rejected. absl::nullopt if no upgrade
-     *        was requested. True if the upgrade was accepted, false if it was rejected.
+     * @param upgrade the upgrade result.
      */
-    CreateChainResult(bool created, absl::optional<bool> upgrade)
+    CreateChainResult(bool created, UpgradeResult upgrade = UpgradeResult::UpgradeUnneeded)
         : created_(created), upgrade_(upgrade) {}
 
     /**
@@ -853,15 +854,15 @@ public:
     /**
      * @return whether the upgrade was accepted.
      */
-    bool upgradeAccepted() const { return upgrade_.has_value() ? upgrade_.value() : false; }
+    bool upgradeAccepted() const { return upgrade_ == UpgradeResult::UpgradeAccepted; }
     /**
      * @return whether the upgrade was rejected.
      */
-    bool upgradeRejected() const { return upgrade_.has_value() ? !upgrade_.value() : false; }
+    bool upgradeRejected() const { return upgrade_ == UpgradeResult::UpgradeRejected; }
 
   private:
     bool created_{};
-    absl::optional<bool> upgrade_{};
+    UpgradeResult upgrade_{};
   };
 
   /**
@@ -1002,8 +1003,8 @@ private:
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
-  absl::optional<bool> createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
-                                                const FilterChainOptionsImpl& options);
+  UpgradeResult createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
+                                         const FilterChainOptionsImpl& options);
 
   // Returns the encoder filter to start iteration with.
   std::list<ActiveStreamEncoderFilterPtr>::iterator

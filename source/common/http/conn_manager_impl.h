@@ -331,39 +331,40 @@ private:
     struct State {
       // It's possibly for the codec to see the completed response but not fully
       // encode it.
-      bool codec_saw_local_complete_{}; // This indicates that local is complete as the completed
+      bool codec_saw_local_complete_ = false; // This indicates that local is complete
+                                              // as the completed
 
       // response has made its way to the codec.
-      bool codec_encode_complete_{};  // This indicates that the codec has
-                                      // completed encoding the response.
-      bool on_reset_stream_called_{}; // Whether the stream has been reset.
-      bool is_zombie_stream_{};       // Whether stream is waiting for signal
-                                      // the underlying codec to be destroyed.
+      bool codec_encode_complete_ = false;  // This indicates that the codec has
+                                            // completed encoding the response.
+      bool on_reset_stream_called_ = false; // Whether the stream has been reset.
+      bool is_zombie_stream_ = false;       // Whether stream is waiting for signal
+                                            // the underlying codec to be destroyed.
 
       // Whether the upgrade request has be accepted by the filter chain.
       // False if the request is not an upgrade request or upgrade is rejected by the filter chain.
-      bool successful_upgrade_{};
+      bool successful_upgrade_ = false;
 
       // True if this stream was the original externally created stream, but was
       // destroyed as part of internal redirect.
-      bool is_internally_destroyed_{};
+      bool is_internally_destroyed_ = false;
       // True if this stream is internally created. Currently only used for
       // internal redirects or other streams created via recreateStream().
-      bool is_internally_created_{};
+      bool is_internally_created_ = false;
 
       // True if the response headers indicate a successful upgrade or connect
       // response.
-      bool is_tunneling_{};
+      bool is_tunneling_ = false;
 
-      bool decorated_propagate_{true};
+      bool decorated_propagate_ = true;
 
       // Indicates that sending headers to the filter manager is deferred to the
       // next I/O cycle. If data or trailers are received when this flag is set
       // they are deferred too.
       // TODO(yanavlasov): encapsulate the entire state of deferred streams into a separate
       // structure, so it can be atomically created and cleared.
-      bool deferred_to_next_io_iteration_{};
-      bool deferred_end_stream_{};
+      bool deferred_to_next_io_iteration_ = false;
+      bool deferred_end_stream_ = false;
     };
 
     bool canDestroyStream() const {

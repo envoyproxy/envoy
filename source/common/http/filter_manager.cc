@@ -1627,7 +1627,7 @@ void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_st
   tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
-absl::optional<bool>
+FilterManager::UpgradeResult
 FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
                                         const FilterChainOptionsImpl& options) {
   const HeaderEntry* upgrade = nullptr;
@@ -1642,12 +1642,14 @@ FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_f
 
   if (upgrade == nullptr) {
     // No upgrade header, no upgrade filter chain.
-    return absl::nullopt;
+    return UpgradeResult::UpgradeUnneeded;
   }
 
   const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
   return filter_chain_factory.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                       upgrade_map, *this, options);
+                                                       upgrade_map, *this, options)
+             ? UpgradeResult::UpgradeAccepted
+             : UpgradeResult::UpgradeRejected;
 }
 
 FilterManager::CreateChainResult
@@ -1664,14 +1666,14 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
   // to set valid initial route only when the downstream callbacks is available.
   FilterChainOptionsImpl options(downstream_callbacks.has_value() ? streamInfo().route() : nullptr);
 
-  absl::optional<bool> upgrade = absl::nullopt;
+  UpgradeResult upgrade = UpgradeResult::UpgradeUnneeded;
 
   // Only try the upgrade filter chain for downstream filter chains.
   if (downstream_callbacks.has_value()) {
     upgrade = createUpgradeFilterChain(filter_chain_factory, options);
-    if (upgrade.value_or(false)) {
+    if (upgrade == UpgradeResult::UpgradeAccepted) {
       // Upgrade filter chain is created. Return the result directly.
-      state_.create_chain_result_ = CreateChainResult(true, true);
+      state_.create_chain_result_ = CreateChainResult(true, upgrade);
       return state_.create_chain_result_;
     }
     // If the upgrade is unnecessary or the upgrade filter chain is rejected, fall through to
