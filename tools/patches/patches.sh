@@ -20,9 +20,11 @@ create_patches_for_version () {
     if [[ "$version" == "main" ]]; then
         mirror_branch="envoy/main"
         patch_branch="patches/main"
+        release_branch="main"
     else
         mirror_branch="envoy/${version}"
-        patch_branch="patches/${version}"
+        patch_branch="patches/${version}"#
+        release_branch="release/v${version}"
     fi
 
     last_commit="$(git log -n1 "origin/${mirror_branch}" --pretty=format:"%H")"
@@ -40,7 +42,7 @@ create_patches_for_version () {
     echo "Creating README (${version}): ${PATCH_README_TPL} -> ${patch_readme}"
     PATCHES_FILENAME="$(basename "${PATCHES_PATH}")"
     PATCHES_FILENAME="$PATCHES_FILENAME.zip" \
-             PATCH_BRANCH="$patch_branch" \
+             PATCH_BRANCH="$release_branch" \
              PATCH_COMMIT="$merge_commit" \
              PATCH_VERSION="$version" \
                  envsubst < "$PATCH_README_TPL" > "$patch_readme"
