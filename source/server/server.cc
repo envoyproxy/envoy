@@ -84,9 +84,9 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
                            std::unique_ptr<ProcessContext> process_context,
                            Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), live_(false), options_(options),
-      validation_context_(options_.allowUnknownStaticFields(),
-                          !options.rejectUnknownDynamicFields(),
-                          options.ignoreUnknownDynamicFields()),
+      validation_context_(
+          options_.allowUnknownStaticFields(), !options.rejectUnknownDynamicFields(),
+          options.ignoreUnknownDynamicFields(), options.suppressDeprecatedWarningLogs()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),

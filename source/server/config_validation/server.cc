@@ -54,7 +54,8 @@ ValidationInstance::ValidationInstance(
     const ProcessContextOptRef& process_context)
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields(),
-                                             !options.ignoreUnknownDynamicFields()),
+                                             !options.ignoreUnknownDynamicFields(),
+                                             options.suppressDeprecatedWarningLogs()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
                                    random_generator_, bootstrap_, process_context)),
