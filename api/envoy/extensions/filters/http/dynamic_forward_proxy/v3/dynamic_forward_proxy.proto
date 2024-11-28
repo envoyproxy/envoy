@@ -74,6 +74,14 @@ message PerRouteConfig {
     //
     //   If the header appears multiple times only the first value is used.
     string host_rewrite_header = 2;
+
+    // Specifies a hostname to be used only for DNS resolution, while preserving the original host header for
+    // forwarding. If not set or empty, the original host header value will be used for DNS lookup.
+    //
+    // Note: Unlike ``host_rewrite_literal`` and ``host_rewrite_header``, this option only affects the DNS resolution
+    // process and does not modify the host header used for forwarding. This makes it safe to use in combination with
+    // HCM host rewrite options.
+    string dns_lookup_override_literal = 3;
   }
 }
 
