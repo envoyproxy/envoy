@@ -25,7 +25,8 @@ create_patches_for_version () {
         patch_branch="patches/${version}"
     fi
 
-    last_commit="$(git log -n1 "origin/${mirror_branch}" --pretty=format:"%H")"
+    # this expects there to be a SINGLE COMMIT extra on the envoy mirror branch
+    last_commit="$(git log --skip=1 -n1 "origin/${mirror_branch}" --pretty=format:"%H")"
     patch_commit="$(git log -n1 "origin/${patch_branch}" --pretty=format:"%H")"
     patch_count="$(git rev-list --count "${last_commit}".."${patch_commit}")"
 
