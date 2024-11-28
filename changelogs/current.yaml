@@ -279,6 +279,14 @@ new_features:
   change: |
     Added a new ``setUpstreamOverrideHost()`` which could be used to set the given host as the upstream host for the
     current request.
+- area: dynamic_forward_proxy
+  change: |
+    added a new :ref:`dns_lookup_override_header
+    <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig.dns_lookup_override_header>`
+    field to
+    :ref:`PerRouteConfig <envoy_v3_api_msg_extensions.filters.http.dynamic_forward_proxy.v3.PerRouteConfig>`, allowing
+    DNS resolution to use a different hostname from a given header while preserving the original host header for the
+    forwarding.
 
 deprecated:
 - area: rbac

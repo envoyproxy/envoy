@@ -114,10 +114,16 @@ public:
 
   const std::string& hostRewrite() const { return host_rewrite_; }
   const Http::LowerCaseString& hostRewriteHeader() const { return host_rewrite_header_; }
+  const std::string& dnsLookupOverrideLiteral() const { return dns_lookup_override_literal_; }
+  const Http::LowerCaseString& dnsLookupOverrideHeader() const {
+    return dns_lookup_override_header_;
+  }
 
 private:
   const std::string host_rewrite_;
   const Http::LowerCaseString host_rewrite_header_;
+  const std::string dns_lookup_override_literal_;
+  const Http::LowerCaseString dns_lookup_override_header_;
 };
 
 class ProxyFilter
