@@ -1223,18 +1223,27 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
   if (lhs.additional_addresses_size() != rhs.additional_addresses_size()) {
     return false;
   }
-  // Assume people won't change the order of additional addresses.
+
   for (auto i = 0; i < lhs.additional_addresses_size(); i++) {
-    if (lhs.additional_addresses(i).has_socket_options() !=
-        rhs.additional_addresses(i).has_socket_options()) {
+    auto lhs_addr = lhs.additional_addresses(i);
+    auto iter = std::find_if(
+        rhs.additional_addresses().begin(), rhs.additional_addresses().end(),
+        [&lhs_addr](const envoy::config::listener::v3::AdditionalAddress& addr) {
+          return Protobuf::util::MessageDifferencer::Equals(lhs_addr.address(), addr.address());
+        });
+    if (iter == rhs.additional_addresses().end()) {
+      return false;
+    }
+
+    if (lhs.additional_addresses(i).has_socket_options() != iter->has_socket_options()) {
       return false;
     }
     if (lhs.additional_addresses(i).has_socket_options()) {
       is_equal =
           std::equal(lhs.additional_addresses(i).socket_options().socket_options().begin(),
                      lhs.additional_addresses(i).socket_options().socket_options().end(),
-                     rhs.additional_addresses(i).socket_options().socket_options().begin(),
-                     rhs.additional_addresses(i).socket_options().socket_options().end(),
+                     iter->socket_options().socket_options().begin(),
+                     iter->socket_options().socket_options().end(),
                      [](const ::envoy::config::core::v3::SocketOption& option,
                         const ::envoy::config::core::v3::SocketOption& other_option) {
                        return Protobuf::util::MessageDifferencer::Equals(option, other_option);
