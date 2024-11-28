@@ -7,13 +7,15 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/buffer/buffer.h"
+
+#include "source/common/http/utility.h"
+
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
-#include "envoy/buffer/buffer.h"
-#include "source/common/http/utility.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -23,10 +25,9 @@ namespace GrpcJsonReverseTranscoder {
 
 namespace {
 
-absl::Status BuildReplacementVector(
-    nlohmann::json& request, std::string http_rule_path,
-    std::vector<std::pair<std::string, std::string>>& replacements,
-    absl::flat_hash_set<std::string>& param_set) {
+absl::Status BuildReplacementVector(nlohmann::json& request, std::string http_rule_path,
+                                    std::vector<std::pair<std::string, std::string>>& replacements,
+                                    absl::flat_hash_set<std::string>& param_set) {
   size_t end = 0;
   // Iterate through the path and replace the placeholders with the values from
   // the request message.
@@ -40,8 +41,7 @@ absl::Status BuildReplacementVector(
     }
     end = http_rule_path.find('}', start);
     if (end == std::string::npos) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Invalid HTTP path: ", http_rule_path));
+      return absl::InvalidArgumentError(absl::StrCat("Invalid HTTP path: ", http_rule_path));
     }
     std::string key = http_rule_path.substr(start + 1, end - start - 1);
     bool has_one_path_segment = true;
@@ -61,20 +61,19 @@ absl::Status BuildReplacementVector(
     // "parent.id". In this case, we need to extract the value of the "parent"
     // field from the request object and then extract the value of the "id"
     // field from the "parent" object.
-    std::optional<std::string> param_value =
+    absl::optional<std::string> param_value =
         GetNestedJsonValueAsString(request, key, has_one_path_segment);
     if (!param_value.has_value()) {
       return absl::InvalidArgumentError(
           absl::StrCat("Key, ", key, ", not found in the request message"));
     }
     replacements.push_back(
-        {std::string(http_rule_path.substr(start, end - start + 1)),
-         param_value.value()});
+        {std::string(http_rule_path.substr(start, end - start + 1)), param_value.value()});
   }
   return absl::OkStatus();
 }
 
-}  // namespace
+} // namespace
 
 std::string BuildGrpcMessage(Envoy::Buffer::Instance& body_data) {
   const uint64_t message_length = body_data.length();
@@ -86,9 +85,9 @@ std::string BuildGrpcMessage(Envoy::Buffer::Instance& body_data) {
   return Envoy::Http::Utility::PercentEncoding::encode(message);
 }
 
-std::optional<std::string> GetNestedJsonValueAsString(
-    const nlohmann::json& object, const std::string& key,
-    bool has_one_path_segment) {
+absl::optional<std::string> GetNestedJsonValueAsString(const nlohmann::json& object,
+                                                       const std::string& key,
+                                                       bool has_one_path_segment) {
   nlohmann::json::json_pointer key_pointer(
       absl::StrCat("/", absl::StrReplaceAll(key, {{".", "/"}})));
   if (!object.contains(key_pointer)) {
@@ -101,8 +100,7 @@ std::optional<std::string> GetNestedJsonValueAsString(
     value = object[key_pointer].dump();
   }
   return Envoy::Http::Utility::PercentEncoding::encode(
-      value, has_one_path_segment ? absl::StrCat(reserved_chars, "/")
-                                  : reserved_chars);
+      value, has_one_path_segment ? absl::StrCat(reserved_chars, "/") : reserved_chars);
 }
 
 void BuildQueryParamString(const nlohmann::json& object,
@@ -119,9 +117,8 @@ void BuildQueryParamString(const nlohmann::json& object,
     } else {
       value = object.dump();
     }
-    absl::StrAppend(
-        query_string, query_string->empty() ? "" : "&", prefix, "=",
-        Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(value));
+    absl::StrAppend(query_string, query_string->empty() ? "" : "&", prefix, "=",
+                    Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(value));
     return;
   }
 
@@ -138,13 +135,11 @@ void BuildQueryParamString(const nlohmann::json& object,
   }
 }
 
-absl::StatusOr<std::string> BuildPath(nlohmann::json& request,
-                                      std::string http_rule_path,
+absl::StatusOr<std::string> BuildPath(nlohmann::json& request, std::string http_rule_path,
                                       std::string http_body_field) {
   std::vector<std::pair<std::string, std::string>> replacements;
   absl::flat_hash_set<std::string> param_set;
-  absl::Status status =
-      BuildReplacementVector(request, http_rule_path, replacements, param_set);
+  absl::Status status = BuildReplacementVector(request, http_rule_path, replacements, param_set);
   if (!status.ok()) {
     return status;
   }
@@ -168,8 +163,7 @@ absl::StatusOr<std::string> BuildPath(nlohmann::json& request,
   return http_rule_path;
 }
 
-}  // namespace GrpcJsonReverseTranscoder
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
-
+} // namespace GrpcJsonReverseTranscoder
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

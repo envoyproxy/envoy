@@ -5,6 +5,8 @@ load(
     "envoy_extension_package",
 )
 
+licenses(["notice"])  # Apache 2
+
 # L7 HTTP filter that implements binary gRPC to JSON transcoding
 # Public docs:
 envoy_extension_package()
