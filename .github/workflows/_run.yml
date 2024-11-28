@@ -153,7 +153,7 @@ on:
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.3.11
+          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.3.12
             with:
               context: %{{ inputs.context }}
       steps-pre:
