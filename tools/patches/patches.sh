@@ -23,7 +23,7 @@ create_patches_for_version () {
         release_branch="main"
     else
         mirror_branch="envoy/${version}"
-        patch_branch="patches/${version}"#
+        patch_branch="patches/${version}"
         release_branch="release/v${version}"
     fi
 
