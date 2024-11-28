@@ -870,8 +870,8 @@ public:
     bool upgradeRejected() const { return upgrade_ == UpgradeResult::UpgradeRejected; }
 
   private:
-    bool created_{};
-    UpgradeResult upgrade_{};
+    bool created_ = false;
+    UpgradeResult upgrade_ = UpgradeResult::UpgradeUnneeded;
   };
 
   /**
