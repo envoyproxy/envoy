@@ -40,6 +40,7 @@ struct FieldValidationConfig {
   bool allow_unknown_static_fields = false;
   bool reject_unknown_dynamic_fields = false;
   bool ignore_unknown_dynamic_fields = false;
+  bool suppress_deprecated_warning_logs = false;
 };
 
 // Create OptionsImplBase structures suitable for tests. Disables hot restart.

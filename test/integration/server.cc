@@ -54,6 +54,8 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
   test_options.setAllowUnknownFields(validation_config.allow_unknown_static_fields);
   test_options.setRejectUnknownFieldsDynamic(validation_config.reject_unknown_dynamic_fields);
   test_options.setIgnoreUnknownFieldsDynamic(validation_config.ignore_unknown_dynamic_fields);
+  test_options.setSupressingDeprecatedWarningLog(
+      validation_config.suppress_deprecated_warning_logs);
   test_options.setConcurrency(concurrency);
   test_options.setHotRestartDisabled(true);
   if (config_proto) {

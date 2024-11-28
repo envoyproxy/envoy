@@ -279,6 +279,9 @@ new_features:
   change: |
     Added a new ``setUpstreamOverrideHost()`` which could be used to set the given host as the upstream host for the
     current request.
+- area: access log
+  change: |
+    Added new command-line flag :option:`--suppress-deprecated-warning-logs`.
 
 deprecated:
 - area: rbac
