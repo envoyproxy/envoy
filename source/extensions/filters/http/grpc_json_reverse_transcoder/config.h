@@ -11,25 +11,26 @@ namespace HttpFilters {
 namespace GrpcJsonReverseTranscoder {
 
 class GrpcJsonReverseTranscoderFactory
-    : public Common::FactoryBase<
-          envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::GrpcJsonReverseTranscoder> {
+    : public Common::FactoryBase<envoy::extensions::filters::http::grpc_json_reverse_transcoder::
+                                     v3::GrpcJsonReverseTranscoder> {
 public:
-    GrpcJsonReverseTranscoderFactory()
-        : FactoryBase("envoy.filters.http.grpc_json_reverse_transcoder") {}
+  GrpcJsonReverseTranscoderFactory()
+      : FactoryBase("envoy.filters.http.grpc_json_reverse_transcoder") {}
 
 private:
-    Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-        const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::GrpcJsonReverseTranscoder&
-            proto_config,
-        const std::string&, Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+          GrpcJsonReverseTranscoder& proto_config,
+      const std::string&, Server::Configuration::FactoryContext& context) override;
 
-    Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-        const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::GrpcJsonReverseTranscoder&
-            proto_config,
-        Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) override;
+  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+      const envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::
+          GrpcJsonReverseTranscoder& proto_config,
+      Server::Configuration::ServerFactoryContext& context,
+      ProtobufMessage::ValidationVisitor&) override;
 };
 
-}  // namespace GrpcJsonReverseTranscoder
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace GrpcJsonReverseTranscoder
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy

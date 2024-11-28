@@ -3,9 +3,10 @@
 #include <optional>
 #include <string>
 
+#include "envoy/buffer/buffer.h"
+
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/statusor.h"
-#include "envoy/buffer/buffer.h"
 #include "nlohmann/json.hpp"
 
 namespace Envoy {
@@ -27,10 +28,9 @@ std::string BuildGrpcMessage(Envoy::Buffer::Instance& body_data);
 // [-_./0-9a-zA-Z].
 // TODO(numanelahi): Add `~` to the list of characters that are not percent
 // encoded.
-std::optional<std::string> GetNestedJsonValueAsString(
-    const nlohmann::json& object, const std::string& key,
-    bool has_one_path_segment);
-
+absl::optional<std::string> GetNestedJsonValueAsString(const nlohmann::json& object,
+                                                       const std::string& key,
+                                                       bool has_one_path_segment);
 
 // Takes the json object builds a percent encoded query string out of it.
 // @param object The json object to build the query string from.
@@ -64,8 +64,7 @@ std::optional<std::string> GetNestedJsonValueAsString(
 // then query_string = "prefix.f=hello%20world&prefix.g=1.234"
 void BuildQueryParamString(const nlohmann::json& object,
                            const absl::flat_hash_set<std::string>& ignore_list,
-                           std::string* query_string,
-                           std::string key_prefix = "");
+                           std::string* query_string, std::string key_prefix = "");
 
 // Takes the request json object and the gRPC method's http path annotation and
 // build the normalized HTTP path out of it.
@@ -87,11 +86,10 @@ void BuildQueryParamString(const nlohmann::json& object,
 // `/v1/projects/123456789/shelves/fiction?description=This%20is%20a%20test%20description&theme=Kids`,
 // when the http_body_field is "shelf", adding `theme` and `description` as
 // query parameters to the http path.
-absl::StatusOr<std::string> BuildPath(nlohmann::json& request,
-                                      std::string http_rule_path,
+absl::StatusOr<std::string> BuildPath(nlohmann::json& request, std::string http_rule_path,
                                       std::string http_body_field);
 
-}  // namespace GrpcJsonReverseTranscoder
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace GrpcJsonReverseTranscoder
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
