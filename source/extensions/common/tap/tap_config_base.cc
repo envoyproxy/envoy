@@ -101,7 +101,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
   case ProtoOutputSink::OutputSinkTypeCase::kUdpSink: {
     sink_ = std::make_unique<UdpTapSink>(sinks[0].udp_sink());
     sink_to_use_ = sink_.get();
-    ENVOY_LOG_MISC(debug, "Done init UDP sink configured data");
+    ENVOY_LOG_MISC(debug, "Done init UDP sink configure data");
   } break;
   case ProtoOutputSink::OutputSinkTypeCase::kCustomSink: {
     TapSinkFactory& tap_sink_factory =
