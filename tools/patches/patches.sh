@@ -25,12 +25,13 @@ create_patches_for_version () {
         patch_branch="patches/${version}"
     fi
 
-    # this expects there to be a SINGLE COMMIT extra on the envoy mirror branch
     last_commit="$(git log --skip=1 -n1 "origin/${mirror_branch}" --pretty=format:"%H")"
+    # this expects there to be a SINGLE COMMIT extra on the envoy mirror branch
+    merge_commit="$(git log --skip=1 -n1 "origin/${mirror_branch}" --pretty=format:"%H")"
     patch_commit="$(git log -n1 "origin/${patch_branch}" --pretty=format:"%H")"
     patch_count="$(git rev-list --count "${last_commit}".."${patch_commit}")"
 
-    echo "PATCH (${version}) from ${last_commit} -> ${patch_commit} (${patch_count} commits)"
+    echo "PATCH (${version}) from ${merge_commit} -> ${patch_commit} (${patch_count} commits)"
 
     git checkout "origin/$patch_branch"
     git format-patch "-${patch_count}" -o "$patch_dir"
@@ -40,7 +41,7 @@ create_patches_for_version () {
     PATCHES_FILENAME="$(basename "${PATCHES_PATH}")"
     PATCHES_FILENAME="$PATCHES_FILENAME.zip" \
              PATCH_BRANCH="$patch_branch" \
-             PATCH_COMMIT="$last_commit" \
+             PATCH_COMMIT="$merge_commit" \
              PATCH_VERSION="$version" \
                  envsubst < "$PATCH_README_TPL" > "$patch_readme"
     echo "-----------------------"
