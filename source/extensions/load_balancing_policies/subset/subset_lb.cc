@@ -270,8 +270,6 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* 
     HostConstSharedPtr host = tryChooseHostFromContext(actual_used_context, host_chosen);
     if (host_chosen) {
       // Subset lookup succeeded, return this result even if it's nullptr.
-      const auto cluster_name = host->cluster().name();
-      ENVOY_LOG(info, "chosen host: {}", host->cluster().name());
       return host;
     }
     // otherwise check if there is fallback policy configured for given route metadata
@@ -484,7 +482,6 @@ void SubsetLoadBalancer::processSubsets(uint32_t priority, const HostVector& all
       // For each host, for each subset key, attempt to extract the metadata corresponding to the
       // key from the host.
       std::vector<SubsetMetadata> all_kvs = extractSubsetMetadata(keys, *host);
-
       for (const auto& kvs : all_kvs) {
         // The host has metadata for each key, find or create its subset.
         auto entry = findOrCreateLbSubsetEntry(subsets_, kvs, 0);

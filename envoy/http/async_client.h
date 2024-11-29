@@ -379,10 +379,6 @@ public:
       sampled_ = sampled;
       return *this;
     }
-    // Something to keep in mind is: when I set the MetadataCriteria here, I'd expect
-    // for it to be always taken into consideration whenever the request is sent. Will
-    // that work for "stream" too?
-    // And ownership here is so weird, shouldn't this be a shared ptr maybe, or a copy?
     StreamOptions&
     setMetadataMatchCriteria(const Envoy::Router::MetadataMatchCriteria* metadata_match) {
       this->metadata_match = metadata_match;
@@ -453,12 +449,7 @@ public:
     absl::optional<bool> sampled_{true};
     // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
-    // TODO: not sure this belongs here
-    // We got to double check where "stream options"
-    // is also used. This may make sense as "the metadata
-    // used for routing/LB this request (RequestOption)"", but
-    // it might be different for the StreamOption idea.
-    // This needs to be a pointer (relies on vtable)
+    // MetadataMatchCriteria to be associated to the new stream
     const Envoy::Router::MetadataMatchCriteria* metadata_match;
   };
 
