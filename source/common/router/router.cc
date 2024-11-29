@@ -776,7 +776,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (streaming_shadows_) {
     // start the shadow streams.
     for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
-      // We mind need to pass routing information from here too.
       const auto& shadow_policy = shadow_policy_wrapper.get();
       const absl::optional<absl::string_view> shadow_cluster_name =
           getShadowCluster(shadow_policy, *downstream_headers_);
