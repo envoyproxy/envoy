@@ -1,5 +1,7 @@
 #pragma once
 
+// NOLINT(namespace-envoy)
+
 // This is a pure C header, so we can't apply clang-tidy to it.
 // NOLINTBEGIN
 
