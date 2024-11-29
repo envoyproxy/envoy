@@ -372,12 +372,11 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
              if (!wrapper.info_.upstreamInfo().has_value()) {
                return {};
              }
-             if (auto connection_pool_callback_latency = wrapper.info_.upstreamInfo()
-                                                             .value()
-                                                             .get()
-                                                             .upstreamTiming()
-                                                             .connectionPoolCallbackLatency();
-                 connection_pool_callback_latency.has_value()) {
+
+             const StreamInfo::UpstreamInfo& upstream_info = wrapper.info_.upstreamInfo().value();
+             const absl::optional<std::chrono::nanoseconds> connection_pool_callback_latency =
+                 upstream_info.upstreamTiming().connectionPoolCallbackLatency();
+             if (connection_pool_callback_latency.has_value()) {
                return CelValue::CreateDuration(
                    absl::FromChrono(connection_pool_callback_latency.value()));
              }
