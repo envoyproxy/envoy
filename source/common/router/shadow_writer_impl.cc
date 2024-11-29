@@ -67,6 +67,7 @@ Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAn
     headers.setHost(shadowAppendedHost(headers.getHostValue()));
   }
 
+  // We may not need this here (in router.cc we set the shadow option)
   const_cast<Http::AsyncClient::RequestOptions&>(options).setIsShadow(true);
   return thread_local_cluster;
 }
