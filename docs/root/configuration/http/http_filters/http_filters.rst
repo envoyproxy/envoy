@@ -37,6 +37,7 @@ HTTP filters
   grpc_field_extraction_filter
   grpc_http1_bridge_filter
   grpc_http1_reverse_bridge_filter
+  grpc_json_reverse_transcoder_filter
   grpc_json_transcoder_filter
   grpc_stats_filter
   grpc_web_filter

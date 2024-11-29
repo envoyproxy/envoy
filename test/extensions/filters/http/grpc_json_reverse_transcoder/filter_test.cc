@@ -70,6 +70,42 @@ protected:
     return TestEnvironment::runfilesPath("test/proto/bookstore.descriptor");
   }
 
+  std::string makeProtoDescriptor(std::function<void(Protobuf::FileDescriptorSet&)> process) {
+    Protobuf::FileDescriptorSet descriptor_set;
+    descriptor_set.ParseFromString(
+        api_->fileSystem()
+            .fileReadToEnd(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"))
+            .value());
+
+    process(descriptor_set);
+
+    TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
+    std::string path = TestEnvironment::temporaryPath("envoy_test/proto.descriptor");
+    std::ofstream file(path, std::ios::binary);
+    descriptor_set.SerializeToOstream(&file);
+
+    return path;
+  }
+
+  void stripImports(Protobuf::FileDescriptorSet& descriptor_set, const std::string& file_name) {
+    Protobuf::FileDescriptorProto file_descriptor;
+    // filter down descriptor_set to only contain one proto specified as file_name but none of its
+    // dependencies
+    auto file_itr =
+        std::find_if(descriptor_set.file().begin(), descriptor_set.file().end(),
+                     [&file_name](const Protobuf::FileDescriptorProto& file) {
+                       // return whether file.name() ends with file_name
+                       return file.name().length() >= file_name.length() &&
+                              0 == file.name().compare(file.name().length() - file_name.length(),
+                                                       std::string::npos, file_name);
+                     });
+    RELEASE_ASSERT(file_itr != descriptor_set.file().end(), "");
+    file_descriptor = *file_itr;
+
+    descriptor_set.clear_file();
+    descriptor_set.add_file()->Swap(&file_descriptor);
+  }
+
   Api::ApiPtr api_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   std::shared_ptr<GrpcJsonReverseTranscoderConfig> config_;
@@ -221,7 +257,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, RequestWithMultipleDataFrames) {
   EXPECT_EQ(headers.getContentLengthValue(), std::to_string(expected_request.size()));
 }
 
-// Test request transcoding where request type is google.api.HttpBody
+// Test request transcoding where request type is `google.api.HttpBody`
 TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeHttpBody) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {":path", "/bookstore.Bookstore/EchoRawBody"},
@@ -241,7 +277,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeHttpBody) {
   EXPECT_EQ(headers.getContentLengthValue(), std::to_string(http_body.data().size()));
 }
 
-// Test request transcoding where request type is google.api.HttpBody and
+// Test request transcoding where request type is `google.api.HttpBody` and
 // the path contains placeholders.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, MissingPlaceholderValue) {
   Http::TestRequestHeaderMapImpl headers{
@@ -259,7 +295,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, MissingPlaceholderValue) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(*request_data, true));
 }
 
-// Test request transcoding for the payload is a nested filed of type google.api.HttpBody.
+// Test request transcoding for the payload is a nested filed of type `google.api.HttpBody`.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeNestedHttpBody) {
   auto config =
       std::make_shared<GrpcJsonReverseTranscoderConfig>(bookstoreProtoConfig(true), *api_);
@@ -328,7 +364,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, DecoderBufferLimitOverflow) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.decodeData(*request_data, true));
 }
 
-// Test transcoding with request of type google.api.HttpBody overflowing the buffer limits.
+// Test transcoding with request of type `google.api.HttpBody` overflowing the buffer limits.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, DecoderBufferLimitOverflowHttpBody) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {":path", "/bookstore.Bookstore/CreateBookHttpBody"},
@@ -518,7 +554,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKResponseWithTrailer) {
   EXPECT_EQ(trailers.getGrpcStatusValue(), "0");
 }
 
-// Test transcoding of a response that's supposed to be transcoded into google.api.HttpBody
+// Test transcoding of a response that's supposed to be transcoded into `google.api.HttpBody`
 TEST_F(GrpcJsonReverseTranscoderFilterTest, OKHttpBodyResponse) {
   Http::TestRequestHeaderMapImpl req_headers{{":method", "POST"},
                                              {":path", "/bookstore.Bookstore/GetIndex"},
@@ -547,7 +583,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, OKHttpBodyResponse) {
   EXPECT_EQ(trailers.getGrpcStatusValue(), "0");
 }
 
-// Test transcoding of an empty response that's supposed to be transcoded into google.api.HttpBody
+// Test transcoding of an empty response that's supposed to be transcoded into `google.api.HttpBody`
 TEST_F(GrpcJsonReverseTranscoderFilterTest, EmptyHttpBodyResponse) {
   Http::TestRequestHeaderMapImpl req_headers{{":method", "POST"},
                                              {":path", "/bookstore.Bookstore/GetIndex"},
@@ -568,7 +604,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, EmptyHttpBodyResponse) {
   EXPECT_EQ(trailers.getGrpcStatusValue(), "0");
 }
 
-// Test transcoding of a response that's supposed to be transcoded into google.api.HttpBody with
+// Test transcoding of a response that's supposed to be transcoded into `google.api.HttpBody` with
 // trailers.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, OKHttpBodyResponseWithTrailer) {
   Http::TestRequestHeaderMapImpl req_headers{{":method", "POST"},
@@ -614,7 +650,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, EncoderBufferLimitOverflow) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(response, false));
 }
 
-// Test the overflow of buffer limit for the google.api.HttpBody reponse.
+// Test the overflow of buffer limit for the `google.api.HttpBody` response.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, EncoderBufferLimitOverflowHttpBody) {
   Http::TestRequestHeaderMapImpl req_headers{{":method", "POST"},
                                              {":path", "/bookstore.Bookstore/GetIndex"},
@@ -648,6 +684,24 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, MiscEncodingAndDecoding) {
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
+}
+
+// Test to parse an invalid proto descriptor from the file.
+TEST_F(GrpcJsonReverseTranscoderFilterTest, ParseInvalidConfig) {
+  envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::GrpcJsonReverseTranscoder
+      config;
+  config.set_descriptor_path("test/proto/bookstore.proto");
+  EXPECT_THROW_WITH_MESSAGE(GrpcJsonReverseTranscoderConfig(config, *api_), EnvoyException,
+                            "Unable to parse proto descriptor");
+}
+
+TEST_F(GrpcJsonReverseTranscoderFilterTest, ParseInvalidFileConfig) {
+  envoy::extensions::filters::http::grpc_json_reverse_transcoder::v3::GrpcJsonReverseTranscoder
+      config;
+  config.set_descriptor_path(makeProtoDescriptor(
+      [&](Protobuf::FileDescriptorSet& pb) { stripImports(pb, "test/proto/bookstore.proto"); }));
+  EXPECT_THROW_WITH_MESSAGE(GrpcJsonReverseTranscoderConfig(config, *api_), EnvoyException,
+                            "Unable to build proto descriptor pool");
 }
 
 // Test parsing of a proto descriptor in binary format.
@@ -720,7 +774,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, CreateTranscoderInvalidMethod) {
   EXPECT_EQ(status.code(), absl::StatusCode::kNotFound);
 }
 
-// Test creation of a transcoder instance for a gRPC method without google.api.http annotation.
+// Test creation of a transcoder instance for a gRPC method without `google.api.http` annotation.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, CreateTranscoderWithoutHttpAnnotations) {
   auto config = GrpcJsonReverseTranscoderConfig(bookstoreProtoConfig(), *api_);
 
