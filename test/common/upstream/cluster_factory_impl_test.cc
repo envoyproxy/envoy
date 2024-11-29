@@ -168,7 +168,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
       cluster_type:
           name: envoy.clusters.custom_static
           typed_config:
-            "@type": type.googleapis.com/test.integration.clusters.CustomStaticConfig
+            "@type": type.googleapis.com/test.integration.clusters.CustomStaticConfig1
             priority: 10
             address: 127.0.0.1
             port_value: 80
@@ -194,7 +194,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
   EXPECT_FALSE(cluster->info()->addedViaApi());
 }
 
-TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
+TEST_F(TestStaticClusterImplTest, UnsupportedClusterName) {
   const std::string yaml = R"EOF(
     name: staticcluster
     connect_timeout: 0.25s
@@ -209,9 +209,6 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
                     port_value: 443
     cluster_type:
         name: envoy.clusters.bad_cluster_name
-        typed_config:
-          "@type": type.googleapis.com/test.integration.clusters.CustomStaticConfig
-          priority: 10
   )EOF";
   // the factory is not registered, expect to fail
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
@@ -222,6 +219,35 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
   EXPECT_EQ(create_result.status().message(),
             "Didn't find a registered cluster factory implementation for name: "
             "'envoy.clusters.bad_cluster_name'");
+}
+
+TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
+  std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 443
+    cluster_type:
+        name: envoy.clusters.logical_dns
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
+  )EOF";
+  // the factory is not registered, expect to fail
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  auto create_result =
+      ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
+                                     ssl_context_manager_, std::move(outlier_event_logger_), false);
+  EXPECT_FALSE(create_result.ok());
+  EXPECT_EQ(create_result.status().message(),
+            "Didn't find a registered cluster factory implementation for type: "
+            "'envoy.config.cluster.v3.Cluster'");
 }
 
 TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
@@ -241,7 +267,7 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
                     address: 10.0.0.1
                     port_value: 443
       cluster_type:
-        name: envoy.clusters.test_static
+        name: envoy.clusters.custom_static
     )EOF";
 
   const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
@@ -251,7 +277,7 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
   EXPECT_FALSE(create_result.ok());
   EXPECT_EQ(create_result.status().message(),
             "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
-            "'envoy.clusters.test_static'");
+            "'envoy.clusters.custom_static'");
 }
 
 } // namespace

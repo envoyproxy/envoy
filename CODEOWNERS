@@ -377,6 +377,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/clusters/logical_dns/ @UNOWNED @UNOWNED
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
+/*/extensions/clusters/dns @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/listener_manager @alyssawilk @ggreenway
 /*/source/extensions/listener_managers/validation_listener_manager @alyssawilk @ggreenway
 /*/source/extensions/config_subscription/ @adisuissa @UNOWNED

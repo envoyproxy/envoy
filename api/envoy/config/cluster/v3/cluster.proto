@@ -953,8 +953,15 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  google.protobuf.Duration dns_refresh_rate = 16
-      [(validate.rules).duration = {gt {nanos: 1000000}}];
+  // This field is deprecated in favor of using the :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
+  // extension point and configuring it with :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
+  // If :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is configured with
+  // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`, this field will be ignored.
+  google.protobuf.Duration dns_refresh_rate = 16 [
+    deprecated = true,
+    (validate.rules).duration = {gt {nanos: 1000000}},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // DNS jitter can be optionally specified if the cluster type is either
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
@@ -965,7 +972,15 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  google.protobuf.Duration dns_jitter = 58 [(validate.rules).duration = {gte {}}];
+  // This field is deprecated in favor of using the :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
+  // extension point and configuring it with :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
+  // If :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is configured with
+  // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`, this field will be ignored.
+  google.protobuf.Duration dns_jitter = 58 [
+    deprecated = true,
+    (validate.rules).duration = {gte {}},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // If the DNS failure refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
@@ -975,16 +990,31 @@ message Cluster {
   // other than :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
   // :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>` this setting is
   // ignored.
-  RefreshRate dns_failure_refresh_rate = 44;
+  // This field is deprecated in favor of using the :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
+  // extension point and configuring it with :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
+  // If :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is configured with
+  // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`, this field will be ignored.
+  RefreshRate dns_failure_refresh_rate = 44
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
   // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
   // resolution.
-  bool respect_dns_ttl = 39;
+  // This field is deprecated in favor of using the :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
+  // extension point and configuring it with :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
+  // If :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is configured with
+  // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`, this field will be ignored.
+  bool respect_dns_ttl = 39
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The DNS IP address resolution policy. If this setting is not specified, the
   // value defaults to
   // :ref:`AUTO<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.AUTO>`.
+  // For logical and strict dns cluster, this field is deprecated in favor of using the
+  // :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
+  // extension point and configuring it with :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
+  // If :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is configured with
+  // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`, this field will be ignored.
   DnsLookupFamily dns_lookup_family = 17 [(validate.rules).enum = {defined_only: true}];
 
   // If DNS resolvers are specified and the cluster type is either
@@ -1024,6 +1054,9 @@ message Cluster {
   // During the transition period when both ``dns_resolution_config`` and ``typed_dns_resolver_config`` exists,
   // when ``typed_dns_resolver_config`` is in place, Envoy will use it and ignore ``dns_resolution_config``.
   // When ``typed_dns_resolver_config`` is missing, the default behavior is in place.
+  // Also note that this field is deprecated for logical dns and strict dns clusters and will be ignored when
+  // :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is configured with
+  // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
   // [#extension-category: envoy.network.dns_resolver]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
 
