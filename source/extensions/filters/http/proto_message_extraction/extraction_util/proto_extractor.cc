@@ -35,15 +35,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoMessageExtraction {
 
-using ::Envoy::Protobuf::FieldMask;
 using ::Envoy::Protobuf::util::JsonParseOptions;
 using ::Envoy::ProtobufUtil::FieldMaskUtil;
-using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::ProtobufWkt::Type;
 using ::google::grpc::transcoding::TypeHelper;
-using ::google::protobuf::util::converter::JsonObjectWriter;
-using ::google::protobuf::util::converter::ProtoStreamObjectSource;
-using ::google::protobuf::util::converter::TypeInfo;
 using ::proto_processing_lib::proto_scrubber::FieldCheckerInterface;
 using ::proto_processing_lib::proto_scrubber::FieldMaskPathChecker;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;

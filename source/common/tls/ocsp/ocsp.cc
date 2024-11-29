@@ -114,8 +114,8 @@ OcspResponseWrapperImpl::create(std::vector<uint8_t> der_response, TimeSource& t
   auto response_or_error = readDerEncodedOcspResponse(der_response);
   RETURN_IF_NOT_OK(response_or_error.status());
   RETURN_IF_NOT_OK(validateResponse(response_or_error.value()));
-  return std::unique_ptr<OcspResponseWrapperImpl>{
-      new OcspResponseWrapperImpl(der_response, time_source, std::move(response_or_error.value()))};
+  return std::make_unique<OcspResponseWrapperImpl>(der_response, time_source,
+                                                   std::move(response_or_error.value()));
 }
 
 OcspResponseWrapperImpl::OcspResponseWrapperImpl(std::vector<uint8_t> der_response,

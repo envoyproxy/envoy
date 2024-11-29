@@ -168,7 +168,7 @@ namespace {
 // HTTP/2 valid characters (similar to oghttp2's implementation) and the "@" character.
 // Once UHV is used, this function should be removed, and the HTTP/1 and HTTP/2
 // authority validations should be different.
-bool check_authority_h1_h2(const absl::string_view header_value) {
+bool checkAuthorityH1H2(const absl::string_view header_value) {
   static constexpr char ValidAuthorityChars[] = {
       0 /* NUL  */, 0 /* SOH  */, 0 /* STX  */, 0 /* ETX  */,
       0 /* EOT  */, 0 /* ENQ  */, 0 /* ACK  */, 0 /* BEL  */,
@@ -248,7 +248,7 @@ bool check_authority_h1_h2(const absl::string_view header_value) {
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.internal_authority_header_validator")) {
-    return check_authority_h1_h2(header_value);
+    return checkAuthorityH1H2(header_value);
   }
   return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
 }

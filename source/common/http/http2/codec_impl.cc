@@ -86,11 +86,11 @@ public:
     }
   }
 };
-const char* codec_strerror(int error_code) { return nghttp2_strerror(error_code); }
+const char* codecStrError(int error_code) { return nghttp2_strerror(error_code); }
 #else
   const absl::string_view errorDetails(int) const { return oghttp2_err_unknown_; }
 };
-const char* codec_strerror(int) { return "unknown_error"; }
+const char* codecStrError(int) { return "unknown_error"; }
 #endif
 
 int reasonToReset(StreamResetReason reason) {
@@ -967,7 +967,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
     }
 #endif
     if (rc != static_cast<ssize_t>(slice.len_)) {
-      return codecProtocolError(codec_strerror(rc));
+      return codecProtocolError(codecStrError(rc));
     }
 
     current_slice_ = nullptr;
@@ -1254,7 +1254,7 @@ int ConnectionImpl::onError(absl::string_view error) {
 }
 
 int ConnectionImpl::onInvalidFrame(int32_t stream_id, int error_code) {
-  ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, codec_strerror(error_code),
+  ENVOY_CONN_LOG(debug, "invalid frame: {} on stream {}", connection_, codecStrError(error_code),
                  stream_id);
 
   // Set details of error_code in the stream whenever we have one.
@@ -1528,7 +1528,7 @@ Status ConnectionImpl::sendPendingFrames() {
   const int rc = adapter_->Send();
   if (rc != 0) {
     ASSERT(rc == ERR_CALLBACK_FAILURE);
-    return codecProtocolError(codec_strerror(rc));
+    return codecProtocolError(codecStrError(rc));
   }
 
   // See ConnectionImpl::StreamImpl::resetStream() for why we do this. This is an uncommon event,

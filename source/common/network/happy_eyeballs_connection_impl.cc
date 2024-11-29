@@ -117,7 +117,7 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
   // First_family_ip_version defaults to the first valid ip version
   // unless overwritten by happy_eyeballs_config. There must be at least one
   // entry in the vector that is passed to the function.
-  ASSERT(in.size() > 0);
+  ASSERT(!in.empty());
   Address::IpVersion first_family_ip_version = in[0].get()->ip()->version();
 
   const auto first_address_family_count =

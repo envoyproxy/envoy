@@ -129,7 +129,7 @@ void TimerTokenBucket::onFillTimer(uint64_t refill_counter, double factor) {
   // descriptor refill interval over the global refill interval. For example,
   // if the descriptor refill interval is 150ms and the global refill
   // interval is 50ms, this descriptor is refilled every 3rd call.
-  if (refill_counter % multiplier_ != 0) {
+  if (multiplier_ != 0 && refill_counter % multiplier_ != 0) {
     return;
   }
 
