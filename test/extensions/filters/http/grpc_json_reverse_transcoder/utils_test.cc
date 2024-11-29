@@ -19,7 +19,7 @@ TEST(BuildQueryParamString, ReturnsQueryParamString) {
   "code": 3,
   "content": "Some random content",
   "active": true,
-  "editions": ["kindle", "hardback", "audiobook"],
+  "editions": ["kindle", "hardback", "audio-book"],
   "authors": [
     {"name": "author1"},
     {"name": "author2"}
@@ -54,7 +54,7 @@ TEST(BuildQueryParamString, ReturnsQueryParamString) {
   EXPECT_EQ(query_string, "books=book1&books=book2&"
                           "shelf.authors.name=author1&shelf.authors.name=author2&"
                           "shelf.editions=kindle&shelf.editions=hardback&shelf.editions"
-                          "=audiobook");
+                          "=audio-book");
 
   query_string.clear();
   BuildQueryParamString(object,
@@ -66,7 +66,7 @@ TEST(BuildQueryParamString, ReturnsQueryParamString) {
                           "publisher.isbn=lksdjflkj3423&publisher.name=pub2&"
                           "shelf.authors.name=author1&shelf.authors.name=author2&"
                           "shelf.editions=kindle&shelf.editions=hardback&shelf.editions"
-                          "=audiobook");
+                          "=audio-book");
 
   query_string.clear();
   BuildQueryParamString(object, {}, &query_string, "unit_test");
@@ -77,8 +77,8 @@ TEST(BuildQueryParamString, ReturnsQueryParamString) {
                           "unit_test.shelf.active=true&unit_test.shelf.authors.name=author1&unit_"
                           "test.shelf.authors.name=author2&unit_test.shelf.code=3&unit_test.shelf."
                           "content=Some%20random%20content&unit_test.shelf.editions=kindle&unit_"
-                          "test.shelf.editions=hardback&unit_test.shelf.editions=audiobook&unit_"
-                          "test.shelf.name=science-fiction&unit_test.theme=Kids");
+                          "test.shelf.editions=hardback&unit_test.shelf.editions=audio-book"
+                          "&unit_test.shelf.name=science-fiction&unit_test.theme=Kids");
 }
 
 TEST(BuildPath, ReturnsPathWithPlaceholdersReplaced) {
@@ -88,7 +88,7 @@ TEST(BuildPath, ReturnsPathWithPlaceholdersReplaced) {
   "code": 3,
   "content": "Some random content",
   "active": true,
-  "editions": ["kindle", "hardback", "audiobook"],
+  "editions": ["kindle", "hardback", "audio-book"],
   "authors": [
     {"name": "author1"},
     {"name": "author2"}
@@ -123,8 +123,8 @@ TEST(BuildPath, ReturnsPathWithPlaceholdersReplaced) {
                           "shelf.authors.name=author2&"
                           "shelf.code=3&shelf.content=Some%20random%20content&"
                           "shelf.editions=kindle&shelf.editions=hardback&"
-                          "shelf.editions=audiobook&"
-                          "theme=Kids");
+                          "shelf.editions=audio-book"
+                          "&theme=Kids");
 
   // Check the path with a single-segment path variable and a verb.
   path = BuildPath(request, "/v1/{parent}/shelves/{shelf.name}:custom_verb", "*");
@@ -146,7 +146,7 @@ TEST(NestedJson, GetNestedJsonValuesAsString) {
   "code": 3,
   "content": "Some random content",
   "active": true,
-  "editions": ["kindle", "hardback", "audiobook"],
+  "editions": ["kindle", "hardback", "audio-book"],
   "authors": [
     {"name": "author1"},
     {"name": "author2"}

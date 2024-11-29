@@ -12,6 +12,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/http/stream_reset_handler.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
@@ -141,7 +142,6 @@ bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfRequestTranscoderFailed() 
   const auto& status = transcoder_->RequestStatus();
   if (status.ok())
     return false;
-  ENVOY_STREAM_LOG(error, "Request transcoding failed: {}", *decoder_callbacks_, status.message());
   decoder_callbacks_->sendLocalReply(
       Code::BadRequest, status.message(), nullptr, Status::WellKnownGrpcStatus::InvalidArgument,
       absl::StrCat(RcDetails::get().grpc_transcode_failed, "{",
@@ -200,7 +200,8 @@ bool GrpcJsonReverseTranscoderFilter::BuildRequestFromHttpBody(RequestHeaderMap&
       Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
       CodedInputStream coded_stream(&stream);
       if (!http_body.MergeFromCodedStream(&coded_stream)) {
-        decoder_callbacks_->resetStream();
+        decoder_callbacks_->resetStream(Http::StreamResetReason::LocalReset,
+                                        "Failed to decode the `google.api.HttpBody` message");
         return true;
       }
       const std::string body = static_cast<std::string>(http_body.data());
@@ -279,8 +280,6 @@ bool GrpcJsonReverseTranscoderFilter::CreateDataBuffer(json& payload,
     std::string decoded_body;
     if (!absl::WebSafeBase64Unescape(
             payload[request_params_.http_body_field]["data"].get<std::string>(), &decoded_body)) {
-      ENVOY_STREAM_LOG(error, "Failed to decode the request body from the gRPC message",
-                       *decoder_callbacks_);
       decoder_callbacks_->sendLocalReply(
           Code::BadRequest, "Failed to decode the request body from the gRPC message", nullptr,
           Status::WellKnownGrpcStatus::InvalidArgument,
