@@ -776,6 +776,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   if (streaming_shadows_) {
     // start the shadow streams.
     for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
+      // We mind need to pass routing information from here too.
       const auto& shadow_policy = shadow_policy_wrapper.get();
       const absl::optional<absl::string_view> shadow_cluster_name =
           getShadowCluster(shadow_policy, *downstream_headers_);
@@ -795,8 +796,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
               .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
-              .setDiscardResponseBody(true);
-      options.setFilterConfig(config_);
+              .setDiscardResponseBody(true)
+              .setFilterConfig(config_)
+              .setMetadataMatchCriteria(route_->routeEntry()->metadataMatchCriteria());
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
         // without waiting.
@@ -1053,8 +1055,9 @@ void Filter::maybeDoShadowing() {
                        .setChildSpanName("mirror")
                        .setSampled(shadow_policy.traceSampled())
                        .setIsShadow(true)
-                       .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend());
-    options.setFilterConfig(config_);
+                       .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
+                       .setFilterConfig(config_)
+                       .setMetadataMatchCriteria(route_->routeEntry()->metadataMatchCriteria());
     config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                    options);
   }
