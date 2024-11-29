@@ -10,9 +10,6 @@ bug_fixes:
   change: |
     Relaxed the restriction on SNI logging to allow the ``_`` character, even if
     ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
-- area: tracers
-  change: |
-    Avoid possible overflow when setting span attributes in Dynatrace sampler.
 - area: validation/tools
   change: |
     Add back missing extension for ``schema_validator_tool``.
