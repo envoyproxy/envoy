@@ -114,7 +114,7 @@ const _displayItem = (item, searchTerms) => {
   // </ENVOY>
 
   if (descr)
-    listItem.appendChild(document.createElement("span")).innerHTML =
+    listItem.appendChild(document.createElement("span")).innerText =
       " (" + descr + ")";
   else if (showSearchSummary)
     fetch(requestUrl)
