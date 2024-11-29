@@ -50,7 +50,6 @@ test_suite(
         "http2_adapter_nghttp2_adapter_test",
         "http2_adapter_nghttp2_data_provider_test",
         "http2_adapter_nghttp2_session_test",
-        "http2_adapter_nghttp2_util_test",
         "http2_adapter_oghttp2_adapter_test",
         "http2_adapter_oghttp2_session_test",
         "http2_adapter_oghttp2_util_test",
@@ -406,19 +405,6 @@ envoy_cc_library(
         ":http2_adapter_http2_visitor_interface",
         ":http2_adapter_nghttp2_include",
         ":quiche_common_platform_export",
-    ],
-)
-
-envoy_cc_test(
-    name = "http2_adapter_nghttp2_util_test",
-    srcs = ["quiche/http2/adapter/nghttp2_util_test.cc"],
-    copts = quiche_copts,
-    repository = "@envoy",
-    deps = [
-        ":http2_adapter_nghttp2_test_utils",
-        ":http2_adapter_nghttp2_util",
-        ":http2_adapter_test_utils",
-        ":quiche_common_platform_test",
     ],
 )
 
@@ -3043,6 +3029,19 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "quiche_common_quiche_vectorized_io_utils_lib",
+    srcs = ["quiche/common/vectorized_io_utils.cc"],
+    hdrs = ["quiche/common/vectorized_io_utils.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":quiche_common_platform_export",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
 envoy_quic_cc_library(
     name = "quic_core_http_client_lib",
     srcs = [
@@ -5565,6 +5564,7 @@ envoy_cc_library(
         ":quiche_common_callbacks",
         ":quiche_common_platform_export",
         ":quiche_common_quiche_stream_lib",
+        ":quiche_common_quiche_vectorized_io_utils_lib",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
