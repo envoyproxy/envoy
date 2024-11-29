@@ -337,9 +337,8 @@ case $CI_TARGET in
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
-        CLANG_TIDY_TARGETS=(
-            ${CLANG_TIDY_TARGETS:-//contrib/... //source/... //test/... @envoy_api//...}
-        )
+        TARGETS="${CLANG_TIDY_TARGETS:-//contrib/... //source/... //test/... @envoy_api//...}"
+        CLANG_TIDY_TARGETS=(${TARGETS[@]})
         echo "Running clang-tidy on ${CLANG_TIDY_TARGETS[*]}"
         bazel build \
               "${BAZEL_BUILD_OPTIONS[@]}" \
