@@ -76,9 +76,7 @@ jobs:
           name: Release (arm64)
           arch: arm64
           bazel-extra: >-
-            --config=cache-envoy-engflow
-            --config=common-envoy-engflow
-            --config=bes-envoy-engflow
+            --config=remote-cache-envoy-engflow
           rbe: false
           runs-on: envoy-arm64-medium
 
@@ -97,9 +95,7 @@ jobs:
     with:
       arch: ${{ matrix.arch }}
       bazel-extra: >-
-        --config=cache-envoy-engflow
-        --config=common-envoy-engflow
-        --config=bes-envoy-engflow
+        --config=remote-cache-envoy-engflow
       downloads: |
         release.${{ matrix.arch }}: release/${{ matrix.arch }}/bin/
       target: ${{ matrix.target }}
