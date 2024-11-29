@@ -10,5 +10,7 @@ def test_program(name):
             "-shared",
             "-fPIC",
         ],
+        # All programs here are C, not C++, so we don't need to apply clang-tidy.
+        tags = ["notidy"],
         linkstatic = False,
     )
