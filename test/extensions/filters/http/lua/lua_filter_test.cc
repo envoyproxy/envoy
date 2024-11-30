@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/data/core/v3/tlv_metadata.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
@@ -3167,6 +3168,130 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostNonIpHost) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
                                   StrEq("[string \"...\"]:3: host is not a valid IP address")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataSimple) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local typed_meta = request_handle:connectionStreamInfo():typedMetadata("envoy.filters.listener.proxy_protocol")
+      if typed_meta["typed_metadata"] ~= nil then
+        request_handle:logTrace("key: " .. typed_meta["typed_metadata"]["tlv_ea"])
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Setup connection info with typed metadata
+  envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+  auto* meta_value = tlvs_metadata.mutable_typed_metadata();
+  (*meta_value)["tlv_ea"] = "vpce-064c279a4001a055f";
+
+  ProtobufWkt::Any typed_config;
+  typed_config.PackFrom(tlvs_metadata);
+
+  stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.filters.listener.proxy_protocol", typed_config});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillOnce(Return(OptRef<const Network::Connection>{connection_}));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("key: vpce-064c279a4001a055f")));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataNotFound) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local typed_meta = request_handle:connectionStreamInfo():typedMetadata("unknown.filter")
+      if next(typed_meta) == nil then
+        request_handle:logTrace("empty metadata")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillOnce(Return(OptRef<const Network::Connection>{connection_}));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("empty metadata")));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataInvalidType) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local typed_meta = request_handle:connectionStreamInfo():typedMetadata("envoy.test.metadata")
+      if typed_meta["value"] == nil then
+        request_handle:logTrace("metadata value is nil")
+      else
+        request_handle:logTrace(typed_meta["value"])
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Pack an invalid/unknown message type
+  ProtobufWkt::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/unknown.type");
+  typed_config.set_value("invalid data");
+
+  stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.test.metadata", typed_config});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillOnce(Return(OptRef<const Network::Connection>{connection_}));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
+                                  StrEq("[string \"...\"]:3: could not find descriptor for type "
+                                        "URL: type.googleapis.com/unknown.type")));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataUnpackFailure) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local typed_meta = request_handle:connectionStreamInfo():typedMetadata("envoy.filters.listener.proxy_protocol")
+      if typed_meta["typed_metadata"] ~= nil then
+        request_handle:logTrace("key: " .. typed_meta["typed_metadata"]["tlv_ea"])
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Pack invalid data that will fail to unpack
+  ProtobufWkt::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/envoy.data.core.v3.TlvsMetadata");
+  typed_config.set_value("invalid protobuf data");
+
+  stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.filters.listener.proxy_protocol", typed_config});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillOnce(Return(OptRef<const Network::Connection>{connection_}));
+  EXPECT_CALL(Const(connection_), streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::err, HasSubstr("failed to unpack typed metadata message")));
+
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }

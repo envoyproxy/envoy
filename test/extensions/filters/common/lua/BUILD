@@ -37,6 +37,19 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "protobuf_converter_test",
+    srcs = ["protobuf_converter_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        ":lua_wrappers_lib",
+        "//source/extensions/filters/common/lua:protobuf_converter_lib",
+        "//source/extensions/filters/common/lua:wrappers_lib",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "lua_wrappers_lib",
     hdrs = ["lua_wrappers.h"],

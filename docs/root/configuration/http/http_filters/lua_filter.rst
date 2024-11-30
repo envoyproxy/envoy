@@ -911,6 +911,89 @@ Returns the string representation of :repo:`requested server name <envoy/stream_
 Connection stream info object API
 ---------------------------------
 
+``typedMetadata()``
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  connectionStreamInfo:typedMetadata(filterName)
+
+Returns typed metadata for a given filter name. Typed metadata provides type-safe access to metadata values that are stored as protocol buffer messages. This is particularly useful when working with filters that store structured data.
+
+*filterName* is a string that supplies the filter name (e.g., "envoy.filters.listener.proxy_protocol"). Returns a Lua table containing the unpacked protocol buffer message. Returns an empty table if no typed metadata exists for the given filter name or if the metadata cannot be unpacked.
+
+**Type Conversion Details:**
+The following rules apply when converting protocol buffer messages into Lua tables:
+
+- Repeated fields are converted to Lua arrays (1-based indexing).
+- Map fields become Lua tables with string keys.
+- Enums are represented as their numeric values.
+- Byte fields are translated to Lua strings.
+- Nested messages are converted to nested tables.
+- Optional fields that are not set are returned as nil.
+
+**Error Handling:**
+This method ensures type-safe access to metadata but will throw a Lua error in the following scenarios:
+
+- If the specified filter name does not exist.
+- If the metadata exists but cannot be unpacked.
+- If the protocol buffer message is malformed.
+
+**Common Use Cases:**
+
+1. Accessing Proxy Protocol Metadata:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Access proxy protocol typed metadata
+    local typed_meta = request_handle:connectionStreamInfo():typedMetadata("envoy.filters.listener.proxy_protocol")
+
+    -- Check if TLV data exists
+    if typed_meta.typed_metadata then
+      -- Access specific TLV values
+      local tlv_type_authority = typed_meta.typed_metadata.tlv_type_authority
+      local tlv_value = typed_meta.typed_metadata.tlv_value
+
+      request_handle:logInfo(string.format("TLV Authority: %s, Value: %s", tlv_type_authority or "none", tlv_value or "none"))
+    end
+  end
+
+2. Working with Custom Filter Metadata:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local metadata = request_handle:connectionStreamInfo():typedMetadata("custom.filter")
+
+    -- Safely access potentially nested fields
+    if metadata.config then
+      -- Access nested configuration
+      if metadata.config.rules then
+        for _, rule in ipairs(metadata.config.rules) do
+          if rule.name and rule.value then
+            request_handle:logInfo(string.format("Rule: %s = %s", rule.name, rule.value))
+          end
+        end
+      end
+
+      -- Access map fields
+      if metadata.config.properties then
+        for key, value in pairs(metadata.config.properties) do
+          request_handle:logInfo(string.format("Property: %s = %s", key, value))
+        end
+      end
+    end
+  end
+
+**Limitations:**
+
+1. Typed metadata is read-only and cannot be modified through this API
+2. Raw protobuf message structure could not be accessed directly
+3. Extension types or unknown fields cannot be accessed through this API
+4. Map keys must be strings or integers
+5. Some protocol buffer features (like Any messages) may not be fully supported
+
 ``dynamicMetadata()``
 ^^^^^^^^^^^^^^^^^^^^^
 

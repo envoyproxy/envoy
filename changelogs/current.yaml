@@ -287,6 +287,10 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
     to get the duration from when the upstream request was created to when the upstream connection pool is ready.
+- area: lua
+  change: |
+    Added a new ``typedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from
+    network filters, such as the Proxy Protocol, etc.
 
 deprecated:
 - area: rbac

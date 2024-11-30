@@ -1,4 +1,5 @@
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/data/core/v3/tlv_metadata.pb.h"
 
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
@@ -650,6 +651,96 @@ TEST_F(LuaStreamInfoWrapperTest, DontFinishIterationForDynamicMetadata) {
   EXPECT_THROW_WITH_MESSAGE(
       start("callMe"), Filters::Common::Lua::LuaException,
       "[string \"...\"]:6: cannot create a second iterator before completing the first");
+}
+
+class LuaConnectionStreamInfoWrapperTest
+    : public Filters::Common::Lua::LuaWrappersTestBase<ConnectionStreamInfoWrapper> {
+public:
+  void setup(const std::string& script) override {
+    Filters::Common::Lua::LuaWrappersTestBase<ConnectionStreamInfoWrapper>::setup(script);
+    state_->registerType<ConnectionDynamicMetadataMapWrapper>();
+    state_->registerType<ConnectionDynamicMetadataMapIterator>();
+  }
+
+protected:
+  envoy::config::core::v3::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
+    envoy::config::core::v3::Metadata metadata;
+    TestUtility::loadFromYaml(yaml_string, metadata);
+    return metadata;
+  }
+
+  Event::SimulatedTimeSystem test_time_;
+};
+
+// Test getting typed metadata
+TEST_F(LuaConnectionStreamInfoWrapperTest, GetTypedMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local meta = object:typedMetadata("envoy.test.typed_metadata")
+      if meta and meta.typed_metadata then
+        testPrint(meta.typed_metadata.test_key)
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // Create and set metadata directly
+  envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+  auto* meta_value = tlvs_metadata.mutable_typed_metadata();
+  (*meta_value)["test_key"] = "test_value";
+
+  ProtobufWkt::Any typed_config;
+  typed_config.PackFrom(tlvs_metadata);
+
+  stream_info.metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.test.typed_metadata", typed_config});
+
+  Filters::Common::Lua::LuaDeathRef<ConnectionStreamInfoWrapper> wrapper(
+      ConnectionStreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+
+  EXPECT_CALL(printer_, testPrint("test_value"));
+  start("callMe");
+}
+
+// Test iterating typed metadata
+TEST_F(LuaConnectionStreamInfoWrapperTest, IterateTypedMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local meta = object:typedMetadata("envoy.test.typed_metadata")
+      if meta and meta.typed_metadata then
+        for k,v in pairs(meta.typed_metadata) do
+          testPrint(string.format("%s=%s", k, v))
+        end
+      end
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // Create and set metadata directly
+  envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+  auto* meta_value = tlvs_metadata.mutable_typed_metadata();
+  (*meta_value)["key1"] = "value1";
+  (*meta_value)["key2"] = "value2";
+
+  ProtobufWkt::Any typed_config;
+  typed_config.PackFrom(tlvs_metadata);
+
+  stream_info.metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.test.typed_metadata", typed_config});
+
+  Filters::Common::Lua::LuaDeathRef<ConnectionStreamInfoWrapper> wrapper(
+      ConnectionStreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+
+  EXPECT_CALL(printer_, testPrint("key2=value2"));
+  EXPECT_CALL(printer_, testPrint("key1=value1"));
+  start("callMe");
 }
 
 } // namespace

@@ -1,8 +1,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/data/core/v3/tlv_metadata.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
+#include "source/common/protobuf/utility.h"
 
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1329,6 +1333,126 @@ typed_config:
   codec_client_->sendData(*request_encoder, buffer_limit + 1, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+}
+
+// Forward declare the filter class
+class TestTypedMetadataFilter;
+
+// Custom filter to add typed metadata
+class TestTypedMetadataFilter : public Network::ReadFilter {
+public:
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() override {
+    const std::string metadata_key = "envoy.test.typed_metadata";
+
+    // Get mutable access to the typed filter metadata map
+    auto& typed_filter_metadata = *read_callbacks_->connection()
+                                       .streamInfo()
+                                       .dynamicMetadata()
+                                       .mutable_typed_filter_metadata();
+
+    // Create metadata protobuf
+    envoy::data::core::v3::TlvsMetadata metadata;
+    metadata.mutable_typed_metadata()->insert({"test_key", "test_value"});
+
+    // Pack metadata into Any
+    ProtobufWkt::Any typed_metadata;
+    typed_metadata.PackFrom(metadata);
+
+    // Insert into typed filter metadata map
+    typed_filter_metadata[metadata_key] = typed_metadata;
+
+    return Network::FilterStatus::Continue;
+  }
+
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+  }
+
+private:
+  Network::ReadFilterCallbacks* read_callbacks_{};
+};
+
+// Filter factory
+class TestTypedMetadataFilterConfig
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    return Network::FilterFactoryCb([](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<TestTypedMetadataFilter>());
+    });
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Any>();
+  }
+
+  std::string name() const override { return "envoy.test.typed_metadata"; }
+  std::set<std::string> configTypes() override { return {}; };
+};
+
+TEST_P(LuaIntegrationTest, ConnectionTypedMetadata) {
+  // Register our test filter
+  TestTypedMetadataFilterConfig factory;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(factory);
+
+  // Setup network filter config
+  const std::string FILTER_CONFIG = R"EOF(
+name: envoy.test.typed_metadata
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Any
+)EOF";
+
+  config_helper_.addNetworkFilter(FILTER_CONFIG);
+
+  const std::string LUA_FILTER = R"EOF(
+  name: lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    default_source_code:
+      inline_string: |
+        function envoy_on_request(request_handle)
+          local meta = request_handle:connectionStreamInfo():typedMetadata("envoy.test.typed_metadata")
+          if meta and meta.typed_metadata then
+            local value = meta.typed_metadata.test_key
+            request_handle:headers():add("typed_metadata", value)
+          else
+            request_handle:headers():add("typed_metadata", "no_metadata")
+          end
+        end
+  )EOF";
+
+  initializeFilter(LUA_FILTER);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  };
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify the typed metadata was accessible
+  auto typed_metadata_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("typed_metadata"));
+  EXPECT_FALSE(typed_metadata_headers.empty());
+  EXPECT_EQ("test_value", typed_metadata_headers[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
 }
 
 } // namespace

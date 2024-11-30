@@ -3,6 +3,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/extensions/filters/common/lua/protobuf_converter.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
@@ -192,6 +193,43 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
   } else {
     lua_pushnil(state);
   }
+  return 1;
+}
+
+int ConnectionStreamInfoWrapper::luaConnectionTypedMetadata(lua_State* state) {
+  const char* filter_name = luaL_checkstring(state, 2);
+
+  const auto& typed_metadata = connection_stream_info_.dynamicMetadata().typed_filter_metadata();
+  const auto it = typed_metadata.find(filter_name);
+
+  if (it == typed_metadata.end()) {
+    lua_newtable(state);
+    return 1;
+  }
+
+  // Try to unpack the Any message into a new message
+  const std::string& type_url = it->second.type_url();
+  const std::string concrete_type_name{TypeUtil::typeUrlToDescriptorFullName(type_url)};
+
+  const auto* descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
+  if (descriptor == nullptr) {
+    luaL_error(state,
+               absl::StrFormat("could not find descriptor for type URL: %s", type_url).c_str());
+  }
+
+  Protobuf::DynamicMessageFactory message_factory;
+  std::unique_ptr<Protobuf::Message> concrete_message(
+      message_factory.GetPrototype(descriptor)->New());
+
+  auto unpack_status = MessageUtil::unpackTo(it->second, *concrete_message);
+  if (!unpack_status.ok()) {
+    luaL_error(state, absl::StrFormat("failed to unpack typed metadata message: %s",
+                                      unpack_status.ToString())
+                          .c_str());
+  }
+
+  Filters::Common::Lua::ProtobufConverterUtils::messageToLuaTable(state, *concrete_message);
   return 1;
 }
 
