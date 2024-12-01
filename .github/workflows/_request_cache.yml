@@ -47,7 +47,7 @@ jobs:
         - target: docker-arm64
           arch: arm64
           cache-suffix: -arm64
-          runs-on: envoy-arm64-small
+          runs-on: github-arm64-2c-8gb
 
   bazel:
     permissions:
@@ -77,7 +77,7 @@ jobs:
             --config=remote-envoy-engflow
         - name: Bazel (arm64/cache)
           arch: arm64
-          runs-on: envoy-arm64-small
+          runs-on: github-arm64-2c-8gb
           bazel-extra: >-
              --config=clang-libc++
              --config=common-envoy-engflow
