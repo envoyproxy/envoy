@@ -3039,6 +3039,7 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/base:prefetch",
     ],
 )
 
