@@ -215,7 +215,7 @@ message ExtAuthz {
   //
   // .. note::
   //
-  //  2. For requests to an HTTP authorization server: value of *Content-Length* will be set to 0 and the request to the
+  //  2. For requests to an HTTP authorization server: value of ``Content-Length`` will be set to 0 and the request to the
   //  authorization server will not have a message body. However, the check request can include the buffered
   //  client request body (controlled by :ref:`with_request_body
   //  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.with_request_body>` setting),
