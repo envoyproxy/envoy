@@ -38,7 +38,7 @@ public:
                            bool end_stream, const uint64_t stream_id, RequestCallbacks* callbacks,
                            StreamBase* stream) PURE;
   virtual void cancel() PURE;
-  virtual Envoy::StreamInfo::StreamInfo* getStreamInfo() PURE;
+  virtual const Envoy::StreamInfo::StreamInfo* getStreamInfo() PURE;
 };
 
 using ClientBasePtr = std::unique_ptr<ClientBase>;

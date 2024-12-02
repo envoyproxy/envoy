@@ -112,7 +112,7 @@ void ExtProcHttpClient::onFailure(const Http::AsyncClient::Request&,
   onError();
 }
 
-Envoy::StreamInfo::StreamInfo* ExtProcHttpClient::getStreamInfo() {
+const Envoy::StreamInfo::StreamInfo* ExtProcHttpClient::getStreamInfo() {
   if (active_request_ != nullptr) {
     return &active_request_->streamInfo();
   } else {

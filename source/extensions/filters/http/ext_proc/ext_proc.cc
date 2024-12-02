@@ -1073,7 +1073,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::logStreamInfoBase(Envoy::StreamInfo::StreamInfo* stream_info) {
+void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info) {
   if (stream_info == nullptr || logging_info_ == nullptr) {
     return;
   }
