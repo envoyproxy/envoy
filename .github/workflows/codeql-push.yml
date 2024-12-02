@@ -63,7 +63,7 @@ jobs:
 
     - name: Free disk space
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.12
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}

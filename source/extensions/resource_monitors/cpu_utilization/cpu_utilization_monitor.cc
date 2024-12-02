@@ -29,7 +29,7 @@ CpuUtilizationMonitor::CpuUtilizationMonitor(
     const envoy::extensions::resource_monitors::cpu_utilization::v3::
         CpuUtilizationConfig& /*config*/,
     std::unique_ptr<CpuStatsReader> cpu_stats_reader)
-    : utilization_(0.0), cpu_stats_reader_(std::move(cpu_stats_reader)) {
+    : cpu_stats_reader_(std::move(cpu_stats_reader)) {
   previous_cpu_times_ = cpu_stats_reader_->getCpuTimes();
 }
 

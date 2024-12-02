@@ -81,6 +81,10 @@ minor_behavior_changes:
 - area: dns
   change: |
     Patched c-ares to address CVE-2024-25629.
+- area: csrf
+  change: |
+    Increase only the statistics counter ``missing_source_origin`` for requests with a missing source origin.
+    Previously, the ``request_invalid`` counter was also increased for such requests.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -107,6 +111,10 @@ bug_fixes:
   change: |
     Fixed bug where setting ``dns_jitter <envoy_v3_api_field_config.cluster.v3.Cluster.dns_jitter>`` to large values caused Envoy Bug
     to fire.
+- area: OAuth2
+  change: |
+    Fixed an issue where ID token and refresh token did not adhere to the :ref:`cookie_domain
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_domain>` field.
 - area: original_ip_detection custom header extension
   change: |
     Reverted :ref:`custom header
@@ -275,6 +283,10 @@ new_features:
   change: |
     Added a new ``setUpstreamOverrideHost()`` which could be used to set the given host as the upstream host for the
     current request.
+- area: CEL-attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
+    to get the duration from when the upstream request was created to when the upstream connection pool is ready.
 
 deprecated:
 - area: rbac

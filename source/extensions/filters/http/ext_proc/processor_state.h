@@ -80,10 +80,7 @@ public:
                           const std::vector<std::string>& untyped_forwarding_namespaces,
                           const std::vector<std::string>& typed_forwarding_namespaces,
                           const std::vector<std::string>& untyped_receiving_namespaces)
-      : filter_(filter), watermark_requested_(false), paused_(false), no_body_(false),
-        complete_body_available_(false), trailers_available_(false),
-        trailers_sent_to_server_(false), body_replaced_(false), body_received_(false),
-        partial_body_processed_(false), traffic_direction_(traffic_direction),
+      : filter_(filter), traffic_direction_(traffic_direction),
         untyped_forwarding_namespaces_(&untyped_forwarding_namespaces),
         typed_forwarding_namespaces_(&typed_forwarding_namespaces),
         untyped_receiving_namespaces_(&untyped_receiving_namespaces) {}
@@ -242,26 +239,26 @@ protected:
   CallbackState callback_state_ = CallbackState::Idle;
 
   // Keep track of whether we requested a watermark.
-  bool watermark_requested_ : 1;
+  bool watermark_requested_ : 1 = false;
   // Keep track of whether we paused processing and may require
   // a "continue."
-  bool paused_ : 1;
+  bool paused_ : 1 = false;
 
   // If true, then there is not going to be a body
-  bool no_body_ : 1;
+  bool no_body_ : 1 = false;
   // If true, then the filter received the complete body
-  bool complete_body_available_ : 1;
+  bool complete_body_available_ : 1 = false;
   // If true, then the filter received the trailers
-  bool trailers_available_ : 1;
+  bool trailers_available_ : 1 = false;
   // If true, the trailers is already sent to the server.
-  bool trailers_sent_to_server_ : 1;
+  bool trailers_sent_to_server_ : 1 = false;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
-  bool body_replaced_ : 1;
+  bool body_replaced_ : 1 = false;
   // If true, some of the body data is received.
-  bool body_received_ : 1;
+  bool body_received_ : 1 = false;
   // If true, we are in "buffered partial" mode and we already reached the buffer
   // limit, sent the body in a message, and got back a reply.
-  bool partial_body_processed_ : 1;
+  bool partial_body_processed_ : 1 = false;
 
   // If true, the server wants to see the headers
   bool send_headers_ : 1;
