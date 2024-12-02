@@ -87,30 +87,29 @@ RouteConfigProviderSharedPtr RouteConfigProviderManager::addDynamicProvider(
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.normalize_rds_provider_config")) {
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(rds);
 
-    const Protobuf::FieldDescriptor* config_source =
+    const Protobuf::FieldDescriptor* config_source_field =
         reflectable_message->GetDescriptor()->FindFieldByName("config_source");
 
     // If this assertion fails it means that dynamic provider config passed as 'rds' parameter does
     // not contain a proto field called 'config_source'. That field must have
     // envoy::config::core::v3::ConfigSource type.
-    ASSERT(config_source != nullptr);
+    ASSERT(config_source_field != nullptr);
 
-    // Get the proto and adjust the initial_timeout.
-    Protobuf::Message* mutable_config_source =
-        reflectable_message->GetReflection()->MutableMessage(reflectable_message, config_source);
+    Protobuf::Message* mutable_config_source = reflectable_message->GetReflection()->MutableMessage(
+        reflectable_message, config_source_field);
 
     ASSERT(mutable_config_source != nullptr);
 
-    envoy::config::core::v3::ConfigSource& internal_config =
+    envoy::config::core::v3::ConfigSource& config_source =
         dynamic_cast<envoy::config::core::v3::ConfigSource&>(*mutable_config_source);
 
     // Save the value of initial_fetch_timeout. Even though config 'rds' was passed as constant,
     // `reflectable_message` allows to modify values inside the 'rds'.
-    // initial_fetch_timeout will be normalized (zeroed) when hash is calculated and must be
+    // initial_fetch_timeout will be normalized (zeroed) before hash is calculated and must be
     // restored to the original value after hash has been calculated.
-    Protobuf::Duration* orig_initial_timeout = internal_config.release_initial_fetch_timeout();
+    Protobuf::Duration* orig_initial_timeout = config_source.release_initial_fetch_timeout();
     manager_identifier = MessageUtil::hash(rds);
-    internal_config.set_allocated_initial_fetch_timeout(orig_initial_timeout);
+    config_source.set_allocated_initial_fetch_timeout(orig_initial_timeout);
   } else {
     manager_identifier = MessageUtil::hash(rds);
   }
