@@ -5,6 +5,7 @@ load(
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_proto_library",
     "envoy_select_boringssl",
 )
 
@@ -260,11 +261,17 @@ envoy_cc_fuzz_test(
     deps = ["//source/common/common:minimal_logger_lib"],
 )
 
+envoy_proto_library(
+    name = "custom_test_string_matcher_proto",
+    srcs = ["custom_test_string_matcher.proto"],
+)
+
 envoy_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        ":custom_test_string_matcher_proto_cc_proto",
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",

@@ -353,7 +353,7 @@ public:
   // StringMatcher
   bool match(const absl::string_view value) const override { return custom_->match(value); }
 
-  const std::string& stringRepresentation() const override { return EMPTY_STRING; }
+  const std::string& stringRepresentation() const override { PANIC("not implemented"); }
 
 private:
   const StringMatcherPtr custom_;
@@ -450,9 +450,6 @@ public:
   static PathMatcherConstSharedPtr
   createPrefix(const std::string& prefix, bool ignore_case,
                Server::Configuration::CommonFactoryContext& context);
-  static PathMatcherConstSharedPtr
-  createPattern(const std::string& pattern, bool ignore_case,
-                Server::Configuration::CommonFactoryContext& context);
   static PathMatcherConstSharedPtr
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
                   Server::Configuration::CommonFactoryContext& context);

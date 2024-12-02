@@ -9,6 +9,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
+#include "test/common/common/custom_test_string_matcher.pb.h"
+#include "test/common/common/custom_test_string_matcher.pb.validate.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
@@ -74,6 +76,20 @@ TEST_F(MetadataTest, MatchDoubleValue) {
   r->set_start(9);
   r->set_end(9.1);
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher, context_).match(metadata));
+
+  // Matching a non-number should return false.
+  {
+    envoy::config::core::v3::Metadata metadataStringOnly;
+    Envoy::Config::Metadata::mutableMetadataValue(metadataStringOnly, "envoy.filter.a", "label")
+        .set_string_value("test");
+
+    envoy::type::matcher::v3::MetadataMatcher matcherDoubleOnly;
+    matcherDoubleOnly.set_filter("envoy.filter.a");
+    matcherDoubleOnly.add_path()->set_key("label");
+    matcherDoubleOnly.mutable_value()->mutable_double_match()->set_exact(1);
+    EXPECT_FALSE(
+        Envoy::Matchers::MetadataMatcher(matcherDoubleOnly, context_).match(metadataStringOnly));
+  }
 }
 
 TEST_F(MetadataTest, MatchStringExactValue) {
@@ -247,6 +263,20 @@ TEST_F(MetadataTest, MatchStringListValue) {
 
   values->clear_values();
   metadataValue.Clear();
+
+  // Matching a non-list entry should return false.
+  {
+    envoy::config::core::v3::Metadata metadataStringOnly;
+    Envoy::Config::Metadata::mutableMetadataValue(metadataStringOnly, "envoy.filter.a", "groups")
+        .set_string_value("test");
+
+    envoy::type::matcher::v3::MetadataMatcher matcherListOnly;
+    matcherListOnly.set_filter("envoy.filter.a");
+    matcherListOnly.add_path()->set_key("groups");
+    listMatchEntry(&matcherListOnly)->mutable_string_match()->set_exact("some_string");
+    EXPECT_FALSE(
+        Envoy::Matchers::MetadataMatcher(matcherListOnly, context_).match(metadataStringOnly));
+  }
 }
 
 TEST_F(MetadataTest, MatchBoolListValue) {
@@ -327,6 +357,40 @@ TEST_F(MetadataTest, InvertMatch) {
   matcher.mutable_value()->mutable_string_match()->set_exact("prod");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher, context_).match(metadata));
 }
+
+// A custom string matcher that invokes the exact string matcher code.
+class CustomTestStringMatcher : public Matchers::StringMatcher {
+public:
+  CustomTestStringMatcher(const std::string& exact) : internal_matcher_(exact, false) {}
+
+  // Matchers::StringMatcher
+  bool match(const absl::string_view value) const override {
+    return internal_matcher_.match(value);
+  }
+
+private:
+  const Matchers::ExactStringMatcher internal_matcher_;
+};
+
+class CustomTestStringMatcherFactory : public Matchers::StringMatcherExtensionFactory {
+public:
+  Matchers::StringMatcherPtr
+  createStringMatcher(const Protobuf::Message& untyped_config,
+                      Server::Configuration::CommonFactoryContext& context) override {
+    const auto& config =
+        MessageUtil::downcastAndValidate<const test::string_matcher::CustomTestStringMatcher&>(
+            untyped_config, context.messageValidationContext().staticValidationVisitor());
+    return std::make_unique<CustomTestStringMatcher>(config.exact());
+  }
+
+  std::string name() const override { return "test.string_matcher.custom_test"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::string_matcher::CustomTestStringMatcher>();
+  }
+};
+
+REGISTER_FACTORY(CustomTestStringMatcherFactory, Matchers::StringMatcherExtensionFactory);
 
 class StringMatcher : public BaseTest {};
 
@@ -423,11 +487,37 @@ TEST_F(StringMatcher, ExactMatchIgnoreCase) {
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("exacz"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("other"));
 
+  {
+    std::string prefix_opt;
+    EXPECT_FALSE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+  }
+
   matcher.set_ignore_case(true);
   EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match("exact"));
   EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match("EXACT"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("exacz"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("other"));
+
+  {
+    std::string prefix_opt;
+    EXPECT_FALSE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+  }
+}
+
+TEST_F(StringMatcher, ExactMatchValue) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("exact");
+  ProtobufWkt::Value value;
+  value.set_string_value("exact");
+  EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match(value));
+  value.set_string_value("EXACT");
+  EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match(value));
+
+  ProtobufWkt::Value double_value;
+  double_value.set_number_value(9);
+  EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match(value));
 }
 
 TEST_F(StringMatcher, PrefixMatchIgnoreCase) {
@@ -445,6 +535,25 @@ TEST_F(StringMatcher, PrefixMatchIgnoreCase) {
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("other"));
 }
 
+TEST_F(StringMatcher, PrefixMatchCaseSensitivePrefixOptimization) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix("prefix");
+
+  {
+    std::string prefix_opt;
+    EXPECT_TRUE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+    EXPECT_EQ(prefix_opt, "prefix");
+  }
+
+  matcher.set_ignore_case(true);
+  {
+    std::string prefix_opt;
+    EXPECT_FALSE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+  }
+}
+
 TEST_F(StringMatcher, SuffixMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_suffix("suffix");
@@ -453,11 +562,23 @@ TEST_F(StringMatcher, SuffixMatchIgnoreCase) {
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("abc-suffiz"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("other"));
 
+  {
+    std::string prefix_opt;
+    EXPECT_FALSE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+  }
+
   matcher.set_ignore_case(true);
   EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match("abc-suffix"));
   EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match("ABC-SUFFIX"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("abc-suffiz"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("other"));
+
+  {
+    std::string prefix_opt;
+    EXPECT_FALSE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+  }
 }
 
 TEST_F(StringMatcher, ContainsMatchIgnoreCase) {
@@ -469,11 +590,23 @@ TEST_F(StringMatcher, ContainsMatchIgnoreCase) {
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("abc-container-int-def"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("other"));
 
+  {
+    std::string prefix_opt;
+    EXPECT_FALSE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+  }
+
   matcher.set_ignore_case(true);
   EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match("abc-contained-str-def"));
   EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match("abc-cOnTaInEd-str-def"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("abc-ContAineR-str-def"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("other"));
+
+  {
+    std::string prefix_opt;
+    EXPECT_FALSE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+  }
 }
 
 TEST_F(StringMatcher, SafeRegexValue) {
@@ -483,6 +616,12 @@ TEST_F(StringMatcher, SafeRegexValue) {
   EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match("foo"));
   EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match("foobar"));
   EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("bar"));
+
+  {
+    std::string prefix_opt;
+    EXPECT_FALSE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+  }
 }
 
 TEST_F(StringMatcher, SafeRegexValueIgnoreCase) {
@@ -492,6 +631,26 @@ TEST_F(StringMatcher, SafeRegexValueIgnoreCase) {
   matcher.mutable_safe_regex()->set_regex("foo");
   EXPECT_THROW_WITH_MESSAGE(Matchers::createStringMatcher(matcher, context_)->match("foo"),
                             EnvoyException, "ignore_case has no effect for safe_regex.");
+}
+
+TEST_F(StringMatcher, CustomMatchIgnoreCase) {
+  test::string_matcher::CustomTestStringMatcher custom_matcher;
+  custom_matcher.set_exact("exact");
+  envoy::type::matcher::v3::StringMatcher matcher;
+  auto* string_match_extension = matcher.mutable_custom();
+  string_match_extension->set_name("unused test.string_matcher.custom");
+  string_match_extension->mutable_typed_config()->PackFrom(custom_matcher);
+
+  EXPECT_TRUE(Matchers::createStringMatcher(matcher, context_)->match("exact"));
+  EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("EXACT"));
+  EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("exacz"));
+  EXPECT_FALSE(Matchers::createStringMatcher(matcher, context_)->match("other"));
+
+  {
+    std::string prefix_opt;
+    EXPECT_FALSE(
+        Matchers::createStringMatcher(matcher, context_)->getCaseSensitivePrefixMatch(prefix_opt));
+  }
 }
 
 TEST_F(StringMatcher, ExactMatchIgnoreCaseStringRepresentation) {
