@@ -146,7 +146,6 @@ paths:
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
     - source/common/config/watched_directory.cc
-    - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
     - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc
