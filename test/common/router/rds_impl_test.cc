@@ -962,14 +962,6 @@ virtual_hosts:
                   ->onConfigUpdate(decoded_resources.refvec_, "1")
                   .ok());
 
-  envoy::extensions::filters::network::http_connection_manager::v3::Rds rds2;
-  rds2 = rds_;
-  // Modify parameters which should not affect the provider. In other words, the same provider
-  // should be picked, regardless of the fact that initial_fetch_timeout is different for both
-  // configs.
-  rds2.mutable_config_source()->mutable_initial_fetch_timeout()->set_seconds(
-      rds_.config_source().initial_fetch_timeout().seconds() + 1);
-
   RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
           rds_, server_factory_context_, "foo_prefix", outer_init_manager_);
@@ -984,6 +976,7 @@ virtual_hosts:
             &dynamic_cast<RdsRouteConfigProviderImpl&>(*provider2).subscription());
   EXPECT_EQ(&provider_->configInfo().value().config_, &provider2->configInfo().value().config_);
 
+  envoy::extensions::filters::network::http_connection_manager::v3::Rds rds2;
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderSharedPtr provider3 =
@@ -998,13 +991,7 @@ virtual_hosts:
                      ->dynamic_route_configs()
                      .size());
 
-  // provider_ and provider2 point to the same provider via shared_ptr. Deleting the first
-  // pointer should not erase the provider in route_config_provider_manager.
   provider_.reset();
-  EXPECT_EQ(2UL, route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
-                     ->dynamic_route_configs()
-                     .size());
-
   provider2.reset();
 
   // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so
@@ -1164,6 +1151,55 @@ dynamic_route_configs:
 )EOF",
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump3.DebugString());
+}
+
+TEST_F(RouteConfigProviderManagerImplTest, NormalizeDynamicProviderConfig) {
+  setup();
+
+  const auto route_config = parseRouteConfigurationFromV3Yaml(R"EOF(
+name: foo_route_config
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+)EOF");
+  const auto decoded_resources = TestUtility::decodeResources({route_config});
+
+  EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "1")
+                  .ok());
+
+  UniversalStringMatcher universal_name_matcher;
+  EXPECT_EQ(1UL, route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
+                     ->dynamic_route_configs()
+                     .size());
+
+  for (bool normalize_config : std::vector<bool>({true, false})) {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.normalize_rds_provider_config",
+                                  normalize_config);
+    envoy::extensions::filters::network::http_connection_manager::v3::Rds rds2;
+    rds2 = rds_;
+    // The following is valid only when normalize_config is true:
+    // Modify parameters which should not affect the provider. In other words, the same provider
+    // should be picked, regardless of the fact that initial_fetch_timeout is different for both
+    // configs.
+    rds2.mutable_config_source()->mutable_initial_fetch_timeout()->set_seconds(
+        rds_.config_source().initial_fetch_timeout().seconds() + 1);
+
+    RouteConfigProviderSharedPtr provider2 =
+        route_config_provider_manager_->createRdsRouteConfigProvider(
+            rds2, server_factory_context_, "foo_prefix", outer_init_manager_);
+
+    EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                    ->onConfigUpdate(decoded_resources.refvec_, "provider2")
+                    .ok());
+    EXPECT_EQ(normalize_config ? 1UL : 2UL,
+              route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
+                  ->dynamic_route_configs()
+                  .size());
+  }
 }
 
 } // namespace

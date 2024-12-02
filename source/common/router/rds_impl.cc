@@ -180,21 +180,8 @@ RouteConfigProviderSharedPtr RdsFactoryImpl::createRdsRouteConfigProvider(
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     Init::Manager& init_manager, ProtoTraitsImpl& proto_traits,
     Rds::RouteConfigProviderManager& manager) {
-  envoy::extensions::filters::network::http_connection_manager::v3::Rds normalized_rds;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.normalize_rds_provider_config")) {
-    normalized_rds = rds;
-    // Normalization clears RDS providers's parameters which are not important
-    // for actual fetching of routes. When one of those "not important" parameters is changed,
-    // the existing provider should be chosen.
-    // TODO(cpakulski): Consider adding RdsFactoryImpl::normalizeRdsConfigProvider method, if more
-    // fields needs to be cleared.
-    normalized_rds.mutable_config_source()->clear_initial_fetch_timeout();
-  }
   auto provider = manager.addDynamicProvider(
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.normalize_rds_provider_config")
-          ? normalized_rds
-          : rds,
-      rds.route_config_name(), init_manager,
+      rds, rds.route_config_name(), init_manager,
       [&factory_context, &rds, &stat_prefix, &manager, &proto_traits](uint64_t manager_identifier) {
         auto config_update =
             std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits, factory_context);
