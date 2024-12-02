@@ -1,14 +1,18 @@
 # .github/workflows/mobile-perf.yml regression tests these files are not used in the E-M build.
+source/common/watchdog/abort_action_config.h
+source/common/upstream/prod_cluster_info_factory.h
 source/extensions/filters/http/on_demand/config.h
 source/extensions/filters/http/on_demand/on_demand_update.h
 source/common/http/route_config_update_requster.h
 source/common/listener_manager/listener_manager_impl.h
+source/common/network/io_uring_socket_handle_impl.h
 source/server/overload_manager_impl.cc
 source/common/network/listen_socket_impl.h
 source/common/network/tcp_listener_impl.h
 source/server/guarddog_impl.h
 source/server/watchdog_impl.h
 source/server/options_impl.cc
+source/common/upstream/health_discovery_service.h
 source/extensions/access_loggers/common/file_access_log_impl.h
 source/common/router/scoped_rds.h
 source/extensions/load_balancing_policies/subset/subset_lb.h
@@ -22,3 +26,4 @@ source/common/tls/ocsp/ocsp.h
 source/common/formatter/http_specific_formatter.h
 source/common/formatter/stream_info_formatter.h
 source/common/tls/default_tls_certificate_selector.h
+source/common/upstream/od_cds_api_impl.h

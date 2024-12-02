@@ -263,6 +263,15 @@ public:
     reset(object, leave_on_stack);
   }
 
+  LuaRef(const LuaRef&) = delete;
+
+  LuaRef(LuaRef&& that) {
+    object_ = that.object_;
+    ref_ = that.ref_;
+    that.object_ = std::pair<T*, lua_State*>{};
+    that.ref_ = LUA_NOREF;
+  }
+
   ~LuaRef() { unref(); }
   T* get() { return object_.first; }
 
@@ -317,6 +326,9 @@ protected:
 template <typename T> class LuaDeathRef : public LuaRef<T> {
 public:
   using LuaRef<T>::LuaRef;
+
+  LuaDeathRef(const LuaDeathRef&) = delete;
+  LuaDeathRef(LuaDeathRef&&) = default;
 
   ~LuaDeathRef() { markDead(); }
 

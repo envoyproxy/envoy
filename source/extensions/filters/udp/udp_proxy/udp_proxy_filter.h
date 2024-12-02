@@ -130,8 +130,8 @@ public:
   virtual UdpProxyDownstreamStats& stats() const PURE;
   virtual TimeSource& timeSource() const PURE;
   virtual const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const PURE;
-  virtual const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const PURE;
-  virtual const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& sessionAccessLogs() const PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& proxyAccessLogs() const PURE;
   virtual const UdpSessionFilterChainFactory& sessionFilterFactory() const PURE;
   virtual bool hasSessionFilters() const PURE;
   virtual const UdpTunnelingConfigPtr& tunnelingConfig() const PURE;
@@ -149,7 +149,7 @@ class UdpLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   UdpLoadBalancerContext(const Udp::HashPolicy* hash_policy,
                          const Network::Address::InstanceConstSharedPtr& peer_address,
-                         const StreamInfo::StreamInfo* stream_info)
+                         StreamInfo::StreamInfo* stream_info)
       : stream_info_(stream_info) {
     if (hash_policy) {
       hash_ = hash_policy->generateHash(*peer_address);
@@ -157,11 +157,11 @@ public:
   }
 
   absl::optional<uint64_t> computeHashKey() override { return hash_; }
-  const StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_; }
+  StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_; }
 
 private:
   absl::optional<uint64_t> hash_;
-  const StreamInfo::StreamInfo* stream_info_;
+  StreamInfo::StreamInfo* const stream_info_;
 };
 
 /**
@@ -858,7 +858,7 @@ protected:
 
     Upstream::HostConstSharedPtr
     chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address,
-               const StreamInfo::StreamInfo* stream_info) const;
+               StreamInfo::StreamInfo* stream_info) const;
 
     UdpProxyFilter& filter_;
     Upstream::ThreadLocalCluster& cluster_;
