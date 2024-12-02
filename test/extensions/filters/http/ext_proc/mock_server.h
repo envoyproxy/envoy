@@ -23,7 +23,7 @@ public:
                RequestCallbacks*, StreamBase*));
   MOCK_METHOD(void, cancel, ());
 
-  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, ());
+  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const));
 };
 
 class MockStream : public ExternalProcessorStream {
