@@ -99,8 +99,6 @@ func createRequest(r *C.httpRequest) *httpRequest {
 	req.decodingState.request = req
 	req.encodingState.request = req
 
-	req.cond.L = &req.waitingLock
-
 	err := Requests.StoreReq(r, req)
 	if err != nil {
 		panic(fmt.Sprintf("createRequest failed, err: %s", err.Error()))

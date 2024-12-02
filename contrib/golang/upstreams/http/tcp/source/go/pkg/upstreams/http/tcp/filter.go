@@ -49,9 +49,6 @@ type httpRequest struct {
 	req               *C.httpRequest
 	tcpUpstreamFilter api.TcpUpstreamFilter
 	pInfo             panicInfo
-	waitingLock       sync.Mutex // protect waitingCallback
-	cond              sync.Cond
-	waitingCallback   int32
 
 	// protect multiple cases:
 	// 1. protect req_->strValue in the C++ side from being used concurrently.
