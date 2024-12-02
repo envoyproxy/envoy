@@ -51,7 +51,6 @@ typedef enum { // NOLINT(modernize-use-using)
 } CAPIStatus;
 
 // tcp upstream
-CAPIStatus envoyGoTcpUpstreamInfo(void* u, int info_type, void* ret);
 CAPIStatus envoyGoTcpUpstreamGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf);
 CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len, void* value_data, int value_len, headerAction action);

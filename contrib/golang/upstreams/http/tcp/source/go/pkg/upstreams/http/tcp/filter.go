@@ -52,7 +52,6 @@ type httpRequest struct {
 
 	// protect multiple cases:
 	// 1. protect req_->strValue in the C++ side from being used concurrently.
-	// 2. protect waitingCallback from being modified in markMayWaitingCallback concurrently.
 	mutex sync.Mutex
 
 	// decodingState and encodingState are part of httpRequest, not another GC object.
