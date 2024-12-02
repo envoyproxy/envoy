@@ -25,6 +25,7 @@ namespace Router {
   COUNTER(rq_redirect)                                                                             \
   COUNTER(rq_reset_after_downstream_response_started)                                              \
   COUNTER(rq_total)                                                                                \
+  HISTOGRAM(upstream_service_time, Milliseconds)                                                   \
   STATNAME(retry)
 
 MAKE_STAT_NAMES_STRUCT(StatNames, ALL_ROUTER_STATS);
