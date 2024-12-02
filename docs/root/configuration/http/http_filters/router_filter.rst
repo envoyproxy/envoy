@@ -434,6 +434,7 @@ owning HTTP connection manager.
   rq_total, Counter, Total routed requests
   rq_reset_after_downstream_response_started, Counter, Total requests that were reset after downstream response had started
   rq_overload_local_reply, Counter, Total requests that were load shed if downstream filter load shed point is configured
+  upstream_service_time, Histogram, Total time in milliseconds spent by the upstream host processing the request and the network latency between Envoy and upstream host. This value matches what would be found in the ``x-envoy-upstream-service-time`` response header.
 
 .. _config_http_filters_router_vcluster_stats:
 

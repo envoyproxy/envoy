@@ -6886,5 +6886,37 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
+TEST_F(RouterTest, UpstreamServiceTimeRecorded) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  // Only send upstream service time if we received the complete request.
+  EXPECT_CALL(stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "vhost.fake_vhost.vcluster.fake_virtual_cluster.upstream_rq_time"),
+                  32ull));
+  EXPECT_CALL(
+      stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "test.upstream_service_time"), 32ull));
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+
+  test_time_.advanceTimeWait(std::chrono::milliseconds(32));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
 } // namespace Router
 } // namespace Envoy

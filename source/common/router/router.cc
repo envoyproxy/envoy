@@ -1680,11 +1680,15 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   if (DateUtil::timePointValid(downstream_request_complete_time_)) {
     Event::Dispatcher& dispatcher = callbacks_->dispatcher();
     MonotonicTime response_received_time = dispatcher.timeSource().monotonicTime();
-    std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        response_received_time - downstream_request_complete_time_);
+    const uint64_t upstream_service_time_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(response_received_time -
+                                                              downstream_request_complete_time_)
+            .count();
     if (!config_->suppress_envoy_headers_) {
-      headers->setEnvoyUpstreamServiceTime(ms.count());
+      headers->setEnvoyUpstreamServiceTime(upstream_service_time_ms);
     }
+    // Record the upstream service time in the stats
+    stats_.upstream_service_time_.recordValue(upstream_service_time_ms);
   }
 
   upstream_request.upstreamCanary(

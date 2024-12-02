@@ -408,6 +408,11 @@ new_features:
   change: |
     Add the option to reduce the rate limit budget based on request/response contexts on stream done.
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
+- area: router
+  change: |
+    Added histogram metric ``upstream_service_time`` which tracks the total time in milliseconds spent by the upstream
+    host processing the request and the network latency between Envoy and upstream host. This value matches what would
+    be found in the ``x-envoy-upstream-service-time`` response header.
 
 deprecated:
 - area: rbac
