@@ -141,6 +141,9 @@ bug_fixes:
   change: |
     Fixed bug where dynamic_forward_proxy udp session filter disabled buffer in filter config
     instead of disabling buffer for the filter instance.
+- area: csrf
+  change: |
+    Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
