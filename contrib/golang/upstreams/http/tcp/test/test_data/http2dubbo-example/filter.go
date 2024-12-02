@@ -208,15 +208,11 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
   - OnDestroy Usages:
   - 1. do something when destroy request
     *
-  - @param reason tells destryp reason.
 
 *
 */
-func (*tcpUpstreamFilter) OnDestroy(reason api.DestroyReason) {
-	if reason != api.Normal {
-		api.LogInfof("[OnDestroy] , unexpected destroy, reason: %+v", reason)
-	}
-	api.LogInfof("[OnDestroy] , normal destroy, reason: %+v", reason)
+func (*tcpUpstreamFilter) OnDestroy() {
+	api.LogInfof("[OnDestroy] , tcpUpstreamFilter destroy")
 }
 
 func transformToDubboFrame(methodName, interfaceName string, dubboArgsFromHttp map[string]string) *bytes.Buffer {

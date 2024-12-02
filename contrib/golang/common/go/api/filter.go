@@ -355,7 +355,7 @@ type TcpUpstreamFilter interface {
 	// (Be careful: when return TcpUpstreamContinue, resp headers will be send to http, from then on, further resp headers will not be send)
 	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
 	// destroy filter
-	OnDestroy(DestroyReason)
+	OnDestroy()
 }
 
 func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) TcpUpstreamStatus {
@@ -370,7 +370,7 @@ func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeade
 	return TcpUpstreamContinue
 }
 
-func (*EmptyTcpUpstreamFilter) OnDestroy(DestroyReason) {
+func (*EmptyTcpUpstreamFilter) OnDestroy() {
 }
 
 type TcpUpstreamFactory func(config interface{}, callbacks TcpUpstreamCallbackHandler) TcpUpstreamFilter

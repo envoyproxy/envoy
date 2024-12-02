@@ -77,17 +77,6 @@ func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 }
 
 //export envoyGoTcpUpstreamDestroyPluginConfig
-func envoyGoTcpUpstreamDestroyPluginConfig(id uint64, needDelay int) {
-	if needDelay == 1 {
-		// there is a concurrency race in the c++ side:
-		// 1. when A envoy worker thread is using the cached merged_config_id_ and it will call into Go after some time.
-		// 2. while B envoy worker thread may update the merged_config_id_ in getMergedConfigId, that will delete the id.
-		// so, we delay deleting the id in the Go side.
-		time.AfterFunc(delayDeleteTime, func() {
-			configCache.Delete(id)
-		})
-	} else {
-		// there is no race for non-merged config.
-		configCache.Delete(id)
-	}
+func envoyGoTcpUpstreamDestroyPluginConfig(id uint64) {
+	configCache.Delete(id)
 }

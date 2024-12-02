@@ -201,15 +201,13 @@ func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes,
 }
 
 //export envoyGoOnTcpUpstreamDestroy
-func envoyGoOnTcpUpstreamDestroy(r *C.httpRequest, reason uint64) {
+func envoyGoOnTcpUpstreamDestroy(r *C.httpRequest) {
 	req := getRequest(r)
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.recoverPanic()
 
-	v := api.DestroyReason(reason)
-
 	f := req.tcpUpstreamFilter
-	f.OnDestroy(v)
+	f.OnDestroy()
 
 	// Break circular references between httpRequest and StreamFilter,
 	// since Finalizers don't work with circular references,

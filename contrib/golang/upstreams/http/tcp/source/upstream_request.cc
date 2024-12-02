@@ -31,7 +31,7 @@ FilterConfig::FilterConfig(
 
 FilterConfig::~FilterConfig() {
   if (config_id_ > 0) {
-    dso_lib_->envoyGoTcpUpstreamDestroyPluginConfig(config_id_, 0);
+    dso_lib_->envoyGoTcpUpstreamDestroyPluginConfig(config_id_);
   }
 }
 
@@ -112,12 +112,11 @@ TcpUpstream::~TcpUpstream() {
   // initRequest haven't be called yet, which mean haven't called into Go.
   if (configId == 0) {
     return;
-  }              
+  }
 
-  auto reason = (decoding_state_->isProcessingInGo() || encoding_state_->isProcessingInGo())
-                ? DestroyReason::Terminate
-                : DestroyReason::Normal;
-  dynamic_lib_->envoyGoOnTcpUpstreamDestroy(this, int(reason));
+  ASSERT(!decoding_state_->isProcessingInGo() && !encoding_state_->isProcessingInGo());
+
+  dynamic_lib_->envoyGoOnTcpUpstreamDestroy(this);
 }
 
 void TcpUpstream::initRequest() {

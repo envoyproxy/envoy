@@ -136,10 +136,6 @@ public:
     NotEndStream,
     EndStream,
   };
-  enum class DestroyReason {
-    Normal,
-    Terminate,
-  };
   enum class HttpStatusCode : uint64_t {
     Success = 200,
   };

@@ -210,7 +210,7 @@ public:
 
   virtual GoUint64 envoyGoOnTcpUpstreamConfig(httpConfig* p0) PURE;
 
-  virtual void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0, GoInt p1) PURE;
+  virtual void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0) PURE;
 
   virtual GoUint64 envoyGoEncodeHeader(processState* state, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) PURE;
 
@@ -218,7 +218,7 @@ public:
 
   virtual GoUint64 envoyGoOnUpstreamData(processState* state, GoUint64 end_stream, GoUint64 header_num, GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) PURE;
 
-  virtual void envoyGoOnTcpUpstreamDestroy(httpRequest* p0, int p1) PURE;
+  virtual void envoyGoOnTcpUpstreamDestroy(httpRequest* p0) PURE;
 
 };
 
@@ -229,7 +229,7 @@ public:
 
   GoUint64 envoyGoOnTcpUpstreamConfig(httpConfig* p0) override;
 
-  void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0, GoInt p1) override;
+  void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0) override;
 
   GoUint64 envoyGoEncodeHeader(processState* state, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) override;
 
@@ -237,12 +237,12 @@ public:
 
   GoUint64 envoyGoOnUpstreamData(processState* state, GoUint64 end_stream, GoUint64 header_num, GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) override;
 
-  void envoyGoOnTcpUpstreamDestroy(httpRequest* p0, int p1) override;
+  void envoyGoOnTcpUpstreamDestroy(httpRequest* p0) override;
 
 private:
   GoUint64 (*envoy_go_on_tcp_upstream_config_)(httpConfig* p0) = {nullptr};
 
-  void (*envoy_go_tcp_upstream_destroy_plugin_config_)(GoUint64 p0, GoInt p1) = {nullptr};
+  void (*envoy_go_tcp_upstream_destroy_plugin_config_)(GoUint64 p0) = {nullptr};
 
   GoUint64 (*envoy_go_encode_header_)(processState* p0, GoUint64 p1, GoUint64 p2, GoUint64 p3, GoUint64 buf_ptr, GoUint64 buf_len) = {nullptr};
 
@@ -250,7 +250,7 @@ private:
                                             
   GoUint64 (*envoy_go_on_upstream_data_)(processState* state, GoUint64 end_stream, GoUint64 header_size, GoUint64 header_byte_size,  GoUint64 buf_ptr, GoUint64 buf_len) = {nullptr};
 
-  void (*envoy_go_on_tcp_upstream_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
+  void (*envoy_go_on_tcp_upstream_destroy_)(httpRequest* p0) = {nullptr};
 };
 
 using TcpUpstreamDsoPtr = std::shared_ptr<TcpUpstreamDso>;

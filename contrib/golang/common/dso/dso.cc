@@ -265,9 +265,9 @@ GoUint64 TcpUpstreamDsoImpl::envoyGoOnTcpUpstreamConfig(httpConfig* p0) {
   return envoy_go_on_tcp_upstream_config_(p0);
 }
 
-void TcpUpstreamDsoImpl::envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0, GoInt p1) {
+void TcpUpstreamDsoImpl::envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0) {
   ASSERT(envoy_go_tcp_upstream_destroy_plugin_config_ != nullptr);
-  return envoy_go_tcp_upstream_destroy_plugin_config_(p0, p1);
+  return envoy_go_tcp_upstream_destroy_plugin_config_(p0);
 }
 
 GoUint64 TcpUpstreamDsoImpl::envoyGoEncodeHeader(processState* state, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) {
@@ -285,9 +285,9 @@ GoUint64 TcpUpstreamDsoImpl::envoyGoOnUpstreamData(processState* state, GoUint64
   return envoy_go_on_upstream_data_(state, end_stream, header_num, header_bytes, buf_ptr, buf_len);
 }
 
-void TcpUpstreamDsoImpl::envoyGoOnTcpUpstreamDestroy(httpRequest* p0, int p1) {
+void TcpUpstreamDsoImpl::envoyGoOnTcpUpstreamDestroy(httpRequest* p0) {
   ASSERT(envoy_go_on_tcp_upstream_destroy_ != nullptr);
-  envoy_go_on_tcp_upstream_destroy_(p0, GoUint64(p1));
+  envoy_go_on_tcp_upstream_destroy_(p0);
 }
 
 } // namespace Dso
