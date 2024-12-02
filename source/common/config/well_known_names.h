@@ -76,7 +76,6 @@ public:
     const std::string regex_;
     const std::string substr_;
     const std::string negative_match_; // A value that will not match as the extracted tag value.
-    const Regex::Type re_type_;
   };
 
   struct TokenizedDescriptor {

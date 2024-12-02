@@ -830,7 +830,7 @@ TEST_F(StatsThreadLocalStoreTest, ExtractAndAppendTagsRegexValueWithMatch) {
   envoy::config::metrics::v3::StatsConfig stats_config;
   auto* tag_specifier = stats_config.add_stats_tags();
   tag_specifier->set_tag_name("foo_tag");
-  tag_specifier->set_regex("^foo.(.+)");
+  tag_specifier->set_regex("^foo.((.+))");
 
   const Stats::TagVector tags_vector;
   store_->setTagProducer(TagProducerImpl::createTagProducer(stats_config, tags_vector).value());

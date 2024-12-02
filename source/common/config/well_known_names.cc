@@ -243,7 +243,7 @@ TagNameValues::TagNameValues() {
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
                            const std::string& substr, const std::string& negative_matching_value) {
   descriptor_vec_.emplace_back(
-      Descriptor{name, expandRegex(regex), substr, negative_matching_value, Regex::Type::Re2});
+      Descriptor{name, expandRegex(regex), substr, negative_matching_value});
 }
 
 void TagNameValues::addTokenized(const std::string& name, const std::string& tokens) {

@@ -63,13 +63,12 @@ public:
    * @param substr a substring that -- if provided -- must be present in a stat name
    *               in order to match the regex. This is an optional performance tweak
    *               to avoid large numbers of failed regex lookups.
-   * @param re_type the regular expression syntax used (Regex::Type::StdRegex or Regex::Type::Re2).
    * @return TagExtractorPtr newly constructed TagExtractor or a failure status.
    */
-  static absl::StatusOr<TagExtractorPtr>
-  createTagExtractor(absl::string_view name, absl::string_view regex, absl::string_view substr = "",
-                     absl::string_view negative_match = "",
-                     Regex::Type re_type = Regex::Type::StdRegex);
+  static absl::StatusOr<TagExtractorPtr> createTagExtractor(absl::string_view name,
+                                                            absl::string_view regex,
+                                                            absl::string_view substr = "",
+                                                            absl::string_view negative_match = "");
 
   TagExtractorImplBase(absl::string_view name, absl::string_view regex,
                        absl::string_view substr = "");
@@ -121,18 +120,6 @@ protected:
   PERF_TAG_COUNTERS;
 };
 
-class TagExtractorStdRegexImpl : public TagExtractorImplBase {
-public:
-  TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
-                           absl::string_view substr = "");
-
-  bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
-                  IntervalSet<size_t>& remove_characters) const override;
-
-private:
-  const std::regex regex_;
-};
-
 class TagExtractorRe2Impl : public TagExtractorImplBase {
 public:
   TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
@@ -140,6 +127,14 @@ public:
 
   bool extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                   IntervalSet<size_t>& remove_characters) const override;
+
+  absl::Status status() const {
+    if (!regex_.ok()) {
+      return absl::InvalidArgumentError(
+          fmt::format("Invalid regex '{}': {}", regex_.pattern(), regex_.error()));
+    }
+    return absl::OkStatus();
+  }
 
 private:
   const re2::RE2 regex_;

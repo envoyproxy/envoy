@@ -78,8 +78,6 @@ public:
 
 DECLARE_FACTORY(GoogleReEngineFactory);
 
-enum class Type { Re2, StdRegex };
-
 /**
  * Utilities for constructing regular expressions.
  */

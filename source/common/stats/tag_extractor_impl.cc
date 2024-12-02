@@ -17,14 +17,6 @@
 
 namespace Envoy {
 namespace Stats {
-namespace {
-std::regex parseStdRegex(const std::string& regex) {
-  TRY_ASSERT_MAIN_THREAD { return std::regex(regex, std::regex::optimize); }
-  END_TRY
-  CATCH(const std::regex_error& e,
-        { throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what())); });
-}
-} // namespace
 
 const std::vector<absl::string_view>& TagExtractionContext::tokens() {
   if (tokens_.empty()) {
@@ -68,8 +60,8 @@ std::string TagExtractorImplBase::extractRegexPrefix(absl::string_view regex) {
 
 absl::StatusOr<TagExtractorPtr>
 TagExtractorImplBase::createTagExtractor(absl::string_view name, absl::string_view regex,
-                                         absl::string_view substr, absl::string_view negative_match,
-                                         Regex::Type re_type) {
+                                         absl::string_view substr,
+                                         absl::string_view negative_match) {
   if (name.empty()) {
     return absl::InvalidArgumentError("tag_name cannot be empty");
   }
@@ -78,68 +70,23 @@ TagExtractorImplBase::createTagExtractor(absl::string_view name, absl::string_vi
     return absl::InvalidArgumentError(fmt::format(
         "No regex specified for tag specifier and no default regex for name: '{}'", name));
   }
-  switch (re_type) {
-  case Regex::Type::Re2:
-    return std::make_unique<TagExtractorRe2Impl>(name, regex, substr, negative_match);
-  case Regex::Type::StdRegex:
-    ASSERT(negative_match.empty(), "Not supported");
-    return std::make_unique<TagExtractorStdRegexImpl>(name, regex, substr);
+  auto res = std::make_unique<TagExtractorRe2Impl>(name, regex, substr, negative_match);
+  const absl::Status status = res->status();
+  if (!status.ok()) {
+    return status;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
+  return res;
 }
 
 bool TagExtractorImplBase::substrMismatch(absl::string_view stat_name) const {
   return !substr_.empty() && stat_name.find(substr_) == absl::string_view::npos;
 }
 
-TagExtractorStdRegexImpl::TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
-                                                   absl::string_view substr)
-    : TagExtractorImplBase(name, regex, substr), regex_(parseStdRegex(std::string(regex))) {}
-
 std::string& TagExtractorImplBase::addTagReturningValueRef(std::vector<Tag>& tags) const {
   tags.emplace_back();
   Tag& tag = tags.back();
   tag.name_ = name_;
   return tag.value_;
-}
-
-bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
-                                          IntervalSet<size_t>& remove_characters) const {
-  PERF_OPERATION(perf);
-
-  absl::string_view stat_name = context.name();
-  if (substrMismatch(stat_name)) {
-    PERF_RECORD(perf, "re-skip", name_);
-    PERF_TAG_INC(skipped_);
-    return false;
-  }
-
-  std::match_results<absl::string_view::iterator> match;
-  // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  if (std::regex_search<absl::string_view::iterator>(stat_name.begin(), stat_name.end(), match,
-                                                     regex_) &&
-      match.size() > 1) {
-    // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
-    const auto& remove_subexpr = match[1];
-
-    // value_subexpr is the optional second submatch. It is usually inside the first submatch
-    // (remove_subexpr) to allow the expression to strip off extra characters that should be removed
-    // from the string but also not necessary in the tag value ("." for example). If there is no
-    // second submatch, then the value_subexpr is the same as the remove_subexpr.
-    const auto& value_subexpr = match.size() > 2 ? match[2] : remove_subexpr;
-    addTagReturningValueRef(tags) = value_subexpr.str();
-
-    // Determines which characters to remove from stat_name to elide remove_subexpr.
-    std::string::size_type start = remove_subexpr.first - stat_name.begin();
-    std::string::size_type end = remove_subexpr.second - stat_name.begin();
-    remove_characters.insert(start, end);
-    PERF_RECORD(perf, "re-match", name_);
-    PERF_TAG_INC(matched_);
-    return true;
-  }
-  PERF_RECORD(perf, "re-miss", name_);
-  PERF_TAG_INC(missed_);
-  return false;
 }
 
 TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,

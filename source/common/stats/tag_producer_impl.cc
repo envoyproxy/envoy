@@ -66,7 +66,7 @@ absl::Status TagProducerImpl::addExtractorsMatching(absl::string_view name) {
   for (const auto& desc : Config::TagNames::get().descriptorVec()) {
     if (desc.name_ == name) {
       auto extractor_or_error = TagExtractorImplBase::createTagExtractor(
-          desc.name_, desc.regex_, desc.substr_, desc.negative_match_, desc.re_type_);
+          desc.name_, desc.regex_, desc.substr_, desc.negative_match_);
       if (!extractor_or_error.ok()) {
         return extractor_or_error.status();
       }
@@ -157,7 +157,7 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v3::StatsCon
   if (!config.has_use_all_default_tags() || config.use_all_default_tags().value()) {
     for (const auto& desc : Config::TagNames::get().descriptorVec()) {
       auto extractor_or_error = TagExtractorImplBase::createTagExtractor(
-          desc.name_, desc.regex_, desc.substr_, desc.negative_match_, desc.re_type_);
+          desc.name_, desc.regex_, desc.substr_, desc.negative_match_);
       RETURN_IF_NOT_OK_REF(extractor_or_error.status());
       addExtractor(std::move(extractor_or_error.value()));
     }

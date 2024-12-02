@@ -31,7 +31,7 @@ Matchers::StringMatcherPtr makeExactStringMatcher(const std::string& exact_match
       config, context);
 }
 
-Matchers::StringMatcherPtr makeStdRegexStringMatcher(const std::string& regex) {
+Matchers::StringMatcherPtr makeRegexStringMatcher(const std::string& regex) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   envoy::type::matcher::v3::StringMatcher config;
   config.MergeFrom(TestUtility::createRegexMatcher(regex));
@@ -803,7 +803,7 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByRegex) {
   };
 
   cors_policy_->allow_origins_.clear();
-  cors_policy_->allow_origins_.emplace_back(makeStdRegexStringMatcher(".*"));
+  cors_policy_->allow_origins_.emplace_back(makeRegexStringMatcher(".*"));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -826,7 +826,7 @@ TEST_F(CorsFilterTest, OptionsRequestNotMatchingOriginByRegex) {
                                                  {"access-control-request-method", "GET"}};
 
   cors_policy_->allow_origins_.clear();
-  cors_policy_->allow_origins_.emplace_back(makeStdRegexStringMatcher(".*.envoyproxy.io"));
+  cors_policy_->allow_origins_.emplace_back(makeRegexStringMatcher(".*.envoyproxy.io"));
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
