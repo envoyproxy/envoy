@@ -4,7 +4,7 @@ Becoming a maintainer generally means that you are going to be spending substant
 Envoy for the foreseeable future. You should have domain expertise and be extremely proficient in C++.
 
 * Express interest to the
-  [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-announce)
+  [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-maintainers)
   that you are interested in becoming a maintainer and, if your company does not have pre-existing maintainers,
   that your organization is interested in and willing to sponsoring a maintainer.
 * We will expect you to start contributing increasingly complicated PRs, under the guidance
