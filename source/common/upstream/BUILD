@@ -312,6 +312,7 @@ envoy_cc_library(
     deps = [
         ":health_checker_lib",
         ":locality_endpoint_lib",
+        ":prod_cluster_info_factory_lib",
         ":upstream_includes",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",

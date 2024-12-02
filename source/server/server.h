@@ -40,7 +40,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/prod_cluster_info_factory.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
@@ -263,8 +262,7 @@ public:
   virtual std::unique_ptr<HdsDelegateApi>
   maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
                          Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
-                         Ssl::ContextManager& ssl_context_manager,
-                         Upstream::ClusterInfoFactory& info_factory) PURE;
+                         Ssl::ContextManager& ssl_context_manager) PURE;
 
   void run() override;
 
@@ -417,7 +415,6 @@ private:
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Config::XdsManagerPtr xds_manager_;
-  Upstream::ProdClusterInfoFactory info_factory_;
   std::unique_ptr<HdsDelegateApi> hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;

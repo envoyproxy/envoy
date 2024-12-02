@@ -964,7 +964,7 @@ protected:
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
   virtual bool setRotateNameservers() const { return false; }
-  virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return 0; }
+  virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return nullptr; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;

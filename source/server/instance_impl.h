@@ -19,8 +19,7 @@ protected:
   std::unique_ptr<HdsDelegateApi>
   maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
                          Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
-                         Ssl::ContextManager& ssl_context_manager,
-                         Upstream::ClusterInfoFactory& info_factory) override;
+                         Ssl::ContextManager& ssl_context_manager) override;
 
 private:
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;

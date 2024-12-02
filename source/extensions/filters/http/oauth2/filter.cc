@@ -793,16 +793,26 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   }
 
   if (!id_token_.empty()) {
-    const std::string id_token_cookie_tail_http_only =
+    std::string id_token_cookie_tail_http_only =
         fmt::format(CookieTailHttpOnlyFormatString, expires_id_token_in_);
+    if (!config_->cookieDomain().empty()) {
+      id_token_cookie_tail_http_only =
+          absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()),
+                       id_token_cookie_tail_http_only);
+    }
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail_http_only));
   }
 
   if (!refresh_token_.empty()) {
-    const std::string refresh_token_cookie_tail_http_only =
+    std::string refresh_token_cookie_tail_http_only =
         fmt::format(CookieTailHttpOnlyFormatString, expires_refresh_token_in_);
+    if (!config_->cookieDomain().empty()) {
+      refresh_token_cookie_tail_http_only =
+          absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()),
+                       refresh_token_cookie_tail_http_only);
+    }
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
                                          refresh_token_cookie_tail_http_only));

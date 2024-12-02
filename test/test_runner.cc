@@ -153,7 +153,7 @@ int TestRunner::runTests(int argc, char** argv) {
   // However do not redirect to file from death test children as the parent typically
   // looks for specific output in stderr
   if (!TestEnvironment::getOptions().logPath().empty() && !is_death_test_child) {
-    file_logger = std::make_unique<Logger::FileSinkDelegate>(
+    file_logger = *Logger::FileSinkDelegate::create(
         TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
   }
 

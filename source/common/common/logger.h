@@ -97,7 +97,8 @@ const static bool should_log = true;
   FUNCTION(wasm)                                                                                   \
   FUNCTION(websocket)                                                                              \
   FUNCTION(golang)                                                                                 \
-  FUNCTION(stats_sinks)
+  FUNCTION(stats_sinks)                                                                            \
+  FUNCTION(dynamic_modules)
 
 // clang-format off
 enum class Id {

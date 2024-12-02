@@ -1,0 +1,127 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              matcher:
+                matcher_tree:
+                  input:
+                    name: request-headers
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                      header_name: :path
+                  exact_match_map:
+                    map:
+                      "/new_endpoint/foo/0":
+                        action:
+                          name: route_foo
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.config.route.v3.Route
+                            match:
+                              prefix: ""
+                            route:
+                              cluster: cluster_0
+                      "/new_endpoint/foo/1":
+                        action:
+                          name: route_bar
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.config.route.v3.Route
+                            match:
+                              prefix: ""
+                            route:
+                              cluster: cluster_1
+                      "/new_endpoint/foo/2":
+                        action:
+                          name: route_bar
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.config.route.v3.Route
+                            match:
+                              prefix: ""
+                            route:
+                              cluster: cluster_2
+                on_no_match:
+                  matcher:
+                    matcher_tree:
+                      input:
+                        name: prefix-matches
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                          header_name: :path
+                      prefix_match_map:
+                        map:
+                          "/new_endpoint/foo":
+                            action:
+                              name: route_foo_prefix
+                              typed_config:
+                                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                                match:
+                                  prefix: ""
+                                route:
+                                  cluster: cluster_1
+                          "/new_endpoint":
+                            action:
+                              name: route_foo_prefix
+                              typed_config:
+                                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                                match:
+                                  prefix: ""
+                                route:
+                                  cluster: cluster_2
+  clusters:
+  - name: cluster_0
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: service0_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service0.local
+                port_value: 80
+  - name: cluster_1
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: service1_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service1.local
+                port_value: 80
+  - name: cluster_2
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: service2_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service2.local
+                port_value: 80

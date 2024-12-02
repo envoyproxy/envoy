@@ -1,7 +1,7 @@
 #pragma once
 
 #include <chrono>
-#include <iostream>
+#include <iosfwd>
 
 #include "envoy/network/io_handle.h"
 

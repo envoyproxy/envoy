@@ -373,9 +373,7 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection().ptr();
   }
-  const StreamInfo::StreamInfo* requestStreamInfo() const override {
-    return &callbacks_->streamInfo();
-  }
+  StreamInfo::StreamInfo* requestStreamInfo() const override { return &callbacks_->streamInfo(); }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {

@@ -294,6 +294,11 @@ void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
         connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
       }
     }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
+      ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
+      connectivity_manager_->clusterManager().drainConnections(
+          [](const Upstream::Host&) { return true; });
+    }
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
       Http::HttpServerPropertiesCacheManager& cache_manager =

@@ -56,7 +56,7 @@ TEST_F(UpstreamConnTest, ConnectUpstream) {
   initialize();
 
   const auto* dst_addr =
-      upConn_->requestStreamInfo()->filterState().getDataReadOnly<Network::AddressObject>(
+      upConn_->requestStreamInfo()->filterState()->getDataReadOnly<Network::AddressObject>(
           "envoy.network.transport_socket.original_dst_address");
   EXPECT_EQ(dst_addr->address()->asString(), addr_);
 
