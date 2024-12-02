@@ -77,7 +77,7 @@ jobs:
         //examples/kotlin/hello_world:hello_envoy_kt
       request: ${{ needs.load.outputs.request }}
       target: kotlin-hello-world
-      runs-on: envoy-x64-small
+      runs-on: ubuntu-22.04
       steps-pre: |
         - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.12
       steps-post: |
@@ -106,7 +106,7 @@ jobs:
       args: ${{ matrix.args }}
       request: ${{ needs.load.outputs.request }}
       target: ${{ matrix.target }}
-      runs-on: envoy-x64-small
+      runs-on: ubuntu-22.04
       steps-pre: |
         - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.12
       steps-post: ${{ matrix.steps-post }}

@@ -466,7 +466,7 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
   const std::string& body = streamed_response.body();
   const bool end_of_stream = streamed_response.end_of_stream();
 
-  if (body.size() > 0) {
+  if (!body.empty()) {
     Buffer::OwnedImpl buffer;
     buffer.add(body);
     ENVOY_LOG(trace,
