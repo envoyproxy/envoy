@@ -84,10 +84,6 @@ private:
 
 namespace {
 
-using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
-
 void setHostClientSideWeight(HostSharedPtr& host, uint32_t weight,
                              long long non_empty_since_seconds,
                              long long last_update_time_seconds) {

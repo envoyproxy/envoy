@@ -1,6 +1,7 @@
 Checks: >
   -clang-analyzer-core.NonNullParamChecker,
   -clang-analyzer-optin.cplusplus.UninitializedObject,
+  -clang-diagnostic-builtin-macro-redefined,
   abseil-duration-*,
   abseil-faster-strsplit-delimiter,
   abseil-no-namespace,
