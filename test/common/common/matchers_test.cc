@@ -798,6 +798,15 @@ TEST_F(PathMatcher, MatchSuffixPath) {
   EXPECT_FALSE(Matchers::PathMatcher(matcher, context_).match("/suffiz#suffix"));
 }
 
+TEST_F(PathMatcher, SuffixPathStringRepresentation) {
+  envoy::type::matcher::v3::PathMatcher matcher;
+  matcher.mutable_path()->set_suffix("suffix");
+
+  // TODO(adisuissa): once the internal matcher_ type is replaced,
+  // this test will need to be updated.
+  EXPECT_EQ(Matchers::PathMatcher(matcher, context_).stringRepresentation(), "");
+}
+
 TEST_F(PathMatcher, MatchContainsPath) {
   envoy::type::matcher::v3::PathMatcher matcher;
   matcher.mutable_path()->set_contains("contains");
