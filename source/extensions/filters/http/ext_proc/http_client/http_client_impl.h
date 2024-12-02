@@ -22,7 +22,7 @@ public:
                     Server::Configuration::ServerFactoryContext& context)
       : config_(config), context_(context) {}
 
-  ~ExtProcHttpClient() { cancel(); }
+  ~ExtProcHttpClient() override { cancel(); }
 
   void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream,
                    const uint64_t stream_id, RequestCallbacks* callbacks,

@@ -5194,7 +5194,7 @@ TEST_F(HttpFilterTest, GrpcServiceMetadataOverride) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
   processRequestHeaders(false, absl::nullopt);
 
-  const auto& meta = filter_->grpc_service_config().initial_metadata();
+  const auto& meta = filter_->grpcServiceConfig().initial_metadata();
   EXPECT_EQ(meta[0].value(), "a"); // a = a inherited
   EXPECT_EQ(meta[1].value(), "c"); // b = c overridden
   EXPECT_EQ(meta[2].value(), "c"); // c = c added
