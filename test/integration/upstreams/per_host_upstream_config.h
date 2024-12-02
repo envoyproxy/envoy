@@ -99,7 +99,8 @@ public:
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         Upstream::ResourcePriority priority,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
-                        Upstream::LoadBalancerContext* ctx) const override {
+                        Upstream::LoadBalancerContext* ctx,
+                        const Protobuf::Message&) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       // This example factory doesn't support terminating CONNECT/CONNECT-UDP stream.
       return nullptr;

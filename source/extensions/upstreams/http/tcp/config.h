@@ -22,7 +22,8 @@ public:
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         Upstream::ResourcePriority priority,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
-                        Upstream::LoadBalancerContext* ctx, const Protobuf::Message&) const override;
+                        Upstream::LoadBalancerContext* ctx,
+                        const Protobuf::Message&) const override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto>();
   }

@@ -3,6 +3,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "google/protobuf/any.pb.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
@@ -306,9 +307,13 @@ HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
     return nullptr;
   }
 
+  google::protobuf::Any message;
+  if (cluster.info()->upstreamConfig()) {
+    message = cluster.info()->upstreamConfig()->typed_config();
+  }
   return factory->createGenericConnPool(
       cluster, Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context, cluster.info()->upstreamConfig()->typed_config());
+      decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context, message);
 }
 
 HttpConnPool::~HttpConnPool() {
