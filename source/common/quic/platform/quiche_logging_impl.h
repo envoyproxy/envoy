@@ -8,7 +8,7 @@
 
 #include <cerrno>
 #include <cstring>
-#include <iostream>
+#include <iosfwd>
 #include <sstream>
 #include <string>
 
