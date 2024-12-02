@@ -175,17 +175,19 @@ public:
     return !(remote_fetch_disallow_timer_->enabled() || remote_fetch_in_flight_);
   }
 
-  void allowRemoteJwksFetch(absl::optional<bool> fetch_succeeded, bool fetch_in_flight) override {
+  void allowRemoteJwksFetch(absl::optional<bool> stop_backoff, bool fetch_in_flight) override {
     remote_fetch_in_flight_ = fetch_in_flight;
 
-    if (!fetch_succeeded.has_value()) {
+    if (!stop_backoff.has_value()) {
       return;
     }
 
-    if (fetch_succeeded.value()) {
-      if (jwt_provider_.remote_jwks().has_async_fetch()) {
-        async_fetcher_->resetFetchTimer();
-      }
+    // Update async fetch timer each time back off is modified, which implies that a fetch was made.
+    if (jwt_provider_.remote_jwks().has_async_fetch()) {
+      async_fetcher_->resetFetchTimer();
+    }
+
+    if (stop_backoff.value()) {
       remote_fetch_disallow_timer_->disableTimer();
       remote_fetch_backoff_strategy_->reset();
     } else {
