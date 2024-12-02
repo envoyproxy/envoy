@@ -41,8 +41,6 @@ jobs:
       # head-sha: ${{ github.sha }}
 
   build:
-    secrets:
-      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read
@@ -75,8 +73,6 @@ jobs:
       trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
 
   san:
-    secrets:
-      gcp-key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
     permissions:
       actions: read
       contents: read

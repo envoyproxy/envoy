@@ -30,8 +30,8 @@ TEST(Coverage, InsertStatusToString) {
   EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedByCache), "InsertAbortedByCache");
   EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedCacheCongested),
             "InsertAbortedCacheCongested");
-  EXPECT_EQ(insertStatusToString(InsertStatus::InsertAbortedResponseIncomplete),
-            "InsertAbortedResponseIncomplete");
+  EXPECT_EQ(insertStatusToString(InsertStatus::FilterAbortedBeforeInsertComplete),
+            "FilterAbortedBeforeInsertComplete");
   EXPECT_EQ(insertStatusToString(InsertStatus::HeaderUpdate), "HeaderUpdate");
   EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertCacheHit), "NoInsertCacheHit");
   EXPECT_EQ(insertStatusToString(InsertStatus::NoInsertRequestNotCacheable),
