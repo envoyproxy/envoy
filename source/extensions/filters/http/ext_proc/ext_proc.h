@@ -457,9 +457,6 @@ public:
   const ProcessorState& decodingState() { return decoding_state_; }
   void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) override;
   void onError() override;
-  void setStreamInfo(Envoy::StreamInfo::StreamInfo* stream_info) override {
-    stream_info_http_ = stream_info;
-  }
 
 private:
   void mergePerRouteConfig();
@@ -541,10 +538,6 @@ private:
 
   // Set to true when the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
-
-  // The HTTP stream info when Envoy sends the requests to the external processor
-  // using HTTP client.
-  Envoy::StreamInfo::StreamInfo* stream_info_http_ = nullptr;
 
   std::vector<std::string> untyped_forwarding_namespaces_{};
   std::vector<std::string> typed_forwarding_namespaces_{};

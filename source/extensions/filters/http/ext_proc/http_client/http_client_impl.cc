@@ -57,7 +57,6 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
       if (active_request_ != nullptr) {
         Buffer::OwnedImpl body(req_in_json.value());
         active_request_->sendData(body, true);
-        callbacks_->setStreamInfo(&active_request_->streamInfo());
       }
     } else {
       ENVOY_LOG(error, "ext_proc cluster {} does not exist in the config", cluster);
@@ -68,7 +67,6 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
 void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
                                   Http::ResponseMessagePtr&& response) {
   auto status = Envoy::Http::Utility::getResponseStatusOrNullopt(response->headers());
-  active_request_ = nullptr;
   if (status.has_value()) {
     uint64_t status_code = status.value();
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
@@ -93,6 +91,7 @@ void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
       if (callbacks_) {
         callbacks_->onComplete(response_msg);
         callbacks_ = nullptr;
+        active_request_ = nullptr;
       }
     } else {
       ENVOY_LOG(error, "Response status is not OK, status: {}", status_code);
@@ -110,18 +109,24 @@ void ExtProcHttpClient::onFailure(const Http::AsyncClient::Request&,
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   ENVOY_LOG(error, "Request failed: stream has been reset");
-  active_request_ = nullptr;
   onError();
 }
 
+Envoy::StreamInfo::StreamInfo* ExtProcHttpClient::getStreamInfo() {
+  if (active_request_ != nullptr ) {
+    return &active_request_->streamInfo();
+  } else {
+    return nullptr;
+  }
+}
+
 void ExtProcHttpClient::onError() {
-  // Cancel if the request is active.
-  cancel();
   ENVOY_LOG(error, "ext_proc HTTP client error condition happens.");
   if (callbacks_) {
     callbacks_->onError();
     callbacks_ = nullptr;
   }
+  active_request_ = nullptr;
 }
 
 void ExtProcHttpClient::cancel() {

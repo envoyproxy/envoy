@@ -36,6 +36,8 @@ public:
   void onFailure(const Http::AsyncClient::Request& request,
                  Http::AsyncClient::FailureReason reason) override;
 
+  Envoy::StreamInfo::StreamInfo* getStreamInfo() override;
+
   Server::Configuration::ServerFactoryContext& context() const { return context_; }
 
 private:

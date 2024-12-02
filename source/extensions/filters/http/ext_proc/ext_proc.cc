@@ -455,11 +455,6 @@ Filter::StreamOpenState Filter::openStream() {
 
     stream_ = config_->threadLocalStreamManager().store(std::move(stream_object), config_->stats(),
                                                         config_->deferredCloseTimeout());
-    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
-    // have a proper implementation of streamInfo.
-    if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
-      logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
-    }
   }
   return StreamOpenState::Ok;
 }
@@ -1092,12 +1087,17 @@ void Filter::logStreamInfoBase(Envoy::StreamInfo::StreamInfo* stream_info) {
   if (logging_info_->upstreamHost() == nullptr) {
     logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
   }
+
+  // Only set cluster info in logging info once.
+  if (logging_info_->clusterInfo() == nullptr) {
+    logging_info_->setClusterInfo(stream_info->upstreamClusterInfo());
+  }
 }
 
 void Filter::logStreamInfo() {
   if (!config().grpcService().has_value()) {
     // HTTP service
-    logStreamInfoBase(stream_info_http_);
+    logStreamInfoBase(client_->getStreamInfo());
     return;
   }
 

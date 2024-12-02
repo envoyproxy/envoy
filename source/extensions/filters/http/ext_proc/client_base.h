@@ -18,7 +18,6 @@ public:
   virtual ~RequestCallbacks() = default;
   virtual void onComplete(envoy::service::ext_proc::v3::ProcessingResponse& response) PURE;
   virtual void onError() PURE;
-  virtual void setStreamInfo(Envoy::StreamInfo::StreamInfo* stream_info) PURE;
 };
 
 /**
@@ -39,6 +38,7 @@ public:
                            bool end_stream, const uint64_t stream_id, RequestCallbacks* callbacks,
                            StreamBase* stream) PURE;
   virtual void cancel() PURE;
+  virtual Envoy::StreamInfo::StreamInfo* getStreamInfo() PURE;
 };
 
 using ClientBasePtr = std::unique_ptr<ClientBase>;
