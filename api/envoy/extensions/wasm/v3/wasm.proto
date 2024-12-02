@@ -4,6 +4,7 @@ package envoy.extensions.wasm.v3;
 
 import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
 import "google/protobuf/any.proto";
 
@@ -69,7 +70,7 @@ message SanitizationConfig {
 }
 
 // Configuration for a Wasm VM.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message VmConfig {
   // An ID which will be used along with a hash of the wasm code (or the name of the registered Null
   // VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
@@ -131,6 +132,9 @@ message VmConfig {
   // on native platforms.
   // Warning: Envoy rejects the configuration if there's conflict of key space.
   EnvironmentVariables environment_variables = 7;
+
+  // Specifies authentication credentials to remote OCI registry.
+  HttpBasicCredentials basic_credentials = 8;
 }
 
 message EnvironmentVariables {
@@ -195,4 +199,10 @@ message WasmService {
   // If true, create a single VM rather than creating one VM per worker. Such a singleton can
   // not be used with filters.
   bool singleton = 2;
+}
+
+message HttpBasicCredentials {
+  string user = 1;
+
+  transport_sockets.tls.v3.SdsSecretConfig password = 2;
 }

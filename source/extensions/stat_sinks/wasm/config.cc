@@ -22,7 +22,7 @@ WasmSinkFactory::createStatsSink(const Protobuf::Message& proto_config,
           proto_config, context.messageValidationContext().staticValidationVisitor());
 
   auto plugin_config = std::make_unique<Common::Wasm::PluginConfig>(
-      config.config(), context, context.scope(), context.initManager(),
+      config.config(), context, nullptr, context.scope(), context.initManager(),
       envoy::config::core::v3::TrafficDirection::UNSPECIFIED, nullptr, true);
 
   context.api().customStatNamespaces().registerStatNamespace(

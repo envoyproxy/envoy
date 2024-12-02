@@ -8,13 +8,13 @@ namespace Wasm {
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::FactoryContext& context)
     : Extensions::Common::Wasm::PluginConfig(
-          config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
+          config.config(), context.serverFactoryContext(), &context.getTransportSocketFactoryContext(), context.scope(), context.initManager(),
           context.listenerInfo().direction(), &context.listenerInfo().metadata(), false) {}
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& config,
                            Server::Configuration::UpstreamFactoryContext& context)
     : Extensions::Common::Wasm::PluginConfig(
-          config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
+          config.config(), context.serverFactoryContext(), nullptr, context.scope(), context.initManager(),
           envoy::config::core::v3::TrafficDirection::OUTBOUND, nullptr, false) {}
 
 } // namespace Wasm
