@@ -159,7 +159,16 @@ public:
   virtual void clearWatermark() PURE;
 
   absl::Status handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
+
+  /**
+   * Handles responses containing body modifications from an external processor. Supports three
+   * modes of operation: buffered, streamed, and buffered partial.
+   *
+   * @param response The body response received from the external processor
+   * @return Status indicating success or failure of the handling operation
+   */
   absl::Status handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
+
   absl::Status
   handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
 
@@ -245,7 +254,7 @@ protected:
   bool trailers_sent_to_server_ : 1 = false;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
   bool body_replaced_ : 1 = false;
-  // If true, some body data is received.
+  // If true, some of the body data is received.
   bool body_received_ : 1 = false;
   // If true, we are in "buffered partial" mode and we already reached the buffer
   // limit, sent the body in a message, and got back a reply.
@@ -286,14 +295,87 @@ private:
   handleStreamedBodyResponse(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   bool handleDuplexStreamedBodyResponse(
       const envoy::service::ext_proc::v3::CommonResponse& common_response);
-  absl::StatusOr<bool>
-  handleBodyInStreamedState(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void sendBufferedDataInStreamedMode(bool end_stream);
   absl::Status
   processHeaderMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
   void clearStreamingChunk() { chunk_queue_.clear(); }
   CallbackState getCallbackStateAfterHeaderResp(
       const envoy::service::ext_proc::v3::CommonResponse& common_response) const;
+
+  /**
+   * Validates if the current callback state is valid for processing body responses.
+   *
+   * @return true if the callback state is valid for body processing, false otherwise
+   */
+  bool isValidBodyCallbackState() const;
+
+  /**
+   * Handles buffered body callback state by processing header and body mutations if present.
+   *
+   * @param common_response The common response from the external processor
+   * @return StatusOr<bool> Returns Ok(true) if processing should continue, or an error status on
+   * failure
+   */
+  absl::StatusOr<bool>
+  handleBufferedBodyCallback(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+
+  /**
+   * Handles streamed body callback state by processing header and body mutations.
+   *
+   * @param common_response The common response from the external processor
+   * @return StatusOr<bool> Returns Ok(true) if processing should continue, or an error status on
+   * failure
+   */
+  absl::StatusOr<bool>
+  handleStreamedBodyCallback(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+
+  /**
+   * Handles buffered partial body callback state by processing both header and body
+   * mutations for partial body data.
+   *
+   * @param common_response The common response from the external processor
+   * @return StatusOr<bool> Returns Ok(true) if processing should continue, or an error status on
+   * failure
+   */
+  absl::StatusOr<bool> handleBufferedPartialBodyCallback(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+
+  /**
+   * Processes header mutations if headers are available in the current state.
+   *
+   * @param common_response The common response containing potential header mutations
+   * @return Status Returns Ok if header mutations were processed successfully or not needed,
+   *         or an error status on failure
+   */
+  absl::Status processHeaderMutationIfAvailable(
+      const envoy::service::ext_proc::v3::CommonResponse& common_response);
+
+  /**
+   * Validates content length against body mutation size. Content-length header is only
+   * allowed in BUFFERED mode when body mutation by external processor is enabled.
+   * The mutation will be rejected if the content length doesn't match the mutated body length.
+   *
+   * @param common_response The common response containing body mutations to validate
+   * @return Status Returns Ok if validation passes or is not needed, or an error status if
+   *         the content length doesn't match the mutated body length
+   */
+  absl::Status
+  validateContentLength(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+
+  /**
+   * Applies body mutations to buffered data.
+   *
+   * @param common_response The common response containing body mutations to apply
+   */
+  void
+  applyBufferedBodyMutation(const envoy::service::ext_proc::v3::CommonResponse& common_response);
+
+  /**
+   * Finalizes body response processing by handling trailers and continuation.
+   *
+   * @param should_continue Indicates if processing should continue after finalization
+   */
+  void finalizeBodyResponse(bool should_continue);
 };
 
 class DecodingProcessorState : public ProcessorState {
