@@ -92,8 +92,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     return;
   }
 
-  cert_validator_ = cert_validator_factory->createCertValidator(
+  auto validator_or_error = cert_validator_factory->createCertValidator(
       config.certificateValidationContext(), stats_, factory_context_);
+  SET_AND_RETURN_IF_NOT_OK(validator_or_error.status(), creation_status);
+  cert_validator_ = std::move(*validator_or_error);
 
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));

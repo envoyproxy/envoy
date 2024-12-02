@@ -15,9 +15,19 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+absl::StatusOr<std::unique_ptr<PlatformBridgeCertValidator>>
+PlatformBridgeCertValidator::create(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                                    SslStats& stats) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<PlatformBridgeCertValidator>(new PlatformBridgeCertValidator(
+      config, stats, Thread::PosixThreadFactory::create(), creation_status));
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return ret;
+}
+
 PlatformBridgeCertValidator::PlatformBridgeCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    Thread::PosixThreadFactoryPtr thread_factory)
+    Thread::PosixThreadFactoryPtr thread_factory, absl::Status& creation_status)
     : allow_untrusted_certificate_(config != nullptr &&
                                    config->trustChainVerification() ==
                                        envoy::extensions::transport_sockets::tls::v3::
@@ -28,18 +38,15 @@ PlatformBridgeCertValidator::PlatformBridgeCertValidator(
             "Invalid certificate validation context config.");
   if (config != nullptr && config->customValidatorConfig().has_value()) {
     envoy_mobile::extensions::cert_validator::platform_bridge::PlatformBridgeCertValidator cfg;
-    THROW_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
-        config->customValidatorConfig().value().typed_config(),
-        ProtobufMessage::getStrictValidationVisitor(), cfg));
+    SET_AND_RETURN_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
+                                 config->customValidatorConfig().value().typed_config(),
+                                 ProtobufMessage::getStrictValidationVisitor(), cfg),
+                             creation_status);
     if (cfg.has_thread_priority()) {
       thread_priority_ = cfg.thread_priority().value();
     }
   }
 }
-
-PlatformBridgeCertValidator::PlatformBridgeCertValidator(
-    const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats)
-    : PlatformBridgeCertValidator(config, stats, Thread::PosixThreadFactory::create()) {}
 
 PlatformBridgeCertValidator::~PlatformBridgeCertValidator() {
   // Wait for validation threads to finish.

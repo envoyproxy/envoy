@@ -585,7 +585,7 @@ absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const
 
 class DefaultCertValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr
+  absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       Server::Configuration::CommonFactoryContext& context) override {
     return std::make_unique<DefaultCertValidator>(config, stats, context);

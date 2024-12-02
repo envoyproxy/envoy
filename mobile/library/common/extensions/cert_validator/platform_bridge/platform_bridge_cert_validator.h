@@ -19,8 +19,8 @@ namespace Tls {
 // validation.
 class PlatformBridgeCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
-  PlatformBridgeCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                              SslStats& stats);
+  static absl::StatusOr<std::unique_ptr<PlatformBridgeCertValidator>>
+  create(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats);
 
   ~PlatformBridgeCertValidator() override;
 
@@ -58,6 +58,10 @@ public:
   }
 
 protected:
+  PlatformBridgeCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
+                              SslStats& stats, Thread::PosixThreadFactoryPtr thread_factory,
+                              absl::Status& creation_status);
+
   enum class ValidationFailureType {
     Success,
     FailVerifyError,
@@ -82,11 +86,10 @@ protected:
                                          Event::Dispatcher* dispatcher,
                                          PlatformBridgeCertValidator* parent);
 
+  Thread::PosixThreadFactoryPtr& threadFactory() { return thread_factory_; }
+
 private:
   GTEST_FRIEND_CLASS(PlatformBridgeCertValidatorTest, ThreadCreationFailed);
-
-  PlatformBridgeCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                              SslStats& stats, Thread::PosixThreadFactoryPtr thread_factory);
 
   // Called when a pending verification completes. Must be invoked on the main thread.
   void onVerificationComplete(const Thread::ThreadId& thread_id, const std::string& hostname,
