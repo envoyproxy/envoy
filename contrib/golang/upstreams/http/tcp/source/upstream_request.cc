@@ -140,15 +140,15 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
 
   ProcessorState* state = encoding_state_;
   state->headers = &headers;
-  Buffer::OwnedImpl buf;
-  Buffer::Instance& buffer = state->doDataList.push(buf);
+  Buffer::OwnedImpl buffer;
   auto s = dynamic_cast<processState*>(state);
   state->setFilterState(FilterState::ProcessingHeader);
-  ENVOY_LOG(debug, "tcp upstream encodeHeaders, state: {}", state->stateStr());
+
   GoUint64 go_status = dynamic_lib_->envoyGoEncodeHeader(
     s, end_stream ? 1 : 0, headers.size(), headers.byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
   state->handleHeaderGolangStatus(static_cast<TcpUpstreamStatus>(go_status));
+  ENVOY_LOG(debug, "tcp upstream encodeHeaders, state: {}", state->stateStr());
 
   bool send_data_to_upstream = (state->filterState() == FilterState::Done);
 
@@ -156,8 +156,7 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
 
   if (send_data_to_upstream) {
     // when go side decide to send data to upstream in encodeHeaders, here will directly send and encodeData will not send.
-    state->doDataList.moveOut(buf);
-    upstream_conn_data_->connection().write(buf, upstream_conn_self_half_close_);
+    upstream_conn_data_->connection().write(buffer, upstream_conn_self_half_close_);
   }
 
   return Envoy::Http::okStatus();
@@ -223,14 +222,10 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
   DecodingProcessorState* state = decoding_state_;
   state->resp_headers = static_cast<Envoy::Http::RequestOrResponseHeaderMap*>(resp_headers_.get());
-  Buffer::Instance& buffer = state->doDataList.push(data);
   auto s = dynamic_cast<processState*>(state);
-  state->setFilterState(FilterState::ProcessingData);
 
   GoUint64 go_status = dynamic_lib_->envoyGoOnUpstreamData(
-    s, end_stream ? 1 : 0, (*resp_headers_).size(), (*resp_headers_).byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
-  state->doDataList.moveOut(data);
-  state->setFilterState(FilterState::Done);
+    s, end_stream ? 1 : 0, (*resp_headers_).size(), (*resp_headers_).byteSize(), reinterpret_cast<uint64_t>(&data), data.length());
 
   switch (static_cast<TcpUpstreamStatus>(go_status)) {
   case TcpUpstreamStatus::TcpUpstreamContinue:
@@ -400,7 +395,7 @@ CAPIStatus TcpUpstream::setRespHeader(ProcessorState& state, absl::string_view k
 }
 
 CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data) {
-  if (!state.doDataList.checkExisting(buffer)) {
+  if (state.filterState() == FilterState::ProcessingData && !state.doDataList.checkExisting(buffer)) {
     ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
@@ -414,7 +409,7 @@ CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buff
 }
 
 CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length) {
-  if (!state.doDataList.checkExisting(buffer)) {
+  if (state.filterState() == FilterState::ProcessingData && !state.doDataList.checkExisting(buffer)) {
     ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
@@ -424,8 +419,9 @@ CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buf
 }
 
 CAPIStatus TcpUpstream::setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
-                                   absl::string_view& value, bufferAction action) {                                   
-  if (!state.doDataList.checkExisting(buffer)) {
+                                   absl::string_view& value, bufferAction action) {                 
+
+  if (state.filterState() == FilterState::ProcessingData && !state.doDataList.checkExisting(buffer)) {
     ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }

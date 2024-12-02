@@ -59,6 +59,9 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, buffer
 	if endOfStream || (dubboMethod == "" || dubboInterface == "") {
 		// get mock dubbo frame
 		buf := transformToDubboFrame("", "", map[string]string{"name": "mock"})
+		// for test buffer API
+		bufferForUpstreamData.String()
+		bufferForUpstreamData.Reset()
 		// directly send data to upstream without EncodeData
 		bufferForUpstreamData.Set(buf.Bytes())
 		headerMap.Range(func(key, value string) bool {
