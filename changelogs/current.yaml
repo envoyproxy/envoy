@@ -123,6 +123,9 @@ bug_fixes:
 - area: tracers
   change: |
     Avoid possible overflow when setting span attributes in Dynatrace sampler.
+- area: ecds
+  change: |
+    Fixing a singleton early destroy when using ECDS in an upstream filter.
 - area: load_balancing
   change: |
     Fixed default host weight calculation of :ref:`client_side_weighted_round_robin
