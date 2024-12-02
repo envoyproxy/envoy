@@ -917,7 +917,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // case EDF creation is skipped. When all original weights are equal and no hosts are in slow
     // start mode we can rely on unweighted host pick to do optimal round robin and least-loaded
     // host selection with lower memory and CPU overhead.
-    if (!alwaysUseEdfScheduler() && hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
+    if (hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
       // Skip edf creation.
       return;
     }
@@ -962,8 +962,6 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
         host_set->degradedHostsPerLocality().get()[locality_index]);
   }
 }
-
-bool EdfLoadBalancerBase::alwaysUseEdfScheduler() const { return false; }
 
 bool EdfLoadBalancerBase::isSlowStartEnabled() const {
   return slow_start_window_ > std::chrono::milliseconds(0);

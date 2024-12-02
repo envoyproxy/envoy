@@ -9,12 +9,11 @@
 namespace Envoy {
 namespace Network {
 
-// The interval at which system proxy settings should be polled at.
-CFTimeInterval kProxySettingsRefreshRateSeconds = 10;
-
 AppleSystemProxySettingsMonitor::AppleSystemProxySettingsMonitor(
-    SystemProxySettingsReadCallback proxy_settings_read_callback)
-    : proxy_settings_read_callback_(proxy_settings_read_callback) {}
+    SystemProxySettingsReadCallback proxy_settings_read_callback,
+    CFTimeInterval proxy_settings_refresh_interval)
+    : proxy_settings_read_callback_(proxy_settings_read_callback),
+      proxy_settings_refresh_interval_(proxy_settings_refresh_interval) {}
 
 void AppleSystemProxySettingsMonitor::start() {
   if (started_) {
@@ -36,7 +35,7 @@ void AppleSystemProxySettingsMonitor::start() {
 
   source_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue_);
   dispatch_source_set_timer(source_, dispatch_time(DISPATCH_TIME_NOW, 0),
-                            kProxySettingsRefreshRateSeconds * NSEC_PER_SEC, 0);
+                            proxy_settings_refresh_interval_ * NSEC_PER_SEC, 0);
   dispatch_source_set_event_handler(source_, ^{
     const auto new_proxy_settings = readSystemProxySettings();
     if (new_proxy_settings != proxy_settings) {

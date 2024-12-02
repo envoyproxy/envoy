@@ -5,7 +5,14 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      gcs-cache-key:
+        required: true
+
     inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -20,6 +27,8 @@ concurrency:
 
 jobs:
   san:
+    secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
       contents: read
       packages: read
@@ -34,6 +43,7 @@ jobs:
         ERROR
         error:
         Error:
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe }}
       target: ${{ matrix.target }}
       timeout-minutes: 180

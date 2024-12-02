@@ -11,6 +11,7 @@ on:
       dockerhub-username:
       dockerhub-password:
       gcp-key:
+      gcs-cache-key:
       gpg-key:
       gpg-key-password:
       rbe-key:
@@ -69,7 +70,7 @@ on:
           Error:
       fail-match:
         type: string
-      gcs-only:
+      gcs-cache-bucket:
         type: string
       import-gpg:
         type: boolean
@@ -85,6 +86,9 @@ on:
       rbe:
         type: boolean
         default: true
+      rbe-google:
+        type: boolean
+        default: false
       repo-fetch-depth:
         type: number
         default: 1
@@ -92,16 +96,48 @@ on:
         type: string
         default: |
           - run: |
-              # disk space at beginning of build
+              # Pre build report
               df -h > "${TMP_REPORT}/df-pre"
+              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" ]]; then
+                  exit 0
+              fi
+              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" -maxdepth 1 -type d \
+                  | rev \
+                  | cut -d/ -f1 \
+                  | rev \
+                  > "${TMP_REPORT}/shas-pre"
+              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" ]]; then
+                  exit 0
+              fi
+              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" -maxdepth 1 -type d \
+                  | rev \
+                  | cut -d/ -f1 \
+                  | rev \
+                  >> "${TMP_REPORT}/shas-pre"
             shell: bash
       report-post:
         type: string
         default: |
           - run: |
-              # disk space at end of build
+              # Post build report
               df -h > "${TMP_REPORT}/df-post"
               (du -ch "%{{ inputs.temp-dir || runner.temp }}" | grep -E "[0-9]{2,}M|[0-9]G" || :) > "${TMP_REPORT}/du-post"
+              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" ]]; then
+                  exit 0
+              fi
+              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha256/" -maxdepth 1 -type d \
+                  | rev \
+                  | cut -d/ -f1 \
+                  | rev \
+                  > "${TMP_REPORT}/shas-post"
+              if [[ ! -e "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" ]]; then
+                  exit 0
+              fi
+              find "${ENVOY_DOCKER_BUILD_DIR}/repository_cache/content_addressable/sha384/" -maxdepth 1 -type d \
+                  | rev \
+                  | cut -d/ -f1 \
+                  | rev \
+                  >> "${TMP_REPORT}/shas-post"
             shell: bash
       request:
         type: string
@@ -117,7 +153,7 @@ on:
       summary-post:
         type: string
         default: |
-          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.3.1
+          - uses: envoyproxy/toolshed/gh-actions/envoy/run/summary@actions-v0.3.12
             with:
               context: %{{ inputs.context }}
       steps-pre:
@@ -179,7 +215,7 @@ jobs:
     name: ${{ inputs.target-suffix && format('[{0}] ', inputs.target-suffix) || '' }}${{ inputs.command }} ${{ inputs.target }}
     timeout-minutes: ${{ inputs.timeout-minutes }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.12
       id: started
       name: Create timestamp
       with:
@@ -187,7 +223,7 @@ jobs:
         filter: |
           now
     # This controls which input vars are exposed to the run action (and related steps)
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.12
       name: Context
       id: context
       with:
@@ -206,14 +242,41 @@ jobs:
              "runs-on": $runsOn,
              "job-started": ${{ steps.started.outputs.value }}}
           | . * {$config, $check}
+
+
+    - run: |
+        sudo mkdir -p /etc/docker
+        echo '{
+          "ipv6": true,
+          "fixed-cidr-v6": "2001:db8:1::/64"
+          }' | sudo tee /etc/docker/daemon.json
+        sudo service docker restart
+      name: Configure Docker ipv6
+      if: ${{ inputs.docker-ipv6 }}
+
+    # Caches
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.12
+      name: Setup GCP (cache)
+      if: ${{ inputs.gcs-cache-bucket }}
+      with:
+        key: ${{ secrets.gcs-cache-key }}
+    - uses: envoyproxy/toolshed/gh-actions/cache/restore@actions-v0.3.12
+      if: ${{ inputs.gcs-cache-bucket }}
+      name: >-
+        Restore Bazel cache
+        (${{ fromJSON(inputs.request).config.ci.cache.bazel }})
+      with:
+        gcs-bucket: ${{ inputs.gcs-cache-bucket }}
+        key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch || 'x64' }}
+        path: ${{ runner.temp }}/bazel_root
     - if: ${{ inputs.cache-build-image }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
-      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.1
+      uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.12
       with:
         image-tag: ${{ inputs.cache-build-image }}
         key-suffix: ${{ inputs.cache-build-image-key-suffix }}
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.12
       id: appauth
       name: Appauth
       if: ${{ inputs.trusted }}
@@ -224,7 +287,7 @@ jobs:
         # - the workaround is to allow the token to be passed through.
         token: ${{ github.token }}
         token-ok: true
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.12
       id: checkout
       name: Checkout Envoy repository
       with:
@@ -241,7 +304,7 @@ jobs:
         token: ${{ inputs.trusted && steps.appauth.outputs.token || github.token }}
 
     # This is currently only use by mobile-docs and can be removed once they are updated to the newer website
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.12
       id: checkout-extra
       name: Checkout extra repository (for publishing)
       if: ${{ inputs.checkout-extra }}
@@ -250,7 +313,7 @@ jobs:
         ssh-key: ${{ inputs.trusted && inputs.ssh-key-extra || '' }}
 
     - name: Import GPG key
-      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.3.1
+      uses: envoyproxy/toolshed/gh-actions/gpg/import@actions-v0.3.12
       if: ${{ inputs.import-gpg }}
       with:
         key: ${{ secrets.gpg-key }}
@@ -259,38 +322,29 @@ jobs:
         configured-passphrase-path: /build/gpg-passphrase
 
     - run: |
-        sudo mkdir -p /etc/docker
-        echo '{
-          "ipv6": true,
-          "fixed-cidr-v6": "2001:db8:1::/64"
-          }' | sudo tee /etc/docker/daemon.json
-        sudo service docker restart
-      if: ${{ inputs.docker-ipv6 }}
-
-    - run: |
         echo "e3b4a6e9570da15ac1caffdded17a8bebdc7dfc9" > .BAZEL_FAKE_SCM_REVISION
+      name: Configure PR Bazel settings
       if: >-
-        ${{ fromJSON(inputs.request).request.pr == '' }}
-
+        ${{ fromJSON(inputs.request).request.pr != '' }}
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.12
+      name: Setup GCP (artefacts/rbe)
+      id: gcp
+      with:
+        key: ${{ secrets.gcp-key }}
+        key-copy: ${{ inputs.rbe-google && runner.temp || '' }}
     - run: |
-        if [[ "${{ secrets.gcp-key }}" == "" ]]; then
-            exit 0
-        fi
-        GCP_SERVICE_ACCOUNT_KEY_PATH=$(mktemp -p "${{ runner.temp }}" -t gcp_service_account.XXXXXX.json)
-        echo "${{ secrets.gcp-key }}" | base64 --decode > "${GCP_SERVICE_ACCOUNT_KEY_PATH}"
-        GCP_SERVICE_ACCOUNT_KEY_FILE="$(basename "${GCP_SERVICE_ACCOUNT_KEY_PATH}")"
+        GCP_SERVICE_ACCOUNT_KEY_FILE="$(basename "${{ steps.gcp.outputs.key-copy-path }}")"
         echo "GCP_SERVICE_ACCOUNT_KEY_PATH=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE}" >> "$GITHUB_ENV"
-        if [[ "${{ inputs.gcs-only }}" != "" ]]; then
-            exit 0
-        fi
         BAZEL_BUILD_EXTRA_OPTIONS="--google_credentials=/build/${GCP_SERVICE_ACCOUNT_KEY_FILE} --config=rbe-google"
         echo "BAZEL_BUILD_EXTRA_OPTIONS=${BAZEL_BUILD_EXTRA_OPTIONS}" >> "$GITHUB_ENV"
-
+      if: ${{ steps.gcp.outputs.key-copy-path }}
+      name: Setup Google RBE
     - run: |
         echo "${{ vars.ENVOY_CI_BAZELRC }}" > repo.bazelrc
       if: ${{ vars.ENVOY_CI_BAZELRC }}
+      name: Configure repo Bazel settings
 
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.1
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.12
       name: Run CI ${{ inputs.command }} ${{ inputs.target }}
       with:
         args: ${{ inputs.args != '--' && inputs.args || inputs.target }}

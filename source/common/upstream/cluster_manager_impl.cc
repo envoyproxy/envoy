@@ -345,8 +345,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
-      outlier_event_logger_ = std::make_shared<Outlier::EventLoggerImpl>(
-          log_manager, event_log_file_path, time_source_);
+      outlier_event_logger_ = THROW_OR_RETURN_VALUE(
+          Outlier::EventLoggerImpl::create(log_manager, event_log_file_path, time_source_),
+          std::unique_ptr<Outlier::EventLoggerImpl>);
     }
   }
 
@@ -1678,14 +1679,15 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
 }
 
 OdCdsApiHandlePtr
-ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
+                                     const envoy::config::core::v3::ConfigSource& odcds_config,
                                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a
   // way to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds = OdCdsApiImpl::create(odcds_config, odcds_resources_locator, *this, *this,
-                                    *stats_.rootScope(), validation_visitor);
+  auto odcds = creation_function(odcds_config, odcds_resources_locator, *this, *this,
+                                 *stats_.rootScope(), validation_visitor);
   return OdCdsApiHandleImpl::create(*this, std::move(odcds));
 }
 

@@ -93,8 +93,7 @@ TEST_F(ExtProcStreamTest, OpenCloseStream) {
   auto options = Http::AsyncClient::StreamOptions().setParentContext(parent_context);
   auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
   EXPECT_CALL(stream_, closeStream());
-  EXPECT_CALL(stream_, resetStream());
-  stream->close();
+  stream->closeLocalStream();
 }
 
 TEST_F(ExtProcStreamTest, SendToStream) {
@@ -107,8 +106,8 @@ TEST_F(ExtProcStreamTest, SendToStream) {
   ProcessingRequest req;
   stream->send(std::move(req), false);
   EXPECT_CALL(stream_, closeStream());
-  EXPECT_CALL(stream_, resetStream());
-  stream->close();
+
+  stream->closeLocalStream();
 }
 
 TEST_F(ExtProcStreamTest, SendAndClose) {
@@ -150,8 +149,7 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
   stream_callbacks_->onReceiveTrailingMetadata(std::move(empty_response_trailers));
 
   EXPECT_CALL(stream_, closeStream());
-  EXPECT_CALL(stream_, resetStream());
-  stream->close();
+  stream->closeLocalStream();
 }
 
 TEST_F(ExtProcStreamTest, StreamClosed) {
@@ -161,13 +159,15 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
   auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
+  EXPECT_FALSE(stream->remoteClosed());
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 0);
   stream_callbacks_->onRemoteClose(0, "");
   EXPECT_FALSE(last_response_);
   EXPECT_TRUE(grpc_closed_);
+  EXPECT_TRUE(stream->remoteClosed());
   EXPECT_EQ(grpc_status_, 0);
-  stream->close();
+  stream->closeLocalStream();
 }
 
 TEST_F(ExtProcStreamTest, StreamError) {
@@ -183,7 +183,8 @@ TEST_F(ExtProcStreamTest, StreamError) {
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
   EXPECT_EQ(grpc_status_, 123);
-  stream->close();
+  stream->closeLocalStream();
+  EXPECT_TRUE(stream->localClosed());
 }
 
 } // namespace
