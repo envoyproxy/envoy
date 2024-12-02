@@ -7,7 +7,6 @@
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/upstream/default_local_address_selector_factory.h"
-#include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
@@ -160,10 +159,6 @@ void ExtensionRegistry::registerFactories() {
   // This is Envoy's lightweight listener manager which lets E-M avoid the 1M
   // hit of compiling in downstream code.
   Server::forceRegisterApiListenerManagerFactoryImpl();
-
-  // This is required code for certain watchdog config, required until Envoy
-  // Mobile compiles out watchdog support.
-  Watchdog::forceRegisterAbortActionFactory();
 
   // This is required for the default upstream local address selector.
   Upstream::forceRegisterDefaultUpstreamLocalAddressSelectorFactory();

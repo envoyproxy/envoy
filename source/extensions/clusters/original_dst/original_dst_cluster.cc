@@ -73,11 +73,13 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
             Network::Utility::copyInternetAddressAndPort(*dst_ip));
         // Create a host we can use immediately.
         auto info = parent_->cluster_->info();
-        HostSharedPtr host(std::make_shared<HostImpl>(
-            info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, nullptr, 1,
-            envoy::config::core::v3::Locality().default_instance(),
-            envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
-            envoy::config::core::v3::UNKNOWN, parent_->cluster_->time_source_));
+        HostSharedPtr host(std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
+            HostImpl::create(
+                info, info->name() + dst_addr.asString(), std::move(host_ip_port), nullptr, nullptr,
+                1, envoy::config::core::v3::Locality().default_instance(),
+                envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(), 0,
+                envoy::config::core::v3::UNKNOWN, parent_->cluster_->time_source_),
+            std::unique_ptr<HostImpl>)));
         ENVOY_LOG(debug, "Created host {} {}.", *host, host->address()->asString());
 
         // Tell the cluster about the new host
@@ -103,7 +105,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
 Network::Address::InstanceConstSharedPtr
 OriginalDstCluster::LoadBalancer::filterStateOverrideHost(LoadBalancerContext* context) {
   const auto streamInfos = {
-      context->requestStreamInfo(),
+      const_cast<const StreamInfo::StreamInfo*>(context->requestStreamInfo()),
       context->downstreamConnection() ? &context->downstreamConnection()->streamInfo() : nullptr};
   for (const auto streamInfo : streamInfos) {
     if (streamInfo == nullptr) {
@@ -152,7 +154,7 @@ OriginalDstCluster::LoadBalancer::metadataOverrideHost(LoadBalancerContext* cont
     return nullptr;
   }
   const auto streamInfos = {
-      context->requestStreamInfo(),
+      const_cast<const StreamInfo::StreamInfo*>(context->requestStreamInfo()),
       context->downstreamConnection() ? &context->downstreamConnection()->streamInfo() : nullptr};
   const ProtobufWkt::Value* value = nullptr;
   for (const auto streamInfo : streamInfos) {

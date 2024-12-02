@@ -264,7 +264,7 @@ Envoy supports using a :ref:`generic match tree <arch_overview_matching_api>` to
 specify the route table.
 
 This is a more expressive matching engine than the original one, allowing
-for sublinear matching on arbitrary headers (unlike the original matching engine which could only
+for :ref:`sublinear matching <arch_overview_sublinear_routing>`  on arbitrary headers (unlike the original matching engine which could only
 do this for ``:authority`` in some cases).
 
 To use the generic matching tree, specify a matcher on a virtual host with a :ref:`Route <envoy_v3_api_msg_config.route.v3.Route>`

@@ -100,13 +100,6 @@ Http::RequestHeaderMapPtr buildRequestHeaderMapFromPairs(const Pairs& pairs) {
 
 template <typename P> static uint32_t headerSize(const P& p) { return p ? p->size() : 0; }
 
-Upstream::HostDescriptionConstSharedPtr getHost(const StreamInfo::StreamInfo* info) {
-  if (info && info->upstreamInfo() && info->upstreamInfo().value().get().upstreamHost()) {
-    return info->upstreamInfo().value().get().upstreamHost();
-  }
-  return nullptr;
-}
-
 } // namespace
 
 // Test support.
@@ -160,12 +153,23 @@ WasmResult Buffer::copyFrom(size_t start, size_t length, std::string_view data) 
 }
 
 Context::Context() = default;
-Context::Context(Wasm* wasm) : ContextBase(wasm) {}
+Context::Context(Wasm* wasm) : ContextBase(wasm) {
+  if (wasm != nullptr) {
+    abi_version_ = wasm->abi_version_;
+  }
+}
 Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, plugin) {
+  if (wasm != nullptr) {
+    abi_version_ = wasm->abi_version_;
+  }
   root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
-    : ContextBase(wasm, root_context_id, plugin_handle), plugin_handle_(plugin_handle) {}
+    : ContextBase(wasm, root_context_id, plugin_handle), plugin_handle_(plugin_handle) {
+  if (wasm != nullptr) {
+    abi_version_ = wasm->abi_version_;
+  }
+}
 
 Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
 Plugin* Context::plugin() const { return static_cast<Plugin*>(plugin_.get()); }
@@ -435,10 +439,7 @@ WasmResult serializeValue(Filters::Common::Expr::CelValue value, std::string* re
   return WasmResult::SerializationFailure;
 }
 
-#define PROPERTY_TOKENS(_f)                                                                        \
-  _f(NODE) _f(LISTENER_DIRECTION) _f(LISTENER_METADATA) _f(CLUSTER_NAME) _f(CLUSTER_METADATA)      \
-      _f(ROUTE_NAME) _f(ROUTE_METADATA) _f(PLUGIN_NAME) _f(UPSTREAM_HOST_METADATA)                 \
-          _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)
+#define PROPERTY_TOKENS(_f) _f(PLUGIN_NAME) _f(PLUGIN_ROOT_ID) _f(PLUGIN_VM_ID) _f(CONNECTION_ID)
 
 static inline std::string downCase(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
@@ -513,57 +514,6 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   }
-  case PropertyToken::NODE:
-    if (root_local_info_) {
-      return CelProtoWrapper::CreateMessage(&root_local_info_->node(), arena);
-    } else if (plugin_) {
-      return CelProtoWrapper::CreateMessage(&plugin()->localInfo().node(), arena);
-    }
-    break;
-  case PropertyToken::LISTENER_DIRECTION:
-    if (plugin_) {
-      return CelValue::CreateInt64(plugin()->direction());
-    }
-    break;
-  case PropertyToken::LISTENER_METADATA:
-    if (plugin_) {
-      return CelProtoWrapper::CreateMessage(plugin()->listenerMetadata(), arena);
-    }
-    break;
-  case PropertyToken::CLUSTER_NAME:
-    if (getHost(info)) {
-      return CelValue::CreateString(&getHost(info)->cluster().name());
-    } else if (info && info->route() && info->route()->routeEntry()) {
-      return CelValue::CreateString(&info->route()->routeEntry()->clusterName());
-    } else if (info && info->upstreamClusterInfo().has_value() &&
-               info->upstreamClusterInfo().value()) {
-      return CelValue::CreateString(&info->upstreamClusterInfo().value()->name());
-    }
-    break;
-  case PropertyToken::CLUSTER_METADATA:
-    if (getHost(info)) {
-      return CelProtoWrapper::CreateMessage(&getHost(info)->cluster().metadata(), arena);
-    } else if (info && info->upstreamClusterInfo().has_value() &&
-               info->upstreamClusterInfo().value()) {
-      return CelProtoWrapper::CreateMessage(&info->upstreamClusterInfo().value()->metadata(),
-                                            arena);
-    }
-    break;
-  case PropertyToken::UPSTREAM_HOST_METADATA:
-    if (getHost(info)) {
-      return CelProtoWrapper::CreateMessage(getHost(info)->metadata().get(), arena);
-    }
-    break;
-  case PropertyToken::ROUTE_NAME:
-    if (info) {
-      return CelValue::CreateString(&info->getRouteName());
-    }
-    break;
-  case PropertyToken::ROUTE_METADATA:
-    if (info && info->route()) {
-      return CelProtoWrapper::CreateMessage(&info->route()->metadata(), arena);
-    }
-    break;
   case PropertyToken::PLUGIN_NAME:
     if (plugin_) {
       return CelValue::CreateStringView(plugin()->name_);
@@ -732,9 +682,7 @@ WasmResult Context::addHeaderMapValue(WasmHeaderMapType type, std::string_view k
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->addCopy(lower_key, std::string(value));
-  if (type == WasmHeaderMapType::RequestHeaders) {
-    clearRouteCache();
-  }
+  onHeadersModified(type);
   return WasmResult::Ok;
 }
 
@@ -807,9 +755,7 @@ WasmResult Context::setHeaderMapPairs(WasmHeaderMapType type, const Pairs& pairs
     const Http::LowerCaseString lower_key{std::string(p.first)};
     map->addCopy(lower_key, std::string(p.second));
   }
-  if (type == WasmHeaderMapType::RequestHeaders) {
-    clearRouteCache();
-  }
+  onHeadersModified(type);
   return WasmResult::Ok;
 }
 
@@ -820,9 +766,7 @@ WasmResult Context::removeHeaderMapValue(WasmHeaderMapType type, std::string_vie
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->remove(lower_key);
-  if (type == WasmHeaderMapType::RequestHeaders) {
-    clearRouteCache();
-  }
+  onHeadersModified(type);
   return WasmResult::Ok;
 }
 
@@ -834,9 +778,7 @@ WasmResult Context::replaceHeaderMapValue(WasmHeaderMapType type, std::string_vi
   }
   const Http::LowerCaseString lower_key{std::string(key)};
   map->setCopy(lower_key, toAbslStringView(value));
-  if (type == WasmHeaderMapType::RequestHeaders) {
-    clearRouteCache();
-  }
+  onHeadersModified(type);
   return WasmResult::Ok;
 }
 
@@ -1656,12 +1598,6 @@ void Context::failStream(WasmStreamType stream_type) {
 WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view body_text,
                                       Pairs additional_headers, uint32_t grpc_status,
                                       std::string_view details) {
-  // This flag is used to avoid calling sendLocalReply() twice, even if wasm code has this
-  // logic. We can't reuse "local_reply_sent_" here because it can't avoid calling nested
-  // sendLocalReply() during encodeHeaders().
-  if (local_reply_hold_) {
-    return WasmResult::BadArgument;
-  }
   // "additional_headers" is a collection of string_views. These will no longer
   // be valid when "modify_headers" is finally called below, so we must
   // make copies of all the headers.
@@ -1686,11 +1622,6 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
                                   modify_headers = std::move(modify_headers), grpc_status,
                                   details = StringUtil::replaceAllEmptySpace(
                                       absl::string_view(details.data(), details.size()))] {
-      // When the wasm vm fails, failStream() is called if the plugin is fail-closed, we need
-      // this flag to avoid calling sendLocalReply() twice.
-      if (local_reply_sent_) {
-        return;
-      }
       // C++, Rust and other SDKs use -1 (InvalidCode) as the default value if gRPC code is not set,
       // which should be mapped to nullopt in Envoy to prevent it from sending a grpc-status trailer
       // at all.
@@ -1701,10 +1632,8 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
       }
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
                                          modify_headers, grpc_status_code, details);
-      local_reply_sent_ = true;
     });
   }
-  local_reply_hold_ = true;
   return WasmResult::Ok;
 }
 

@@ -2306,6 +2306,8 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():serialNumberPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():issuerPeerCertificate())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():subjectPeerCertificate())
+        request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():parsedSubjectPeerCertificate():commonName())
+        request_handle:logTrace(table.concat(request_handle:streamInfo():downstreamSslConnection():parsedSubjectPeerCertificate():organizationName(), ","))
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():ciphersuiteString())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():tlsVersion())
         request_handle:logTrace(request_handle:streamInfo():downstreamSslConnection():urlEncodedPemEncodedPeerCertificate())
@@ -2389,6 +2391,16 @@ TEST_F(LuaHttpFilterTest, InspectStreamInfoDowstreamSslConnection) {
   const std::string peer_cert_subject = "peer-cert-subject";
   EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillOnce(ReturnRef(peer_cert_subject));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq(peer_cert_subject)));
+
+  Ssl::ParsedX509Name parsed_subject;
+  parsed_subject.commonName_ = "Test CN";
+  parsed_subject.organizationName_.push_back("Test O1");
+  parsed_subject.organizationName_.push_back("Test O2");
+  Ssl::ParsedX509NameOptConstRef const_parsed_subject(parsed_subject);
+  EXPECT_CALL(*connection_info, parsedSubjectPeerCertificate())
+      .WillRepeatedly(Return(const_parsed_subject));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Test CN")));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("Test O1,Test O2")));
 
   const std::string cipher_suite = "cipher-suite";
   EXPECT_CALL(*connection_info, ciphersuiteString()).WillOnce(Return(cipher_suite));
@@ -3019,6 +3031,144 @@ TEST_F(LuaHttpFilterTest, StatsWithPerFilterPrefix) {
                         StrEq("[string \"...\"]:7: attempt to index global 'bye' (a nil value)")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(2, stats_store_.counter("test.lua.my_script.errors").value());
+}
+
+// Test successful upstream host override
+TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHost) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:setUpstreamOverrideHost("192.168.21.11", false)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_,
+              setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), false)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Test upstream host override with strict flag set to true
+TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostStrict) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:setUpstreamOverrideHost("192.168.21.11", true)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_,
+              setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), true)));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Test that setUpstreamOverrideHost requires a host argument
+TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostNoArgument) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:setUpstreamOverrideHost()
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::err,
+                        StrEq("[string \"...\"]:3: bad argument #1 to 'setUpstreamOverrideHost' "
+                              "(string expected, got no value)")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test that setUpstreamOverrideHost validates the argument type for strict flag
+TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostInvalidStrictType) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:setUpstreamOverrideHost("192.168.21.11", "not_a_boolean")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_,
+              scriptLog(spdlog::level::err,
+                        StrEq("[string \"...\"]:3: bad argument #2 to 'setUpstreamOverrideHost' "
+                              "(boolean expected, got string)")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test that setUpstreamOverrideHost can be called on different paths
+TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostDifferentPaths) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:setUpstreamOverrideHost("192.168.21.11", true)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/path1"}};
+    EXPECT_CALL(decoder_callbacks_,
+                setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), true)));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  }
+
+  setupFilter();
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers{{":path", "/path2"}};
+    EXPECT_CALL(decoder_callbacks_,
+                setUpstreamOverrideHost(testing::Pair(testing::Eq("192.168.21.11"), true)));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  }
+}
+
+// Test empty host argument
+TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostEmptyHost) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:setUpstreamOverrideHost("", false)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
+                                  StrEq("[string \"...\"]:3: host is not a valid IP address")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test that setUpstreamOverrideHost rejects non-IP hosts
+TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostNonIpHost) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:setUpstreamOverrideHost("example.com", false)
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::err,
+                                  StrEq("[string \"...\"]:3: host is not a valid IP address")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
 }
 
 } // namespace

@@ -77,11 +77,12 @@ private:
   ConfigTraitsImpl<RouteConfiguration, ConfigImpl, NullConfigImpl> config_traits_;
   ProtoTraitsImpl<RouteConfiguration, 1> proto_traits_;
 
-  std::string getRdsName() { return Rds().GetDescriptor()->name(); }
+  std::string getRdsName() { return std::string(Rds().GetDescriptor()->name()); }
 
   std::string getNameFieldName() {
     ASSERT(RouteConfiguration().GetDescriptor()->FindFieldByNumber(NameFieldNumber));
-    return RouteConfiguration().GetDescriptor()->FindFieldByNumber(NameFieldNumber)->name();
+    return std::string(
+        RouteConfiguration().GetDescriptor()->FindFieldByNumber(NameFieldNumber)->name());
   }
 };
 

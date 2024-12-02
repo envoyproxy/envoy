@@ -70,7 +70,7 @@ public:
 
 protected:
   ContextConfigImpl(const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
-                    const unsigned default_min_protocol_version,
+                    bool auto_sni_san_match, const unsigned default_min_protocol_version,
                     const unsigned default_max_protocol_version,
                     const std::string& default_cipher_suites, const std::string& default_curves,
                     Server::Configuration::TransportSocketFactoryContext& factory_context,
@@ -79,6 +79,7 @@ protected:
   const Server::Options& options_;
   Singleton::Manager& singleton_manager_;
   Server::ServerLifecycleNotifier& lifecycle_notifier_;
+  const bool auto_sni_san_match_;
 
 private:
   static unsigned tlsVersionFromProto(
@@ -128,6 +129,8 @@ public:
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
+  bool autoHostServerNameIndication() const override { return auto_host_sni_; }
+  bool autoSniSanMatch() const override { return auto_sni_san_match_; }
   bool allowRenegotiation() const override { return allow_renegotiation_; }
   size_t maxSessionKeys() const override { return max_session_keys_; }
   bool enforceRsaKeyUsage() const override { return enforce_rsa_key_usage_; }
@@ -142,6 +145,7 @@ private:
   static const unsigned DEFAULT_MAX_VERSION;
 
   const std::string server_name_indication_;
+  const bool auto_host_sni_;
   const bool allow_renegotiation_;
   const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;

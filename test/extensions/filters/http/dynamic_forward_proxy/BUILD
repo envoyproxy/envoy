@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//test/mocks/server:factory_context_mocks",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     name = "proxy_filter_test",
     srcs = ["proxy_filter_test.cc"],
     extension_names = ["envoy.filters.http.dynamic_forward_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",

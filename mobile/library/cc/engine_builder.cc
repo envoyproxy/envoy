@@ -10,6 +10,7 @@
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 
 #if defined(__APPLE__)
@@ -227,18 +228,8 @@ EngineBuilder& EngineBuilder::setNumTimeoutsToTriggerPortMigration(int num_timeo
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setForceAlwaysUsev6(bool value) {
-  always_use_v6_ = value;
-  return *this;
-}
-
 EngineBuilder& EngineBuilder::enableInterfaceBinding(bool interface_binding_on) {
   enable_interface_binding_ = interface_binding_on;
-  return *this;
-}
-
-EngineBuilder& EngineBuilder::setUseGroIfAvailable(bool use_gro_if_available) {
-  use_gro_if_available_ = use_gro_if_available;
   return *this;
 }
 
@@ -270,6 +261,12 @@ EngineBuilder& EngineBuilder::setUpstreamTlsSni(std::string sni) {
 EngineBuilder&
 EngineBuilder::setQuicConnectionIdleTimeoutSeconds(int quic_connection_idle_timeout_seconds) {
   quic_connection_idle_timeout_seconds_ = quic_connection_idle_timeout_seconds;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setKeepAliveInitialIntervalMilliseconds(int keepalive_initial_interval_ms) {
+  keepalive_initial_interval_ms_ = keepalive_initial_interval_ms;
   return *this;
 }
 
@@ -338,8 +335,11 @@ EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool val
 }
 
 #if defined(__APPLE__)
-EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
+EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
   respect_system_proxy_settings_ = value;
+  if (refresh_interval_secs > 0) {
+    proxy_settings_refresh_interval_secs_ = refresh_interval_secs;
+  }
   return *this;
 }
 
@@ -759,6 +759,14 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         ->mutable_idle_network_timeout()
         ->set_seconds(quic_connection_idle_timeout_seconds_);
 
+    auto* quic_protocol_options = alpn_options.mutable_auto_config()
+                                      ->mutable_http3_protocol_options()
+                                      ->mutable_quic_protocol_options();
+    if (keepalive_initial_interval_ms_ > 0) {
+      quic_protocol_options->mutable_connection_keepalive()->mutable_initial_interval()->set_nanos(
+          keepalive_initial_interval_ms_ * 1000 * 1000);
+    }
+
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
     (*base_cluster->mutable_typed_extension_protocol_options())
         ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -848,16 +856,13 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  (*reloadable_features.mutable_fields())["always_use_v6"].set_bool_value(always_use_v6_);
-  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(
-      use_gro_if_available_);
+  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(true);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
   for (auto& guard_and_value : restart_runtime_guards_) {
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
@@ -904,7 +909,7 @@ EngineSharedPtr EngineBuilder::build() {
 
 #if defined(__APPLE__)
   if (respect_system_proxy_settings_) {
-    registerAppleProxyResolver();
+    registerAppleProxyResolver(proxy_settings_refresh_interval_secs_);
   }
 #endif
 

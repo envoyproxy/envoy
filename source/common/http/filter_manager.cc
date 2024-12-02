@@ -453,6 +453,8 @@ void ActiveStreamDecoderFilter::sendLocalReply(
   ActiveStreamFilterBase::sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
+void ActiveStreamDecoderFilter::sendGoAwayAndClose() { parent_.sendGoAwayAndClose(); }
+
 void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers) {
   // If Envoy is not configured to proxy 100-Continue responses, swallow the 100 Continue
   // here. This avoids the potential situation where Envoy strips Expect: 100-Continue and sends a
@@ -868,7 +870,7 @@ void FilterManager::decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMa
                      metadata_map);
     if (state_.decoder_filter_chain_aborted_) {
       // If the decoder filter chain has been aborted, then either:
-      // 1. This filter has sent a local reply from decode metadata.
+      // 1. This filter has sent a local reply or GoAway from decode metadata.
       // 2. This filter is the terminal http filter, and an upstream HTTP filter has sent a local
       // reply.
       ASSERT((status == FilterMetadataStatus::StopIterationForLocalReply) ||
@@ -987,8 +989,12 @@ void DownstreamFilterManager::sendLocalReply(
   }
 
   if (!filter_manager_callbacks_.responseHeaders().has_value() &&
-      !filter_manager_callbacks_.informationalHeaders().has_value()) {
-    // If the response has not started at all, send the response through the filter chain.
+      (!filter_manager_callbacks_.informationalHeaders().has_value() ||
+       (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx") &&
+        !(state_.filter_call_state_ & FilterCallState::IsEncodingMask)))) {
+    // If the response has not started at all, or if the only response so far is an informational
+    // 1xx that has already been fully processed, send the response through the filter chain.
 
     if (auto cb = filter_manager_callbacks_.downstreamCallbacks(); cb.has_value()) {
       // The initial route maybe never be set or the cached route maybe cleared by the filters.

@@ -3,14 +3,17 @@
 #include <CFNetwork/CFNetwork.h>
 #include <CoreFoundation/CoreFoundation.h>
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Network {
 
 TestAppleSystemProxySettingsMonitor::TestAppleSystemProxySettingsMonitor(
     const std::string& host, const int port, const bool use_pac_resolver,
     Network::SystemProxySettingsReadCallback proxy_settings_read_callback)
-    : AppleSystemProxySettingsMonitor(std::move(proxy_settings_read_callback)), host_(host),
-      port_(port), use_pac_resolver_(use_pac_resolver) {}
+    : AppleSystemProxySettingsMonitor(std::move(proxy_settings_read_callback),
+                                      /*proxy_settings_refresh_interval=*/10),
+      host_(host), port_(port), use_pac_resolver_(use_pac_resolver) {}
 
 CFDictionaryRef TestAppleSystemProxySettingsMonitor::getSystemProxySettings() const {
   if (use_pac_resolver_) {
@@ -44,13 +47,11 @@ CFDictionaryRef TestAppleSystemProxySettingsMonitor::getSystemProxySettingsWithP
   const void* keys[] = {kCFNetworkProxiesProxyAutoConfigEnable,
                         kCFNetworkProxiesProxyAutoConfigURLString};
 
+  // Interpret the host + port as the location from which to obtain the PAC file.
+  const std::string pac_file_url = absl::StrCat("http://", host_, ":", port_, "/proxy.pac");
   const void* values[] = {
       CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &one_),
-      // The PAC file URL doesn't matter, we don't use it in the tests; we just need it to exist to
-      // exercise the PAC file URL code path in the tests.
-      CFStringCreateWithCString(kCFAllocatorDefault,
-                                "http://randomproxysettingsserver.com/random.pac",
-                                kCFStringEncodingUTF8)};
+      CFStringCreateWithCString(kCFAllocatorDefault, pac_file_url.c_str(), kCFStringEncodingUTF8)};
 
   int num_pairs = sizeof(keys) / sizeof(CFStringRef);
 
