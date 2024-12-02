@@ -137,7 +137,9 @@ void ProxyFilterConfig::ThreadLocalClusterInfo::onClusterRemoval(const std::stri
 ProxyPerRouteConfig::ProxyPerRouteConfig(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config)
     : host_rewrite_(config.host_rewrite_literal()),
-      host_rewrite_header_(Http::LowerCaseString(config.host_rewrite_header())) {}
+      host_rewrite_header_(Http::LowerCaseString(config.host_rewrite_header())),
+      dns_lookup_override_literal_(config.dns_lookup_override_literal()),
+      dns_lookup_override_header_(Http::LowerCaseString(config.dns_lookup_override_header())) {}
 
 void ProxyFilter::onDestroy() {
   // Make sure we destroy any active cache/cluster load handle in case we are getting reset and
@@ -196,24 +198,45 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     default_port = 443;
   }
 
+  // Store original host header for later use
+  std::string original_host = std::string(headers.getHostValue());
+  bool host_overridden = false;
+
   // Check for per route filter config.
   const auto* config =
       Http::Utility::resolveMostSpecificPerFilterConfig<ProxyPerRouteConfig>(decoder_callbacks_);
 
   if (config != nullptr) {
-    const auto& host_rewrite = config->hostRewrite();
-    if (!host_rewrite.empty()) {
-      headers.setHost(host_rewrite);
-    }
+    const auto& dns_override_lit = config->dnsLookupOverrideLiteral();
 
-    const auto& host_rewrite_header = config->hostRewriteHeader();
-    if (!host_rewrite_header.get().empty()) {
-      const auto header = headers.get(host_rewrite_header);
-      if (!header.empty()) {
-        // This is an implicitly untrusted header, so per the API documentation only the first
-        // value is used.
-        const auto& header_value = header[0]->value().getStringView();
-        headers.setHost(header_value);
+    if (!dns_override_lit.empty()) {
+      // Temporarily modify host header for DNS resolution
+      headers.setHost(dns_override_lit);
+      host_overridden = true;
+    } else {
+      // Use LowerCaseString API for header checks
+      const auto& dns_override_header = config->dnsLookupOverrideHeader();
+      if (!dns_override_header.get().empty()) {
+        const auto header = headers.get(dns_override_header);
+        if (!header.empty()) {
+          const auto& header_value = header[0]->value().getStringView();
+          headers.setHost(std::string(header_value));
+          host_overridden = true;
+        }
+      } else {
+        const auto& host_rewrite = config->hostRewrite();
+        if (!host_rewrite.empty()) {
+          headers.setHost(host_rewrite);
+        }
+
+        const auto& host_rewrite_header = config->hostRewriteHeader();
+        if (!host_rewrite_header.get().empty()) {
+          const auto header = headers.get(host_rewrite_header);
+          if (!header.empty()) {
+            const auto& header_value = header[0]->value().getStringView();
+            headers.setHost(header_value);
+          }
+        }
       }
     }
   }
@@ -280,6 +303,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   cache_load_handle_ = std::move(result.handle_);
   if (cache_load_handle_ == nullptr) {
     circuit_breaker_.reset();
+  }
+
+  // Restore original host if we used dns_resolution_override
+  if (host_overridden) {
+    headers.setHost(original_host);
   }
 
   switch (result.status_) {

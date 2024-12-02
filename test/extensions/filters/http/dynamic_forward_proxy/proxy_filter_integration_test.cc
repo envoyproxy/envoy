@@ -1,5 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
@@ -1491,6 +1492,164 @@ TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
   // No new cluster should be added as DFP cluster already exists
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+}
+
+TEST_P(ProxyFilterIntegrationTest, DnsLookupOverrideLiteral) {
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  // Configure the per-route dns_lookup_override_literal via route configuration
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0);
+        auto* per_route_config = route->mutable_typed_per_filter_config();
+        envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig dfp_config;
+        dfp_config.set_dns_lookup_override_literal("bar");
+        (*per_route_config)["envoy.filters.http.dynamic_forward_proxy"].PackFrom(dfp_config);
+      });
+
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Use the actual target hostname in the Host header
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  // Verify response
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify DNS timing headers exist
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("dns_start")).empty());
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
+}
+
+TEST_P(ProxyFilterIntegrationTest, DnsLookupOverrideLiteralWithTls) {
+  upstream_tls_ = true;
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  // Configure the per-route dns_lookup_override_literal via route configuration
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0);
+        auto* per_route_config = route->mutable_typed_per_filter_config();
+        envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig dfp_config;
+        dfp_config.set_dns_lookup_override_literal("bar");
+        (*per_route_config)["envoy.filters.http.dynamic_forward_proxy"].PackFrom(dfp_config);
+      });
+
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Match the pattern used in the working UpstreamTlsWithIpHost test
+  default_request_headers_.setHost(
+      fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port()));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Verify SNI handling
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+
+  // Complete the response
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify DNS timing headers
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("dns_start")).empty());
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
+}
+
+TEST_P(ProxyFilterIntegrationTest, DnsLookupOverrideHeader) {
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  // Configure dns_lookup_override_header via route configuration
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0);
+        auto* per_route_config = route->mutable_typed_per_filter_config();
+        envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig dfp_config;
+        dfp_config.set_dns_lookup_override_header("x-dns-lookup");
+        (*per_route_config)["envoy.filters.http.dynamic_forward_proxy"].PackFrom(dfp_config);
+      });
+
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Use localhost as original host but override DNS lookup via header
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())},
+      {"x-dns-lookup", "bar"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  // Verify response
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify DNS timing headers exist
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("dns_start")).empty());
+  EXPECT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
+}
+
+TEST_P(ProxyFilterIntegrationTest, DnsLookupOverrideHeaderEmptyValue) {
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  // Configure dns_lookup_override_header but provide empty header value
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0);
+        auto* per_route_config = route->mutable_typed_per_filter_config();
+        envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig dfp_config;
+        dfp_config.set_dns_lookup_override_header("x-dns-lookup");
+        (*per_route_config)["envoy.filters.http.dynamic_forward_proxy"].PackFrom(dfp_config);
+      });
+
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Don't include the x-dns-lookup header
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  // Should succeed using original host
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace
