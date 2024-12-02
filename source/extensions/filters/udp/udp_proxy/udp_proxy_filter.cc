@@ -305,7 +305,7 @@ UdpProxyFilter::createSessionWithOptionalHost(Network::UdpRecvData::LocalPeerAdd
 
 Upstream::HostConstSharedPtr UdpProxyFilter::ClusterInfo::chooseHost(
     const Network::Address::InstanceConstSharedPtr& peer_address,
-    const StreamInfo::StreamInfo* stream_info) const {
+    StreamInfo::StreamInfo* stream_info) const {
   UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address, stream_info);
   Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
   return host;

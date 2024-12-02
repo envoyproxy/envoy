@@ -48,14 +48,20 @@ public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr&& token_secret_provider,
                   ThreadLocal::SlotAllocator& tls, Api::Api& api)
-      : client_secret_(std::move(client_secret_provider), tls, api),
-        token_secret_(std::move(token_secret_provider), tls, api) {}
-  const std::string& clientSecret() const override { return client_secret_.secret(); }
-  const std::string& tokenSecret() const override { return token_secret_.secret(); }
+      : client_secret_(
+            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                      std::move(client_secret_provider), tls, api),
+                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
+        token_secret_(
+            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                      std::move(token_secret_provider), tls, api),
+                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)) {}
+  const std::string& clientSecret() const override { return client_secret_->secret(); }
+  const std::string& tokenSecret() const override { return token_secret_->secret(); }
 
 private:
-  Secret::ThreadLocalGenericSecretProvider client_secret_;
-  Secret::ThreadLocalGenericSecretProvider token_secret_;
+  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> client_secret_;
+  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> token_secret_;
 };
 
 /**

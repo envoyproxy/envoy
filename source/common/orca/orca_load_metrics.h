@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Orca {
 
 // List of metric names to report to the LRS.
-typedef std::vector<std::string> LrsReportMetricNames;
+using LrsReportMetricNames = std::vector<std::string>;
 
 // Adds metrics with `metric_names` from the `report` to the `stats`.
 void addOrcaLoadReportToLoadMetricStats(const LrsReportMetricNames& metric_names,

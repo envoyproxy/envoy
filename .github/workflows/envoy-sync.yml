@@ -34,12 +34,12 @@ jobs:
         - data-plane-api
         - mobile-website
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.12
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.12
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: main
@@ -61,12 +61,12 @@ jobs:
         downstream:
         - envoy-openssl
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.12
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.5
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.12
       with:
         repository: "envoyproxy/${{ matrix.downstream }}"
         ref: release/v1.28

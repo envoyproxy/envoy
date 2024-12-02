@@ -2242,6 +2242,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
+  LogLevelSetter save_levels(spdlog::level::trace);
   disable_client_header_validation_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -5388,6 +5389,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailer) {
 
 // Verify that stream is reset with invalid trailers, when configured.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailerStreamError) {
+  LogLevelSetter save_levels(spdlog::level::trace);
   // H/1 requests are not affected by the override_stream_error_on_invalid_http_message
   if (downstream_protocol_ == Http::CodecType::HTTP1) {
     return;

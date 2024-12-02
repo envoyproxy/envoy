@@ -89,6 +89,7 @@ envoy_cc_test(
     srcs = ["cluster_manager_impl_test.cc"],
     rbe_pool = "4core",
     deps = [
+        ":metadata_writer_lb_proto_cc_proto",
         ":test_cluster_manager",
         "//envoy/config:config_validator_interface",
         "//source/common/router:context_lib",
@@ -681,4 +682,9 @@ envoy_cc_test_library(
         "//envoy/upstream:upstream_interface",
         "@com_google_absl//absl/types:optional",
     ],
+)
+
+envoy_proto_library(
+    name = "metadata_writer_lb_proto",
+    srcs = ["metadata_writer_lb.proto"],
 )

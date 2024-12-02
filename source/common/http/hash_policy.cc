@@ -28,11 +28,13 @@ private:
 class HeaderHashMethod : public HashMethodImplBase {
 public:
   HeaderHashMethod(const envoy::config::route::v3::RouteAction::HashPolicy::Header& header,
-                   bool terminal, Regex::Engine& regex_engine)
+                   bool terminal, Regex::Engine& regex_engine, absl::Status& creation_status)
       : HashMethodImplBase(terminal), header_name_(header.header_name()) {
     if (header.has_regex_rewrite()) {
       const auto& rewrite_spec = header.regex_rewrite();
-      regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
+      auto regex_or_error = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
+      SET_AND_RETURN_IF_NOT_OK(regex_or_error.status(), creation_status);
+      regex_rewrite_ = std::move(*regex_or_error);
       regex_rewrite_substitution_ = rewrite_spec.substitution();
     }
   }
@@ -183,16 +185,29 @@ private:
   const std::string key_;
 };
 
+absl::StatusOr<std::unique_ptr<HashPolicyImpl>> HashPolicyImpl::create(
+    absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policy,
+    Regex::Engine& regex_engine) {
+  absl::Status creation_status = absl::OkStatus();
+  std::unique_ptr<HashPolicyImpl> ret = std::unique_ptr<HashPolicyImpl>(
+      new HashPolicyImpl(hash_policy, regex_engine, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 HashPolicyImpl::HashPolicyImpl(
     absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policies,
-    Regex::Engine& regex_engine) {
+    Regex::Engine& regex_engine, absl::Status& creation_status) {
 
   hash_impls_.reserve(hash_policies.size());
   for (auto* hash_policy : hash_policies) {
     switch (hash_policy->policy_specifier_case()) {
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kHeader:
-      hash_impls_.emplace_back(
-          new HeaderHashMethod(hash_policy->header(), hash_policy->terminal(), regex_engine));
+      hash_impls_.emplace_back(new HeaderHashMethod(hash_policy->header(), hash_policy->terminal(),
+                                                    regex_engine, creation_status));
+      if (!creation_status.ok()) {
+        return;
+      }
       break;
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kCookie: {
       absl::optional<std::chrono::seconds> ttl;

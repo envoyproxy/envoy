@@ -262,6 +262,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
   absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
   bool shouldLoadShed() const override;
+  void sendGoAwayAndClose() override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -448,6 +449,11 @@ public:
    * Called after encoding has completed.
    */
   virtual void endStream() PURE;
+
+  /**
+   * Attempt to send GOAWAY and close the connection.
+   */
+  virtual void sendGoAwayAndClose() PURE;
 
   /**
    * Called when the stream write buffer is no longer above the low watermark.
@@ -856,6 +862,16 @@ public:
   bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
 
   virtual bool shouldLoadShed() { return false; };
+
+  void sendGoAwayAndClose() {
+    // Stop filter chain iteration by checking encoder or decoder chain.
+    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+      state_.decoder_filter_chain_aborted_ = true;
+    } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+      state_.encoder_filter_chain_aborted_ = true;
+    }
+    filter_manager_callbacks_.sendGoAwayAndClose();
+  }
 
 protected:
   struct State {

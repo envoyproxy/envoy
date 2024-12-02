@@ -98,7 +98,8 @@ public:
 };
 
 TEST_F(CsrfFilterTest, RequestWithNonMutableMethod) {
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {"host", "localhost"}, {":scheme", "http"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
@@ -111,8 +112,22 @@ TEST_F(CsrfFilterTest, RequestWithNonMutableMethod) {
   EXPECT_EQ(0U, config_->stats().request_valid_.value());
 }
 
-TEST_F(CsrfFilterTest, RequestWithoutOrigin) {
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"}};
+TEST_F(CsrfFilterTest, RequestWithoutOriginAndWithoutDestination) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"}, {":scheme", "http"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
+
+  EXPECT_EQ(1U, config_->stats().missing_source_origin_.value());
+  EXPECT_EQ(0U, config_->stats().request_invalid_.value());
+  EXPECT_EQ(0U, config_->stats().request_valid_.value());
+}
+
+TEST_F(CsrfFilterTest, RequestWithoutOriginAndWithDestination) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "PUT"}, {"host", "localhost"}, {":scheme", "http"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
@@ -125,8 +140,8 @@ TEST_F(CsrfFilterTest, RequestWithoutOrigin) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithoutDestination) {
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"},
-                                                 {"origin", "http://localhost"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "PUT"}, {"origin", "http://localhost"}, {":scheme", "http"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
@@ -139,8 +154,10 @@ TEST_F(CsrfFilterTest, RequestWithoutDestination) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOrigin) {
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "PUT"}, {"origin", "http://cross-origin"}, {":authority", "localhost"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"},
+                                                 {"origin", "http://cross-origin"},
+                                                 {":authority", "localhost"},
+                                                 {":scheme", "http"}};
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "403"},
@@ -214,8 +231,6 @@ TEST_F(CsrfFilterTest, RequestWithValidOriginNonStandardPort) {
   EXPECT_EQ(1U, config_->stats().request_valid_.value());
 }
 
-// This works because gURL drops the port for hostAndPort() when they are standard
-// ports (e.g.: 80 & 443).
 TEST_F(CsrfFilterTest, RequestWithValidOriginHttpVsHttps) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"},
                                                  {"origin", "https://localhost"},
@@ -232,8 +247,10 @@ TEST_F(CsrfFilterTest, RequestWithValidOriginHttpVsHttps) {
 }
 
 TEST_F(CsrfFilterTest, RequestWithInvalidOriginCsrfDisabledShadowDisabled) {
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "PUT"}, {"origin", "http://cross-origin"}, {"host", "localhost"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "PUT"},
+                                                 {"origin", "http://cross-origin"},
+                                                 {"host", "localhost"},
+                                                 {":scheme", "http"}};
 
   setFilterEnabled(false);
 
