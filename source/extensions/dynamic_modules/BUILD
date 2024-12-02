@@ -10,11 +10,11 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "dynamic_modules_lib",
-    srcs = [
+    srcs = ["dynamic_modules.cc"],
+    hdrs = [
         "abi.h",
-        "dynamic_modules.cc",
+        "dynamic_modules.h",
     ],
-    hdrs = ["dynamic_modules.h"],
     deps = [
         ":abi_version_lib",
         "//envoy/common:exception_lib",

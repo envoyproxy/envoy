@@ -37,7 +37,9 @@ TEST_P(HyperscanRegexEngineIntegrationTest, Hyperscan) {
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_regex() = "^/asdf/.+";
 
-  EXPECT_NO_THROW(Envoy::Regex::Utility::parseRegex(matcher, test_server_->server().regexEngine()));
+  EXPECT_TRUE(Envoy::Regex::Utility::parseRegex(matcher, test_server_->server().regexEngine())
+                  .status()
+                  .ok());
 };
 
 } // namespace Hyperscan

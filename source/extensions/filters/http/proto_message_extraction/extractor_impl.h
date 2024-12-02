@@ -42,6 +42,11 @@ public:
 
   const ExtractedMessageResult& GetResult() const override { return result_; }
 
+  void ClearResult() override {
+    result_.request_data.clear();
+    result_.response_data.clear();
+  }
+
 private:
   const envoy::extensions::filters::http::proto_message_extraction::v3::MethodExtraction&
       method_extraction_;

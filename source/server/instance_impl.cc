@@ -27,12 +27,13 @@ std::unique_ptr<Server::GuardDog> InstanceImpl::maybeCreateGuardDog(absl::string
                                                 config().mainThreadWatchdogConfig(), api(), name);
 }
 
-std::unique_ptr<HdsDelegateApi> InstanceImpl::maybeCreateHdsDelegate(
-    Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
-    Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
-    Ssl::ContextManager& ssl_context_manager, Upstream::ClusterInfoFactory& info_factory) {
+std::unique_ptr<HdsDelegateApi>
+InstanceImpl::maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context,
+                                     Stats::Scope& scope, Grpc::RawAsyncClientPtr&& async_client,
+                                     Envoy::Stats::Store& stats,
+                                     Ssl::ContextManager& ssl_context_manager) {
   return std::make_unique<Upstream::HdsDelegate>(server_context, scope, std::move(async_client),
-                                                 stats, ssl_context_manager, info_factory);
+                                                 stats, ssl_context_manager);
 }
 
 } // namespace Server

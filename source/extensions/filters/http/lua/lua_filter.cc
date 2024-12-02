@@ -899,6 +899,32 @@ void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
   response_stream_wrapper_.reset();
 }
 
+int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
+  // Get the host address argument
+  size_t len;
+  const char* host = luaL_checklstring(state, 2, &len);
+
+  // Validate that host is not null and is an IP address
+  if (host == nullptr) {
+    luaL_error(state, "host argument is required");
+  }
+  if (!Http::Utility::parseAuthority(host).is_ip_address_) {
+    luaL_error(state, "host is not a valid IP address");
+  }
+
+  // Get the optional strict flag (defaults to false)
+  bool strict = false;
+  if (lua_gettop(state) >= 3) {
+    luaL_checktype(state, 3, LUA_TBOOLEAN);
+    strict = lua_toboolean(state, 3);
+  }
+
+  // Set the upstream override host
+  callbacks_.setUpstreamOverrideHost(std::make_pair(std::string(host, len), strict));
+
+  return 0;
+}
+
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
   uint64_t status = Http::Utility::getResponseStatus(*headers);

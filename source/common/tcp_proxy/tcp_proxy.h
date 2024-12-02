@@ -430,7 +430,7 @@ public:
     return &read_callbacks_->connection();
   }
 
-  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+  StreamInfo::StreamInfo* requestStreamInfo() const override {
     return &read_callbacks_->connection().streamInfo();
   }
 
@@ -520,6 +520,7 @@ public:
                         std::function<void(Http::ResponseHeaderMap& headers)>,
                         const absl::optional<Grpc::Status::GrpcStatus>,
                         absl::string_view) override {}
+    void sendGoAwayAndClose() override {}
     void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     Http::ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
     void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}
