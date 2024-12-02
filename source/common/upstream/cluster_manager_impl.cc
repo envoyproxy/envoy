@@ -345,8 +345,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
-      outlier_event_logger_ = std::make_shared<Outlier::EventLoggerImpl>(
-          log_manager, event_log_file_path, time_source_);
+      outlier_event_logger_ = THROW_OR_RETURN_VALUE(
+          Outlier::EventLoggerImpl::create(log_manager, event_log_file_path, time_source_),
+          std::unique_ptr<Outlier::EventLoggerImpl>);
     }
   }
 

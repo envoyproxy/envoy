@@ -30,11 +30,11 @@ jobs:
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
     - name: Free disk space
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.5
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.12
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@ea9e4e37992a54ee68a9622e985e60c8e8f12d9f  # codeql-bundle-v3.27.4
+      uses: github/codeql-action/init@f09c1c0a94de965c15400f5634aa42fac8fb8f88  # codeql-bundle-v3.27.5
       # Override language selection by uncommenting this and choosing your languages
       with:
         languages: cpp
@@ -75,6 +75,6 @@ jobs:
         git clean -xdf
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@ea9e4e37992a54ee68a9622e985e60c8e8f12d9f  # codeql-bundle-v3.27.4
+      uses: github/codeql-action/analyze@f09c1c0a94de965c15400f5634aa42fac8fb8f88  # codeql-bundle-v3.27.5
       with:
         trap-caching: false
