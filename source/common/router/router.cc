@@ -66,10 +66,22 @@ constexpr uint64_t TimeoutPrecisionFactor = 100;
 
 } // namespace
 
+absl::StatusOr<std::unique_ptr<FilterConfig>>
+FilterConfig::create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+                     ShadowWriterPtr&& shadow_writer,
+                     const envoy::extensions::filters::http::router::v3::Router& config) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<FilterConfig>(
+      new FilterConfig(stat_prefix, context, std::move(shadow_writer), config, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            Server::Configuration::FactoryContext& context,
                            ShadowWriterPtr&& shadow_writer,
-                           const envoy::extensions::filters::http::router::v3::Router& config)
+                           const envoy::extensions::filters::http::router::v3::Router& config,
+                           absl::Status& creation_status)
     : FilterConfig(
           context.serverFactoryContext(), stat_prefix, context.serverFactoryContext().localInfo(),
           context.scope(), context.serverFactoryContext().clusterManager(),
@@ -108,8 +120,10 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, server_factory_ctx,
                context.serverFactoryContext().clusterManager(), *upstream_ctx_, prefix);
-    THROW_IF_NOT_OK(helper.processFilters(upstream_http_filters, "router upstream http",
-                                          "router upstream http", upstream_http_filter_factories_));
+    SET_AND_RETURN_IF_NOT_OK(helper.processFilters(upstream_http_filters, "router upstream http",
+                                                   "router upstream http",
+                                                   upstream_http_filter_factories_),
+                             creation_status);
   }
 }
 

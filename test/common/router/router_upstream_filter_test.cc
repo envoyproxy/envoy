@@ -69,8 +69,8 @@ public:
     }
 
     Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
-    config_ = std::make_shared<FilterConfig>(prefix.statName(), context_,
-                                             ShadowWriterPtr(new MockShadowWriter()), router_proto);
+    config_ = *FilterConfig::create(prefix.statName(), context_,
+                                    ShadowWriterPtr(new MockShadowWriter()), router_proto);
     router_ = std::make_shared<TestFilter>(config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
     EXPECT_CALL(callbacks_.dispatcher_, pushTrackedObject(_)).Times(testing::AnyNumber());

@@ -140,7 +140,6 @@ paths:
     - source/common/upstream/prod_cluster_info_factory.cc
     - source/common/secret/sds_api.h
     - source/common/secret/sds_api.cc
-    - source/common/router/router.cc
     - source/common/config/config_provider_impl.h
     - source/common/grpc/async_client_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
