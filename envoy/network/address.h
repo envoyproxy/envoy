@@ -9,6 +9,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
@@ -23,6 +24,20 @@ namespace Address {
 
 class Instance;
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
+
+/*
+ * Used to store InstanceConstSharedPtr in filter state.
+ */
+class InstanceConstSharedPtrAccessor : public Envoy::StreamInfo::FilterState::Object {
+public:
+  InstanceConstSharedPtrAccessor(Network::Address::InstanceConstSharedPtr ip)
+      : ip_(std::move(ip)) {}
+
+  Network::Address::InstanceConstSharedPtr getIp() const { return ip_; }
+
+private:
+  Network::Address::InstanceConstSharedPtr ip_;
+};
 
 /**
  * Interface for an Ipv4 address.

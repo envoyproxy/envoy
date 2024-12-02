@@ -20,6 +20,9 @@
 using testing::Const;
 using testing::Return;
 using testing::ReturnRef;
+using DynamicMetadataIPMatcherConfig =
+    envoy::config::rbac::v3::Principal::DynamicMetadataIPMatcherConfig;
+using FilterStateIPMatcherConfig = envoy::config::rbac::v3::Principal::FilterStateIPMatcherConfig;
 
 namespace Envoy {
 namespace Extensions {
@@ -248,6 +251,67 @@ TEST(IPMatcher, IPMatcher) {
                false, conn, headers, info);
   checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), false, conn,
                headers, info);
+}
+
+TEST(IPMatcher, FilterStateIpMatcher) {
+  NiceMock<Envoy::Network::MockConnection> conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  FilterStateIPMatcherConfig config;
+  config.set_key("RbacFilterStateIp");
+  config.mutable_ip_range()->set_address_prefix("4.5.6.7");
+  config.mutable_ip_range()->mutable_prefix_len()->set_value(32);
+
+  checkMatcher(FilterStateIPMatcher(config), false, conn, headers, info);
+
+  info.filter_state_->setData(
+      "RbacFilterStateIp",
+      std::make_shared<Network::Address::InstanceConstSharedPtrAccessor>(
+          Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.7", 456, false)),
+      StreamInfo::FilterState::StateType::Mutable);
+
+  checkMatcher(FilterStateIPMatcher(config), true, conn, headers, info);
+}
+
+TEST(IPMatcher, MetadataIpMatcherIpv4) {
+  NiceMock<Envoy::Network::MockConnection> conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  DynamicMetadataIPMatcherConfig config;
+  config.mutable_ip_range()->set_address_prefix("4.5.6.7");
+  config.mutable_ip_range()->mutable_prefix_len()->set_value(32);
+  config.set_filter("envoy.filters.dynamic.ip.producer");
+  config.add_path("DynamicIp");
+
+  checkMatcher(DynamicMetadataIPMatcher(config), false, conn, headers, info);
+
+  Envoy::ProtobufWkt::Struct metadata_ip;
+  (*metadata_ip.mutable_fields())["DynamicIp"].set_string_value("4.5.6.7:456");
+  (*info.metadata_.mutable_filter_metadata())["envoy.filters.dynamic.ip.producer"] = metadata_ip;
+
+  checkMatcher(DynamicMetadataIPMatcher(config), true, conn, headers, info);
+}
+
+TEST(IPMatcher, MetadataIpMatcherIpv6) {
+  NiceMock<Envoy::Network::MockConnection> conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+
+  DynamicMetadataIPMatcherConfig config;
+  config.mutable_ip_range()->set_address_prefix("2001:db8::");
+  config.mutable_ip_range()->mutable_prefix_len()->set_value(32);
+  config.set_filter("envoy.filters.dynamic.ip.producer");
+  config.add_path("DynamicIp");
+
+  checkMatcher(DynamicMetadataIPMatcher(config), false, conn, headers, info);
+
+  Envoy::ProtobufWkt::Struct metadata_ip;
+  (*metadata_ip.mutable_fields())["DynamicIp"].set_string_value("[2001:db8::1]:8080");
+  (*info.metadata_.mutable_filter_metadata())["envoy.filters.dynamic.ip.producer"] = metadata_ip;
+
+  checkMatcher(DynamicMetadataIPMatcher(config), true, conn, headers, info);
 }
 
 TEST(PortMatcher, PortMatcher) {

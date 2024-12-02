@@ -64,6 +64,49 @@ public:
         ProtobufMessage::getStrictValidationVisitor()));
   }
 
+  // A simple policy which passes iff there is a valid IP in dynamic metadata.
+  void setupPolicyForDynamicMetadataIP() {
+    envoy::extensions::filters::http::rbac::v3::RBAC config;
+
+    envoy::config::rbac::v3::Policy policy;
+    policy.add_permissions()->set_any(true);
+
+    auto dynamic_metadata_ip = policy.add_principals()->mutable_dynamic_metadata_ip();
+    dynamic_metadata_ip->set_filter("envoy.filters.dynamic.client.ip.producer");
+    dynamic_metadata_ip->add_path("dynamic_client_ip");
+    dynamic_metadata_ip->mutable_ip_range()->set_address_prefix("1.2.3.4");
+
+    config.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+
+    (*config.mutable_rules()->mutable_policies())["foo"] = policy;
+    config.set_rules_stat_prefix("");
+
+    setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, "test", *stats_store_.rootScope(), context_,
+        ProtobufMessage::getStrictValidationVisitor()));
+  }
+
+  // A simple policy which passes iff there is a valid IP in filter state.
+  void setupPolicyForFilterStateIP() {
+    envoy::extensions::filters::http::rbac::v3::RBAC config;
+
+    envoy::config::rbac::v3::Policy policy;
+    policy.add_permissions()->set_any(true);
+
+    auto filter_state_ip = policy.add_principals()->mutable_filter_state_ip();
+    filter_state_ip->set_key("filter_state_client_ip");
+    filter_state_ip->mutable_ip_range()->set_address_prefix("1.2.3.4");
+
+    config.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+
+    (*config.mutable_rules()->mutable_policies())["foo"] = policy;
+    config.set_rules_stat_prefix("");
+
+    setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+        config, "test", *stats_store_.rootScope(), context_,
+        ProtobufMessage::getStrictValidationVisitor()));
+  }
+
   void setupMatcher(std::string action, std::string on_no_match_action) {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
 
@@ -517,6 +560,47 @@ TEST_F(RoleBasedAccessControlFilterTest, Path) {
       {":authority", "host"},
   };
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, DynamicMetadataClientIP) {
+  setupPolicyForDynamicMetadataIP();
+
+  Envoy::ProtobufWkt::Struct metadata_ip;
+  (*metadata_ip.mutable_fields())["dynamic_client_ip"].set_string_value("1.2.3.4:5678");
+  (*req_info_.metadata_.mutable_filter_metadata())["envoy.filters.dynamic.client.ip.producer"] =
+      metadata_ip;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, DynamicMetadataClientIPFail) {
+  setupPolicyForDynamicMetadataIP();
+
+  // Nothing in dynamic metadata, the dynamic metadata principal with not match.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+  checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, FilterStateClientIP) {
+  setupPolicyForFilterStateIP();
+
+  req_info_.filter_state_->setData(
+      "filter_state_client_ip",
+      std::make_shared<Network::Address::InstanceConstSharedPtrAccessor>(
+          Envoy::Network::Utility::parseInternetAddressNoThrow("1.2.3.4", 5678, false)),
+      StreamInfo::FilterState::StateType::Mutable);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, FilterStateClientIPFail) {
+  setupPolicyForFilterStateIP();
+
+  // Nothing in filter state, the filter state principal matcher with not match.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
   checkAccessLogMetadata(LogResult::Undecided);
 }
 

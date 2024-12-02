@@ -312,7 +312,7 @@ message Permission {
 
 // Principal defines an identity or a group of identities for a downstream
 // subject.
-// [#next-free-field: 14]
+// [#next-free-field: 16]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
@@ -336,6 +336,23 @@ message Principal {
     // is used from the certificate, otherwise the subject field is used. If
     // unset, it applies to any user that is authenticated.
     type.matcher.v3.StringMatcher principal_name = 2;
+  }
+
+  message FilterStateIPMatcherConfig {
+    // The key at which the filter state object is stored.
+    string key = 1;
+
+    core.v3.CidrRange ip_range = 2;
+  }
+
+  message DynamicMetadataIPMatcherConfig {
+    // The name of the filter that set the dynamic metadata.
+    string filter = 1;
+
+    // Field names in the dynamic metadata in order.
+    repeated string path = 2;
+
+    core.v3.CidrRange ip_range = 3;
   }
 
   oneof identifier {
@@ -405,6 +422,18 @@ message Principal {
     // Matches against metadata from either dynamic state or route configuration. Preferred over the
     // ``metadata`` field as it provides more flexibility in metadata source selection.
     SourcedMetadata sourced_metadata = 13;
+
+    // A CIDR block for matching an IP fetched from filter state. If an IP is not found at the key
+    // in filter state, the matcher will fail.
+    // Useful to essentially override
+    // :ref:`remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.remote_ip>` or
+    // :ref:`direct_remote_ip <envoy_v3_api_field_config.rbac.v3.Principal.direct_remote_ip>`.
+    FilterStateIPMatcherConfig filter_state_ip = 14;
+
+    // The same as
+    // :ref:`filter_state_ip <envoy_v3_api_field_config.rbac.v3.Principal.filter_state_ip>`, except
+    // the IP is fetched from dynamic metadata_ip instead.
+    DynamicMetadataIPMatcherConfig dynamic_metadata_ip = 15;
   }
 }
 
