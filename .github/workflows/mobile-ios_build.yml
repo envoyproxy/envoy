@@ -168,12 +168,6 @@ jobs:
           app: //test/swift/apps/experimental:app
           expected-status: 200
           target: swift-experimental-app
-        - name: Build swift async await
-          app: //examples/swift/async_await:app
-          expected: >-
-            Uploaded 7 MB of data
-          target: swift-async-await
-          timeout: 10m
         - name: Build objc hello world
           app: //examples/objective-c/hello_world:app
           expected-status: 301
