@@ -58,6 +58,8 @@ public:
   virtual void processResponse(Protobuf::field_extraction::MessageData& message) = 0;
 
   virtual const ExtractedMessageResult& GetResult() const = 0;
+
+  virtual void ClearResult() = 0;
 };
 
 using ExtractorPtr = std::unique_ptr<Extractor>;

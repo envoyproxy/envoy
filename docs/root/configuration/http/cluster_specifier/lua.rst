@@ -80,6 +80,8 @@ Returns a :ref:`header object <config_lua_cluster_specifier_header_wrapper>`.
 
 Returns a :ref:`handle <config_lua_cluster_specifier_cluster>` to the specified cluster, or nil if it isn't found.
 
+.. include:: ../../../_include/lua_common.rst
+
 .. _config_lua_cluster_specifier_header_wrapper:
 
 Header object API
@@ -99,6 +101,8 @@ This method gets a header.
 Returns either a string containing the header value, or ``nil`` if the header does not exist.
 
 If there are multiple headers in the same case-insensitive key, their values will be concatenated to a string separated by ``,``.
+
+.. include:: ../../../_include/lua_common.rst
 
 .. _config_lua_cluster_specifier_cluster:
 
@@ -132,3 +136,4 @@ This method gets the current number of requests for this cluster.
 
 This method gets the current number of pending requests for this cluster.
 
+.. include:: ../../../_include/lua_common.rst

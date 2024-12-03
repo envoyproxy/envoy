@@ -9,7 +9,6 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-using testing::NiceMock;
 using testing::Return;
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {

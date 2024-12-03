@@ -329,7 +329,7 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
         ;;
 
-    clang_tidy)
+    clang-tidy)
         # clang-tidy will warn on standard library issues with libc++
         ENVOY_STDLIB="libstdc++"
         setup_clang_toolchain
@@ -337,14 +337,19 @@ case $CI_TARGET in
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
-        CLANG_TIDY_TARGETS=(
-            //contrib/...
-            //source/...
-            //test/...
-            @envoy_api//...)
+        if [[ -n "$CLANG_TIDY_TARGETS" ]]; then
+            read -ra CLANG_TIDY_TARGETS <<< "${CLANG_TIDY_TARGETS}"
+        else
+            CLANG_TIDY_TARGETS=(
+                //contrib/...
+                //source/...
+                //test/...
+                @envoy_api//...)
+        fi
+        echo "Running clang-tidy on ${CLANG_TIDY_TARGETS[*]}"
         bazel build \
               "${BAZEL_BUILD_OPTIONS[@]}" \
-              --config clang-tidy \
+              --config=clang-tidy \
               "${CLANG_TIDY_TARGETS[@]}"
         ;;
 

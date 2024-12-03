@@ -2,6 +2,9 @@
 
 // NOLINT(namespace-envoy)
 
+// This is a pure C header, so we can't apply clang-tidy to it.
+// NOLINTBEGIN
+
 // This is a pure C header file that defines the ABI of the core of dynamic modules used by Envoy.
 //
 // This must not contain any dependencies besides standard library since it is not only used by
@@ -127,3 +130,5 @@ void envoy_dynamic_module_on_http_filter_config_destroy(
 #ifdef __cplusplus
 }
 #endif
+
+// NOLINTEND

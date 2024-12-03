@@ -54,7 +54,7 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
                            DurationUtil::durationToMilliseconds(http_uri.timeout())))
                        .setSendInternal(false)
                        .setSendXff(false);
-    const std::string cluster = http_uri.cluster();
+    const std::string& cluster = http_uri.cluster();
     const auto thread_local_cluster = context().clusterManager().getThreadLocalCluster(cluster);
     if (thread_local_cluster) {
       active_request_ =

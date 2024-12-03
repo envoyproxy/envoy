@@ -334,10 +334,16 @@ TEST(Context, ResponseAttributes) {
   Protobuf::Arena arena;
   ResponseWrapper response(arena, &header_map, &trailer_map, info);
   ResponseWrapper empty_response(arena, nullptr, nullptr, empty_info);
+  UpstreamWrapper upstream(arena, info);
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
   EXPECT_CALL(info, legacyResponseFlags()).WillRepeatedly(Return(0x1));
+
+  auto cx_pool_start_time = MonotonicTime(std::chrono::nanoseconds(10000000));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
 
   const absl::optional<std::string> code_details = "unauthorized";
   EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));
@@ -453,6 +459,16 @@ TEST(Context, ResponseAttributes) {
     upstream_timing.onFirstUpstreamTxByteSent(info.timeSource());
     upstream_timing.onLastUpstreamRxByteReceived(info.timeSource());
     EXPECT_TRUE(response[CelValue::CreateStringView(BackendLatency)].has_value());
+  }
+
+  {
+    info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+    StreamInfo::UpstreamTiming& upstream_timing = info.upstreamInfo()->upstreamTiming();
+    upstream_timing.recordConnectionPoolCallbackLatency(cx_pool_start_time, time_system);
+    auto value = upstream[CelValue::CreateStringView(UpstreamConnectionPoolReadyDuration)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsDuration());
+    EXPECT_EQ("15ms", absl::FormatDuration(value.value().DurationOrDie()));
   }
 
   {
@@ -1142,6 +1158,11 @@ TEST(Context, UpstreamEdgeCases) {
 
   {
     const auto value = upstream[CelValue::CreateStringView(UpstreamTransportFailureReason)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = upstream[CelValue::CreateStringView(UpstreamConnectionPoolReadyDuration)];
     EXPECT_FALSE(value.has_value());
   }
 }

@@ -143,4 +143,4 @@ jobs:
           arch: arm64
           bazel-extra: >-
             --config=remote-cache-envoy-engflow
-          runs-on: envoy-arm64-small
+          runs-on: github-arm64-2c-8gb

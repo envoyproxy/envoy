@@ -3407,7 +3407,7 @@ envoy_quic_cc_library(
 
 envoy_quic_cc_library(
     name = "quic_core_one_block_arena_lib",
-    srcs = ["quiche/quic/core/quic_one_block_arena.h"],
+    hdrs = ["quiche/quic/core/quic_one_block_arena.h"],
     deps = [
         ":quic_core_arena_scoped_ptr_lib",
         ":quic_core_types_lib",
