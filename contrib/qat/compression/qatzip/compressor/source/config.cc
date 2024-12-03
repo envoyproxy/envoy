@@ -87,6 +87,7 @@ QatzipCompressorFactory::QatzipThreadLocal::QatzipThreadLocal(QzSessionParams_T 
 QatzipCompressorFactory::QatzipThreadLocal::~QatzipThreadLocal() {
   if (initialized_) {
     qzTeardownSession(&session_);
+    qzClose(&session_);
   }
 }
 
