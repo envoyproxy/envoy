@@ -186,9 +186,9 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
 // Negative test for protoc-gen-validate constraints for statsd.
 TEST(StatsdConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  EXPECT_THROW(auto sink = StatsdSinkFactory().createStatsSink(
-                   envoy::config::metrics::v3::StatsdSink(), server),
-               ProtoValidationException);
+  EXPECT_THROW(
+      StatsdSinkFactory().createStatsSink(envoy::config::metrics::v3::StatsdSink(), server).value(),
+      ProtoValidationException);
 }
 
 } // namespace
