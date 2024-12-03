@@ -1,0 +1,82 @@
+name: Request/cache (prime Docker)
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      app-id:
+        required: true
+      app-key:
+        required: true
+    inputs:
+      caches:
+        type: string
+        required: true
+      image-tag:
+        type: string
+        required: true
+
+      arch:
+        type: string
+        default: x64
+      cache-suffix:
+        type: string
+        default:
+      runs-on:
+        type: string
+        default: ubuntu-24.04
+      lock-repository:
+        type: string
+        default: envoyproxy/ci-mutex
+
+## Docker cache
+#
+# This workflow will only prime the cache, and should be done separately first, prior
+# to any jobs that require it.
+#
+# For a job that does, you can restore with something like:
+#
+#    steps:
+#    - uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.12
+#      with:
+#        key: "${{ needs.env.outputs.build-image }}"
+#
+
+
+jobs:
+  docker:
+    runs-on: ${{ inputs.runs-on || 'ubuntu-24.04' }}
+    name: "[${{ inputs.arch }}] Prime Docker cache"
+    if: ${{ ! fromJSON(inputs.caches).docker[inputs.arch] }}
+    steps:
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.12
+      id: appauth
+      name: Appauth (mutex lock)
+      with:
+        app_id: ${{ secrets.app-id }}
+        key: ${{ secrets.app-key }}
+    - uses: envoyproxy/toolshed/gh-actions/docker/cache/prime@actions-v0.3.12
+      id: docker
+      name: Prime Docker cache (${{ inputs.image-tag }}${{ inputs.cache-suffix }})
+      with:
+        image-tag: ${{ inputs.image-tag }}
+        key-suffix: ${{ inputs.cache-suffix }}
+        lock-token: ${{ steps.appauth.outputs.token }}
+        lock-repository: ${{ inputs.lock-repository }}
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.12
+      id: data
+      name: Cache data
+      with:
+        input-format: yaml
+        input: |
+          cached: ${{ steps.docker.outputs.cached }}
+          key: ${{ inputs.image-tag }}${{ inputs.cache-suffix }}
+    - uses: envoyproxy/toolshed/gh-actions/json/table@actions-v0.3.12
+      name: Summary
+      with:
+        json: ${{ steps.data.outputs.value }}
+        output-path: GITHUB_STEP_SUMMARY
+        title: >-
+          Cache (Docker ${{ inputs.arch }})

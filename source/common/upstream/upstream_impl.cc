@@ -111,8 +111,8 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
         fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(
-      typed_config, factory_context.messageValidationVisitor(), *proto_config);
+  RETURN_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
+      typed_config, factory_context.messageValidationVisitor(), *proto_config));
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
@@ -381,20 +381,6 @@ createUpstreamLocalAddressSelector(
   return selector_or_error.value();
 }
 
-class LoadBalancerFactoryContextImpl : public Upstream::LoadBalancerFactoryContext {
-public:
-  explicit LoadBalancerFactoryContextImpl(
-      Server::Configuration::ServerFactoryContext& server_context)
-      : server_context_(server_context) {}
-
-  Event::Dispatcher& mainThreadDispatcher() override {
-    return server_context_.mainThreadDispatcher();
-  }
-
-private:
-  Server::Configuration::ServerFactoryContext& server_context_;
-};
-
 } // namespace
 
 // Allow disabling ALPN checks for transport sockets. See
@@ -513,10 +499,7 @@ void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health
   // Clear all old EDS health flags first.
   HostImplBase::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   HostImplBase::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-    HostImplBase::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
-  }
+  HostImplBase::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
 
   // Set the appropriate EDS health flag.
   switch (health_status) {
@@ -526,10 +509,7 @@ void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health
     HostImplBase::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DRAINING:
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-      HostImplBase::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
-    }
+    HostImplBase::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
     break;
   case envoy::config::core::v3::DEGRADED:
     HostImplBase::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
@@ -779,40 +759,21 @@ void HostSetImpl::rebuildLocalityScheduler(
   locality_scheduler = nullptr;
   if (all_hosts_per_locality != nullptr && locality_weights != nullptr &&
       !locality_weights->empty() && !eligible_hosts.empty()) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.edf_lb_locality_scheduler_init_fix")) {
-      locality_entries.clear();
-      for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
-        const double effective_weight = effectiveLocalityWeight(
-            i, eligible_hosts_per_locality, *excluded_hosts_per_locality, *all_hosts_per_locality,
-            *locality_weights, overprovisioning_factor);
-        if (effective_weight > 0) {
-          locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
-        }
+    locality_entries.clear();
+    for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
+      const double effective_weight = effectiveLocalityWeight(
+          i, eligible_hosts_per_locality, *excluded_hosts_per_locality, *all_hosts_per_locality,
+          *locality_weights, overprovisioning_factor);
+      if (effective_weight > 0) {
+        locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
       }
-      // If not all effective weights were zero, create the scheduler.
-      if (!locality_entries.empty()) {
-        locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>(
-            EdfScheduler<LocalityEntry>::createWithPicks(
-                locality_entries,
-                [](const LocalityEntry& entry) { return entry.effective_weight_; }, seed));
-      }
-    } else {
-      locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>();
-      locality_entries.clear();
-      for (uint32_t i = 0; i < all_hosts_per_locality->get().size(); ++i) {
-        const double effective_weight = effectiveLocalityWeight(
-            i, eligible_hosts_per_locality, *excluded_hosts_per_locality, *all_hosts_per_locality,
-            *locality_weights, overprovisioning_factor);
-        if (effective_weight > 0) {
-          locality_entries.emplace_back(std::make_shared<LocalityEntry>(i, effective_weight));
-          locality_scheduler->add(effective_weight, locality_entries.back());
-        }
-      }
-      // If all effective weights were zero, reset the scheduler.
-      if (locality_scheduler->empty()) {
-        locality_scheduler = nullptr;
-      }
+    }
+    // If not all effective weights were zero, create the scheduler.
+    if (!locality_entries.empty()) {
+      locality_scheduler = std::make_unique<EdfScheduler<LocalityEntry>>(
+          EdfScheduler<LocalityEntry>::createWithPicks(
+              locality_entries, [](const LocalityEntry& entry) { return entry.effective_weight_; },
+              seed));
     }
   }
 }
@@ -1095,8 +1056,7 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
-    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
-    ProtobufMessage::ValidationVisitor& visitor) {
+    Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster) {
   LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
 
@@ -1139,13 +1099,12 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
                     ClusterProto::LbPolicy_Name(cluster.lb_policy())));
   }
 
-  return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster, visitor)};
+  return Result{lb_factory, lb_factory->loadConfig(factory_context, cluster)};
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-    LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
-    ProtobufMessage::ValidationVisitor& visitor) {
+    Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster) {
   // Handle the lb subset config case first.
   // Note it is possible to have a lb_subset_config without actually having any subset selectors.
   // In this case the subset load balancer should not be used.
@@ -1153,12 +1112,12 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
     auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
         "envoy.load_balancing_policies.subset");
     if (lb_factory != nullptr) {
-      return Result{lb_factory, lb_factory->loadConfig(lb_factory_context, cluster, visitor)};
+      return Result{lb_factory, lb_factory->loadConfig(factory_context, cluster)};
     }
     return absl::InvalidArgumentError("No subset load balancer factory found");
   }
 
-  return getTypedLbConfigFromLegacyProtoWithoutSubset(lb_factory_context, cluster, visitor);
+  return getTypedLbConfigFromLegacyProtoWithoutSubset(factory_context, cluster);
 }
 
 using ProtocolOptionsHashMap =
@@ -1336,10 +1295,8 @@ ClusterInfoImpl::ClusterInfoImpl(
   } else {
     // If load_balancing_policy is not set, we will try to convert legacy lb_policy
     // to load_balancing_policy and use it.
-    LoadBalancerFactoryContextImpl lb_factory_context(server_context);
-
-    auto lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-        lb_factory_context, config, server_context.messageValidationVisitor());
+    auto lb_pair =
+        LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(server_context, config);
     SET_AND_RETURN_IF_NOT_OK(lb_pair.status(), creation_status);
     load_balancer_factory_ = lb_pair->factory;
     ASSERT(load_balancer_factory_ != nullptr, "null load balancer factory");
@@ -1437,8 +1394,10 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
     auto message = factory.createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
-                                           factory_context.messageValidationVisitor(), *message);
+    SET_AND_RETURN_IF_NOT_OK(
+        Config::Utility::translateOpaqueConfig(
+            proto_config.typed_config(), factory_context.messageValidationVisitor(), *message),
+        creation_status);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, upstream_context_);
     filter_factories_.push_back(
@@ -1449,9 +1408,9 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (http_protocol_options_) {
     Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
     has_configured_http_filters_ = !http_filters.empty();
-    static const std::string upstream_codec_type_url =
+    static const std::string upstream_codec_type_url(
         envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance()
-            .GetTypeName();
+            .GetTypeName());
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
       codec_filter->set_name("envoy.filters.http.upstream_codec");
@@ -1511,14 +1470,13 @@ ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& 
             policy.typed_extension_config(), /*is_optional=*/true);
     if (factory != nullptr) {
       // Load and validate the configuration.
-      LoadBalancerFactoryContextImpl lb_factory_context(context);
       auto proto_message = factory->createEmptyConfigProto();
-      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                             context.messageValidationVisitor(), *proto_message);
+      RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+          policy.typed_extension_config().typed_config(), context.messageValidationVisitor(),
+          *proto_message));
 
       load_balancer_factory_ = factory;
-      load_balancer_config_ = factory->loadConfig(lb_factory_context, *proto_message,
-                                                  context.messageValidationVisitor());
+      load_balancer_config_ = factory->loadConfig(context, *proto_message);
 
       break;
     }

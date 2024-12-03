@@ -10,14 +10,21 @@ on:
     types:
     - completed
 
+concurrency:
+  group: >-
+    ${{ ((github.event.workflow_run.head_branch == 'main'
+          || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+          && github.event.repository.full_name == github.repository)
+        && github.run_id
+        || github.event.workflow_run.head_branch }}-${{ github.event.repository.full_name }}-${{ github.workflow }}
+  cancel-in-progress: true
+
 
 jobs:
   load:
     secrets:
       app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
-      lock-app-key: ${{ secrets.ENVOY_CI_MUTEX_APP_KEY }}
-      lock-app-id: ${{ secrets.ENVOY_CI_MUTEX_APP_ID }}
     permissions:
       actions: read
       contents: read
@@ -26,7 +33,6 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_load.yml
     with:
-      cache-docker: false
       check-name: mobile-ios
 
   build:
@@ -88,7 +94,7 @@ jobs:
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.35
+        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.12
           with:
             app: ${{ matrix.app }}
             args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
@@ -133,7 +139,7 @@ jobs:
       source: |
         source ./ci/mac_ci_setup.sh
       steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.2.35
+        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.12
           with:
             app: ${{ matrix.app }}
             args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}

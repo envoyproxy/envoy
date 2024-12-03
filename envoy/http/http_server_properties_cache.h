@@ -97,12 +97,16 @@ public:
   public:
     virtual ~Http3StatusTracker() = default;
 
+    // Returns true if HTTP/3 status is pending.
+    virtual bool isHttp3Pending() const PURE;
     // Returns true if HTTP/3 is broken.
     virtual bool isHttp3Broken() const PURE;
     // Returns true if HTTP/3 is confirmed to be working.
     virtual bool isHttp3Confirmed() const PURE;
     // Returns true if HTTP/3 has failed recently.
     virtual bool hasHttp3FailedRecently() const PURE;
+    // Marks HTTP/3 status as pending.
+    virtual void markHttp3Pending() PURE;
     // Marks HTTP/3 broken for a period of time, subject to backoff.
     virtual void markHttp3Broken() PURE;
     // Marks HTTP/3 as confirmed to be working and resets the backoff timeout.
@@ -176,9 +180,25 @@ public:
   getOrCreateHttp3StatusTracker(const Origin& origin) PURE;
 
   /**
+   * @param origin The origin to check h3 brokenness for.
+   * @return true if it's broken.
+   */
+  virtual bool isHttp3Broken(const Origin& origin) PURE;
+
+  /**
+   * @ origin The origin to mark h3 broken.
+   */
+  virtual void markHttp3Broken(const Origin& origin) PURE;
+
+  /**
    * Changes any origins with status "Broken" for HTTP/3 to "Failed Recently"
    */
   virtual void resetBrokenness() PURE;
+
+  /**
+   * Changes any origin status for HTTP/3 to "Pending".
+   */
+  virtual void resetStatus() PURE;
 };
 
 using HttpServerPropertiesCacheSharedPtr = std::shared_ptr<HttpServerPropertiesCache>;

@@ -185,7 +185,8 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
 
   if (config_->maxConnectionDuration()) {
     connection_duration_timer_ =
-        dispatcher_->createTimer([this]() -> void { onConnectionDurationTimeout(); });
+        dispatcher_->createScaledTimer(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout,
+                                       [this]() -> void { onConnectionDurationTimeout(); });
     connection_duration_timer_->enableTimer(config_->maxConnectionDuration().value());
   }
 
@@ -754,6 +755,18 @@ void ConnectionManagerImpl::onDrainTimeout() {
   codec_->goAway();
   drain_state_ = DrainState::Closing;
   checkForDeferredClose(false);
+}
+
+void ConnectionManagerImpl::sendGoAwayAndClose() {
+  ENVOY_CONN_LOG(trace, "connection manager sendGoAwayAndClose was triggerred from filters.",
+                 read_callbacks_->connection());
+  if (go_away_sent_) {
+    return;
+  }
+  codec_->goAway();
+  go_away_sent_ = true;
+  doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
+                    "forced_goaway");
 }
 
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,

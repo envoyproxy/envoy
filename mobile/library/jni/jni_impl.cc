@@ -1218,12 +1218,11 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
                       jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
                       jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
                       jint dns_num_retries, jboolean enable_drain_post_dns_refresh,
-                      jboolean enable_http3, jboolean use_cares, jboolean force_v6,
-                      jboolean use_gro, jstring http3_connection_options,
+                      jboolean enable_http3, jboolean use_cares, jstring http3_connection_options,
                       jstring http3_client_connection_options, jobjectArray quic_hints,
                       jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
                       jboolean enable_brotli_decompression,
-                      jlong num_timeouts_to_trigger_port_migration, jboolean enable_socket_tagging,
+                      jint num_timeouts_to_trigger_port_migration, jboolean enable_socket_tagging,
                       jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
@@ -1280,13 +1279,11 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
       builder.addCaresFallbackResolver(host, stoi(port));
     }
   }
-  builder.setUseGroIfAvailable(use_gro == JNI_TRUE);
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
   builder.enablePlatformCertificatesValidation(enable_platform_certificates_validation == JNI_TRUE);
   builder.setUpstreamTlsSni(Envoy::JNI::javaStringToCppString(jni_helper, upstream_tls_sni));
-  builder.setForceAlwaysUsev6(force_v6 == JNI_TRUE);
   builder.setKeepAliveInitialIntervalMilliseconds(
       (h3_connection_keepalive_initial_interval_milliseconds));
 
@@ -1327,12 +1324,11 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jint dns_num_retries,
     jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean use_cares,
-    jboolean force_v6, jboolean use_gro, jstring http3_connection_options,
-    jstring http3_client_connection_options, jobjectArray quic_hints,
-    jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
-    jboolean enable_brotli_decompression, jlong num_timeouts_to_trigger_port_migration,
-    jboolean enable_socket_tagging, jboolean enable_interface_binding,
-    jlong h2_connection_keepalive_idle_interval_milliseconds,
+    jstring http3_connection_options, jstring http3_client_connection_options,
+    jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
+    jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
+    jint num_timeouts_to_trigger_port_migration, jboolean enable_socket_tagging,
+    jboolean enable_interface_binding, jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
@@ -1346,16 +1342,15 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
       jni_helper, connect_timeout_seconds, dns_refresh_seconds, dns_failure_refresh_seconds_base,
       dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
       dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
-      enable_drain_post_dns_refresh, enable_http3, use_cares, force_v6, use_gro,
-      http3_connection_options, http3_client_connection_options, quic_hints,
-      quic_canonical_suffixes, enable_gzip_decompression, enable_brotli_decompression,
+      enable_drain_post_dns_refresh, enable_http3, use_cares, http3_connection_options,
+      http3_client_connection_options, quic_hints, quic_canonical_suffixes,
+      enable_gzip_decompression, enable_brotli_decompression,
       num_timeouts_to_trigger_port_migration, enable_socket_tagging, enable_interface_binding,
       h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
       max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
       app_version, app_id, trust_chain_verification, filter_chain,
       enable_platform_certificates_validation, upstream_tls_sni, runtime_guards,
       cares_fallback_resolvers, h3_connection_keepalive_initial_interval_milliseconds, builder);
-
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }
 

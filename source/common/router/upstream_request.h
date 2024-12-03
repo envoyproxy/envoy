@@ -232,7 +232,6 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   // Tracks the number of times the flow of data from downstream has been disabled.
   uint32_t downstream_data_disabled_{};
-  bool calling_encode_headers_ : 1;
   bool upstream_canary_ : 1;
   bool router_sent_end_stream_ : 1;
   bool encode_trailers_ : 1;
@@ -339,6 +338,7 @@ public:
   void disarmRequestTimeout() override {}
   void resetIdleTimer() override {}
   void onLocalReply(Http::Code) override {}
+  void sendGoAwayAndClose() override {}
   // Upgrade filter chains not supported.
   const Router::RouteEntry::UpgradeMap* upgradeMap() override { return nullptr; }
 
