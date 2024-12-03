@@ -386,8 +386,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
            "&response_type=code"
            "&scope=" +
            TEST_DEFAULT_SCOPE +
-           "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D1234567890000000"},
+           "&state=eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"},
   };
 
   // explicitly tell the validator to fail the validation.
@@ -452,8 +451,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
            "&response_type=code"
            "&scope=" +
            TEST_DEFAULT_SCOPE +
-           "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D1234567890000000"},
+           "&state=eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -512,8 +510,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
            "&response_type=code"
            "&scope=" +
            TEST_DEFAULT_SCOPE +
-           "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D1234567890000000"},
+           "&state=eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -695,7 +692,7 @@ TEST_F(OAuth2Test, SetBearerToken) {
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf%26nonce%3D1234567890000000"},
+       "/_oauth?code=123&state=eyJ1cmwiOiJodHRwczovL2FzZGYiLCJub25jZSI6IjEyMzQ1Njc4OTAwMDAwMDAifQ"},
       {Http::Headers::get().Cookie.get(),
        "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -782,8 +779,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
            "&response_type=code"
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
+           "&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
@@ -803,8 +799,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
+       "/_oauth?code=123&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"},
       {Http::Headers::get().Cookie.get(),
        "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -898,7 +893,7 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
 TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf%26nonce%3D1234567890000000"},
+       "/_oauth?code=123&state=eyJ1cmwiOiJodHRwczovL2FzZGYiLCJub25jZSI6IjEyMzQ1Njc4OTAwMDAwMDAifQ"},
       {Http::Headers::get().Cookie.get(),
        "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -1306,8 +1301,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%3A%2F%2Ftraffic.example.com%2Foriginal_path%3Fvar1%3D1%2526var2%3D2%"
-           "26nonce%3D1234567890000000"},
+           "&state=url%3Dhttps%3A%2F%2Ftraffic.example.com%2Foriginal_path%3Fvar1%3D1%2526var2%3D2%26nonce%3D1234567890000000"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
@@ -1340,8 +1334,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%3A%2F%2Ftraffic.example.com%2Foriginal_path%3Fvar1%3D1%2526var2%3D2%"
-           "26nonce%3D1234567890000000"},
+           "&state=url%3Dhttps%3A%2F%2Ftraffic.example.com%2Foriginal_path%3Fvar1%3D1%2526var2%3D2%26nonce%3D1234567890000000"},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
@@ -1390,8 +1383,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
            "&response_type=code"
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
+           "&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%"
            "3Dbar%"
@@ -1414,8 +1406,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
       {Http::Headers::get().Cookie.get(),
        "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
+       "/_oauth?code=123&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -1478,8 +1469,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
            "&response_type=code"
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
+           "&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
@@ -1501,8 +1491,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
       {Http::Headers::get().Cookie.get(),
        "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
+       "/_oauth?code=123&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -1589,8 +1578,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
            "&response_type=code"
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
+           "&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%"
            "3Dbar%"
@@ -1613,8 +1601,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
       {Http::Headers::get().Cookie.get(),
        "OauthNonce=1234567890000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
+       "/_oauth?code=123&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2377,8 +2364,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
            "&response_type=code"
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
+           "&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
@@ -2402,8 +2388,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
       {Http::Headers::get().Cookie.get(),
        "OauthNonce=1234567890000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
+       "/_oauth?code=123&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2510,8 +2495,7 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
            "&response_type=code"
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
-           "&state=https%3A%2F%2Ftraffic.example.com%2Ftest%3Fname%3Dadmin%26level%3Dtrace"
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           "&state=https%3A%2F%2Ftraffic.example.com%2Ftest%3Fname%3Dadmin%26level%3Dtrace&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com"},
   };
 
@@ -2568,8 +2552,7 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
            "&response_type=code"
            "&scope=" +
            TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
+           "&state=eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vdGVzdD9uYW1lPWFkbWluJmxldmVsPXRyYWNlIiwibm9uY2UiOiIxMjM0NTY3ODkwMDAwMDAwIn0"
            "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},

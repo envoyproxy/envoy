@@ -557,18 +557,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
  */
 const std::string OAuth2Filter::encodeState(const std::string& original_request_url,
                                             const std::string& nonce) const {
-  ProtobufWkt::Struct protobuf_struct;
-  auto& fields = *protobuf_struct.mutable_fields();
-  fields[stateParamsUrl].set_string_value(original_request_url);
-  fields[stateParamsNonce].set_string_value(nonce);
-
-  absl::StatusOr<std::string> json_or_error =
-      MessageUtil::getJsonStringFromMessage(protobuf_struct);
-  ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
-  if (json_or_error.ok()) {
-    return Base64Url::encode(json_or_error.value().data(), json_or_error.value().size());
-  }
-  return "";
+  std::string json = fmt::format(R"({{"url":"{}","nonce":"{}"}})", original_request_url, nonce);
+  return Base64Url::encode(json.data(), json.size());
 }
 
 /**
