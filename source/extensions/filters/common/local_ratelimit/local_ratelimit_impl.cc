@@ -212,6 +212,12 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     const auto per_descriptor_fill_interval = std::chrono::milliseconds(
         PROTOBUF_GET_MS_OR_DEFAULT(descriptor.token_bucket(), fill_interval, 0));
 
+    // Validate that the descriptor's fill interval is logically correct (same
+    // constraint of >=50msec as for fill_interval).
+    if (per_descriptor_fill_interval < std::chrono::milliseconds(50)) {
+      throw EnvoyException("local rate limit descriptor token bucket fill timer must be >= 50ms");
+    }
+
     if (per_descriptor_fill_interval.count() % fill_interval.count() != 0) {
       throw EnvoyException(
           "local rate descriptor limit is not a multiple of token bucket fill timer");

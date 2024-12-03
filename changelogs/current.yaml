@@ -103,6 +103,9 @@ bug_fixes:
     Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
     in the :ref:`google_grpc <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>` resource used for ADS, and adds
     that as a tag ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
+- area: golang
+  change:
+    Fixes a crash during Golang GC caused by accessing deleted decoder_callbacks. The bug was introduced in 1.31.0.
 - area: access_log
   change: |
     Relaxed the restriction on SNI logging to allow the ``_`` character, even if
@@ -131,6 +134,10 @@ bug_fixes:
 - area: validation/tools
   change: |
     Add back missing extension for ``schema_validator_tool``.
+- area: udp/dynamic_forward_proxy
+  change: |
+    Fixed bug where dynamic_forward_proxy udp session filter disabled buffer in filter config
+    instead of disabling buffer for the filter instance.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -205,6 +212,9 @@ new_features:
     :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` access log
     formatter operator. The following time points were added: ``%US_CX_BEG%``,
     ``%US_CX_END%``, ``%US_HS_END%``.
+- area: lua
+  change: |
+    Add logging functions to all lua objects. Previously these were only available on the Lua http filter request handle.
 - area: access log
   change: |
     Added fields for :ref:`DOWNSTREAM_DIRECT_LOCAL_ADDRESS and DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT <config_access_log_format>`.

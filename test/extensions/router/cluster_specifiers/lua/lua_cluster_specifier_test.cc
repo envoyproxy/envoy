@@ -307,6 +307,33 @@ TEST_F(LuaClusterSpecifierPluginTest, ClusterRef) {
   config_->perLuaCodeSetup()->runtimeGC();
 }
 
+TEST_F(LuaClusterSpecifierPluginTest, Logging) {
+  const std::string config = R"EOF(
+  source_code:
+    inline_string: |
+      function envoy_on_route(route_handle)
+        route_handle:logTrace("log test")
+        route_handle:logDebug("log test")
+        route_handle:logInfo("log test")
+        route_handle:logWarn("log test")
+        route_handle:logErr("log test")
+        route_handle:logCritical("log test")
+      end
+  default_cluster: default_service
+  )EOF";
+  setUpTest(config);
+
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"trace", "log test"},
+                                                         {"debug", "log test"},
+                                                         {"info", "log test"},
+                                                         {"warn", "log test"},
+                                                         {"error", "log test"},
+                                                         {"critical", "log test"}}),
+                             { plugin_->route(mock_route, headers); });
+}
+
 } // namespace Lua
 } // namespace Router
 } // namespace Extensions
