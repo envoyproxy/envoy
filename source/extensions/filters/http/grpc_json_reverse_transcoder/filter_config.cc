@@ -50,21 +50,17 @@ using ::google::grpc::transcoding::TypeHelper;
 GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
     const GrpcJsonReverseTranscoder& transcoder_config, Api::Api& api) {
   Protobuf::FileDescriptorSet descriptor_set;
-  switch (transcoder_config.descriptor_set_case()) {
-  case GrpcJsonReverseTranscoder::DescriptorSetCase::kDescriptorPath: {
+  if (!transcoder_config.descriptor_path().empty()) {
     auto file_or_error = api.fileSystem().fileReadToEnd(transcoder_config.descriptor_path());
     THROW_IF_NOT_OK(file_or_error.status());
     if (!descriptor_set.ParseFromString(file_or_error.value())) {
       throw EnvoyException("Unable to parse proto descriptor");
     }
-    break;
-  }
-  case GrpcJsonReverseTranscoder::DescriptorSetCase::kDescriptorBinary:
+  } else if (!transcoder_config.descriptor_binary().empty()) {
     if (!descriptor_set.ParseFromString(transcoder_config.descriptor_binary())) {
       throw EnvoyException("Unable to parse proto descriptor binary");
     }
-    break;
-  case GrpcJsonReverseTranscoder::DescriptorSetCase::DESCRIPTOR_SET_NOT_SET:
+  } else {
     throw EnvoyException("Descriptor set not set");
   }
   for (auto& file : descriptor_set.file()) {
