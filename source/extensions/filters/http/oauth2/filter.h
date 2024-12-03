@@ -293,10 +293,9 @@ public:
   void finishRefreshAccessTokenFlow();
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
-  bool validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce);
-  const std::string& encodeState(const std::string& original_request_url, const std::string& nonce)
 
-      private : friend class OAuth2Test;
+private:
+  friend class OAuth2Test;
 
   std::shared_ptr<CookieValidator> validator_;
 
@@ -335,6 +334,9 @@ public:
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str);
+  bool validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce);
+  const std::string encodeState(const std::string& original_request_url,
+                                const std::string& nonce) const;
 };
 
 } // namespace Oauth2
