@@ -167,7 +167,7 @@ absl::Status GrpcJsonReverseTranscoderConfig::CreateTranscoder(
     if (!status.ok()) {
       return status;
     }
-    if (request_body_field_path.size() == 0) {
+    if (request_body_field_path.empty()) {
       return absl::InvalidArgumentError(
           absl::StrCat("Failed to resolve the request type: ", request_type_url));
     }
