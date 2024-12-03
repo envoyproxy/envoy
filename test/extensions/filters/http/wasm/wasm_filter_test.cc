@@ -477,8 +477,8 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data1, false));
   // The first call to decodeData() will not result in the addDecodedData() callback being called
-  // because the filter doesn't know will the VM's onRequestBody() return StopIterationAndBuffer or
-  // Continue. Add the data to the buffer manually for the test.
+  // because the filter doesn't yet know if the VM's onRequestBody() will return
+  // StopIterationAndBuffer or Continue. Add the data to the buffer manually for the test.
   bufferedBody.add(data1);
 
   // The second call to decodeData() will result in the addDecodedData() callback being called
@@ -510,7 +510,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
   filter().onDestroy();
 }
 
-TEST_P(WasmHttpFilterTest, BodyRequestBufferBodyAndDestoryFilterInTheAddDecodedDataCallback) {
+TEST_P(WasmHttpFilterTest, BodyRequestBufferBodyAndDestroyFilterInTheAddDecodedDataCallback) {
   setupTest("body");
   setupFilter();
 
@@ -527,8 +527,8 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBodyAndDestoryFilterInTheAddDecodedD
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data1, false));
   // The first call to decodeData() will not result in the addDecodedData() callback being called
-  // because the filter doesn't know will the VM's onRequestBody() return StopIterationAndBuffer or
-  // Continue. Add the data to the buffer manually for the test.
+  // because the filter doesn't yet know if the VM's onRequestBody() will return
+  // StopIterationAndBuffer or Continue. Add the data to the buffer manually for the test.
   bufferedBody.add(data1);
 
   // The second call to decodeData() will result in the addDecodedData() callback being called
@@ -684,8 +684,8 @@ TEST_P(WasmHttpFilterTest, BodyResponseBufferThenStreamBody) {
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().encodeData(data1, false));
   // The first call to encodeData() will not result in the addEncodedData() callback being called
-  // because the filter doesn't know will the VM's onResponseBody() return StopIterationAndBuffer or
-  // Continue. Add the data to the buffer manually for the test.
+  // because the filter doesn't yet know if the VM's onResponseBody() will return
+  // StopIterationAndBuffer or Continue. Add the data to the buffer manually for the test.
   bufferedBody.add(data1);
 
   // The second call to encodeData() will result in the addEncodedData() callback being called
