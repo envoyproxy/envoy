@@ -96,7 +96,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderManager::addDynamicProvider(
     ASSERT(config_source_field != nullptr);
 
     Protobuf::Message* mutable_config_source = reflectable_message->GetReflection()->MutableMessage(
-        reflectable_message, config_source_field);
+        &(*reflectable_message), config_source_field);
 
     ASSERT(mutable_config_source != nullptr);
 
@@ -107,7 +107,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderManager::addDynamicProvider(
     // `reflectable_message` allows to modify values inside the 'rds'.
     // initial_fetch_timeout will be normalized (zeroed) before hash is calculated and must be
     // restored to the original value after hash has been calculated.
-    Protobuf::Duration* orig_initial_timeout = config_source.release_initial_fetch_timeout();
+    auto* orig_initial_timeout = config_source.release_initial_fetch_timeout();
     manager_identifier = MessageUtil::hash(rds);
     config_source.set_allocated_initial_fetch_timeout(orig_initial_timeout);
   } else {
