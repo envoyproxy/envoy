@@ -131,10 +131,6 @@ xcodeproj(
             launch_action = xcode_schemes.launch_action("//examples/objective-c/hello_world:app"),
         ),
         xcode_schemes.scheme(
-            name = "Baseline App",
-            launch_action = xcode_schemes.launch_action("//test/swift/apps/baseline:app"),
-        ),
-        xcode_schemes.scheme(
             name = "Experimental App",
             launch_action = xcode_schemes.launch_action("//test/swift/apps/experimental:app"),
         ),
@@ -165,7 +161,6 @@ xcodeproj(
             labels = [
                 "//examples/objective-c/hello_world:app",
                 "//examples/swift/hello_world:app",
-                "//test/swift/apps/baseline:app",
                 "//test/swift/apps/experimental:app",
             ],
             target_environments = [
