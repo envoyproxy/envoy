@@ -20,14 +20,16 @@ Health check
 Statistics
 ----------
 
-The health check filter outputs statistics in the ``<stat_prefix>.health_check.`` namespace.
+The health check filter outputs statistics in the ``http.<stat_prefix>.health_check.`` namespace. The
+:ref:`stat prefix <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
+comes from the owning HTTP connection manager.
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  request_total, Counter, Total number of requests that were served from this health check filter
-  failed, Counter, Total number of health checks that failed (including failures from cluster status)
+  request_total, Counter, Total number of requests processed by this health check filter, including responses served from the cache
+  failed, Counter, Total number of health checks that failed, including failures due to cluster status and responses served from the cache
   ok, Counter, Total number of health checks that passed
   cached_response, Counter, Total number of requests that were responded to with cached health check status
   failed_cluster_not_found, Counter, Total number of failed health checks due to referenced cluster not being found

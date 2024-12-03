@@ -134,6 +134,7 @@ void HealthCheckFilter::onComplete() {
       stats_->cached_response_.inc();
     } else if (cluster_min_healthy_percentages_ != nullptr &&
                !cluster_min_healthy_percentages_->empty()) {
+      // Check the status of the specified upstream cluster(s) to determine the right response.
       auto& clusterManager = context_.clusterManager();
       for (const auto& item : *cluster_min_healthy_percentages_) {
         details = &RcDetails::get().HealthCheckClusterHealthy;
@@ -141,6 +142,7 @@ void HealthCheckFilter::onComplete() {
         const uint64_t min_healthy_percentage = static_cast<uint64_t>(item.second);
         auto* cluster = clusterManager.getThreadLocalCluster(cluster_name);
         if (cluster == nullptr) {
+          // If the cluster does not exist at all, consider the service unhealthy.
           final_status = Http::Code::ServiceUnavailable;
           details = &RcDetails::get().HealthCheckNoCluster;
           stats_->failed_cluster_not_found_.inc();
@@ -150,6 +152,8 @@ void HealthCheckFilter::onComplete() {
         const auto& endpoint_stats = cluster->info()->endpointStats();
         const uint64_t membership_total = endpoint_stats.membership_total_.value();
         if (membership_total == 0) {
+          // If the cluster exists but is empty, consider the service unhealthy unless
+          // the specified minimum percent healthy for the cluster happens to be zero.
           if (min_healthy_percentage == 0UL) {
             continue;
           } else {
@@ -159,7 +163,8 @@ void HealthCheckFilter::onComplete() {
             break;
           }
         }
-
+        // In the general case, consider the service unhealthy if fewer than the
+        // specified percentage of the servers in the cluster are available (healthy + degraded).
         if ((100UL * (endpoint_stats.membership_healthy_.value() +
                       endpoint_stats.membership_degraded_.value())) <
             membership_total * min_healthy_percentage) {

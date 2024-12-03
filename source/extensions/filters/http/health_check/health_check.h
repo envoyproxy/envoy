@@ -44,19 +44,14 @@ struct HealthCheckFilterStats {
   }
 };
 
-// Forward declarations
-class HealthCheckFilter;
-class HealthCheckCacheManager;
-
-using HealthCheckCacheManagerSharedPtr = std::shared_ptr<HealthCheckCacheManager>;
 using HealthCheckFilterStatsSharedPtr = std::shared_ptr<HealthCheckFilterStats>;
-using ClusterMinHealthyPercentages = std::map<std::string, double>;
-using ClusterMinHealthyPercentagesConstSharedPtr =
-    std::shared_ptr<const ClusterMinHealthyPercentages>;
-using HeaderDataVectorSharedPtr = std::shared_ptr<std::vector<Http::HeaderUtility::HeaderDataPtr>>;
 
 /**
- * Shared cache manager used by all filter instances.
+ * Shared cache manager used by all instances of a health check filter configuration as well as
+ * all threads. This sets up a timer that will invalidate the cached response code and allow some
+ * requests to go through to the backend. No attempt is made to allow only a single request to go
+ * through to the backend, so during the invalidation window some number of requests will get
+ * through.
  */
 class HealthCheckCacheManager {
 public:
@@ -81,6 +76,12 @@ private:
   std::atomic<Http::Code> last_response_code_{};
   std::atomic<bool> last_response_degraded_{};
 };
+
+using HealthCheckCacheManagerSharedPtr = std::shared_ptr<HealthCheckCacheManager>;
+using HeaderDataVectorSharedPtr = std::shared_ptr<std::vector<Http::HeaderUtility::HeaderDataPtr>>;
+using ClusterMinHealthyPercentages = std::map<std::string, double>;
+using ClusterMinHealthyPercentagesConstSharedPtr =
+    std::shared_ptr<const ClusterMinHealthyPercentages>;
 
 /**
  * Health check responder filter.
