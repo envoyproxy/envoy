@@ -37,9 +37,11 @@ public:
   TcpStatsdSinkTest() {
     cluster_manager_.initializeClusters({"fake_cluster"}, {});
     cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
-    sink_ = std::make_unique<TcpStatsdSink>(
-        local_info_, "fake_cluster", tls_, cluster_manager_,
-        *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()));
+    sink_ =
+        TcpStatsdSink::create(
+            local_info_, "fake_cluster", tls_, cluster_manager_,
+            *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()))
+            .value();
   }
 
   void expectCreateConnection() {
@@ -191,10 +193,11 @@ TEST_F(TcpStatsdSinkTest, NoHost) {
 }
 
 TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
-  sink_ = std::make_unique<TcpStatsdSink>(
-      local_info_, "fake_cluster", tls_, cluster_manager_,
-      *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()),
-      "test_prefix");
+  sink_ = TcpStatsdSink::create(
+              local_info_, "fake_cluster", tls_, cluster_manager_,
+              *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()),
+              "test_prefix")
+              .value();
 
   NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";

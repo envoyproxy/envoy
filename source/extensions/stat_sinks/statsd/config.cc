@@ -14,7 +14,7 @@ namespace Extensions {
 namespace StatSinks {
 namespace Statsd {
 
-Stats::SinkPtr
+absl::StatusOr<Stats::SinkPtr>
 StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                    Server::Configuration::ServerFactoryContext& server) {
 
@@ -24,7 +24,7 @@ StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
   switch (statsd_sink.statsd_specifier_case()) {
   case envoy::config::metrics::v3::StatsdSink::StatsdSpecifierCase::kAddress: {
     auto address_or_error = Network::Address::resolveProtoAddress(statsd_sink.address());
-    THROW_IF_NOT_OK_REF(address_or_error.status());
+    RETURN_IF_NOT_OK_REF(address_or_error.status());
     Network::Address::InstanceConstSharedPtr address = address_or_error.value();
     ENVOY_LOG(debug, "statsd UDP ip address: {}", address->asString());
     return std::make_unique<Common::Statsd::UdpStatsdSink>(server.threadLocal(), std::move(address),
@@ -32,9 +32,9 @@ StatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
   }
   case envoy::config::metrics::v3::StatsdSink::StatsdSpecifierCase::kTcpClusterName:
     ENVOY_LOG(debug, "statsd TCP cluster: {}", statsd_sink.tcp_cluster_name());
-    return std::make_unique<Common::Statsd::TcpStatsdSink>(
-        server.localInfo(), statsd_sink.tcp_cluster_name(), server.threadLocal(),
-        server.clusterManager(), server.scope(), statsd_sink.prefix());
+    return Common::Statsd::TcpStatsdSink::create(server.localInfo(), statsd_sink.tcp_cluster_name(),
+                                                 server.threadLocal(), server.clusterManager(),
+                                                 server.scope(), statsd_sink.prefix());
   case envoy::config::metrics::v3::StatsdSink::StatsdSpecifierCase::STATSD_SPECIFIER_NOT_SET:
     break; // Fall through to PANIC
   }
