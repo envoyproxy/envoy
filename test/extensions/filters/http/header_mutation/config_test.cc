@@ -57,7 +57,7 @@ TEST(FactoryTest, FactoryTest) {
 
   EXPECT_NE(nullptr, factory->createRouteSpecificFilterConfig(
                          per_route_proto_config, mock_factory_context.server_factory_context_,
-                         mock_factory_context.messageValidationVisitor()));
+                         mock_factory_context.messageValidationVisitor()).value());
 }
 
 TEST(FactoryTest, UpstreamFactoryTest) {

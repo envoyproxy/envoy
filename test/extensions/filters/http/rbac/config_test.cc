@@ -115,7 +115,7 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
       factory.createRouteSpecificFilterConfig(*proto_config, context,
-                                              ProtobufMessage::getNullValidationVisitor());
+                                              ProtobufMessage::getNullValidationVisitor()).value();
   EXPECT_TRUE(route_config.get());
 }
 

@@ -26,7 +26,7 @@ private:
       const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;

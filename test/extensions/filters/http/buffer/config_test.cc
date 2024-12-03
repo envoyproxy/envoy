@@ -106,7 +106,7 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
       factory.createRouteSpecificFilterConfig(*proto_config, factory_context,
-                                              ProtobufMessage::getNullValidationVisitor());
+                                              ProtobufMessage::getNullValidationVisitor()).value();
   EXPECT_TRUE(route_config.get());
 
   const auto* inflated = dynamic_cast<const BufferFilterSettings*>(route_config.get());

@@ -65,7 +65,7 @@ public:
     NiceMock<Server::Configuration::MockServerFactoryContext> context;
     return std::dynamic_pointer_cast<const FileSystemBufferFilterConfig>(
         factory()->createRouteSpecificFilterConfig(route_proto_config, context,
-                                                   ProtobufMessage::getNullValidationVisitor()));
+                                                   ProtobufMessage::getNullValidationVisitor()).value());
   }
 };
 

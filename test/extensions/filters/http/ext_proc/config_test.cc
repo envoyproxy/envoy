@@ -147,7 +147,7 @@ TEST(HttpExtProcConfigTest, CorrectRouteMetadataOnlyConfig) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Router::RouteSpecificFilterConfigConstSharedPtr cb = factory.createRouteSpecificFilterConfig(
-      *proto_config, context, context.messageValidationVisitor());
+      *proto_config, context, context.messageValidationVisitor()).value();
 }
 
 TEST(HttpExtProcConfigTest, InvalidServiceConfig) {
@@ -451,7 +451,7 @@ TEST(HttpExtProcConfigTest, CompleteRouteConfig) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Router::RouteSpecificFilterConfigConstSharedPtr cb = factory.createRouteSpecificFilterConfig(
-      *proto_config, context, context.messageValidationVisitor());
+      *proto_config, context, context.messageValidationVisitor()).value();
   ASSERT_NE(nullptr, cb);
 }
 

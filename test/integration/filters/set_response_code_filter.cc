@@ -105,7 +105,7 @@ private:
     };
   }
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> createRouteSpecificFilterConfigTyped(
       const test::integration::filters::SetResponseCodePerRouteFilterConfig& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor&) override {
@@ -145,7 +145,7 @@ private:
     };
   }
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> createRouteSpecificFilterConfigTyped(
       const test::integration::filters::SetResponseCodePerRouteFilterConfigDual& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor&) override {

@@ -143,7 +143,7 @@ request_rules:
   HeaderToMetadataConfig factory;
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
-      proto_config, context, ProtobufMessage::getNullValidationVisitor());
+      proto_config, context, ProtobufMessage::getNullValidationVisitor()).value();
   const auto* config = dynamic_cast<const Config*>(route_config.get());
   EXPECT_TRUE(config->doRequest());
   EXPECT_FALSE(config->doResponse());

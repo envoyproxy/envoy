@@ -38,7 +38,7 @@ TEST(CompressorFilterFactoryTests, EmptyPerRouteConfig) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   CompressorFilterFactory factory;
   EXPECT_THROW(factory.createRouteSpecificFilterConfig(per_route, context,
-                                                       context.messageValidationVisitor()),
+                                                       context.messageValidationVisitor()).value(),
                ProtoValidationException);
 }
 

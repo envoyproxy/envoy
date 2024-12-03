@@ -75,7 +75,7 @@ Http::FilterFactoryCb BasicAuthFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 BasicAuthFilterFactory::createRouteSpecificFilterConfigTyped(
     const BasicAuthPerRoute& proto_config, Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor&) {

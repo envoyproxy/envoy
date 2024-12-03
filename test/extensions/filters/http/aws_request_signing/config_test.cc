@@ -366,7 +366,7 @@ stat_prefix: foo_prefix
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  ASSERT_NE(route_config, nullptr);
+  ASSERT_TRUE(route_config.ok());
 }
 
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4RegionInEnv) {
@@ -392,7 +392,7 @@ stat_prefix: foo_prefix
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  ASSERT_NE(route_config, nullptr);
+  ASSERT_TRUE(route_config.ok());
 }
 
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4A) {
@@ -417,7 +417,7 @@ stat_prefix: foo_prefix
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  ASSERT_NE(route_config, nullptr);
+  ASSERT_TRUE(route_config.ok());
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidRegionRouteSpecificFilterConfigSigV4) {
@@ -573,7 +573,7 @@ stat_prefix: foo_prefix
   EXPECT_THROW(
       {
         const auto route_config = factory.createRouteSpecificFilterConfig(
-            proto_config, context, ProtobufMessage::getNullValidationVisitor());
+            proto_config, context, ProtobufMessage::getNullValidationVisitor()).value();
       },
       EnvoyException);
 }

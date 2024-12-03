@@ -129,7 +129,7 @@ xds_matcher:
   TestUtility::loadFromYamlAndValidate(yaml, config);
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
       factory.createRouteSpecificFilterConfig(config, server_factory_context,
-                                              ProtobufMessage::getNullValidationVisitor());
+                                              ProtobufMessage::getNullValidationVisitor()).value();
   EXPECT_TRUE(route_config.get());
 }
 
