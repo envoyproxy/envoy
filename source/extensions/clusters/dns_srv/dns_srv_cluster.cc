@@ -79,7 +79,7 @@ void DnsSrvCluster::startResolve() {
         ENVOY_LOG(debug, "Got DNS response, details: {}, status: {}", details,
                   static_cast<int>(status));
 
-        if (status == Network::DnsResolver::ResolutionStatus::Success) {
+        if (status == Network::DnsResolver::ResolutionStatus::Completed) {
           for (const auto& dns : response) {
             ENVOY_LOG(debug, "SRV: host: {}, port: {}, weight: {}, prio: {}", dns.srv().host_,
                       dns.srv().port_, dns.srv().weight_, dns.srv().priority_);
@@ -118,7 +118,7 @@ void DnsSrvCluster::allTargetsResolved() {
   for (const auto& target : active_resolve_list_->getResolvedTargets()) {
     // SRV query returns a number of instances (hostnames), but each hostname
     // may potentially be resolved in a number of IP addresses
-    if (target->resolve_status_ != Network::DnsResolver::ResolutionStatus::Success) {
+    if (target->resolve_status_ != Network::DnsResolver::ResolutionStatus::Completed) {
       ENVOY_LOG(debug, "IP resolution for target: '{}' has failed", target->srv_record_hostname_);
       continue;
     }
@@ -133,7 +133,7 @@ void DnsSrvCluster::allTargetsResolved() {
 
       ENVOY_LOG(debug, "Endpoints size: {}", load_assignment_.endpoints().size());
       // load_assignment_.endpoints()[0].lb_endpoints()
-      new_hosts.emplace_back(new HostImpl(
+      auto host_or_status = HostImpl::create(
           info_, target->srv_record_hostname_, address,
           // TODO(zyfjeff): Created through metadata shared pool
           std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
@@ -141,7 +141,16 @@ void DnsSrvCluster::allTargetsResolved() {
               locality_lb_endpoints.metadata()),
           lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints.locality(),
           lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints.priority(),
-          lb_endpoint_.health_status(), time_source_));
+          lb_endpoint_.health_status(), time_source_);
+
+      if (!host_or_status.ok()) {
+        // TODO: update counter?
+        // TODO: log address
+        ENVOY_LOG(debug, "Failed to create host record for: '{}'", target->srv_record_hostname_);
+        continue;
+      }
+
+      new_hosts.emplace_back(std::move(host_or_status.value()));
       all_new_hosts.emplace(address->asString());
 
       priority_state_manager.registerHostForPriority(new_hosts.back(), locality_lb_endpoints);
@@ -251,7 +260,7 @@ void DnsSrvCluster::ResolveTarget::startResolve() {
 
         active_dns_query_ = nullptr;
 
-        if (status == Network::DnsResolver::ResolutionStatus::Success) {
+        if (status == Network::DnsResolver::ResolutionStatus::Completed) {
           for (const auto& resp : response) {
             const auto& addrinfo = resp.addrInfo();
             ENVOY_LOG(debug, "Resolved ip for '{}' = {}", srv_record_hostname_,
@@ -277,7 +286,7 @@ DnsSrvClusterFactory::createClusterWithConfig(
     const envoy::extensions::clusters::dns_srv::v3::Cluster& proto_config,
     Upstream::ClusterFactoryContext& context) {
   auto dns_resolver_or_error = selectDnsResolver(cluster, context);
-  THROW_IF_NOT_OK(dns_resolver_or_error.status());
+  RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
   if (proto_config.srv_names_size() > 1) {
     return absl::InvalidArgumentError("SRV DNS Cluster can only contain one DNS record (so far)");
