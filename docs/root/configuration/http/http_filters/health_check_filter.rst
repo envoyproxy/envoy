@@ -28,8 +28,8 @@ comes from the owning HTTP connection manager.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  request_total, Counter, Total number of requests processed by this health check filter, including responses served from the cache
-  failed, Counter, Total number of health checks that failed, including failures due to cluster status and responses served from the cache
+  request_total, Counter, Total number of requests processed by this health check filter ()including responses served from the cache)
+  failed, Counter, Total number of health checks that failed (including failures due to cluster status and responses served from the cache)
   ok, Counter, Total number of health checks that passed
   cached_response, Counter, Total number of requests that were responded to with cached health check status
   failed_cluster_not_found, Counter, Total number of failed health checks due to referenced cluster not being found
