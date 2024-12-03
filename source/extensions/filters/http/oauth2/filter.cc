@@ -492,10 +492,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     scheme = Http::Headers::get().SchemeValues.Http;
   }
 
-  const std::string base_path = absl::StrCat(scheme, "://", host_);
-  const std::string full_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
-  const std::string escaped_url = Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
-
   // Generate a nonce to prevent CSRF attacks
   std::string nonce;
   bool nonce_cookie_exists = false;
@@ -524,10 +520,12 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
         absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
   }
 
+  const std::string base_path = absl::StrCat(scheme, "://", host_);
+  const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
+
   // Encode the original request URL and the nonce to the state parameter
-  const std::string state =
-      absl::StrCat(stateParamsUrl, "=", escaped_url, "&", stateParamsNonce, "=", nonce);
-  const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
+  const std::string state = encodeState(original_url, nonce);
+  query_params.overwrite(queryParamsState, state);
 
   Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
@@ -538,7 +536,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
 
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
-  query_params.overwrite(queryParamsState, escaped_state);
+
   // Copy the authorization endpoint URL to replace its query params.
   auto authorization_endpoint_url = config_->authorizationEndpointUrl();
   const std::string path_and_query_params = query_params.replaceQueryString(
@@ -551,6 +549,43 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
   config_->stats().oauth_unauthorized_rq_.inc();
+}
+
+/**
+ * Encodes the state parameter for the OAuth2 flow.
+ * The state parameter is a base64Url encoded JSON object containing the original request URL and a nonce for CSRF protection.
+ *
+ */
+const std::string& OAuth2Filter::encodeState(const std::string& original_request_url,
+                                             const std::string& nonce) {
+  ProtobufWkt::Struct protobuf_struct;
+  auto& fields = *protobuf_struct.mutable_fields();
+  fields[stateParamsUrl].set_string_value(original_request_url);
+  fields[stateParamsNonce].set_string_value(nonce);
+
+  absl::StatusOr<std::string> json_or_error =
+      Envoy::MessageUtil::getJsonStringFromMessage(protobuf_struct);
+  ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
+  if (json_or_error.ok()) {
+    return Envoy::Base64Url::encode(json_or_error.data(), json_or_error.size());
+  }
+  return "";
+}
+
+const std::string& OAuth2Filter::decodeState(const std::string& original_request_url,
+                                             const std::string& nonce) {
+  ProtobufWkt::Struct protobuf_struct;
+  auto& fields = *protobuf_struct.mutable_fields();
+  fields[stateParamsUrl].set_string_value(original_request_url);
+  fields[stateParamsNonce].set_string_value(nonce);
+
+  absl::StatusOr<std::string> json_or_error =
+      Envoy::MessageUtil::getJsonStringFromMessage(protobuf_struct);
+  ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
+  if (json_or_error.ok()) {
+    return Envoy::Base64Url::encode(json_or_error.data(), json_or_error.size());
+  }
+  return "";
 }
 
 /**
@@ -848,19 +883,21 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   }
 
   // Return 401 unauthorized if the state query parameter does not contain the original request URL
-  // and nonce. state is an HTTP URL encoded string that contains the url and nonce, for example:
-  // state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%3D1234567890000000".
-  std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
-  const auto state_parameters = Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
-  auto urlVal = state_parameters.getFirstValue(stateParamsUrl);
-  auto nonceVal = state_parameters.getFirstValue(stateParamsNonce);
-  if (!urlVal.has_value() || !nonceVal.has_value()) {
+  // and nonce.
+  std::string state = Envoy::Base64Url::decode(stateVal.value());
+   ProtobufWkt::Struct state_struct;
+
+  MessageUtil::loadFromJson(state,state_struct);
+  const auto& filed_value_pair = state_struct.fields();
+  f (!filed_value_pair.contains("code")) {
+  if (!filed_value_pair.contains(stateParamsUrl) ||
+      !filed_value_pair.contains(stateParamsNonce) ) {
     ENVOY_LOG(error, "state query param does not contain url or nonce: \n{}", state);
     return {false, "", ""};
   }
 
   // Return 401 unauthorized if the URL in the state is not valid.
-  std::string original_request_url = urlVal.value();
+  original_request_url = filed_value_pair.at(stateParamsUrl).string_value()
   Http::Utility::Url url;
   if (!url.initialize(original_request_url, false)) {
     ENVOY_LOG(error, "state url {} can not be initialized", original_request_url);
@@ -873,7 +910,8 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // sessions via CSRF attack. The attack can result in victims saving their sensitive data
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
-  if (!validateNonce(headers, nonceVal.value())) {
+  nonce = filed_value_pair.at(stateParamsNonce).string_value()
+  if (!validateNonce(headers, nonce)) {
     ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonceVal.value());
     return {false, "", ""};
   }
