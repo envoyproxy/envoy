@@ -101,7 +101,6 @@ paths:
     - source/common/watchdog/abort_action_config.cc
     - source/extensions/watchdog/profile_action/config.cc
     - source/common/router/route_config_update_receiver_impl.cc
-    - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc

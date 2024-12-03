@@ -65,7 +65,7 @@ public:
         server_(server) {}
 
   // Upstream::ClusterManagerFactory
-  ClusterManagerPtr
+  absl::StatusOr<ClusterManagerPtr>
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
   Http::ConnectionPool::InstancePtr allocateConnPool(
       Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
@@ -147,7 +147,7 @@ public:
    */
   ClusterManagerInitHelper(
       ClusterManager& cm,
-      const std::function<void(ClusterManagerCluster&)>& per_cluster_init_callback)
+      const std::function<absl::Status(ClusterManagerCluster&)>& per_cluster_init_callback)
       : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
@@ -190,10 +190,10 @@ private:
 
   void initializeSecondaryClusters();
   void maybeFinishInitialize();
-  void onClusterInit(ClusterManagerCluster& cluster);
+  absl::Status onClusterInit(ClusterManagerCluster& cluster);
 
   ClusterManager& cm_;
-  std::function<void(ClusterManagerCluster& cluster)> per_cluster_init_callback_;
+  std::function<absl::Status(ClusterManagerCluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
   ClusterManager::InitializationCompleteCallback initialized_callback_;
@@ -251,9 +251,9 @@ public:
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
   // Upstream::ClusterManager
-  bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                          const std::string& version_info,
-                          const bool avoid_cds_removal = false) override;
+  absl::StatusOr<bool> addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                                          const std::string& version_info,
+                                          const bool avoid_cds_removal = false) override;
 
   void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
     init_helper_.setPrimaryClustersInitializedCb(callback);
@@ -381,16 +381,14 @@ public:
 protected:
   // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
   // clusterManagerFromProto() static method. The init() method must be called after construction.
-  ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                     ClusterManagerFactory& factory,
-                     Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-                     ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                     const LocalInfo::LocalInfo& local_info,
-                     AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
-                     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                     Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context, Server::Instance& server);
+  ClusterManagerImpl(
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+      OptRef<Server::Admin> admin, ProtobufMessage::ValidationContext& validation_context,
+      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
+      Router::Context& router_context, Server::Instance& server, absl::Status& creation_status);
 
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -872,7 +870,7 @@ private:
                                              const std::string& version_info, bool added_via_api,
                                              bool required_for_ads, ClusterMap& cluster_map,
                                              bool avoid_cds_removal = false);
-  void onClusterInit(ClusterManagerCluster& cluster);
+  absl::Status onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);

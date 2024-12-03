@@ -46,7 +46,13 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
             fmt::format("{}: duplicate cluster {} found", cluster.name(), cluster.name()));
         continue;
       }
-      if (cm_.addOrUpdateCluster(cluster, resource.get().version())) {
+      auto update_or_error = cm_.addOrUpdateCluster(cluster, resource.get().version());
+      if (!update_or_error.status().ok()) {
+        exception_msgs.push_back(
+            fmt::format("{}: {}", cluster.name(), update_or_error.status().message()));
+        continue;
+      }
+      if (*update_or_error) {
         any_applied = true;
         ENVOY_LOG(debug, "{}: add/update cluster '{}'", name_, cluster.name());
         ++added_or_updated;
