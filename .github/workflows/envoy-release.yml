@@ -190,13 +190,13 @@ jobs:
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.2.36
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.12
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.2.36
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.12
       with:
         config: |
           fetch-depth: 0
