@@ -83,6 +83,7 @@ TimerTokenBucket::TimerTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill
       // Calculate the fill rate in tokens per second.
       fill_rate_(tokens_per_fill /
                  std::chrono::duration_cast<std::chrono::duration<double>>(fill_interval).count()) {
+  ASSERT(multiplier_ != 0);
   tokens_ = max_tokens;
   fill_time_ = parent_.time_source_.monotonicTime();
 }
@@ -129,7 +130,8 @@ void TimerTokenBucket::onFillTimer(uint64_t refill_counter, double factor) {
   // descriptor refill interval over the global refill interval. For example,
   // if the descriptor refill interval is 150ms and the global refill
   // interval is 50ms, this descriptor is refilled every 3rd call.
-  if (multiplier_ != 0 && refill_counter % multiplier_ != 0) {
+  ASSERT(multiplier_ != 0);
+  if (refill_counter % multiplier_ != 0) {
     return;
   }
 
