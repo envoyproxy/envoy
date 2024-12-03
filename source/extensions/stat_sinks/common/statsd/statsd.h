@@ -111,7 +111,7 @@ public:
                 const std::string& prefix = getDefaultPrefix());
 
   /**
-   * This is a wrapper around the constructor to allows it to return a StatusOr.
+   * This is a wrapper around the constructor to return StatusOr.
    */
   static absl::StatusOr<std::unique_ptr<TcpStatsdSink>>
   create(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
