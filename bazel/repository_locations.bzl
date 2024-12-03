@@ -1383,7 +1383,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         version = "3.8.0",
         sha256 = "e0297cc6fdb09ef9d9905751b25d2b629c17528f8629b60561eeff87ce29099c",
         strip_prefix = "kafka_2.13-{version}",
-        urls = ["https://archive.apache.org/dist/kafka/{version}/kafka_2.13-{version}.tgz"],
+        urls = ["https://downloads.apache.org/kafka/{version}/kafka_2.13-{version}.tgz"],
         release_date = "2024-07-23",
         use_category = ["test_only"],
     ),
@@ -1469,8 +1469,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.52.2",
-        sha256 = "671ddb3fe5ebcf9dd34d051eca7352fbaf33fa53bf61eed0b75a4c34829e5480",
+        version = "0.53.0",
+        sha256 = "85e2013727ab26fb22abdffe4b2ac0c27a2d5b6296167ba63d8f6e13140f51f9",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
@@ -1482,7 +1482,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         ],
         implied_untracked_deps = ["rules_cc"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2024-10-07",
+        release_date = "2024-10-18",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",
