@@ -65,6 +65,30 @@ The following UDP statistics are available for UDP listeners and are rooted at
 
    downstream_rx_datagram_dropped, Counter, Number of datagrams dropped due to kernel overflow or truncation
 
+.. _config_listener_stats_quic:
+
+QUIC statistics
+---------------
+
+The following QUIC statistics, which are available when using the :ref:`QUIC stats debug visitor <envoy_v3_api_msg_extensions.quic.connection_debug_visitor.quic_stats.v3.Config>`,
+are rooted at *listener.<address>.quic_stats.*:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   cx_tx_packets_total, Counter, Total packets transmitted
+   cx_tx_packets_retransmitted_total, Counter, Total packets retransmitted
+   cx_tx_amplification_throttling_total, Counter, Total number of packets throttled during the server handshake response. This often indicates that the TLS certificate chain is too long to be transmitted without an additional network round trip.
+   cx_rx_packets_total, Counter, Total number of packets received
+   cx_path_degrading_total, Counter, Number of times that network path degradation was detected
+   cx_forward_progress_after_path_degrading_total, Counter, Number of times that forward progress was made after the path degraded
+   cx_rtt_us, Histogram, Smoothed round trip time estimate in microseconds
+   cx_tx_estimated_bandwidth, Histogram, Estimated connection bandwith in bytes per second
+   cx_tx_percent_retransmitted_packets, Histogram, Percent of packets on a connection which were retransmistted
+   cx_tx_mtu, Histogram, The maximum packet size that will be sent for a connection
+   cx_rx_mtu, Histogram, The size of the largest packet received from the peer
+
 .. _config_listener_stats_per_handler:
 
 Per-handler Listener Stats

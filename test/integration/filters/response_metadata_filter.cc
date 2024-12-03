@@ -53,6 +53,13 @@ public:
     return Http::Filter1xxHeadersStatus::Continue;
   }
 
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
+    Http::MetadataMap metadata_map = {{"local-reply", "local-reply"}};
+    Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
+    encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
+    return Http::LocalErrorStatus::Continue;
+  }
+
   // Adds new metadata to metadata_map directly, and consumes metadata when the keys are equal to
   // remove and metadata. If the key is equal to consume, replaces it with replace.
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap& metadata_map) override {

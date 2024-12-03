@@ -136,7 +136,7 @@ public:
   /**
    * @return std::list<AccessLog::InstanceSharedPtr> the list of access loggers.
    */
-  virtual std::list<AccessLog::InstanceSharedPtr> accessLogs() const PURE;
+  virtual AccessLog::InstanceSharedPtrVector accessLogs() const PURE;
 
   /**
    * @return const std::string& profiler output path.

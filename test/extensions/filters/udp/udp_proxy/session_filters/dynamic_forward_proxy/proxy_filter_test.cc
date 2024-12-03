@@ -93,8 +93,6 @@ TEST_F(DynamicProxyFilterTest, DefaultBufferConfig) {
   EXPECT_TRUE(filter_config_->bufferEnabled());
   EXPECT_EQ(1024, filter_config_->maxBufferedDatagrams());
   EXPECT_EQ(16384, filter_config_->maxBufferedBytes());
-  filter_config_->disableBuffer();
-  EXPECT_FALSE(filter_config_->bufferEnabled());
 }
 
 TEST_F(DynamicProxyFilterTest, CustomBufferConfig) {
@@ -109,11 +107,11 @@ TEST_F(DynamicProxyFilterTest, CustomBufferConfig) {
   EXPECT_EQ(20, filter_config_->maxBufferedBytes());
 }
 
-TEST_F(DynamicProxyFilterTest, StopIterationOnMissingHostAndPort) {
+TEST_F(DynamicProxyFilterTest, ContinueOnMissingHostAndPort) {
   setup();
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onNewSession());
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(recv_data_stub1_));
 }
 
 TEST_F(DynamicProxyFilterTest, StopIterationOnMissingPort) {
@@ -124,25 +122,25 @@ TEST_F(DynamicProxyFilterTest, StopIterationOnMissingPort) {
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, StopIterationOnMissingHost) {
+TEST_F(DynamicProxyFilterTest, ContinueOnMissingHost) {
   setup();
   setFilterStatePort(50);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onNewSession());
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(recv_data_stub1_));
 }
 
-TEST_F(DynamicProxyFilterTest, StopIterationOnEmptyHost) {
+TEST_F(DynamicProxyFilterTest, ContinueOnEmptyHost) {
   setup();
   setFilterState("", 50);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
-  EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onNewSession());
+  EXPECT_EQ(ReadFilterStatus::Continue, filter_->onData(recv_data_stub1_));
 }
 
 TEST_F(DynamicProxyFilterTest, StopIterationOnPortIsZero) {
   setup();
-  setFilterState("", 0);
+  setFilterState("host", 0);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
@@ -150,7 +148,7 @@ TEST_F(DynamicProxyFilterTest, StopIterationOnPortIsZero) {
 
 TEST_F(DynamicProxyFilterTest, StopIterationOnPortOutOfRange) {
   setup();
-  setFilterState("", 65536);
+  setFilterState("host", 65536);
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onNewSession());
   EXPECT_EQ(ReadFilterStatus::StopIteration, filter_->onData(recv_data_stub1_));
@@ -248,7 +246,10 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithDefaultBufferConfig) {
   filter_->onLoadDnsCacheComplete(host_info);
 
   EXPECT_CALL(*handle, onDestroy());
-  EXPECT_FALSE(filter_config_->bufferEnabled());
+
+  // Filter buffer is disabled but the filter config still has the buffer enabled.
+  EXPECT_FALSE(filter_->sessionBufferEnabled());
+  EXPECT_TRUE(filter_config_->bufferEnabled());
 }
 
 TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferSizeOverflow) {
@@ -282,7 +283,10 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferSizeOverflow) {
   filter_->onLoadDnsCacheComplete(host_info);
 
   EXPECT_CALL(*handle, onDestroy());
-  EXPECT_FALSE(filter_config_->bufferEnabled());
+
+  // Filter buffer is disabled but the filter config still has the buffer enabled.
+  EXPECT_FALSE(filter_->sessionBufferEnabled());
+  EXPECT_TRUE(filter_config_->bufferEnabled());
 }
 
 TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferBytesOverflow) {
@@ -316,7 +320,10 @@ TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithBufferBytesOverflow) {
   filter_->onLoadDnsCacheComplete(host_info);
 
   EXPECT_CALL(*handle, onDestroy());
-  EXPECT_FALSE(filter_config_->bufferEnabled());
+
+  // Filter buffer is disabled but the filter config still has the buffer enabled.
+  EXPECT_FALSE(filter_->sessionBufferEnabled());
+  EXPECT_TRUE(filter_config_->bufferEnabled());
 }
 
 TEST_F(DynamicProxyFilterTest, LoadingCacheEntryWithContinueFilterChainFailure) {

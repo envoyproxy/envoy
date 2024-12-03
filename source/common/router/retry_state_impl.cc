@@ -156,7 +156,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy,
       envoy::config::route::v3::HeaderMatcher header_matcher;
       header_matcher.set_name(std::string(absl::StripAsciiWhitespace(header_name)));
       retriable_headers_.emplace_back(
-          std::make_shared<Http::HeaderUtility::HeaderData>(header_matcher, context));
+          Http::HeaderUtility::createHeaderData(header_matcher, context));
     }
   }
 }
