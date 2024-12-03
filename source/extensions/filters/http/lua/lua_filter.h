@@ -178,12 +178,6 @@ public:
             {"bodyChunks", static_luaBodyChunks},
             {"trailers", static_luaTrailers},
             {"metadata", static_luaMetadata},
-            {"logTrace", static_luaLogTrace},
-            {"logDebug", static_luaLogDebug},
-            {"logInfo", static_luaLogInfo},
-            {"logWarn", static_luaLogWarn},
-            {"logErr", static_luaLogErr},
-            {"logCritical", static_luaLogCritical},
             {"httpCall", static_luaHttpCall},
             {"respond", static_luaRespond},
             {"streamInfo", static_luaStreamInfo},
@@ -264,17 +258,6 @@ private:
    * @return a handle to the network connection's stream info.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaConnectionStreamInfo);
-
-  /**
-   * Log a message to the Envoy log.
-   * @param 1 (string): The log message.
-   */
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogTrace);
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogDebug);
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogInfo);
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogWarn);
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogErr);
-  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaLogCritical);
 
   /**
    * Verify cryptographic signatures.
@@ -511,14 +494,13 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
 /**
  * The HTTP Lua filter. Allows scripts to run in both the request an response flow.
  */
-class Filter : public Http::StreamFilter, Logger::Loggable<Logger::Id::lua> {
+class Filter : public Http::StreamFilter, private Filters::Common::Lua::LuaLoggable {
 public:
   Filter(FilterConfigConstSharedPtr config, TimeSource& time_source)
       : config_(config), time_source_(time_source), stats_(config->stats()) {}
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
   void scriptError(const Filters::Common::Lua::LuaException& e);
-  virtual void scriptLog(spdlog::level::level_enum level, absl::string_view message);
 
   // Http::StreamFilterBase
   void onDestroy() override;
