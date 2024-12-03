@@ -24,6 +24,7 @@ static xds::data::orca::v3::OrcaLoadReport exampleOrcaLoadReport() {
   orca_load_report.set_rps_fractional(1000);
   orca_load_report.mutable_named_metrics()->insert({"foo", 123});
   orca_load_report.mutable_named_metrics()->insert({"bar", 0.2});
+  orca_load_report.mutable_utilization()->insert({"total", 0.5});
   return orca_load_report;
 }
 
@@ -74,7 +75,7 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeader) {
        absl::StrCat(kHeaderFormatPrefixText,
                     "cpu_utilization:0.7,application_utilization:0.8,mem_utilization:0.9,"
                     "rps_fractional:1000,eps:2,"
-                    "named_metrics.foo:123,named_metrics.bar:0.2")}};
+                    "named_metrics.foo:123,named_metrics.bar:0.2,utilization.total:0.5")}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
 }
@@ -161,7 +162,8 @@ TEST(OrcaParserUtilTest, JsonHeader) {
        absl::StrCat(kHeaderFormatPrefixJson,
                     "{\"cpu_utilization\": 0.7, \"application_utilization\": 0.8, "
                     "\"mem_utilization\": 0.9, \"rps_fractional\": 1000, \"eps\": 2, "
-                    "\"named_metrics\": {\"foo\": 123,\"bar\": 0.2}}")}};
+                    "\"named_metrics\": {\"foo\": 123,\"bar\": 0.2}, "
+                    "\"utilization\": {\"total\": 0.5}}")}};
   EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
               StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
 }

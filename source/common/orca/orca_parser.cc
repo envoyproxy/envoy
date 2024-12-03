@@ -49,6 +49,16 @@ absl::Status tryCopyNamedMetricToOrcaLoadReport(absl::string_view metric_name, d
   return absl::OkStatus();
 }
 
+absl::Status tryCopyUtilizationToOrcaLoadReport(absl::string_view metric_name, double metric_value,
+                                                OrcaLoadReport& orca_load_report) {
+  if (metric_name.empty()) {
+    return absl::InvalidArgumentError("utilization metric key is empty.");
+  }
+
+  orca_load_report.mutable_utilization()->insert({std::string(metric_name), metric_value});
+  return absl::OkStatus();
+}
+
 std::vector<absl::string_view> parseCommaDelimitedHeader(const absl::string_view entry) {
   std::vector<absl::string_view> values;
   std::vector<absl::string_view> tokens =
@@ -82,6 +92,11 @@ absl::Status tryCopyMetricToOrcaLoadReport(absl::string_view metric_name,
   if (std::isinf(value)) {
     return absl::InvalidArgumentError(
         fmt::format("custom backend load metric value({}) cannot be infinity.", metric_name));
+  }
+
+  if (absl::StartsWith(metric_name, kUtilizationPrefix)) {
+    auto metric_name_without_prefix = absl::StripPrefix(metric_name, kUtilizationPrefix);
+    return tryCopyUtilizationToOrcaLoadReport(metric_name_without_prefix, value, orca_load_report);
   }
 
   if (absl::StartsWith(metric_name, kNamedMetricsFieldPrefix)) {
