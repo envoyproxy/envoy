@@ -71,7 +71,11 @@ public:
     ASSERT(first < last, "Illegal byte range.");
   }
   uint64_t begin() const { return first_; }
+
   // Unlike RawByteRange, end() is one past the index of the last offset.
+  //
+  // If end() == std::numeric_limits<uint64_t>::max(), the cache doesn't yet
+  // know the response body's length.
   uint64_t end() const { return last_; }
   uint64_t length() const { return last_ - first_; }
   void trimFront(uint64_t n) {

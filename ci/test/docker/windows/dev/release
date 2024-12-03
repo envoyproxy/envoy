@@ -1,2 +1,0 @@
->> BUILD: mocktest/repo-legacy-dev:MOCKSHA
-> docker build --platform windows/amd64 -f ci/Dockerfile-envoy-windows --build-arg BUILD_OS=mcr.microsoft.com/windows/fakecore --build-arg BUILD_TAG=ltsc1992 -t mocktest/repo-legacy-dev:MOCKSHA .

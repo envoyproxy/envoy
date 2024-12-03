@@ -28,8 +28,9 @@ class HttpCacheTestDelegate {
 public:
   virtual ~HttpCacheTestDelegate() = default;
 
-  virtual void setUp(Event::MockDispatcher& dispatcher) { dispatcher_ = &dispatcher; }
+  virtual void setUp() {}
   virtual void tearDown() {}
+
   virtual std::shared_ptr<HttpCache> cache() = 0;
 
   // Specifies whether or not the cache supports validating stale cache entries
@@ -38,14 +39,21 @@ public:
   // RequiresValidation.
   virtual bool validationEnabled() const = 0;
 
-  Event::MockDispatcher& dispatcher() { return *dispatcher_; }
+  // May be overridden to, for example, also drain other threads into the dispatcher
+  // before draining the dispatcher.
+  virtual void beforePumpingDispatcher(){};
+  void pumpDispatcher();
+
+  Event::Dispatcher& dispatcher() { return *dispatcher_; }
 
 private:
-  Event::MockDispatcher* dispatcher_ = nullptr;
+  Api::ApiPtr api_ = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
 };
 
 class HttpCacheImplementationTest
-    : public testing::TestWithParam<std::function<std::unique_ptr<HttpCacheTestDelegate>()>> {
+    : public Event::TestUsingSimulatedTime,
+      public testing::TestWithParam<std::function<std::unique_ptr<HttpCacheTestDelegate>()>> {
 public:
   static constexpr absl::Duration kLastValidUpdateMinInterval = absl::Seconds(10);
 
@@ -55,25 +63,23 @@ protected:
 
   std::shared_ptr<HttpCache> cache() const { return delegate_->cache(); }
   bool validationEnabled() const { return delegate_->validationEnabled(); }
+  void pumpIntoDispatcher() { delegate_->beforePumpingDispatcher(); }
+  void pumpDispatcher() { delegate_->pumpDispatcher(); }
   LookupContextPtr lookup(absl::string_view request_path);
 
-  absl::Status insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
-                      const absl::string_view body,
-                      std::chrono::milliseconds timeout = std::chrono::seconds(1));
-
-  virtual absl::Status insert(LookupContextPtr lookup,
-                              const Http::TestResponseHeaderMapImpl& headers,
-                              const absl::string_view body,
-                              const absl::optional<Http::TestResponseTrailerMapImpl> trailers,
-                              std::chrono::milliseconds timeout = std::chrono::seconds(1));
+  virtual absl::Status
+  insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
+         const absl::string_view body,
+         const absl::optional<Http::TestResponseTrailerMapImpl> trailers = absl::nullopt);
 
   absl::Status insert(absl::string_view request_path,
-                      const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body,
-                      std::chrono::milliseconds timeout = std::chrono::seconds(1));
+                      const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body);
 
-  Http::ResponseHeaderMapPtr getHeaders(LookupContext& context);
+  // Returns the headers and a bool for end_stream.
+  std::pair<Http::ResponseHeaderMapPtr, bool> getHeaders(LookupContext& context);
 
-  std::string getBody(LookupContext& context, uint64_t start, uint64_t end);
+  // Returns a body chunk and a bool for end_stream.
+  std::pair<std::string, bool> getBody(LookupContext& context, uint64_t start, uint64_t end);
 
   Http::TestResponseTrailerMapImpl getTrailers(LookupContext& context);
 
@@ -82,6 +88,8 @@ protected:
                      const ResponseMetadata& metadata);
 
   LookupRequest makeLookupRequest(absl::string_view request_path);
+
+  LookupContextPtr lookupContextWithAllParts();
 
   testing::AssertionResult
   expectLookupSuccessWithHeaders(LookupContext* lookup_context,
@@ -94,9 +102,10 @@ protected:
   std::unique_ptr<HttpCacheTestDelegate> delegate_;
   VaryAllowList vary_allow_list_;
   LookupResult lookup_result_;
+  bool lookup_end_stream_after_headers_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Event::SimulatedTimeSystem time_system_;
-  Event::MockDispatcher dispatcher_;
+  Event::Dispatcher& dispatcher() { return delegate_->dispatcher(); }
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;

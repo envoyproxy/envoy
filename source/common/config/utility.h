@@ -126,7 +126,7 @@ public:
    */
   static absl::Status
   validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
-                      const std::string& cluster_name, const std::string& config_source);
+                      absl::string_view cluster_name, absl::string_view config_source);
 
   /**
    * Potentially calls Utility::validateClusterName, if a cluster name can be found.
@@ -237,7 +237,7 @@ public:
    * Get a Factory from the registry with a particular name or return nullptr.
    * @param name string identifier for the particular implementation.
    */
-  template <class Factory> static Factory* getFactoryByName(const std::string& name) {
+  template <class Factory> static Factory* getFactoryByName(absl::string_view name) {
     if (name.empty()) {
       return nullptr;
     }
@@ -299,21 +299,21 @@ public:
    * @param typed_config for the extension config.
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
-    static const std::string& typed_struct_type =
-        xds::type::v3::TypedStruct::default_instance().GetTypeName();
-    static const std::string& legacy_typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetTypeName();
+    static const std::string typed_struct_type(
+        xds::type::v3::TypedStruct::default_instance().GetTypeName());
+    static const std::string legacy_typed_struct_type(
+        udpa::type::v1::TypedStruct::default_instance().GetTypeName());
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     }
@@ -353,7 +353,8 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
+    THROW_IF_NOT_OK(
+        translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config));
     return config;
   }
 
@@ -377,7 +378,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(typed_config, validation_visitor, *config);
+    THROW_IF_NOT_OK(translateOpaqueConfig(typed_config, validation_visitor, *config));
     return config;
   }
 
@@ -406,10 +407,11 @@ public:
    * @param typed_config opaque config packed in google.protobuf.Any
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
+   * @return a status indicating if translation was a success
    */
-  static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    ProtobufMessage::ValidationVisitor& validation_visitor,
-                                    Protobuf::Message& out_proto);
+  static absl::Status translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+                                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                                            Protobuf::Message& out_proto);
 
   /**
    * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
@@ -418,22 +420,13 @@ public:
    * @param filter_chain_type the type of filter chain.
    * @param is_terminal_filter true if the filter is designed to be terminal.
    * @param last_filter_in_current_config true if the filter is last in the configuration.
-   * @throws EnvoyException if there is a mismatch between design and configuration.
+   * @return a status indicating if there is a mismatch between design and configuration.
    */
-  static void validateTerminalFilters(const std::string& name, const std::string& filter_type,
-                                      const std::string& filter_chain_type, bool is_terminal_filter,
-                                      bool last_filter_in_current_config) {
-    if (is_terminal_filter && !last_filter_in_current_config) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Error: terminal filter named {} of type {} must be the "
-                      "last filter in a {} filter chain.",
-                      name, filter_type, filter_chain_type));
-    } else if (!is_terminal_filter && last_filter_in_current_config) {
-      ExceptionUtil::throwEnvoyException(fmt::format(
-          "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
-          name, filter_type, filter_chain_type));
-    }
-  }
+  static absl::Status validateTerminalFilters(const std::string& name,
+                                              const std::string& filter_type,
+                                              const std::string& filter_chain_type,
+                                              bool is_terminal_filter,
+                                              bool last_filter_in_current_config);
 
   /**
    * Prepares the DNS failure refresh backoff strategy given the cluster configuration.

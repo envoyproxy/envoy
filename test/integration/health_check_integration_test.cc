@@ -3,6 +3,8 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/type/v3/range.pb.h"
 
+#include "source/common/upstream/health_discovery_service.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/http/http2/http2_frame.h"
 #include "test/common/upstream/utility.h"
@@ -496,7 +498,7 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
 // followup health check would happen. Using real time solves this because then
 // the ordering of advancing the time system and enabling the health check timer
 // is inconsequential.
-TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayErroSingleEndpointGoAwayErrorr) {
+TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayError) {
   initialize();
 
   // GOAWAY doesn't exist in HTTP1.

@@ -23,14 +23,12 @@ envoy_cc_library(
     name = "fluentd_access_log_lib",
     srcs = ["fluentd_access_log_impl.cc"],
     hdrs = ["fluentd_access_log_impl.h"],
-    external_deps = [
-        "msgpack",
-    ],
     deps = [
         ":substitution_formatter_lib",
         "//envoy/access_log:access_log_interface",
         "//source/common/access_log:access_log_lib",
         "//source/extensions/access_loggers/common:access_log_base",
+        "@com_github_msgpack_cpp//:msgpack",
         "@envoy_api//envoy/extensions/access_loggers/fluentd/v3:pkg_cc_proto",
     ],
 )

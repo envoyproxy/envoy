@@ -10,6 +10,7 @@ envoy_mobile_android_test(
     srcs = [
         "ElementTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.ElementTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],
@@ -20,6 +21,7 @@ envoy_mobile_android_test(
     srcs = [
         "TagsBuilderTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.TagsBuilderTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
     ],

@@ -106,11 +106,24 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "external_auth_lib",
+    srcs = ["external_auth.cc"],
+    hdrs = ["external_auth.h"],
+    deps = [
+        ":command_splitter_lib",
+        "//source/common/grpc:async_client_lib",
+        "//source/common/grpc:typed_async_client_lib",
+        "@envoy_api//envoy/service/redis_auth/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "proxy_filter_lib",
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
     deps = [
         ":command_splitter_interface",
+        ":external_auth_lib",
         "//envoy/network:drain_decision_interface",
         "//envoy/network:filter_interface",
         "//envoy/upstream:cluster_manager_interface",

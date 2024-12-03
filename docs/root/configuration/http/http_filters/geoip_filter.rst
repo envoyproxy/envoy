@@ -76,5 +76,7 @@ per geolocation database type (rooted at ``<stat_prefix>.maxmind.``). Database t
    ``<db_type>.total``, Counter, Total number of lookups performed for a given geolocation database file.
    ``<db_type>.hit``, Counter, Total number of successful lookups (with non empty lookup result) performed for a given geolocation database file.
    ``<db_type>.lookup_error``, Counter, Total number of errors that occured during lookups for a given geolocation database file.
+   ``<db_type>.db_reload_success``, Counter, Total number of times when the geolocation database file was reloaded successfully.
+   ``<db_type>.db_reload_error``, Counter, Total number of times when the geolocation database file failed to reload.
 
 

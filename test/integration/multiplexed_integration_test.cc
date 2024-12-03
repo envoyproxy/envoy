@@ -197,6 +197,9 @@ TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) 
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
+TEST_P(MultiplexedIntegrationTest, RouterUpstreamResponseWithErrorBeforeRequestComplete) {
+  testRouterUpstreamResponseBeforeRequestComplete(500);
+}
 TEST_P(MultiplexedIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(MultiplexedIntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
@@ -1094,6 +1097,120 @@ TEST_P(MultiplexedIntegrationTest, BadFrame) {
   }
 }
 
+// Test GoAway from L7 decoder filters with StopIteration.
+TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilter) {
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"skip-goaway", "false"}});
+
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+// Test GoAway from L7 decoder filters with Continue.
+TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByFilterContinue) {
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"continue-filter-chain", "true"},
+                                     {"skip-goaway", "false"}});
+
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+// Test GoAway from L7 encoder filters with StopIteration.
+TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterStopIteration) {
+  FakeHttpConnectionPtr fake_upstream_connection;
+  Http::RequestEncoder* encoder;
+  FakeStreamPtr upstream_request;
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"skip-goaway", "true"}});
+
+  encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_request));
+
+  codec_client_->sendData(*encoder, 128, true);
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+
+  upstream_request->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"send-encoder-goaway", "true"},
+                                      {"continue-encoder-filter-chain", "false"}},
+      true);
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+// Test GoAway from L7 encoder filters with Continue.
+TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredByEncoderFilterContinue) {
+  FakeHttpConnectionPtr fake_upstream_connection;
+  Http::RequestEncoder* encoder;
+  FakeStreamPtr upstream_request;
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"skip-goaway", "true"}});
+
+  encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, upstream_request));
+
+  codec_client_->sendData(*encoder, 128, true);
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+
+  upstream_request->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"send-encoder-goaway", "true"},
+                                      {"continue-encoder-filter-chain", "true"}},
+      true);
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+// Test sending GoAway during SendLocalReply from L7 encoder filters.
+TEST_P(MultiplexedIntegrationTest, SendGoAwayTriggerredInLocalReplyEncoderFilter) {
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"send-local-reply", "true"},
+  });
+  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
 TEST_P(MultiplexedIntegrationTest, GoAway) {
@@ -1664,6 +1781,51 @@ TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeaders) {
   ASSERT_TRUE(response->complete());
 }
 
+TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeadersWithLocalReplyDuringData) {
+  std::string local_reply_during_decode_config = R"EOF(
+  name: local-reply-during-decode
+  )EOF";
+  std::string add_response_metadata_config = R"EOF(
+  name: response-metadata-filter
+  )EOF";
+  config_helper_.prependFilter(local_reply_during_decode_config);
+  config_helper_.prependFilter(add_response_metadata_config);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.set_proxy_100_continue(true);
+        hcm.mutable_http2_protocol_options()->set_allow_metadata(true);
+        hcm.mutable_http3_protocol_options()->set_allow_metadata(true);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"expect", "100-contINUE"},
+                                     {"local-reply-during-data", "true"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Wait for the request headers to be received upstream.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  response->waitFor1xxHeaders();
+  codec_client_->sendData(*request_encoder_, 10, false);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  ASSERT(response->informationalHeaders() != nullptr);
+  EXPECT_EQ(response->headers().getStatusValue(), "500");
+  std::set<std::string> expected_metadata_keys = {"local-reply", "duplicate", "headers",
+                                                  "100-continue"};
+  verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
+}
+
 class MultiplexedRingHashIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   MultiplexedRingHashIntegrationTest();
@@ -2002,6 +2164,8 @@ public:
     }
     return v;
   }
+
+  void sendRequestsAndResponses(uint32_t num_requests);
 };
 
 TEST_P(Http2FrameIntegrationTest, UpstreamRemoteMalformedFrameEndstreamWith1xxHeader) {
@@ -2142,6 +2306,9 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
 }
 
 TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "true");
+
   beginSession();
   FakeRawConnectionPtr fake_upstream_connection;
 
@@ -2165,6 +2332,115 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
                    std::string(settings_max_connections_frame))));
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, UpstreamGoAway) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "true");
+
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  const Http2Frame rst_stream =
+      Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
+  const Http2Frame go_away_frame =
+      Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(rst_stream), std::string(go_away_frame))));
+  ASSERT_TRUE(fake_upstream_connection->close());
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, UpstreamGoAwayLegacy) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "false");
+
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  const Http2Frame rst_stream =
+      Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
+  const Http2Frame go_away_frame =
+      Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
+  ASSERT_TRUE(fake_upstream_connection->write(
+      absl::StrCat(std::string(rst_stream), std::string(go_away_frame))));
+  ASSERT_TRUE(fake_upstream_connection->close());
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+// Test that sending an invalid frame results in `upstream_cx_protocol_error`.
+TEST_P(Http2FrameIntegrationTest, UpstreamProtocolError) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "true");
+
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  ASSERT_TRUE(fake_upstream_connection->write("abcdefg this is not a valid h2 frame"));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
+// Test that sending an invalid frame results in `upstream_cx_protocol_error`.
+TEST_P(Http2FrameIntegrationTest, UpstreamProtocolErrorLegacy) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "false");
+
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  ASSERT_TRUE(fake_upstream_connection->write("abcdefg this is not a valid h2 frame"));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
 
   // Cleanup.
   tcp_client_->close();
@@ -2441,7 +2717,6 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
   )EOF");
 
   const int kRequestsSentPerIOCycle = 20;
-  autonomous_upstream_ = true;
   config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
   beginSession();
 
@@ -2467,6 +2742,17 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithMetadata) {
   }
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  std::vector<FakeStreamPtr> upstream_requests(kRequestsSentPerIOCycle);
+  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+    FakeStreamPtr upstream_request;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+    ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+    ASSERT_TRUE(upstream_request->receivedData());
+    upstream_request->encodeHeaders(default_response_headers_, true);
+    upstream_requests.push_back(std::move(upstream_request));
+  }
 
   for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
     auto frame = readFrame();
@@ -2513,43 +2799,110 @@ TEST_P(Http2FrameIntegrationTest, MultipleRequestsDecodeHeadersEndsRequest) {
   tcp_client_->close();
 }
 
-TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailers) {
-  const int kRequestsSentPerIOCycle = 20;
-  autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+void Http2FrameIntegrationTest::sendRequestsAndResponses(uint32_t num_requests) {
   beginSession();
 
   std::string buffer;
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
-    auto request =
-        Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
-                                    {{"response_data_blocks", "0"}, {"no_trailers", "1"}});
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                               {{"request_no", absl::StrCat(i)}});
     absl::StrAppend(&buffer, std::string(request));
   }
 
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+  for (uint32_t i = 0; i < num_requests; ++i) {
     auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a");
     absl::StrAppend(&buffer, std::string(data));
   }
 
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+  for (uint32_t i = 0; i < num_requests; ++i) {
     auto trailers = Http2Frame::makeEmptyHeadersFrame(
         Http2Frame::makeClientStreamId(i),
         static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
             Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
-    trailers.appendHeaderWithoutIndexing({"k", "v"});
+    trailers.appendHeaderWithoutIndexing({"k", absl::StrCat("v", i)});
     trailers.adjustPayloadSize();
     absl::StrAppend(&buffer, std::string(trailers));
   }
 
   ASSERT_TRUE(tcp_client_->write(buffer, false, false));
 
-  for (int i = 0; i < kRequestsSentPerIOCycle; ++i) {
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  std::vector<FakeStreamPtr> upstream_requests(num_requests);
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    FakeStreamPtr upstream_request;
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+    ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+    ASSERT_TRUE(upstream_request->receivedData());
+    ASSERT_FALSE(upstream_request->trailers()
+                     ->get(Http::LowerCaseString("k"))[0]
+                     ->value()
+                     .getStringView()
+                     .empty());
+    upstream_request->encodeHeaders(default_response_headers_, true);
+    upstream_requests.push_back(std::move(upstream_request));
+  }
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
     auto frame = readFrame();
     EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
     EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
   }
   tcp_client_->close();
+}
+
+// Validate that GOAWAY is triggered by a L7 filter.
+TEST_P(Http2FrameIntegrationTest, SendGoAwayTriggerredByDecodingFilter) {
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  beginSession();
+  uint32_t num_requests = 10;
+  std::string buffer;
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto request = Http2Frame::makePostRequest(Http2Frame::makeClientStreamId(i), "a", "/",
+                                               {{"request_no", absl::StrCat(i)}});
+    absl::StrAppend(&buffer, std::string(request));
+  }
+
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto data = Http2Frame::makeDataFrame(Http2Frame::makeClientStreamId(i), "a");
+    absl::StrAppend(&buffer, std::string(data));
+  }
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+  tcp_client_->waitForDisconnect();
+}
+
+// GOAWAY is not triggered by a L7 filter.
+TEST_P(Http2FrameIntegrationTest, SendGoAwayNotTriggerredByDecodingFilter) {
+  config_helper_.addFilter("name: send-goaway-during-decode-filter");
+  beginSession();
+  std::string buffer;
+  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(1), "a", "/",
+                                         {{"skip-goaway", "true"}});
+  absl::StrAppend(&buffer, std::string(request));
+
+  ASSERT_TRUE(tcp_client_->write(buffer, false, false));
+  waitForNextUpstreamConnection({0}, std::chrono::milliseconds(500), fake_upstream_connection_);
+  FakeStreamPtr upstream_request;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
+  ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+  tcp_client_->close();
+}
+
+// Validate that processing of deferred requests with body and trailers is handled correctly
+// when there is a filter that pauses and resumes iteration.
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersWithFilterChainPause) {
+  const int kRequestsSentPerIOCycle = 20;
+  // Add filter that stops iteration in the decodeHeaders and resumes in
+  // decodeData to verify that downstream end_stream is handled correctly by the filter manager.
+  config_helper_.addFilter("name: stop-in-headers-continue-in-body-filter");
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+  sendRequestsAndResponses(kRequestsSentPerIOCycle);
+}
+
+TEST_P(Http2FrameIntegrationTest, MultipleRequestsWithTrailersNoPauseInFilterChain) {
+  const int kRequestsSentPerIOCycle = 20;
+  config_helper_.addRuntimeOverride("http.max_requests_per_io_cycle", "1");
+  sendRequestsAndResponses(kRequestsSentPerIOCycle);
 }
 
 // Validate the request completion during processing of headers in the deferred requests,
@@ -2875,7 +3228,7 @@ TEST_P(MultiplexedIntegrationTest, InconsistentContentLength) {
   ASSERT_TRUE(response->waitForReset());
   // http3.inconsistent_content_length.
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
   } else if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
     EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
@@ -2927,8 +3280,6 @@ TEST_P(MultiplexedIntegrationTest, PerTryTimeoutWhileDownstreamStopsReading) {
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
     return;
   }
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read", "true");
 
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->listeners_size() >= 1, "");

@@ -35,7 +35,7 @@ ClientSslAuthConfig::ClientSslAuthConfig(
           std::chrono::milliseconds(1000)),
       tls_(tls.allocateSlot()), stats_(generateStats(scope, config.stat_prefix())) {
   auto list_or_error = Network::Address::IpList::create(config.ip_white_list());
-  THROW_IF_STATUS_NOT_OK(list_or_error, throw);
+  THROW_IF_NOT_OK_REF(list_or_error.status());
   ip_allowlist_ = std::move(list_or_error.value());
 
   if (!cm.clusters().hasCluster(remote_cluster_name_)) {
@@ -71,9 +71,13 @@ GlobalStats ClientSslAuthConfig::generateStats(Stats::Scope& scope, const std::s
 
 void ClientSslAuthConfig::parseResponse(const Http::ResponseMessage& message) {
   AllowedPrincipalsSharedPtr new_principals(new AllowedPrincipals());
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(message.bodyAsString());
-  for (const Json::ObjectSharedPtr& certificate : loader->getObjectArray("certificates")) {
-    new_principals->add(certificate->getString("fingerprint_sha256"));
+  Json::ObjectSharedPtr loader = THROW_OR_RETURN_VALUE(
+      Json::Factory::loadFromString(message.bodyAsString()), Json::ObjectSharedPtr);
+  auto array = THROW_OR_RETURN_VALUE(loader->getObjectArray("certificates"),
+                                     std::vector<Json::ObjectSharedPtr>);
+  for (const Json::ObjectSharedPtr& certificate : array) {
+    new_principals->add(
+        THROW_OR_RETURN_VALUE(certificate->getString("fingerprint_sha256"), std::string));
   }
 
   tls_->set([new_principals](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {

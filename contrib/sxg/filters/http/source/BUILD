@@ -21,7 +21,6 @@ envoy_cc_library(
         "filter.h",
         "filter_config.h",
     ],
-    external_deps = ["libsxg"],
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/common/config:datasource_lib",
@@ -31,6 +30,7 @@ envoy_cc_library(
         "//source/common/secret:secret_provider_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg_cc_proto",
+        "//bazel/foreign_cc:libsxg",
         # use boringssl alias to select fips vs non-fips version.
         "//bazel:boringssl",
     ],

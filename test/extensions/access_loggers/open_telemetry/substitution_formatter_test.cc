@@ -915,7 +915,7 @@ TEST(SubstitutionFormatterTest, CELFormatterTest) {
             "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
     )EOF",
                               otel_config);
-    auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+    auto commands = *Formatter::SubstitutionFormatStringUtils::parseFormatters(
         otel_config.formatters(), context);
 
     OpenTelemetryFormatter formatter(otel_config.resource_attributes(), commands);

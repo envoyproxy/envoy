@@ -12,6 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "header_formatter_test",
     srcs = ["header_formatter_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http/http1:header_formatter_lib",
     ],
@@ -20,6 +21,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/buffer:buffer_interface",
         "//envoy/event:dispatcher_interface",
@@ -50,6 +52,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_lib",
@@ -77,6 +80,7 @@ envoy_cc_fuzz_test(
     name = "http1_connection_fuzz_test",
     srcs = ["http1_connection_fuzz_test.cc"],
     corpus = "http1_connection_corpus",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:conn_manager_lib",
         "//source/common/http:header_map_lib",

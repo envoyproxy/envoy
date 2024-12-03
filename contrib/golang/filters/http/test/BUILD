@@ -16,6 +16,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//test/mocks/server:factory_context_mocks",
@@ -30,6 +31,7 @@ envoy_cc_test(
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",
         "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//contrib/golang/filters/http/source:golang_filter_lib",
         "//source/common/stream_info:stream_info_lib",
@@ -52,6 +54,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data/access_log:filter.so",
         "//contrib/golang/filters/http/test/test_data/action:filter.so",
+        "//contrib/golang/filters/http/test/test_data/add_data:filter.so",
         "//contrib/golang/filters/http/test/test_data/basic:filter.so",
         "//contrib/golang/filters/http/test/test_data/buffer:filter.so",
         "//contrib/golang/filters/http/test/test_data/echo:filter.so",
@@ -60,6 +63,7 @@ envoy_cc_test(
         "//contrib/golang/filters/http/test/test_data/property:filter.so",
         "//contrib/golang/filters/http/test/test_data/routeconfig:filter.so",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//contrib/golang/filters/http/source:config",
         "//source/exe:main_common_lib",
@@ -85,6 +89,7 @@ envoy_cc_fuzz_test(
     name = "golang_filter_fuzz_test",
     srcs = ["golang_filter_fuzz_test.cc"],
     corpus = "golang_filter_corpus",
+    rbe_pool = "6gig",
     deps = [
         ":golang_filter_fuzz_proto_cc_proto",
         "//contrib/golang/common/dso/test:dso_mocks",
@@ -106,6 +111,7 @@ envoy_cc_test(
     data = [
         "//contrib/golang/filters/http/test/test_data/websocket:filter.so",
     ],
+    rbe_pool = "6gig",
     tags = [
         "cpu:3",
     ],

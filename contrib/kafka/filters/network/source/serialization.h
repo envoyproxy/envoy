@@ -919,6 +919,72 @@ private:
 };
 
 /**
+ * Nullable objects are sent as single byte and following data.
+ * Reference: https://issues.apache.org/jira/browse/KAFKA-14425
+ */
+template <typename DeserializerType>
+class NullableStructDeserializer
+    : public Deserializer<absl::optional<typename DeserializerType::result_type>> {
+public:
+  using ResponseType = absl::optional<typename DeserializerType::result_type>;
+
+  uint32_t feed(absl::string_view& data) override {
+
+    if (data.empty()) {
+      return 0;
+    }
+
+    uint32_t bytes_read = 0;
+
+    if (!marker_consumed_) {
+      // Read marker byte from input.
+      int8_t marker;
+      safeMemcpy(&marker, data.data());
+      data = {data.data() + 1, data.size() - 1};
+      bytes_read += 1;
+      marker_consumed_ = true;
+
+      if (marker >= 0) {
+        data_buf_ = absl::make_optional(DeserializerType());
+      } else {
+        return bytes_read;
+      }
+    }
+
+    if (data_buf_) {
+      bytes_read += data_buf_->feed(data);
+    }
+
+    return bytes_read;
+  }
+
+  bool ready() const override {
+    if (marker_consumed_) {
+      if (data_buf_) {
+        return data_buf_->ready();
+      } else {
+        return true; // It's an empty optional.
+      }
+    } else {
+      return false;
+    }
+  }
+
+  ResponseType get() const override {
+    if (data_buf_) {
+      const typename ResponseType::value_type deserialized_form = data_buf_->get();
+      return absl::make_optional(deserialized_form);
+    } else {
+      return absl::nullopt;
+    }
+  }
+
+private:
+  bool marker_consumed_{false};
+  absl::optional<DeserializerType> data_buf_; // Present if marker was consumed and was 0 or more.
+};
+
+/**
  * Kafka UUID is basically two longs, so we are going to keep model them the same way.
  * Reference:
  * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/Uuid.java#L38
@@ -997,6 +1063,12 @@ public:
   template <typename T> uint32_t computeSize(const NullableArray<T>& arg) const;
 
   /**
+   * Compute size of given nullable object, if it were to be encoded.
+   * @return serialized size of argument.
+   */
+  template <typename T> uint32_t computeSize(const absl::optional<T>& arg) const;
+
+  /**
    * Compute size of given reference, if it were to be compactly encoded.
    * @return serialized size of argument.
    */
@@ -1031,6 +1103,12 @@ public:
    * @return bytes written
    */
   template <typename T> uint32_t encode(const NullableArray<T>& arg, Buffer::Instance& dst);
+
+  /**
+   * Encode given nullable object in a buffer.
+   * @return bytes written
+   */
+  template <typename T> uint32_t encode(const absl::optional<T>& arg, Buffer::Instance& dst);
 
   /**
    * Compactly encode given reference in a buffer.
@@ -1136,6 +1214,15 @@ inline uint32_t EncodingContext::computeSize(const NullableArray<T>& arg) const 
 }
 
 /**
+ * Template overload for nullable T.
+ * The size of nullable object is 1 (for market byte) and the size of real object (if any).
+ */
+template <typename T>
+inline uint32_t EncodingContext::computeSize(const absl::optional<T>& arg) const {
+  return 1 + (arg ? computeSize(*arg) : 0);
+}
+
+/**
  * Template overload for Uuid.
  */
 template <> inline uint32_t EncodingContext::computeSize(const Uuid&) const {
@@ -1148,6 +1235,14 @@ template <> inline uint32_t EncodingContext::computeSize(const Uuid&) const {
  */
 template <typename T> inline uint32_t EncodingContext::computeCompactSize(const T& arg) const {
   return arg.computeCompactSize(*this);
+}
+
+/**
+ * Template overload for Uuid.
+ * This data type is not compacted, so we just point to non-compact implementation.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const Uuid& arg) const {
+  return computeSize(arg);
 }
 
 /**
@@ -1381,6 +1476,23 @@ uint32_t EncodingContext::encode(const NullableArray<T>& arg, Buffer::Instance& 
 }
 
 /**
+ * Encode nullable object as marker byte (1 if present, -1 otherwise), then if object is present,
+ * have it serialise itself.
+ */
+template <typename T>
+uint32_t EncodingContext::encode(const absl::optional<T>& arg, Buffer::Instance& dst) {
+  if (arg) {
+    const int8_t marker = 1;
+    encode(marker, dst);
+    const uint32_t written = encode(*arg, dst);
+    return 1 + written;
+  } else {
+    const int8_t marker = -1;
+    return encode(marker, dst);
+  }
+}
+
+/**
  * Template overload for Uuid.
  */
 template <> inline uint32_t EncodingContext::encode(const Uuid& arg, Buffer::Instance& dst) {
@@ -1397,6 +1509,13 @@ template <> inline uint32_t EncodingContext::encode(const Uuid& arg, Buffer::Ins
 template <typename T>
 inline uint32_t EncodingContext::encodeCompact(const T& arg, Buffer::Instance& dst) {
   return arg.encodeCompact(dst, *this);
+}
+
+/**
+ * Uuid is not encoded in compact fashion, so we just delegate to normal implementation.
+ */
+template <> inline uint32_t EncodingContext::encodeCompact(const Uuid& arg, Buffer::Instance& dst) {
+  return encode(arg, dst);
 }
 
 /**

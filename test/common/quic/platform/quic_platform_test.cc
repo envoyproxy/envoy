@@ -33,7 +33,6 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_test.h"
@@ -356,27 +355,6 @@ TEST_F(QuicPlatformTest, QuicNotReached) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicMutex) {
-  QuicMutex mu;
-
-  QuicWriterMutexLock wmu(&mu);
-  mu.AssertReaderHeld();
-  mu.WriterUnlock();
-  {
-    QuicReaderMutexLock rmu(&mu);
-    mu.AssertReaderHeld();
-  }
-  mu.WriterLock();
-}
-
-TEST_F(QuicPlatformTest, QuicNotification) {
-  QuicNotification notification;
-  EXPECT_FALSE(notification.HasBeenNotified());
-  notification.Notify();
-  notification.WaitForNotification();
-  EXPECT_TRUE(notification.HasBeenNotified());
-}
-
 TEST_F(QuicPlatformTest, QuicTestOutput) {
   Envoy::TestEnvironment::setEnvVar("QUICHE_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
 
@@ -452,20 +430,20 @@ TEST_F(QuicPlatformTest, UpdateReloadableFlags) {
 
   // Flip both flags to a non-default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false", true},
-       {"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true", false}});
+      {{"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_false", true},
+       {"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true", false}});
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
 
   // Flip one flag back to a default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_false", false}});
+      {{"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_false", false}});
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_true));
 
   // Flip the other back to a default value.
   flag_registry.updateReloadableFlags(
-      {{"FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true", true}});
+      {{"FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true", true}});
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
 }

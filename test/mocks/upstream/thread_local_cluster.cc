@@ -19,9 +19,14 @@ MockThreadLocalCluster::MockThreadLocalCluster() {
       .WillByDefault(Return(Upstream::TcpPoolData([]() {}, &tcp_conn_pool_)));
   ON_CALL(*this, httpAsyncClient()).WillByDefault(ReturnRef(async_client_));
   ON_CALL(*this, dropOverload()).WillByDefault(Return(cluster_.drop_overload_));
+  ON_CALL(*this, dropCategory()).WillByDefault(ReturnRef(cluster_.drop_category_));
   ON_CALL(*this, setDropOverload(_)).WillByDefault(Invoke([this](UnitFloat drop_overload) -> void {
     cluster_.drop_overload_ = drop_overload;
   }));
+  ON_CALL(*this, setDropCategory(_))
+      .WillByDefault(Invoke([this](absl::string_view drop_category) -> void {
+        cluster_.drop_category_ = drop_category;
+      }));
 }
 
 MockThreadLocalCluster::~MockThreadLocalCluster() = default;

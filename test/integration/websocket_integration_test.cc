@@ -130,7 +130,6 @@ void WebsocketIntegrationTest::initialize() {
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           ConfigHelper::HttpProtocolOptions protocol_options;
@@ -147,7 +146,6 @@ void WebsocketIntegrationTest::initialize() {
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
   } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
@@ -782,5 +780,58 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeFailedWithPrePayload) {
 
   tcp_client->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(WebsocketIntegrationTest, WebsocketUpgradeWithDisabledSmallBufferFilter) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  const std::string WebsocketUpgradeWithDisabledSmallBufferConfig = R"EOF(
+    name: typed-per-filter-config-for-ws
+    virtual_hosts:
+    - name: app-ws
+      domains:
+      - "*"
+      routes:
+      - match:
+          prefix: "/websocket/test"
+        route:
+          cluster: cluster_0
+          upgrade_configs:
+          - upgrade_type: websocket
+        typed_per_filter_config:
+          buffer:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            disabled: true
+)EOF";
+
+  const std::string TinyBufferFilter = R"EOF(
+    name: buffer
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
+        max_request_bytes : 1
+)EOF";
+
+  config_helper_.prependFilter(TinyBufferFilter);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto route_config = hcm.mutable_route_config();
+        TestUtility::loadFromYaml(WebsocketUpgradeWithDisabledSmallBufferConfig, *route_config);
+      });
+  initialize();
+
+  performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
+  sendBidirectionalData();
+
+  // Send some final data from the client, and disconnect.
+  codec_client_->sendData(*request_encoder_, "bye!", false);
+  codec_client_->close();
+
+  // Verify the final data was received and that the connection is torn down.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hellobye!"));
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 } // namespace Envoy

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <utility>
 
 #include "envoy/stream_info/stream_info.h"
 
@@ -12,6 +13,7 @@
 #include "source/extensions/filters/network/common/redis/fault.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool.h"
+#include "source/extensions/filters/network/redis_proxy/external_auth.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
 
 #include "test/test_common/printers.h"
@@ -140,6 +142,38 @@ public:
 };
 
 } // namespace CommandSplitter
+
+namespace ExternalAuth {
+
+class MockExternalAuthClient : public ExternalAuthClient {
+public:
+  MockExternalAuthClient();
+  ~MockExternalAuthClient() override;
+
+  // ExtAuthz::Client
+  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, authenticateExternal,
+              (AuthenticateCallback & callback, CommandSplitter::SplitCallbacks& pending_request,
+               const StreamInfo::StreamInfo& stream_info, std::string username,
+               std::string password));
+};
+
+class MockAuthenticateCallback : public AuthenticateCallback {
+public:
+  MockAuthenticateCallback();
+  ~MockAuthenticateCallback() override;
+
+  void onAuthenticateExternal(CommandSplitter::SplitCallbacks& request,
+                              AuthenticateResponsePtr&& response) override {
+    onAuthenticateExternal_(request, response);
+  }
+
+  MOCK_METHOD(void, onAuthenticateExternal_,
+              (CommandSplitter::SplitCallbacks & request, AuthenticateResponsePtr& response));
+};
+
+} // namespace ExternalAuth
+
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

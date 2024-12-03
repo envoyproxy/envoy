@@ -7,6 +7,7 @@
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/ssl_socket.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/extensions/filters/http/dynamic_forward_proxy/test_resolver.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -40,7 +41,7 @@ public:
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
                           const std::string& override_auto_sni_header = "",
                           const std::string& typed_dns_resolver_config = "",
-                          bool use_sub_cluster = false) {
+                          bool use_sub_cluster = false, double dns_query_timeout = 5) {
     const std::string filter_use_sub_cluster = R"EOF(
 name: dynamic_forward_proxy
 typed_config:
@@ -48,8 +49,8 @@ typed_config:
   sub_cluster_config:
     cluster_init_timeout: 5s
 )EOF";
-    const std::string filter_use_dns_cache =
-        fmt::format(R"EOF(
+    const std::string filter_use_dns_cache = fmt::format(
+        R"EOF(
 name: dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
@@ -59,11 +60,12 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     host_ttl: {}s
+    dns_query_timeout: {:.9f}s
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
 )EOF",
-                    Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_,
-                    max_pending_requests, key_value_config_, typed_dns_resolver_config);
+        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
+        max_pending_requests, key_value_config_, typed_dns_resolver_config);
     config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster : filter_use_dns_cache);
 
     config_helper_.prependFilter(fmt::format(R"EOF(
@@ -164,11 +166,12 @@ typed_config:
     dns_lookup_family: {}
     max_hosts: {}
     host_ttl: {}s
+    dns_query_timeout: {:.9f}s
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
 )EOF",
-        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, max_pending_requests,
-        key_value_config_, typed_dns_resolver_config);
+        Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
+        max_pending_requests, key_value_config_, typed_dns_resolver_config);
 
     TestUtility::loadFromYaml(use_sub_cluster ? cluster_type_config_use_sub_cluster
                                               : cluster_type_config_use_dns_cache,
@@ -291,12 +294,16 @@ typed_config:
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
-    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
+    std::string access_log = waitForAccessLog(access_log_name_);
+    EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+    EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 
     response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
+    access_log = waitForAccessLog(access_log_name_, 1);
+    EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+    EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
   }
 
   void multipleRequestsMaybeReresolve(bool reresolve) {
@@ -435,6 +442,69 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
 }
 
+TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+  config_helper_.addRuntimeOverride("envoy.enable_dfp_dns_trace", "true");
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
+  autonomous_upstream_ = true;
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000000001);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("dns_resolution_failure{resolve_timeout:"));
+}
+
+TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
+  autonomous_upstream_ = true;
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000000001);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_),
+              HasSubstr("dns_resolution_failure{resolve_timeout}"));
+}
+
 TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
@@ -528,12 +598,16 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainAndNoCaching) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure"));
+  std::string access_log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+  EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 
   response = codec_client_->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("dns_resolution_failure"));
+  access_log = waitForAccessLog(access_log_name_, 1);
+  EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+  EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 }
 
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
@@ -1221,6 +1295,68 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
+// Verify that we expire sub clusters and not remove on CDS.
+TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvoidCDSRemoval) {
+  const std::string cluster_yaml = R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  auto cluster = Upstream::parseClusterFromV3Yaml(cluster_yaml);
+  // make runtime guard false
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "false");
+  initializeWithArgs(1024, 1024, "", "", true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  // one more cluster
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+  cleanupUpstreamAndDownstream();
+
+  // Sub cluster expected to be removed after ttl
+  // > 5m
+  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  response = sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+
+  // sub cluster added again
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
+  cleanupUpstreamAndDownstream();
+
+  // Make update to DFP cluster
+  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
+  cds_helper_.setCds({cluster_});
+
+  // sub cluster removed due to dfp cluster update
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 2);
+}
+
 // Verify that we expire sub clusters.
 TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveSubClusterViaTTL) {
   initializeWithArgs(1024, 1024, "", "", true);
@@ -1295,6 +1431,66 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithIpHost) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   checkSimpleRequestSuccess(0, 0, response.get());
+}
+
+// Verify that no DFP clusters are removed when CDS Reload is triggered.
+TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "true");
+  const std::string cluster_yaml = R"EOF(
+    name: fake_cluster
+    connect_timeout: 0.250s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: fake_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 11001
+  )EOF";
+  auto cluster = Upstream::parseClusterFromV3Yaml(cluster_yaml);
+
+  initializeWithArgs(1024, 1024, "", "", true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response =
+      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
+  checkSimpleRequestSuccess(1024, 1024, response.get());
+  // one more sub cluster
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+
+  // Cause a cluster reload via CDS.
+  cds_helper_.setCds({cluster_, cluster});
+  // a new cluster is added and no dfp cluster is removed
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForCounterEq("cluster_manager.cluster_modified", 0);
+  // No DFP cluster should be removed.
+  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
+
+  // The fake upstream connection should stay connected
+  ASSERT_TRUE(fake_upstream_connection_->connected());
+
+  // Now send another request. This should not create new sub cluster.
+  response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
+  checkSimpleRequestSuccess(512, 512, response.get());
+
+  // No new cluster should be added as DFP cluster already exists
+  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
 } // namespace

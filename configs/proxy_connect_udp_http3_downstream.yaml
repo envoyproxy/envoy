@@ -58,6 +58,10 @@ static_resources:
         explicit_http_config:
           http3_protocol_options:
             allow_extended_connect: true
+            quic_protocol_options:
+              # Increase the max packet length for tunneling.
+              # The example value matches the default value used by the MASQUE client in QUICHE.
+              max_packet_length: 1350
     load_assignment:
       cluster_name: cluster_0
       endpoints:

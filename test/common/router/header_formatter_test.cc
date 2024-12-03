@@ -70,6 +70,9 @@ TEST(HeaderParserTest, TestParse) {
       {"%DOWNSTREAM_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
       {"%DOWNSTREAM_LOCAL_PORT%", {"0"}, {}},
       {"%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
+      {"%DOWNSTREAM_DIRECT_LOCAL_ADDRESS%", {"127.0.0.2:0"}, {}},
+      {"%DOWNSTREAM_DIRECT_LOCAL_PORT%", {"0"}, {}},
+      {"%DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT%", {"127.0.0.2"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"value"}, {}},
       {"[%UPSTREAM_METADATA([\"ns\", \"key\"])%", {"[value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \"key\"])%]", {"value]"}, {}},
@@ -217,7 +220,7 @@ TEST(HeaderParserTest, TestParse) {
 
     if (test_case.expected_exception_) {
       EXPECT_FALSE(test_case.expected_output_);
-      EXPECT_THROW(THROW_IF_STATUS_NOT_OK(HeaderParser::configure(to_add), throw), EnvoyException);
+      EXPECT_THROW(THROW_IF_NOT_OK_REF(HeaderParser::configure(to_add).status()), EnvoyException);
       continue;
     }
 

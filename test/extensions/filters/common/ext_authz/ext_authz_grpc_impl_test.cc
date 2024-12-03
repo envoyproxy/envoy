@@ -100,6 +100,21 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
+TEST_F(ExtAuthzGrpcClientTest, StreamInfo) {
+  initialize();
+
+  envoy::service::auth::v3::CheckRequest request;
+  EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  NiceMock<StreamInfo::MockStreamInfo> ext_authz_stream_info;
+  EXPECT_CALL(async_request_, streamInfo()).WillOnce(ReturnRef(ext_authz_stream_info));
+  EXPECT_NE(client_->streamInfo(), nullptr);
+
+  EXPECT_CALL(async_request_, cancel());
+  client_->cancel();
+}
+
 // Test the client when an ok response is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
   initialize();

@@ -405,6 +405,20 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("http.rds_connection_manager.rds.agg/route_config.1-23.update_success",
                          "http.rds.update_success", {rds_hcm, rds_route_config});
 
+  // SRDS.
+  Tag scoped_rds_hcm;
+
+  scoped_rds_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  scoped_rds_hcm.value_ = "scoped_rds_connection_manager";
+
+  Tag scoped_rds_route_config;
+  scoped_rds_route_config.name_ = tag_names.SCOPED_RDS_CONFIG;
+  scoped_rds_route_config.value_ = "scoped_route_config.123";
+
+  regex_tester.testRegex(
+      "http.scoped_rds_connection_manager.scoped_rds.scoped_route_config.123.update_success",
+      "http.scoped_rds.update_success", {scoped_rds_hcm, scoped_rds_route_config});
+
   // Listener manager worker id
   Tag worker_id;
   worker_id.name_ = tag_names.WORKER_ID;

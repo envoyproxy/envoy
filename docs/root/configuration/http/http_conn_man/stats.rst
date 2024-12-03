@@ -26,6 +26,7 @@ statistics:
    ``downstream_cx_ssl_active``, Gauge, Total active TLS connections
    ``downstream_cx_http1_active``, Gauge, Total active HTTP/1.1 connections
    ``downstream_cx_upgrades_active``, Gauge, Total active upgraded connections. These are also counted as active http1/http2 connections.
+   ``downstream_cx_http1_soft_drain``, Gauge, Total active HTTP/1.x connections waiting for another downstream request to safely close the connection.
    ``downstream_cx_http2_active``, Gauge, Total active HTTP/2 connections
    ``downstream_cx_http3_active``, Gauge, Total active HTTP/3 connections
    ``downstream_cx_protocol_error``, Counter, Total protocol errors
@@ -66,6 +67,7 @@ statistics:
    ``downstream_rq_timeout``, Counter, Total requests closed due to a timeout on the request path
    ``downstream_rq_overload_close``, Counter, Total requests closed due to Envoy overload
    ``downstream_rq_redirected_with_normalized_path``, Counter, Total requests redirected due to different original and normalized URL paths. This action is configured by setting the :ref:`path_with_escaped_slashes_action <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.path_with_escaped_slashes_action>` config option.
+   ``downstream_rq_too_many_premature_resets``, Counter, Total number of connections closed due to too many premature request resets on the connection.
    ``rs_too_large``, Counter, Total response errors due to buffering an overly large body
 
 .. _config_http_conn_man_stats_per_ua:

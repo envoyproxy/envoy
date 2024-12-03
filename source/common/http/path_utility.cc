@@ -1,9 +1,9 @@
 #include "source/common/http/path_utility.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/types/optional.h"
 #include "url/url_canon.h"
@@ -24,16 +24,6 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
   output.Complete();
   return absl::make_optional(std::move(canonical_path));
 }
-
-void unescapeInPath(std::string& path, absl::string_view escape_sequence,
-                    absl::string_view substitution) {
-  std::vector<absl::string_view> split = absl::StrSplit(path, escape_sequence);
-  if (split.size() == 1) {
-    return;
-  }
-  path = absl::StrJoin(split, substitution);
-}
-
 } // namespace
 
 /* static */
@@ -92,13 +82,14 @@ PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& head
   }
   const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
 
-  // TODO(yanavlasov): optimize this by adding case insensitive matcher
-  std::string decoded_path{path};
-  unescapeInPath(decoded_path, "%2F", "/");
-  unescapeInPath(decoded_path, "%2f", "/");
-  unescapeInPath(decoded_path, "%5C", "\\");
-  unescapeInPath(decoded_path, "%5c", "\\");
-  headers.setPath(absl::StrCat(decoded_path, query));
+  static const std::vector<std::pair<absl::string_view, absl::string_view>> replacements{
+      {"%2F", "/"},
+      {"%2f", "/"},
+      {"%5C", "\\"},
+      {"%5c", "\\"},
+  };
+  headers.setPath(absl::StrCat(absl::StrReplaceAll(path, replacements), query));
+
   // Path length will not match if there were unescaped %2f or %5c
   return headers.getPathValue().length() != original_length
              ? UnescapeSlashesResult::FoundAndUnescaped

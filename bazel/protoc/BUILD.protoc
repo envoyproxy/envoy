@@ -1,0 +1,18 @@
+load("@envoy//bazel/protoc:protoc.bzl", "protoc_binary")
+
+protoc_binary(
+    name = "protoc",
+    srcs = select({
+        ":windows": ["bin/protoc.exe"],
+        "//conditions:default": ["bin/protoc"],
+    }),
+    executable = "protoc.exe",
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)

@@ -7,7 +7,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/header_utility.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,7 +40,6 @@ public:
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
   DynamicForwardProxyStats& filterStats() { return filter_stats_; }
   bool bufferEnabled() const { return buffer_enabled_; };
-  void disableBuffer() { buffer_enabled_ = false; }
   uint32_t maxBufferedDatagrams() const { return max_buffered_datagrams_; };
   uint64_t maxBufferedBytes() const { return max_buffered_bytes_; };
 
@@ -54,7 +52,7 @@ private:
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   const Stats::ScopeSharedPtr stats_scope_;
   DynamicForwardProxyStats filter_stats_;
-  bool buffer_enabled_;
+  const bool buffer_enabled_;
   uint32_t max_buffered_datagrams_;
   uint64_t max_buffered_bytes_;
 };
@@ -63,12 +61,17 @@ using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
 using BufferedDatagramPtr = std::unique_ptr<Network::UdpRecvData>;
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
+using ReadFilter = Network::UdpSessionReadFilter;
+using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
+using ReadFilterCallbacks = Network::UdpSessionReadFilterCallbacks;
+
 class ProxyFilter
     : public ReadFilter,
       public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
       Logger::Loggable<Logger::Id::forward_proxy> {
 public:
-  ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(config)){};
+  ProxyFilter(ProxyFilterConfigSharedPtr config)
+      : config_(std::move(config)), session_buffer_enabled_(config_->bufferEnabled()){};
 
   // Network::ReadFilter
   ReadFilterStatus onNewSession() override;
@@ -82,10 +85,14 @@ public:
   void onLoadDnsCacheComplete(
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override;
 
+  bool sessionBufferEnabled() const { return session_buffer_enabled_; };
+
 private:
   void maybeBufferDatagram(Network::UdpRecvData& data);
+  void diableSessionBuffer() { session_buffer_enabled_ = false; }
 
   const ProxyFilterConfigSharedPtr config_;
+  bool session_buffer_enabled_;
   Upstream::ResourceAutoIncDecPtr circuit_breaker_;
   Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr cache_load_handle_;
   ReadFilterCallbacks* read_callbacks_{};

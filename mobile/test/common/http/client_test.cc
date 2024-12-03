@@ -212,6 +212,34 @@ TEST_P(ClientTest, BasicStreamHeaders) {
   ASSERT_EQ(callbacks_called.on_complete_calls_, 1);
 }
 
+TEST_P(ClientTest, BasicStreamHeadersIdempotent) {
+  // Create a stream, and set up request_decoder_ and response_encoder_
+  StreamCallbacksCalled callbacks_called;
+  createStream(createDefaultStreamCallbacks(callbacks_called));
+
+  // Send request headers.
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(dispatcher_, popTrackedObject(_));
+  TestRequestHeaderMapImpl expected_headers;
+  HttpTestUtility::addDefaultHeaders(expected_headers);
+  expected_headers.addCopy("x-envoy-mobile-cluster", "base_clear");
+  expected_headers.addCopy("x-forwarded-proto", "https");
+  expected_headers.addCopy("x-envoy-retry-on", "http3-post-connect-failure");
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers), true));
+  http_client_.sendHeaders(stream_, createDefaultRequestHeaders(), /* end_stream= */ true,
+                           /* idempotent= */ true);
+
+  // Encode response headers.
+  EXPECT_CALL(dispatcher_, pushTrackedObject(_));
+  EXPECT_CALL(dispatcher_, popTrackedObject(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, true);
+  ASSERT_EQ(callbacks_called.on_headers_calls_, 1);
+  // Ensure that the callbacks on the EnvoyStreamCallbacks were called.
+  ASSERT_EQ(callbacks_called.on_complete_calls_, 1);
+}
+
 TEST_P(ClientTest, BasicStreamData) {
   StreamCallbacksCalled callbacks_called;
   callbacks_called.end_stream_with_headers_ = false;
@@ -463,6 +491,85 @@ TEST_P(ClientTest, MultipleStreams) {
   // Finish stream 1.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, true);
+  ASSERT_EQ(callbacks_called1.on_headers_calls_, 1);
+  ASSERT_EQ(callbacks_called1.on_complete_calls_, 1);
+}
+
+TEST_P(ClientTest, MultipleUploads) {
+  envoy_stream_t stream1 = 1;
+  envoy_stream_t stream2 = 2;
+  auto request_data1 = std::make_unique<Buffer::OwnedImpl>("request body1");
+  auto request_data2 = std::make_unique<Buffer::OwnedImpl>("request body2");
+
+  // Create a stream, and set up request_decoder_ and response_encoder_
+  StreamCallbacksCalled callbacks_called1;
+  auto stream_callbacks1 = createDefaultStreamCallbacks(callbacks_called1);
+  createStream(std::move(stream_callbacks1));
+
+  // Send request headers.
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, false));
+  http_client_.sendHeaders(stream1, createDefaultRequestHeaders(), false);
+  http_client_.sendData(stream1, std::move(request_data1), true);
+
+  // Start stream2.
+  // Setup EnvoyStreamCallbacks to handle the response headers.
+  NiceMock<MockRequestDecoder> request_decoder2;
+  ON_CALL(request_decoder2, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+  ResponseEncoder* response_encoder2{};
+  StreamCallbacksCalled callbacks_called2;
+  auto stream_callbacks2 = createDefaultStreamCallbacks(callbacks_called1);
+  stream_callbacks2.on_headers_ = [&](const ResponseHeaderMap& headers, bool end_stream,
+                                      envoy_stream_intel) -> void {
+    EXPECT_TRUE(end_stream);
+    EXPECT_EQ(headers.Status()->value().getStringView(), "200");
+    callbacks_called2.on_headers_calls_ = true;
+  };
+  stream_callbacks2.on_complete_ = [&](envoy_stream_intel, envoy_final_stream_intel) -> void {
+    callbacks_called2.on_complete_calls_++;
+  };
+
+  std::vector<Event::SchedulableCallback*> window_callbacks;
+  ON_CALL(dispatcher_, createSchedulableCallback).WillByDefault([&](std::function<void()> cb) {
+    Event::SchedulableCallbackPtr scheduler =
+        dispatcher_.Event::ProvisionalDispatcher::createSchedulableCallback(cb);
+    window_callbacks.push_back(scheduler.get());
+    return scheduler;
+  });
+
+  // Create a stream.
+  ON_CALL(dispatcher_, isThreadSafe()).WillByDefault(Return(true));
+
+  // Grab the response encoder in order to dispatch responses on the stream.
+  // Return the request decoder to make sure calls are dispatched to the decoder via the dispatcher
+  // API.
+  EXPECT_CALL(*api_listener_, newStreamHandle(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoderHandlePtr {
+        response_encoder2 = &encoder;
+        return std::make_unique<TestHandle>(request_decoder2);
+      }));
+  http_client_.startStream(stream2, std::move(stream_callbacks2), explicit_flow_control_);
+
+  // Send request headers.
+  EXPECT_CALL(request_decoder2, decodeHeaders_(_, false));
+  http_client_.sendHeaders(stream2, createDefaultRequestHeaders(), false);
+  http_client_.sendData(stream2, std::move(request_data2), true);
+
+  for (auto* callback : window_callbacks) {
+    EXPECT_TRUE(callback->enabled());
+  }
+
+  // Finish stream 2.
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  TestResponseHeaderMapImpl response_headers2{{":status", "200"}};
+  response_encoder2->encodeHeaders(response_headers2, true);
+  ASSERT_EQ(callbacks_called2.on_headers_calls_, 1);
+  // Ensure that the on_headers on the EnvoyStreamCallbacks was called.
+  ASSERT_EQ(callbacks_called2.on_complete_calls_, 1);
+
+  // Finish stream 1.
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   response_encoder_->encodeHeaders(response_headers, true);

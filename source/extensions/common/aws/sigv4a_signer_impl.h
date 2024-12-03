@@ -50,6 +50,10 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
  */
 
 class SigV4ASignerImpl : public SignerBaseImpl {
+
+  // Allow friend access for signer corpus testing
+  friend class SigV4ASignerImplFriend;
+
 public:
   SigV4ASignerImpl(
       absl::string_view service_name, absl::string_view region,

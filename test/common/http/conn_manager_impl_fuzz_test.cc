@@ -94,11 +94,12 @@ public:
           callbacks.streamInfo().setResponseCodeDetails("");
         }));
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
-    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
-        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                   FilterChainManager& manager) -> bool {
-          return filter_factory_.createFilterChain(manager);
-        }));
+    EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _, _))
+        .WillRepeatedly(
+            Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                       FilterChainManager& manager, const Http::FilterChainOptions&) -> bool {
+              return filter_factory_.createFilterChain(manager);
+            }));
   }
 
   Http::ForwardClientCertType
@@ -127,7 +128,7 @@ public:
 
   // Http::ConnectionManagerConfig
   const RequestIDExtensionSharedPtr& requestIDExtension() override { return request_id_extension_; }
-  const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
     return flush_access_log_on_tunnel_successfully_established_;
@@ -151,6 +152,9 @@ public:
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
+  }
+  bool http1SafeMaxConnectionDuration() const override {
+    return http1_safe_max_connection_duration_;
   }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return max_stream_duration_;
@@ -248,7 +252,7 @@ public:
       config_;
   NiceMock<Random::MockRandomGenerator> random_;
   RequestIDExtensionSharedPtr request_id_extension_;
-  std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   bool flush_access_log_on_new_request_ = false;
   bool flush_access_log_on_tunnel_successfully_established_ = false;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
@@ -275,6 +279,7 @@ public:
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  bool http1_safe_max_connection_duration_{false};
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};

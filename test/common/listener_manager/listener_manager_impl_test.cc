@@ -476,7 +476,7 @@ filter_chains:
 TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_, _));
   EXPECT_FALSE(manager_->isWorkerStarted());
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   // Validate that there are no active listeners and workers are started.
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.total_active_listeners",
@@ -503,11 +503,11 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Socket::Type::Datagram, _,
                                  ListenerComponentFactory::BindType::ReusePort, _, 0))
-      .WillOnce(Invoke(
-          [this](const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
-                 const Network::Socket::OptionsSharedPtr&, ListenerComponentFactory::BindType,
-                 const Network::SocketCreationOptions&,
-                 uint32_t) -> Network::SocketSharedPtr { return listener_factory_.socket_; }));
+      .WillOnce(
+          Invoke([this](const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
+                        const Network::Socket::OptionsSharedPtr&,
+                        ListenerComponentFactory::BindType, const Network::SocketCreationOptions&,
+                        uint32_t) { return listener_factory_.socket_; }));
   EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   addOrUpdateListener(listener_proto);
@@ -1008,11 +1008,12 @@ TEST_P(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
   for (const auto& f : listener_mutators) {
     auto new_listener = listener;
     f(new_listener);
-    EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(new_listener, "version", *manager_, "foo", true,
-                                               false, /*hash=*/static_cast<uint64_t>(0)),
-                              EnvoyException,
-                              "error adding listener named 'foo': has "
-                              "unsupported tcp listener feature");
+    EXPECT_EQ(ListenerImpl::create(new_listener, "version", *manager_, "foo", true, false,
+                                   /*hash=*/static_cast<uint64_t>(0))
+                  .status()
+                  .message(),
+              "error adding listener named 'foo': has "
+              "unsupported tcp listener feature");
   }
   {
     auto new_listener = listener;
@@ -1154,7 +1155,7 @@ dynamic_listeners:
 
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   worker_->callAddCompletion();
 
   time_system_.setSystemTime(std::chrono::milliseconds(3003003003003));
@@ -1474,7 +1475,7 @@ static_listeners:
 )EOF");
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Now add new version listener foo after workers start, note it's fine that server_init_mgr is
   // initialized, as no target will be added to it.
@@ -1549,7 +1550,7 @@ filter_chains: {}
       .RetiresOnSaturation();
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_create_success").value());
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -1700,7 +1701,7 @@ dynamic_listeners:
 )EOF",
                   mock_matcher);
 
-  // Validate that workers_started stat is zero before calling startWorkers.
+  // Validate that workers_started stat is zero before calling startWorkers.ok()
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
                    .value());
@@ -1708,7 +1709,7 @@ dynamic_listeners:
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   // Validate that workers_started stat is still zero before workers set the status via
   // completion callback.
   EXPECT_EQ(0, server_.stats_store_
@@ -1925,7 +1926,7 @@ TEST_P(ListenerManagerImplTest, UpdateActiveToWarmAndBack) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add and initialize foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -1986,7 +1987,7 @@ TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleAddresses) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add and initialize foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -2303,7 +2304,7 @@ TEST_P(ListenerManagerImplTest, UpdateListenerWithCompatibleZeroPortAddresses) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add and initialize foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -2375,7 +2376,7 @@ TEST_P(ListenerManagerImplTest, AddReusableDrainingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener directly into active.
   const std::string listener_foo_yaml = R"EOF(
@@ -2436,7 +2437,7 @@ TEST_P(ListenerManagerImplTest, AddReusableDrainingListenerWithMultiAddresses) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener directly into active.
   const std::string listener_foo_yaml = R"EOF(
@@ -2498,7 +2499,7 @@ TEST_P(ListenerManagerImplTest, AddClosedDrainingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener directly into active.
   const std::string listener_foo_yaml = R"EOF(
@@ -2551,7 +2552,7 @@ TEST_P(ListenerManagerImplTest, AddClosedDrainingListenerWithMultiAddresses) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener directly into active.
   const std::string listener_foo_yaml = R"EOF(
@@ -2604,11 +2605,12 @@ TEST_P(ListenerManagerImplTest, BindToPortEqualToFalse) {
   InSequence s;
   auto mock_interface = std::make_unique<Network::MockSocketInterface>(
       std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
-  StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(
+      std::move(mock_interface));
 
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -2624,12 +2626,11 @@ filter_chains:
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
       .WillOnce(Invoke(
-          [this, &real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
-                                         Network::Socket::Type socket_type,
-                                         const Network::Socket::OptionsSharedPtr& options,
-                                         ListenerComponentFactory::BindType bind_type,
-                                         const Network::SocketCreationOptions& creation_options,
-                                         uint32_t worker_index) -> Network::SocketSharedPtr {
+          [this, &real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
             // When bind_to_port is equal to false, the BSD socket is not created at main thread.
             EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
             return real_listener_factory.createListenSocket(
@@ -2644,11 +2645,12 @@ TEST_P(ListenerManagerImplTest, UpdateBindToPortEqualToFalse) {
   InSequence s;
   auto mock_interface = std::make_unique<Network::MockSocketInterface>(
       std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
-  StackedScopedInjectableLoader<Network::SocketInterface> new_interface(std::move(mock_interface));
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(
+      std::move(mock_interface));
 
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -2664,12 +2666,11 @@ filter_chains:
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
       .WillOnce(Invoke(
-          [this, &real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
-                                         Network::Socket::Type socket_type,
-                                         const Network::Socket::OptionsSharedPtr& options,
-                                         ListenerComponentFactory::BindType bind_type,
-                                         const Network::SocketCreationOptions& creation_options,
-                                         uint32_t worker_index) -> Network::SocketSharedPtr {
+          [this, &real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
             // When bind_to_port is equal to false, the BSD socket is not created at main thread.
             EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
             return real_listener_factory.createListenSocket(
@@ -2700,7 +2701,7 @@ TEST_P(ListenerManagerImplTest, DEPRECATED_FEATURE_TEST(DeprecatedBindToPortEqua
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -2719,20 +2720,19 @@ filter_chains:
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
-      .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
-                           const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Socket::Type socket_type,
-                           const Network::Socket::OptionsSharedPtr& options,
-                           ListenerComponentFactory::BindType bind_type,
-                           const Network::SocketCreationOptions& creation_options,
-                           uint32_t worker_index) -> Network::SocketSharedPtr {
-        EXPECT_CALL(server_, hotRestart).Times(0);
-        // When bind_to_port is equal to false, create socket fd directly, and do not get socket
-        // fd through hot restart.
-        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
-        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
-                                                        creation_options, worker_index);
-      }));
+      .WillOnce(Invoke(
+          [this, &syscall_result, &real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            EXPECT_CALL(server_, hotRestart).Times(0);
+            // When bind_to_port is equal to false, create socket fd directly, and do not get socket
+            // fd through hot restart.
+            ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
@@ -2742,7 +2742,7 @@ TEST_P(ListenerManagerImplTest, ReusePortEqualToTrue) {
   InSequence s;
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   const std::string listener_foo_yaml = R"EOF(
 name: foo
 address:
@@ -2768,17 +2768,16 @@ filter_chains:
           }));
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
-      .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
-                           const Network::Address::InstanceConstSharedPtr& address,
-                           Network::Socket::Type socket_type,
-                           const Network::Socket::OptionsSharedPtr& options,
-                           ListenerComponentFactory::BindType bind_type,
-                           const Network::SocketCreationOptions& creation_options,
-                           uint32_t worker_index) -> Network::SocketSharedPtr {
-        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
-        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
-                                                        creation_options, worker_index);
-      }));
+      .WillOnce(Invoke(
+          [this, &syscall_result, &real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+            ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
@@ -2786,18 +2785,20 @@ filter_chains:
 
 TEST_P(ListenerManagerImplTest, NotSupportedDatagramUds) {
   ProdListenerComponentFactory real_listener_factory(server_);
-  EXPECT_THROW_WITH_MESSAGE(real_listener_factory.createListenSocket(
-                                *Network::Address::PipeInstance::create("/foo"),
-                                Network::Socket::Type::Datagram, nullptr, default_bind_type, {}, 0),
-                            EnvoyException,
-                            "socket type SocketType::Datagram not supported for pipes");
+  EXPECT_EQ(real_listener_factory
+                .createListenSocket(*Network::Address::PipeInstance::create("/foo"),
+                                    Network::Socket::Type::Datagram, nullptr, default_bind_type, {},
+                                    0)
+                .status()
+                .message(),
+            "socket type SocketType::Datagram not supported for pipes");
 }
 
 TEST_P(ListenerManagerImplTest, CantListen) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -2829,7 +2830,7 @@ TEST_P(ListenerManagerImplTest, CantBindSocket) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -2887,7 +2888,7 @@ TEST_P(ListenerManagerImplTest, ConfigDumpWithExternalError) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Make sure the config dump is empty by default.
   ListenerManager::FailureStates empty_failure_state;
@@ -2923,7 +2924,7 @@ TEST_P(ListenerManagerImplTest, ListenerDraining) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   const std::string listener_foo_yaml = R"EOF(
 name: foo
@@ -2973,7 +2974,7 @@ TEST_P(ListenerManagerImplTest, RemoveListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Remove an unknown listener.
   EXPECT_FALSE(manager_->removeListener("unknown"));
@@ -3055,7 +3056,7 @@ TEST_P(ListenerManagerImplTest, StopListeners) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener in inbound direction.
   const std::string listener_foo_yaml = R"EOF(
@@ -3158,7 +3159,7 @@ TEST_P(ListenerManagerImplTest, StopAllListeners) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -3206,7 +3207,7 @@ TEST_P(ListenerManagerImplTest, StopWarmingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -3296,7 +3297,7 @@ TEST_P(ListenerManagerImplTest, DuplicateAddressDontBind) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -5677,7 +5678,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
                      Configuration::ListenerFactoryContext& context)
                      -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
-            return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+            return *ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
                 filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
           }));
   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
@@ -5760,7 +5761,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
                      Configuration::ListenerFactoryContext& context)
                      -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
-            return ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
+            return *ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
                 filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
           }));
 
@@ -6107,13 +6108,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
-      .WillOnce(Invoke(
-          [&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
-              const Network::Socket::OptionsSharedPtr& options, ListenerComponentFactory::BindType,
-              const Network::SocketCreationOptions&, uint32_t) -> Network::SocketSharedPtr {
-            EXPECT_EQ(options, nullptr);
-            return listener_factory_.socket_;
-          }));
+      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
+                           const Network::Socket::OptionsSharedPtr& options,
+                           ListenerComponentFactory::BindType,
+                           const Network::SocketCreationOptions&, uint32_t) {
+        EXPECT_EQ(options, nullptr);
+        return listener_factory_.socket_;
+      }));
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -6436,13 +6437,12 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Mptcp) {
 
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, default_bind_type, creation_options, 0))
-      .WillOnce(
-          Invoke([&real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
-                                          Network::Socket::Type socket_type,
-                                          const Network::Socket::OptionsSharedPtr& options,
-                                          ListenerComponentFactory::BindType bind_type,
-                                          const Network::SocketCreationOptions& creation_options,
-                                          uint32_t worker_index) -> Network::SocketSharedPtr {
+      .WillOnce(Invoke(
+          [&real_listener_factory](
+              const Network::Address::InstanceConstSharedPtr& address,
+              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+              ListenerComponentFactory::BindType bind_type,
+              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
             return real_listener_factory.createListenSocket(
                 address, socket_type, options, bind_type, creation_options, worker_index);
           }));
@@ -6708,7 +6708,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
 TEST_P(ListenerManagerImplWithDispatcherStatsTest, DispatherStatsWithCorrectPrefix) {
   EXPECT_CALL(*worker_, start(_, _));
   EXPECT_CALL(*worker_, initializeStats(_));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, ApiListener) {
@@ -6925,7 +6925,7 @@ per_connection_buffer_limit_bytes: 10
           nanos: 2000000
   )EOF");
 
-  // Validate that workers_started stat is zero before calling startWorkers.
+  // Validate that workers_started stat is zero before calling startWorkers.ok()
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
                    .value());
@@ -6933,7 +6933,7 @@ per_connection_buffer_limit_bytes: 10
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
   // Validate that workers_started stat is still zero before workers set the status via
   // completion callback.
   EXPECT_EQ(0, server_.stats_store_
@@ -7122,7 +7122,7 @@ TEST_P(ListenerManagerImplTest, StopInplaceWarmingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7184,7 +7184,7 @@ TEST_P(ListenerManagerImplTest, RemoveInplaceUpdatingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7253,7 +7253,7 @@ TEST_P(ListenerManagerImplTest, UpdateInplaceWarmingListener) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7316,7 +7316,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, RemoveTheInplaceUpdat
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7402,7 +7402,7 @@ TEST_P(ListenerManagerImplTest, DrainageDuringInplaceUpdate) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7472,7 +7472,7 @@ TEST_P(ListenerManagerImplTest, SharedListenerInfoInInplaceUpdate) {
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener into warming.
   const std::string listener_foo_yaml = R"EOF(
@@ -7534,7 +7534,7 @@ TEST_P(ListenerManagerImplTest, ListenSocketFactoryIsClonedFromListenerDrainingF
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -7629,7 +7629,7 @@ TEST_P(ListenerManagerImplTest,
   InSequence s;
 
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   // Add foo listener.
   const std::string listener_foo_yaml = R"EOF(
@@ -7810,6 +7810,24 @@ TEST(ListenerMessageUtilTest, ListenerMessageHaveDifferentFilterChainsAreEquival
   EXPECT_TRUE(Server::ListenerMessageUtil::filterChainOnlyChange(listener1, listener2));
 }
 
+TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, InvalidAddress) {
+  // Worker is not started yet.
+  envoy::config::listener::v3::Listener listener_proto;
+  Protobuf::TextFormat::ParseFromString(R"EOF(
+    name: "foo"
+    address: {
+      socket_address: {
+        address: "127.0.0.1.0"
+        port_value: 1234
+      }
+    }
+    filter_chains: {}
+  )EOF",
+                                        &listener_proto);
+  EXPECT_EQ(manager_->addOrUpdateListener(listener_proto, "", true).status().message(),
+            "malformed IP address: 127.0.0.1.0");
+}
+
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWorkerNotStarted) {
   // Worker is not started yet.
   auto listener_proto = createDefaultListener();
@@ -7837,7 +7855,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
 // do not share a listener.
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfDifferentSocketType) {
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   auto listener_proto = createDefaultListener();
 
@@ -7863,7 +7881,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfDi
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        DEPRECATED_FEATURE_TEST(TraditionalUpdateIfImplicitProxyProtocolChanges)) {
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   auto listener_proto = createDefaultListener();
 
@@ -7884,7 +7902,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest,
 
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZeroFilterChain) {
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   auto listener_proto = createDefaultListener();
 
@@ -7907,7 +7925,7 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZe
 TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest,
        TraditionalUpdateIfListenerConfigHasUpdateOtherThanFilterChain) {
   EXPECT_CALL(*worker_, start(_, _));
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
   auto listener_proto = createDefaultListener();
 
@@ -7974,7 +7992,7 @@ TEST_P(ListenerManagerImplTest, WorkersStartedCallbackCalled) {
 
   EXPECT_CALL(*worker_, start(_, _));
   EXPECT_CALL(callback_, Call());
-  manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 }
 
 TEST(ListenerEnableReusePortTest, All) {
@@ -8035,15 +8053,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, InvalidExtendConnectionBalanceCon
   extend_balance_config->mutable_typed_config()->set_type_url(
       "type.googleapis.com/google.protobuf.test");
 
-  auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                                    /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
   EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
-  EXPECT_THROW_WITH_MESSAGE(
-      listener_impl.addSocketFactory(std::move(socket_factory)), EnvoyException,
-      "Didn't find a registered implementation for type: 'google.protobuf.test'");
+  EXPECT_EQ(listener_impl->addSocketFactory(std::move(socket_factory)).message(),
+            "Didn't find a registered implementation for type: 'google.protobuf.test'");
 #endif
 }
 
@@ -8053,14 +8070,14 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
   auto listener = createIPv4Listener("TCPListener");
   listener.mutable_connection_balance_config();
 
-  auto listener_impl = ListenerImpl(listener, "version", *manager_, "foo", true, false,
-                                    /*hash=*/static_cast<uint64_t>(0));
+  auto listener_impl = *ListenerImpl::create(listener, "version", *manager_, "foo", true, false,
+                                             /*hash=*/static_cast<uint64_t>(0));
   auto socket_factory = std::make_unique<Network::MockListenSocketFactory>();
   Network::Address::InstanceConstSharedPtr address(
       new Network::Address::Ipv4Instance("192.168.0.1", 80, nullptr));
   EXPECT_CALL(*socket_factory, localAddress()).WillOnce(ReturnRef(address));
-  EXPECT_THROW_WITH_MESSAGE(listener_impl.addSocketFactory(std::move(socket_factory)),
-                            EnvoyException, "No valid balance type for connection balance");
+  EXPECT_EQ(listener_impl->addSocketFactory(std::move(socket_factory)).message(),
+            "No valid balance type for connection balance");
 #endif
 }
 

@@ -1,4 +1,5 @@
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -47,9 +48,11 @@ protected:
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
-  void setupFromV3Yaml(const std::string& yaml) {
+  void setupFromV3Yaml(const std::string& yaml, bool expect_success = true) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
-    resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+    if (expect_success) {
+      resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+    }
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
@@ -99,7 +102,7 @@ protected:
     EXPECT_CALL(membership_updated_, ready());
     EXPECT_CALL(initialized_, ready());
     EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -129,7 +132,7 @@ protected:
 
     // Should not cause any changes.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
@@ -167,7 +170,7 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
@@ -196,10 +199,10 @@ protected:
         .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
     logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
 
-    // Empty Success should not cause any change.
+    // Empty Completed should not cause any change.
     ON_CALL(random_, random()).WillByDefault(Return(6000));
     EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(6000), _));
-    dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "", {});
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "", {});
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(server_context_.dispatcher_,
@@ -301,7 +304,7 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-        cb(Network::DnsResolver::ResolutionStatus::Success, "",
+        cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
@@ -350,7 +353,7 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   // Successful call should reset the failure backoff strategy.
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -390,12 +393,12 @@ TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(5000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(5)));
 
   // If the response is successful but empty, the cluster uses the cluster configured refresh rate.
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                 TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 
   // On failure, the cluster uses the cluster configured refresh rate.
@@ -603,8 +606,105 @@ TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+}
+
+TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
+  const std::string config = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 4s
+  dns_jitter:
+    seconds: 0
+    nanos: 512000000
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  dns_lookup_family: V4_ONLY
+  wait_for_warm_on_init: false
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  uint64_t random_return = 8000;
+  uint64_t jitter_ms = random_return % 512; // default value
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV3Yaml(config);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000 + jitter_ms), _));
+  ON_CALL(random_, random()).WillByDefault(Return(random_return));
+
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
+}
+
+TEST_F(LogicalDnsClusterTest, NegativeDnsJitter) {
+  const std::string yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_jitter: -1s
+  lb_policy: ROUND_ROBIN
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(yaml, false), EnvoyException,
+                            "Invalid duration: Expected positive duration: seconds: -1\n");
+}
+
+TEST_F(LogicalDnsClusterTest, ExtremeJitter) {
+  // When random returns large values, they were being reinterpreted as very negative values causing
+  // negative refresh rates.
+  const std::string jitter_yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 1s
+  dns_failure_refresh_rate:
+    base_interval: 7s
+    max_interval: 10s
+  connect_timeout: 0.25s
+  dns_jitter: 1000s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV3Yaml(jitter_yaml);
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(testing::Ge(std::chrono::milliseconds(4000)), _));
+  ON_CALL(random_, random()).WillByDefault(Return(std::numeric_limits<int64_t>::min()));
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
 }
 
 } // namespace

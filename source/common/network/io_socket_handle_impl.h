@@ -32,8 +32,6 @@ public:
                               absl::optional<int> domain = absl::nullopt,
                               size_t address_cache_max_capacity = 0)
       : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
-        udp_read_normalize_addresses_(
-            Runtime::runtimeFeatureEnabled("envoy.restart_features.udp_read_normalize_addresses")),
         receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
     if (address_cache_max_capacity > 0) {
       recent_received_addresses_ =
@@ -60,9 +58,11 @@ public:
                                   const Address::Instance& peer_address) override;
 
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override;
+                                  uint32_t self_port, const UdpSaveCmsgConfig& save_cmsg_config,
+                                  RecvMsgOutput& output) override;
 
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   const UdpSaveCmsgConfig& save_cmsg_config,
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
 
@@ -107,8 +107,6 @@ protected:
   // and IPV6 addresses.
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                            CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
-
-  const bool udp_read_normalize_addresses_;
 
   // Latches a copy of the runtime feature "envoy.reloadable_features.quic_receive_ecn".
   const bool receive_ecn_;

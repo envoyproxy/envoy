@@ -209,6 +209,16 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
+TEST_F(ExtAuthzHttpClientTest, StreamInfo) {
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  EXPECT_EQ(client_->streamInfo(), nullptr);
+  auto check_response = TestCommon::makeMessageResponse(
+      TestCommon::makeHeaderValueOption({{":status", "200", false}}));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(async_request_, std::move(check_response));
+}
+
 // Test HTTP client config default values.
 TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString foo{"foo"};

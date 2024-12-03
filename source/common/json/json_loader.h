@@ -14,14 +14,8 @@ class Factory {
 public:
   /**
    * Constructs a Json Object from a string.
-   * Throws Json::Exception if unable to parse the string.
    */
-  static ObjectSharedPtr loadFromString(const std::string& json);
-
-  /**
-   * Constructs a Json Object from a string.
-   */
-  static absl::StatusOr<ObjectSharedPtr> loadFromStringNoThrow(const std::string& json);
+  static absl::StatusOr<ObjectSharedPtr> loadFromString(const std::string& json);
 
   /**
    * Constructs a Json Object from a Protobuf struct.

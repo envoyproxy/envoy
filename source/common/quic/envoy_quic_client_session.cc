@@ -85,12 +85,12 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
           std::make_unique<StreamInfo::StreamInfoImpl>(
               dispatcher.timeSource(),
               connection->connectionSocket()->connectionInfoProviderSharedPtr(),
-              StreamInfo::FilterState::LifeSpan::Connection)),
+              StreamInfo::FilterState::LifeSpan::Connection),
+          quic_stat_names, scope),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get()),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
-      quic_stat_names_(quic_stat_names), rtt_cache_(rtt_cache), scope_(scope),
-      transport_socket_options_(transport_socket_options),
+      rtt_cache_(rtt_cache), transport_socket_options_(transport_socket_options),
       transport_socket_factory_(makeOptRefFromPtr(
           dynamic_cast<QuicTransportSocketFactoryBase*>(transport_socket_factory.ptr()))) {
   streamInfo().setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
@@ -111,6 +111,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
   network_connection_ = nullptr;
+  if (registry_.has_value()) {
+    registry_->unregisterObserver(*network_connectivity_observer_);
+  }
 }
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
@@ -137,7 +140,8 @@ void EnvoyQuicClientSession::OnConnectionClosed(const quic::QuicConnectionCloseF
     }
   }
   quic::QuicSpdyClientSession::OnConnectionClosed(frame, source);
-  quic_stat_names_.chargeQuicConnectionCloseStats(scope_, frame.quic_error_code, source, true);
+  quic_stat_names_.chargeQuicConnectionCloseStats(stats_scope_, frame.quic_error_code, source,
+                                                  true);
   onConnectionCloseEvent(frame, source, version());
 }
 
@@ -163,18 +167,10 @@ void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
   }
 }
 
-void EnvoyQuicClientSession::MaybeSendRstStreamFrame(quic::QuicStreamId id,
-                                                     quic::QuicResetStreamError error,
-                                                     quic::QuicStreamOffset bytes_written) {
-  QuicSpdyClientSession::MaybeSendRstStreamFrame(id, error, bytes_written);
-  quic_stat_names_.chargeQuicResetStreamErrorStats(scope_, error, /*from_self*/ true,
-                                                   /*is_upstream*/ true);
-}
-
 void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
   QuicSpdyClientSession::OnRstStream(frame);
-  quic_stat_names_.chargeQuicResetStreamErrorStats(scope_, frame.error(),
-                                                   /*from_self*/ false, /*is_upstream*/ true);
+  incrementSentQuicResetStreamErrorStats(frame.error(),
+                                         /*from_self*/ false, /*is_upstream*/ true);
 }
 
 void EnvoyQuicClientSession::OnCanCreateNewOutgoingStream(bool unidirectional) {
@@ -306,6 +302,14 @@ void EnvoyQuicClientSession::OnServerPreferredAddressAvailable(
 std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
   return configured_alpns_.empty() ? quic::QuicSpdyClientSession::GetAlpnsToOffer()
                                    : configured_alpns_;
+}
+
+void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry) {
+  if (network_connectivity_observer_ == nullptr) {
+    network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserver>(*this);
+  }
+  registry.registerObserver(*network_connectivity_observer_);
+  registry_ = makeOptRef(registry);
 }
 
 } // namespace Quic

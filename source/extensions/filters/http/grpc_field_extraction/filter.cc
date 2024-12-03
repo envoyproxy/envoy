@@ -214,10 +214,7 @@ void Filter::handleExtractionResult(const ExtractionResult& result) {
   ProtobufWkt::Struct dest_metadata;
   for (const auto& req_field : result) {
     RELEASE_ASSERT(!req_field.path.empty(), "`req_field.path` shouldn't be empty");
-    auto* list = (*dest_metadata.mutable_fields())[req_field.path].mutable_list_value();
-    for (const auto& value : req_field.values) {
-      list->add_values()->set_string_value(value);
-    }
+    (*dest_metadata.mutable_fields())[req_field.path] = req_field.value;
   }
   if (dest_metadata.fields_size() > 0) {
     ENVOY_STREAM_LOG(debug, "injected dynamic metadata `{}` with `{}`", *decoder_callbacks_,

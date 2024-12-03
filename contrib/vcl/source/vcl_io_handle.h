@@ -31,6 +31,7 @@ public:
   os_fd_t fdDoNotUse() const override { return fd_; }
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
+  bool wasConnected() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
@@ -42,8 +43,10 @@ public:
                                   const Envoy::Network::Address::Ip* self_ip,
                                   const Envoy::Network::Address::Instance& peer_address) override;
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override;
+                                  uint32_t self_port, const UdpSaveCmsgConfig& save_cmsg_config,
+                                  RecvMsgOutput& output) override;
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   const UdpSaveCmsgConfig& save_cmsg_config,
                                    RecvMsgOutput& output) override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
   absl::optional<uint64_t> congestionWindowInBytes() const override;
@@ -63,8 +66,8 @@ public:
                               unsigned long out_buffer_len, unsigned long* bytes_returned) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
   absl::optional<int> domain() override;
-  Envoy::Network::Address::InstanceConstSharedPtr localAddress() override;
-  Envoy::Network::Address::InstanceConstSharedPtr peerAddress() override;
+  absl::StatusOr<Envoy::Network::Address::InstanceConstSharedPtr> localAddress() override;
+  absl::StatusOr<Envoy::Network::Address::InstanceConstSharedPtr> peerAddress() override;
   Api::SysCallIntResult shutdown(int) override { return {0, 0}; }
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,

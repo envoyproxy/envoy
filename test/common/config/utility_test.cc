@@ -20,6 +20,7 @@
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -29,6 +30,7 @@
 #include "udpa/type/v1/typed_struct.pb.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
+using Envoy::StatusHelpers::HasStatusMessage;
 using testing::ContainsRegex;
 using testing::Eq;
 using testing::HasSubstr;
@@ -588,11 +590,12 @@ TEST(UtilityTest, AnyWrongType) {
   ProtobufWkt::Any typed_config;
   typed_config.PackFrom(source_duration);
   ProtobufWkt::Timestamp out;
-  EXPECT_THROW_WITH_REGEX(
+  EXPECT_THAT(
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
-                                     out),
-      EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
+                                     out)
+          .message(),
+      ContainsRegex(
+          R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)"));
 }
 
 TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
@@ -653,7 +656,9 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToStruct) {
   this->packTypedStructIntoAny(typed_config, untyped_struct);
 
   ProtobufWkt::Struct out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(), out);
+  EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
+                                             ProtobufMessage::getStrictValidationVisitor(), out)
+                  .ok());
 
   EXPECT_THAT(out, ProtoEq(untyped_struct));
 }
@@ -671,13 +676,16 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV2) {
 
   {
     API_NO_BOOST(envoy::api::v2::Cluster) out;
-    Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getNullValidationVisitor(), out);
+    EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
+                                               ProtobufMessage::getNullValidationVisitor(), out)
+                    .ok());
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
     API_NO_BOOST(envoy::api::v2::Cluster) out;
-    Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
-                                   out);
+    EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
+                                               ProtobufMessage::getStrictValidationVisitor(), out)
+                    .ok());
     EXPECT_THAT(out, ProtoEq(cluster));
   }
 }
@@ -695,13 +703,16 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV3) {
 
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-    Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getNullValidationVisitor(), out);
+    EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
+                                               ProtobufMessage::getNullValidationVisitor(), out)
+                    .ok());
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-    Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
-                                   out);
+    EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
+                                               ProtobufMessage::getStrictValidationVisitor(), out)
+                    .ok());
     EXPECT_THAT(out, ProtoEq(cluster));
   }
 }
@@ -726,7 +737,8 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToInvalidType) {
 
   ProtobufWkt::Any out;
   EXPECT_THROW_WITH_REGEX(Utility::translateOpaqueConfig(
-                              typed_config, ProtobufMessage::getStrictValidationVisitor(), out),
+                              typed_config, ProtobufMessage::getStrictValidationVisitor(), out)
+                              .IgnoreError(),
                           EnvoyException, "Unable to parse JSON as proto");
 }
 
@@ -742,7 +754,9 @@ TEST(UtilityTest, AnyToClusterV2) {
   typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::api::v2::Cluster) out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(), out);
+  EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
+                                             ProtobufMessage::getStrictValidationVisitor(), out)
+                  .ok());
   EXPECT_THAT(out, ProtoEq(cluster));
 }
 
@@ -758,7 +772,9 @@ TEST(UtilityTest, AnyToClusterV3) {
   typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(), out);
+  EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
+                                             ProtobufMessage::getStrictValidationVisitor(), out)
+                  .ok());
   EXPECT_THAT(out, ProtoEq(cluster));
 }
 
@@ -769,7 +785,9 @@ TEST(UtilityTest, EmptyToEmptyConfig) {
   typed_config.PackFrom(empty_config);
 
   envoy::extensions::filters::http::cors::v3::Cors out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(), out);
+  EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
+                                             ProtobufMessage::getStrictValidationVisitor(), out)
+                  .ok());
   EXPECT_THAT(out, ProtoEq(envoy::extensions::filters::http::cors::v3::Cors()));
 }
 
@@ -892,6 +910,43 @@ TEST(UtilityTest, GetGrpcControlPlane) {
     TestUtility::loadFromYaml(config_yaml, api_config_source);
     EXPECT_EQ(absl::nullopt, Utility::getGrpcControlPlane(api_config_source));
   }
+}
+
+TEST(UtilityTest, ValidateTerminalFiltersSucceeds) {
+  EXPECT_OK(Utility::validateTerminalFilters("filter_name", "filter_type", "chain_type",
+                                             /*is_terminal_filter=*/true,
+                                             /*last_filter_in_current_config=*/true));
+  EXPECT_OK(Utility::validateTerminalFilters("filter_name", "filter_type", "chain_type",
+                                             /*is_terminal_filter=*/false,
+                                             /*last_filter_in_current_config=*/false));
+}
+
+TEST(UtilityTest, ValidateTerminalFilterFailsWithMisplacedTerminalFilter) {
+  EXPECT_THAT(
+      Utility::validateTerminalFilters("filter_name", "filter_type", "chain_type",
+                                       /*is_terminal_filter=*/true,
+                                       /*last_filter_in_current_config=*/false),
+      HasStatusMessage("Error: terminal filter named filter_name of type filter_type must be the "
+                       "last filter in a chain_type filter chain."));
+}
+
+TEST(UtilityTest, ValidateTerminalFilterFailsWithMissingTerminalFilter) {
+  EXPECT_THAT(Utility::validateTerminalFilters("filter_name", "filter_type", "chain_type",
+                                               /*is_terminal_filter=*/false,
+                                               /*last_filter_in_current_config=*/true),
+              HasStatusMessage("Error: non-terminal filter named filter_name of type "
+                               "filter_type is the last filter in a chain_type filter chain."));
+}
+
+TEST(UtilityTest, ValidateTerminalFilterFailsWithMissingUpstreamTerminalFilter) {
+  EXPECT_THAT(
+      Utility::validateTerminalFilters("filter_name", "filter_type", "router upstream http",
+                                       /*is_terminal_filter=*/false,
+                                       /*last_filter_in_current_config=*/true),
+      HasStatusMessage("Error: non-terminal filter named filter_name of type "
+                       "filter_type is the last filter in a router upstream http filter chain. "
+                       "When upstream_http_filters are specified, they must explicitly end with an "
+                       "UpstreamCodec filter."));
 }
 
 } // namespace

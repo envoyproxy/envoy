@@ -34,6 +34,10 @@ public:
     EXPECT_EQ(true, upstream_request_->complete());
   }
 
+  void testNonTerminalEncodingFilterWithCompleteRequest();
+  void testNonTerminalEncodingFilterWithIncompleteRequest();
+  void testFilterAddsDataAndTrailersToHeaderOnlyRequest();
+
   const int count_ = 70;
   const int size_ = 1000;
   const int added_decoded_data_size_ = 1;
@@ -1235,50 +1239,7 @@ TEST_P(FilterIntegrationTest, ResetFilter) {
 }
 
 // Verify filters can reset the stream
-TEST_P(FilterIntegrationTest, ResetFilterWithRuntimeFlagFalse) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.abort_filter_chain_on_stream_reset",
-                                    "false");
-
-  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
-  prependFilter(R"EOF(
-  name: reset-stream-filter
-  )EOF");
-
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  IntegrationStreamDecoderPtr response =
-      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  ASSERT_TRUE(response->waitForReset());
-  EXPECT_FALSE(response->complete());
-}
-
-// Verify filters can reset the stream
 TEST_P(FilterIntegrationTest, EncoderResetFilter) {
-  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
-  prependFilter(R"EOF(
-  name: encoder-reset-stream-filter
-  )EOF");
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  IntegrationStreamDecoderPtr response =
-      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  // Accept request and send response.
-  waitForNextUpstreamRequest(0);
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, true);
-
-  // The stream will be in the response path.
-  ASSERT_TRUE(response->waitForReset());
-  EXPECT_FALSE(response->complete());
-}
-
-TEST_P(FilterIntegrationTest, EncoderResetFilterWithRuntimeFlagFalse) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.abort_filter_chain_on_stream_reset",
-                                    "false");
-
   // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
   prependFilter(R"EOF(
   name: encoder-reset-stream-filter
@@ -1403,5 +1364,296 @@ TEST_P(FilterIntegrationTest, LocalReplyFromEncodeMetadata) {
 
   cleanupUpstreamAndDownstream();
 }
+
+// Validate that adding trailers during encode/decodeData with end_stream==true works correctly
+// with half close enabled.
+TEST_P(FilterIntegrationTest, FilterAddsTrailersWithIndependentHalfClose) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  prependFilter(R"EOF(
+  name: add-trailers-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "sni.lyft.com"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  // The add-body-filter will add trailers to the response
+  upstream_request_->encodeData(100, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(response->body().size(), 100);
+  // Make sure response trailers added by the filter were received by the client
+  EXPECT_EQ(response->trailers()->size(), 1);
+
+  Buffer::OwnedImpl data(std::string(100, 'r'));
+  codec_client_->sendData(*request_encoder, data, true);
+
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  ASSERT_TRUE(upstream_request_->complete());
+  // Make sure request trailers added by the filter were received by the upstream
+  EXPECT_EQ(upstream_request_->trailers()->size(), 1);
+  EXPECT_EQ(upstream_request_->bodyLength(), 100);
+}
+
+void FilterIntegrationTest::testNonTerminalEncodingFilterWithIncompleteRequest() {
+  // Encoding by non-terminal upstream filter is not supported
+  if (!testing_downstream_filter_) {
+    return;
+  }
+  prependFilter(R"EOF(
+  name: non-terminal-encoding-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.NonTerminalEncodingFilterConfig
+      where_to_start_encoding: DECODE_HEADERS
+      encode_body: IN_TIMER_CALLBACK
+      encode_trailers: IN_TIMER_CALLBACK
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "sni.lyft.com"}});
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(response->body(), "encoded body");
+  EXPECT_EQ(response->trailers()->size(), 1);
+}
+
+// Verify that when non terminal filter encodes end_stream with request still incomplete
+// the stream is reset. The behavior is the same with or without independent half-close enabled.
+TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithIncompleteRequest) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
+  testNonTerminalEncodingFilterWithIncompleteRequest();
+}
+
+TEST_P(FilterIntegrationTest,
+       NonTerminalEncodingFilterWithIncompleteRequestAndIdependentHalfClose) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  testNonTerminalEncodingFilterWithIncompleteRequest();
+}
+
+void FilterIntegrationTest::testNonTerminalEncodingFilterWithCompleteRequest() {
+  // Encoding by non-terminal upstream filter is not supported
+  if (!testing_downstream_filter_) {
+    return;
+  }
+  prependFilter(R"EOF(
+  name: non-terminal-encoding-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.NonTerminalEncodingFilterConfig
+      where_to_start_encoding: DECODE_DATA
+      encode_body: SYNCHRONOUSLY
+      encode_trailers: IN_TIMER_CALLBACK
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "sni.lyft.com"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  Buffer::OwnedImpl data(std::string(100, 'r'));
+  // Complete request and kick off response encoding from decodeData
+  codec_client_->sendData(*request_encoder, data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_FALSE(response->reset());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(response->body(), "encoded body");
+  EXPECT_EQ(response->trailers()->size(), 1);
+}
+
+// Verify that when non terminal filter encodes end_stream with request complete
+// the stream is finished gracefully and not reset. The behavior is the same with or without
+// independent half-close enabled.
+TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithCompleteRequest) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
+  testNonTerminalEncodingFilterWithCompleteRequest();
+}
+
+TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithCompleteRequestAndIdependentHalfClose) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  testNonTerminalEncodingFilterWithCompleteRequest();
+}
+
+void FilterIntegrationTest::testFilterAddsDataAndTrailersToHeaderOnlyRequest() {
+  // When an upstream filter adds body to the header only request the result observed by
+  // the upstream server is unpredictable. Sending of the added body races with the
+  // downstream FM closing the request, as it observed end_stream in both directions.
+  // This use case is effectively unsupported at this point.
+  if (!testing_downstream_filter_) {
+    return;
+  }
+  prependFilter(R"EOF(
+  name: add-trailers-filter
+  )EOF");
+  prependFilter(R"EOF(
+  name: add-body-filter-2
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: ENCODE_HEADERS
+      body_size: 100
+      where_to_stop_and_buffer: DECODE_DATA
+  )EOF");
+  prependFilter(R"EOF(
+  name: add-body-filter-1
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: DECODE_HEADERS
+      body_size: 100
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  // Even though client's request had only headers, the add-body-filter will add body and pause
+  // filter chain in decodeData, so the upstream should see incomplete request.
+  ASSERT_FALSE(upstream_request_->complete());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // Make sure response body added by the filter were received by the client
+  EXPECT_EQ(response->body().size(), 100);
+  // Note that client will not see reset because Envoy's downstream codec does not
+  // send RST_STREAM after it observed END_STREAM in both directions.
+  EXPECT_FALSE(response->reset());
+
+  if (testing_downstream_filter_) {
+    // When response is complete the downstream FM will reset the upstream request that was made
+    // incomplete by adding data and then pausing decoder filter chain.
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  } else {
+    // The upstream response completes successfully if add-body-filter is an upstream filter.
+    // This is because the downstream HCM sees completed stream and does not issue reset.
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  }
+}
+
+// Validate that extending request lifetime by adding body and trailers to a header only request
+// and then pausing decoder filter chain, results in stream reset when encoding completes.
+// The behavior is the same with or without independent half-close enabled.
+TEST_P(FilterIntegrationTest, FilterAddsDataToHeaderOnlyRequest) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
+  testFilterAddsDataAndTrailersToHeaderOnlyRequest();
+}
+
+TEST_P(FilterIntegrationTest, FilterAddsDataToHeaderOnlyRequestWithIndependentHalfClose) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+  testFilterAddsDataAndTrailersToHeaderOnlyRequest();
+}
+
+// Add metadata in the first filter before recreate the stream in the second filter,
+// on response path.
+TEST_P(FilterIntegrationTest, RecreateStreamAfterEncodeMetadata) {
+  // recreateStream is not supported in Upstream filter chain.
+  if (!testing_downstream_filter_) {
+    return;
+  }
+
+  prependFilter("{ name: add-metadata-encode-headers-filter }");
+  prependFilter("{ name: encoder-recreate-stream-filter }");
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Second upstream request is triggered by recreateStream.
+  FakeStreamPtr upstream_request_2;
+  // Wait for the next stream on the upstream connection.
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_2));
+  // Wait for the stream to be completely received.
+  ASSERT_TRUE(upstream_request_2->waitForEndStream(*dispatcher_));
+  upstream_request_2->encodeHeaders(default_response_headers_, true);
+
+  // Wait for the response to be completely received.
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  // Verify the metadata is received.
+  std::set<std::string> expected_metadata_keys = {"headers", "duplicate"};
+  EXPECT_EQ(response->metadataMap().size(), expected_metadata_keys.size());
+  for (const auto& key : expected_metadata_keys) {
+    // keys are the same as their corresponding values.
+    auto it = response->metadataMap().find(key);
+    ASSERT_FALSE(it == response->metadataMap().end()) << "key: " << key;
+    EXPECT_EQ(response->metadataMap().find(key)->second, key);
+  }
+}
+
+// Add metadata in the first filter on local reply path.
+TEST_P(FilterIntegrationTest, EncodeMetadataOnLocalReply) {
+  // Local replies are not seen by upstream HTTP filters. add-metadata-encode-headers-filter will
+  // not be invoked if it is installed in upstream filter chain.
+  // Thus, this test is only applicable to downstream filter chain.
+  if (!testing_downstream_filter_) {
+    return;
+  }
+
+  prependFilter("{ name: local-reply-during-decode }");
+  prependFilter("{ name: add-metadata-encode-headers-filter }");
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+
+  // Verify the metadata is received.
+  std::set<std::string> expected_metadata_keys = {"headers", "duplicate"};
+  EXPECT_EQ(response->metadataMap().size(), expected_metadata_keys.size());
+  for (const auto& key : expected_metadata_keys) {
+    // keys are the same as their corresponding values.
+    auto it = response->metadataMap().find(key);
+    ASSERT_FALSE(it == response->metadataMap().end()) << "key: " << key;
+    EXPECT_EQ(response->metadataMap().find(key)->second, key);
+  }
+}
+
 } // namespace
 } // namespace Envoy

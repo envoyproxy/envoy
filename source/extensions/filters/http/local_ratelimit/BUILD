@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
+        "//source/extensions/filters/common/ratelimit_config:ratelimit_config_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/common:ratelimit_headers_lib",
         "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",

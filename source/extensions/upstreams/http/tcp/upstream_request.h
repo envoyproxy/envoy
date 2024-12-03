@@ -78,7 +78,7 @@ public:
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
-  void enableHalfClose() override {}
+  void enableTcpTunneling() override {}
   void readDisable(bool disable) override;
   void resetStream() override;
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
@@ -94,6 +94,8 @@ private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+  bool downstream_complete_ = false;
+  const bool force_reset_on_upstream_half_close_{};
 };
 
 } // namespace Tcp

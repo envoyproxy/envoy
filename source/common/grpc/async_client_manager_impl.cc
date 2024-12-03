@@ -167,7 +167,7 @@ absl::StatusOr<RawAsyncClientSharedPtr> AsyncClientManagerImpl::getOrCreateRawAs
   }
   auto factory_or_error =
       factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check);
-  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
   client = factory_or_error.value()->createUncachedRawAsyncClient();
   raw_async_client_cache_->setCache(config_with_hash_key, client);
   return client;
@@ -183,7 +183,7 @@ AsyncClientManagerImpl::getOrCreateRawAsyncClientWithHashKey(
   }
   auto factory_or_error =
       factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check);
-  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
   client = factory_or_error.value()->createUncachedRawAsyncClient();
   raw_async_client_cache_->setCache(config_with_hash_key, client);
   return client;

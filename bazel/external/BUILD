@@ -7,14 +7,10 @@ exports_files(["boringssl_fips.genrule_cmd"])
 cc_library(
     name = "all_external",
     srcs = [":empty.cc"],
-    defines = ["OPENTRACING_STATIC"],
-    # TODO: external/io_opentracing_cpp/BUILD.bazel:19:1: Executing genrule
-    # @io_opentracing_cpp//:generate_version_h failed - needs porting
     tags = ["skip_on_windows"],
     deps = [
         "@com_github_datadog_dd_trace_cpp//:dd_trace_cpp",
         "@com_google_googletest//:gtest",
-        "@io_opentracing_cpp//:opentracing",
     ],
 )
 

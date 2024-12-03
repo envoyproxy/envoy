@@ -10,16 +10,18 @@ import io.envoyproxy.envoymobile.engine.JniLibrary;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
+import org.junit.BeforeClass;
 
 import static com.google.common.truth.Truth.assertThat;
 
-// NOLINT(namespace-envoy)
-
 @RunWith(RobolectricTestRunner.class)
 public class AndroidEngineStartUpTest {
-  static { JniLibrary.loadTestLibrary(); }
-
   private final Context appContext = ApplicationProvider.getApplicationContext();
+
+  @BeforeClass
+  public static void loadJniLibrary() {
+    JniLibrary.loadTestLibrary();
+  }
 
   @Test
   public void ensure_engine_starts_and_terminates() throws InterruptedException {

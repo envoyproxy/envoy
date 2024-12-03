@@ -99,6 +99,46 @@ TEST_F(CustomHeaderTest, FallbacksToDefaultResponseCode) {
   EXPECT_EQ(reject_options.body, "");
 }
 
+TEST_F(CustomHeaderTest, SkipXFFAppendBehavior) {
+  // Test all scenarios to ensure XFF header is never appended
+
+  // When header is missing
+  {
+    Envoy::Http::TestRequestHeaderMapImpl headers{{"x-other", "abc"}};
+    Envoy::Http::OriginalIPDetectionParams params = {headers, nullptr};
+    auto result = custom_header_extension_->detect(params);
+
+    EXPECT_TRUE(result.skip_xff_append) << "XFF append should be skipped when header is missing";
+  }
+
+  // When header contains invalid IP
+  {
+    Envoy::Http::TestRequestHeaderMapImpl headers{{"x-real-ip", "not-a-real-ip"}};
+    Envoy::Http::OriginalIPDetectionParams params = {headers, nullptr};
+    auto result = custom_header_extension_->detect(params);
+
+    EXPECT_TRUE(result.skip_xff_append) << "XFF append should be skipped for invalid IP";
+  }
+
+  // When header contains valid IPv4
+  {
+    Envoy::Http::TestRequestHeaderMapImpl headers{{"x-real-ip", "1.2.3.4"}};
+    Envoy::Http::OriginalIPDetectionParams params = {headers, nullptr};
+    auto result = custom_header_extension_->detect(params);
+
+    EXPECT_TRUE(result.skip_xff_append) << "XFF append should be skipped for valid IPv4";
+  }
+
+  // When header contains valid IPv6
+  {
+    Envoy::Http::TestRequestHeaderMapImpl headers{{"x-real-ip", "fc00::1"}};
+    Envoy::Http::OriginalIPDetectionParams params = {headers, nullptr};
+    auto result = custom_header_extension_->detect(params);
+
+    EXPECT_TRUE(result.skip_xff_append) << "XFF append should be skipped for valid IPv6";
+  }
+}
+
 } // namespace CustomHeader
 } // namespace OriginalIPDetection
 } // namespace Http

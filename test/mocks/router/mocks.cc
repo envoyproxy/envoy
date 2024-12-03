@@ -45,9 +45,9 @@ void MockRetryState::expectHedgedPerTryTimeoutRetry() {
 }
 
 void MockRetryState::expectResetRetry() {
-  EXPECT_CALL(*this, shouldRetryReset(_, _, _))
+  EXPECT_CALL(*this, shouldRetryReset(_, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used,
-                              DoRetryResetCallback callback) {
+                              DoRetryResetCallback callback, bool) {
         callback_ = [callback]() { callback(false); };
         return RetryStatus::Yes;
       }));
@@ -76,6 +76,7 @@ MockVirtualHost::MockVirtualHost() {
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
+  ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
 }
 
 MockVirtualHost::~MockVirtualHost() = default;
@@ -98,6 +99,10 @@ MockPathMatchCriterion::~MockPathMatchCriterion() = default;
 
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
+  ON_CALL(*this, getRequestHostValue(_))
+      .WillByDefault([](const Http::RequestHeaderMap& headers) -> std::string {
+        return std::string(headers.getHostValue());
+      });
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
@@ -106,8 +111,6 @@ MockRouteEntry::MockRouteEntry() {
       .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
-  ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
-  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
   ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(path_match_criterion_));
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
@@ -153,6 +156,7 @@ MockRoute::MockRoute() {
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
+  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
 }
 MockRoute::~MockRoute() = default;
 

@@ -57,7 +57,7 @@ ClientSslSocketFactory::~ClientSslSocketFactory() { manager_.removeContext(ssl_c
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-    Upstream::HostDescriptionConstSharedPtr) const {
+    Upstream::HostDescriptionConstSharedPtr host) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -69,7 +69,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
   if (ssl_ctx) {
     auto status_or_socket =
         SslSocket::create(std::move(ssl_ctx), InitialState::Client, transport_socket_options,
-                          config_->createHandshaker());
+                          config_->createHandshaker(), host);
     if (status_or_socket.ok()) {
       return std::move(*status_or_socket);
     }

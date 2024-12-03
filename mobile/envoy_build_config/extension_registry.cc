@@ -7,7 +7,6 @@
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/upstream/default_local_address_selector_factory.h"
-#include "source/common/watchdog/abort_action_config.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
@@ -36,7 +35,6 @@
 #include "source/common/listener_manager/connection_handler_impl.h"
 #endif
 
-#ifdef ENVOY_ENABLE_QUIC
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
 #include "source/common/quic/server_codec_impl.h"
 #include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
@@ -44,9 +42,8 @@
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
 #endif
-#include "source/common/quic/quic_client_transport_socket_factory.h"
-#endif
 
+#include "source/common/quic/quic_client_transport_socket_factory.h"
 #include "extension_registry_platform_additions.h"
 #include "library/common/extensions/cert_validator/platform_bridge/config.h"
 #include "library/common/extensions/filters/http/local_error/config.h"
@@ -163,10 +160,6 @@ void ExtensionRegistry::registerFactories() {
   // hit of compiling in downstream code.
   Server::forceRegisterApiListenerManagerFactoryImpl();
 
-  // This is required code for certain watchdog config, required until Envoy
-  // Mobile compiles out watchdog support.
-  Watchdog::forceRegisterAbortActionFactory();
-
   // This is required for the default upstream local address selector.
   Upstream::forceRegisterDefaultUpstreamLocalAddressSelectorFactory();
 
@@ -182,8 +175,6 @@ void ExtensionRegistry::registerFactories() {
   Server::FilterChain::forceRegisterFilterChainNameActionFactory();
 #endif
 
-#ifdef ENVOY_ENABLE_QUIC
-
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
   // These are QUIC downstream factories required if Envoy Mobile is compiled with
   // proxy functionality and QUIC support.
@@ -195,8 +186,8 @@ void ExtensionRegistry::registerFactories() {
   Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
   Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 #endif
+
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();
-#endif
 }
 
 } // namespace Envoy

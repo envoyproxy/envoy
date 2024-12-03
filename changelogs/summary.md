@@ -1,24 +1,14 @@
 **Summary of changes**:
 
-* Removed the Swift/C++ interop layer in Envoy Mobile.
-* Addd retry policy to ext_proc.
-* Added HTTP downstream remote reset response flag.
-* Added support for the Fluentd access logger.
-* Introduced `MemoryAllocatorManager` to configure heap memory release rate.
-* Envoy Mobile added `CONNECT` Proxy support for iOS.
-* Redis: support echo command.
-* Envoy Mobile setting QUIC newtowrk idle timeout to 30 seconds.
-* Sending server preferred address to non-QUICHE clients.
-* Avoid concatenation of JWT duplicated headers.
-* HTTP: Keep `Transfer-Encoding` header for `trailers`.
-* Envoy Mobile setting the socket receive buffer to 1MB for QUIC.
-* Added `FULL_SCAN` support to least-request load-balancing algorithm.
-* aws_lambda and ext_proc filters can be used as an upstream filter.
-* Hosts marked as draining in and EDS update are now excluded.
-* Envoy Mobile supports log-levels.
-* Added support for URI tempate matching for RBAC.
-* Fixed load balancing initialization bug.
-* Supporting `%UPSTREAM_CONNECTION_ID%` in access logs.
-* Added request and response attributes support to ext_proc.
-* Added support sending dynamic metadata to ext_proc.
-* Re-enable the nghttp2 codec for HTTP/2 connections by default.
+* Envoy now logs warnings when `internal_address_config` is not set.  If you see this logged warning and wish to retain trusted status for internal addresses you must explicitly configure `internal_address_config` (which will turn off the warning) before the next Envoy release.
+* Removed support for (long deprecated) opentracing.
+* Added a configuration setting for the maximum size of response headers in responses.
+* Added support for `connection_pool_per_downstream_connection` flag in tcp connection pool.
+* For the strict DNS and logical DNS cluster types, the `dns_jitter` field allows spreading out DNS refresh requests
+* Added dynamic metadata matcher support `dynamic metadata input` and `dynamic metadata input matcher`.
+* The xff original IP detection method now supports using a list of trusted CIDRs when parsing `x-forwarded-for`.
+* QUIC server and client support certificate compression, which can in some cases reduce the number of round trips required to setup a connection.
+* Added the ability to monitor CPU utilization in Linux based systems via `cpu utilization monitor` in overload manager.
+* Added new access log command operators (`%START_TIME_LOCAL%` and `%EMIT_TIME_LOCAL%`) formatters (`%UPSTREAM_CLUSTER_RAW%` `%DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256%`, and `%DOWNSTREAM_PEER_CHAIN_SERIALS%`) as well as significant boosts to json parsing. See release notes for details
+* Added support for `%BYTES_RECEIVED%`, `%BYTES_SENT%`, `%UPSTREAM_HEADER_BYTES_SENT%`, `%UPSTREAM_HEADER_BYTES_RECEIVED%`,`%UPSTREAM_WIRE_BYTES_SENT%`, `%UPSTREAM_WIRE_BYTES_RECEIVED%` and access log substitution strings for UDP tunneling flows.
+* Added ECDS support for UDP session filters.

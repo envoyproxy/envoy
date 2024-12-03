@@ -48,13 +48,10 @@ public:
   ~StaticDummyConfigProvider() override = default;
 
   // Envoy::Config::ConfigProvider
-  const Protobuf::Message* getConfigProto() const override { return &config_proto_; }
-
-  // Envoy::Config::ConfigProvider
-  std::string getConfigVersion() const override { return ""; }
-
-  // Envoy::Config::ConfigProvider
   ConfigConstSharedPtr getConfig() const override { return config_; }
+
+  // Envoy::Config::ConfigProvider
+  ConfigProtoVector getConfigProtos() const override { return {&config_proto_}; }
 
 private:
   ConfigConstSharedPtr config_;
@@ -121,13 +118,12 @@ public:
   DummyConfigSubscription& subscription() { return *subscription_; }
 
   // Envoy::Config::ConfigProvider
-  const Protobuf::Message* getConfigProto() const override {
-    if (!subscription_->configProto().has_value()) {
-      return nullptr;
+  ConfigProtoVector getConfigProtos() const override {
+    if (subscription_->configProto().has_value()) {
+      return {&subscription_->configProto().value()};
     }
-    return &subscription_->configProto().value();
+    return {};
   }
-  std::string getConfigVersion() const override { return ""; }
 
 private:
   // Lifetime of this pointer is owned by the shared_ptr held by the base class.
@@ -163,10 +159,12 @@ public:
     }
 
     for (const auto* provider : immutableConfigProviders(ConfigProviderInstanceType::Static)) {
-      ASSERT(provider->configProtoInfo<test::common::config::DummyConfig>());
+      ASSERT(provider->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
       auto* static_config = config_dump->mutable_static_dummy_configs()->Add();
       static_config->mutable_dummy_config()->MergeFrom(
-          provider->configProtoInfo<test::common::config::DummyConfig>().value().config_proto_);
+          *provider->configProtoInfoVector<test::common::config::DummyConfig>()
+               .value()
+               .config_protos_[0]);
       TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                             *static_config->mutable_last_updated());
     }
@@ -268,7 +266,7 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
       ConfigProviderManager::NullOptionalArg());
 
   // No config protos have been received via the subscription yet.
-  EXPECT_FALSE(provider1->configProtoInfo<test::common::config::DummyConfig>().has_value());
+  EXPECT_FALSE(provider1->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> untyped_dummy_configs;
   const auto dummy_config = parseDummyConfigFromYaml("a: a dummy config");
@@ -284,11 +282,9 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
       config_source_proto, server_factory_context_, init_manager_, "dummy_prefix",
       ConfigProviderManager::NullOptionalArg());
 
-  EXPECT_TRUE(provider2->configProtoInfo<test::common::config::DummyConfig>().has_value());
+  EXPECT_TRUE(provider2->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
   EXPECT_EQ(&dynamic_cast<DummyDynamicConfigProvider&>(*provider1).subscription(),
             &dynamic_cast<DummyDynamicConfigProvider&>(*provider2).subscription());
-  EXPECT_EQ(&provider1->configProtoInfo<test::common::config::DummyConfig>().value().config_proto_,
-            &provider2->configProtoInfo<test::common::config::DummyConfig>().value().config_proto_);
   EXPECT_EQ(provider1->config<const DummyConfig>().get(),
             provider2->config<const DummyConfig>().get());
 
@@ -394,8 +390,7 @@ public:
       : ImmutableConfigProviderBase(factory_context, config_provider_manager, instance_type,
                                     ApiType::Full) {}
   ConfigConstSharedPtr getConfig() const override { return nullptr; }
-  std::string getConfigVersion() const override { return ""; }
-  const Protobuf::Message* getConfigProto() const override { return nullptr; }
+  ConfigProtoVector getConfigProtos() const override { return {}; }
 };
 
 class ConfigProviderImplDeathTest : public ConfigProviderImplTest {};
@@ -605,12 +600,6 @@ public:
     return proto_vector;
   }
 
-  std::string getConfigVersion() const override {
-    return (subscription_->configInfo().has_value())
-               ? subscription_->configInfo().value().last_config_version_
-               : "";
-  }
-
 private:
   DeltaDummyConfigSubscription* subscription_;
 };
@@ -748,8 +737,6 @@ TEST_F(DeltaConfigProviderImplTest, MultipleDeltaSubscriptions) {
   EXPECT_EQ(provider1->config<const DummyConfig>().get(),
             provider2->config<const DummyConfig>().get());
   EXPECT_EQ(provider1->config<const DummyConfig>()->numProtos(), 4);
-  EXPECT_EQ(provider1->configProtoInfoVector<test::common::config::DummyConfig>().value().version_,
-            "2");
 }
 
 // Tests a config update failure.

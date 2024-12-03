@@ -17,6 +17,9 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/null_counter.h"
+#include "source/common/stats/null_gauge.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl_base.h"
@@ -408,7 +411,8 @@ public:
          Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
          Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
          bool use_bootstrap_node_metadata = false,
-         std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr);
+         std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>&& config_proto = nullptr,
+         bool use_admin_server = true);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -418,6 +422,7 @@ public:
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value);
   void unsetDynamicContextParam(absl::string_view resource_type_url, absl::string_view key);
+  void setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source);
 
   Server::DrainManagerImpl& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {
@@ -437,7 +442,8 @@ public:
              ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
              uint32_t concurrency, std::chrono::seconds drain_time,
              Server::DrainStrategy drain_strategy,
-             Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata);
+             Buffer::WatermarkFactorySharedPtr watermark_factory, bool use_bootstrap_node_metadata,
+             bool use_admin_server);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
@@ -566,7 +572,8 @@ protected:
                                        Server::ComponentFactory& component_factory,
                                        Random::RandomGeneratorPtr&& random_generator,
                                        ProcessObjectOptRef process_object,
-                                       Buffer::WatermarkFactorySharedPtr watermark_factory) PURE;
+                                       Buffer::WatermarkFactorySharedPtr watermark_factory,
+                                       bool use_admin_server) PURE;
 
   // Will be called by subclass on server thread when the server is ready to be accessed. The
   // server may not have been run yet, but all server access methods (server(), statStore(),
@@ -583,7 +590,7 @@ private:
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
                      Buffer::WatermarkFactorySharedPtr watermark_factory,
-                     bool use_bootstrap_node_metadata);
+                     bool use_bootstrap_node_metadata, bool use_admin_server);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;
@@ -641,7 +648,8 @@ private:
                                Server::ComponentFactory& component_factory,
                                Random::RandomGeneratorPtr&& random_generator,
                                ProcessObjectOptRef process_object,
-                               Buffer::WatermarkFactorySharedPtr watermark_factory) override;
+                               Buffer::WatermarkFactorySharedPtr watermark_factory,
+                               bool use_admin_server) override;
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a non-main thread.

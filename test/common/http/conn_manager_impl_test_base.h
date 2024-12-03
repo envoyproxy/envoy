@@ -29,6 +29,38 @@ using testing::NiceMock;
 namespace Envoy {
 namespace Http {
 
+struct SetupOpts {
+  SetupOpts& setSsl(bool ssl) {
+    ssl_ = ssl;
+    return *this;
+  }
+
+  SetupOpts& setServerName(absl::string_view server_name) {
+    server_name_ = server_name;
+    return *this;
+  }
+
+  SetupOpts& setTracing(bool tracing) {
+    tracing_ = tracing;
+    return *this;
+  }
+
+  SetupOpts& setUseSrds(bool use_srds) {
+    use_srds_ = use_srds;
+    return *this;
+  }
+
+  SetupOpts& setHttp1SafeMaxConnectionDuration(bool http1_safe_max_connection_duration) {
+    http1_safe_max_connection_duration_ = http1_safe_max_connection_duration;
+    return *this;
+  }
+
+  bool ssl_{false};
+  std::string server_name_{"envoy-server-test"};
+  bool tracing_{true};
+  bool use_srds_{false};
+  bool http1_safe_max_connection_duration_{false};
+};
 // Base class for HttpConnectionManagerImpl related tests. This base class is used by tests under
 // common/http as well as test/extensions/filters/http/ext_proc/, to reuse the many mocks/default
 // impls of ConnectionManagerConfig that we need to provide to HttpConnectionManagerImpl.
@@ -37,7 +69,7 @@ public:
   HttpConnectionManagerImplMixin();
   ~HttpConnectionManagerImplMixin() override;
   Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header);
-  void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false);
+  void setup(const SetupOpts& opts = {});
   void setupFilterChain(int num_decoder_filters, int num_encoder_filters, int num_requests = 1);
   void setUpBufferLimits();
 
@@ -61,7 +93,7 @@ public:
                              const ResponseHeaderMap& expected_response);
 
   // Http::ConnectionManagerConfig
-  const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
     return flush_log_on_tunnel_successfully_established_;
@@ -85,6 +117,9 @@ public:
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
+  }
+  bool http1SafeMaxConnectionDuration() const override {
+    return http1_safe_max_connection_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -221,7 +256,7 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   std::string access_log_path_;
-  std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   bool flush_access_log_on_new_request_ = false;
   bool flush_log_on_tunnel_successfully_established_ = false;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
@@ -248,6 +283,7 @@ public:
   uint64_t max_requests_per_connection_{};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  bool http1_safe_max_connection_duration_{false};
   std::chrono::milliseconds stream_idle_timeout_{};
   std::chrono::milliseconds request_timeout_{};
   std::chrono::milliseconds request_headers_timeout_{};

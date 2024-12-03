@@ -61,12 +61,7 @@ void MutationUtils::headersToProto(
     if (headerCanBeForwarded(e.key().getStringView(), allowed_headers, disallowed_headers)) {
       auto* new_header = proto_out.add_headers();
       new_header->set_key(std::string(e.key().getStringView()));
-      // Setting up value or raw_value field based on the runtime flag.
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_raw_value")) {
-        new_header->set_raw_value(std::string(e.value().getStringView()));
-      } else {
-        new_header->set_value(MessageUtil::sanitizeUtf8String(e.value().getStringView()));
-      }
+      new_header->set_raw_value(std::string(e.value().getStringView()));
     }
     return Http::HeaderMap::Iterate::Continue;
   });
@@ -158,21 +153,7 @@ absl::Status MutationUtils::applyHeaderMutations(const HeaderMutation& mutation,
       continue;
     }
 
-    // Only one of value or raw_value in the HeaderValue message should be set.
-    if (!sh.header().value().empty() && !sh.header().raw_value().empty()) {
-      ENVOY_LOG(debug, "Only one of value or raw_value in the HeaderValue message should be set, "
-                       "may not be append.");
-      rejected_mutations.inc();
-      return absl::InvalidArgumentError(
-          "Only one of value or raw_value in the HeaderValue message should be set.");
-    }
-
-    absl::string_view header_value;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_raw_value")) {
-      header_value = sh.header().raw_value();
-    } else {
-      header_value = sh.header().value();
-    }
+    const absl::string_view header_value = sh.header().raw_value();
     if (!Http::HeaderUtility::headerNameIsValid(sh.header().key()) ||
         !Http::HeaderUtility::headerValueIsValid(header_value)) {
       ENVOY_LOG(debug,

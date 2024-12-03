@@ -67,7 +67,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-    MonotonicTime receive_time, uint8_t tos) {
+    MonotonicTime receive_time, uint8_t tos, Buffer::RawSlice /*saved_cmsg*/) {
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(
@@ -128,7 +128,10 @@ void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket&
       connection_socket.close();
     }
   }
-  if (!connection_socket.isOpen()) {
+  if (!connection_socket.isOpen() && connectionSocket().get() == &connection_socket) {
+    // Only close the connection if the connection socket is the current one. If it is a probing
+    // socket that isn't the current socket, do not close the connection upon failure, as the
+    // current socket is still usable.
     CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
                     quic::ConnectionCloseBehavior::SILENT_CLOSE);
   }
@@ -164,7 +167,7 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
   probeWithNewPort(peer_address(), quic::PathValidationReason::kPortMigration);
 }
 
-void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& peer_address,
+void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& peer_addr,
                                                  quic::PathValidationReason reason) {
   const Network::Address::InstanceConstSharedPtr& current_local_address =
       connectionSocket()->connectionInfoProvider().localAddress();
@@ -179,9 +182,10 @@ void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& 
   }
 
   // The probing socket will have the same host but a different port.
-  auto probing_socket =
-      createConnectionSocket(connectionSocket()->connectionInfoProvider().remoteAddress(),
-                             new_local_address, connectionSocket()->options(), prefer_gro_);
+  auto probing_socket = createConnectionSocket(
+      peer_addr == peer_address() ? connectionSocket()->connectionInfoProvider().remoteAddress()
+                                  : quicAddressToEnvoyAddressInstance(peer_addr),
+      new_local_address, connectionSocket()->options(), prefer_gro_);
   setUpConnectionSocket(*probing_socket, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));
@@ -189,7 +193,7 @@ void EnvoyQuicClientConnection::probeWithNewPort(const quic::QuicSocketAddress& 
       probing_socket->connectionInfoProvider().localAddress()->ip());
 
   auto context = std::make_unique<EnvoyQuicPathValidationContext>(
-      self_address, peer_address, std::move(writer), std::move(probing_socket));
+      self_address, peer_addr, std::move(writer), std::move(probing_socket));
   ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this),
                reason);
 }
@@ -238,7 +242,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   ASSERT(events & (Event::FileReadyType::Read | Event::FileReadyType::Write));
 
   if (events & Event::FileReadyType::Write) {
-    OnCanWrite();
+    OnBlockedWriterCanWrite();
   }
 
   bool is_probing_socket =
@@ -257,14 +261,15 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
         *this, dispatcher_.timeSource(), prefer_gro_, !disallow_mmsg_, packets_dropped_);
     if (err == nullptr) {
-      // In the case where the path validation fails, the probing socket will be closed and its IO
-      // events are no longer interesting.
-      if (!is_probing_socket || HasPendingPathValidation() ||
-          connectionSocket().get() == &connection_socket) {
+      // If this READ event is on the probing socket and any packet read failed the path validation
+      // (i.e. via STATELESS_RESET), the probing socket should have been closed and the default
+      // socket remained unchanged. In this case any remaining unread packets are no longer
+      // interesting. Only re-register READ event to continue reading the remaining packets in the
+      // next loop if this is not the case.
+      if (!(is_probing_socket && !HasPendingPathValidation() &&
+            connectionSocket().get() != &connection_socket)) {
         connection_socket.ioHandle().activateFileEvents(Event::FileReadyType::Read);
-        return;
       }
-
     } else if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
                      err->getErrorDetails());

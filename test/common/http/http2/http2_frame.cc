@@ -6,7 +6,7 @@
 
 #include "source/common/common/hex.h"
 
-#include "quiche/spdy/core/hpack/hpack_encoder.h"
+#include "quiche/http2/hpack/hpack_encoder.h"
 
 namespace {
 

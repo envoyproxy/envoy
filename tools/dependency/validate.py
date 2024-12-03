@@ -7,6 +7,7 @@ the use_category metadata in bazel/repository_locations.bzl.
 
 import asyncio
 import json
+import os
 import pathlib
 import re
 import sys
@@ -15,8 +16,8 @@ from aio.api import bazel
 
 import envoy_repo
 
-BAZEL_QUERY_EXTERNAL_DEP_RE = re.compile('@(\w+)//')
-EXTENSION_LABEL_RE = re.compile('(//source/extensions/.*):')
+BAZEL_QUERY_EXTERNAL_DEP_RE = re.compile(r'@(\w+)//')
+EXTENSION_LABEL_RE = re.compile(r'(//source/extensions/.*):')
 
 # We can safely ignore these as they are from Bazel or internal repository structure.
 IGNORE_DEPS = set([
@@ -48,7 +49,8 @@ def test_only_ignore(dep):
     return False
 
 
-query = bazel.BazelEnv(envoy_repo.PATH).query
+query = bazel.BazelEnv(
+    envoy_repo.PATH, startup_options=os.environ.get("BAZEL_STARTUP_OPTION_LIST", "").split()).query
 
 
 class DependencyError(Exception):

@@ -36,6 +36,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/filter_chain_helper.h"
+#include "source/common/http/sidestream_watermark.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/context_impl.h"
@@ -229,10 +230,18 @@ public:
     }
   }
 
+  static absl::StatusOr<std::unique_ptr<FilterConfig>>
+  create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+         ShadowWriterPtr&& shadow_writer,
+         const envoy::extensions::filters::http::router::v3::Router& config);
+
+protected:
   FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
-               const envoy::extensions::filters::http::router::v3::Router& config);
+               const envoy::extensions::filters::http::router::v3::Router& config,
+               absl::Status& creation_status);
 
+public:
   bool createFilterChain(
       Http::FilterChainManager& manager, bool only_create_if_configured = false,
       const Http::FilterChainOptions& options = Http::EmptyFilterChainOptions{}) const override {
@@ -247,8 +256,8 @@ public:
     return true;
   }
 
-  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*,
-                                Http::FilterChainManager&) const override {
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
+                                const Http::FilterChainOptions&) const override {
     // Upgrade filter chains not yet supported for upstream HTTP filters.
     return false;
   }
@@ -306,7 +315,10 @@ public:
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
         request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
-                                               "envoy.reloadable_features.streaming_shadow")) {}
+                                               "envoy.reloadable_features.streaming_shadow")),
+        allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
+        upstream_request_started_(false), orca_load_report_received_(false) {}
 
   ~Filter() override;
 
@@ -369,9 +381,7 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection().ptr();
   }
-  const StreamInfo::StreamInfo* requestStreamInfo() const override {
-    return &callbacks_->streamInfo();
-  }
+  StreamInfo::StreamInfo* requestStreamInfo() const override { return &callbacks_->streamInfo(); }
   const Http::RequestHeaderMap* downstreamHeaders() const override { return downstream_headers_; }
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
@@ -418,6 +428,10 @@ public:
       return {};
     }
     return callbacks_->upstreamOverrideHost();
+  }
+
+  void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) override {
+    orca_load_report_callbacks_ = callbacks;
   }
 
   /**
@@ -557,6 +571,9 @@ private:
   Http::Context& httpContext() { return config_->http_context_; }
   bool checkDropOverload(Upstream::ThreadLocalCluster& cluster,
                          std::function<void(Http::ResponseHeaderMap&)>& modify_headers);
+  // Process Orca Load Report if necessary (e.g. cluster has lrsReportMetricNames).
+  void maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
+                                  UpstreamRequest& upstream_request);
 
   RetryStatePtr retry_state_;
   const FilterConfigSharedPtr config_;
@@ -598,6 +615,8 @@ private:
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
+  std::weak_ptr<OrcaLoadReportCallbacks> orca_load_report_callbacks_;
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
   bool downstream_response_started_ : 1;
@@ -607,6 +626,11 @@ private:
   bool include_timeout_retry_header_in_request_ : 1;
   bool request_buffer_overflowed_ : 1;
   const bool streaming_shadows_ : 1;
+  const bool allow_multiplexed_upstream_half_close_ : 1;
+  bool upstream_request_started_ : 1;
+  // Indicate that ORCA report is received to process it only once in either response headers or
+  // trailers.
+  bool orca_load_report_received_ : 1;
 };
 
 class ProdFilter : public Filter {

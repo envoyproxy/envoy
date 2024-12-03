@@ -111,6 +111,40 @@ TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
       "Missing config source specifier in envoy::config::core::v3::ConfigSource");
 }
 
+// The API type AGGREGATED_GRPC is not supported at the moment. Validate that an
+// appropriate error message is returned.
+TEST_F(SubscriptionFactoryTest, AggregatedGrpcNotYetSupported) {
+  envoy::config::core::v3::ConfigSource config;
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+  primary_clusters.insert("static_cluster");
+
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config), EnvoyException,
+                            "Unsupported config source AGGREGATED_GRPC");
+}
+
+// The API type AGGREGATED_DELTA_GRPC is not supported at the moment. Validate that an
+// appropriate error message is returned.
+TEST_F(SubscriptionFactoryTest, AggregatedDeltaGrpcNotYetSupported) {
+  envoy::config::core::v3::ConfigSource config;
+  Upstream::ClusterManager::ClusterSet primary_clusters;
+  config.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+  config.mutable_api_config_source()->set_transport_api_version(envoy::config::core::v3::V3);
+  config.mutable_api_config_source()->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+      "static_cluster");
+  primary_clusters.insert("static_cluster");
+
+  EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
+  EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config), EnvoyException,
+                            "Unsupported config source AGGREGATED_DELTA_GRPC");
+}
+
 TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
   envoy::config::core::v3::ConfigSource config;
   Upstream::ClusterManager::ClusterSet primary_clusters;
@@ -289,7 +323,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
   primary_clusters.insert("static_cluster_baz");
 
   {
-    EXPECT_CALL(cm_, primaryClusters()).Times(2).WillRepeatedly(ReturnRef(primary_clusters));
+    EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
     EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
 
     EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,

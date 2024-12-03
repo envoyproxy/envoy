@@ -30,6 +30,7 @@ envoy_cc_library(
         ":http_formatter_context_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//envoy/stream_info:stream_info_interface",
     ],

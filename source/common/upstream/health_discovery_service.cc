@@ -29,14 +29,14 @@ static constexpr uint32_t RetryMaxDelayMilliseconds = 30000;
 
 HdsDelegate::HdsDelegate(Server::Configuration::ServerFactoryContext& server_context,
                          Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
-                         Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                         ClusterInfoFactory& info_factory)
+                         Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.health.v3.HealthDiscoveryService.StreamHealthCheck")),
       async_client_(std::move(async_client)), dispatcher_(server_context.mainThreadDispatcher()),
       server_context_(server_context), store_stats_(stats),
-      ssl_context_manager_(ssl_context_manager), info_factory_(info_factory),
+      ssl_context_manager_(ssl_context_manager),
+      info_factory_(std::make_unique<ProdClusterInfoFactory>()),
       tls_(server_context_.threadLocal()) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       server_context.localInfo().node());
@@ -199,7 +199,7 @@ absl::Status
 HdsDelegate::updateHdsCluster(HdsClusterPtr cluster,
                               const envoy::config::cluster::v3::Cluster& cluster_config,
                               const envoy::config::core::v3::BindConfig& bind_config) {
-  return cluster->update(cluster_config, bind_config, info_factory_, tls_);
+  return cluster->update(cluster_config, bind_config, *info_factory_, tls_);
 }
 
 HdsClusterPtr
@@ -208,7 +208,7 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
   // Create HdsCluster.
   auto new_cluster =
       std::make_shared<HdsCluster>(server_context_, std::move(cluster_config), bind_config,
-                                   store_stats_, ssl_context_manager_, false, info_factory_, tls_);
+                                   store_stats_, ssl_context_manager_, false, *info_factory_, tls_);
 
   // Begin HCs in the background.
   new_cluster->initialize([] {});
@@ -372,11 +372,12 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
       const LocalityEndpointTuple endpoint_key = {locality_endpoints.locality(), host};
       // Initialize an endpoint host object.
       auto address_or_error = Network::Address::resolveProtoAddress(host.endpoint().address());
-      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
-      HostSharedPtr endpoint = std::make_shared<HostImpl>(
-          info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
-          locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
-          envoy::config::core::v3::UNKNOWN, time_source_);
+      THROW_IF_NOT_OK_REF(address_or_error.status());
+      HostSharedPtr endpoint = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
+          HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
+                           locality_endpoints.locality(), host.endpoint().health_check_config(), 0,
+                           envoy::config::core::v3::UNKNOWN, time_source_),
+          std::unique_ptr<HostImpl>));
       // Add this host/endpoint pointer to our flat list of endpoints for health checking.
       hosts_->push_back(endpoint);
       // Add this host/endpoint pointer to our structured list by locality so results can be
@@ -440,7 +441,7 @@ absl::Status HdsCluster::updateHealthchecks(
       // If it does not, create a new one.
       auto checker_or_error =
           Upstream::HealthCheckerFactory::create(health_check, *this, server_context_);
-      RETURN_IF_STATUS_NOT_OK(checker_or_error);
+      RETURN_IF_NOT_OK_REF(checker_or_error.status());
       auto new_health_checker = checker_or_error.value();
       health_checkers_map.insert({health_check, new_health_checker});
       health_checkers.push_back(new_health_checker);
@@ -487,11 +488,12 @@ void HdsCluster::updateHosts(
         // We do not have this endpoint saved, so create a new one.
         auto address_or_error =
             Network::Address::resolveProtoAddress(endpoint.endpoint().address());
-        THROW_IF_STATUS_NOT_OK(address_or_error, throw);
-        host = std::make_shared<HostImpl>(info_, "", std::move(address_or_error.value()), nullptr,
-                                          nullptr, 1, endpoints.locality(),
-                                          endpoint.endpoint().health_check_config(), 0,
-                                          envoy::config::core::v3::UNKNOWN, time_source_);
+        THROW_IF_NOT_OK_REF(address_or_error.status());
+        host = std::shared_ptr<HostImpl>(THROW_OR_RETURN_VALUE(
+            HostImpl::create(info_, "", std::move(address_or_error.value()), nullptr, nullptr, 1,
+                             endpoints.locality(), endpoint.endpoint().health_check_config(), 0,
+                             envoy::config::core::v3::UNKNOWN, time_source_),
+            std::unique_ptr<HostImpl>));
 
         // Set the initial health status as in HdsCluster::initialize.
         host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -532,35 +534,11 @@ void HdsCluster::updateHosts(
 
 ClusterSharedPtr HdsCluster::create() { return nullptr; }
 
-ClusterInfoConstSharedPtr
-ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
-  Envoy::Stats::ScopeSharedPtr scope =
-      params.stats_.createScope(fmt::format("cluster.{}.", params.cluster_.name()));
-
-  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      params.server_context_, params.ssl_context_manager_, *scope,
-      params.server_context_.clusterManager(), params.server_context_.messageValidationVisitor());
-
-  // TODO(JimmyCYJ): Support SDS for HDS cluster.
-  Network::UpstreamTransportSocketFactoryPtr socket_factory = THROW_OR_RETURN_VALUE(
-      Upstream::createTransportSocketFactory(params.cluster_, factory_context),
-      Network::UpstreamTransportSocketFactoryPtr);
-  auto socket_matcher = THROW_OR_RETURN_VALUE(
-      TransportSocketMatcherImpl::create(params.cluster_.transport_socket_matches(),
-                                         factory_context, socket_factory, *scope),
-      std::unique_ptr<TransportSocketMatcherImpl>);
-
-  return std::make_unique<ClusterInfoImpl>(
-      params.server_context_.initManager(), params.server_context_, params.cluster_,
-      params.bind_config_, params.server_context_.runtime(), std::move(socket_matcher),
-      std::move(scope), params.added_via_api_, factory_context);
-}
-
 void HdsCluster::initHealthchecks() {
   for (auto& health_check : cluster_.health_checks()) {
     auto health_checker_or_error =
         Upstream::HealthCheckerFactory::create(health_check, *this, server_context_);
-    THROW_IF_STATUS_NOT_OK(health_checker_or_error, throw);
+    THROW_IF_NOT_OK_REF(health_checker_or_error.status());
 
     auto health_checker = health_checker_or_error.value();
     health_checkers_.push_back(health_checker);

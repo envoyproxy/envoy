@@ -27,8 +27,10 @@ envoy_cc_fuzz_test(
         "substitution_formatter_fuzz_test.dict",
         "//test/fuzz:headers.dict",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":substitution_formatter_fuzz_proto_cc_proto",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//test/fuzz:utility_lib",
     ],
@@ -47,9 +49,11 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "substitution_formatter_test",
     srcs = ["substitution_formatter_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":command_extension_lib",
         "//source/common/common:utility_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
@@ -74,13 +78,16 @@ envoy_cc_test(
 envoy_cc_test(
     name = "substitution_format_string_test",
     srcs = ["substitution_format_string_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":command_extension_lib",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_format_string_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -89,10 +96,9 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "substitution_formatter_speed_test",
     srcs = ["substitution_formatter_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
+    rbe_pool = "6gig",
     deps = [
+        "//source/common/formatter:formatter_extension_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/http:header_map_lib",
         "//source/common/network:address_lib",
@@ -100,6 +106,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/http:http_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
+        "@com_github_google_benchmark//:benchmark",
     ],
 )
 

@@ -309,7 +309,6 @@ TEST_F(EnvoyQuicServerSessionTest, NewStream) {
 
   // Receive a GET request on created stream.
   quic::QuicHeaderList headers;
-  headers.OnHeaderBlockStart();
   std::string host("www.abc.com");
   headers.OnHeader(":authority", host);
   headers.OnHeader(":method", "GET");
@@ -376,6 +375,10 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
                     listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_ERROR_PROCESSING_STREAM")
                     ->value());
+  EXPECT_EQ(nullptr,
+            TestUtility::findCounter(
+                listener_config_.listenerScope().store(),
+                "http3.downstream.tx.quic_reset_stream_error_code_QUIC_ERROR_PROCESSING_STREAM"));
 
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
@@ -403,6 +406,9 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
                     listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
+  EXPECT_EQ(nullptr, TestUtility::findCounter(
+                         listener_config_.listenerScope().store(),
+                         "http3.downstream.tx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM"));
 
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(Invoke([&request_decoder, &stream_callbacks](Http::ResponseEncoder& encoder,
@@ -424,6 +430,30 @@ TEST_F(EnvoyQuicServerSessionTest, OnResetFrameIetfQuic) {
                     listener_config_.listenerScope().store(),
                     "http3.downstream.rx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM")
                     ->value());
+  EXPECT_EQ(nullptr, TestUtility::findCounter(
+                         listener_config_.listenerScope().store(),
+                         "http3.downstream.tx.quic_reset_stream_error_code_QUIC_REFUSED_STREAM"));
+}
+
+TEST_F(EnvoyQuicServerSessionTest, ResetStream) {
+  installReadFilter();
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(request_decoder, accessLogHandlers());
+  auto stream1 =
+      dynamic_cast<EnvoyQuicServerStream*>(createNewStream(request_decoder, stream_callbacks));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  stream1->resetStream(Http::StreamResetReason::LocalReset);
+  EXPECT_EQ(1U, TestUtility::findCounter(
+                    listener_config_.listenerScope().store(),
+                    "http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_REQUEST_REJECTED")
+                    ->value());
+  EXPECT_EQ(nullptr,
+            TestUtility::findCounter(
+                listener_config_.listenerScope().store(),
+                "http3.downstream.rx.quic_reset_stream_error_code_QUIC_STREAM_REQUEST_REJECTED"));
 }
 
 TEST_F(EnvoyQuicServerSessionTest, ConnectionClose) {
@@ -544,7 +574,6 @@ TEST_F(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
 
   // Receive a GET request on created stream.
   quic::QuicHeaderList request_headers;
-  request_headers.OnHeaderBlockStart();
   std::string host("www.abc.com");
   request_headers.OnHeader(":authority", host);
   request_headers.OnHeader(":method", "GET");
@@ -647,7 +676,6 @@ TEST_F(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
 
   // Receive a GET request on created stream.
   quic::QuicHeaderList request_headers;
-  request_headers.OnHeaderBlockStart();
   std::string host("www.abc.com");
   request_headers.OnHeader(":authority", host);
   request_headers.OnHeader(":method", "GET");
@@ -892,7 +920,6 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
 
   // Receive a GET request on created stream.
   quic::QuicHeaderList request_headers;
-  request_headers.OnHeaderBlockStart();
   std::string host("www.abc.com");
   request_headers.OnHeader(":authority", host);
   request_headers.OnHeader(":method", "GET");

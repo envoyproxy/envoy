@@ -34,9 +34,6 @@ envoy_cc_library(
     name = "jwks_async_fetcher_lib",
     srcs = ["jwks_async_fetcher.cc"],
     hdrs = ["jwks_async_fetcher.h"],
-    external_deps = [
-        "jwt_verify_lib",
-    ],
     deps = [
         ":stats_lib",
         "//envoy/server:factory_context_interface",
@@ -45,6 +42,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
+        "@com_github_google_jwt_verify//:jwt_verify_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
@@ -53,13 +51,11 @@ envoy_cc_library(
     name = "jwks_cache_lib",
     srcs = ["jwks_cache.cc"],
     hdrs = ["jwks_cache.h"],
-    external_deps = [
-        "jwt_verify_lib",
-    ],
     deps = [
         "jwks_async_fetcher_lib",
         ":jwt_cache_lib",
         "//source/common/config:datasource_lib",
+        "@com_github_google_jwt_verify//:jwt_verify_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
@@ -83,14 +79,12 @@ envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    external_deps = [
-        "jwt_verify_lib",
-    ],
     deps = [
         ":filter_config_lib",
         ":matchers_lib",
         "//envoy/http:filter_interface",
         "//source/common/http:headers_lib",
+        "@com_github_google_jwt_verify//:jwt_verify_lib",
     ],
 )
 
@@ -151,12 +145,10 @@ envoy_cc_library(
     name = "jwt_cache_lib",
     srcs = ["jwt_cache.cc"],
     hdrs = ["jwt_cache.h"],
-    external_deps = [
-        "jwt_verify_lib",
-        "simple_lru_cache_lib",
-    ],
     deps = [
         "//source/common/protobuf:utility_lib",
+        "@com_github_google_jwt_verify//:jwt_verify_lib",
+        "@com_github_google_jwt_verify//:simple_lru_cache_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )

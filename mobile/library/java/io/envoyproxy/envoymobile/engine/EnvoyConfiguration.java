@@ -1,12 +1,11 @@
 package io.envoyproxy.envoymobile.engine;
 
-import com.google.protobuf.Struct;
+import android.util.Pair;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.regex.Pattern;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
@@ -25,34 +24,35 @@ public class EnvoyConfiguration {
     ACCEPT_UNTRUSTED
   }
 
-  public final Integer connectTimeoutSeconds;
-  public final Integer dnsRefreshSeconds;
-  public final Integer dnsFailureRefreshSecondsBase;
-  public final Integer dnsFailureRefreshSecondsMax;
-  public final Integer dnsQueryTimeoutSeconds;
-  public final Integer dnsMinRefreshSeconds;
+  public final int connectTimeoutSeconds;
+  public final int dnsRefreshSeconds;
+  public final int dnsFailureRefreshSecondsBase;
+  public final int dnsFailureRefreshSecondsMax;
+  public final int dnsQueryTimeoutSeconds;
+  public final int dnsMinRefreshSeconds;
   public final List<String> dnsPreresolveHostnames;
-  public final Boolean enableDNSCache;
-  public final Integer dnsCacheSaveIntervalSeconds;
-  public final Boolean enableDrainPostDnsRefresh;
-  public final Boolean enableHttp3;
-  public final Boolean useCares;
-  public final Boolean useGro;
+  public final boolean enableDNSCache;
+  public final int dnsCacheSaveIntervalSeconds;
+  public final int dnsNumRetries;
+  public final boolean enableDrainPostDnsRefresh;
+  public final boolean enableHttp3;
+  public final boolean useCares;
+  public final List<Pair<String, String>> caresFallbackResolvers;
   public final String http3ConnectionOptions;
   public final String http3ClientConnectionOptions;
   public final Map<String, String> quicHints;
   public final List<String> quicCanonicalSuffixes;
-  public final Boolean enableGzipDecompression;
-  public final Boolean enableBrotliDecompression;
-  public final Boolean enablePortMigration;
-  public final Boolean enableSocketTagging;
-  public final Boolean enableInterfaceBinding;
-  public final Integer h2ConnectionKeepaliveIdleIntervalMilliseconds;
-  public final Integer h2ConnectionKeepaliveTimeoutSeconds;
-  public final Integer maxConnectionsPerHost;
+  public final boolean enableGzipDecompression;
+  public final boolean enableBrotliDecompression;
+  public final int numTimeoutsToTriggerPortMigration;
+  public final boolean enableSocketTagging;
+  public final boolean enableInterfaceBinding;
+  public final int h2ConnectionKeepaliveIdleIntervalMilliseconds;
+  public final int h2ConnectionKeepaliveTimeoutSeconds;
+  public final int maxConnectionsPerHost;
   public final List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories;
-  public final Integer streamIdleTimeoutSeconds;
-  public final Integer perTryIdleTimeoutSeconds;
+  public final int streamIdleTimeoutSeconds;
+  public final int perTryIdleTimeoutSeconds;
   public final String appVersion;
   public final String appId;
   public final TrustChainVerification trustChainVerification;
@@ -60,10 +60,9 @@ public class EnvoyConfiguration {
   public final Map<String, EnvoyStringAccessor> stringAccessors;
   public final Map<String, EnvoyKeyValueStore> keyValueStores;
   public final Map<String, String> runtimeGuards;
-  public final Boolean enablePlatformCertificatesValidation;
+  public final boolean enablePlatformCertificatesValidation;
   public final String upstreamTlsSni;
-
-  private static final Pattern UNRESOLVED_KEY_PATTERN = Pattern.compile("\\{\\{ (.+) \\}\\}");
+  public final int h3ConnectionKeepaliveInitialIntervalMilliseconds;
 
   /**
    * Create a new instance of the configuration.
@@ -85,13 +84,13 @@ public class EnvoyConfiguration {
    * @param enableDNSCache                                whether to enable DNS cache.
    * @param dnsCacheSaveIntervalSeconds                   the interval at which to save results to
    *     the configured key value store.
+   * @param dnsNumRetries                                 the number of retries before the DNS
+   *     resolver gives up
    * @param enableDrainPostDnsRefresh                     whether to drain connections after soft
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
    *     HTTP/3 (QUIC).
    * @param useCares                                      whether to use the c_ares library for DNS
-   * @param useGro                                        whether to use UDP GRO on upstream QUIC
-   *     connections, if available.
    * @param http3ConnectionOptions                        connection options to be used in HTTP/3.
    * @param http3ClientConnectionOptions                  client connection options to be used in
    *     HTTP/3.
@@ -103,7 +102,8 @@ public class EnvoyConfiguration {
    *     decompression.
    * @param enableBrotliDecompression                     whether to enable response brotli
    *     decompression.
-   * @param enablePortMigration                           whether to enable quic port migration.
+   * @param numTimeoutsToTriggerPortMigration                 number of timeouts to trigger port
+   *     migration.
    * @param enableSocketTagging                           whether to enable socket tagging.
    * @param enableInterfaceBinding                        whether to allow interface binding.
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
@@ -125,24 +125,31 @@ public class EnvoyConfiguration {
    * @param keyValueStores                                platform key-value store implementations.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
    * @param upstreamTlsSni                                the upstream TLS socket SNI override.
+   * @param caresFallbackResolvers                        A list of host port pair that's used as
+   *     c-ares's fallback resolvers.
+   * @param h3ConnectionKeepaliveInitialIntervalMilliseconds the initial keepalive ping timeout for
+   * HTTP/3.
    */
   public EnvoyConfiguration(
       int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
       int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds,
       List<String> dnsPreresolveHostnames, boolean enableDNSCache, int dnsCacheSaveIntervalSeconds,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares, boolean useGro,
+      int dnsNumRetries, boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares,
       String http3ConnectionOptions, String http3ClientConnectionOptions,
       Map<String, Integer> quicHints, List<String> quicCanonicalSuffixes,
       boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      boolean enablePortMigration, boolean enableSocketTagging, boolean enableInterfaceBinding,
-      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
-      int maxConnectionsPerHost, int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
-      String appVersion, String appId, TrustChainVerification trustChainVerification,
+      int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
+      boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost,
+      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
+      TrustChainVerification trustChainVerification,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, Map<String, Boolean> runtimeGuards,
-      boolean enablePlatformCertificatesValidation, String upstreamTlsSni) {
+      boolean enablePlatformCertificatesValidation, String upstreamTlsSni,
+      List<Pair<String, Integer>> caresFallbackResolvers,
+      int h3ConnectionKeepaliveInitialIntervalMilliseconds) {
     JniLibrary.load();
     this.connectTimeoutSeconds = connectTimeoutSeconds;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
@@ -153,10 +160,15 @@ public class EnvoyConfiguration {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames;
     this.enableDNSCache = enableDNSCache;
     this.dnsCacheSaveIntervalSeconds = dnsCacheSaveIntervalSeconds;
+    this.dnsNumRetries = dnsNumRetries;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
     this.useCares = useCares;
-    this.useGro = useGro;
+    this.caresFallbackResolvers = new ArrayList<>();
+    for (Pair<String, Integer> hostAndPort : caresFallbackResolvers) {
+      this.caresFallbackResolvers.add(
+          new Pair<String, String>(hostAndPort.first, String.valueOf(hostAndPort.second)));
+    }
     this.http3ConnectionOptions = http3ConnectionOptions;
     this.http3ClientConnectionOptions = http3ClientConnectionOptions;
     this.quicHints = new HashMap<>();
@@ -166,7 +178,7 @@ public class EnvoyConfiguration {
     this.quicCanonicalSuffixes = quicCanonicalSuffixes;
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
-    this.enablePortMigration = enablePortMigration;
+    this.numTimeoutsToTriggerPortMigration = numTimeoutsToTriggerPortMigration;
     this.enableSocketTagging = enableSocketTagging;
     this.enableInterfaceBinding = enableInterfaceBinding;
     this.h2ConnectionKeepaliveIdleIntervalMilliseconds =
@@ -198,10 +210,12 @@ public class EnvoyConfiguration {
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.upstreamTlsSni = upstreamTlsSni;
+    this.h3ConnectionKeepaliveInitialIntervalMilliseconds =
+        h3ConnectionKeepaliveInitialIntervalMilliseconds;
   }
 
   public long createBootstrap() {
-    Boolean enforceTrustChainVerification =
+    boolean enforceTrustChainVerification =
         trustChainVerification == EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
     List<EnvoyNativeFilterConfig> reverseFilterChain = new ArrayList<>(nativeFilterChain);
     Collections.reverse(reverseFilterChain);
@@ -211,22 +225,20 @@ public class EnvoyConfiguration {
     byte[][] runtimeGuards = JniBridgeUtility.mapToJniBytes(this.runtimeGuards);
     byte[][] quicHints = JniBridgeUtility.mapToJniBytes(this.quicHints);
     byte[][] quicSuffixes = JniBridgeUtility.stringsToJniBytes(quicCanonicalSuffixes);
+    byte[][] caresFallbackResolvers =
+        JniBridgeUtility.listOfStringPairsToJniBytes(this.caresFallbackResolvers);
 
     return JniLibrary.createBootstrap(
         connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
-        enableDNSCache, dnsCacheSaveIntervalSeconds, enableDrainPostDnsRefresh, enableHttp3,
-        useCares, useGro, http3ConnectionOptions, http3ClientConnectionOptions, quicHints,
-        quicSuffixes, enableGzipDecompression, enableBrotliDecompression, enablePortMigration,
-        enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
-        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
-        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
-        enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards);
-  }
-
-  static class ConfigurationException extends RuntimeException {
-    ConfigurationException(String unresolvedKey) {
-      super("Unresolved template key: " + unresolvedKey);
-    }
+        enableDNSCache, dnsCacheSaveIntervalSeconds, dnsNumRetries, enableDrainPostDnsRefresh,
+        enableHttp3, useCares, http3ConnectionOptions, http3ClientConnectionOptions, quicHints,
+        quicSuffixes, enableGzipDecompression, enableBrotliDecompression,
+        numTimeoutsToTriggerPortMigration, enableSocketTagging, enableInterfaceBinding,
+        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
+        maxConnectionsPerHost, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
+        appId, enforceTrustChainVerification, filterChain, enablePlatformCertificatesValidation,
+        upstreamTlsSni, runtimeGuards, caresFallbackResolvers,
+        h3ConnectionKeepaliveInitialIntervalMilliseconds);
   }
 }

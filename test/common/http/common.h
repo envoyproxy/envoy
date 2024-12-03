@@ -47,14 +47,17 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
     pool_ready_.ready();
   }
 
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     host_ = host;
     reason_ = reason;
+    transport_failure_reason_ = transport_failure_reason;
     pool_failure_.ready();
   }
 
   ConnectionPool::PoolFailureReason reason_;
+  std::string transport_failure_reason_;
   testing::NiceMock<ReadyWatcher> pool_failure_;
   testing::NiceMock<ReadyWatcher> pool_ready_;
   Http::RequestEncoder* outer_encoder_{};

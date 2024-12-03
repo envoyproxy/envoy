@@ -81,25 +81,28 @@ type StreamFilter interface {
 	StreamEncoderFilter
 
 	// log
-	OnLog()
-	OnLogDownstreamStart()
-	OnLogDownstreamPeriodic()
+	OnLog(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap)
+	OnLogDownstreamStart(RequestHeaderMap)
+	OnLogDownstreamPeriodic(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap)
 
 	// destroy filter
 	OnDestroy(DestroyReason)
-	// TODO add more for stream complete
+	OnStreamComplete()
 }
 
-func (*PassThroughStreamFilter) OnLog() {
+func (*PassThroughStreamFilter) OnLog(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap) {
 }
 
-func (*PassThroughStreamFilter) OnLogDownstreamStart() {
+func (*PassThroughStreamFilter) OnLogDownstreamStart(RequestHeaderMap) {
 }
 
-func (*PassThroughStreamFilter) OnLogDownstreamPeriodic() {
+func (*PassThroughStreamFilter) OnLogDownstreamPeriodic(RequestHeaderMap, RequestTrailerMap, ResponseHeaderMap, ResponseTrailerMap) {
 }
 
 func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
+}
+
+func (*PassThroughStreamFilter) OnStreamComplete() {
 }
 
 type StreamFilterConfigParser interface {
@@ -156,6 +159,8 @@ type StreamFilterCallbacks interface {
 	// ClearRouteCache clears the route cache for the current request, and filtermanager will re-fetch the route in the next filter.
 	// Please be careful to invoke it, since filtermanager will raise an 404 route_not_found response when failed to re-fetch a route.
 	ClearRouteCache()
+	// RefreshRouteCache works like ClearRouteCache, but it will re-fetch the route immediately.
+	RefreshRouteCache()
 	Log(level LogType, msg string)
 	LogLevel() LogType
 	// GetProperty fetch Envoy attribute and return the value as a string.
@@ -179,6 +184,10 @@ type FilterProcessCallbacks interface {
 	SendLocalReply(responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
 	// RecoverPanic recover panic in defer and terminate the request by SendLocalReply with 500 status code.
 	RecoverPanic()
+	// AddData add extra data when processing headers/trailers.
+	// For example, turn a headers only request into a request with a body, add more body when processing trailers, and so on.
+	// The second argument isStreaming supplies if this caller streams data or buffers the full body.
+	AddData(data []byte, isStreaming bool)
 }
 
 type DecoderFilterCallbacks interface {

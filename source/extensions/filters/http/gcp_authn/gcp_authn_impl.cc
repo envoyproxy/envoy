@@ -34,8 +34,8 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  const std::string cluster = config_.http_uri().cluster();
-  const std::string uri = config_.http_uri().uri();
+  const std::string cluster =
+      config_.cluster().empty() ? config_.http_uri().cluster() : config_.cluster();
   const auto thread_local_cluster =
       context_.serverFactoryContext().clusterManager().getThreadLocalCluster(cluster);
 
@@ -50,8 +50,8 @@ void GcpAuthnClient::fetchToken(RequestCallbacks& callbacks, Http::RequestMessag
   // Set up the request options.
   Envoy::Http::AsyncClient::RequestOptions options =
       Envoy::Http::AsyncClient::RequestOptions()
-          .setTimeout(std::chrono::milliseconds(
-              DurationUtil::durationToMilliseconds(config_.http_uri().timeout())))
+          .setTimeout(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+              config_.has_timeout() ? config_.timeout() : config_.http_uri().timeout())))
           // GCP metadata server rejects X-Forwarded-For requests.
           // https://cloud.google.com/compute/docs/storing-retrieving-metadata#x-forwarded-for_header
           .setSendXff(false);

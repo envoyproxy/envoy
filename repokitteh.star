@@ -61,3 +61,8 @@ def _milestone():
   github.issue_label('milestone/review')
 
 handlers.command(name='milestone', func=_milestone)
+
+def _nostalebot():
+  github.issue_label('no stalebot')
+
+handlers.command(name='nostalebot', func=_nostalebot)

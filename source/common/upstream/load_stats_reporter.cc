@@ -20,12 +20,16 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
-  retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
+  retry_timer_ = dispatcher.createTimer([this]() -> void {
+    stats_.retries_.inc();
+    establishNewStream();
+  });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
 }
 
 void LoadStatsReporter::setRetryTimer() {
+  ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.", RETRY_DELAY_MS);
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
 }
 
@@ -127,7 +131,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
     if (drop_overload_count > 0) {
       auto* dropped_request = cluster_stats->add_dropped_requests();
-      dropped_request->set_category("drop_overload");
+      dropped_request->set_category(cluster.dropCategory());
       dropped_request->set_dropped_count(drop_overload_count);
     }
 
@@ -150,8 +154,6 @@ void LoadStatsReporter::sendLoadStatsRequest() {
 }
 
 void LoadStatsReporter::handleFailure() {
-  ENVOY_LOG(warn, "Load reporter stats stream/connection failure, will retry in {} ms.",
-            RETRY_DELAY_MS);
   stats_.errors_.inc();
   setRetryTimer();
 }
@@ -243,10 +245,17 @@ void LoadStatsReporter::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& 
 }
 
 void LoadStatsReporter::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
   response_timer_->disableTimer();
   stream_ = nullptr;
-  handleFailure();
+  if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+              message);
+    handleFailure();
+  } else {
+    ENVOY_LOG(debug, "{} gRPC config stream closed gracefully, {}", service_method_.name(),
+              message);
+    setRetryTimer();
+  }
 }
 
 } // namespace Upstream

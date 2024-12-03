@@ -44,7 +44,7 @@ public:
     return stream_->isAboveWriteBufferHighWatermark();
   }
 
-  void setWatermarkCallbacks(Envoy::Http::DecoderFilterWatermarkCallbacks& callbacks) {
+  void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) {
     stream_->setWatermarkCallbacks(callbacks);
   }
 
@@ -58,6 +58,7 @@ public:
   bool operator==(RawAsyncStream* stream) const { return stream_ == stream; }
   bool operator!=(RawAsyncStream* stream) const { return stream_ != stream; }
   const StreamInfo::StreamInfo& streamInfo() const { return stream_->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return stream_->streamInfo(); }
 
 private:
   RawAsyncStream* stream_{};

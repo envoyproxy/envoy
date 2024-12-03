@@ -275,6 +275,32 @@ TEST(PosixThreadTest, Joinable) {
   EXPECT_FALSE(thread->joinable());
 }
 
+TEST(PosixThreadTest, ThreadPriority) {
+  auto thread_factory = PosixThreadFactory::create();
+  Options options;
+  options.priority_ = 15;
+  double thread_priority;
+  auto thread = thread_factory->createThread(
+      [&]() { thread_priority = thread_factory->currentThreadPriority(); }, options,
+      /* crash_on_failure= */ false);
+  thread->join();
+
+  EXPECT_EQ(thread_priority, options.priority_);
+}
+
+TEST(PosixThreadTest, InvalidThreadPriority) {
+  auto thread_factory = PosixThreadFactory::create();
+  Options options;
+  options.priority_ = -200;
+  double thread_priority;
+  auto thread = thread_factory->createThread(
+      [&]() { thread_priority = thread_factory->currentThreadPriority(); }, options,
+      /* crash_on_failure= */ false);
+  thread->join();
+
+  EXPECT_NE(thread_priority, options.priority_);
+}
+
 class PosixThreadFactoryFailCreate : public PosixThreadFactory {
 protected:
   int createPthread(ThreadHandle*) override { return 1; }

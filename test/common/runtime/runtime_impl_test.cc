@@ -32,6 +32,7 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche/common/platform/api/quiche_flags.h"
 #endif
+ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_boolean_to_string_fix);
 ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_reject_invalid_yaml);
 
 using testing::_;
@@ -577,7 +578,7 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
 
   // Test that Quiche flags can be overwritten via Envoy runtime config.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(
-      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true: "
+      "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true: "
       "true");
   setup();
 
@@ -586,7 +587,7 @@ TEST_F(StaticLoaderImplTest, QuicheReloadableFlags) {
 
   // Test that Quiche flags can be overwritten again.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(
-      "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_quic_testonly_default_true: "
+      "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_testonly_default_true: "
       "false");
   setup();
 
@@ -1312,6 +1313,40 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
 
   EXPECT_THROW_WITH_MESSAGE(loader.value()->initialize(cm_).IgnoreError(), EnvoyException,
                             "bad config");
+}
+
+TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
+  setup();
+
+  absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, true);
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      toggle: true
+  )EOF");
+
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get());
+}
+
+TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagDisabled) {
+  setup();
+
+  absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, false);
+
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      toggle: true
+  )EOF");
+
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(runtime);
+
+  EXPECT_EQ("1", loader_->snapshot().get("toggle").value().get()); // Assuming previous behavior
 }
 
 } // namespace

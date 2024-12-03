@@ -69,7 +69,7 @@ using ::google::protobuf::BytesValue;                   // NOLINT(misc-unused-us
 using ::google::protobuf::Descriptor;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DescriptorPool;               // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DescriptorPoolDatabase;       // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::DynamicCastToGenerated;       // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DynamicCastMessage;           // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DynamicMessageFactory;        // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::EnumValueDescriptor;          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FieldDescriptor;              // NOLINT(misc-unused-using-decls)
@@ -92,15 +92,6 @@ using ::google::protobuf::Type;                         // NOLINT(misc-unused-us
 using ::google::protobuf::UInt32Value;                  // NOLINT(misc-unused-using-decls)
 
 using Message = ::google::protobuf::MessageLite;
-
-template <typename T> const T* DynamicCastToGenerated(const Message* from) {
-  return static_cast<const T*>(from);
-}
-
-template <typename T> T* DynamicCastToGenerated(Message* from) {
-  const Message* message_const = from;
-  return const_cast<T*>(DynamicCastToGenerated<T>(message_const));
-}
 
 using ReflectableMessage = std::unique_ptr<::google::protobuf::Message>;
 using uint32 = uint32_t;

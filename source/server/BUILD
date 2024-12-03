@@ -14,14 +14,12 @@ envoy_cc_library(
     name = "backtrace_lib",
     srcs = ["backtrace.cc"],
     hdrs = ["backtrace.h"],
-    external_deps = [
-        "abseil_stacktrace",
-        "abseil_symbolize",
-    ],
     tags = ["backtrace"],
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/version:version_lib",
+        "@com_google_absl//absl/debugging:stacktrace",
+        "@com_google_absl//absl/debugging:symbolize",
     ],
 )
 
@@ -128,7 +126,6 @@ envoy_cc_library(
     name = "guarddog_lib",
     srcs = ["guarddog_impl.cc"],
     hdrs = ["guarddog_impl.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":watchdog_lib",
         "//envoy/api:api_interface",
@@ -149,6 +146,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/watchdog:abort_action_config",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
@@ -239,6 +237,7 @@ envoy_cc_library(
         "//bazel:linux_x86_64": ["options_impl_platform_linux.cc"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.cc"],
         "//bazel:linux_ppc": ["options_impl_platform_linux.cc"],
+        "//bazel:linux_s390x": ["options_impl_platform_linux.cc"],
         "//bazel:linux_mips64": ["options_impl_platform_linux.cc"],
         "//conditions:default": ["options_impl_platform_default.cc"],
     }),
@@ -249,6 +248,7 @@ envoy_cc_library(
         "//bazel:linux_x86_64": ["options_impl_platform_linux.h"],
         "//bazel:linux_aarch64": ["options_impl_platform_linux.h"],
         "//bazel:linux_ppc": ["options_impl_platform_linux.h"],
+        "//bazel:linux_s390x": ["options_impl_platform_linux.h"],
         "//bazel:linux_mips64": ["options_impl_platform_linux.h"],
         "//conditions:default": [],
     }),
@@ -269,11 +269,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "options_lib",
-    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
     srcs = ["options_impl.cc"],
     hdrs = ["options_impl.h"],
+    # TCLAP command line parser needs this to support int64_t/uint64_t in several build environments.
     copts = ["-DHAVE_LONG_LONG"],
-    external_deps = ["tclap"],
     deps = [
         ":options_base",
         "//envoy/network:address_interface",
@@ -287,6 +286,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:tag_utility_lib",
         "//source/common/version:version_lib",
+        "@com_github_mirror_tclap//:tclap",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -408,10 +408,7 @@ envoy_cc_library(
     name = "server_base_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    external_deps = [
-        "abseil_node_hash_map",
-        "abseil_optional",
-    ],
+    rbe_pool = "6gig",
     deps = [
         ":api_listener_lib",
         ":configuration_lib",
@@ -443,6 +440,7 @@ envoy_cc_library(
         "//source/common/common:perf_tracing_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/config:xds_manager_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/grpc:context_lib",
@@ -463,9 +461,10 @@ envoy_cc_library(
         "//source/common/stats:thread_local_store_lib",
         "//source/common/tls:context_lib",
         "//source/common/upstream:cluster_manager_lib",
-        "//source/common/upstream:health_discovery_service_lib",
         "//source/common/version:version_lib",
         "//source/server/admin:admin_lib",
+        "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
@@ -479,6 +478,8 @@ envoy_cc_library(
         ":guarddog_lib",
         ":server_base_lib",
         "//source/common/memory:heap_shrinker_lib",
+        "//source/common/upstream:health_discovery_service_lib",
+        "//source/common/upstream:prod_cluster_info_factory_lib",
         "//source/server:null_overload_manager_lib",
         "//source/server:overload_manager_lib",
     ],

@@ -20,9 +20,10 @@ public:
     returnOverride(Envoy::Network::TestIoSocketHandle* io_handle,
                    Network::Address::InstanceConstSharedPtr& peer_address_override_out) {
       absl::MutexLock lock(&mutex_);
-      if (socket_type_ == io_handle->getSocketType() && error_ &&
-          (io_handle->localAddress()->ip()->port() == src_port_ ||
-           (dst_port_ && io_handle->peerAddress()->ip()->port() == dst_port_))) {
+      if (absl::StatusOr<Network::Address::InstanceConstSharedPtr> addr = io_handle->localAddress();
+          socket_type_ == io_handle->getSocketType() && error_ &&
+          ((addr.ok() && (*addr)->ip()->port() == src_port_) ||
+           (dst_port_ && (*io_handle->peerAddress())->ip()->port() == dst_port_))) {
         ASSERT(matched_iohandle_ == nullptr || matched_iohandle_ == io_handle,
                "Matched multiple io_handles, expected at most one to match.");
         matched_iohandle_ = io_handle;
@@ -31,7 +32,7 @@ public:
                    : Envoy::Network::IoSocketError::create(error_->getSystemErrorCode());
       }
 
-      if (orig_dnat_address_ != nullptr && *orig_dnat_address_ == *io_handle->peerAddress()) {
+      if (orig_dnat_address_ != nullptr && *orig_dnat_address_ == **io_handle->peerAddress()) {
         ASSERT(translated_dnat_address_ != nullptr);
         peer_address_override_out = translated_dnat_address_;
       }
@@ -39,13 +40,23 @@ public:
       return Api::IoError::none();
     }
 
-    Api::IoErrorPtr returnConnectOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
+    Api::IoErrorPtr
+    returnConnectOverride(Envoy::Network::TestIoSocketHandle* io_handle,
+                          Network::Address::InstanceConstSharedPtr& peer_address_override_out) {
       absl::MutexLock lock(&mutex_);
-      if (block_connect_ && socket_type_ == io_handle->getSocketType() &&
-          (io_handle->localAddress()->ip()->port() == src_port_ ||
-           (dst_port_ && io_handle->peerAddress()->ip()->port() == dst_port_))) {
+      if (absl::StatusOr<Network::Address::InstanceConstSharedPtr> addr = io_handle->localAddress();
+          block_connect_ && socket_type_ == io_handle->getSocketType() &&
+          ((addr.ok() && (*addr)->ip()->port() == src_port_) ||
+           (dst_port_ && (*io_handle->peerAddress())->ip()->port() == dst_port_))) {
         return Network::IoSocketError::getIoSocketEagainError();
       }
+
+      if (orig_dnat_address_ != nullptr && peer_address_override_out != nullptr &&
+          *orig_dnat_address_ == *peer_address_override_out) {
+        ASSERT(translated_dnat_address_ != nullptr);
+        peer_address_override_out = translated_dnat_address_;
+      }
+
       return Api::IoError::none();
     }
 
@@ -116,15 +127,8 @@ public:
 
   explicit SocketInterfaceSwap(Network::Socket::Type socket_type);
 
-  ~SocketInterfaceSwap() {
-    test_socket_interface_loader_.reset();
-    Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
-  }
-
-  Envoy::Network::SocketInterface* const previous_socket_interface_{
-      Envoy::Network::SocketInterfaceSingleton::getExisting()};
   std::shared_ptr<IoHandleMatcher> write_matcher_;
-  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> test_socket_interface_loader_;
 };
 
 } // namespace Envoy

@@ -143,7 +143,8 @@ Network::UpstreamTransportSocketFactoryPtr
 IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::Store& store,
                                                           Ssl::ContextManager& context_manager,
                                                           ThreadLocal::Instance& threadlocal,
-                                                          const std::string& san_to_match) {
+                                                          const std::string& san_to_match,
+                                                          bool connect_to_upstreams) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(api));
   ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
@@ -155,10 +156,11 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
 #ifdef ENVOY_ENABLE_YAML
   initializeUpstreamTlsContextConfig(
       Ssl::ClientSslTransportOptions().setAlpn(true).setSan(san_to_match).setSni("lyft.com"),
-      *tls_context);
+      *tls_context, connect_to_upstreams);
 #else
   UNREFERENCED_PARAMETER(tls_context);
   UNREFERENCED_PARAMETER(san_to_match);
+  UNREFERENCED_PARAMETER(connect_to_upstreams);
   RELEASE_ASSERT(0, "unsupported");
 #endif // ENVOY_ENABLE_YAML
 
@@ -219,13 +221,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description =
-      std::make_shared<Upstream::HostDescriptionImpl>(
+      std::shared_ptr<Upstream::HostDescriptionImpl>(*Upstream::HostDescriptionImpl::create(
           cluster, "",
           *Network::Utility::resolveUrl(
               fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
           nullptr, nullptr, envoy::config::core::v3::Locality().default_instance(),
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-          time_system);
+          time_system));
 
   if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(type,

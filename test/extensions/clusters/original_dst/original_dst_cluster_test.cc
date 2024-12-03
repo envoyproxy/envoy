@@ -43,7 +43,7 @@ public:
   TestLoadBalancerContext(const Network::Connection* connection)
       : TestLoadBalancerContext(connection, nullptr) {}
   TestLoadBalancerContext(const Network::Connection* connection,
-                          const StreamInfo::StreamInfo* request_stream_info)
+                          StreamInfo::StreamInfo* request_stream_info)
       : connection_(connection), request_stream_info_(request_stream_info) {}
   TestLoadBalancerContext(const Network::Connection* connection, const std::string& key,
                           const std::string& value)
@@ -55,14 +55,14 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
-  const StreamInfo::StreamInfo* requestStreamInfo() const override { return request_stream_info_; }
+  StreamInfo::StreamInfo* requestStreamInfo() const override { return request_stream_info_; }
   const Http::RequestHeaderMap* downstreamHeaders() const override {
     return downstream_headers_.get();
   }
 
   absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
-  const StreamInfo::StreamInfo* request_stream_info_;
+  StreamInfo::StreamInfo* request_stream_info_;
   Http::RequestHeaderMapPtr downstream_headers_;
 };
 
@@ -85,7 +85,7 @@ public:
 
     OriginalDstClusterFactory factory;
     auto status_or_pair = factory.createClusterImpl(cluster_config, factory_context);
-    THROW_IF_STATUS_NOT_OK(status_or_pair, throw);
+    THROW_IF_NOT_OK_REF(status_or_pair.status());
 
     cluster_ = std::dynamic_pointer_cast<OriginalDstCluster>(status_or_pair.value().first);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
@@ -1163,10 +1163,8 @@ TEST(DestinationAddress, ObjectFactory) {
   auto object = factory->createFromBytes(address);
   ASSERT_NE(nullptr, object);
   EXPECT_EQ(address, object->serializeAsString());
-  auto mirror = factory->reflect(object.get());
-  ASSERT_NE(nullptr, mirror);
-  EXPECT_THAT(mirror->getField("ip"), testing::VariantWith<absl::string_view>("10.0.0.10"));
-  EXPECT_THAT(mirror->getField("port"), testing::VariantWith<int64_t>(8080));
+  EXPECT_THAT(object->getField("ip"), testing::VariantWith<absl::string_view>("10.0.0.10"));
+  EXPECT_THAT(object->getField("port"), testing::VariantWith<int64_t>(8080));
   EXPECT_EQ(nullptr, factory->createFromBytes("foo"));
 }
 

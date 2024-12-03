@@ -102,15 +102,25 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
   if (!happy_eyeballs_config.has_value()) {
     return sortAddresses(in);
   }
-  ENVOY_LOG_EVENT(debug, "happy_eyeballs_sort_address", "sort address with happy_eyeballs config.");
+  // Sort the addresses according to https://datatracker.ietf.org/doc/html/rfc8305#section-4.
+  // Currently the first_address_family version and count options are supported. This allows
+  // specifying the address family version to prefer over the other, and the number (count)
+  // of addresses in that family to attempt before moving to the other family.
+  // If no family version is specified, the version is taken from the first
+  // address in the list. The default count is 1. As an example, assume the
+  // family version is v6, and the count is 3, then the output list will be:
+  // [3*v6, 1*v4, 3*v6, 1*v4, ...] (assuming sufficient addresses exist in the input).
+  ENVOY_LOG_EVENT(trace, "happy_eyeballs_sort_address", "sort address with happy_eyeballs config.");
   std::vector<Address::InstanceConstSharedPtr> address_list;
   address_list.reserve(in.size());
 
   // First_family_ip_version defaults to the first valid ip version
-  // unless overwritten by happy_eyeballs_config.
+  // unless overwritten by happy_eyeballs_config. There must be at least one
+  // entry in the vector that is passed to the function.
+  ASSERT(in.size() > 0);
   Address::IpVersion first_family_ip_version = in[0].get()->ip()->version();
 
-  auto first_address_family_count =
+  const auto first_address_family_count =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(happy_eyeballs_config.value(), first_address_family_count, 1);
   switch (happy_eyeballs_config.value().first_address_family_version()) {
   case envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT:
@@ -132,7 +142,6 @@ HappyEyeballsConnectionProvider::sortAddressesWithConfig(
     return !hasMatchingIpVersion(first_family_ip_version, val);
   });
 
-  // Address::IpVersion first_family_ip_version(Address::IpVersion::v4);
   while (first != in.end() || other != in.end()) {
     uint32_t count = 0;
     while (first != in.end() && ++count <= first_address_family_count) {

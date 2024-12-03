@@ -461,6 +461,15 @@ const char ExpectedPayloadAndHeaderJSON[] = R"(
 }
 )";
 
+const char ExpectedJWTExpiredStatusJSON[] = R"(
+{
+  "my_payload":{
+    "code": 3,
+    "message": "Jwt is expired"
+    }
+}
+)";
+
 // Token copied from https://github.com/google/jwt_verify_lib/blob/master/src/verify_jwk_ec_test.cc
 // Use jwt.io to modify payload as:
 // {

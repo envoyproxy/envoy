@@ -7,6 +7,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -47,7 +48,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigText) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("plain text, path=/bar/foo, code=200",
             formatter->formatWithContext(formatter_context_, stream_info_));
 }
@@ -63,7 +64,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const auto out_json = formatter->formatWithContext(formatter_context_, stream_info_);
 
   const std::string expected = R"EOF({
@@ -78,6 +79,9 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJson) {
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.logging_with_fast_json_formatter", "false"}});
+
   const std::vector<std::string> invalid_configs = {
       R"(
   json_format:
@@ -86,10 +90,11 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestInvalidConfigs) {
   };
   for (const auto& yaml : invalid_configs) {
     TestUtility::loadFromYaml(yaml, config_);
-    EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
-                              EnvoyException,
-                              "Only string values, nested structs, list values and number values "
-                              "are supported in structured access log format.");
+    EXPECT_THROW_WITH_MESSAGE(
+        SubstitutionFormatStringUtils::fromProtoConfig(config_, context_).IgnoreError(),
+        EnvoyException,
+        "Only string values, nested structs, list values and number values "
+        "are supported in structured access log format.");
   }
 }
 
@@ -107,7 +112,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtension)
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("plain text TestFormatter",
             formatter->formatWithContext(formatter_context_, stream_info_));
 }
@@ -127,9 +132,8 @@ TEST_F(SubstitutionFormatStringUtilsTest,
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
-                            EnvoyException,
-                            "Failed to create command parser: envoy.formatter.FailFormatter");
+  EXPECT_EQ(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_).status().message(),
+            "Failed to create command parser: envoy.formatter.FailFormatter");
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionUnknown) {
@@ -143,9 +147,8 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigFormatterExtensionU
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
-                            EnvoyException,
-                            "Formatter not found: envoy.formatter.TestFormatterUnknown");
+  EXPECT_EQ(SubstitutionFormatStringUtils::fromProtoConfig(config_, context_).status().message(),
+            "Formatter not found: envoy.formatter.TestFormatterUnknown");
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithExtension) {
@@ -166,7 +169,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithExtension) 
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const auto out_json = formatter->formatWithContext(formatter_context_, stream_info_);
 
   const std::string expected = R"EOF({
@@ -201,7 +204,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestFromProtoConfigJsonWithMultipleExt
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  auto formatter = SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  auto formatter = *SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   const auto out_json = formatter->formatWithContext(formatter_context_, stream_info_);
 
   const std::string expected = R"EOF({
@@ -225,9 +228,8 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithUnknownExtensio
   TestUtility::loadFromYaml(yaml, proto);
   *entry1 = proto;
 
-  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::parseFormatters(config, context_),
-                            EnvoyException,
-                            "Formatter not found: envoy.formatter.TestFormatterUnknown");
+  EXPECT_EQ(SubstitutionFormatStringUtils::parseFormatters(config, context_).status().message(),
+            "Formatter not found: envoy.formatter.TestFormatterUnknown");
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithInvalidFormatter) {
@@ -246,9 +248,8 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithInvalidFormatte
   TestUtility::loadFromYaml(yaml, proto);
   *entry1 = proto;
 
-  EXPECT_THROW_WITH_MESSAGE(SubstitutionFormatStringUtils::parseFormatters(config, context_),
-                            EnvoyException,
-                            "Failed to create command parser: envoy.formatter.FailFormatter");
+  EXPECT_EQ(SubstitutionFormatStringUtils::parseFormatters(config, context_).status().message(),
+            "Failed to create command parser: envoy.formatter.FailFormatter");
 }
 
 TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithSingleExtension) {
@@ -267,7 +268,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithSingleExtension
   TestUtility::loadFromYaml(yaml, proto);
   *entry1 = proto;
 
-  auto commands = SubstitutionFormatStringUtils::parseFormatters(config, context_);
+  auto commands = *SubstitutionFormatStringUtils::parseFormatters(config, context_);
   ASSERT_EQ(1, commands.size());
 
   absl::optional<size_t> max_length = {};
@@ -306,7 +307,7 @@ TEST_F(SubstitutionFormatStringUtilsTest, TestParseFormattersWithMultipleExtensi
   TestUtility::loadFromYaml(additional_command_yaml, additional_command_proto);
   *entry2 = additional_command_proto;
 
-  auto commands = SubstitutionFormatStringUtils::parseFormatters(config, context_);
+  auto commands = *SubstitutionFormatStringUtils::parseFormatters(config, context_);
   ASSERT_EQ(2, commands.size());
 
   absl::optional<size_t> max_length = {};

@@ -19,11 +19,7 @@ bool ExtProcTestUtility::headerProtosEqualIgnoreOrder(
   Http::TestRequestHeaderMapImpl actual_headers;
   for (const auto& header : actual.headers()) {
     if (!ignoredHeaders().contains(header.key())) {
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_header_raw_value")) {
-        actual_headers.addCopy(header.key(), header.raw_value());
-      } else {
-        actual_headers.addCopy(header.key(), header.value());
-      }
+      actual_headers.addCopy(header.key(), header.raw_value());
     }
   }
   return TestUtility::headerMapEqualIgnoreOrder(expected, actual_headers);

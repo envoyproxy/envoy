@@ -25,6 +25,43 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 namespace Http {
 
 /**
+ * Callbacks for sidestream connection (from http async client) watermark limits.
+ */
+class SidestreamWatermarkCallbacks {
+public:
+  virtual ~SidestreamWatermarkCallbacks() = default;
+
+  /**
+   * Called when the sidestream connection or stream goes over its high watermark. Note that this
+   * may be called separately for both the stream going over and the connection going over. It
+   * is the responsibility of the sidestreamWatermarkCallbacks implementation to handle unwinding
+   * multiple high and low watermark calls.
+   */
+  virtual void onSidestreamAboveHighWatermark() PURE;
+
+  /**
+   * Called when the sidestream connection or stream goes from over its high watermark to under its
+   * low watermark. As with onSidestreamAboveHighWatermark above, this may be called independently
+   * when both the stream and the connection go under the low watermark limit, and the callee must
+   * ensure that the flow of data does not resume until all callers which were above their high
+   * watermarks have gone below.
+   */
+  virtual void onSidestreamBelowLowWatermark() PURE;
+
+  /**
+    Sidestream subscribes to downstream watermark events on the downstream stream and downstream
+    connection.
+  */
+  virtual void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
+  /**
+    Sidestream stop subscribing to watermark events on the downstream stream and downstream
+    connection.
+   */
+  virtual void
+  removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
+};
+
+/**
  * Supports sending an HTTP request message and receiving a response asynchronously.
  */
 class AsyncClient {
@@ -191,7 +228,7 @@ public:
      * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
      * will trigger ENVOY_BUG.
      */
-    virtual void setWatermarkCallbacks(DecoderFilterWatermarkCallbacks& callbacks) PURE;
+    virtual void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) PURE;
 
     /***
      * Remove previously set watermark callbacks. If there's no watermark callback registered, this
@@ -209,6 +246,7 @@ public:
      * @returns the stream info object associated with the stream.
      */
     virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+    virtual StreamInfo::StreamInfo& streamInfo() PURE;
   };
 
   /***
@@ -342,6 +380,11 @@ public:
       return *this;
     }
 
+    StreamOptions& setSidestreamWatermarkCallbacks(SidestreamWatermarkCallbacks* callbacks) {
+      sidestream_watermark_callbacks = callbacks;
+      return *this;
+    }
+
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
@@ -399,6 +442,8 @@ public:
     std::string child_span_name_{""};
     // Sampling decision for the tracing span. The span is sampled by default.
     absl::optional<bool> sampled_{true};
+    // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
+    Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
   };
 
   /**

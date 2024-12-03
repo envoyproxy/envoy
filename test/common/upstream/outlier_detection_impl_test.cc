@@ -2646,7 +2646,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
   EXPECT_CALL(log_manager, createAccessLog(Filesystem::FilePathAndType{
                                Filesystem::DestinationType::File, "foo"}))
       .WillOnce(Return(file));
-  EventLoggerImpl event_logger(log_manager, "foo", time_system);
+  std::unique_ptr<EventLoggerImpl> event_logger =
+      *EventLoggerImpl::create(log_manager, "foo", time_system);
 
   StringViewSaver log1;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
@@ -2659,8 +2660,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                   "\"num_ejections\":0,\"enforced\":true,\"eject_consecutive_event\":{}}\n")))
       .WillOnce(SaveArg<0>(&log1));
 
-  event_logger.logEject(host, detector, envoy::data::cluster::v3::CONSECUTIVE_5XX, true);
-  Json::Factory::loadFromString(log1);
+  event_logger->logEject(host, detector, envoy::data::cluster::v3::CONSECUTIVE_5XX, true);
+  *Json::Factory::loadFromString(log1);
 
   StringViewSaver log2;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
@@ -2672,8 +2673,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                          "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log2));
 
-  event_logger.logUneject(host);
-  Json::Factory::loadFromString(log2);
+  event_logger->logUneject(host);
+  *Json::Factory::loadFromString(log2);
 
   // now test with time since last action.
   monotonic_time = (time_system.monotonicTime() - std::chrono::seconds(30));
@@ -2698,8 +2699,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                          "\"host_success_rate\":0,\"cluster_average_success_rate\":0,"
                          "\"cluster_success_rate_ejection_threshold\":0}}\n")))
       .WillOnce(SaveArg<0>(&log3));
-  event_logger.logEject(host, detector, envoy::data::cluster::v3::SUCCESS_RATE, false);
-  Json::Factory::loadFromString(log3);
+  event_logger->logEject(host, detector, envoy::data::cluster::v3::SUCCESS_RATE, false);
+  *Json::Factory::loadFromString(log3);
 
   StringViewSaver log4;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
@@ -2710,8 +2711,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                          "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
                          "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log4));
-  event_logger.logUneject(host);
-  Json::Factory::loadFromString(log4);
+  event_logger->logUneject(host);
+  *Json::Factory::loadFromString(log4);
 
   StringViewSaver log5;
   EXPECT_CALL(host->outlier_detector_, lastUnejectionTime()).WillOnce(ReturnRef(monotonic_time));
@@ -2727,8 +2728,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                   "\"num_ejections\":0,\"enforced\":false,\"eject_failure_percentage_event\":{"
                   "\"host_success_rate\":0}}\n")))
       .WillOnce(SaveArg<0>(&log5));
-  event_logger.logEject(host, detector, envoy::data::cluster::v3::FAILURE_PERCENTAGE, false);
-  Json::Factory::loadFromString(log5);
+  event_logger->logEject(host, detector, envoy::data::cluster::v3::FAILURE_PERCENTAGE, false);
+  *Json::Factory::loadFromString(log5);
 
   StringViewSaver log6;
   EXPECT_CALL(host->outlier_detector_, lastEjectionTime()).WillOnce(ReturnRef(monotonic_time));
@@ -2739,8 +2740,8 @@ TEST(OutlierDetectionEventLoggerImplTest, All) {
                          "\"upstream_url\":\"10.0.0.1:443\",\"action\":\"UNEJECT\","
                          "\"num_ejections\":0,\"enforced\":false}\n")))
       .WillOnce(SaveArg<0>(&log6));
-  event_logger.logUneject(host);
-  Json::Factory::loadFromString(log6);
+  event_logger->logUneject(host);
+  *Json::Factory::loadFromString(log6);
 }
 
 TEST(OutlierUtility, SRThreshold) {

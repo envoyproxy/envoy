@@ -446,9 +446,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
   test_server_->waitForGaugeEq("cluster.local_cluster.membership_total", 1);
   simTime().advanceTimeWait(std::chrono::milliseconds(1));
 
-  EXPECT_EQ(1, share_provider->tokensPerFill(1));
-  EXPECT_EQ(2, share_provider->tokensPerFill(2));
-  EXPECT_EQ(4, share_provider->tokensPerFill(4));
+  EXPECT_EQ(1.0, share_provider->getTokensShareFactor());
 
   sendSotwDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       Config::TypeUrl::get().ClusterLoadAssignment,
@@ -459,9 +457,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
   test_server_->waitForGaugeEq("cluster.local_cluster.membership_total", 2);
   simTime().advanceTimeWait(std::chrono::milliseconds(1));
 
-  EXPECT_EQ(1, share_provider->tokensPerFill(1));
-  EXPECT_EQ(1, share_provider->tokensPerFill(2));
-  EXPECT_EQ(2, share_provider->tokensPerFill(4));
+  EXPECT_EQ(0.5, share_provider->getTokensShareFactor());
 
   cleanUpXdsConnection();
 }

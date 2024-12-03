@@ -1,0 +1,29 @@
+[package]
+name = "test-programs"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/envoyproxy/envoy"
+
+[dependencies]
+envoy-proxy-dynamic-modules-rust-sdk = { path = "../../../../../source/extensions/dynamic_modules/sdk/rust" }
+
+[[example]]
+name = "no_op"
+path = "no_op.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "no_program_init"
+path = "no_program_init.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "program_init_fail"
+path = "program_init_fail.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "abi_version_mismatch"
+path = "abi_version_mismatch.rs"
+crate-type = ["cdylib"]

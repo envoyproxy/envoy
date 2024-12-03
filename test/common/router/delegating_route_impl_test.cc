@@ -29,12 +29,12 @@ TEST(DelegatingRoute, DelegatingRouteTest) {
   TEST_METHOD(metadata);
   TEST_METHOD(typedMetadata);
   TEST_METHOD(routeName);
+  TEST_METHOD(virtualHost);
 
   std::string name;
   TEST_METHOD(mostSpecificPerFilterConfig, name);
 
-  std::function<void(const Router::RouteSpecificFilterConfig&)> cb;
-  TEST_METHOD(traversePerFilterConfig, name, cb);
+  TEST_METHOD(perFilterConfigs, name);
 }
 
 // Verify that DelegatingRouteEntry class forwards all calls to internal base route.
@@ -74,8 +74,6 @@ TEST(DelegatingRouteEntry, DelegatingRouteEntryTest) {
   TEST_METHOD(grpcTimeoutHeaderOffset);
   TEST_METHOD(maxGrpcTimeout);
   TEST_METHOD(grpcTimeoutOffset);
-  TEST_METHOD(virtualCluster, request_headers);
-  TEST_METHOD(virtualHost);
   TEST_METHOD(autoHostRewrite);
   TEST_METHOD(appendXfh);
   TEST_METHOD(metadataMatchCriteria);

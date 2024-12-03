@@ -43,6 +43,8 @@ public:
 
   // Network::ActiveDnsQuery
   MOCK_METHOD(void, cancel, (CancelReason reason));
+  MOCK_METHOD(void, addTrace, (uint8_t));
+  MOCK_METHOD(std::string, getTraces, ());
 };
 
 class MockFilterManager : public FilterManager {
@@ -190,6 +192,7 @@ public:
   MOCK_METHOD(void, onDataWorker, (Network::UdpRecvData && data));
   MOCK_METHOD(void, post, (Network::UdpRecvData && data));
   MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
+  MOCK_METHOD(const IoHandle::UdpSaveCmsgConfig&, udpSaveCmsgConfig, (), (const));
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -256,6 +259,7 @@ public:
               (const));
 
   MOCK_METHOD(void, onPeerAddressChanged, (const quic::QuicSocketAddress&, Connection&));
+  MOCK_METHOD(void, onFirstPacketReceived, (const quic::QuicReceivedPacket&));
 };
 
 #endif
@@ -411,7 +415,6 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, ());
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
-  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
 
   IoHandlePtr io_handle_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
@@ -446,7 +449,7 @@ public:
   MOCK_METHOD(bool, reusePort, (), (const));
   MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
   MOCK_METHOD(void, closeAllSockets, ());
-  MOCK_METHOD(void, doFinalPreWorkerInit, ());
+  MOCK_METHOD(absl::Status, doFinalPreWorkerInit, ());
 };
 
 class MockUdpPacketWriterFactory : public UdpPacketWriterFactory {
@@ -506,7 +509,7 @@ public:
   MOCK_METHOD(bool, ignoreGlobalConnLimit, (), (const));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
 
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
     return empty_access_logs_;
   }
 
@@ -518,7 +521,7 @@ public:
   ListenerInfoConstSharedPtr listener_info_;
   Stats::IsolatedStoreImpl store_;
   std::string name_;
-  const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+  const AccessLog::InstanceSharedPtrVector empty_access_logs_;
 };
 
 class MockListener : public Listener {
@@ -720,10 +723,11 @@ public:
   MOCK_METHOD(void, processPacket,
               (Address::InstanceConstSharedPtr local_address,
                Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-               MonotonicTime receive_time, uint8_t tos));
+               MonotonicTime receive_time, uint8_t tos, Buffer::RawSlice saved_cmsg));
   MOCK_METHOD(void, onDatagramsDropped, (uint32_t dropped));
   MOCK_METHOD(uint64_t, maxDatagramSize, (), (const));
   MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
+  MOCK_METHOD(const IoHandle::UdpSaveCmsgConfig&, saveCmsgConfig, (), (const));
 };
 
 class MockSocketInterface : public SocketInterfaceImpl {

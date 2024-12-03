@@ -2,6 +2,7 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/quic/envoy_quic_network_observer_registry_factory.h"
 #include "source/common/singleton/manager_impl.h"
 
 #include "test/mocks/secret/mocks.h"
@@ -32,7 +33,8 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                TimeSource& source, ClusterConnectivityState& state,
-               Http::PersistentQuicInfoPtr& quic_info));
+               Http::PersistentQuicInfoPtr& quic_info,
+               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry));
 
   MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
               (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,

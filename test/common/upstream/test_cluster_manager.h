@@ -90,9 +90,11 @@ public:
           alternate_protocol_options,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, TimeSource&,
-      ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& /*quic_info*/) override {
-    return Http::ConnectionPool::InstancePtr{allocateConnPool_(
-        host, alternate_protocol_options, options, transport_socket_options, state)};
+      ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& /*quic_info*/,
+      OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) override {
+    return Http::ConnectionPool::InstancePtr{allocateConnPool_(host, alternate_protocol_options,
+                                                               options, transport_socket_options,
+                                                               state, network_observer_registry)};
   }
 
   Tcp::ConnectionPool::InstancePtr
@@ -132,7 +134,8 @@ public:
                const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
                    alternate_protocol_options,
                Network::ConnectionSocket::OptionsSharedPtr,
-               Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState&));
+               Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState&,
+               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,

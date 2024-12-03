@@ -4,6 +4,7 @@ package envoy.extensions.filters.udp.udp_proxy.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
 
 import "google/protobuf/any.proto";
@@ -61,6 +62,11 @@ message UdpProxyConfig {
       // Filter specific configuration which depends on the filter being
       // instantiated. See the supported filters for further documentation.
       google.protobuf.Any typed_config = 2;
+
+      // Configuration source specifier for an extension configuration discovery
+      // service. In case of a failure and without the default configuration, the
+      // UDP session will be removed.
+      config.core.v3.ExtensionConfigSource config_discovery = 3;
     }
   }
 

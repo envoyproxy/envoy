@@ -24,8 +24,8 @@ envoy_cc_library(
         "dns_filter_utils.h",
         "dns_parser.h",
     ],
-    external_deps = ["ares"],
     deps = [
+        "//bazel/foreign_cc:ares",
         "//envoy/buffer:buffer_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:address_interface",

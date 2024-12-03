@@ -27,7 +27,6 @@ envoy_cc_library(
         "matcher_extension.h",
         "matchers.h",
     ],
-    external_deps = ["abseil_optional"],
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/http:header_map_interface",
@@ -39,6 +38,7 @@ envoy_cc_library(
         "//source/common/network:cidr_range_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/path/match/uri_template:uri_template_match_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

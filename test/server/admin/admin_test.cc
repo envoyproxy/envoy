@@ -79,10 +79,10 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 TEST_P(AdminInstanceTest, AdminAddress) {
   server_.options_.admin_address_path_ = TestEnvironment::temporaryPath("admin.address");
   AdminImpl admin_address_out_path(cpu_profile_path_, server_, false);
-  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  AccessLog::InstanceSharedPtrVector access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "info", "admin address:",
@@ -94,10 +94,10 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   server_.options_.admin_address_path_ =
       TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
-  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  AccessLog::InstanceSharedPtrVector access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "critical",
@@ -142,6 +142,8 @@ TEST_P(AdminInstanceTest, Help) {
   EXPECT_EQ(Http::Code::OK, getCallback("/help", header_map, response));
   const std::string expected = R"EOF(admin commands are:
   /: Admin home page
+  /allocprofiler (POST): enable/disable the allocation profiler (if supported)
+      enable: enable/disable the allocation profiler; One of (y, n)
   /certs: print certs on machine
   /clusters: upstream cluster status
   /config_dump: dump current Envoy configs (experimental)
@@ -338,8 +340,6 @@ TEST_P(AdminInstanceTest, Overrides) {
   ASSERT_TRUE(peer.routeConfigProvider().onConfigUpdate().ok());
 
   peer.scopedRouteConfigProvider().lastUpdated();
-  peer.scopedRouteConfigProvider().getConfigProto();
-  peer.scopedRouteConfigProvider().getConfigVersion();
   peer.scopedRouteConfigProvider().getConfig();
   peer.scopedRouteConfigProvider().apiType();
   peer.scopedRouteConfigProvider().getConfigProtos();
@@ -354,7 +354,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.socketFactory().clone();
   peer.socketFactory().closeAllSockets();
-  peer.socketFactory().doFinalPreWorkerInit();
+  ASSERT_TRUE(peer.socketFactory().doFinalPreWorkerInit().ok());
 
   peer.listener().name();
   peer.listener().udpListenerConfig();

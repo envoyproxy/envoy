@@ -49,6 +49,7 @@ public:
   }
   Api::IoCallUint64Result close() override;
   bool isOpen() const override;
+  bool wasConnected() const override;
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
@@ -59,8 +60,11 @@ public:
                                   const Network::Address::Ip* self_ip,
                                   const Network::Address::Instance& peer_address) override;
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override;
+                                  uint32_t self_port,
+                                  const Network::IoHandle::UdpSaveCmsgConfig& udp_save_cmsg_config,
+                                  RecvMsgOutput& output) override;
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   const Network::IoHandle::UdpSaveCmsgConfig& udp_save_cmsg_config,
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
   bool supportsMmsg() const override;
@@ -76,8 +80,8 @@ public:
                               unsigned long*) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
   absl::optional<int> domain() override;
-  Network::Address::InstanceConstSharedPtr localAddress() override;
-  Network::Address::InstanceConstSharedPtr peerAddress() override;
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> localAddress() override;
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> peerAddress() override;
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;

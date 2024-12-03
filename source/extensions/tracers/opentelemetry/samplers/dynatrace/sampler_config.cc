@@ -9,11 +9,11 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 bool SamplerConfig::parse(const std::string& json) {
-  const auto result = Envoy::Json::Factory::loadFromStringNoThrow(json);
+  const auto result = Envoy::Json::Factory::loadFromString(json);
   if (result.ok()) {
     const auto& obj = result.value();
     if (obj->hasObject("rootSpansPerMinute")) {
-      const auto value = obj->getInteger("rootSpansPerMinute", default_root_spans_per_minute_);
+      const auto value = *obj->getInteger("rootSpansPerMinute", default_root_spans_per_minute_);
       root_spans_per_minute_.store(value);
       return true;
     }

@@ -465,24 +465,20 @@ and security team to ensure they still qualify for inclusion on the list.
 
 | Organization  | End User | Last Review |
 |:-------------:|:--------:|:-----------:|
-| AWS           | No       | 06/21       |
-| Cilium        | No       | 06/21       |
-| Cloud Foundry | No       | 06/21       |
-| Datawire      | No       | 06/21       |
-| F5            | No       | 06/21       |
-| Google        | No       | 06/21       |
-| IBM           | No       | 06/21       |
-| Istio         | No       | 06/21       |
-| Microsoft     | No       | 2/21        |
-| Red Hat       | No       | 06/21       |
-| solo.io       | No       | 06/21       |
-| Tetrate       | No       | 06/21       |
-| VMware        | No       | 06/21       |
-| Pinterest     | Yes      | 06/21       |
-| Dropbox       | Yes      | 01/20       |
-| Stripe        | Yes      | 01/20       |
-| Square        | Yes      | 05/21       |
-| Apple         | Yes      | 05/21       |
-| Spotify       | Yes      | 06/21       |
-| Netflix       | Yes      | 06/22       |
+| AWS           | No       | 07/24       |
+| Cilium        | No       | 07/24       |
+| Cloud Foundry | No       | 07/24       |
+| F5            | No       | 07/24       |
+| Google        | No       | 07/24       |
+| Istio         | No       | 07/24       |
+| Microsoft     | No       | 07/24       |
+| Red Hat       | No       | 07/24       |
+| VMware        | No       | 07/24       |
+| Tetrate       | No       | 07/24       |
+| solo.io       | No       | 07/24       |
+| Pinterest     | Yes      | 07/24       |
+| Dropbox       | Yes      | 07/24       |
+| Apple         | Yes      | 07/24       |
+| Spotify       | Yes      | 02/21       |
+| Netflix       | Yes      | 07/24       |
 | Slack         | Yes      | 07/24       |

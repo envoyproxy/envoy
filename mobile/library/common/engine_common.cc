@@ -59,13 +59,19 @@ class ServerLite : public Server::InstanceBase {
 public:
   using Server::InstanceBase::InstanceBase;
   void maybeCreateHeapShrinker() override {}
-  std::unique_ptr<Envoy::Server::OverloadManager> createOverloadManager() override {
+  absl::StatusOr<std::unique_ptr<Envoy::Server::OverloadManager>> createOverloadManager() override {
     return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
   }
   std::unique_ptr<Envoy::Server::OverloadManager> createNullOverloadManager() override {
     return std::make_unique<Envoy::Server::NullOverloadManager>(threadLocal(), true);
   }
   std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view) override {
+    return nullptr;
+  }
+  std::unique_ptr<Server::HdsDelegateApi>
+  maybeCreateHdsDelegate(Server::Configuration::ServerFactoryContext&, Stats::Scope&,
+                         Grpc::RawAsyncClientPtr&&, Envoy::Stats::Store&,
+                         Ssl::ContextManager&) override {
     return nullptr;
   }
 };

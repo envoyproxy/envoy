@@ -57,11 +57,11 @@ def extract_clang_proto_style(clang_format_text):
     format_dict = {}
     for line in clang_format_text.split('\n'):
         if lang is None or lang != 'Proto':
-            match = re.match('Language:\s+(\w+)', line)
+            match = re.match(r'Language:\s+(\w+)', line)
             if match:
                 lang = match.group(1)
             continue
-        match = re.match('(\w+):\s+(\w+)', line)
+        match = re.match(r'(\w+):\s+(\w+)', line)
         if match:
             key, value = match.groups()
             format_dict[key] = value
@@ -196,7 +196,7 @@ def format_header_from_file(
         if t.startswith('envoy.') and typedb.types[t].proto_path != file_proto.name)
 
     def camel_case(s):
-        return ''.join(t.capitalize() for t in re.split('[\._]', s))
+        return ''.join(t.capitalize() for t in re.split(r'[\._]', s))
 
     package_line = 'package %s;\n' % file_proto.package
     file_block = '\n'.join(['syntax = "proto3";\n', package_line])

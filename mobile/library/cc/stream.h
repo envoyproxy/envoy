@@ -21,8 +21,11 @@ public:
    *
    * @param headers the headers to send.
    * @param end_stream indicates whether to close the stream locally after sending this frame.
+   * @param idempotent indicates that the request is idempotent. When idempotent is set to true
+   *                   Envoy Mobile will retry on HTTP/3 post-handshake failures. By default, it is
+   *                   set to false.
    */
-  Stream& sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream);
+  Stream& sendHeaders(Http::RequestHeaderMapPtr headers, bool end_stream, bool idempotent = false);
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple times.

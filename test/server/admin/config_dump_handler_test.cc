@@ -27,6 +27,7 @@ void addHostInfo(NiceMock<Upstream::MockHost>& host, const std::string& hostname
   ON_CALL(host, address()).WillByDefault(Return(address));
   std::shared_ptr<Upstream::HostImplBase::AddressVector> address_list =
       std::make_shared<Upstream::HostImplBase::AddressVector>();
+  address_list->push_back(*Network::Utility::resolveUrl(address_url));
   for (auto& new_addr : additional_addresses_url) {
     address_list->push_back(*Network::Utility::resolveUrl(new_addr));
   }
@@ -150,7 +151,8 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
               hostname_for_healthcheck, "tcp://1.2.3.5:90", 5, 6);
   // Adding drop_overload config.
   ON_CALL(cluster, dropOverload()).WillByDefault(Return(UnitFloat(0.00035)));
-
+  const std::string drop_overload = "drop_overload";
+  ON_CALL(cluster, dropCategory()).WillByDefault(ReturnRef(drop_overload));
   Buffer::OwnedImpl response;
   Http::TestResponseHeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?include_eds", header_map, response));

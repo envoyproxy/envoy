@@ -85,6 +85,7 @@ settings:
   EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context.serverFactoryContext()));
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_, grpcAsyncClientManager()).Times(0);
   cb(connection);
 }
 
@@ -190,6 +191,35 @@ settings:
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config),
                           ProtoValidationException,
                           "ConnectionRateLimitPerSec: value must be greater than 0");
+}
+
+// Verify async gRPC client is created if external auth is enabled.
+TEST(RedisProxyFilterConfigFactoryTest, ExternalAuthProvider) {
+  const std::string yaml = R"EOF(
+prefix_routes:
+  catch_all_route:
+    cluster: fake_cluster
+stat_prefix: foo
+settings:
+  op_timeout: 0.02s
+  connection_rate_limit:
+   connection_rate_limit_per_sec: 1
+external_auth_provider:
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "external_auth_cluster"
+      )EOF";
+
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RedisProxyFilterConfigFactory factory;
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context).value();
+  EXPECT_TRUE(factory.isTerminalFilterByProto(proto_config, context.serverFactoryContext()));
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  EXPECT_CALL(context.server_factory_context_.cluster_manager_, grpcAsyncClientManager());
+  cb(connection);
 }
 
 } // namespace RedisProxy

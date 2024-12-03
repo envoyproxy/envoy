@@ -1,0 +1,269 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.proto_message_extraction.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_message_extraction.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/proto_message_extraction/v3;proto_message_extractionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Proto Message Extraction]
+//
+// [#extension: envoy.filters.http.proto_message_extraction]
+//
+// Overview
+// --------
+//
+// ProtoMessageExtraction filter supports extracting gRPC
+// requests/responses(proto messages) into google.protobuf.Struct and storing
+// results in the dynamic metadata `envoy.filters.http.proto_message_extraction`
+// for later access.
+//
+// Assumptions
+// -----------
+//
+// This filter assumes it is only applicable for gRPC with Protobuf as payload.
+//
+// Process Flow
+// ------------
+//
+// On the request path, it will check
+//
+// 1. if the incoming gRPC request is configured, the filter tries to:
+//
+//   a. buffer the incoming data to complete protobuf messages
+//   b. extract individual protobuf messages according to directives
+//   c. write the result into the dynamic metadata.
+//   d. pass through the request data
+//
+// 2. otherwise, pass through the request.
+//
+// On the response path, it will check
+//
+// 1. if the incoming gRPC request is configured, the filter tries to:
+//
+//   a. buffer the incoming data to complete protobuf messages
+//   b. extract individual protobuf messages according to directives
+//   c. write the result into the dynamic metadata.
+//   d. pass through the response data
+//
+// 2. otherwise, pass through the response.
+//
+// Config Requirements
+// -------------------
+
+// Here are config requirements
+
+// 1. the extracted target field should be among the following primitive types:
+// `string`, `uint32`, `uint64`, `int32`, `int64`, `sint32`, `sint64`,
+// `fixed32`, `fixed64`, `sfixed32`, `sfixed64`, `float`, `double`.
+
+// 2. the target field could be repeated.
+
+// 3. the intermediate type could also be repeated.
+
+// Output Format
+// -------------
+
+// The extracted requests and responses will be  will be added in the dynamic
+// ``metadata<google.protobuf.Struct>`` with the same layout of the message.
+
+// For the default `FIRST_AND_LAST` mode, it will be like:
+
+// .. code-block:: json
+
+//   {
+//     "requests":{
+//        "first":{
+//           "foo": "val_foo1",
+//        }
+//        "last":{
+//           "foo": "val_foo3",
+//        }
+//     },
+//     "responses":{
+//        "first":{
+//           "baz": "val_baz1",
+//        }
+//        "last":{
+//           "baz": "val_foo3",
+//        }
+//     }
+//   }
+
+// Example for `FIRST_AND_LAST` mode
+// ---------------------------------
+//
+// Let's say we have the following definition for the bi-streaming request
+// `pkg.svc.Method`.
+//
+// .. code-block:: proto
+//
+//   message MethodRequest {
+//     string foo = 1;
+//     Nested nested = 2;
+//     Msg redacted = 3;
+//     ...
+//   }
+//
+//   message MethodResponse {
+//     string baz = 1;
+//   }
+//
+//   message Nested {
+//     Msg double_nested = 2;
+//   }
+//
+//   message Msg {
+//     string bar = 1;
+//     string not_extracted = 2;
+//   }
+//
+// This is the filter config in JSON.
+//
+// .. code-block:: json
+//
+//   {
+//     "descriptor_set":{},
+//     "mode": "FIRST_AND_LAST",
+//     "extraction_by_method":{
+//        "pkg.svc.Method":{
+//           "request_extraction_by_field":{
+//              "foo":"EXTRACT",
+//              "nested.doubled_nested.bar":"EXTRACT",
+//              "redacted":"EXTRACT_REDACT"
+//           },
+//           "response_extraction_by_field":{
+//              "bar":"EXTRACT",
+//           }
+//        }
+//     }
+//   }
+//
+// During runtime, the filter receives the following `MethodRequest` message in
+// JSON.
+//
+// .. code-block:: json
+//
+//   {
+//     "foo": "val_foo1",
+//     "nested": { "double_nested": {"bar": "val_bar1", "not_extracted":
+//     "val_not_extracted1"}, "redacted": { "bar": "val_redacted_bar1"}
+//   }
+//   {
+//     "foo": "val_foo2",
+//     "nested": { "double_nested": {"bar": "val_bar2", "not_extracted":
+//     "val_not_extracted2"}, "redacted": { "bar": "val_redacted_bar2"}
+//   }
+//   {
+//     "foo": "val_foo3",
+//     "nested": { "double_nested": {"bar": "val_bar3", "not_extracted":
+//     "val_not_extracted3"}, "redacted": { "bar": "val_redacted_bar3"}
+//   }
+//
+// the filter receives the following `MethodResponse` message in
+// JSON.
+//
+// .. code-block:: json
+//
+//   {
+//     "baz": "val_baz1",
+//   }
+//   {
+//     "baz": "val_baz2",
+//   }
+//   {
+//     "baz": "val_baz3",
+//   }
+//
+// The filter will write the following dynamic
+// metadata(`envoy.filters.http.proto_message_extraction`) in JSON.
+//
+// .. code-block:: json
+//
+//   {
+//     "requests":{
+//        "first":{
+//           "foo": "val_foo1",
+//           "nested": { "double_nested": {"bar": "val_bar1"}},
+//           "redacted": {}
+//        }
+//        "last":{
+//           "foo": "val_foo3",
+//           "nested": { "double_nested": {"bar": "val_bar3"}},
+//           "redacted": {}
+//        }
+//     },
+//     "responses":{
+//        "first":{
+//           "baz": "val_baz1"
+//        }
+//        "last":{
+//           "baz": "val_foo3"
+//        }
+//     }
+//   }
+
+message ProtoMessageExtractionConfig {
+  enum ExtractMode {
+    ExtractMode_UNSPECIFIED = 0;
+
+    // The filter will extract the first and the last message for
+    // for streaming cases, containing
+    // client-side streaming, server-side streaming or bi-directional streaming.
+    FIRST_AND_LAST = 1;
+  }
+
+  // The proto descriptor set binary for the gRPC services.
+  oneof descriptor_set {
+    // It could be passed by a local file through ``Datasource.filename`` or
+    // embedded in the ``Datasource.inline_bytes``.
+    config.core.v3.DataSource data_source = 1;
+
+    // Unimplemented, the key of proto descriptor TypedMetadata.
+    // Among filters depending on the proto descriptor, we can have a
+    // TypedMetadata for proto descriptors, so that these filters can share one
+    // copy of proto descriptor in memory.
+    string proto_descriptor_typed_metadata = 2;
+  }
+
+  ExtractMode mode = 3;
+
+  // Specify the message extraction info.
+  // The key is the fully qualified gRPC method name.
+  // ``${package}.${Service}.${Method}``, like
+  // ``endpoints.examples.bookstore.BookStore.GetShelf``
+  //
+  // The value is the message extraction information for individual gRPC
+  // methods.
+  map<string, MethodExtraction> extraction_by_method = 4;
+}
+
+// This message can be used to support per route config approach later even
+// though the Istio doesn't support that so far.
+message MethodExtraction {
+  enum ExtractDirective {
+    ExtractDirective_UNSPECIFIED = 0;
+
+    // The value of this field will be extracted.
+    EXTRACT = 1;
+
+    // It should be only annotated on Message type fields so if the field isn't
+    // empty, an empty Struct will be extracted.
+    EXTRACT_REDACT = 2;
+  }
+
+  // The mapping of field path to its ExtractDirective for request messages
+  map<string, ExtractDirective> request_extraction_by_field = 2;
+
+  // The mapping of field path to its ExtractDirective for response messages
+  map<string, ExtractDirective> response_extraction_by_field = 3;
+}

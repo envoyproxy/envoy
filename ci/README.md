@@ -85,6 +85,15 @@ To force the Envoy build image to be refreshed by Docker you can set `ENVOY_DOCK
 ENVOY_DOCKER_PULL=true ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
+
+# Generating compile commands
+
+The `./ci/do_ci.sh` script provides a CI target that generates compile commands for clangd or other tools.
+
+```bash
+ENVOY_GEN_COMPDB_OPTIONS="--vscode --exclude_contrib" ./ci/do_ci.sh refresh_compdb
+```
+
 ## On Linux
 
 An example basic invocation to build a developer version of the Envoy static binary (using the Bazel `fastbuild` type) is:
@@ -212,7 +221,7 @@ Docker host.
 
 The base build image used in the CI flows here lives in the [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository. If you need to make and/or test changes to the build image, instructions to do so can be found in
-the [build_container](https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/README.md) folder.
+the [docker](https://github.com/envoyproxy/envoy-build-tools/blob/main/docker/README.md) folder.
 See the Dockerfiles and build scripts there for building a new image.
 
 # macOS Build Flow

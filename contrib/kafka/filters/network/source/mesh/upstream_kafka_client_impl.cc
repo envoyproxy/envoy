@@ -89,8 +89,8 @@ void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const Outbou
       // We could not submit data to producer.
       // Let's treat that as a normal failure (Envoy is a broker after all) and propagate
       // downstream.
-      ENVOY_LOG(trace, "Produce failure: {}, while sending to [{}/{}]", ec, record.topic_,
-                record.partition_);
+      ENVOY_LOG(trace, "Produce failure: {}, while sending to [{}/{}]", static_cast<int>(ec),
+                record.topic_, record.partition_);
       if (nullptr != librdkafka_headers) {
         // Kafka headers need to be deleted manually if produce call fails.
         utils_.deleteHeaders(librdkafka_headers);
@@ -115,7 +115,8 @@ void RichKafkaProducer::checkDeliveryReports() {
 // Kafka callback that contains the delivery information.
 void RichKafkaProducer::dr_cb(RdKafka::Message& message) {
   ENVOY_LOG(trace, "Delivery finished: {}, payload has been saved at offset {} in {}/{}",
-            message.err(), message.topic_name(), message.partition(), message.offset());
+            static_cast<int>(message.err()), message.topic_name(), message.partition(),
+            message.offset());
   const DeliveryMemento memento = {message.payload(), message.err(), message.offset()};
   // Because this method gets executed in poller thread, we need to pass the data through
   // dispatcher.

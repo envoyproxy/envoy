@@ -22,6 +22,7 @@ public:
   MOCK_METHOD(os_fd_t, fdDoNotUse, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, close, ());
   MOCK_METHOD(bool, isOpen, (), (const));
+  MOCK_METHOD(bool, wasConnected, (), (const));
   MOCK_METHOD(Api::IoCallUint64Result, readv,
               (uint64_t max_length, Buffer::RawSlice* slices, uint64_t num_slice));
   MOCK_METHOD(Api::IoCallUint64Result, read,
@@ -34,9 +35,10 @@ public:
                const Address::Ip* self_ip, const Address::Instance& peer_address));
   MOCK_METHOD(Api::IoCallUint64Result, recvmsg,
               (Buffer::RawSlice * slices, const uint64_t num_slice, uint32_t self_port,
-               RecvMsgOutput& output));
+               const UdpSaveCmsgConfig& save_cmsg_config, RecvMsgOutput& output));
   MOCK_METHOD(Api::IoCallUint64Result, recvmmsg,
-              (RawSliceArrays & slices, uint32_t self_port, RecvMsgOutput& output));
+              (RawSliceArrays & slices, uint32_t self_port,
+               const UdpSaveCmsgConfig& save_cmsg_config, RecvMsgOutput& output));
   MOCK_METHOD(Api::IoCallUint64Result, recv, (void* buffer, size_t length, int flags));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
@@ -50,8 +52,8 @@ public:
               (int level, int optname, void* optval, socklen_t* optlen));
   MOCK_METHOD(Api::SysCallIntResult, setBlocking, (bool blocking));
   MOCK_METHOD(absl::optional<int>, domain, ());
-  MOCK_METHOD(Address::InstanceConstSharedPtr, localAddress, ());
-  MOCK_METHOD(Address::InstanceConstSharedPtr, peerAddress, ());
+  MOCK_METHOD(absl::StatusOr<Address::InstanceConstSharedPtr>, localAddress, ());
+  MOCK_METHOD(absl::StatusOr<Address::InstanceConstSharedPtr>, peerAddress, ());
   MOCK_METHOD(IoHandlePtr, duplicate, ());
   MOCK_METHOD(void, createFileEvent_,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,

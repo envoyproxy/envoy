@@ -55,7 +55,7 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
           send_repeated.Add()->CopyFrom(config.tcp_health_check().send());
         }
         auto bytes_or_error = PayloadMatcher::loadProtoBytes(send_repeated);
-        THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
+        THROW_IF_NOT_OK_REF(bytes_or_error.status());
         return bytes_or_error.value();
       }()),
       proxy_protocol_config_(config.tcp_health_check().has_proxy_protocol_config()
@@ -63,7 +63,7 @@ TcpHealthCheckerImpl::TcpHealthCheckerImpl(const Cluster& cluster,
                                        config.tcp_health_check().proxy_protocol_config())
                                  : nullptr) {
   auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.tcp_health_check().receive());
-  THROW_IF_STATUS_NOT_OK(bytes_or_error, throw);
+  THROW_IF_NOT_OK_REF(bytes_or_error.status());
   receive_bytes_ = bytes_or_error.value();
 }
 

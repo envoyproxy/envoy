@@ -1,8 +1,11 @@
 #pragma once
 
+#include <queue>
+
 #include "source/extensions/common/async_files/async_file_handle.h"
 #include "source/extensions/common/async_files/async_file_manager.h"
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
+#include "source/extensions/common/async_files/async_file_manager_thread_pool.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,18 +26,23 @@ public:
   // These can be consumed by calling MockAsyncFileManager::nextActionCompletes
   // with the desired parameter to the on_complete callback.
   MOCK_METHOD(absl::StatusOr<CancelFunction>, stat,
-              (std::function<void(absl::StatusOr<struct stat>)> on_complete));
+              (Event::Dispatcher * dispatcher,
+               absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete));
   MOCK_METHOD(absl::StatusOr<CancelFunction>, createHardLink,
-              (absl::string_view filename, std::function<void(absl::Status)> on_complete));
-  MOCK_METHOD(absl::Status, close, (std::function<void(absl::Status)> on_complete));
+              (Event::Dispatcher * dispatcher, absl::string_view filename,
+               absl::AnyInvocable<void(absl::Status)> on_complete));
+  MOCK_METHOD(absl::StatusOr<CancelFunction>, close,
+              (Event::Dispatcher * dispatcher, absl::AnyInvocable<void(absl::Status)> on_complete));
   MOCK_METHOD(absl::StatusOr<CancelFunction>, read,
-              (off_t offset, size_t length,
-               std::function<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete));
+              (Event::Dispatcher * dispatcher, off_t offset, size_t length,
+               absl::AnyInvocable<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete));
   MOCK_METHOD(absl::StatusOr<CancelFunction>, write,
-              (Buffer::Instance & contents, off_t offset,
-               std::function<void(absl::StatusOr<size_t>)> on_complete));
-  MOCK_METHOD(absl::StatusOr<CancelFunction>, duplicate,
-              (std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)> on_complete));
+              (Event::Dispatcher * dispatcher, Buffer::Instance& contents, off_t offset,
+               absl::AnyInvocable<void(absl::StatusOr<size_t>)> on_complete));
+  MOCK_METHOD(
+      absl::StatusOr<CancelFunction>, duplicate,
+      (Event::Dispatcher * dispatcher,
+       absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)> on_complete));
 
 private:
   std::shared_ptr<MockAsyncFileManager> manager_;
@@ -50,7 +58,8 @@ public:
 
 template <typename T> class TypedMockAsyncFileAction : public MockAsyncFileAction {
 public:
-  explicit TypedMockAsyncFileAction(T on_complete) : on_complete_(on_complete) {}
+  explicit TypedMockAsyncFileAction(T on_complete) : on_complete_(std::move(on_complete)) {}
+  void onComplete() override {}
   T on_complete_;
   std::string describe() const override { return typeid(T).name(); }
 };
@@ -60,17 +69,20 @@ public:
   MockAsyncFileManager();
   // The default behavior of the methods that would enqueue an action is to enqueue a mock action.
   MOCK_METHOD(CancelFunction, createAnonymousFile,
-              (absl::string_view path,
-               std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete));
+              (Event::Dispatcher * dispatcher, absl::string_view path,
+               absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete));
   MOCK_METHOD(CancelFunction, openExistingFile,
-              (absl::string_view filename, Mode mode,
-               std::function<void(absl::StatusOr<AsyncFileHandle>)> on_complete));
+              (Event::Dispatcher * dispatcher, absl::string_view filename, Mode mode,
+               absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete));
   MOCK_METHOD(CancelFunction, stat,
-              (absl::string_view filename,
-               std::function<void(absl::StatusOr<struct stat>)> on_complete));
+              (Event::Dispatcher * dispatcher, absl::string_view filename,
+               absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete));
   MOCK_METHOD(CancelFunction, unlink,
-              (absl::string_view filename, std::function<void(absl::Status)> on_complete));
+              (Event::Dispatcher * dispatcher, absl::string_view filename,
+               absl::AnyInvocable<void(absl::Status)> on_complete));
   MOCK_METHOD(std::string, describe, (), (const));
+  MOCK_METHOD(void, waitForIdle, ());
+  MOCK_METHOD(void, postCancelledActionForCleanup, (std::unique_ptr<AsyncFileAction> action));
 
   // mockCancel is called any time any action queued by mock is cancelled. It isn't overriding
   // a function from the real class, it's just used for verification.
@@ -83,19 +95,29 @@ public:
   // not just a Status or a T.
   template <typename T> void nextActionCompletes(T result) {
     ASSERT_FALSE(queue_.empty());
+    auto entry = std::move(queue_.front());
+    queue_.pop();
     auto action =
-        std::dynamic_pointer_cast<TypedMockAsyncFileAction<std::function<void(T)>>>(queue_.front());
-    ASSERT_TRUE(action.get() != nullptr)
-        << "mismatched type for nextActionCompletes: action is " << queue_.front()->describe()
+        dynamic_cast<TypedMockAsyncFileAction<absl::AnyInvocable<void(T)>>*>(entry.action_.get());
+    ASSERT_TRUE(action != nullptr)
+        << "mismatched type for nextActionCompletes: action is " << action->describe()
         << ", nextActionCompletes was given " << typeid(T).name();
-    queue_.pop_front();
-    action->on_complete_(std::move(result));
+    if (entry.dispatcher_) {
+      entry.dispatcher_->post([action = std::move(entry.action_), state = std::move(entry.state_),
+                               result = std::move(result)]() mutable {
+        if (state->load() != QueuedAction::State::Cancelled) {
+          dynamic_cast<TypedMockAsyncFileAction<absl::AnyInvocable<void(T)>>*>(action.get())
+              ->on_complete_(std::move(result));
+        }
+      });
+    }
   }
 
-  std::deque<std::shared_ptr<MockAsyncFileAction>> queue_;
+  std::queue<QueuedAction> queue_;
 
 private:
-  MOCK_METHOD(CancelFunction, enqueue, (const std::shared_ptr<AsyncFileAction> action));
+  MOCK_METHOD(CancelFunction, enqueue,
+              (Event::Dispatcher * dispatcher, std::unique_ptr<AsyncFileAction> action));
   friend class MockAsyncFileContext;
 };
 
@@ -107,15 +129,16 @@ public:
 };
 
 // Add deduction guides for comping with the ctad-maybe-unsupported warning
-TypedMockAsyncFileAction(std::function<void(absl::Status)>)
-    ->TypedMockAsyncFileAction<std::function<void(absl::Status)>>;
-TypedMockAsyncFileAction(std::function<void(absl::StatusOr<Buffer::InstancePtr>)>)
-    ->TypedMockAsyncFileAction<std::function<void(absl::StatusOr<Buffer::InstancePtr>)>>;
-TypedMockAsyncFileAction(std::function<void(absl::StatusOr<size_t>)>)
-    ->TypedMockAsyncFileAction<std::function<void(absl::StatusOr<size_t>)>>;
-TypedMockAsyncFileAction(std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>)
+TypedMockAsyncFileAction(absl::AnyInvocable<void(absl::Status)>)
+    ->TypedMockAsyncFileAction<absl::AnyInvocable<void(absl::Status)>>;
+TypedMockAsyncFileAction(absl::AnyInvocable<void(absl::StatusOr<Buffer::InstancePtr>)>)
+    ->TypedMockAsyncFileAction<absl::AnyInvocable<void(absl::StatusOr<Buffer::InstancePtr>)>>;
+TypedMockAsyncFileAction(absl::AnyInvocable<void(absl::StatusOr<size_t>)>)
+    ->TypedMockAsyncFileAction<absl::AnyInvocable<void(absl::StatusOr<size_t>)>>;
+TypedMockAsyncFileAction(
+    absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>)
     ->TypedMockAsyncFileAction<
-        std::function<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>>;
+        absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)>>;
 
 } // namespace AsyncFiles
 } // namespace Common

@@ -20,7 +20,7 @@ TAG_BRANCH="refs/tags/vXXX"
 MAIN_BRANCH="refs/heads/main"
 OTHER_BRANCH="refs/heads/something/else"
 
-PLATFORMS=(linux windows)
+PLATFORMS=(linux)
 TEST_TYPES=(dev nondev)
 BRANCH_TYPES=(tag release main other)
 
@@ -62,19 +62,15 @@ _test () {
     export ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path
     export DOCKER_IMAGE_PREFIX=mocktest/repo
 
-    if [[ "$platform" == "windows" ]]; then
-        export DOCKER_FAKE_WIN=1
-    fi
-
     if [[ "$DOCKER_CI_TEST_COMMIT" ]]; then
         echo "COMMIT(${name}): > ${testdata}"
-        echo "  DOCKER_FAKE_WIN=${DOCKER_FAKE_WIN} ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
+        echo "  ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
         ./ci/docker_ci.sh | grep -E "^>" > "$testdata"
         return
     fi
 
     echo "TEST(${name}): <> ${testdata}"
-    echo "  DOCKER_FAKE_WIN=${DOCKER_FAKE_WIN} ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
+    echo "  ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
     generated="$(mktemp)"
 
     ./ci/docker_ci.sh | grep -E "^>" > "$generated"

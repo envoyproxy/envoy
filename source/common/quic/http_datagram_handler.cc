@@ -56,7 +56,8 @@ bool HttpDatagramHandler::OnCapsule(const quiche::Capsule& capsule) {
                                  quic::MessageStatusToString(status)));
     return true;
   }
-  if (status == quic::MessageStatus::MESSAGE_STATUS_TOO_LARGE) {
+  if (status == quic::MessageStatus::MESSAGE_STATUS_TOO_LARGE ||
+      status == quic::MessageStatus::MESSAGE_STATUS_SETTINGS_NOT_RECEIVED) {
     ENVOY_LOG(warn, fmt::format("SendHttpH3Datagram failed: status = {}, drops the Datagram.",
                                 quic::MessageStatusToString(status)));
     return true;

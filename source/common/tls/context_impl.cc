@@ -218,23 +218,24 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
       bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
       const int pkey_id = EVP_PKEY_id(public_key.get());
-      ctx.is_ecdsa_ = pkey_id == EVP_PKEY_EC;
       switch (pkey_id) {
       case EVP_PKEY_EC: {
-        // We only support P-256 ECDSA today.
+        // We only support P-256, P-384 or P-521 ECDSA today.
         const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
         // Since we checked the key type above, this should be valid.
         ASSERT(ecdsa_public_key != nullptr);
         const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
+        const int ec_group_curve_name = EC_GROUP_get_curve_name(ecdsa_group);
         if (ecdsa_group == nullptr ||
-            EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
+            (ec_group_curve_name != NID_X9_62_prime256v1 && ec_group_curve_name != NID_secp384r1 &&
+             ec_group_curve_name != NID_secp521r1)) {
           creation_status = absl::InvalidArgumentError(
-              fmt::format("Failed to load certificate chain from {}, only P-256 "
-                          "ECDSA certificates are supported",
+              fmt::format("Failed to load certificate chain from {}, only P-256, "
+                          "P-384 or P-521 ECDSA certificates are supported",
                           ctx.cert_chain_file_path_));
           return;
         }
-        ctx.is_ecdsa_ = true;
+        ctx.ec_group_curve_name_ = ec_group_curve_name;
       } break;
       case EVP_PKEY_RSA: {
         // We require RSA certificates with 2048-bit or larger keys.
@@ -302,14 +303,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       }
 
       if (additional_init != nullptr) {
-        additional_init(ctx, tls_certificate);
+        absl::Status init_status = additional_init(ctx, tls_certificate);
+        SET_AND_RETURN_IF_NOT_OK(creation_status, init_status);
       }
     }
-  }
-
-  // use the server's cipher list preferences
-  for (auto& ctx : tls_contexts_) {
-    SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
   }
 
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols(), creation_status);
@@ -461,7 +458,8 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
 }
 
 absl::StatusOr<bssl::UniquePtr<SSL>>
-ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
+ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
+                    Upstream::HostDescriptionConstSharedPtr) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
   // selected certificate via SSL_set_SSL_CTX().
@@ -696,7 +694,7 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
 
 namespace Ssl {
 
-bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) {
+bool TlsContext::isCipherEnabled(uint16_t cipher_id, uint16_t client_version) const {
   const SSL_CIPHER* c = SSL_get_cipher_by_value(cipher_id);
   if (c == nullptr) {
     return false;

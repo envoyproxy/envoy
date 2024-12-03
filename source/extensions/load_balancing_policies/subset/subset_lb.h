@@ -171,7 +171,7 @@ public:
     const Network::Connection* downstreamConnection() const override {
       return wrapped_->downstreamConnection();
     }
-    const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    StreamInfo::StreamInfo* requestStreamInfo() const override {
       return wrapped_->requestStreamInfo();
     }
     const Http::RequestHeaderMap* downstreamHeaders() const override {
@@ -198,6 +198,10 @@ public:
 
     absl::optional<OverrideHost> overrideHostToSelect() const override {
       return wrapped_->overrideHostToSelect();
+    }
+
+    void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) override {
+      wrapped_->setOrcaLoadReportCallbacks(callbacks);
     }
 
   private:

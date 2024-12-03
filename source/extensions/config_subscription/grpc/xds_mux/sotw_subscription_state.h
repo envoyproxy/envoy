@@ -35,7 +35,7 @@ public:
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const override;
 
-  void markStreamFresh() override;
+  void markStreamFresh(bool) override;
 
   void ttlExpiryCallback(const std::vector<std::string>& expired) override;
 
@@ -48,7 +48,7 @@ private:
   std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>
   getNextRequestInternal() override;
 
-  void handleGoodResponse(const envoy::service::discovery::v3::DiscoveryResponse& message) override;
+  void handleGoodResponse(envoy::service::discovery::v3::DiscoveryResponse& message) override;
   void setResourceTtl(const DecodedResourceImpl& decoded_resource);
   bool isHeartbeatResource(const DecodedResource& resource, const std::string& version);
 

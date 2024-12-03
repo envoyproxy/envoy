@@ -167,6 +167,10 @@ FluentdAccessLoggerCacheImpl::getOrCreateLogger(const FluentdAccessLogConfigShar
   }
 
   auto* cluster = cluster_manager_.getThreadLocalCluster(config->cluster());
+  if (!cluster) {
+    return nullptr;
+  }
+
   auto client =
       cluster->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
 

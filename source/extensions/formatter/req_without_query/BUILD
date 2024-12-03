@@ -17,6 +17,7 @@ envoy_cc_library(
     srcs = ["req_without_query.cc"],
     hdrs = ["req_without_query.h"],
     deps = [
+        "//source/common/formatter:substitution_format_utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",
     ],

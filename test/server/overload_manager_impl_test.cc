@@ -177,9 +177,10 @@ public:
                       ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v3::OverloadManager& config,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                      const Server::MockOptions& options)
+                      const Server::MockOptions& options, absl::Status& creation_status)
       : OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
-                            api, options) {
+                            api, options, creation_status) {
+    THROW_IF_NOT_OK_REF(creation_status);
     EXPECT_CALL(*this, createScaledRangeTimerManager)
         .Times(AnyNumber())
         .WillRepeatedly(Invoke(this, &TestOverloadManager::createDefaultScaledRangeTimerManager));
@@ -224,9 +225,10 @@ protected:
   }
 
   std::unique_ptr<TestOverloadManager> createOverloadManager(const std::string& config) {
+    absl::Status creation_status = absl::OkStatus();
     return std::make_unique<TestOverloadManager>(dispatcher_, *stats_.rootScope(), thread_local_,
                                                  parseConfig(config), validation_visitor_, *api_,
-                                                 options_);
+                                                 options_, creation_status);
   }
 
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
@@ -596,6 +598,8 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
             min_scale: { value: 10 } # percent
           - timer: TRANSPORT_SOCKET_CONNECT
             min_scale: { value: 40 } # percent
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_scale: { value: 20 } # percent
       triggers:
         - name: "envoy.resource_monitors.fake_resource1"
           scaled:
@@ -609,6 +613,7 @@ constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimu
      Event::AbsoluteMinimum(std::chrono::seconds(2))},
     {TimerType::HttpDownstreamIdleStreamTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
     {TimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.4))},
+    {TimerType::HttpDownstreamMaxConnectionTimeout, Event::ScaledMinimum(UnitFloat(0.2))},
 };
 TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
   auto manager(createOverloadManager(kReducedTimeoutsConfig));

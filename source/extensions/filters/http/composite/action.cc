@@ -115,7 +115,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCb
   if (context.factory_context_.has_value()) {
     auto callback_or_status = factory.createFilterFactoryFromProto(
         *message, context.stat_prefix_, context.factory_context_.value());
-    THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
+    THROW_IF_NOT_OK_REF(callback_or_status.status());
     callback = callback_or_status.value();
   }
 
@@ -146,7 +146,7 @@ Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCb
   if (context.upstream_factory_context_.has_value()) {
     auto callback_or_status = factory.createFilterFactoryFromProto(
         *message, context.stat_prefix_, context.upstream_factory_context_.value());
-    THROW_IF_STATUS_NOT_OK(callback_or_status, throw);
+    THROW_IF_NOT_OK_REF(callback_or_status.status());
     callback = callback_or_status.value();
   }
 

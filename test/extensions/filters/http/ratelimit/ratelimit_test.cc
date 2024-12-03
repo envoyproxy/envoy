@@ -3,11 +3,13 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/http/context_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/filters/http/ratelimit/ratelimit.h"
 
 #include "test/extensions/filters/common/ratelimit/mocks.h"
@@ -62,9 +64,8 @@ public:
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
         route_rate_limit_);
-    filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_.rate_limit_policy_entry_
-        .clear();
-    filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_.rate_limit_policy_entry_
+    filter_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_.clear();
+    filter_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_
         .emplace_back(vh_rate_limit_);
   }
 
@@ -223,13 +224,60 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
                               _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  request_headers_.addCopy(Http::Headers::get().RequestId, "requestid");
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited))
+      .Times(0);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
+  setUpTest(filter_config_);
+  InSequence s;
+
+  filter_callbacks_.stream_info_.filter_state_->setData(
+      "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(5),
+      StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+              getApplicableRateLimit(0));
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
+                              _, _, 5))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -267,7 +315,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -323,7 +371,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1150,7 +1198,7 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1193,7 +1241,7 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1244,8 +1292,7 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1294,8 +1341,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1342,7 +1388,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(true));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1389,7 +1435,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
       .Times(2)
       .WillRepeatedly(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1438,7 +1484,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
       .Times(2)
       .WillRepeatedly(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1487,8 +1533,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
       .Times(2)
       .WillRepeatedly(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1531,8 +1576,7 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->route_entry_.virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
@@ -1670,6 +1714,18 @@ TEST_F(HttpRateLimitFilterTest, StatsWithPrefix) {
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
   EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
+}
+
+TEST(ObjectFactory, HitsAddend) {
+  const std::string name = "envoy.ratelimit.hits_addend";
+  auto* factory =
+      Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(name);
+  ASSERT_NE(nullptr, factory);
+  EXPECT_EQ(name, factory->name());
+  const std::string hits_addend = std::to_string(1234);
+  auto object = factory->createFromBytes(hits_addend);
+  ASSERT_NE(nullptr, object);
+  EXPECT_EQ(hits_addend, object->serializeAsString());
 }
 
 } // namespace

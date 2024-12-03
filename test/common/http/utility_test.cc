@@ -1237,58 +1237,6 @@ TEST(HttpUtility, ResolveMostSpecificPerFilterConfigNilRoute) {
   EXPECT_EQ(nullptr, Utility::resolveMostSpecificPerFilterConfig<TestConfig>(&filter_callbacks));
 }
 
-// Verify that merging works as expected and we get back the merged result.
-TEST(HttpUtility, GetMergedPerFilterConfig) {
-  TestConfig baseTestConfig, routeTestConfig;
-
-  baseTestConfig.state_ = 1;
-  routeTestConfig.state_ = 1;
-
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
-
-  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(_, _))
-      .WillOnce(Invoke([&](const std::string&,
-                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-        cb(baseTestConfig);
-        cb(routeTestConfig);
-      }));
-
-  // merge the configs
-  auto merged_cfg = Utility::getMergedPerFilterConfig<TestConfig>(
-      &filter_callbacks,
-      [&](TestConfig& base_cfg, const TestConfig& route_cfg) { base_cfg.merge(route_cfg); });
-
-  // make sure that the callback was called (which means that the dynamic_cast worked.)
-  ASSERT_TRUE(merged_cfg.has_value());
-  EXPECT_EQ(2, merged_cfg.value().state_);
-}
-
-class BadConfig {
-public:
-  int state_;
-  void merge(const BadConfig& other) { state_ += other.state_; }
-};
-
-// Verify that merging result is empty as expected when the bad config is provided.
-TEST(HttpUtility, GetMergedPerFilterBadConfig) {
-  TestConfig testConfig;
-  NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks;
-
-  EXPECT_CALL(*filter_callbacks.route_, traversePerFilterConfig(_, _))
-      .WillOnce(Invoke([&](const std::string&,
-                           std::function<void(const Router::RouteSpecificFilterConfig&)> cb) {
-        cb(testConfig);
-      }));
-
-  EXPECT_LOG_CONTAINS(
-      "debug", "Failed to retrieve the correct type of route specific filter config",
-      auto merged_cfg = Utility::getMergedPerFilterConfig<BadConfig>(
-          &filter_callbacks,
-          [&](BadConfig& base_cfg, const BadConfig& route_cfg) { base_cfg.merge(route_cfg); });
-      // Dynamic_cast failed, so merged_cfg is not set.
-      ASSERT_FALSE(merged_cfg.has_value()););
-}
-
 TEST(HttpUtility, CheckIsIpAddress) {
   std::array<std::tuple<bool, std::string, std::string, absl::optional<uint32_t>>, 15> patterns{
       std::make_tuple(true, "1.2.3.4", "1.2.3.4", absl::nullopt),

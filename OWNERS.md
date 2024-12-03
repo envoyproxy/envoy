@@ -11,8 +11,6 @@ routing PRs, questions, etc. to the right place.
 * Matt Klein ([mattklein123](https://github.com/mattklein123)) (mattklein123@gmail.com)
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
-* Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
-  * xDS APIs, configuration and control plane.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
     connections, etc.), Envoy Mobile.
@@ -51,6 +49,8 @@ routing PRs, questions, etc. to the right place.
   * Load balancing, GeoIP, overload manager, security.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
+* Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
+  * Overload manager, security, logging, wasm, data plane.
 
 # Envoy mobile maintainers
 
@@ -78,7 +78,6 @@ without further review.
 
 * All senior maintainers
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
-* Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
 * Tim Walsh ([twghu](https://github.com/twghu)) (twalsh@redhat.com)
 * Pradeep Rao ([pradeepcrao](https://github.com/pradeepcrao)) (pcrao@google.com)
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
@@ -107,6 +106,7 @@ without further review.
 * Rafal Augustyniak ([Augustyniak](https://github.com/Augustyniak)) (raugustyniak@lyft.com)
 * Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan.j@gmail.com)
+* Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
 
 # Friends of Envoy
 

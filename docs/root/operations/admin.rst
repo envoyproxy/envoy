@@ -250,6 +250,11 @@ modify different aspects of the server:
   Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
   Requires compiling with tcmalloc (default).
 
+.. http:post:: /allocprofiler
+
+  Enable or disable the allocation profiler. The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
+
 .. _operations_admin_interface_healthcheck_fail:
 
 .. http:post:: /healthcheck/fail

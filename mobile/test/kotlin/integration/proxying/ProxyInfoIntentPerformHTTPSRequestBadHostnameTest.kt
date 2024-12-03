@@ -11,8 +11,10 @@ import io.envoyproxy.envoymobile.AndroidEngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
 import io.envoyproxy.envoymobile.RequestMethod
+import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.JniLibrary
 import io.envoyproxy.envoymobile.engine.testing.HttpProxyTestServerFactory
+import io.envoyproxy.envoymobile.engine.testing.HttpTestServerFactory
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -20,8 +22,8 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mockito
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 
 //                                                ┌──────────────────┐
 //                                                │   Envoy Proxy    │
@@ -41,32 +43,37 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
   }
 
   private lateinit var httpProxyTestServer: HttpProxyTestServerFactory.HttpProxyTestServer
+  private lateinit var httpTestServer: HttpTestServerFactory.HttpTestServer
 
   @Before
   fun setUp() {
     httpProxyTestServer =
       HttpProxyTestServerFactory.start(HttpProxyTestServerFactory.Type.HTTPS_PROXY)
+    httpTestServer = HttpTestServerFactory.start(HttpTestServerFactory.Type.HTTP1_WITH_TLS)
   }
 
   @After
   fun tearDown() {
     httpProxyTestServer.shutdown()
+    httpTestServer.shutdown()
   }
 
   @Test
   fun `attempts an HTTPs request through a proxy using an async DNS resolution that fails`() {
-    val context = Mockito.spy(ApplicationProvider.getApplicationContext<Context>())
-    val connectivityManager: ConnectivityManager = Mockito.mock(ConnectivityManager::class.java)
-    Mockito.doReturn(connectivityManager)
-      .`when`(context)
-      .getSystemService(Context.CONNECTIVITY_SERVICE)
-    Mockito.`when`(connectivityManager.defaultProxy)
-      .thenReturn(ProxyInfo.buildDirectProxy("loopback", httpProxyTestServer.port))
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val connectivityManager =
+      context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    connectivityManager.bindProcessToNetwork(connectivityManager.activeNetwork)
+    Shadows.shadowOf(connectivityManager)
+      .setProxyForNetwork(
+        connectivityManager.activeNetwork,
+        ProxyInfo.buildDirectProxy("bad.hostname", httpProxyTestServer.port)
+      )
 
     val onEngineRunningLatch = CountDownLatch(1)
     val onErrorLatch = CountDownLatch(1)
 
-    context.sendStickyBroadcast(Intent(Proxy.PROXY_CHANGE_ACTION))
+    context.sendBroadcast(Intent(Proxy.PROXY_CHANGE_ACTION))
 
     val builder = AndroidEngineBuilder(context)
     val engine =
@@ -75,6 +82,7 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
         .setLogger { _, msg -> print(msg) }
         .enableProxying(true)
         .setOnEngineRunning { onEngineRunningLatch.countDown() }
+        .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
         .build()
 
     onEngineRunningLatch.await(10, TimeUnit.SECONDS)
@@ -84,8 +92,8 @@ class ProxyInfoIntentPerformHTTPSRequestBadHostnameTest {
       RequestHeadersBuilder(
           method = RequestMethod.GET,
           scheme = "https",
-          authority = "api.lyft.com",
-          path = "/ping"
+          authority = httpTestServer.address,
+          path = "/"
         )
         .build()
 

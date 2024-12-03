@@ -1,3 +1,4 @@
+#include "test/common/http/filters/assertion/filter.pb.h"
 #include "test/common/integration/engine_with_test_server.h"
 #include "test/common/integration/test_server.h"
 
@@ -9,24 +10,26 @@
 
 namespace Envoy {
 
-inline constexpr absl::string_view ASSERTION_FILTER_TEXT_PROTO = R"(
-  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
-    match_config: {
-      http_request_trailers_match: {
-        headers: { name: 'trailer-key', exact_match: 'trailer-value' }
-      }
-    }
-  }
-)";
-
 TEST(SendTrailersTest, Success) {
+  envoymobile::extensions::filters::http::assertion::Assertion assertion;
+  auto* http_request_trailers_match =
+      assertion.mutable_match_config()->mutable_http_request_trailers_match();
+  auto trailer = http_request_trailers_match->add_headers();
+  trailer->set_name("trailer-key");
+  trailer->set_exact_match("trailer-value");
+  ProtobufWkt::Any typed_config;
+  typed_config.set_type_url(
+      "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion");
+  std::string serialized_assertion;
+  assertion.SerializeToString(&serialized_assertion);
+  typed_config.set_value(serialized_assertion);
+
   absl::Notification engine_running;
   Platform::EngineBuilder engine_builder;
   engine_builder.enforceTrustChainVerification(false)
       .setLogLevel(Logger::Logger::debug)
-#ifdef ENVOY_ENABLE_FULL_PROTOS
-      .addNativeFilter("envoy.filters.http.assertion", std::string(ASSERTION_FILTER_TEXT_PROTO))
-#endif
+      .addNativeFilter("envoy.filters.http.assertion", typed_config)
+
       .setOnEngineRunning([&]() { engine_running.Notify(); });
   EngineWithTestServer engine_with_test_server(engine_builder, TestServerType::HTTP2_WITH_TLS,
                                                /* headers= */ {}, /* body= */ "body",

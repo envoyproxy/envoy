@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     repository = "@envoy",
     deps = [
         "//library/common/extensions/cert_validator/platform_bridge:config",
+        "//library/common/extensions/cert_validator/platform_bridge:platform_bridge_cc_proto",
         "//test/common/mocks/common:common_mocks",
         "@envoy//source/common/tls/cert_validator:cert_validator_lib",
         "@envoy//test/common/tls:ssl_test_utils",

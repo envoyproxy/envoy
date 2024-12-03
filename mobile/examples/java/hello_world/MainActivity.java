@@ -137,7 +137,7 @@ public class MainActivity extends Activity {
           return Unit.INSTANCE;
         })
         .start(Executors.newSingleThreadExecutor())
-        .sendHeaders(requestHeaders, true);
+        .sendHeaders(requestHeaders, /* endStream= */ true, /* idempotent= */ false);
 
     clear_text = !clear_text;
   }

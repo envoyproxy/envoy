@@ -68,8 +68,8 @@ public:
                       absl::string_view details) override {
     state().decoder_filter_chain_aborted_ = true;
     state().encoder_filter_chain_aborted_ = true;
-    state().remote_encode_complete_ = true;
-    state().local_complete_ = true;
+    state().encoder_filter_chain_complete_ = true;
+    state().observed_encode_end_stream_ = true;
     // TODO(alyssawilk) this should be done through the router to play well with hedging.
     upstream_request_.parent_.callbacks()->sendLocalReply(code, body, modify_headers, grpc_status,
                                                           details);
@@ -86,16 +86,13 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
-      calling_encode_headers_(false), upstream_canary_(false), router_sent_end_stream_(false),
-      encode_trailers_(false), retried_(false), awaiting_headers_(true),
-      outlier_detection_timeout_recorded_(false),
+      upstream_canary_(false), router_sent_end_stream_(false), encode_trailers_(false),
+      retried_(false), awaiting_headers_(true), outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
       paused_for_websocket_(false), reset_stream_(false),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
       cleaned_up_(false), had_upstream_(false),
       stream_options_({can_send_early_data, can_use_http3}), grpc_rq_success_deferred_(false),
-      upstream_wait_for_response_headers_before_disabling_read_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.upstream_wait_for_response_headers_before_disabling_read")),
       enable_half_close_(enable_half_close) {
   if (auto tracing_config = parent_.callbacks()->tracingConfig(); tracing_config.has_value()) {
     if (tracing_config->spawnUpstreamSpan() || parent_.config().start_child_span_) {
@@ -464,12 +461,9 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
   }
   clearRequestEncoder();
   awaiting_headers_ = false;
-  if (!calling_encode_headers_) {
-    stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
-    parent_.onUpstreamReset(reason, transport_failure_reason, *this);
-  } else {
-    deferred_reset_reason_ = reason;
-  }
+
+  stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
+  parent_.onUpstreamReset(reason, transport_failure_reason, *this);
 }
 
 void UpstreamRequest::resetStream() {
@@ -598,9 +592,6 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   had_upstream_ = true;
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
-  if (enable_half_close_) {
-    upstream_->enableHalfClose();
-  }
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
@@ -717,17 +708,6 @@ void UpstreamRequest::clearRequestEncoder() {
 }
 
 void UpstreamRequest::readDisableOrDefer(bool disable) {
-  if (!upstream_wait_for_response_headers_before_disabling_read_) {
-    if (disable) {
-      parent_.cluster()->trafficStats()->upstream_flow_control_paused_reading_total_.inc();
-      upstream_->readDisable(true);
-    } else {
-      parent_.cluster()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
-      upstream_->readDisable(false);
-    }
-    return;
-  }
-
   if (disable) {
     // See comments on deferred_read_disabling_count_ for when we do and don't defer.
     if (parent_.downstreamResponseStarted()) {
@@ -813,8 +793,13 @@ void UpstreamRequestFilterManagerCallbacks::resetStream(
   // which should force reset the stream, and a codec driven reset, which should
   // tell the router the stream reset, and let the router make the decision to
   // send a local reply, or retry the stream.
-  if (reset_reason == Http::StreamResetReason::LocalReset &&
-      transport_failure_reason != "codec_error") {
+  bool is_codec_error;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")) {
+    is_codec_error = absl::StrContains(transport_failure_reason, "codec_error");
+  } else {
+    is_codec_error = transport_failure_reason == "codec_error";
+  }
+  if (reset_reason == Http::StreamResetReason::LocalReset && !is_codec_error) {
     upstream_request_.parent_.callbacks()->resetStream();
     return;
   }

@@ -120,6 +120,11 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   return dynamicContextChanged();
 }
 
+void DeltaSubscriptionState::markStreamFresh(bool should_send_initial_resource_versions) {
+  any_request_sent_yet_in_current_stream_ = false;
+  should_send_initial_resource_versions_ = should_send_initial_resource_versions;
+}
+
 bool DeltaSubscriptionState::isHeartbeatResource(
     const envoy::service::discovery::v3::Resource& resource) const {
   if (!supports_heartbeats_) {
@@ -151,8 +156,10 @@ bool DeltaSubscriptionState::isHeartbeatResource(
 }
 
 void DeltaSubscriptionState::handleGoodResponse(
-    const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
+    envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   absl::flat_hash_set<std::string> names_added_removed;
+  // TODO(adisuissa): remove the non_heartbeat_resources structure once
+  // "envoy.reloadable_features.xds_prevent_resource_copy" is deprecated.
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> non_heartbeat_resources;
   for (const auto& resource : message.resources()) {
     if (!names_added_removed.insert(resource.name()).second) {
@@ -162,9 +169,9 @@ void DeltaSubscriptionState::handleGoodResponse(
     if (isHeartbeatResource(resource)) {
       continue;
     }
-    // TODO (dmitri-d) consider changing onConfigUpdate callback interface to avoid copying of
-    // resources
-    non_heartbeat_resources.Add()->CopyFrom(resource);
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_prevent_resource_copy")) {
+      non_heartbeat_resources.Add()->CopyFrom(resource);
+    }
     // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
     if (!resource.has_resource() && resource.aliases_size() > 0) {
       continue;
@@ -183,12 +190,30 @@ void DeltaSubscriptionState::handleGoodResponse(
     }
   }
 
-  callbacks().onConfigUpdate(non_heartbeat_resources, message.removed_resources(),
+  absl::Span<const envoy::service::discovery::v3::Resource* const> non_heartbeat_resources_span;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xds_prevent_resource_copy")) {
+    // Reorder the resources in the response, having all the non-heartbeat
+    // resources at the front of the list. Note that although there's no
+    // requirement to keep stable ordering, we do so to process the resources in
+    // the order they were sent.
+    auto last_non_heartbeat = std::stable_partition(
+        message.mutable_resources()->begin(), message.mutable_resources()->end(),
+        [&](const envoy::service::discovery::v3::Resource& resource) {
+          return !isHeartbeatResource(resource);
+        });
+
+    non_heartbeat_resources_span = absl::MakeConstSpan(
+        message.resources().data(), last_non_heartbeat - message.resources().begin());
+  } else {
+    non_heartbeat_resources_span =
+        absl::MakeConstSpan(non_heartbeat_resources.data(), non_heartbeat_resources.size());
+  }
+  callbacks().onConfigUpdate(non_heartbeat_resources_span, message.removed_resources(),
                              message.system_version_info());
 
   // Processing point when resources are successfully ingested.
   if (xds_config_tracker_.has_value()) {
-    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources,
+    xds_config_tracker_->onConfigAccepted(message.type_url(), non_heartbeat_resources_span,
                                           message.removed_resources());
   }
 
@@ -244,21 +269,25 @@ DeltaSubscriptionState::getNextRequestInternal() {
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
     for (auto const& [resource_name, resource_state] : requested_resource_state_) {
-      // Populate initial_resource_versions with the resource versions we currently have.
-      // Resources we are interested in, but are still waiting to get any version of from the
-      // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-      if (!resource_state.isWaitingForServer()) {
-        (*request->mutable_initial_resource_versions())[resource_name] = resource_state.version();
+      if (should_send_initial_resource_versions_) {
+        // Populate initial_resource_versions with the resource versions we currently have.
+        // Resources we are interested in, but are still waiting to get any version of from the
+        // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
+        if (!resource_state.isWaitingForServer()) {
+          (*request->mutable_initial_resource_versions())[resource_name] = resource_state.version();
+        }
       }
       // We are going over a list of resources that we are interested in, so add them to
       // resource_names_subscribe.
       names_added_.insert(resource_name);
     }
-    for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
-      (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
-    }
-    for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
-      (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+    if (should_send_initial_resource_versions_) {
+      for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
+        (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+      }
+      for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
+        (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+      }
     }
     // If this is a legacy wildcard request, then make sure that the resource_names_subscribe is
     // empty.

@@ -6,7 +6,6 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/dfp_setter.pb.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/dfp_setter.pb.validate.h"
@@ -21,6 +20,10 @@ namespace DynamicForwardProxy {
 
 using DynamicForwardProxySetterFilterConfig = test::extensions::filters::udp::udp_proxy::
     session_filters::DynamicForwardProxySetterFilterConfig;
+
+using ReadFilter = Network::UdpSessionReadFilter;
+using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
+using ReadFilterCallbacks = Network::UdpSessionReadFilterCallbacks;
 
 class DynamicForwardProxySetterFilter : public virtual ReadFilter {
 public:
@@ -58,7 +61,7 @@ private:
   FilterFactoryCb
   createFilterFactoryFromProtoTyped(const DynamicForwardProxySetterFilterConfig& config,
                                     Server::Configuration::FactoryContext&) override {
-    return [config](FilterChainFactoryCallbacks& callbacks) -> void {
+    return [config](Network::UdpSessionFilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addReadFilter(
           std::make_unique<DynamicForwardProxySetterFilter>(config.host(), config.port()));
     };

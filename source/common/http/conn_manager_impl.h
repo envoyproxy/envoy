@@ -45,7 +45,6 @@
 #include "source/common/http/user_agent.h"
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
-#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -157,6 +156,7 @@ private:
       still_alive_.reset();
     }
 
+    void log(AccessLog::AccessLogType type);
     void completeRequest();
 
     const Network::Connection* connection();
@@ -176,8 +176,8 @@ private:
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeMetadata(MetadataMapPtr&&) override;
 
-    // Mark that the last downstream byte is received, and the downstream stream is complete.
-    void maybeEndDecode(bool end_stream);
+    // Record the timestamp of last downstream byte is received.
+    void maybeRecordLastByteReceived(bool end_stream);
 
     // Http::RequestDecoder
     void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
@@ -189,8 +189,32 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
-    std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-      return filter_manager_.accessLogHandlers();
+
+    void sendGoAwayAndClose() override { return connection_manager_.sendGoAwayAndClose(); }
+
+    AccessLog::InstanceSharedPtrVector accessLogHandlers() override {
+      const AccessLog::InstanceSharedPtrVector& config_log_handlers =
+          connection_manager_.config_->accessLogs();
+      const AccessLog::InstanceSharedPtrVector& filter_log_handlers =
+          filter_manager_.accessLogHandlers();
+
+      AccessLog::InstanceSharedPtrVector combined_log_handlers;
+      combined_log_handlers.reserve(config_log_handlers.size() + filter_log_handlers.size());
+
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.filter_access_loggers_first")) {
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+
+      } else {
+        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                     config_log_handlers.end());
+        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                     filter_log_handlers.end());
+      }
+      return combined_log_handlers;
     }
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
     // (i.e. possibly after this stream has been destroyed).
@@ -205,10 +229,9 @@ private:
     }
 
     // ScopeTrackedObject
-    ExecutionContext* executionContext() const override {
-      return getConnectionExecutionContext(connection_manager_.read_callbacks_->connection());
+    OptRef<const StreamInfo::StreamInfo> trackedStream() const override {
+      return filter_manager_.trackedStream();
     }
-
     void dumpState(std::ostream& os, int indent_level = 0) const override {
       const char* spaces = spacesForLevel(indent_level);
       os << spaces << "ActiveStream " << this << DUMP_MEMBER(stream_id_);
@@ -283,7 +306,7 @@ private:
     OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
-    bool isHalfCloseEnabled() override { return false; }
+    bool isHalfCloseEnabled() override { return connection_manager_.allow_upstream_half_close_; }
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
@@ -327,7 +350,8 @@ private:
           : codec_saw_local_complete_(false), codec_encode_complete_(false),
             on_reset_stream_called_(false), is_zombie_stream_(false), successful_upgrade_(false),
             is_internally_destroyed_(false), is_internally_created_(false), is_tunneling_(false),
-            decorated_propagate_(true), deferred_to_next_io_iteration_(false) {}
+            decorated_propagate_(true), deferred_to_next_io_iteration_(false),
+            deferred_end_stream_(false) {}
 
       // It's possibly for the codec to see the completed response but not fully
       // encode it.
@@ -410,7 +434,7 @@ private:
     //    harmonize this behavior with H/1.
     // 3. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in the
     // HTTP connection manager configuration, then the entire connection is closed.
-    bool validateTrailers();
+    bool validateTrailers(RequestTrailerMap& trailers);
 
     std::weak_ptr<bool> stillAlive() { return {still_alive_}; }
 
@@ -508,6 +532,7 @@ private:
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
     std::queue<MetadataMapPtr> deferred_metadata_;
+    RequestTrailerMapPtr deferred_request_trailers_;
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -575,6 +600,8 @@ private:
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
+  void sendGoAwayAndClose();
+
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than
   // the stream was alive for short period of time. This period is specified
@@ -606,6 +633,8 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
+  // When set to true, add Connection:close response header to nudge downstream client to reconnect.
+  bool soft_drain_http1_{false};
   Random::RandomGenerator& random_generator_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
@@ -622,6 +651,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
+  bool go_away_sent_{false};
   bool remote_close_{};
   // Hop by hop headers should always be cleared for Envoy-as-a-proxy but will
   // not be for Envoy-mobile.
@@ -638,6 +668,18 @@ private:
   uint32_t requests_during_dispatch_count_{0};
   const uint32_t max_requests_during_dispatch_{UINT32_MAX};
   Event::SchedulableCallbackPtr deferred_request_processing_callback_;
+
+  // If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3
+  // protocols the stream is destroyed after both request and response are complete i.e. reach their
+  // respective end-of-stream, by receiving trailers or the header/body with end-stream set in both
+  // directions AND response has success (2xx) status code.
+  //
+  // For HTTP/1 upstream protocol or if independent half-close is disabled the stream is destroyed
+  // when the response is complete and reaches its end-of-stream, i.e. when trailers or the response
+  // header/body with end-stream set are received, even if the request has not yet completed. If
+  // request was incomplete at response completion, the stream is reset.
+
+  const bool allow_upstream_half_close_{};
 };
 
 } // namespace Http

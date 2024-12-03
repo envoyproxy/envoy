@@ -34,38 +34,48 @@ using ::testing::StrictMock;
 
 class AsyncFileHandleHelpers {
 public:
+  void resolveFileActions() {
+    manager_->waitForIdle();
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
   void close(AsyncFileHandle& handle) {
-    std::promise<absl::Status> close_result;
-    EXPECT_OK(handle->close([&](absl::Status status) { close_result.set_value(status); }));
-    EXPECT_OK(close_result.get_future().get());
+    absl::Status close_result;
+    EXPECT_OK(
+        handle->close(dispatcher_.get(), [&](absl::Status status) { close_result = status; }));
+    resolveFileActions();
+    EXPECT_OK(close_result);
   }
   AsyncFileHandle createAnonymousFile() {
-    std::promise<AsyncFileHandle> create_result;
-    manager_->createAnonymousFile(tmpdir_, [&](absl::StatusOr<AsyncFileHandle> result) {
-      create_result.set_value(result.value());
-    });
-    return create_result.get_future().get();
+    AsyncFileHandle create_result;
+    manager_->createAnonymousFile(
+        dispatcher_.get(), tmpdir_,
+        [&](absl::StatusOr<AsyncFileHandle> result) { create_result = result.value(); });
+    resolveFileActions();
+    return create_result;
   }
   AsyncFileHandle openExistingFile(absl::string_view filename, AsyncFileManager::Mode mode) {
-    std::promise<AsyncFileHandle> open_result;
-    manager_->openExistingFile(filename, mode, [&](absl::StatusOr<AsyncFileHandle> result) {
-      open_result.set_value(result.value());
-    });
-    return open_result.get_future().get();
+    AsyncFileHandle open_result;
+    manager_->openExistingFile(
+        dispatcher_.get(), filename, mode,
+        [&](absl::StatusOr<AsyncFileHandle> result) { open_result = result.value(); });
+    resolveFileActions();
+    return open_result;
   }
   const char* test_tmpdir = std::getenv("TEST_TMPDIR");
   std::string tmpdir_ = test_tmpdir ? test_tmpdir : "/tmp";
 
-  std::unique_ptr<Singleton::ManagerImpl> singleton_manager_;
-  std::shared_ptr<AsyncFileManagerFactory> factory_;
+  std::unique_ptr<Singleton::ManagerImpl> singleton_manager_ =
+      std::make_unique<Singleton::ManagerImpl>();
+  std::shared_ptr<AsyncFileManagerFactory> factory_ =
+      AsyncFileManagerFactory::singleton(singleton_manager_.get());
   std::shared_ptr<AsyncFileManager> manager_;
+  Api::ApiPtr api_ = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
 };
 
 class AsyncFileHandleTest : public testing::Test, public AsyncFileHandleHelpers {
 public:
   void SetUp() override {
-    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>();
-    factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
     envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
     config.mutable_thread_pool()->set_thread_count(1);
     manager_ = factory_->getAsyncFileManager(config);
@@ -77,8 +87,6 @@ public:
   void SetUp() override {
     EXPECT_CALL(mock_posix_file_operations_, supportsAllPosixFileOperations())
         .WillRepeatedly(Return(true));
-    singleton_manager_ = std::make_unique<Singleton::ManagerImpl>();
-    factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
     envoy::extensions::common::async_files::v3::AsyncFileManagerConfig config;
     config.mutable_thread_pool()->set_thread_count(1);
     manager_ = factory_->getAsyncFileManager(config, &mock_posix_file_operations_);
@@ -103,49 +111,41 @@ TEST_F(AsyncFileHandleTest, WriteReadClose) {
   absl::StatusOr<size_t> write_status, second_write_status;
   absl::StatusOr<Buffer::InstancePtr> read_status, second_read_status;
   Buffer::OwnedImpl hello("hello");
-  std::promise<absl::Status> close_status;
-  EXPECT_OK(handle->write(hello, 0, [&](absl::StatusOr<size_t> status) {
+  ASSERT_OK(handle->write(dispatcher_.get(), hello, 0, [&](absl::StatusOr<size_t> status) {
     write_status = std::move(status);
-    // Make sure writing at an offset works
-    Buffer::OwnedImpl two_chars("p!");
-    EXPECT_OK(handle->write(two_chars, 3, [&](absl::StatusOr<size_t> status) {
-      second_write_status = std::move(status);
-      EXPECT_OK(handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
-        read_status = std::move(status);
-        // Verify reading at an offset.
-        EXPECT_OK(handle->read(2, 3, [&](absl::StatusOr<Buffer::InstancePtr> status) {
-          second_read_status = std::move(status);
-          EXPECT_OK(handle->close(
-              [&](absl::Status status) { close_status.set_value(std::move(status)); }));
-        }));
-      }));
-    }));
   }));
-  ASSERT_OK(close_status.get_future().get());
-  // The first write was 5 characters.
+  resolveFileActions();
   EXPECT_THAT(write_status, IsOkAndHolds(5U));
-
-  // The second write was 2 characters.
+  Buffer::OwnedImpl two_chars("p!");
+  ASSERT_OK(handle->write(dispatcher_.get(), two_chars, 3, [&](absl::StatusOr<size_t> status) {
+    second_write_status = std::move(status);
+  }));
+  resolveFileActions();
   EXPECT_THAT(second_write_status, IsOkAndHolds(2U));
-
-  // This should be "hello" from the first write, with the last two characters replaced with "p!"
-  // from the second write.
-  EXPECT_OK(read_status);
+  ASSERT_OK(handle->read(dispatcher_.get(), 0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
+    read_status = std::move(status);
+  }));
+  resolveFileActions();
+  ASSERT_OK(read_status);
   EXPECT_THAT(*read_status.value(), BufferStringEqual("help!"));
-
-  // Second read should have three characters in it.
-  EXPECT_OK(second_read_status);
+  ASSERT_OK(handle->read(dispatcher_.get(), 2, 3, [&](absl::StatusOr<Buffer::InstancePtr> status) {
+    second_read_status = std::move(status);
+  }));
+  resolveFileActions();
+  ASSERT_OK(second_read_status);
   EXPECT_THAT(*second_read_status.value(), BufferStringEqual("lp!"));
+  close(handle);
 }
 
 TEST_F(AsyncFileHandleTest, LinkCreatesNamedFile) {
   auto handle = createAnonymousFile();
-  std::promise<absl::StatusOr<size_t>> write_status_promise;
+  absl::StatusOr<size_t> write_status;
   // Write "hello" to the anonymous file.
   Buffer::OwnedImpl data("hello");
-  EXPECT_OK(handle->write(
-      data, 0, [&](absl::StatusOr<size_t> status) { write_status_promise.set_value(status); }));
-  absl::StatusOr<size_t> write_status = write_status_promise.get_future().get();
+  EXPECT_OK(handle->write(dispatcher_.get(), data, 0, [&](absl::StatusOr<size_t> status) {
+    write_status = std::move(status);
+  }));
+  resolveFileActions();
   ASSERT_THAT(write_status, IsOkAndHolds(5U));
   char filename[1024];
   snprintf(filename, sizeof(filename), "%s/async_link_test.XXXXXX", tmpdir_.c_str());
@@ -160,12 +160,13 @@ TEST_F(AsyncFileHandleTest, LinkCreatesNamedFile) {
   posix.unlink(filename);
 
   // Link the anonymous file into our tmp file name.
-  std::promise<absl::Status> link_status;
+  absl::Status link_status = absl::InternalError("not set");
   std::cout << "Linking as " << filename << std::endl;
 
-  EXPECT_OK(handle->createHardLink(std::string(filename),
-                                   [&](absl::Status status) { link_status.set_value(status); }));
-  ASSERT_OK(link_status.get_future().get());
+  EXPECT_OK(handle->createHardLink(dispatcher_.get(), std::string(filename),
+                                   [&](absl::Status status) { link_status = status; }));
+  resolveFileActions();
+  ASSERT_OK(link_status);
   // Read the contents of the linked file back, raw.
   char fileContents[6];
   fileContents[5] = '\0';
@@ -183,11 +184,10 @@ TEST_F(AsyncFileHandleTest, LinkCreatesNamedFile) {
 
 TEST_F(AsyncFileHandleTest, LinkReturnsErrorIfLinkFails) {
   auto handle = createAnonymousFile();
-  std::promise<absl::Status> link_status_promise;
-  EXPECT_OK(handle->createHardLink("/some/path/that/does/not/exist", [&](absl::Status status) {
-    link_status_promise.set_value(status);
-  }));
-  absl::Status link_status = link_status_promise.get_future().get();
+  absl::Status link_status = absl::InternalError("not set");
+  EXPECT_OK(handle->createHardLink(dispatcher_.get(), "/some/path/that/does/not/exist",
+                                   [&](absl::Status status) { link_status = std::move(status); }));
+  resolveFileActions();
   ASSERT_EQ(absl::StatusCode::kNotFound, link_status.code()) << link_status;
   close(handle);
 }
@@ -219,11 +219,11 @@ TEST_F(AsyncFileHandleTest, OpenExistingWriteOnlyFailsOnRead) {
   TestTmpFile tmpfile(tmpdir_);
 
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::WriteOnly);
-  std::promise<absl::StatusOr<Buffer::InstancePtr>> read_status_promise;
-  EXPECT_OK(handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
-    read_status_promise.set_value(std::move(status));
+  absl::StatusOr<Buffer::InstancePtr> read_status;
+  EXPECT_OK(handle->read(dispatcher_.get(), 0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
+    read_status = std::move(status);
   }));
-  absl::StatusOr<Buffer::InstancePtr> read_status = read_status_promise.get_future().get();
+  resolveFileActions();
   ASSERT_EQ(absl::StatusCode::kFailedPrecondition, read_status.status().code())
       << read_status.status();
   close(handle);
@@ -234,11 +234,14 @@ TEST_F(AsyncFileHandleTest, OpenExistingWriteOnlyCanWrite) {
   TestTmpFile tmpfile(tmpdir_);
 
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::WriteOnly);
-  std::promise<absl::StatusOr<size_t>> write_status;
+  absl::StatusOr<size_t> write_status;
   Buffer::OwnedImpl buf("nine char");
-  EXPECT_OK(handle->write(
-      buf, 0, [&](absl::StatusOr<size_t> status) { write_status.set_value(std::move(status)); }));
-  ASSERT_EQ(9, write_status.get_future().get().value());
+  EXPECT_OK(handle->write(dispatcher_.get(), buf, 0, [&](absl::StatusOr<size_t> status) {
+    write_status = std::move(status);
+  }));
+  resolveFileActions();
+  ASSERT_OK(write_status);
+  EXPECT_EQ(9, write_status.value());
   close(handle);
 }
 
@@ -247,12 +250,12 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadOnlyFailsOnWrite) {
   TestTmpFile tmpfile(tmpdir_);
 
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::ReadOnly);
-  std::promise<absl::StatusOr<size_t>> write_status_promise;
+  absl::StatusOr<size_t> write_status;
   Buffer::OwnedImpl buf("hello");
-  EXPECT_OK(handle->write(buf, 0, [&](absl::StatusOr<size_t> status) {
-    write_status_promise.set_value(std::move(status));
+  EXPECT_OK(handle->write(dispatcher_.get(), buf, 0, [&](absl::StatusOr<size_t> status) {
+    write_status = std::move(status);
   }));
-  auto write_status = write_status_promise.get_future().get();
+  resolveFileActions();
   ASSERT_EQ(absl::StatusCode::kFailedPrecondition, write_status.status().code())
       << write_status.status();
   close(handle);
@@ -263,11 +266,13 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadOnlyCanRead) {
   TestTmpFile tmpfile(tmpdir_);
 
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::ReadOnly);
-  std::promise<absl::StatusOr<Buffer::InstancePtr>> read_status;
-  EXPECT_OK(handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
-    read_status.set_value(std::move(status));
+  absl::StatusOr<Buffer::InstancePtr> read_status;
+  EXPECT_OK(handle->read(dispatcher_.get(), 0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
+    read_status = std::move(status);
   }));
-  ASSERT_EQ("hello", read_status.get_future().get().value()->toString());
+  resolveFileActions();
+  ASSERT_OK(read_status);
+  ASSERT_EQ("hello", read_status.value()->toString());
   close(handle);
 }
 
@@ -276,38 +281,40 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadWriteCanReadAndWrite) {
   TestTmpFile tmpfile(tmpdir_);
 
   auto handle = openExistingFile(tmpfile.name(), AsyncFileManager::Mode::ReadWrite);
-  std::promise<absl::StatusOr<size_t>> write_status_promise;
+  absl::StatusOr<size_t> write_status;
   Buffer::OwnedImpl buf("p me!");
-  EXPECT_OK(handle->write(buf, 3, [&](absl::StatusOr<size_t> status) {
-    write_status_promise.set_value(std::move(status));
+  EXPECT_OK(handle->write(dispatcher_.get(), buf, 3, [&](absl::StatusOr<size_t> status) {
+    write_status = std::move(status);
   }));
-  auto write_status = write_status_promise.get_future().get();
+  resolveFileActions();
   ASSERT_THAT(write_status, IsOkAndHolds(5U));
-  std::promise<absl::StatusOr<Buffer::InstancePtr>> read_status_promise;
-  EXPECT_OK(handle->read(0, 8, [&](absl::StatusOr<Buffer::InstancePtr> status) {
-    read_status_promise.set_value(std::move(status));
+  absl::StatusOr<Buffer::InstancePtr> read_status;
+  EXPECT_OK(handle->read(dispatcher_.get(), 0, 8, [&](absl::StatusOr<Buffer::InstancePtr> status) {
+    read_status = std::move(status);
   }));
-  auto read_status = read_status_promise.get_future().get();
-  EXPECT_OK(read_status);
+  resolveFileActions();
+  ASSERT_OK(read_status);
   EXPECT_THAT(*read_status.value(), BufferStringEqual("help me!"));
   close(handle);
 }
 
 TEST_F(AsyncFileHandleTest, DuplicateCreatesIndependentHandle) {
   auto handle = createAnonymousFile();
-  std::promise<absl::StatusOr<AsyncFileHandle>> duplicate_status_promise;
-  EXPECT_OK(handle->duplicate(
-      [&](absl::StatusOr<AsyncFileHandle> status) { duplicate_status_promise.set_value(status); }));
-  auto duplicate_status = duplicate_status_promise.get_future().get();
+  absl::StatusOr<AsyncFileHandle> duplicate_status;
+  EXPECT_OK(handle->duplicate(dispatcher_.get(), [&](absl::StatusOr<AsyncFileHandle> status) {
+    duplicate_status = std::move(status);
+  }));
+  resolveFileActions();
   ASSERT_OK(duplicate_status);
   AsyncFileHandle dup_file = std::move(duplicate_status.value());
   // Close the original file.
   close(handle);
-  std::promise<absl::StatusOr<size_t>> write_status_promise;
+  absl::StatusOr<size_t> write_status;
   Buffer::OwnedImpl buf("hello");
-  EXPECT_OK(dup_file->write(
-      buf, 0, [&](absl::StatusOr<size_t> result) { write_status_promise.set_value(result); }));
-  auto write_status = write_status_promise.get_future().get();
+  EXPECT_OK(dup_file->write(dispatcher_.get(), buf, 0, [&](absl::StatusOr<size_t> result) {
+    write_status = std::move(result);
+  }));
+  resolveFileActions();
   // writing to the duplicate file should still work.
   EXPECT_THAT(write_status, IsOkAndHolds(5U));
   close(dup_file);
@@ -320,11 +327,11 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialReadReturnsPartialResult) {
         memcpy(buf, "hel", 3);
         return Api::SysCallSizeResult{3, 0};
       });
-  std::promise<absl::StatusOr<Buffer::InstancePtr>> read_status_promise;
-  EXPECT_OK(handle->read(0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
-    read_status_promise.set_value(std::move(status.value()));
+  absl::StatusOr<Buffer::InstancePtr> read_status;
+  EXPECT_OK(handle->read(dispatcher_.get(), 0, 5, [&](absl::StatusOr<Buffer::InstancePtr> status) {
+    read_status = std::move(status.value());
   }));
-  auto read_status = read_status_promise.get_future().get();
+  resolveFileActions();
   EXPECT_OK(read_status);
   EXPECT_THAT(*read_status.value(), BufferStringEqual("hel"));
   close(handle);
@@ -344,11 +351,11 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialWriteRetries) {
       .WillOnce(Return(Api::SysCallSizeResult{3, 0}));
   EXPECT_CALL(mock_posix_file_operations_, pwrite(_, IsMemoryMatching("lo"), 2, 3))
       .WillOnce(Return(Api::SysCallSizeResult{2, 0}));
-  std::promise<absl::StatusOr<size_t>> write_status_promise;
-  EXPECT_OK(handle->write(write_value, 0, [&](absl::StatusOr<size_t> status) {
-    write_status_promise.set_value(std::move(status.value()));
+  absl::StatusOr<size_t> write_status;
+  EXPECT_OK(handle->write(dispatcher_.get(), write_value, 0, [&](absl::StatusOr<size_t> status) {
+    write_status = std::move(status.value());
   }));
-  auto write_status = write_status_promise.get_future().get();
+  resolveFileActions();
   EXPECT_THAT(write_status, IsOkAndHolds(5U));
   close(handle);
 }
@@ -361,9 +368,8 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingDuplicateInProgressClosesTheF
     finishing_dup.get_future().wait();
     return Api::SysCallSocketResult{4242, 0};
   });
-  auto cancel_dup = handle->duplicate([](absl::StatusOr<AsyncFileHandle>) {
-    // Callback is not called if we cancel (already validated in manager tests)
-    // so this is unimportant.
+  auto cancel_dup = handle->duplicate(dispatcher_.get(), [](absl::StatusOr<AsyncFileHandle>) {
+    FAIL() << "cancelled callback should not be called";
   });
   entering_dup.get_future().wait();
   cancel_dup.value()();
@@ -386,8 +392,8 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingCreateHardLinkInProgressRemov
     finishing_hardlink.get_future().wait();
     return Api::SysCallIntResult{0, 0};
   });
-  auto cancel_hardlink = handle->createHardLink(filename, [](absl::Status) {
-    // Callback is not called if we cancel, so this is unimportant.
+  auto cancel_hardlink = handle->createHardLink(dispatcher_.get(), filename, [](absl::Status) {
+    FAIL() << "cancelled callback should not be called";
   });
   entering_hardlink.get_future().wait();
   cancel_hardlink.value()();
@@ -410,8 +416,8 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CancellingFailedCreateHardLinkInProgres
     finishing_hardlink.get_future().wait();
     return Api::SysCallIntResult{-1, EBADF};
   });
-  auto cancel_hardlink = handle->createHardLink(filename, [](absl::Status) {
-    // Callback is not called if we cancel, so this is unimportant.
+  auto cancel_hardlink = handle->createHardLink(dispatcher_.get(), filename, [](absl::Status) {
+    FAIL() << "cancelled callback should not be called";
   });
   entering_hardlink.get_future().wait();
   cancel_hardlink.value()();
@@ -429,11 +435,11 @@ TEST_F(AsyncFileHandleWithMockPosixTest, StatSuccessReturnsPopulatedStatStruct) 
     *buffer = expected_stat;
     return Api::SysCallIntResult{0, 0};
   });
-  std::promise<absl::StatusOr<struct stat>> fstat_status_promise;
-  EXPECT_OK(handle->stat([&](absl::StatusOr<struct stat> status) {
-    fstat_status_promise.set_value(std::move(status));
+  absl::StatusOr<struct stat> fstat_status;
+  EXPECT_OK(handle->stat(dispatcher_.get(), [&](absl::StatusOr<struct stat> status) {
+    fstat_status = std::move(status);
   }));
-  auto fstat_status = fstat_status_promise.get_future().get();
+  resolveFileActions();
   EXPECT_THAT(fstat_status, IsOkAndHolds(testing::Field(&stat::st_size, expected_stat.st_size)));
   close(handle);
 }
@@ -442,11 +448,11 @@ TEST_F(AsyncFileHandleWithMockPosixTest, StatFailureReportsError) {
   auto handle = createAnonymousFile();
   EXPECT_CALL(mock_posix_file_operations_, fstat(_, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
-  std::promise<absl::StatusOr<struct stat>> fstat_status_promise;
-  EXPECT_OK(handle->stat([&](absl::StatusOr<struct stat> status) {
-    fstat_status_promise.set_value(std::move(status));
+  absl::StatusOr<struct stat> fstat_status;
+  EXPECT_OK(handle->stat(dispatcher_.get(), [&](absl::StatusOr<struct stat> status) {
+    fstat_status = std::move(status);
   }));
-  auto fstat_status = fstat_status_promise.get_future().get();
+  resolveFileActions();
   EXPECT_THAT(fstat_status, StatusIs(absl::StatusCode::kFailedPrecondition));
   close(handle);
 }
@@ -455,9 +461,10 @@ TEST_F(AsyncFileHandleWithMockPosixTest, CloseFailureReportsError) {
   auto handle = createAnonymousFile();
   EXPECT_CALL(mock_posix_file_operations_, close(1))
       .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
-  std::promise<absl::Status> close_status_promise;
-  EXPECT_OK(handle->close([&](absl::Status status) { close_status_promise.set_value(status); }));
-  auto close_status = close_status_promise.get_future().get();
+  absl::Status close_status;
+  EXPECT_OK(handle->close(dispatcher_.get(),
+                          [&](absl::Status status) { close_status = std::move(status); }));
+  resolveFileActions();
   EXPECT_EQ(absl::StatusCode::kFailedPrecondition, close_status.code()) << close_status;
 }
 
@@ -465,19 +472,20 @@ TEST_F(AsyncFileHandleWithMockPosixTest, DuplicateFailureReportsError) {
   auto handle = createAnonymousFile();
   EXPECT_CALL(mock_posix_file_operations_, duplicate(_))
       .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
-  std::promise<absl::StatusOr<AsyncFileHandle>> dup_status_promise;
-  EXPECT_OK(handle->duplicate(
-      [&](absl::StatusOr<AsyncFileHandle> status) { dup_status_promise.set_value(status); }));
-  auto dup_status = dup_status_promise.get_future().get();
+  absl::StatusOr<AsyncFileHandle> dup_status;
+  EXPECT_OK(handle->duplicate(dispatcher_.get(), [&](absl::StatusOr<AsyncFileHandle> status) {
+    dup_status = std::move(status);
+  }));
+  resolveFileActions();
   EXPECT_THAT(dup_status, StatusIs(absl::StatusCode::kFailedPrecondition));
   close(handle);
 }
 
 TEST_F(AsyncFileHandleWithMockPosixTest, EnqueuingActionAfterCloseReturnsError) {
   auto handle = createAnonymousFile();
-  EXPECT_OK(handle->close([](absl::Status) {}));
-  auto failed_status = handle->close([](absl::Status) {});
-  EXPECT_EQ(absl::StatusCode::kFailedPrecondition, failed_status.code()) << failed_status;
+  EXPECT_OK(handle->close(dispatcher_.get(), [](absl::Status) {}));
+  auto failed_status = handle->close(dispatcher_.get(), [](absl::Status) {});
+  EXPECT_THAT(failed_status, StatusIs(absl::StatusCode::kFailedPrecondition));
 }
 
 } // namespace AsyncFiles

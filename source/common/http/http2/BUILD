@@ -28,13 +28,6 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
-    external_deps = [
-        "quiche_http2_adapter",
-        "abseil_optional",
-        "abseil_inlined_vector",
-        "abseil_algorithm",
-        "abseil_cleanup",
-    ],
     deps = [
         ":codec_stats_lib",
         ":metadata_decoder_lib",
@@ -63,8 +56,12 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:status_lib",
         "//source/common/http:utility_lib",
-        "//source/common/network:common_connection_filter_states_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@com_github_google_quiche//:http2_adapter",
+        "@com_google_absl//absl/algorithm",
+        "@com_google_absl//absl/cleanup",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ] + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
 )
@@ -97,14 +94,12 @@ envoy_cc_library(
     name = "metadata_encoder_lib",
     srcs = ["metadata_encoder.cc"],
     hdrs = ["metadata_encoder.h"],
-    external_deps = [
-        "quiche_http2_adapter",
-    ],
     deps = [
         "//envoy/http:codec_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "@com_github_google_quiche//:http2_adapter",
     ],
 )
 
@@ -112,15 +107,13 @@ envoy_cc_library(
     name = "metadata_decoder_lib",
     srcs = ["metadata_decoder.cc"],
     hdrs = ["metadata_decoder.h"],
-    external_deps = [
-        "quiche_http2_hpack_decoder",
-    ],
     deps = [
         "//envoy/http:codec_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@com_github_google_quiche//:http2_hpack_decoder_hpack_decoder_lib",
     ] + envoy_select_nghttp2([envoy_external_dep_path("nghttp2")]),
 )
 

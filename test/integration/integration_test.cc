@@ -525,6 +525,29 @@ TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
   testEnvoyProxying1xx(true);
 }
 
+TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestAfterHeaders) {
+  testRouterRetryOnResetBeforeRequestAfterHeaders();
+}
+
+TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestBeforeHeaders) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    // Ensure we only have one connection upstream, one request active at a time.
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_common_http_protocol_options()
+        ->mutable_max_requests_per_connection()
+        ->set_value(1);
+    protocol_options.mutable_use_downstream_protocol_config();
+    auto* circuit_breakers = cluster->mutable_circuit_breakers();
+    circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.prependFilter("{ name: buffer-continue-filter }", false);
+  testRouterRetryOnResetBeforeRequestBeforeHeaders();
+}
+
 // Test the x-envoy-is-timeout-retry header is set to false for retries that are not
 // initiated by timeouts.
 TEST_P(IntegrationTest, RouterIsTimeoutRetryHeader) {

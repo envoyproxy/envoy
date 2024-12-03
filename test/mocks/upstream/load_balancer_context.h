@@ -15,7 +15,7 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, computeHashKey, ());
   MOCK_METHOD(Router::MetadataMatchCriteria*, metadataMatchCriteria, ());
   MOCK_METHOD(const Network::Connection*, downstreamConnection, (), (const));
-  MOCK_METHOD(const StreamInfo::StreamInfo*, requestStreamInfo, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo*, requestStreamInfo, (), (const));
   MOCK_METHOD(const Http::RequestHeaderMap*, downstreamHeaders, (), (const));
   MOCK_METHOD(const HealthyAndDegradedLoad&, determinePriorityLoad,
               (const PrioritySet&, const HealthyAndDegradedLoad&,
@@ -26,6 +26,7 @@ public:
   MOCK_METHOD(Network::TransportSocketOptionsConstSharedPtr, upstreamTransportSocketOptions, (),
               (const));
   MOCK_METHOD(absl::optional<OverrideHost>, overrideHostToSelect, (), (const));
+  MOCK_METHOD(void, setOrcaLoadReportCallbacks, (std::weak_ptr<OrcaLoadReportCallbacks>));
 
 private:
   HealthyAndDegradedLoad priority_load_;

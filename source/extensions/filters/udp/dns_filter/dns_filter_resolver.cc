@@ -30,7 +30,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
     // We don't support other lookups other than A and AAAA. Set success here so that we don't
     // retry for something that we are certain will fail.
     ENVOY_LOG(debug, "Unknown query type [{}] for upstream lookup", domain_query->type_);
-    ctx.query_context->resolution_status_ = Network::DnsResolver::ResolutionStatus::Success;
+    ctx.query_context->resolution_status_ = Network::DnsResolver::ResolutionStatus::Completed;
     ctx.resolver_status = DnsFilterResolverStatus::Complete;
     invokeCallback(ctx);
     return;
@@ -87,7 +87,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
                        ctx.resolver_status = DnsFilterResolverStatus::Complete;
 
                        // C-ares doesn't expose the TTL in the data available here.
-                       if (status == Network::DnsResolver::ResolutionStatus::Success) {
+                       if (status == Network::DnsResolver::ResolutionStatus::Completed) {
                          ctx.resolved_hosts.reserve(response.size());
                          for (const auto& resp : response) {
                            const auto& addrinfo = resp.addrInfo();

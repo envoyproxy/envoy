@@ -27,6 +27,8 @@ absl::string_view statusCodeToString(StatusCode code) {
     return "InboundFramesWithEmptyPayloadError";
   case StatusCode::EnvoyOverloadError:
     return "EnvoyOverloadError";
+  case StatusCode::GoAwayGracefulClose:
+    return "GoAwayGracefulClose";
   }
   return "";
 }
@@ -45,7 +47,7 @@ struct PrematureResponsePayload : public EnvoyStatusPayload {
 template <typename T> void storePayload(absl::Status& status, const T& payload) {
   const T* allocated = new T(payload);
   const absl::string_view sv =
-      absl::string_view(reinterpret_cast<const char*>(allocated), sizeof(allocated));
+      absl::string_view(reinterpret_cast<const char*>(allocated), sizeof(T));
   absl::Cord cord = absl::MakeCordFromExternal(sv, [allocated]() { delete allocated; });
   cord.Flatten(); // Flatten ahead of time for easier access later.
   status.SetPayload(EnvoyPayloadUrl, std::move(cord));
@@ -124,6 +126,12 @@ Status envoyOverloadError(absl::string_view message) {
   return status;
 }
 
+Status goAwayGracefulCloseError() {
+  absl::Status status(absl::StatusCode::kInternal, {});
+  storePayload(status, EnvoyStatusPayload(StatusCode::GoAwayGracefulClose));
+  return status;
+}
+
 // Methods for checking and extracting error information
 StatusCode getStatusCode(const Status& status) {
   return status.ok() ? StatusCode::Ok : getPayload(status).status_code_;
@@ -158,6 +166,10 @@ bool isInboundFramesWithEmptyPayloadError(const Status& status) {
 
 bool isEnvoyOverloadError(const Status& status) {
   return getStatusCode(status) == StatusCode::EnvoyOverloadError;
+}
+
+bool isGoAwayGracefulCloseError(const Status& status) {
+  return getStatusCode(status) == StatusCode::GoAwayGracefulClose;
 }
 
 } // namespace Http

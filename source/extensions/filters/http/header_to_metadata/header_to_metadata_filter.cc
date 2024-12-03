@@ -84,7 +84,9 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine) : rule_(rule) {
 
   if (rule.on_header_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule.on_header_present().regex_value_rewrite();
-    regex_rewrite_ = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
+    regex_rewrite_ =
+        THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine),
+                              Regex::CompiledMatcherPtr);
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 }

@@ -12,6 +12,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "config_unit_test",
     srcs = ["config_unit_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//contrib/kafka/filters/network/source/broker:config_lib",
         "//test/mocks/server:factory_context_mocks",
@@ -21,7 +22,9 @@ envoy_cc_test(
 envoy_cc_test(
     name = "filter_unit_test",
     srcs = ["filter_unit_test.cc"],
+    rbe_pool = "6gig",
     deps = [
+        ":mock_request_lib",
         "//contrib/kafka/filters/network/source/broker:filter_lib",
         "//envoy/event:timer_interface",
         "//test/mocks/network:network_mocks",
@@ -33,12 +36,22 @@ envoy_cc_test(
     name = "filter_protocol_test",
     srcs = ["filter_protocol_test.cc"],
     deps = [
-        ":mock_filter_config_test_lib",
         "//contrib/kafka/filters/network/source/broker:filter_lib",
         "//contrib/kafka/filters/network/test:buffer_based_test_lib",
         "//contrib/kafka/filters/network/test:message_utilities",
         "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:test_time_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "request_handler_unit_test",
+    srcs = ["request_handler_unit_test.cc"],
+    deps = [
+        ":mock_filter_config_test_lib",
+        ":mock_request_lib",
+        "//contrib/kafka/filters/network/source/broker:request_handler_lib",
+        "//test/mocks/network:network_mocks",
     ],
 )
 
@@ -58,5 +71,14 @@ envoy_cc_test_library(
     hdrs = ["mock_filter_config.h"],
     deps = [
         "//contrib/kafka/filters/network/source/broker:filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "mock_request_lib",
+    srcs = [],
+    hdrs = ["mock_request.h"],
+    deps = [
+        "//contrib/kafka/filters/network/source:kafka_request_lib",
     ],
 )

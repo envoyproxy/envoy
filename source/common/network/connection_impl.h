@@ -148,6 +148,7 @@ public:
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
+
   DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
 
 protected:

@@ -68,4 +68,20 @@ TEST(OsSyscallsTest, OpenPwritePreadFstatCloseStatUnlink) {
   TestEnvironment::removePath(path);
 }
 
+TEST(OsSyscallsTest, SupportsIpTransparent) {
+  // Some environments support this and some don't; just call the function to make sure nothing
+  // dire (like a crash) happens, without validating the return value.
+  Api::OsSysCallsSingleton::get().supportsIpTransparent(TestEnvironment::getIpVersionsForTest()[0]);
+}
+
+TEST(OsSyscallsTest, SupportsMptcp) {
+  // Some environments support this and some don't; just call the function to make sure nothing
+  // dire (like a crash) happens, without validating the return value.
+  Api::OsSysCallsSingleton::get().supportsMptcp();
+}
+
+TEST(OsSyscallsTest, IoCtlInvalidFd) {
+  EXPECT_NE(0, Api::OsSysCallsSingleton::get().ioctl(0, 0, nullptr, 0, nullptr, 0, nullptr).errno_);
+}
+
 } // namespace Envoy

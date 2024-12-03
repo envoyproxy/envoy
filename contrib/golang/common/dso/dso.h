@@ -43,7 +43,10 @@ public:
                                              GoUint64 p3) PURE;
   virtual GoUint64 envoyGoFilterOnHttpData(processState* p0, GoUint64 p1, GoUint64 p2,
                                            GoUint64 p3) PURE;
-  virtual void envoyGoFilterOnHttpLog(httpRequest* p0, int p1) PURE;
+  virtual void envoyGoFilterOnHttpLog(httpRequest* p0, int p1, processState* p2, processState* p3,
+                                      GoUint64 p4, GoUint64 p5, GoUint64 p6, GoUint64 p7,
+                                      GoUint64 p8, GoUint64 p9, GoUint64 p10, GoUint64 p11) PURE;
+  virtual void envoyGoFilterOnHttpStreamComplete(httpRequest* p0) PURE;
   virtual void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) PURE;
   virtual void envoyGoRequestSemaDec(httpRequest* p0) PURE;
 };
@@ -61,7 +64,10 @@ public:
                                      GoUint64 p3) override;
   GoUint64 envoyGoFilterOnHttpData(processState* p0, GoUint64 p1, GoUint64 p2,
                                    GoUint64 p3) override;
-  void envoyGoFilterOnHttpLog(httpRequest* p0, int p1) override;
+  void envoyGoFilterOnHttpLog(httpRequest* p0, int p1, processState* p2, processState* p3,
+                              GoUint64 p4, GoUint64 p5, GoUint64 p6, GoUint64 p7, GoUint64 p8,
+                              GoUint64 p9, GoUint64 p10, GoUint64 p11) override;
+  void envoyGoFilterOnHttpStreamComplete(httpRequest* p0) override;
   void envoyGoFilterOnHttpDestroy(httpRequest* p0, int p1) override;
   void envoyGoRequestSemaDec(httpRequest* p0) override;
   void cleanup() override;
@@ -75,7 +81,11 @@ private:
                                               GoUint64 p3) = {nullptr};
   GoUint64 (*envoy_go_filter_on_http_data_)(processState* p0, GoUint64 p1, GoUint64 p2,
                                             GoUint64 p3) = {nullptr};
-  void (*envoy_go_filter_on_http_log_)(httpRequest* p0, GoUint64 p1) = {nullptr};
+  void (*envoy_go_filter_on_http_log_)(httpRequest* p0, int p1, processState* p2, processState* p3,
+                                       GoUint64 p4, GoUint64 p5, GoUint64 p6, GoUint64 p7,
+                                       GoUint64 p8, GoUint64 p9, GoUint64 p10,
+                                       GoUint64 p11) = {nullptr};
+  void (*envoy_go_filter_on_http_stream_complete_)(httpRequest* p0) = {nullptr};
   void (*envoy_go_filter_on_http_destroy_)(httpRequest* p0, GoUint64 p1) = {nullptr};
   void (*envoy_go_filter_go_request_sema_dec_)(httpRequest* p0) = {nullptr};
   void (*envoy_go_filter_cleanup_)() = {nullptr};

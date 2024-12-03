@@ -61,7 +61,7 @@ final class CancelProofEnvoyStream {
     if (returnTrueIfCanceledOrIncreaseConcurrentlyRunningStreamOperations()) {
       return; // Already Cancelled - to late to send something.
     }
-    mStream.sendHeaders(envoyRequestHeaders, endStream);
+    mStream.sendHeaders(envoyRequestHeaders, endStream, /* idempotent= */ false);
     if (decreaseConcurrentlyRunningStreamOperationsAndReturnTrueIfAwaitingCancel()) {
       mStream.cancel(); // Cancel was called previously, so now this is honored.
     }

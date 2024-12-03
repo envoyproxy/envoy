@@ -692,7 +692,7 @@ void FakeUpstream::initializeServer() {
   }
 
   dispatcher_->post([this]() -> void {
-    socket_factories_[0]->doFinalPreWorkerInit();
+    EXPECT_TRUE(socket_factories_[0]->doFinalPreWorkerInit().ok());
     handler_->addListener(absl::nullopt, listener_, runtime_, random_);
     server_initialized_.setReady();
   });
@@ -995,14 +995,15 @@ AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const std::stri
       timeout);
 }
 
-void FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
+absl::Status FakeUpstream::FakeListenSocketFactory::doFinalPreWorkerInit() {
   if (socket_->socketType() == Network::Socket::Type::Stream) {
-    ASSERT_EQ(0, socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
+    EXPECT_EQ(0, socket_->ioHandle().listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
   } else {
     ASSERT(socket_->socketType() == Network::Socket::Type::Datagram);
-    ASSERT_TRUE(Network::Socket::applyOptions(socket_->options(), *socket_,
+    EXPECT_TRUE(Network::Socket::applyOptions(socket_->options(), *socket_,
                                               envoy::config::core::v3::SocketOption::STATE_BOUND));
   }
+  return absl::OkStatus();
 }
 
 FakeRawConnection::~FakeRawConnection() {
@@ -1081,7 +1082,7 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
 }
 
 ABSL_MUST_USE_RESULT
-AssertionResult FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
+AssertionResult FakeHttpConnection::waitForInexactRawData(absl::string_view data, std::string& out,
                                                           std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   const auto reached = [this, data, &out]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -1095,12 +1096,13 @@ AssertionResult FakeHttpConnection::waitForInexactRawData(const char* data, std:
     }
     absl::string_view peek_data(peek_buf, result.return_value_);
     size_t index = peek_data.find(data);
+    const auto data_len = data.length();
     if (index != absl::string_view::npos) {
       Buffer::OwnedImpl buffer;
-      *out = std::string(peek_data.data(), index + 4);
+      out = std::string(peek_data.data(), index + data_len);
       auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
                         ->ioHandle()
-                        .recv(peek_buf, index + 4, 0);
+                        .recv(peek_buf, index + data_len, 0);
       return true;
     }
     return false;

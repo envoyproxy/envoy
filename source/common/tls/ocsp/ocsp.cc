@@ -45,9 +45,9 @@ absl::Status skipResponderId(CBS& cbs) {
   //    (excluding the tag and length fields)
 
   auto opt1 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1);
-  RETURN_IF_STATUS_NOT_OK(opt1);
+  RETURN_IF_NOT_OK_REF(opt1.status());
   auto opt2 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 2);
-  RETURN_IF_STATUS_NOT_OK(opt2);
+  RETURN_IF_NOT_OK_REF(opt2.status());
 
   if (opt1.value() || opt2.value()) {
     return absl::OkStatus();
@@ -64,11 +64,11 @@ absl::Status skipCertStatus(CBS& cbs) {
   //  unknown             [2] IMPLICIT UnknownInfo
   // }
   auto opt1 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 0);
-  RETURN_IF_STATUS_NOT_OK(opt1);
+  RETURN_IF_NOT_OK_REF(opt1.status());
   auto opt2 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 1);
-  RETURN_IF_STATUS_NOT_OK(opt2);
+  RETURN_IF_NOT_OK_REF(opt2.status());
   auto opt3 = Asn1Utility::getOptional(cbs, CBS_ASN1_CONTEXT_SPECIFIC | 2);
-  RETURN_IF_STATUS_NOT_OK(opt3);
+  RETURN_IF_NOT_OK_REF(opt3.status());
 
   if (!(opt1.value() || opt2.value() || opt3.value())) {
     return absl::InvalidArgumentError(
@@ -181,14 +181,14 @@ absl::StatusOr<std::unique_ptr<OcspResponse>> Asn1OcspUtility::parseOcspResponse
   }
 
   auto status_or_error = Asn1OcspUtility::parseResponseStatus(elem);
-  RETURN_IF_STATUS_NOT_OK(status_or_error);
+  RETURN_IF_NOT_OK_REF(status_or_error.status());
   auto opt = Asn1Utility::getOptional(elem, CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0);
-  RETURN_IF_STATUS_NOT_OK(opt);
+  RETURN_IF_NOT_OK_REF(opt.status());
   auto maybe_bytes = opt.value();
   ResponsePtr resp = nullptr;
   if (maybe_bytes) {
     auto resp_or_error = Asn1OcspUtility::parseResponseBytes(maybe_bytes.value());
-    RETURN_IF_STATUS_NOT_OK(resp_or_error);
+    RETURN_IF_NOT_OK_REF(resp_or_error.status());
     resp = std::move(resp_or_error.value());
   }
 
@@ -243,7 +243,7 @@ absl::StatusOr<ResponsePtr> Asn1OcspUtility::parseResponseBytes(CBS& cbs) {
   }
 
   auto parse_or_error = Asn1Utility::parseOid(elem);
-  RETURN_IF_STATUS_NOT_OK(parse_or_error);
+  RETURN_IF_NOT_OK_REF(parse_or_error.status());
   auto oid_str = parse_or_error.value();
   if (!CBS_get_asn1(&elem, &response, CBS_ASN1_OCTETSTRING)) {
     return absl::InvalidArgumentError("Expected ASN.1 OCTETSTRING for response");
@@ -271,7 +271,7 @@ Asn1OcspUtility::parseBasicOcspResponse(CBS& cbs) {
         "OCSP BasicOCSPResponse is not a wellf-formed ASN.1 SEQUENCE");
   }
   auto response_or_error = Asn1OcspUtility::parseResponseData(elem);
-  RETURN_IF_STATUS_NOT_OK(response_or_error);
+  RETURN_IF_NOT_OK_REF(response_or_error.status());
   // The `signatureAlgorithm` and `signature` are ignored because OCSP
   // responses are expected to be delivered from a reliable source.
   // Optional additional certs are ignored.
@@ -295,11 +295,11 @@ absl::StatusOr<ResponseData> Asn1OcspUtility::parseResponseData(CBS& cbs) {
   // only support v1, the value of v1 is 0x00
   auto version_or_error =
       Asn1Utility::getOptional(elem, CBS_ASN1_CONTEXT_SPECIFIC | CBS_ASN1_CONSTRUCTED | 0);
-  RETURN_IF_STATUS_NOT_OK(version_or_error);
+  RETURN_IF_NOT_OK_REF(version_or_error.status());
   auto version_cbs = version_or_error.value();
   if (version_cbs.has_value()) {
     auto version_or_error = Asn1Utility::parseInteger(*version_cbs);
-    RETURN_IF_STATUS_NOT_OK(version_or_error);
+    RETURN_IF_NOT_OK_REF(version_or_error.status());
     auto version = version_or_error.value();
     if (version != "00") {
       return absl::InvalidArgumentError(
@@ -309,10 +309,10 @@ absl::StatusOr<ResponseData> Asn1OcspUtility::parseResponseData(CBS& cbs) {
 
   auto status = skipResponderId(elem);
   RETURN_IF_NOT_OK(status);
-  RETURN_IF_STATUS_NOT_OK(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME));
+  RETURN_IF_NOT_OK_REF(Asn1Utility::skip(elem, CBS_ASN1_GENERALIZEDTIME).status());
   auto responses_or_error = Asn1Utility::parseSequenceOf<SingleResponse>(
       elem, [](CBS& cbs) -> absl::StatusOr<SingleResponse> { return {parseSingleResponse(cbs)}; });
-  RETURN_IF_STATUS_NOT_OK(responses_or_error);
+  RETURN_IF_NOT_OK_REF(responses_or_error.status());
   // Extensions currently ignored.
 
   return {std::move(responses_or_error.value())};
@@ -332,14 +332,14 @@ absl::StatusOr<SingleResponse> Asn1OcspUtility::parseSingleResponse(CBS& cbs) {
   }
 
   auto id_or_error = Asn1OcspUtility::parseCertId(elem);
-  RETURN_IF_STATUS_NOT_OK(id_or_error);
+  RETURN_IF_NOT_OK_REF(id_or_error.status());
   RETURN_IF_NOT_OK(skipCertStatus(elem));
   auto this_update_or_error = Asn1Utility::parseGeneralizedTime(elem);
-  RETURN_IF_STATUS_NOT_OK(this_update_or_error);
+  RETURN_IF_NOT_OK_REF(this_update_or_error.status());
   auto next_update_or_error = Asn1Utility::parseOptional<Envoy::SystemTime>(
       elem, Asn1Utility::parseGeneralizedTime,
       CBS_ASN1_CONSTRUCTED | CBS_ASN1_CONTEXT_SPECIFIC | 0);
-  RETURN_IF_STATUS_NOT_OK(next_update_or_error);
+  RETURN_IF_NOT_OK_REF(next_update_or_error.status());
   // Extensions currently ignored.
 
   return SingleResponse{id_or_error.value(), this_update_or_error.value(),
@@ -358,11 +358,11 @@ absl::StatusOr<CertId> Asn1OcspUtility::parseCertId(CBS& cbs) {
     return absl::InvalidArgumentError("OCSP CertID is not a well-formed ASN.1 SEQUENCE");
   }
 
-  RETURN_IF_STATUS_NOT_OK(Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE));
-  RETURN_IF_STATUS_NOT_OK(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
-  RETURN_IF_STATUS_NOT_OK(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING));
+  RETURN_IF_NOT_OK_REF(Asn1Utility::skip(elem, CBS_ASN1_SEQUENCE).status());
+  RETURN_IF_NOT_OK_REF(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING).status());
+  RETURN_IF_NOT_OK_REF(Asn1Utility::skip(elem, CBS_ASN1_OCTETSTRING).status());
   auto serial_number_or_error = Asn1Utility::parseInteger(elem);
-  RETURN_IF_STATUS_NOT_OK(serial_number_or_error);
+  RETURN_IF_NOT_OK_REF(serial_number_or_error.status());
 
   return {serial_number_or_error.value()};
 }

@@ -46,7 +46,7 @@ public:
     udp_upstream_ =
         std::make_unique<UdpUpstream>(&mock_upstream_to_downstream_, std::move(mock_socket),
                                       std::move(mock_host), mock_dispatcher_);
-    EXPECT_NO_THROW(udp_upstream_->enableHalfClose());
+    EXPECT_NO_THROW(udp_upstream_->enableTcpTunneling());
   }
 
 protected:
@@ -83,10 +83,9 @@ TEST_F(UdpUpstreamTest, ExchangeCapsules) {
                              "a1a2a3a4a5a6a7" // UDP Proxying Payload
       );
   Buffer::OwnedImpl sent_capsule(sent_capsule_fragment);
-  EXPECT_CALL(*mock_socket_->io_handle_, sendmsg(_, _, _, _, _))
-      .WillOnce([](const Buffer::RawSlice* slices, uint64_t num_slice, int /*flags*/,
-                   const Network::Address::Ip* /*self_ip*/,
-                   const Network::Address::Instance& /*peer_address*/) {
+  EXPECT_CALL(*mock_socket_->io_handle_, wasConnected()).WillOnce(Return(true));
+  EXPECT_CALL(*mock_socket_->io_handle_, writev(_, _))
+      .WillOnce([](const Buffer::RawSlice* slices, uint64_t num_slice) {
         Buffer::OwnedImpl buffer(absl::HexStringToBytes("a1a2a3a4a5a6a7"));
         EXPECT_TRUE(TestUtility::rawSlicesEqual(buffer.getRawSlices().data(), slices, num_slice));
         return Api::ioCallUint64ResultNoError();
@@ -105,7 +104,8 @@ TEST_F(UdpUpstreamTest, ExchangeCapsules) {
   EXPECT_CALL(mock_upstream_to_downstream_,
               decodeData(BufferStringEqual(decoded_capsule_fragment), false));
   Envoy::MonotonicTime timestamp;
-  udp_upstream_->processPacket(nullptr, nullptr, std::move(received_data), timestamp, /*tos=*/0);
+  udp_upstream_->processPacket(nullptr, nullptr, std::move(received_data), timestamp, /*tos=*/0,
+                               /*saved_cmsg=*/{});
 }
 
 TEST_F(UdpUpstreamTest, HeaderOnlyRequest) {

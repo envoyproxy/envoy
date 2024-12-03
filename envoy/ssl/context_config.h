@@ -128,6 +128,19 @@ public:
   virtual const std::string& serverNameIndication() const PURE;
 
   /**
+   * If true, replaces the SNI for the connection with the hostname of the upstream host, if
+   * the hostname is known.
+   */
+  virtual bool autoHostServerNameIndication() const PURE;
+
+  /**
+   * If true, replace any Subject Alternative Name validations with a validation for a DNS SAN
+   * matching the SNI value sent. Note that the validation will be against the actual requested SNI,
+   * regardless of how it is configured.
+   */
+  virtual bool autoSniSanMatch() const PURE;
+
+  /**
    * @return true if server-initiated TLS renegotiation will be allowed.
    */
   virtual bool allowRenegotiation() const PURE;
@@ -199,6 +212,16 @@ public:
    * downstream TLS handshake, false otherwise.
    */
   virtual bool fullScanCertsOnSNIMismatch() const PURE;
+
+  /**
+   * @return true if the client cipher preference is enabled, false otherwise.
+   */
+  virtual bool preferClientCiphers() const PURE;
+
+  /**
+   * @return a factory which can be used to create TLS context provider instances.
+   */
+  virtual TlsCertificateSelectorFactory tlsCertificateSelectorFactory() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

@@ -15,12 +15,9 @@ namespace LocalRateLimitFilter {
 Http::FilterFactoryCb LocalRateLimitFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  auto& server_context = context.serverFactoryContext();
 
-  FilterConfigSharedPtr filter_config = std::make_shared<FilterConfig>(
-      proto_config, server_context.localInfo(), server_context.mainThreadDispatcher(),
-      server_context.clusterManager(), server_context.singletonManager(), context.scope(),
-      server_context.runtime());
+  FilterConfigSharedPtr filter_config =
+      std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext(), context.scope());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Filter>(filter_config));
   };
@@ -30,9 +27,7 @@ Router::RouteSpecificFilterConfigConstSharedPtr
 LocalRateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const FilterConfig>(
-      proto_config, context.localInfo(), context.mainThreadDispatcher(), context.clusterManager(),
-      context.singletonManager(), context.scope(), context.runtime(), true);
+  return std::make_shared<const FilterConfig>(proto_config, context, context.scope(), true);
 }
 
 /**

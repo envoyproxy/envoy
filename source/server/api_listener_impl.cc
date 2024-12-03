@@ -45,7 +45,7 @@ absl::StatusOr<std::unique_ptr<HttpApiListener>>
 HttpApiListener::create(const envoy::config::listener::v3::Listener& config,
                         Server::Instance& server, const std::string& name) {
   auto address_or_error = Network::Address::resolveProtoAddress(config.address());
-  RETURN_IF_STATUS_NOT_OK(address_or_error);
+  RETURN_IF_NOT_OK_REF(address_or_error.status());
   return std::unique_ptr<HttpApiListener>(
       new HttpApiListener(std::move(address_or_error.value()), config, server, name));
 }

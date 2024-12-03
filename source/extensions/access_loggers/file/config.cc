@@ -31,11 +31,15 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
   switch (fal_config.access_log_format_case()) {
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kFormat:
     if (fal_config.format().empty()) {
-      formatter = Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter();
+      formatter = THROW_OR_RETURN_VALUE(
+          Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+          Formatter::FormatterPtr);
     } else {
       envoy::config::core::v3::SubstitutionFormatString sff_config;
       sff_config.mutable_text_format_source()->set_inline_string(fal_config.format());
-      formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context);
+      formatter = THROW_OR_RETURN_VALUE(
+          Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context),
+          Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
     }
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kJsonFormat:
@@ -46,16 +50,21 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       kTypedJsonFormat: {
     envoy::config::core::v3::SubstitutionFormatString sff_config;
     *sff_config.mutable_json_format() = fal_config.typed_json_format();
-    formatter = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context);
+    formatter = THROW_OR_RETURN_VALUE(
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(sff_config, context),
+        Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
     break;
   }
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::kLogFormat:
-    formatter =
-        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format(), context);
+    formatter = THROW_OR_RETURN_VALUE(
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(fal_config.log_format(), context),
+        Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
     break;
   case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
       ACCESS_LOG_FORMAT_NOT_SET:
-    formatter = Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter();
+    formatter = THROW_OR_RETURN_VALUE(
+        Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+        Formatter::FormatterPtr);
     break;
   }
 

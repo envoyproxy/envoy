@@ -4,8 +4,6 @@ package envoy.extensions.quic.server_preferred_address.v3;
 
 import "envoy/config/core/v3/base.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -20,10 +18,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for DataSourceServerPreferredAddressConfig.
 message DataSourceServerPreferredAddressConfig {
-  // [#comment:TODO(danzh2010): discuss with API shepherds before removing WiP status.]
-
-  option (xds.annotations.v3.message_status).work_in_progress = true;
-
   // Addresses for server preferred address for a single address family (IPv4 or IPv6).
   message AddressFamilyConfig {
     // The server preferred address sent to clients. The data must contain an IP address string.

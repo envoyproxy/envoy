@@ -25,18 +25,8 @@ DOCKER_BUILD_TIMEOUT="${DOCKER_BUILD_TIMEOUT:-500}"
 
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/arm64,linux/amd64}"
 
-function is_windows() {
-    [[ -n "$DOCKER_FAKE_WIN" ]]  || [[ "$(uname -s)" == *NT* ]]
-}
-
 if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
     CI_SHA1="${CI_SHA1:-MOCKSHA}"
-
-    if is_windows; then
-        WINDOWS_IMAGE_BASE="${WINDOWS_IMAGE_BASE:-mcr.microsoft.com/windows/fakecore}"
-        WINDOWS_IMAGE_TAG="${WINDOWS_IMAGE_TAG:-ltsc1992}"
-        WINDOWS_BUILD_TYPE="${WINDOWS_BUILD_TYPE:-legacy}"
-    fi
 fi
 
 MAIN_BRANCH="refs/heads/main"
@@ -101,18 +91,12 @@ config_env() {
     docker buildx create --use --name multi-builder --platform "${DOCKER_PLATFORM}"
 }
 
-if is_windows; then
-    BUILD_TYPES=("-${WINDOWS_BUILD_TYPE}")
-    # BuildKit is not available for Windows images, use standard build command
-    BUILD_COMMAND=("build")
-else
-    # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-    BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-distroless" "-google-vrp" "-tools")
+# "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
+BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-distroless" "-google-vrp" "-tools")
 
-    # Configure docker-buildx tools
-    BUILD_COMMAND=("buildx" "build")
-    config_env
-fi
+# Configure docker-buildx tools
+BUILD_COMMAND=("buildx" "build")
+config_env
 
 old_image_tag_name () {
     # envoyproxy/envoy-dev:latest
@@ -150,9 +134,7 @@ new_image_tag_name () {
 build_platforms() {
     local build_type=$1
 
-    if is_windows; then
-        echo -n "windows/amd64"
-    elif [[ "${build_type}" == *-google-vrp ]]; then
+    if [[ "${build_type}" == *-google-vrp ]]; then
         echo -n "linux/amd64"
     else
         echo -n "$DOCKER_PLATFORM"
@@ -162,13 +144,9 @@ build_platforms() {
 build_args() {
     local build_type=$1 target
 
-    if is_windows; then
-        printf ' -f ci/Dockerfile-envoy-windows --build-arg BUILD_OS=%s --build-arg BUILD_TAG=%s' "${WINDOWS_IMAGE_BASE}" "${WINDOWS_IMAGE_TAG}"
-    else
-        target="${build_type/-debug/}"
-        target="${target/-contrib/}"
-        printf ' -f ci/Dockerfile-envoy --target %s' "envoy${target}"
-    fi
+    target="${build_type/-debug/}"
+    target="${target/-contrib/}"
+    printf ' -f ci/Dockerfile-envoy --target %s' "envoy${target}"
 
     if [[ "${build_type}" == *-contrib* ]]; then
         printf ' --build-arg ENVOY_BINARY=envoy-contrib'
@@ -180,10 +158,6 @@ build_args() {
 }
 
 use_builder() {
-    # BuildKit is not available for Windows images, skip this
-    if is_windows; then
-        return
-    fi
     echo ">> BUILDX: use multi-builder"
     echo "> docker buildx use multi-builder"
 
@@ -207,27 +181,25 @@ build_and_maybe_push_image () {
     build_tag="$(old_image_tag_name "${image_type}")"
     docker_image_tarball="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy${image_type}.tar"
 
-    if ! is_windows; then
-        # `--sbom` and `--provenance` args added for skopeo 1.5.0 compat,
-        # can probably be removed for later versions.
-        args+=(
-            "--sbom=false"
-            "--provenance=false")
-        if [[ -n "$LOAD_IMAGES" ]]; then
-            action="BUILD+LOAD"
-            args+=("--load")
-        elif [[ "${image_type}" =~ debug ]]; then
-            # For linux if its the debug image then push immediately for release branches,
-            # otherwise just test the build
-            if [[ -n "$PUSH_IMAGES_TO_REGISTRY" ]]; then
-                action="BUILD+PUSH"
-                args+=("--push")
-            fi
-        else
-            # For linux non-debug builds, save it first in the tarball, we will push it
-            # with skopeo from there if needed.
-            args+=("-o" "type=oci,dest=${docker_image_tarball}")
+    # `--sbom` and `--provenance` args added for skopeo 1.5.0 compat,
+    # can probably be removed for later versions.
+    args+=(
+        "--sbom=false"
+        "--provenance=false")
+    if [[ -n "$LOAD_IMAGES" ]]; then
+        action="BUILD+LOAD"
+        args+=("--load")
+    elif [[ "${image_type}" =~ debug ]]; then
+        # For linux if its the debug image then push immediately for release branches,
+        # otherwise just test the build
+        if [[ -n "$PUSH_IMAGES_TO_REGISTRY" ]]; then
+            action="BUILD+PUSH"
+            args+=("--push")
         fi
+    else
+        # For linux non-debug builds, save it first in the tarball, we will push it
+        # with skopeo from there if needed.
+        args+=("-o" "type=oci,dest=${docker_image_tarball}")
     fi
 
     docker_build_args=(
@@ -256,13 +228,7 @@ build_and_maybe_push_image () {
         return
     fi
 
-    if is_windows; then
-        echo ">> PUSH: ${build_tag}"
-        echo "> docker push ${build_tag}"
-        if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
-            docker push "$build_tag"
-        fi
-    elif ! [[ "${image_type}" =~ debug ]]; then
+    if ! [[ "${image_type}" =~ debug ]]; then
         push_image_from_tarball "$build_tag" "$docker_image_tarball"
     fi
 }
@@ -275,18 +241,6 @@ tag_image () {
     fi
 
     echo ">> TAG: ${build_tag} -> ${tag}"
-
-    if is_windows; then
-        # we cant use buildx to tag remote images on windows
-        echo "> docker tag ${build_tag} ${tag}"
-        echo ">> PUSH: ${tag}"
-        echo "> docker push ${tag}"
-        if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
-            docker tag "$build_tag" "$tag"
-            docker push "$tag"
-        fi
-        return
-    fi
 
     docker_tag_args=(
         buildx imagetools create
@@ -341,7 +295,7 @@ tag_variants () {
     build_tag="$(old_image_tag_name "${image_type}")"
     new_image_name="$(new_image_tag_name "${image_type}")"
 
-    if ! is_windows && [[ "$build_tag" != "$new_image_name" ]]; then
+    if [[ "$build_tag" != "$new_image_name" ]]; then
         tag_image "${build_tag}" "${new_image_name}"
     fi
 
@@ -359,7 +313,7 @@ tag_variants () {
         tag_name="$(old_image_tag_name "${image_type}" "${variant_type}")"
         new_tag_name="$(new_image_tag_name "${image_type}" "${variant_type}")"
         tag_image "${build_tag}" "${tag_name}"
-        if ! is_windows && ! [[ "$tag_name" == "$new_tag_name" ]]; then
+        if [[ "$tag_name" != "$new_tag_name" ]]; then
             tag_image "${build_tag}" "${new_tag_name}"
         fi
     fi

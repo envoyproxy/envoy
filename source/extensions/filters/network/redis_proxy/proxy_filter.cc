@@ -19,14 +19,18 @@ namespace RedisProxy {
 ProxyFilterConfig::ProxyFilterConfig(
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
     Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
-    Api::Api& api,
+    Api::Api& api, TimeSource& time_source,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),
       downstream_auth_username_(THROW_OR_RETURN_VALUE(
           Config::DataSource::read(config.downstream_auth_username(), true, api), std::string)),
-      dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)) {
+      external_auth_enabled_(config.has_external_auth_provider()),
+      external_auth_expiration_enabled_(external_auth_enabled_ &&
+                                        config.external_auth_provider().enable_auth_expiration()),
+      dns_cache_manager_(cache_manager_factory.get()), dns_cache_(getCache(config)),
+      time_source_(time_source) {
 
   if (config.settings().enable_redirection() && !config.settings().has_dns_cache_config()) {
     ENVOY_LOG(warn, "redirections without DNS lookups enabled might cause client errors, set the "
@@ -70,14 +74,20 @@ ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Sc
 
 ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
                          Common::Redis::EncoderPtr&& encoder, CommandSplitter::Instance& splitter,
-                         ProxyFilterConfigSharedPtr config)
+                         ProxyFilterConfigSharedPtr config,
+                         ExternalAuth::ExternalAuthClientPtr&& auth_client)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
       config_(config), transaction_(this) {
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
-  connection_allowed_ =
-      config_->downstream_auth_username_.empty() && config_->downstream_auth_passwords_.empty();
+  connection_allowed_ = config_->downstream_auth_username_.empty() &&
+                        config_->downstream_auth_passwords_.empty() &&
+                        !config_->external_auth_enabled_;
   connection_quit_ = false;
+  external_auth_call_status_ = ExternalAuthCallStatus::Ready;
+  if (auth_client != nullptr) {
+    auth_client_ = std::move(auth_client);
+  }
 }
 
 ProxyFilter::~ProxyFilter() {
@@ -98,6 +108,19 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
+
+  // If external authentication is enabled and an AUTH command is ongoing,
+  // we keep the request in the queue and let it be processed when the
+  // authentication response is received.
+  if (external_auth_call_status_ == ExternalAuthCallStatus::Pending) {
+    request.pending_request_value_ = std::move(value);
+    return;
+  }
+
+  processRespValue(std::move(value), request);
+}
+
+void ProxyFilter::processRespValue(Common::Redis::RespValuePtr&& value, PendingRequest& request) {
   CommandSplitter::SplitRequestPtr split =
       splitter_.makeRequest(std::move(value), request, callbacks_->connection().dispatcher(),
                             callbacks_->connection().streamInfo());
@@ -122,6 +145,10 @@ void ProxyFilter::onEvent(Network::ConnectionEvent event) {
       pending_requests_.pop_front();
     }
     transaction_.close();
+
+    if (external_auth_call_status_ == ExternalAuthCallStatus::Pending) {
+      auth_client_->cancel();
+    }
   }
 }
 
@@ -133,7 +160,61 @@ void ProxyFilter::onQuit(PendingRequest& request) {
   request.onResponse(std::move(response));
 }
 
+bool ProxyFilter::connectionAllowed() {
+  // Check for external auth expiration.
+  if (connection_allowed_ && config_->external_auth_expiration_enabled_) {
+    const auto now_epoch = config_->timeSource().systemTime().time_since_epoch().count();
+    if (now_epoch > external_auth_expiration_epoch_) {
+      ENVOY_LOG(info, "Redis external authentication expired. Disallowing further commands.");
+      connection_allowed_ = false;
+    }
+  }
+
+  return connection_allowed_;
+}
+
+void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& request,
+                                         ExternalAuth::AuthenticateResponsePtr&& response) {
+  Common::Redis::RespValuePtr redis_response{new Common::Redis::RespValue()};
+
+  if (response->status == ExternalAuth::AuthenticationRequestStatus::Authorized) {
+    redis_response->type(Common::Redis::RespType::SimpleString);
+    redis_response->asString() = "OK";
+    connection_allowed_ = true;
+
+    if (config_->external_auth_expiration_enabled_) {
+      external_auth_expiration_epoch_ = response->expiration.seconds() * 1000000;
+    }
+  } else if (response->status == ExternalAuth::AuthenticationRequestStatus::Unauthorized) {
+    redis_response->type(Common::Redis::RespType::Error);
+    std::string message = response->message.empty() ? "unauthorized" : response->message;
+    redis_response->asString() = fmt::format("ERR {}", message);
+    connection_allowed_ = false;
+  } else {
+    redis_response->type(Common::Redis::RespType::Error);
+    redis_response->asString() = "ERR external authentication failed";
+    ENVOY_LOG(error, "Redis external authentication failed: {}", response->message);
+  }
+
+  external_auth_call_status_ = ExternalAuthCallStatus::Ready;
+
+  request.onResponse(std::move(redis_response));
+
+  // Resume processing of pending requests.
+  while (!pending_requests_.empty() && pending_requests_.front().pending_request_value_) {
+    processRespValue(std::move(pending_requests_.front().pending_request_value_),
+                     pending_requests_.front());
+  }
+}
+
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
+  if (config_->external_auth_enabled_) {
+    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
+    auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(),
+                                       EMPTY_STRING, password);
+    return;
+  }
+
   Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
   if (config_->downstream_auth_passwords_.empty()) {
     response->type(Common::Redis::RespType::Error);
@@ -152,6 +233,13 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
 
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
                          const std::string& password) {
+  if (config_->external_auth_enabled_) {
+    auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(),
+                                       username, password);
+    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
+    return;
+  }
+
   Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
   if (config_->downstream_auth_username_.empty() && config_->downstream_auth_passwords_.empty()) {
     response->type(Common::Redis::RespType::Error);

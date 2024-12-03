@@ -1,9 +1,9 @@
 #pragma once
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/generic_proxy/interface/codec.h"
 
 #include "contrib/envoy/extensions/filters/network/generic_proxy/codecs/kafka/v3/kafka.pb.h"
-#include "contrib/generic_proxy/filters/network/source/interface/codec.h"
 #include "contrib/kafka/filters/network/source/request_codec.h"
 #include "contrib/kafka/filters/network/source/response_codec.h"
 

@@ -2,6 +2,8 @@
 
 #include <openssl/sha.h>
 
+#include "envoy/http/header_map.h"
+
 #include "source/common/common/base64.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
@@ -29,8 +31,10 @@ std::string computeSHA1(absl::string_view password) {
 } // namespace
 
 FilterConfig::FilterConfig(UserMap&& users, const std::string& forward_username_header,
+                           const std::string& authentication_header,
                            const std::string& stats_prefix, Stats::Scope& scope)
     : users_(std::move(users)), forward_username_header_(forward_username_header),
+      authentication_header_(Http::LowerCaseString(authentication_header)),
       stats_(generateStats(stats_prefix + "basic_auth.", scope)) {}
 
 BasicAuthFilter::BasicAuthFilter(FilterConfigConstSharedPtr config) : config_(std::move(config)) {}
@@ -43,7 +47,12 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
     users = &route_specific_settings->users();
   }
 
-  auto auth_header = headers.get(Http::CustomHeaders::get().Authorization);
+  Http::HeaderMap::GetResult auth_header;
+  if (!config_->authenticationHeader().get().empty()) {
+    auth_header = headers.get(config_->authenticationHeader());
+  } else {
+    auth_header = headers.get(Http::CustomHeaders::get().Authorization);
+  }
 
   if (auth_header.empty()) {
     return onDenied("User authentication failed. Missing username and password.",

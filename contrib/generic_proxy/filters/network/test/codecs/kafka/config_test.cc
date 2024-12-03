@@ -1,10 +1,10 @@
 #include <cstdint>
 #include <memory>
 
+#include "test/extensions/filters/network/generic_proxy/mocks/codec.h"
 #include "test/mocks/server/factory_context.h"
 
 #include "contrib/generic_proxy/filters/network/source/codecs/kafka/config.h"
-#include "contrib/generic_proxy/filters/network/test/mocks/codec.h"
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/external/responses.h"
 #include "gtest/gtest.h"

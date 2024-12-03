@@ -354,8 +354,7 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> upstream_handshake_complete_;
 };
 
-class DownstreamTiming {
-public:
+struct DownstreamTiming {
   void setValue(absl::string_view key, MonotonicTime value) { timings_[key] = value; }
 
   absl::optional<MonotonicTime> getValue(absl::string_view value) const {
@@ -410,7 +409,6 @@ public:
     last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
   }
 
-private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
   // The time when the last byte of the request was received.
   absl::optional<MonotonicTime> last_downstream_rx_byte_received_;
@@ -979,6 +977,23 @@ public:
    * finished sending and receiving.
    */
   virtual bool shouldDrainConnectionUponCompletion() const PURE;
+
+  /**
+   * Set the parent for this StreamInfo. This is used to associate the
+   * stream info of an async client with the stream info of the downstream
+   * connection.
+   */
+  virtual void setParentStreamInfo(const StreamInfo& parent_stream_info) PURE;
+
+  /**
+   * Get the parent for this StreamInfo, if available.
+   */
+  virtual OptRef<const StreamInfo> parentStreamInfo() const PURE;
+
+  /**
+   * Clear the parent for this StreamInfo.
+   */
+  virtual void clearParentStreamInfo() PURE;
 
   /**
    * Called if the connection decides to drain itself after serving this request.

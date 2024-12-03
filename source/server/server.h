@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
@@ -39,7 +40,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/health_discovery_service.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
@@ -178,6 +178,9 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return server_.httpServerPropertiesCacheManager();
+  }
   Event::Dispatcher& mainThreadDispatcher() override { return server_.dispatcher(); }
   const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
@@ -253,9 +256,13 @@ public:
   ~InstanceBase() override;
 
   virtual void maybeCreateHeapShrinker() PURE;
-  virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
+  virtual absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() PURE;
   virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
   virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
+  virtual std::unique_ptr<HdsDelegateApi>
+  maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
+                         Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
+                         Ssl::ContextManager& ssl_context_manager) PURE;
 
   void run() override;
 
@@ -264,6 +271,9 @@ public:
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override;
   const Upstream::ClusterManager& clusterManager() const override;
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return *http_server_properties_cache_manager_;
+  }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
@@ -317,6 +327,7 @@ public:
   void setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) override {
     stats_store_.setSinkPredicates(std::move(sink_predicates));
   }
+  Config::XdsManager& xdsManager() override { return *xds_manager_; }
 
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
@@ -403,11 +414,12 @@ private:
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
-  Upstream::ProdClusterInfoFactory info_factory_;
-  Upstream::HdsDelegatePtr hds_delegate_;
+  Config::XdsManagerPtr xds_manager_;
+  std::unique_ptr<HdsDelegateApi> hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
+  std::unique_ptr<Http::HttpServerPropertiesCacheManager> http_server_properties_cache_manager_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

@@ -46,12 +46,11 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
     // `getAllPerFilterConfig` above returns).
     // Thus, here we reverse iterate the vector when `most_specific_wins` is false.
     for (auto it = route_configs_.rbegin(); it != route_configs_.rend(); ++it) {
-      (*it)->mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
+      (*it).get().mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
     }
   } else {
-    for (const auto* route_config : route_configs_) {
-      route_config->mutations().mutateRequestHeaders(headers, ctx,
-                                                     decoder_callbacks_->streamInfo());
+    for (const PerRouteHeaderMutation& route_config : route_configs_) {
+      route_config.mutations().mutateRequestHeaders(headers, ctx, decoder_callbacks_->streamInfo());
     }
   }
 
@@ -70,12 +69,12 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
 
   if (!config_->mostSpecificHeaderMutationsWins()) {
     for (auto it = route_configs_.rbegin(); it != route_configs_.rend(); ++it) {
-      (*it)->mutations().mutateResponseHeaders(headers, ctx, encoder_callbacks_->streamInfo());
+      (*it).get().mutations().mutateResponseHeaders(headers, ctx, encoder_callbacks_->streamInfo());
     }
   } else {
-    for (const auto* route_config : route_configs_) {
-      route_config->mutations().mutateResponseHeaders(headers, ctx,
-                                                      encoder_callbacks_->streamInfo());
+    for (const PerRouteHeaderMutation& route_config : route_configs_) {
+      route_config.mutations().mutateResponseHeaders(headers, ctx,
+                                                     encoder_callbacks_->streamInfo());
     }
   }
 

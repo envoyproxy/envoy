@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "sqlutils_lib",
     srcs = ["sqlutils.cc"],
     hdrs = ["sqlutils.h"],
-    external_deps = ["sqlparser"],
     deps = [
         "//source/common/protobuf:utility_lib",
+        "@com_github_envoyproxy_sqlparser//:sqlparser",
     ],
 )

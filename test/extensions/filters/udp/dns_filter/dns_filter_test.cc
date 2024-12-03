@@ -759,7 +759,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer()).Times(AnyNumber());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -812,7 +812,7 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -865,7 +865,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -917,7 +917,8 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "", TestUtility::makeDnsResponse({}));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({}));
 
   // parse the result
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
@@ -1003,7 +1004,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   // Execute resolve callback. This should harmlessly return and not alter
   // the response received by the client. Even though we are returning a successful
   // response, the client does not get an answer
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"130.207.244.251"}));
 
   // parse the result
@@ -1863,12 +1864,11 @@ TEST_F(DnsFilterTest, NotImplementedQueryTest) {
   EXPECT_EQ(0, config_->stats().downstream_rx_invalid_queries_.value());
 }
 
-TEST_F(DnsFilterTest, NoTransactionIdTest) {
+TEST_F(DnsFilterTest, ZeroTransactionIdTest) {
   InSequence s;
 
   setup(forward_query_off_config);
-  // This buffer has an invalid Transaction ID. We should return an error
-  // to the client
+  // This buffer has a Transaction ID of zero. This is not an error.
   constexpr char dns_request[] = {
       0x00, 0x00,                               // Transaction ID
       0x01, 0x20,                               // Flags
@@ -1888,8 +1888,8 @@ TEST_F(DnsFilterTest, NoTransactionIdTest) {
   sendQueryFromClient("10.0.0.1:1000", query);
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
-  EXPECT_FALSE(response_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NOT_IMPLEMENTED, response_ctx_->getQueryResponseCode());
 }
 
 TEST_F(DnsFilterTest, InvalidShortBufferTest) {

@@ -44,7 +44,7 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 
 using FilterConfigProviderManager =
-    Filter::FilterConfigProviderManager<Filter::NamedHttpFilterFactoryCb,
+    Filter::FilterConfigProviderManager<Filter::HttpFilterFactoryCb,
                                         Server::Configuration::FactoryContext>;
 
 /**
@@ -148,13 +148,14 @@ public:
   };
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-                                Http::FilterChainManager& manager) const override;
+                                Http::FilterChainManager& manager,
+                                const Http::FilterChainOptions& options) const override;
 
   // Http::ConnectionManagerConfig
   const Http::RequestIDExtensionSharedPtr& requestIDExtension() override {
     return request_id_extension_;
   }
-  const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override {
     return flush_log_on_tunnel_successfully_established_;
@@ -178,6 +179,9 @@ public:
   bool isRoutable() const override { return true; }
   absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
     return max_connection_duration_;
+  }
+  bool http1SafeMaxConnectionDuration() const override {
+    return http1_safe_max_connection_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
@@ -288,7 +292,7 @@ private:
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
   std::map<std::string, FilterConfig> upgrade_filter_factories_;
-  std::list<AccessLog::InstanceSharedPtr> access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   bool flush_access_log_on_new_request_;
   absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
   bool flush_log_on_tunnel_successfully_established_{false};
@@ -323,6 +327,7 @@ private:
   const uint32_t max_request_headers_count_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
+  const bool http1_safe_max_connection_duration_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;

@@ -21,7 +21,7 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
       config, context.messageValidationVisitor());
   absl::StatusOr<std::unique_ptr<Extensions::TransportSockets::Tls::ServerContextConfigImpl>>
       server_config_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-          quic_transport.downstream_tls_context(), context);
+          quic_transport.downstream_tls_context(), context, true);
   RETURN_IF_NOT_OK(server_config_or_error.status());
   auto server_config = std::move(server_config_or_error.value());
   // TODO(RyanTheOptimist): support TLS client authentication.
@@ -38,8 +38,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
 }
 
 namespace {
-void initializeQuicCertAndKey(Ssl::TlsContext& context,
-                              const Ssl::TlsCertificateConfig& /*cert_config*/) {
+absl::Status initializeQuicCertAndKey(Ssl::TlsContext& context,
+                                      const Ssl::TlsCertificateConfig& /*cert_config*/) {
   // Convert the certificate chain loaded into the context into PEM, as that is what the QUICHE
   // API expects. By using the version already loaded, instead of loading it from the source,
   // we can reuse all the code that loads from different formats, allows using passwords on the key,
@@ -55,19 +55,20 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
     std::istringstream pem_stream(cert_str);
     auto pem_result = quic::ReadNextPemMessage(&pem_stream);
     if (pem_result.status != quic::PemReadResult::Status::kOk) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           "Error loading certificate in QUIC context: error from ReadNextPemMessage");
     }
     chain.push_back(std::move(pem_result.contents));
+    return absl::OkStatus();
   };
 
-  process_one_cert(SSL_CTX_get0_certificate(context.ssl_ctx_.get()));
+  RETURN_IF_NOT_OK(process_one_cert(SSL_CTX_get0_certificate(context.ssl_ctx_.get())));
 
   STACK_OF(X509)* chain_stack = nullptr;
   int result = SSL_CTX_get0_chain_certs(context.ssl_ctx_.get(), &chain_stack);
   ASSERT(result == 1);
   for (size_t i = 0; i < sk_X509_num(chain_stack); i++) {
-    process_one_cert(sk_X509_value(chain_stack, i));
+    RETURN_IF_NOT_OK(process_one_cert(sk_X509_value(chain_stack, i)));
   }
 
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> cert_chain(
@@ -77,7 +78,7 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
   bssl::UniquePtr<EVP_PKEY> pub_key(X509_get_pubkey(context.cert_chain_.get()));
   int sign_alg = deduceSignatureAlgorithmFromPublicKey(pub_key.get(), &error_details);
   if (sign_alg == 0) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         absl::StrCat("Failed to deduce signature algorithm from public key: ", error_details));
   }
 
@@ -88,10 +89,11 @@ void initializeQuicCertAndKey(Ssl::TlsContext& context,
   std::unique_ptr<quic::CertificatePrivateKey> pem_key =
       std::make_unique<quic::CertificatePrivateKey>(std::move(privateKey));
   if (pem_key == nullptr) {
-    throwEnvoyExceptionOrPanic("Failed to load QUIC private key.");
+    return absl::InvalidArgumentError("Failed to load QUIC private key.");
   }
 
   context.quic_private_key_ = std::move(pem_key);
+  return absl::OkStatus();
 }
 } // namespace
 
@@ -111,16 +113,12 @@ QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
     bool enable_early_data, Stats::Scope& scope, Ssl::ServerContextConfigPtr config,
     Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names,
     absl::Status& creation_status)
-    : QuicTransportSocketFactoryBase(scope, "server"),
-      handle_certs_with_shared_tls_code_(Runtime::runtimeFeatureEnabled(
-          "envoy.restart_features.quic_handle_certs_with_shared_tls_code")),
-      manager_(manager), stats_scope_(scope), config_(std::move(config)),
-      server_names_(server_names), enable_early_data_(enable_early_data) {
-  if (handle_certs_with_shared_tls_code_) {
-    auto ctx_or_error = createSslServerContext();
-    SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
-    ssl_ctx_ = *ctx_or_error;
-  }
+    : QuicTransportSocketFactoryBase(scope, "server"), manager_(manager), stats_scope_(scope),
+      config_(std::move(config)), server_names_(server_names),
+      enable_early_data_(enable_early_data) {
+  auto ctx_or_error = createSslServerContext();
+  SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
+  ssl_ctx_ = *ctx_or_error;
 }
 
 QuicServerTransportSocketFactory::~QuicServerTransportSocketFactory() {
@@ -169,8 +167,9 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   }
   auto ctx =
       std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
-  auto [tls_context, ocsp_staple_action] = ctx->findTlsContext(
-      sni, true /* TODO: ecdsa_capable */, false /* TODO: ocsp_capable */, cert_matched_sni);
+  auto [tls_context, ocsp_staple_action] =
+      ctx->findTlsContext(sni, Ssl::CurveNIDVector{NID_X9_62_prime256v1} /* TODO: ecdsa_capable */,
+                          false /* TODO: ocsp_capable */, cert_matched_sni);
 
   // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ``ssl_ctx``.
   // Both of these members are themselves reference counted, so it is safe to use them after
@@ -181,15 +180,13 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
 absl::Status QuicServerTransportSocketFactory::onSecretUpdated() {
   ENVOY_LOG(debug, "Secret is updated.");
 
-  if (handle_certs_with_shared_tls_code_) {
-    auto ctx_or_error = createSslServerContext();
-    RETURN_IF_NOT_OK(ctx_or_error.status());
-    {
-      absl::WriterMutexLock l(&ssl_ctx_mu_);
-      std::swap(*ctx_or_error, ssl_ctx_);
-    }
-    manager_.removeContext(*ctx_or_error);
+  auto ctx_or_error = createSslServerContext();
+  RETURN_IF_NOT_OK(ctx_or_error.status());
+  {
+    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    std::swap(*ctx_or_error, ssl_ctx_);
   }
+  manager_.removeContext(*ctx_or_error);
 
   stats_.context_config_update_by_sds_.inc();
   return absl::OkStatus();

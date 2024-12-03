@@ -13,9 +13,13 @@ public:
 
 protected:
   void maybeCreateHeapShrinker() override;
-  std::unique_ptr<OverloadManager> createOverloadManager() override;
+  absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() override;
   std::unique_ptr<OverloadManager> createNullOverloadManager() override;
   std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) override;
+  std::unique_ptr<HdsDelegateApi>
+  maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
+                         Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
+                         Ssl::ContextManager& ssl_context_manager) override;
 
 private:
   std::unique_ptr<Memory::HeapShrinker> heap_shrinker_;

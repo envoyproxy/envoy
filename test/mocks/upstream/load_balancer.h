@@ -25,5 +25,6 @@ public:
 
   std::shared_ptr<MockHost> host_{new MockHost()};
 };
+
 } // namespace Upstream
 } // namespace Envoy

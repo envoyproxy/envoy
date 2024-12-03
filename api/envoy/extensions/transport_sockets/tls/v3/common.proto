@@ -290,12 +290,12 @@ message TlsSessionTicketKeys {
 // respect to the TLS handshake.
 // [#not-implemented-hide:]
 message CertificateProviderPluginInstance {
-  // Provider instance name. If not present, defaults to "default".
+  // Provider instance name.
   //
   // Instance names should generally be defined not in terms of the underlying provider
   // implementation (e.g., "file_watcher") but rather in terms of the function of the
   // certificates (e.g., "foo_deployment_identity").
-  string instance_name = 1;
+  string instance_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Opaque name used to specify certificate instances or types. For example, "ROOTCA" to specify
   // a root-certificate (validation context) or "example.com" to specify a certificate for a

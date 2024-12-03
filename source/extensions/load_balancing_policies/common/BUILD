@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "factory_base",
     hdrs = ["factory_base.h"],
     deps = [
+        "//envoy/server:factory_context_interface",
         "//envoy/upstream:load_balancer_interface",
         "//source/common/upstream:load_balancer_factory_base_lib",
     ],
@@ -21,12 +22,12 @@ envoy_cc_library(
     name = "thread_aware_lb_lib",
     srcs = ["thread_aware_lb_impl.cc"],
     hdrs = ["thread_aware_lb_impl.h"],
-    external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
+        "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )

@@ -231,7 +231,7 @@ Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) 
   if (absl::EndsWith(file_path, ".yaml")) {
     contents = MessageUtil::getJsonStringFromMessageOrError(ValueUtil::loadFromYaml(contents));
   }
-  return Json::Factory::loadFromString(contents);
+  return Json::Factory::loadFromString(contents).value();
 }
 
 std::vector<envoy::RouterCheckToolSchema::ValidationItemResult>
@@ -332,11 +332,11 @@ bool RouterCheckTool::compareVirtualCluster(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   const bool has_virtual_cluster =
       has_route_entry &&
-      tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_) != nullptr;
+      tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_) != nullptr;
   std::string actual = "";
   if (has_virtual_cluster) {
     Stats::StatName stat_name =
-        tool_config.route_->routeEntry()->virtualCluster(*tool_config.request_headers_)->statName();
+        tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_)->statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =
@@ -362,7 +362,7 @@ bool RouterCheckTool::compareVirtualHost(
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
   std::string actual = "";
   if (has_route_entry) {
-    Stats::StatName stat_name = tool_config.route_->routeEntry()->virtualHost().statName();
+    Stats::StatName stat_name = tool_config.route_->virtualHost().statName();
     actual = tool_config.symbolTable().toString(stat_name);
   }
   const bool matches =
@@ -530,8 +530,9 @@ bool RouterCheckTool::matchHeaderField(
     const HeaderMap& header_map, const envoy::config::route::v3::HeaderMatcher& header,
     const std::string test_type,
     envoy::RouterCheckToolSchema::HeaderMatchFailure& header_match_failure) {
-  Envoy::Http::HeaderUtility::HeaderData expected_header_data{header, *factory_context_};
-  if (Envoy::Http::HeaderUtility::matchHeaders(header_map, expected_header_data)) {
+  Envoy::Http::HeaderUtility::HeaderDataPtr expected_header_data{
+      Http::HeaderUtility::createHeaderData(header, *factory_context_)};
+  if (expected_header_data->matchesHeaders(header_map)) {
     return true;
   }
 

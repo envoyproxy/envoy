@@ -3,10 +3,17 @@
 // NOLINT(namespace-envoy)
 
 #ifdef __cplusplus
+#include <atomic>
+
+#define _Atomic(X) std::atomic<X>
+
 extern "C" {
+#else
+#include <stdatomic.h> // NOLINT(modernize-deprecated-headers)
 #endif
 
-#include <stdint.h> // NOLINT(modernize-deprecated-headers)
+#include <stdbool.h> // NOLINT(modernize-deprecated-headers)
+#include <stdint.h>  // NOLINT(modernize-deprecated-headers)
 
 typedef struct { // NOLINT(modernize-use-using)
   const char* data;
@@ -27,6 +34,8 @@ typedef struct httpRequest { // NOLINT(modernize-use-using)
   // The ID of the worker that is processing this request, this enables the go filter to dedicate
   // memory to each worker and not require locks
   uint32_t worker_id;
+  // This flag will be read & written by different threads, so it need to be atomic
+  _Atomic(int) is_golang_processing_log;
 } httpRequest;
 
 typedef struct { // NOLINT(modernize-use-using)
@@ -69,6 +78,7 @@ CAPIStatus envoyGoFilterHttpSendLocalReply(void* s, int response_code, void* bod
                                            long long int grpc_status, void* details_data,
                                            int details_len);
 CAPIStatus envoyGoFilterHttpSendPanicReply(void* s, void* details_data, int details_len);
+CAPIStatus envoyGoFilterHttpAddData(void* s, void* data, int data_len, bool is_streaming);
 
 CAPIStatus envoyGoFilterHttpGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data,
                                       int* value_len);
@@ -88,7 +98,7 @@ CAPIStatus envoyGoFilterHttpSetTrailer(void* s, void* key_data, int key_len, voi
 CAPIStatus envoyGoFilterHttpRemoveTrailer(void* s, void* key_data, int key_len);
 
 /* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
-CAPIStatus envoyGoFilterHttpClearRouteCache(void* r);
+CAPIStatus envoyGoFilterHttpClearRouteCache(void* r, bool refresh);
 CAPIStatus envoyGoFilterHttpGetStringValue(void* r, int id, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoFilterHttpGetIntegerValue(void* r, int id, uint64_t* value);
 

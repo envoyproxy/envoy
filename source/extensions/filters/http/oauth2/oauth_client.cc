@@ -106,10 +106,16 @@ void OAuth2ClientImpl::asyncRefreshAccessToken(const std::string& refresh_token,
 void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
   const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
   if (thread_local_cluster != nullptr) {
-    in_flight_request_ = thread_local_cluster->httpAsyncClient().send(
-        std::move(msg), *this,
-        Http::AsyncClient::RequestOptions().setTimeout(
-            std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout))));
+    auto options = Http::AsyncClient::RequestOptions().setTimeout(
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri_, timeout)));
+
+    if (retry_policy_.has_value()) {
+      options.setRetryPolicy(retry_policy_.value());
+      options.setBufferBodyForRetry(true);
+    }
+
+    in_flight_request_ =
+        thread_local_cluster->httpAsyncClient().send(std::move(msg), *this, options);
   } else {
     parent_->sendUnauthorizedResponse();
   }

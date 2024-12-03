@@ -245,17 +245,6 @@ test:mobile-remote-ci-android --config=mobile-test-android
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
 
-# TODO(alyssar) remove in a follow-up PR
-build:mobile-remote-ci-cc-no-exceptions --config=mobile-remote-ci-cc
-build:mobile-remote-ci-cc-no-exceptions --define envoy_exceptions=disabled
-build:mobile-remote-ci-cc-no-exceptions --copt=-fno-exceptions
-
-build:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
-test:mobile-remote-ci-cc-full-protos-enabled --config=mobile-remote-ci-cc
-
-build:mobile-remote-ci-macos-kotlin --config=mobile-remote-ci-macos
-build:mobile-remote-ci-macos-kotlin --fat_apk_cpu=x86_64
-
 build:mobile-remote-ci-core --config=mobile-remote-ci
 test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
 

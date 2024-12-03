@@ -71,14 +71,7 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmStatSinkConfigTest,
 TEST_P(WasmStatSinkConfigTest, CreateWasmFromEmpty) {
   envoy::extensions::stat_sinks::wasm::v3::Wasm config;
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm Stat Sink ");
-}
-
-TEST_P(WasmStatSinkConfigTest, CreateWasmFailOpen) {
-  envoy::extensions::stat_sinks::wasm::v3::Wasm config;
-  config.mutable_config()->set_fail_open(true);
-  EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm Stat Sink ");
+                            "Unable to create Wasm plugin ");
 }
 
 TEST_P(WasmStatSinkConfigTest, CreateWasmFromWASM) {

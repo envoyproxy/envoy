@@ -560,9 +560,8 @@ TEST_P(CompositeFilterIntegrationTest, TestPerRouteEmptyMatcherMultipleFilters) 
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("402"));
 }
 
-class CompositeFilterSeverContextIntegrationTest
-    : public HttpIntegrationTest,
-      public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
+class CompositeFilterSeverContextIntegrationTest : public HttpIntegrationTest,
+                                                   public Grpc::GrpcClientIntegrationParamTest {
 public:
   CompositeFilterSeverContextIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
@@ -611,10 +610,6 @@ public:
             ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
                 .PackFrom(protocol_options);
       }
-      // Parameterize with defer processing to prevent bit rot as filter made
-      // assumptions of data flow, prior relying on eager processing.
-      config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                        deferredProcessing() ? "true" : "false");
     });
 
     setUpstreamProtocol(Http::CodecType::HTTP2);
@@ -742,10 +737,9 @@ public:
   FakeStreamPtr stream_;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientTypeDeferredProcessing, CompositeFilterSeverContextIntegrationTest,
-    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
-    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing,
+                         CompositeFilterSeverContextIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 TEST_P(CompositeFilterSeverContextIntegrationTest,
        BasicFlowDownstreamFilterInDownstreamAllSampled) {

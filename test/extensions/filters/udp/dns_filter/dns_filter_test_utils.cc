@@ -182,10 +182,6 @@ bool DnsResponseValidator::validateDnsResponseObject(DnsQueryContextPtr& context
   }
 
   context->id_ = static_cast<uint16_t>(context->header_.id);
-  if (context->id_ == 0) {
-    ENVOY_LOG(debug, "No ID in DNS Response");
-    return false;
-  }
 
   // Almost always, we will have only one query here. Per the RFC, QDCOUNT is usually 1
   context->queries_.reserve(context->header_.questions);

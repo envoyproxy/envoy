@@ -19,3 +19,4 @@ Services
   ../config/tap/v3/*
   tap/v3/*
   trace/v3/*
+  redis_auth/v3/*

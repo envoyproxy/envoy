@@ -53,7 +53,7 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     quic::ConnectionIdGeneratorInterface& generator,
-    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef&& debug_visitor_factory)
+    EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
     : quic::QuicDispatcher(&quic_config, crypto_config, version_manager, std::move(helper),
                            std::make_unique<EnvoyQuicCryptoServerStreamHelper>(),
                            std::move(alarm_factory), expected_server_connection_id_length,
@@ -65,7 +65,7 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
       quic_stats_(generateStats(listener_config.listenerScope())),
       connection_stats_({QUIC_CONNECTION_STATS(
           POOL_COUNTER_PREFIX(listener_config.listenerScope(), "quic.connection"))}),
-      debug_visitor_factory_(std::move(debug_visitor_factory)) {}
+      debug_visitor_factory_(debug_visitor_factory) {}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
                                              quic::QuicErrorCode error,
@@ -181,24 +181,17 @@ void EnvoyQuicDispatcher::closeConnectionsWithFilterChain(
     // Retain the number of connections in the list early because closing the connection will change
     // the size.
     const size_t num_connections = connections.size();
-    bool delete_sessions_immediately = false;
     for (size_t i = 0; i < num_connections; ++i) {
       Network::Connection& connection = connections.front().get();
       // This will remove the connection from the list. And the last removal will remove connections
       // from the map as well.
       connection.close(Network::ConnectionCloseType::NoFlush);
-      if (!delete_sessions_immediately &&
-          dynamic_cast<QuicFilterManagerConnectionImpl&>(connection).fixQuicLifetimeIssues()) {
-        // If `envoy.reloadable_features.quic_fix_filter_manager_uaf` is true, the closed sessions
-        // need to be deleted right away to consistently handle quic lifetimes. Because upon
-        // returning the filter chain configs will be destroyed, and no longer safe to be accessed.
-        // If any filters access those configs during destruction, it'll be use-after-free
-        delete_sessions_immediately = true;
-      }
     }
     ASSERT(connections_by_filter_chain_.find(filter_chain) == connections_by_filter_chain_.end());
-    if (delete_sessions_immediately) {
-      // Explicitly destroy closed sessions in the current call stack.
+    if (num_connections > 0) {
+      // Explicitly destroy closed sessions in the current call stack. Because upon
+      // returning the filter chain configs will be destroyed, and no longer safe to be accessed.
+      // If any filters access those configs during destruction, it'll be use-after-free
       DeleteSessions();
     }
   }

@@ -137,7 +137,7 @@ function run_testsuite() {
   sleep 3
 
   UPDATED_HOT_RESTART_JSON="${TEST_TMPDIR}"/hot_restart_updated."${TEST_INDEX}".yaml
-  "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
+  "${TEST_SRCDIR}/envoy"/tools/socket_passing/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
     "-u" "${UPDATED_HOT_RESTART_JSON}"
 
   # Send SIGUSR1 signal to the first server, this should not kill it. Also send SIGHUP which should
@@ -205,7 +205,7 @@ function run_testsuite() {
 
   start_test "Checking that listener addresses have not changed"
   HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart.1."${TEST_INDEX}".yaml
-  "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
+  "${TEST_SRCDIR}/envoy"/tools/socket_passing/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
     "-u" "${HOT_RESTART_JSON_1}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
   [[ -z "${CONFIG_DIFF}" ]]
@@ -264,7 +264,7 @@ function run_testsuite() {
 
   start_test "Checking that listener addresses have not changed"
   HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart.2."${TEST_INDEX}".yaml
-  "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
+  "${TEST_SRCDIR}/envoy"/tools/socket_passing/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
     "-u" "${HOT_RESTART_JSON_2}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")
   [[ -z "${CONFIG_DIFF}" ]]
