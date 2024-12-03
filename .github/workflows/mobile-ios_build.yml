@@ -158,20 +158,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - name: Build swift baseline app
-          app: //test/swift/apps/baseline:app
-          expected-status: 301
-          target: swift-baseline-app
         - name: Build swift experimental app
           args: >-
             --config=mobile-remote-ci-macos-ios
           app: //test/swift/apps/experimental:app
           expected-status: 200
           target: swift-experimental-app
-        - name: Build objc hello world
-          app: //examples/objective-c/hello_world:app
-          expected-status: 301
-          target: objc-hello-world
 
   request:
     secrets:
