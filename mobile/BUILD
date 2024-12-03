@@ -123,10 +123,6 @@ xcodeproj(
     scheme_autogeneration_mode = "auto",  # Switch to "all" to generate schemes for all deps
     schemes = [
         xcode_schemes.scheme(
-            name = "Async Await App",
-            launch_action = xcode_schemes.launch_action("//examples/swift/async_await:app"),
-        ),
-        xcode_schemes.scheme(
             name = "Hello World App",
             launch_action = xcode_schemes.launch_action("//examples/swift/hello_world:app"),
         ),
@@ -168,7 +164,6 @@ xcodeproj(
         top_level_targets(
             labels = [
                 "//examples/objective-c/hello_world:app",
-                "//examples/swift/async_await:app",
                 "//examples/swift/hello_world:app",
                 "//test/swift/apps/baseline:app",
                 "//test/swift/apps/experimental:app",

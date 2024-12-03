@@ -94,7 +94,6 @@ paths:
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
     - source/common/upstream/upstream_impl.h
-    - source/common/config/context_provider_impl.h
     - source/common/protobuf/utility.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
@@ -138,9 +137,7 @@ paths:
     - source/server/hot_restart_impl.cc
     - source/common/upstream/health_discovery_service.cc
     - source/common/upstream/prod_cluster_info_factory.cc
-    - source/common/secret/sds_api.h
     - source/common/secret/sds_api.cc
-    - source/common/router/router.cc
     - source/common/config/config_provider_impl.h
     - source/common/grpc/async_client_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc

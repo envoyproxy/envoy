@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include <iostream>
+#include <iosfwd>
 #include <queue>
 
 #include "envoy/upstream/scheduler.h"
