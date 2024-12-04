@@ -681,17 +681,15 @@ TEST_P(HttpInspectorTest, Http1WithLargeHeader) {
 }
 
 TEST_P(HttpInspectorTest, HttpExceedMaxBufferSize) {
-  std::string data = "GET /index?x=0123456789&y=0123456789&z=0123456789 HTTP/1.0\r\n";
-  //                  0               16
+  absl::string_view method = "GET", http = "/index HTTP/1.0\r\n";
+  std::string spaces(Config::MAX_INSPECT_SIZE, ' ');
+  const std::string data = absl::StrCat(method, spaces, http);
 
   envoy::extensions::filters::listener::http_inspector::v3::HttpInspector proto_config;
-  const uint32_t initial_buffer_size = 16;
-  const size_t max_size = 16;
-  proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
-  proto_config.mutable_max_read_buffer_size()->set_value(max_size);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
 
   init();
+  buffer_->resetCapacity(Config::MAX_INSPECT_SIZE);
 
   EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
       .WillOnce(
@@ -717,9 +715,7 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
 
   envoy::extensions::filters::listener::http_inspector::v3::HttpInspector proto_config;
   uint32_t buffer_size = 16;
-  const size_t max_size = 100;
   proto_config.mutable_initial_read_buffer_size()->set_value(buffer_size);
-  proto_config.mutable_max_read_buffer_size()->set_value(max_size);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
 
   init();
