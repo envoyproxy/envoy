@@ -43,7 +43,7 @@ final class KeyValueStoreTests: XCTestCase {
     let testStore = TestKeyValueStore(readExpectation: readExpectation,
                                       saveExpectation: saveExpectation)
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)

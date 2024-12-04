@@ -1,14 +1,11 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_jinja_env", "envoy_py_data", "envoy_pytool_binary", "envoy_pytool_library")
 load("//tools/protodoc:protodoc.bzl", "protodoc_rule")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 envoy_py_namespace()
 
@@ -133,6 +130,7 @@ envoy_pytool_binary(
 
 protodoc_rule(
     name = "api_v3_protodoc",
+    visibility = ["//visibility:public"],
     deps = [
         "@envoy_api//:v3_protos",
         "@envoy_api//:xds_protos",

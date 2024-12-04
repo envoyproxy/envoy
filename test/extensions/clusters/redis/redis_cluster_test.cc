@@ -129,8 +129,9 @@ protected:
         ssl_context_manager_, std::move(outlier_event_logger), false);
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
-    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufMessage::getStrictValidationVisitor(), config);
+    THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        cluster_config.cluster_type().typed_config(), ProtobufMessage::getStrictValidationVisitor(),
+        config));
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_ = std::shared_ptr<RedisCluster>(*RedisCluster::create(
         cluster_config,
@@ -151,8 +152,8 @@ protected:
     envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
-    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           validation_visitor_, config);
+    RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        cluster_config.cluster_type().typed_config(), validation_visitor_, config));
 
     NiceMock<AccessLog::MockAccessLogManager> log_manager;
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;

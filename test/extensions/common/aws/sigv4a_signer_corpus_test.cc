@@ -53,26 +53,30 @@ public:
 
   void loadContext() {
 
-    json_context_ = Json::Factory::loadFromString(readStringFile("context.json"));
+    json_context_ = *Json::Factory::loadFromString(readStringFile("context.json"));
 
-    normalize_ = json_context_->getBoolean("normalize");
-    expiration_ = json_context_->getInteger("expiration_in_seconds");
-    region_ = json_context_->getString("region");
-    service_ = json_context_->getString("service");
-    timestamp_ = json_context_->getString("timestamp");
-    akid_ = json_context_->getObject("credentials")->getString("access_key_id");
-    skid_ = json_context_->getObject("credentials")->getString("secret_access_key");
+    normalize_ = *json_context_->getBoolean("normalize");
+    expiration_ = *json_context_->getInteger("expiration_in_seconds");
+    region_ = *json_context_->getString("region");
+    service_ = *json_context_->getString("service");
+    timestamp_ = *json_context_->getString("timestamp");
+    akid_ = *(*json_context_->getObject("credentials"))->getString("access_key_id");
+    skid_ = *(*json_context_->getObject("credentials"))->getString("secret_access_key");
 
     token_ = "";
 
     try {
-      omit_session_token_ = json_context_->getBoolean("omit_session_token");
+      omit_session_token_ =
+          THROW_OR_RETURN_VALUE(json_context_->getBoolean("omit_session_token"), bool);
     } catch (EnvoyException& e) {
       omit_session_token_ = false;
     }
     if (!omit_session_token_) {
       try {
-        token_ = json_context_->getObject("credentials")->getString("token");
+        token_ = THROW_OR_RETURN_VALUE(
+            THROW_OR_RETURN_VALUE(json_context_->getObject("credentials"), Json::ObjectSharedPtr)
+                ->getString("token"),
+            std::string);
       } catch (EnvoyException& e) {
       }
     }

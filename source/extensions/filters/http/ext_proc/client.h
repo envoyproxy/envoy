@@ -19,11 +19,17 @@ namespace ExternalProcessing {
 
 class ExternalProcessorStream : public StreamBase {
 public:
-  virtual ~ExternalProcessorStream() = default;
+  ~ExternalProcessorStream() override = default;
   virtual void send(envoy::service::ext_proc::v3::ProcessingRequest&& request,
                     bool end_stream) PURE;
   // Idempotent close. Return true if it actually closed.
-  virtual bool close() PURE;
+  // Sends a half-close from the client side.
+  // No further messages can be sent after this, but gRPC server may still send
+  // messages back.
+  virtual bool closeLocalStream() PURE;
+  virtual bool remoteClosed() const PURE;
+  virtual bool localClosed() const PURE;
+  virtual void resetStream() PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
   virtual void notifyFilterDestroy() PURE;
@@ -33,7 +39,7 @@ using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
 
 class ExternalProcessorCallbacks : public RequestCallbacks {
 public:
-  virtual ~ExternalProcessorCallbacks() = default;
+  ~ExternalProcessorCallbacks() override = default;
   virtual void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) PURE;
   virtual void onGrpcError(Grpc::Status::GrpcStatus error) PURE;
@@ -43,11 +49,11 @@ public:
 
 class ExternalProcessorClient : public ClientBase {
 public:
-  virtual ~ExternalProcessorClient() = default;
+  ~ExternalProcessorClient() override = default;
   virtual ExternalProcessorStreamPtr
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-        const Http::AsyncClient::StreamOptions& options,
+        Http::AsyncClient::StreamOptions& options,
         Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) PURE;
 };
 

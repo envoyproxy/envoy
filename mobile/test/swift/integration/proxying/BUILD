@@ -10,6 +10,9 @@ envoy_mobile_swift_test(
     srcs = [
         "HTTPRequestUsingProxyTest.swift",
     ],
+    data = [
+        "@envoy//test/config/integration/certs",
+    ],
     exec_properties = {
         "sandboxNetwork": "standard",
     },

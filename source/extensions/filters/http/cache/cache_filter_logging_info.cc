@@ -69,10 +69,6 @@ absl::string_view insertStatusToString(InsertStatus status) {
   return "UnexpectedInsertStatus";
 }
 
-std::ostream& operator<<(std::ostream& os, const InsertStatus& cache_insert_status) {
-  return os << insertStatusToString(cache_insert_status);
-}
-
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

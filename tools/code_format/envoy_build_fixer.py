@@ -92,7 +92,7 @@ def fix_package_and_license(path, contents):
 
     # Ensure we have an envoy_package / envoy_mobile_package import load if this is a real Envoy package.
     # We also allow the prefix to be overridden if envoy is included in a larger workspace.
-    if re.search(ENVOY_RULE_REGEX, contents):
+    if "tools/" not in path and re.search(ENVOY_RULE_REGEX, contents):
         new_load = 'new_load {}//bazel:envoy_build_system.bzl %s' % package_string
         contents = run_buildozer([
             (new_load.format(os.getenv("ENVOY_BAZEL_PREFIX", "")), '__pkg__'),

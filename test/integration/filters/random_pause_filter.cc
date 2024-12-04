@@ -27,11 +27,13 @@ public:
         connection()->onWriteBufferLowWatermark();
       } else {
         connection()->onWriteBufferHighWatermark();
+        armLowWatermarkTimer();
       }
     }
     return Http::PassThroughFilter::encodeData(buf, end_stream);
   }
 
+private:
   Network::ConnectionImpl* connection() {
     // As long as we're doing horrible things let's do *all* the horrible things.
     // Assert the connection we have is a ConnectionImpl and const cast it so we
@@ -41,8 +43,26 @@ public:
     return const_cast<Network::ConnectionImpl*>(conn_impl);
   }
 
+  // Since we deferred processing data, when the filter raises watermark with
+  // deferred processing the filter chain manager won't invoke it again which
+  // could lower the watermark.
+  void armLowWatermarkTimer() {
+    if (timer_ == nullptr) {
+      timer_ = connection()->dispatcher().createTimer([this]() {
+        if (connection()->aboveHighWatermark()) {
+          connection()->onWriteBufferLowWatermark();
+        }
+      });
+    }
+
+    if (!timer_->enabled()) {
+      timer_->enableHRTimer(std::chrono::microseconds(rng_.random() % 10));
+    }
+  }
+
   absl::Mutex& rand_lock_;
   TestRandomGenerator& rng_;
+  Event::TimerPtr timer_;
 };
 
 class RandomPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {

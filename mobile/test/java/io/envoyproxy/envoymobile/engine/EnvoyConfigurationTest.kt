@@ -84,7 +84,6 @@ class EnvoyConfigurationTest {
     enableHttp3: Boolean = true,
     enableCares: Boolean = false,
     caresFallbackResolvers: MutableList<Pair<String, Int>> = mutableListOf(Pair("1.2.3.4", 88)),
-    enableGro: Boolean = false,
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
     quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
@@ -131,7 +130,6 @@ class EnvoyConfigurationTest {
       enableDrainPostDnsRefresh,
       enableHttp3,
       enableCares,
-      enableGro,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
       quicHints,
@@ -199,7 +197,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("client_connection_options: \"MPQC\"");
     assertThat(resolvedTemplate).doesNotContain("connection_keepalive { initial_interval {")
 
-
     // Per Host Limits
     assertThat(resolvedTemplate).contains("max_connections { value: 543 }")
 
@@ -240,7 +237,6 @@ class EnvoyConfigurationTest {
       dnsCacheSaveIntervalSeconds = 101,
       enableHttp3 = false,
       enableCares = true,
-      enableGro = true,
       enableGzipDecompression = false,
       enableBrotliDecompression = true,
       enableSocketTagging = true,
@@ -266,7 +262,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("address: \"1.2.3.4\"");
     assertThat(resolvedTemplate).contains("port_value: 88");
 
-    // enableGro = true
+    // UDP GRO enabled by default
     assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")
 
     // enableDNSCache = true

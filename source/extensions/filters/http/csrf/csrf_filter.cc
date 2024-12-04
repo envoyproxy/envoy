@@ -59,7 +59,7 @@ std::string sourceOriginValue(const Http::RequestHeaderMap& headers) {
 std::string targetOriginValue(const Http::RequestHeaderMap& headers) {
   const auto host_value = headers.getHostValue();
 
-  // Don't even bother if there's not Host header.
+  // Don't even bother if there's no Host header.
   if (host_value.empty()) {
     return EMPTY_STRING;
   }
@@ -100,19 +100,12 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& head
     return Http::FilterHeadersStatus::Continue;
   }
 
-  bool is_valid = true;
   const auto source_origin = sourceOriginValue(headers);
   if (source_origin.empty()) {
-    is_valid = false;
     config_->stats().missing_source_origin_.inc();
-  }
-
-  if (!isValid(source_origin, headers)) {
-    is_valid = false;
+  } else if (!isValid(source_origin, headers)) {
     config_->stats().request_invalid_.inc();
-  }
-
-  if (is_valid == true) {
+  } else {
     config_->stats().request_valid_.inc();
     return Http::FilterHeadersStatus::Continue;
   }

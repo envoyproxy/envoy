@@ -95,7 +95,8 @@ public:
   // there are relevant resources).
   void markStreamFresh(bool should_send_initial_resource_versions);
 
-  UpdateAck handleResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
+  // May modify the order of resources to put all the non-heartbeat resources first.
+  UpdateAck handleResponse(envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
 
   void handleEstablishmentFailure();
 
@@ -111,7 +112,7 @@ public:
 
 private:
   bool isHeartbeatResponse(const envoy::service::discovery::v3::Resource& resource) const;
-  void handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
+  void handleGoodResponse(envoy::service::discovery::v3::DeltaDiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
 
   class ResourceState {

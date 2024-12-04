@@ -40,8 +40,9 @@ public:
     envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV3Yaml(yaml_config);
     envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig config;
-    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufMessage::getStrictValidationVisitor(), config);
+    THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        cluster_config.cluster_type().typed_config(), ProtobufMessage::getStrictValidationVisitor(),
+        config));
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
@@ -123,10 +124,9 @@ public:
   }
 
   Upstream::MockLoadBalancerContext* setFilterStateHostAndReturnContext(const std::string& host) {
-    StreamInfo::FilterState& filter_state =
-        const_cast<StreamInfo::FilterState&>(lb_context_.requestStreamInfo()->filterState());
+    StreamInfo::FilterStateSharedPtr filter_state = lb_context_.requestStreamInfo()->filterState();
 
-    filter_state.setData(
+    filter_state->setData(
         "envoy.upstream.dynamic_host", std::make_shared<Router::StringAccessorImpl>(host),
         StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection,
         StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);

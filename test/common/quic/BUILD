@@ -244,6 +244,7 @@ envoy_cc_test(
         "//source/server:process_context_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",
+        "//test/mocks/server:listener_factory_context_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",

@@ -25,8 +25,15 @@ const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config), no_op_callbacks_() {
   // Filter for only Request Message types with NoOp Parser callbacks.
-  parser_ = std::make_unique<Http::Http1::LegacyHttpParserImpl>(Http::Http1::MessageType::Request,
-                                                                &no_op_callbacks_);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_inspector_use_balsa_parser")) {
+    // Set both allow_custom_methods and enable_trailers to true with BalsaParser.
+    parser_ = std::make_unique<Http::Http1::BalsaParser>(
+        Http::Http1::MessageType::Request, &no_op_callbacks_, max_request_headers_kb_ * 1024, true,
+        true);
+  } else {
+    parser_ = std::make_unique<Http::Http1::LegacyHttpParserImpl>(Http::Http1::MessageType::Request,
+                                                                  &no_op_callbacks_);
+  }
 }
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
@@ -80,11 +87,11 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
     }
 
     absl::string_view new_data = data.substr(nread_);
-    const size_t pos = new_data.find_first_of("\r\n");
-
+    const size_t pos = new_data.find_first_of('\n');
     if (pos != absl::string_view::npos) {
-      // Include \r or \n
+      // Include \n
       new_data = new_data.substr(0, pos + 1);
+
       ssize_t rc = parser_->execute(new_data.data(), new_data.length());
       nread_ += rc;
       ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,

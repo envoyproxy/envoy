@@ -492,8 +492,8 @@ public:
 
   /**
    * Sanitize host name strings for logging purposes. Replace invalid hostname characters (anything
-   * that's not alphanumeric, hyphen, or period) with underscore. The sanitized string is not a
-   * valid host name.
+   * that's not alphanumeric, hyphen, or period) with underscore. The sanitized string
+   * is not a valid host name.
    * @param source supplies the string to sanitize.
    * @return sanitized string.
    */

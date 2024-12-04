@@ -1381,7 +1381,6 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
       /*failover_async_client=*/nullptr,
-      /*custom_config_validators=*/nullptr,
       /*scope=*/*stats_.rootScope(),
       /*backoff_strategy=*/
       std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -1442,7 +1441,6 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
       /*failover_async_client=*/nullptr,
-      /*custom_config_validators=*/std::make_unique<NiceMock<MockCustomConfigValidators>>(),
       /*scope=*/*stats_.rootScope(),
       /*backoff_strategy=*/
       std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -1505,7 +1503,6 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                        /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(
                            replaced_async_client_),
                        /*failover_async_client=*/nullptr,
-                       /*custom_config_validators=*/nullptr,
                        /*scope=*/*stats_.rootScope(),
                        /*backoff_strategy=*/
                        std::make_unique<JitteredExponentialBackOffStrategy>(
@@ -1574,8 +1571,8 @@ TEST_F(NullGrpcMuxImplTest, OnDiscoveryResponseImplemented) {
 TEST_F(NullGrpcMuxImplTest, UpdateMuxSourceError) {
   Stats::TestUtil::TestStore stats;
   const envoy::config::core::v3::ApiConfigSource empty_config;
-  const absl::Status status = null_mux_.updateMuxSource(nullptr, nullptr, nullptr,
-                                                        *stats.rootScope(), nullptr, empty_config);
+  const absl::Status status =
+      null_mux_.updateMuxSource(nullptr, nullptr, *stats.rootScope(), nullptr, empty_config);
   EXPECT_EQ(status.code(), absl::StatusCode::kUnimplemented);
 }
 

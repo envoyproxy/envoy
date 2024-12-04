@@ -32,27 +32,11 @@ const SocketInterface* sockInterfaceOrDefault(const SocketInterface* sock_interf
   return sock_interface == nullptr ? &SocketInterfaceSingleton::get() : sock_interface;
 }
 
-void throwOnError(absl::Status status) {
-  if (!status.ok()) {
-    throwEnvoyExceptionOrPanic(status.ToString());
-  }
-}
-
-InstanceConstSharedPtr throwOnError(StatusOr<InstanceConstSharedPtr> address) {
-  if (!address.ok()) {
-    throwOnError(address.status());
-  }
-  return *address;
-}
-
 } // namespace
 
 bool forceV6() {
-  // It turns out Android doesn't handle v4 addresses over v6 networks
-  // gracefully in all situations but does handle mapped v4 addresses
-  // gracefully, so always use mapped addresses to work around this.
-#if defined(__ANDROID_API__)
-  return true;
+#if defined(__APPLE__) || defined(__ANDROID_API__)
+  return Runtime::runtimeFeatureEnabled("envoy.reloadable_features.always_use_v6");
 #else
   return false;
 #endif
@@ -108,16 +92,6 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
   }
 }
 
-Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss,
-                                                           socklen_t ss_len, bool v6only) {
-  // Though we don't have any test coverage where address validation in addressFromSockAddr() fails,
-  // this code is called in worker thread and can throw in theory. In that case, the program will
-  // crash due to uncaught exception. In practice, we don't expect any address validation in
-  // addressFromSockAddr() to fail in worker thread.
-  StatusOr<InstanceConstSharedPtr> address = addressFromSockAddr(ss, ss_len, v6only);
-  return throwOnError(address);
-}
-
 Address::InstanceConstSharedPtr
 addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t fd, bool v6only) {
   // Set v6only to false so that mapped-v6 address can be normalize to v4
@@ -138,7 +112,7 @@ addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t f
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   initHelper(address);
 }
 
@@ -148,7 +122,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, const SocketInterface* so
 Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -163,7 +137,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port,
 
 Ipv4Instance::Ipv4Instance(uint32_t port, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   memset(&ip_.ipv4_.address_, 0, sizeof(ip_.ipv4_.address_));
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
@@ -260,14 +234,18 @@ uint32_t Ipv6Instance::Ipv6Helper::port() const { return ntohs(address_.sin6_por
 bool Ipv6Instance::Ipv6Helper::v6only() const { return v6only_; };
 
 std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress() const {
+  return makeFriendlyAddress(address_);
+}
+
+std::string Ipv6Instance::Ipv6Helper::makeFriendlyAddress(const sockaddr_in6& address) {
   char str[INET6_ADDRSTRLEN];
-  const char* ptr = inet_ntop(AF_INET6, &address_.sin6_addr, str, INET6_ADDRSTRLEN);
+  const char* ptr = inet_ntop(AF_INET6, &address.sin6_addr, str, INET6_ADDRSTRLEN);
   ASSERT(str == ptr);
-  if (address_.sin6_scope_id != 0) {
+  if (address.sin6_scope_id != 0) {
     // Note that here we don't use the `if_indextoname` that will give a more user friendly
     // output just because in the past created a performance bottleneck if the machine had a
     // lot of IPv6 Link local addresses.
-    return absl::StrCat(ptr, "%", scopeId());
+    return absl::StrCat(ptr, "%", address.sin6_scope_id);
   }
   return ptr;
 }
@@ -292,7 +270,7 @@ InstanceConstSharedPtr Ipv6Instance::Ipv6Helper::addressWithoutScopeId() const {
 Ipv6Instance::Ipv6Instance(const sockaddr_in6& address, bool v6only,
                            const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   initHelper(address, v6only);
 }
 
@@ -302,7 +280,7 @@ Ipv6Instance::Ipv6Instance(const std::string& address, const SocketInterface* so
 Ipv6Instance::Ipv6Instance(const std::string& address, uint32_t port,
                            const SocketInterface* sock_interface, bool v6only)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
-  throwOnError(validateProtocolSupported());
+  THROW_IF_NOT_OK(validateProtocolSupported());
   sockaddr_in6 addr_in;
   memset(&addr_in, 0, sizeof(addr_in));
   addr_in.sin6_family = AF_INET6;
@@ -335,6 +313,10 @@ Ipv6Instance::Ipv6Instance(absl::Status& status, const sockaddr_in6& address, bo
     return;
   }
   initHelper(address, v6only);
+}
+
+std::string Ipv6Instance::sockaddrToString(const sockaddr_in6& addr) {
+  return Ipv6Helper::makeFriendlyAddress(addr);
 }
 
 namespace {

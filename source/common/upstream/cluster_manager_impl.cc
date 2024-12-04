@@ -345,8 +345,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
-      outlier_event_logger_ = std::make_shared<Outlier::EventLoggerImpl>(
-          log_manager, event_log_file_path, time_source_);
+      outlier_event_logger_ = THROW_OR_RETURN_VALUE(
+          Outlier::EventLoggerImpl::create(log_manager, event_log_file_path, time_source_),
+          std::unique_ptr<Outlier::EventLoggerImpl>);
     }
   }
 
@@ -442,6 +443,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
 
     const bool use_eds_cache =
         Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads");
+
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
@@ -580,6 +582,82 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
     ads_mux_->start();
   }
   return absl::OkStatus();
+}
+
+absl::Status
+ClusterManagerImpl::replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) {
+  // If there was no ADS defined, reject replacement.
+  const auto& bootstrap = server_.bootstrap();
+  if (!bootstrap.has_dynamic_resources() || !bootstrap.dynamic_resources().has_ads_config()) {
+    return absl::InternalError(
+        "Cannot replace an ADS config when one wasn't previously configured in the bootstrap");
+  }
+  const auto& bootstrap_ads_config = server_.bootstrap().dynamic_resources().ads_config();
+
+  // There is no support for switching between different ADS types.
+  if (ads_config.api_type() != bootstrap_ads_config.api_type()) {
+    return absl::InternalError(fmt::format(
+        "Cannot replace an ADS config with a different api_type (expected: {})",
+        envoy::config::core::v3::ApiConfigSource::ApiType_Name(bootstrap_ads_config.api_type())));
+  }
+
+  // There is no support for using a different config validator. Note that if
+  // this is mainly because the validator could be stateful and if the delta-xDS
+  // protocol is used, then the new validator will not have the context of the
+  // previous one.
+  if (bootstrap_ads_config.config_validators_size() != ads_config.config_validators_size()) {
+    return absl::InternalError(fmt::format(
+        "Cannot replace config_validators in ADS config (different size) - Previous: {}, New: {}",
+        bootstrap_ads_config.config_validators_size(), ads_config.config_validators_size()));
+  } else if (bootstrap_ads_config.config_validators_size() > 0) {
+    const bool equal_config_validators = std::equal(
+        bootstrap_ads_config.config_validators().begin(),
+        bootstrap_ads_config.config_validators().end(), ads_config.config_validators().begin(),
+        [](const envoy::config::core::v3::TypedExtensionConfig& a,
+           const envoy::config::core::v3::TypedExtensionConfig& b) {
+          return Protobuf::util::MessageDifferencer::Equivalent(a, b);
+        });
+    if (!equal_config_validators) {
+      return absl::InternalError(fmt::format("Cannot replace config_validators in ADS config "
+                                             "(different contents)\nPrevious: {}\nNew: {}",
+                                             bootstrap_ads_config.DebugString(),
+                                             ads_config.DebugString()));
+    }
+  }
+
+  ENVOY_LOG_MISC(trace, "Replacing ADS config with:\n{}", ads_config.DebugString());
+  auto strategy_or_error = Config::Utility::prepareJitteredExponentialBackOffStrategy(
+      ads_config, random_, Envoy::Config::SubscriptionFactory::RetryInitialDelayMs,
+      Envoy::Config::SubscriptionFactory::RetryMaxDelayMs);
+  RETURN_IF_NOT_OK_REF(strategy_or_error.status());
+  JitteredExponentialBackOffStrategyPtr backoff_strategy = std::move(strategy_or_error.value());
+
+  absl::Status status = Config::Utility::checkTransportVersion(ads_config);
+  RETURN_IF_NOT_OK(status);
+
+  auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+      *async_client_manager_, ads_config, *stats_.rootScope(), false, 0);
+  RETURN_IF_NOT_OK_REF(factory_primary_or_error.status());
+  Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+    auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+        *async_client_manager_, ads_config, *stats_.rootScope(), false, 1);
+    RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
+    factory_failover = std::move(factory_failover_or_error.value());
+  }
+  Grpc::RawAsyncClientPtr primary_client =
+      factory_primary_or_error.value()->createUncachedRawAsyncClient();
+  Grpc::RawAsyncClientPtr failover_client =
+      factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr;
+
+  // Primary client must not be null, as the primary xDS source must be a valid one.
+  // The failover_client may be null (no failover defined).
+  ASSERT(primary_client != nullptr);
+
+  // This will cause a disconnect from the current sources, and replacement of the clients.
+  status = ads_mux_->updateMuxSource(std::move(primary_client), std::move(failover_client),
+                                     *stats_.rootScope(), std::move(backoff_strategy), ads_config);
+  return status;
 }
 
 absl::Status ClusterManagerImpl::initializeSecondaryClusters(
@@ -1601,14 +1679,15 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
 }
 
 OdCdsApiHandlePtr
-ClusterManagerImpl::allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
+                                     const envoy::config::core::v3::ConfigSource& odcds_config,
                                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a
   // way to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds = OdCdsApiImpl::create(odcds_config, odcds_resources_locator, *this, *this,
-                                    *stats_.rootScope(), validation_visitor);
+  auto odcds = creation_function(odcds_config, odcds_resources_locator, *this, *this,
+                                 *stats_.rootScope(), validation_visitor);
   return OdCdsApiHandleImpl::create(*this, std::move(odcds));
 }
 

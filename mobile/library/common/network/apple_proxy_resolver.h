@@ -25,7 +25,7 @@ namespace Network {
  */
 class AppleProxyResolver : public ProxyResolver {
 public:
-  AppleProxyResolver();
+  explicit AppleProxyResolver(int proxy_settings_refresh_interval_secs = 10);
   virtual ~AppleProxyResolver();
 
   /**

@@ -48,14 +48,20 @@ public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& client_secret_provider,
                   Secret::GenericSecretConfigProviderSharedPtr&& token_secret_provider,
                   ThreadLocal::SlotAllocator& tls, Api::Api& api)
-      : client_secret_(std::move(client_secret_provider), tls, api),
-        token_secret_(std::move(token_secret_provider), tls, api) {}
-  const std::string& clientSecret() const override { return client_secret_.secret(); }
-  const std::string& tokenSecret() const override { return token_secret_.secret(); }
+      : client_secret_(
+            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                      std::move(client_secret_provider), tls, api),
+                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
+        token_secret_(
+            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                      std::move(token_secret_provider), tls, api),
+                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)) {}
+  const std::string& clientSecret() const override { return client_secret_->secret(); }
+  const std::string& tokenSecret() const override { return token_secret_->secret(); }
 
 private:
-  Secret::ThreadLocalGenericSecretProvider client_secret_;
-  Secret::ThreadLocalGenericSecretProvider token_secret_;
+  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> client_secret_;
+  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> token_secret_;
 };
 
 /**
@@ -125,10 +131,10 @@ public:
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
   bool preserveAuthorizationHeader() const { return preserve_authorization_header_; }
-  const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
-  const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& denyRedirectMatchers() const {
     return deny_redirect_header_matchers_;
   }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
@@ -160,6 +166,8 @@ public:
     }
     return makeOptRef(retry_policy_.value());
   }
+  bool shouldUseRefreshToken(
+      const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -177,8 +185,8 @@ private:
   FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
-  const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
-  const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const std::string cookie_domain_;
   const AuthType auth_type_;

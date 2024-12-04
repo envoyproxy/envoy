@@ -89,15 +89,12 @@ public:
     LoadBalancerConfigPtr config;
   };
 
-  static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProtoWithoutSubset(LoadBalancerFactoryContext& lb_factory_context,
-                                               const ClusterProto& cluster,
-                                               ProtobufMessage::ValidationVisitor& visitor);
+  static absl::StatusOr<Result> getTypedLbConfigFromLegacyProtoWithoutSubset(
+      Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster);
 
   static absl::StatusOr<Result>
-  getTypedLbConfigFromLegacyProto(LoadBalancerFactoryContext& lb_factory_context,
-                                  const ClusterProto& cluster,
-                                  ProtobufMessage::ValidationVisitor& visitor);
+  getTypedLbConfigFromLegacyProto(Server::Configuration::ServerFactoryContext& factory_context,
+                                  const ClusterProto& cluster);
 };
 
 /**
@@ -629,8 +626,9 @@ public:
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
-  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
-    THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed));
+  virtual absl::Status runUpdateCallbacks(const HostVector& hosts_added,
+                                          const HostVector& hosts_removed) {
+    return member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
   }
 
 private:
@@ -749,12 +747,13 @@ protected:
                                          overprovisioning_factor);
   }
 
-  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
-    THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed));
+  virtual absl::Status runUpdateCallbacks(const HostVector& hosts_added,
+                                          const HostVector& hosts_removed) {
+    return member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
   }
-  virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
-                                           const HostVector& hosts_removed) {
-    THROW_IF_NOT_OK(priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed));
+  virtual absl::Status runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
+                                                   const HostVector& hosts_removed) {
+    return priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
   }
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to

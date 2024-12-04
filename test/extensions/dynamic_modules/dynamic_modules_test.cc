@@ -1,10 +1,6 @@
-#include <memory>
-
-#include "envoy/common/exception.h"
-
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
-#include "test/test_common/environment.h"
+#include "test/extensions/dynamic_modules/util.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -13,28 +9,11 @@ namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 
-// This loads a shared object file from the test_data directory.
-std::string testSharedObjectPath(std::string name, std::string language) {
-  return TestEnvironment::substitute(
-             "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/") +
-         language + "/lib" + name + ".so";
-}
-
 TEST(DynamicModuleTestGeneral, InvalidPath) {
-  absl::StatusOr<DynamicModuleSharedPtr> result = newDynamicModule("invalid_name", false);
+  absl::StatusOr<DynamicModulePtr> result = newDynamicModule("invalid_name", false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
 }
-
-/**
- * Class to test the identical behavior of the dynamic module in different languages.
- */
-class DynamicModuleTestLanguages : public ::testing::TestWithParam<std::string> {
-public:
-  static std::string languageParamToTestName(const ::testing::TestParamInfo<std::string>& info) {
-    return info.param;
-  };
-};
 
 INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Values("c", "rust"),
                          DynamicModuleTestLanguages::languageParamToTestName);
@@ -42,7 +21,7 @@ INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Val
 TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   std::string language = GetParam();
   using GetSomeVariableFuncType = int (*)();
-  absl::StatusOr<DynamicModuleSharedPtr> module =
+  absl::StatusOr<DynamicModulePtr> module =
       newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(module.ok());
   const auto getSomeVariable =
@@ -80,24 +59,24 @@ TEST_P(DynamicModuleTestLanguages, DoNotClose) {
 
 TEST_P(DynamicModuleTestLanguages, LoadNoOp) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModuleSharedPtr> module =
+  absl::StatusOr<DynamicModulePtr> module =
       newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(module.ok());
 }
 
 TEST_P(DynamicModuleTestLanguages, NoProgramInit) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModuleSharedPtr> result =
+  absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("no_program_init", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("undefined symbol: envoy_dynamic_module_on_program_init"));
+              testing::HasSubstr("Failed to resolve symbol envoy_dynamic_module_on_program_init"));
 }
 
 TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModuleSharedPtr> result =
+  absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("program_init_fail", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
@@ -107,12 +86,33 @@ TEST_P(DynamicModuleTestLanguages, ProgramInitFail) {
 
 TEST_P(DynamicModuleTestLanguages, ABIVersionMismatch) {
   std::string language = GetParam();
-  absl::StatusOr<DynamicModuleSharedPtr> result =
+  absl::StatusOr<DynamicModulePtr> result =
       newDynamicModule(testSharedObjectPath("abi_version_mismatch", language), false);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
   EXPECT_THAT(result.status().message(),
               testing::HasSubstr("ABI version mismatch: got invalid-version-hash, but expected"));
+}
+
+TEST(CreateDynamicModulesByName, OK) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute(
+          "{{ test_rundir }}/test/extensions/dynamic_modules/test_data/rust"),
+      1);
+
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
+  EXPECT_TRUE(module.ok());
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+}
+
+TEST(CreateDynamicModulesByName, EnvVarNotSet) {
+  // Without setting the search path, this should fail.
+  absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("no_op", false);
+  EXPECT_FALSE(module.ok());
+  EXPECT_EQ(module.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(module.status().message(),
+              testing::HasSubstr("ENVOY_DYNAMIC_MODULES_SEARCH_PATH is not set"));
 }
 
 } // namespace DynamicModules

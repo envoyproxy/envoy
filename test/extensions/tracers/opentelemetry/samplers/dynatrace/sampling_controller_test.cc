@@ -206,6 +206,13 @@ TEST(SamplingControllerTest, TestWarmup) {
   EXPECT_EQ(sc.getSamplingState("GET_1").getExponent(), 8);
   EXPECT_EQ(sc.getSamplingState("GET_6").getExponent(), 8);
   EXPECT_EQ(sc.getSamplingState("GET_789").getExponent(), 8);
+
+  offerEntry(sc, "GET_7", 10000);
+  EXPECT_EQ(sc.getSamplingState("GET_1").getExponent(), SamplingController::MAX_SAMPLING_EXPONENT);
+  EXPECT_EQ(sc.getSamplingState("GET_6").getExponent(), SamplingController::MAX_SAMPLING_EXPONENT);
+  EXPECT_EQ(sc.getSamplingState("GET_789").getExponent(),
+            SamplingController::MAX_SAMPLING_EXPONENT);
+  EXPECT_EQ(sc.getSamplingState("GET_7").getExponent(), SamplingController::MAX_SAMPLING_EXPONENT);
 }
 
 // Test getting sampling state from an empty SamplingController

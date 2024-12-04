@@ -17,6 +17,9 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/null_counter.h"
+#include "source/common/stats/null_gauge.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl_base.h"
@@ -419,6 +422,7 @@ public:
   void setDynamicContextParam(absl::string_view resource_type_url, absl::string_view key,
                               absl::string_view value);
   void unsetDynamicContextParam(absl::string_view resource_type_url, absl::string_view key);
+  void setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source);
 
   Server::DrainManagerImpl& drainManager() { return *drain_manager_; }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {

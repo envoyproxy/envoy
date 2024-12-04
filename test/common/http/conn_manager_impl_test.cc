@@ -1,5 +1,7 @@
 #include <chrono>
 
+#include "envoy/network/proxy_protocol.h"
+
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/mocks/http/early_header_mutation.h"
 #include "test/test_common/logging.h"
@@ -491,7 +493,13 @@ TEST_F(HttpConnectionManagerImplTest, PopulateStreamInfo) {
   EXPECT_EQ(server_name_, decoder_->streamInfo().downstreamAddressProvider().requestedServerName());
   EXPECT_TRUE(decoder_->streamInfo().filterState()->hasDataWithName(
       Network::ProxyProtocolFilterState::key()));
+  const auto& proxy_proto_data = decoder_->streamInfo()
+                                     .filterState()
+                                     ->getDataReadOnly<Network::ProxyProtocolFilterState>(
+                                         Network::ProxyProtocolFilterState::key())
+                                     ->value();
 
+  EXPECT_EQ(proxy_proto_data.version_, absl::nullopt);
   // Clean up.
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }

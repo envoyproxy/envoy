@@ -15,7 +15,7 @@ namespace {
 absl::Status traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& message,
                                    std::vector<const Protobuf::Message*>& parents,
                                    bool was_any_or_top_level, bool recurse_into_any) {
-  visitor.onMessage(message, parents, was_any_or_top_level);
+  RETURN_IF_NOT_OK(visitor.onMessage(message, parents, was_any_or_top_level));
 
   // If told to recurse into Any messages, do that here and skip the rest of the function.
   if (recurse_into_any) {

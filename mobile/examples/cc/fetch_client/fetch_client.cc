@@ -122,6 +122,7 @@ void Fetch::runEngine(absl::Notification& engine_running,
   Platform::EngineBuilder engine_builder;
   engine_builder.setLogLevel(Logger::Logger::trace);
   engine_builder.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  engine_builder.addRuntimeGuard("quic_no_tcp_delay", true);
   engine_builder.setOnEngineRunning([&engine_running]() { engine_running.Notify(); });
   if (!quic_hints.empty()) {
     engine_builder.enableHttp3(true);

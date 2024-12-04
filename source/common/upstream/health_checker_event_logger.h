@@ -25,22 +25,19 @@ namespace Upstream {
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
 public:
-  HealthCheckEventLoggerImpl(const envoy::config::core::v3::HealthCheck& health_check_config,
-                             Server::Configuration::HealthCheckerFactoryContext& context)
-      : time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
-    // TODO(botengyao): Remove the file_ creation here into the file based health check
-    // event sink. In this way you can remove the file_ based code from the createHealthCheckEvent
+  static absl::StatusOr<std::unique_ptr<HealthCheckEventLoggerImpl>>
+  create(const envoy::config::core::v3::HealthCheck& health_check_config,
+         Server::Configuration::HealthCheckerFactoryContext& context) {
+    AccessLog::AccessLogFileSharedPtr file;
     if (!health_check_config.event_log_path().empty() /* deprecated */) {
       auto file_or_error = context.serverFactoryContext().accessLogManager().createAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File,
                                       health_check_config.event_log_path()});
-      THROW_IF_NOT_OK_REF(file_or_error.status());
-      file_ = file_or_error.value();
+      RETURN_IF_NOT_OK_REF(file_or_error.status());
+      file = file_or_error.value();
     }
-    for (const auto& config : health_check_config.event_logger()) {
-      auto& factory = Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);
-      event_sinks_.push_back(factory.createHealthCheckEventSink(config.typed_config(), context));
-    }
+    return std::unique_ptr<HealthCheckEventLoggerImpl>(
+        new HealthCheckEventLoggerImpl(health_check_config, std::move(file), context));
   }
 
   void logEjectUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
@@ -58,6 +55,18 @@ public:
                    const HostDescriptionConstSharedPtr& host) override;
   void logNoLongerDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
                            const HostDescriptionConstSharedPtr& host) override;
+
+protected:
+  HealthCheckEventLoggerImpl(const envoy::config::core::v3::HealthCheck& health_check_config,
+                             AccessLog::AccessLogFileSharedPtr&& file,
+                             Server::Configuration::HealthCheckerFactoryContext& context)
+      : time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()),
+        file_(std::move(file)) {
+    for (const auto& config : health_check_config.event_logger()) {
+      auto& factory = Config::Utility::getAndCheckFactory<HealthCheckEventSinkFactory>(config);
+      event_sinks_.push_back(factory.createHealthCheckEventSink(config.typed_config(), context));
+    }
+  }
 
 private:
   void createHealthCheckEvent(

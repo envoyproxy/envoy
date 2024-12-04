@@ -33,7 +33,6 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_test.h"
@@ -354,27 +353,6 @@ TEST_F(QuicPlatformTest, QuicNotReached) {
 #else
   EXPECT_DEATH(QUICHE_NOTREACHED(), "reached unexpected code");
 #endif
-}
-
-TEST_F(QuicPlatformTest, QuicMutex) {
-  QuicMutex mu;
-
-  QuicWriterMutexLock wmu(&mu);
-  mu.AssertReaderHeld();
-  mu.WriterUnlock();
-  {
-    quiche::QuicheReaderMutexLock rmu(&mu);
-    mu.AssertReaderHeld();
-  }
-  mu.WriterLock();
-}
-
-TEST_F(QuicPlatformTest, QuicNotification) {
-  QuicNotification notification;
-  EXPECT_FALSE(notification.HasBeenNotified());
-  notification.Notify();
-  notification.WaitForNotification();
-  EXPECT_TRUE(notification.HasBeenNotified());
 }
 
 TEST_F(QuicPlatformTest, QuicTestOutput) {

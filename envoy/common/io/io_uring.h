@@ -471,6 +471,9 @@ public:
    * Indicates whether the current thread has been registered for a IoUringWorker.
    */
   virtual bool currentThreadRegistered() PURE;
+
+  virtual Network::IoHandlePtr createIoUringSocketHandle(int socket_fd, bool socket_v6only,
+                                                         absl::optional<int> domain) PURE;
 };
 
 } // namespace Io

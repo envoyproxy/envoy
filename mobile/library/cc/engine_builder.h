@@ -66,8 +66,6 @@ public:
   EngineBuilder& setNumTimeoutsToTriggerPortMigration(int num_timeouts);
   EngineBuilder& enableInterfaceBinding(bool interface_binding_on);
   EngineBuilder& enableDrainPostDnsRefresh(bool drain_post_dns_refresh_on);
-  // Sets whether to use GRO for upstream UDP sockets (QUIC/HTTP3).
-  EngineBuilder& setUseGroIfAvailable(bool use_gro_if_available);
   EngineBuilder& setUdpSocketReceiveBufferSize(int32_t size);
   EngineBuilder& setUdpSocketSendBufferSize(int32_t size);
   EngineBuilder& enforceTrustChainVerification(bool trust_chain_verification_on);
@@ -115,7 +113,10 @@ public:
   // use in reading and using the system proxy settings.
   // If/when we move Android system proxy registration to the C++ Engine Builder, we will make this
   // API available on all platforms.
-  EngineBuilder& respectSystemProxySettings(bool value);
+  // The optional `refresh_interval_secs` parameter determines how often the system proxy settings
+  // are polled by the operating system; defaults to 10 seconds. If the value is <= 0, the default
+  // value will be used.
+  EngineBuilder& respectSystemProxySettings(bool value, int refresh_interval_secs = 10);
   EngineBuilder& setIosNetworkServiceType(int ios_network_service_type);
 #else
   // Only android supports c_ares
@@ -186,6 +187,7 @@ private:
 #if defined(__APPLE__)
   // TODO(abeyad): once stable, consider setting the default to true.
   bool respect_system_proxy_settings_ = false;
+  int proxy_settings_refresh_interval_secs_ = 10;
   int ios_network_service_type_ = 0;
 #endif
   int dns_min_refresh_seconds_ = 60;
@@ -197,7 +199,6 @@ private:
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
   absl::flat_hash_map<std::string, StringAccessorSharedPtr> string_accessors_;
-  bool use_gro_if_available_ = false;
 
   // This is the same value Cronet uses for QUIC:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.h;drc=ccfe61524368c94b138ddf96ae8121d7eb7096cf;l=87

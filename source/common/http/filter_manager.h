@@ -262,6 +262,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
   absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
   bool shouldLoadShed() const override;
+  void sendGoAwayAndClose() override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -450,6 +451,11 @@ public:
   virtual void endStream() PURE;
 
   /**
+   * Attempt to send GOAWAY and close the connection.
+   */
+  virtual void sendGoAwayAndClose() PURE;
+
+  /**
    * Called when the stream write buffer is no longer above the low watermark.
    */
   virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
@@ -458,11 +464,6 @@ public:
    * Called when the stream write buffer is above above the high watermark.
    */
   virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
-
-  /**
-   * Called when the FilterManager creates an Upgrade filter chain.
-   */
-  virtual void upgradeFilterChainCreated() PURE;
 
   /**
    * Called when request activity indicates that the request timeout should be disarmed.
@@ -579,6 +580,9 @@ public:
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddress();
   }
+  const Network::Address::InstanceConstSharedPtr& directLocalAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().directLocalAddress();
+  }
   bool localAddressRestored() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddressRestored();
   }
@@ -639,11 +643,10 @@ public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
                 OptRef<const Network::Connection> connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
-                uint32_t buffer_limit, const FilterChainFactory& filter_chain_factory)
+                uint32_t buffer_limit)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
-        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
-        filter_chain_factory_(filter_chain_factory) {}
+        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
 
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
@@ -703,7 +706,7 @@ public:
     }
   }
 
-  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() { return access_log_handlers_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogHandlers() { return access_log_handlers_; }
 
   void onStreamComplete() {
     for (auto filter : filters_) {
@@ -830,15 +833,56 @@ public:
    * a local reply without the overhead of creating and traversing the filters.
    */
   void skipFilterChainCreation() {
-    ASSERT(!state_.created_filter_chain_);
-    state_.created_filter_chain_ = true;
+    ASSERT(!state_.create_chain_result_.created());
+    state_.create_chain_result_ = CreateChainResult(true);
   }
 
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 
-  // Set up the Encoder/Decoder filter chain.
-  bool createFilterChain();
+  enum class UpgradeResult : uint8_t { UpgradeUnneeded, UpgradeAccepted, UpgradeRejected };
+
+  /**
+   * Filter chain creation result.
+   */
+  class CreateChainResult {
+  public:
+    CreateChainResult() = default;
+
+    /**
+     * @param created whether the filter chain was created.
+     * @param upgrade the upgrade result.
+     */
+    CreateChainResult(bool created, UpgradeResult upgrade = UpgradeResult::UpgradeUnneeded)
+        : created_(created), upgrade_(upgrade) {}
+
+    /**
+     * @return whether the filter chain was created.
+     */
+    bool created() const { return created_; }
+    /**
+     * @return whether the upgrade was accepted.
+     */
+    bool upgradeAccepted() const { return upgrade_ == UpgradeResult::UpgradeAccepted; }
+    /**
+     * @return whether the upgrade was rejected.
+     */
+    bool upgradeRejected() const { return upgrade_ == UpgradeResult::UpgradeRejected; }
+
+  private:
+    bool created_ = false;
+    UpgradeResult upgrade_ = UpgradeResult::UpgradeUnneeded;
+  };
+
+  /**
+   * Set up the Encoder/Decoder filter chain.
+   * @param filter_chain_factory the factory to create the filter chain.
+   * @param only_create_if_configured whether to only create the filter chain if it is configured
+   *        explicitly. This only makes sense for upstream HTTP filter chain.
+   *
+   */
+  CreateChainResult createFilterChain(const FilterChainFactory& filter_chain_factory,
+                                      bool only_create_if_configured);
 
   OptRef<const Network::Connection> connection() const { return connection_; }
 
@@ -853,6 +897,16 @@ public:
   bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
 
   virtual bool shouldLoadShed() { return false; };
+
+  void sendGoAwayAndClose() {
+    // Stop filter chain iteration by checking encoder or decoder chain.
+    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+      state_.decoder_filter_chain_aborted_ = true;
+    } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+      state_.encoder_filter_chain_aborted_ = true;
+    }
+    filter_manager_callbacks_.sendGoAwayAndClose();
+  }
 
 protected:
   struct State {
@@ -881,7 +935,6 @@ protected:
     // By default, we will assume there are no 1xx. If encode1xxHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 1xx.
     bool has_1xx_headers_{};
-    bool created_filter_chain_{};
     // These two are latched on initial header read, to determine if the original headers
     // constituted a HEAD or gRPC request, respectively.
     bool is_head_request_{};
@@ -903,6 +956,9 @@ protected:
     bool encoder_filters_streaming_{true};
     bool decoder_filters_streaming_{true};
     bool destroyed_{false};
+
+    // Result of filter chain creation.
+    CreateChainResult create_chain_result_{};
 
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
@@ -965,6 +1021,9 @@ private:
 
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
+
+  UpgradeResult createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
+                                         const FilterChainOptionsImpl& options);
 
   // Returns the encoder filter to start iteration with.
   std::list<ActiveStreamEncoderFilterPtr>::iterator
@@ -1038,7 +1097,7 @@ private:
   std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
   std::list<StreamFilterBase*> filters_;
-  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+  AccessLog::InstanceSharedPtrVector access_log_handlers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata
@@ -1053,7 +1112,6 @@ private:
       std::make_shared<Network::Socket::Options>();
   absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
 
-  const FilterChainFactory& filter_chain_factory_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;
@@ -1108,11 +1166,11 @@ public:
                           StreamInfo::FilterStateSharedPtr parent_filter_state,
                           Server::OverloadManager& overload_manager)
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
-                      proxy_100_continue, buffer_limit, filter_chain_factory),
+                      proxy_100_continue, buffer_limit),
         stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
                      StreamInfo::FilterState::LifeSpan::FilterChain,
                      std::move(parent_filter_state)),
-        local_reply_(local_reply),
+        local_reply_(local_reply), filter_chain_factory_(filter_chain_factory),
         downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
             Server::LoadShedPointName::get().HttpDownstreamFilterCheck)),
         use_filter_manager_state_for_downstream_end_stream_(Runtime::runtimeFeatureEnabled(
@@ -1135,6 +1193,8 @@ public:
       const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
     stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
   }
+
+  CreateChainResult createDownstreamFilterChain();
 
   /**
    * Called before local reply is made by the filter manager.
@@ -1212,6 +1272,7 @@ private:
 private:
   OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
   const LocalReply::LocalReply& local_reply_;
+  const FilterChainFactory& filter_chain_factory_;
   Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
   Server::LoadShedPoint* downstream_filter_load_shed_point_{nullptr};
   // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream runtime

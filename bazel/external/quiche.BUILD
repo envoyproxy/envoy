@@ -1528,7 +1528,6 @@ envoy_cc_library(
         ":quic_core_time_lib",
         ":quic_platform_base",
         ":quic_platform_hostname_utils",
-        ":quic_platform_mutex",
     ],
 )
 
@@ -1568,19 +1567,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_platform_server_stats",
-    ],
-)
-
-envoy_cc_library(
-    name = "quic_platform_mutex",
-    hdrs = [
-        "quiche/quic/platform/api/quic_mutex.h",
-    ],
-    repository = "@envoy",
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quiche_common_platform_mutex",
     ],
 )
 
@@ -1945,6 +1931,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":flow_label_lib",
         ":quic_core_batch_writer_batch_writer_base_lib",
         ":quic_core_linux_socket_utils_lib",
         ":quic_platform",
@@ -2352,21 +2339,33 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
-    name = "quic_core_connection_lib",
+    name = "quic_core_connection_alarms_lib",
     srcs = [
-        "quiche/quic/core/quic_connection.cc",
         "quiche/quic/core/quic_connection_alarms.cc",
     ],
     hdrs = [
-        "quiche/quic/core/quic_connection.h",
         "quiche/quic/core/quic_connection_alarms.h",
     ],
     deps = [
         ":quic_core_alarm_factory_lib",
         ":quic_core_alarm_lib",
+        ":quic_core_clock_lib",
+    ],
+)
+
+envoy_quic_cc_library(
+    name = "quic_core_connection_lib",
+    srcs = [
+        "quiche/quic/core/quic_connection.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/quic_connection.h",
+    ],
+    deps = [
         ":quic_core_bandwidth_lib",
         ":quic_core_blocked_writer_interface_lib",
         ":quic_core_config_lib",
+        ":quic_core_connection_alarms_lib",
         ":quic_core_connection_context_lib",
         ":quic_core_connection_id_manager",
         ":quic_core_connection_stats_lib",
@@ -2767,7 +2766,6 @@ envoy_cc_library(
         ":quiche_common_platform_export",
         ":quiche_common_platform_iovec",
         ":quiche_common_platform_logging",
-        ":quiche_common_platform_prefetch",
     ],
 )
 
@@ -3252,8 +3250,7 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/quic_idle_network_detector.cc"],
     hdrs = ["quiche/quic/core/quic_idle_network_detector.h"],
     deps = [
-        ":quic_core_alarm_factory_lib",
-        ":quic_core_alarm_lib",
+        ":quic_core_connection_alarms_lib",
         ":quic_core_constants_lib",
         ":quic_core_one_block_arena_lib",
         ":quic_core_time_lib",
@@ -3410,7 +3407,7 @@ envoy_quic_cc_library(
 
 envoy_quic_cc_library(
     name = "quic_core_one_block_arena_lib",
-    srcs = ["quiche/quic/core/quic_one_block_arena.h"],
+    hdrs = ["quiche/quic/core/quic_one_block_arena.h"],
     deps = [
         ":quic_core_arena_scoped_ptr_lib",
         ":quic_core_types_lib",
@@ -3463,8 +3460,7 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/quic_network_blackhole_detector.cc"],
     hdrs = ["quiche/quic/core/quic_network_blackhole_detector.h"],
     deps = [
-        ":quic_core_alarm_factory_lib",
-        ":quic_core_alarm_lib",
+        ":quic_core_connection_alarms_lib",
         ":quic_core_constants_lib",
         ":quic_core_one_block_arena_lib",
         ":quic_core_time_lib",
@@ -3576,8 +3572,7 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/quic_ping_manager.cc"],
     hdrs = ["quiche/quic/core/quic_ping_manager.h"],
     deps = [
-        ":quic_core_alarm_factory_lib",
-        ":quic_core_alarm_lib",
+        ":quic_core_connection_alarms_lib",
         ":quic_core_constants_lib",
         ":quic_core_one_block_arena_lib",
         ":quic_core_time_lib",
@@ -3605,6 +3600,29 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_core_new_qpack_blocking_manager_lib",
+    srcs = ["quiche/quic/core/qpack/new_qpack_blocking_manager.cc"],
+    hdrs = ["quiche/quic/core/qpack/new_qpack_blocking_manager.h"],
+    deps = [
+        ":quic_core_types_lib",
+        ":quic_platform_base",
+        ":quiche_common_circular_deque_lib",
+        ":quiche_common_intrusive_list_lib",
+    ],
+)
+
+envoy_quic_cc_library(
+    name = "quic_core_qpack_blocking_manager_shim_lib",
+    hdrs = ["quiche/quic/core/qpack/qpack_blocking_manager_shim.h"],
+    deps = [
+        ":quic_core_new_qpack_blocking_manager_lib",
+        ":quic_core_qpack_blocking_manager_lib",
+        ":quic_core_types_lib",
+        ":quic_platform_base",
+    ],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_qpack_qpack_decoder_lib",
     srcs = ["quiche/quic/core/qpack/qpack_decoder.cc"],
     hdrs = ["quiche/quic/core/qpack/qpack_decoder.h"],
@@ -3623,7 +3641,7 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/qpack/qpack_encoder.cc"],
     hdrs = ["quiche/quic/core/qpack/qpack_encoder.h"],
     deps = [
-        ":quic_core_qpack_blocking_manager_lib",
+        ":quic_core_qpack_blocking_manager_shim_lib",
         ":quic_core_qpack_qpack_decoder_stream_receiver_lib",
         ":quic_core_qpack_qpack_encoder_stream_sender_lib",
         ":quic_core_qpack_qpack_header_table_lib",
@@ -4231,6 +4249,11 @@ envoy_quic_cc_library(
     ],
 )
 
+envoy_quic_cc_library(
+    name = "flow_label_lib",
+    hdrs = ["quiche/quic/core/flow_label.h"],
+)
+
 envoy_cc_library(
     name = "quic_core_udp_socket_lib",
     srcs = select({
@@ -4253,6 +4276,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":flow_label_lib",
         ":quic_core_io_socket_lib",
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
@@ -4739,30 +4763,6 @@ envoy_cc_library(
     }),
 )
 
-envoy_cc_library(
-    name = "quiche_common_platform_prefetch",
-    hdrs = [
-        "quiche/common/platform/api/quiche_prefetch.h",
-    ],
-    repository = "@envoy",
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quiche_common_platform_default_quiche_platform_impl_prefetch_impl_lib",
-        ":quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_default_quiche_platform_impl_prefetch_impl_lib",
-    hdrs = [
-        "quiche/common/platform/default/quiche_platform_impl/quiche_prefetch_impl.h",
-    ],
-    deps = [
-        ":quiche_common_platform_export",
-    ],
-)
-
 envoy_quiche_platform_impl_cc_library(
     name = "quiche_common_mobile_quiche_logging_lib",
     srcs = [
@@ -4776,37 +4776,6 @@ envoy_quiche_platform_impl_cc_library(
         "@com_google_absl//absl/log:absl_check",
         "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/log:flags",
-    ],
-)
-
-envoy_cc_library(
-    name = "quiche_common_platform_mutex",
-    srcs = [
-        "quiche/common/platform/api/quiche_mutex.cc",
-    ],
-    hdrs = [
-        "quiche/common/platform/api/quiche_mutex.h",
-    ],
-    repository = "@envoy",
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":quiche_common_platform_default_quiche_platform_impl_mutex_impl_lib",
-        ":quiche_common_platform_export",
-    ],
-)
-
-envoy_quiche_platform_impl_cc_library(
-    name = "quiche_common_platform_default_quiche_platform_impl_mutex_impl_lib",
-    srcs = [
-        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.cc",
-    ],
-    hdrs = [
-        "quiche/common/platform/default/quiche_platform_impl/quiche_mutex_impl.h",
-    ],
-    deps = [
-        ":quiche_common_platform_export",
-        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -4985,7 +4954,6 @@ envoy_cc_library(
         ":quiche_common_platform_default_quiche_platform_impl_testvalue_impl_lib",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
-        ":quiche_common_platform_prefetch",
         "@envoy//source/common/quic/platform:quic_base_impl_lib",
         "@envoy//source/common/quic/platform:quiche_flags_impl_lib",
         "@envoy//source/common/quic/platform:quiche_mem_slice_impl_lib",
@@ -5474,6 +5442,7 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
+        ":quiche_common_platform",
         ":quiche_common_platform_export",
         ":quiche_common_text_utils_lib",
         "@com_google_absl//absl/container:flat_hash_set",

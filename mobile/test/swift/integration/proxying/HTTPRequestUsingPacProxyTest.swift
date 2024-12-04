@@ -60,7 +60,7 @@ final class HTTPRequestUsingPacProxyTest: XCTestCase {
   func testHTTPRequestUsingPacProxy() throws {
     EnvoyTestServer.startHttpProxyServer()
     let proxyPort = EnvoyTestServer.getProxyPort()
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
     let httpPort = EnvoyTestServer.getHttpPort()
 
     let engineExpectation = self.expectation(description: "Run started engine")

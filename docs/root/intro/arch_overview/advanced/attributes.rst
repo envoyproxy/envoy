@@ -152,6 +152,8 @@ The following attributes are available once the upstream connection is establish
    upstream.sha256_peer_certificate_digest, string, SHA256 digest of the peer certificate in the upstream TLS connection if present
    upstream.local_address, string, The local address of the upstream connection
    upstream.transport_failure_reason, string, The upstream transport failure reason e.g. certificate validation failed
+   upstream.request_attempt_count, uint, The count of upstream request attempts. A value of ‘0’ indicates that the request was never attempted upstream
+   upstream.cx_pool_ready_duration, duration, Total duration from when the upstream request was created to when the upstream connection pool is ready
 
 Metadata and filter state
 -------------------------

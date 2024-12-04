@@ -128,17 +128,6 @@ TEST_P(WasmFactoryTest, StartFailed) {
                             "Unable to create Wasm plugin test");
 }
 
-TEST_P(WasmFactoryTest, StartFailedOpen) {
-  ProtobufWkt::StringValue plugin_configuration;
-  plugin_configuration.set_value("bad");
-  config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
-      plugin_configuration);
-  config_.mutable_config()->set_fail_open(true);
-
-  EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm plugin test");
-}
-
 TEST_P(WasmFactoryTest, ConfigureFailed) {
   ProtobufWkt::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");

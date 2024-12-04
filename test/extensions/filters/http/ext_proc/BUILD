@@ -29,7 +29,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "filter_test",
-    size = "small",
+    size = "medium",
     srcs = ["filter_test.cc"],
     copts = select({
         "//bazel:windows_x86_64": [],
@@ -38,7 +38,8 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "6gig",
+    rbe_pool = "2core",
+    shard_count = 8,
     tags = ["skip_on_windows"],
     deps = [
         ":mock_server_lib",

@@ -28,7 +28,8 @@ public:
   bool packTraceReason() { return pack_trace_reason_; }
 
   // Envoy::Http::RequestIDExtension
-  void set(Envoy::Http::RequestHeaderMap& request_headers, bool force) override;
+  void set(Envoy::Http::RequestHeaderMap& request_headers, bool edge_request,
+           bool keep_external_id) override;
   void setInResponse(Envoy::Http::ResponseHeaderMap& response_headers,
                      const Envoy::Http::RequestHeaderMap& request_headers) override;
   absl::optional<absl::string_view>

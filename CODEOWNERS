@@ -202,7 +202,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ratelimit @esmet @mattklein123
 /*/extensions/filters/network/ratelimit @esmet @mattklein123
 # HTTP Quota Based Rate Limit
-/*/extensions/filters/http/rate_limit_quota @tyxia @yanavlasov
+/*/extensions/filters/http/rate_limit_quota @tyxia @yanavlasov @bsurber
 # HTTP Bandwidth Limit
 /*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
 # HTTP Basic Auth
@@ -356,6 +356,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
+/*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov

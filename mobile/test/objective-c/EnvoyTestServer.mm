@@ -11,8 +11,16 @@
   return get_proxy_server_port();
 }
 
-+ (void)startHttp1PlaintextServer {
++ (void)startHttp1Server {
   start_http_server(Envoy::TestServerType::HTTP1_WITHOUT_TLS);
+}
+
++ (void)startHttps1Server {
+  start_http_server(Envoy::TestServerType::HTTP1_WITH_TLS);
+}
+
++ (void)startHttps2Server {
+  start_http_server(Envoy::TestServerType::HTTP2_WITH_TLS);
 }
 
 + (void)startHttpProxyServer {

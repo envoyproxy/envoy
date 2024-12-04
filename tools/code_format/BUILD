@@ -1,11 +1,8 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_python//python:defs.bzl", "py_binary")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 py_library(
     name = "envoy_build_fixer",

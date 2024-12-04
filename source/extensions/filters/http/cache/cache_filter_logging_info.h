@@ -87,8 +87,6 @@ enum class InsertStatus {
 
 absl::string_view insertStatusToString(InsertStatus status);
 
-std::ostream& operator<<(std::ostream& os, const InsertStatus& cache_insert_status);
-
 // Cache-related information about a request, to be used for logging and stats.
 class CacheFilterLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:

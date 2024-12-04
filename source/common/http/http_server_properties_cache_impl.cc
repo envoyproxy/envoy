@@ -4,6 +4,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/http/http3_status_tracker_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "quiche/http2/core/spdy_alt_svc_wire_format.h"
 #include "re2/re2.h"
@@ -296,10 +297,76 @@ HttpServerPropertiesCacheImpl::getOrCreateHttp3StatusTracker(const Origin& origi
   return *it->second.h3_status_tracker;
 }
 
+void HttpServerPropertiesCacheImpl::markHttp3Broken(const Origin& origin) {
+  getOrCreateHttp3StatusTracker(origin).markHttp3Broken();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness")) {
+    maybeSetCanonicalOriginForHttp3Brokenness(origin);
+  }
+}
+
+bool HttpServerPropertiesCacheImpl::isHttp3Broken(const Origin& origin) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_canonical_suffix_for_quic_brokenness")) {
+    return getOrCreateHttp3StatusTracker(origin).isHttp3Broken();
+  }
+
+  // Note that we don't create a new tracker for the origin.
+  if (auto entry_it = protocols_.find(origin);
+      entry_it != protocols_.end() && entry_it->second.h3_status_tracker != nullptr) {
+    return entry_it->second.h3_status_tracker->isHttp3Broken();
+  }
+
+  absl::optional<Origin> canonical = getCanonicalOriginForHttp3Brokenness(origin.hostname_);
+  if (!canonical.has_value()) {
+    return false;
+  }
+  if (auto entry_it = protocols_.find(*canonical); entry_it != protocols_.end()) {
+    if (entry_it->second.h3_status_tracker == nullptr) {
+      ENVOY_BUG(false, "the canonical origin doesn't have HTTP3 tracker");
+      return false;
+    }
+    return entry_it->second.h3_status_tracker->isHttp3Broken();
+  }
+
+  return false;
+}
+
+absl::optional<HttpServerPropertiesCacheImpl::Origin>
+HttpServerPropertiesCacheImpl::getCanonicalOriginForHttp3Brokenness(absl::string_view hostname) {
+  absl::string_view suffix = getCanonicalSuffix(hostname);
+  if (suffix.empty()) {
+    return {};
+  }
+
+  auto it = canonical_h3_brokenness_map_.find(suffix);
+  if (it == canonical_h3_brokenness_map_.end()) {
+    return {};
+  }
+  return it->second;
+}
+
+void HttpServerPropertiesCacheImpl::maybeSetCanonicalOriginForHttp3Brokenness(
+    const Origin& origin) {
+  absl::string_view suffix = getCanonicalSuffix(origin.hostname_);
+  if (suffix.empty()) {
+    return;
+  }
+  canonical_h3_brokenness_map_[suffix] = origin;
+}
+
 void HttpServerPropertiesCacheImpl::resetBrokenness() {
   for (auto& protocol : protocols_) {
     if (protocol.second.h3_status_tracker && protocol.second.h3_status_tracker->isHttp3Broken()) {
       protocol.second.h3_status_tracker->markHttp3FailedRecently();
+    }
+  }
+}
+
+void HttpServerPropertiesCacheImpl::resetStatus() {
+  for (const std::pair<Origin, OriginData>& protocol : protocols_) {
+    if (protocol.second.h3_status_tracker) {
+      protocol.second.h3_status_tracker->markHttp3Pending();
     }
   }
 }
@@ -320,7 +387,7 @@ HttpServerPropertiesCacheImpl::getCanonicalOrigin(absl::string_view hostname) {
     return {};
   }
 
-  auto it = canonical_alt_svc_map_.find(std::string(suffix));
+  auto it = canonical_alt_svc_map_.find(suffix);
   if (it == canonical_alt_svc_map_.end()) {
     return {};
   }
@@ -333,7 +400,7 @@ void HttpServerPropertiesCacheImpl::maybeSetCanonicalOrigin(const Origin& origin
     return;
   }
 
-  canonical_alt_svc_map_[std::string(suffix)] = origin;
+  canonical_alt_svc_map_[suffix] = origin;
 }
 
 } // namespace Http

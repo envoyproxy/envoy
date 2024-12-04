@@ -297,6 +297,7 @@ envoy_cc_test(
     deps = [
         ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",
+        "//envoy/network:proxy_protocol_options_lib",
     ],
 )
 

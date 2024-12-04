@@ -14,7 +14,7 @@ ExternalProcessorClientImpl::ExternalProcessorClientImpl(Grpc::AsyncClientManage
 ExternalProcessorStreamPtr ExternalProcessorClientImpl::start(
     ExternalProcessorCallbacks& callbacks,
     const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-    const Http::AsyncClient::StreamOptions& options,
+    Http::AsyncClient::StreamOptions& options,
     Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) {
   auto client_or_error =
       client_manager_.getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, scope_, true);
@@ -33,15 +33,16 @@ void ExternalProcessorClientImpl::sendRequest(
 
 ExternalProcessorStreamPtr ExternalProcessorStreamImpl::create(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    ExternalProcessorCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options,
+    ExternalProcessorCallbacks& callbacks, Http::AsyncClient::StreamOptions& options,
     Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks) {
   auto stream =
       std::unique_ptr<ExternalProcessorStreamImpl>(new ExternalProcessorStreamImpl(callbacks));
 
+  if (stream->grpcSidestreamFlowControl()) {
+    options.setSidestreamWatermarkCallbacks(&sidestream_watermark_callbacks);
+  }
+
   if (stream->startStream(std::move(client), options)) {
-    if (stream->grpcSidestreamFlowControl()) {
-      stream->stream_->setWatermarkCallbacks(sidestream_watermark_callbacks);
-    }
     return stream;
   }
   // Return nullptr on the start failure.
@@ -64,18 +65,15 @@ void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingR
   stream_.sendMessage(std::move(request), end_stream);
 }
 
-// TODO(tyxia) Refactor the logic of close() function. Invoking it when stream is already closed
-// is redundant.
-bool ExternalProcessorStreamImpl::close() {
-  if (!stream_closed_) {
+bool ExternalProcessorStreamImpl::closeLocalStream() {
+  if (!local_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
     // Unregister the watermark callbacks, if any exist (e.g., filter is not destroyed yet)
     if (grpc_side_stream_flow_control_ && callbacks_.has_value()) {
       stream_.removeWatermarkCallbacks();
     }
     stream_.closeStream();
-    stream_closed_ = true;
-    stream_.resetStream();
+    local_closed_ = true;
     return true;
   }
   return false;
@@ -96,7 +94,10 @@ void ExternalProcessorStreamImpl::onReceiveTrailingMetadata(Http::ResponseTraile
 void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
                                                 const std::string& message) {
   ENVOY_LOG(debug, "gRPC stream closed remotely with status {}: {}", status, message);
-  stream_closed_ = true;
+  // Also mark the client stream as closed: the underlying http async stream is
+  // closed and cleaned up already after processing trailers.
+  local_closed_ = true;
+  remote_closed_ = true;
 
   if (!callbacks_.has_value()) {
     ENVOY_LOG(debug, "Underlying filter object has been destroyed.");
