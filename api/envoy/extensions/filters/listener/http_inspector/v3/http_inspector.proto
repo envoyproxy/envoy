@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.listener.http_inspector.v3;
 
 import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -31,11 +32,5 @@ message HttpInspector {
   // to determine the http version. If not specified, the maximum buffer is
   // 8KiB
   google.protobuf.UInt32Value max_read_buffer_size = 2
-    [(validate.rules).uint32 = {lt: 65537 gt: 15}];
-
-  // If set, then HTTP/1.1 will be assumed if the maximum_read_buffer_size is
-  // reached and the HTTP parser has not reached the end of the request line or
-  // found malformed HTTP. If not specified, no HTTP will be assumed.
-  google.protobuf.BoolValue assume_http11_for_large_requests = 3;
-
+      [(validate.rules).uint32 = {lt: 65537 gt: 15}];
 }

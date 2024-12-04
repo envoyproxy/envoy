@@ -1,4 +1,5 @@
 #include "source/common/common/hex.h"
+#include "source/common/common/logger.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listener_filter_buffer_impl.h"
@@ -36,12 +37,12 @@ std::string testParamToString(const ::testing::TestParamInfo<Http1ParserImpl>& i
 class HttpInspectorTest : public testing::TestWithParam<Http1ParserImpl> {
 public:
   HttpInspectorTest()
-      : cfg_(std::make_shared<Config>(*store_.rootScope(),
-                                      envoy::extensions::filters::listener::http_inspector::v3::HttpInspector())),
+      : cfg_(std::make_shared<Config>(
+            *store_.rootScope(),
+            envoy::extensions::filters::listener::http_inspector::v3::HttpInspector())),
         io_handle_(
             Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt, {})),
         parser_impl_(GetParam()) {}
-  ~HttpInspectorTest() override { io_handle_->close(); }
 
   void init() {
     if (parser_impl_ == Http1ParserImpl::BalsaParser) {
@@ -66,7 +67,7 @@ public:
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
         *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-        filter_->maxReadBytes() == 0, filter_->maxReadBytes());
+        cfg_->initialReadBufferSize() == 0, cfg_->initialReadBufferSize());
   }
 
   void testHttpInspectMultipleReadsNotFound(absl::string_view header, bool http2 = false) {
@@ -679,8 +680,8 @@ TEST_P(HttpInspectorTest, Http1WithLargeHeader) {
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
 }
 
-TEST_P(HttpInspectorTest, HttpAssumeHttpValidGet) {
-  std::string data = "GET /index?x=0123456789 HTTP/1.0\r\n";
+TEST_P(HttpInspectorTest, HttpExceedMaxBufferSize) {
+  std::string data = "GET /index?x=0123456789&y=0123456789&z=0123456789 HTTP/1.0\r\n";
   //                  0               16
 
   envoy::extensions::filters::listener::http_inspector::v3::HttpInspector proto_config;
@@ -688,114 +689,89 @@ TEST_P(HttpInspectorTest, HttpAssumeHttpValidGet) {
   const size_t max_size = 16;
   proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
   proto_config.mutable_max_read_buffer_size()->set_value(max_size);
-  proto_config.mutable_assume_http11_for_large_requests()->set_value(true);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
 
   init();
 
-  {
-    InSequence s;
-#ifdef WIN32
-    EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-        .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
-    for (size_t i = 0; i < 16; i++) {
-      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillOnce(Invoke(
-              [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= 16);
-                memcpy(buffer, data.data() + i, 1);
-                return Api::SysCallSizeResult{ssize_t(1), 0};
-              }))
-          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
-    }
-#else
-    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
-      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
-    }));
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            const size_t amount_to_copy = std::min(length, data.size());
+            memcpy(buffer, data.data(), amount_to_copy);
+            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+          }));
 
-    for (size_t i = 1; i <= 16; i++) {
-      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke(
-              [&data, i](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= i);
-                memcpy(buffer, data.data(), i);
-                return Api::SysCallSizeResult{ssize_t(i), 0};
-              }));
-    }
-#endif
-  }
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 
-  bool got_continue = false;
-  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http11};
-  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
-  while (!got_continue) {
-    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
-    auto status = filter_->onData(*buffer_);
-    if (status == Network::FilterStatus::Continue) {
-      got_continue = true;
-    }
-  }
-  EXPECT_EQ(1, cfg_->stats().http11_found_.value());
+  auto status = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, status);
+  EXPECT_EQ(1, cfg_->stats().read_error_.value());
+  EXPECT_FALSE(io_handle_->isOpen());
 }
 
-TEST_P(HttpInspectorTest, HttpAssumeHttpInvalidGet) {
-  std::string data = "GET \0\0\0\0\0/invalid/uri/\0\0\0\0\0 HTTP/1.0 \r\n";
+TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
+  std::string data = "GET /index?x=0123456789&y=0123456789&z=0123456789 HTTP/1.0\r\n";
+  //                  0               16              32              48
+
   envoy::extensions::filters::listener::http_inspector::v3::HttpInspector proto_config;
-  const uint32_t initial_buffer_size = 16;
-  const size_t max_size = 16;
-  proto_config.mutable_initial_read_buffer_size()->set_value(initial_buffer_size);
+  uint32_t buffer_size = 16;
+  const size_t max_size = 100;
+  proto_config.mutable_initial_read_buffer_size()->set_value(buffer_size);
   proto_config.mutable_max_read_buffer_size()->set_value(max_size);
-  proto_config.mutable_assume_http11_for_large_requests()->set_value(true);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
 
   init();
 
-  {
-    InSequence s;
-#ifdef WIN32
-      EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillRepeatedly(Invoke(
-              [&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= max_size);
-                memcpy(buffer, data.data() + max_size, 1);
-                return Api::SysCallSizeResult{ssize_t(1), 0};
-              }))
-          .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
-#else
-      EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillRepeatedly(Invoke(
-              [&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
-                ASSERT(length >= max_size);
-                memcpy(buffer, data.data(), max_size);
-                return Api::SysCallSizeResult{ssize_t(max_size), 0};
-              }));
-#endif
-  }
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            const size_t amount_to_copy = std::min(length, data.size());
+            memcpy(buffer, data.data(), amount_to_copy);
+            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+          }));
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 
-
-  bool got_continue = false;
-  //if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-  //  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http11};
-  //  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
-  //} else {
-    EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
-  //}
   auto accepted = filter_->onAccept(cb_);
   EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
-  while (!got_continue) {
-    ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
-    auto status = filter_->onData(*buffer_);
-    if (status == Network::FilterStatus::Continue) {
-      got_continue = true;
-    }
-  }
-  //if (parser_impl_ == Http1ParserImpl::BalsaParser) {
-  //  EXPECT_EQ(1, cfg_->stats().http11_found_.value());
-  //} else {
-    EXPECT_EQ(1, cfg_->stats().http_not_found_.value());
-  //}
+  auto status = filter_->onData(*buffer_);
+  EXPECT_EQ(status, Network::FilterStatus::StopIteration);
+  EXPECT_EQ(filter_->maxReadBytes(), 2 * buffer_size);
+  buffer_size *= 2;
+  buffer_->resetCapacity(buffer_size);
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            const size_t amount_to_copy = std::min(length, data.size());
+            memcpy(buffer, data.data(), amount_to_copy);
+            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+          }));
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+
+  status = filter_->onData(*buffer_);
+  EXPECT_EQ(status, Network::FilterStatus::StopIteration);
+  EXPECT_EQ(filter_->maxReadBytes(), 2 * buffer_size);
+  buffer_size *= 2;
+  buffer_->resetCapacity(buffer_size);
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(
+          Invoke([&data](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
+            const size_t amount_to_copy = std::min(length, data.size());
+            memcpy(buffer, data.data(), amount_to_copy);
+            return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
+          }));
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+
+  const std::vector<absl::string_view> alpn_protos{Http::Utility::AlpnNames::get().Http10};
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+
+  status = filter_->onData(*buffer_);
+  EXPECT_EQ(status, Network::FilterStatus::Continue);
+
+  EXPECT_EQ(1, cfg_->stats().http10_found_.value());
 }
 
 } // namespace

@@ -18,38 +18,31 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace HttpInspector {
 
-Config::Config(Stats::Scope& scope,
-               const envoy::extensions::filters::listener::http_inspector::v3::HttpInspector& proto_config)
-    : initial_read_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config,
-                                                                initial_read_buffer_size,
-                                                                DEFAULT_INITIAL_BUFFER_SIZE)),
-      max_read_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config,
-                                                            max_read_buffer_size,
+Config::Config(
+    Stats::Scope& scope,
+    const envoy::extensions::filters::listener::http_inspector::v3::HttpInspector& proto_config)
+    : initial_read_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          proto_config, initial_read_buffer_size, DEFAULT_INITIAL_BUFFER_SIZE)),
+      max_read_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_read_buffer_size,
                                                             DEFAULT_MAX_INSPECT_SIZE)),
-      assume_http11_for_large_requests_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config,
-                                                                       assume_http11_for_large_requests,
-                                                                       false)),
-      stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))}
-{
-    if (initial_read_buffer_size_ > max_read_buffer_size_) {
-        throw EnvoyException(fmt::format("Invalid configuration: initial_read_buffer_size_ ({}) "
-                                "must be less than or equal to max_read_buffer_size_ ({})",
-                                initial_read_buffer_size_, max_read_buffer_size_));
-    }
+      stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))} {
+  if (initial_read_buffer_size_ > max_read_buffer_size_) {
+    throw EnvoyException(fmt::format("Invalid configuration: initial_read_buffer_size_ ({}) "
+                                     "must be less than or equal to max_read_buffer_size_ ({})",
+                                     initial_read_buffer_size_, max_read_buffer_size_));
+  }
 }
 
 const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 
 Filter::Filter(const ConfigSharedPtr config)
-    : config_(config),
-      no_op_callbacks_(),
-      requested_read_bytes_(config->initialReadBufferSize()) {
+    : config_(config), no_op_callbacks_(), requested_read_bytes_(config->initialReadBufferSize()) {
   // Filter for only Request Message types with NoOp Parser callbacks.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_inspector_use_balsa_parser")) {
     // Set both allow_custom_methods and enable_trailers to true with BalsaParser.
     parser_ = std::make_unique<Http::Http1::BalsaParser>(
-        Http::Http1::MessageType::Request, &no_op_callbacks_, max_request_headers_kb_ * 1024, true,
-        true);
+        Http::Http1::MessageType::Request, &no_op_callbacks_, Config::DEFAULT_MAX_INSPECT_SIZE,
+        true, true);
   } else {
     parser_ = std::make_unique<Http::Http1::LegacyHttpParserImpl>(Http::Http1::MessageType::Request,
                                                                   &no_op_callbacks_);
@@ -72,16 +65,14 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     ENVOY_LOG(trace, "http inspector: need more bytes");
 
     // If we have requested the maximum amount of data the filter is configured
-    // to allow, then move on; the request is too large to identify the HTTP
-    // version
+    // to allow, then close the connection; the request line is too large to
+    // determine the http version.
     if (static_cast<size_t>(nread_) == maxConfigReadBytes()) {
-      if (assumeHttp11ForLargeRequests()) {
-        ENVOY_LOG(trace, "http inspector: assuming http");
-        protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
-        done(true);
-      }
-      done(false);
-      return Network::FilterStatus::Continue;
+      ENVOY_LOG(warn, "http inspector: reached max buffer without determining HTTP version, "
+                      "dropping connection");
+      config_->stats().read_error_.inc();
+      cb_->socket().ioHandle().close();
+      return Network::FilterStatus::StopIteration;
     }
 
     // Otherwise, double the buffer size and try again
@@ -158,8 +149,8 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
                 parser_->errorMessage());
 
       // Errors in parsing HTTP.
-      if ((parser_->getStatus() != Http::Http1::ParserStatus::Ok &&
-          parser_->getStatus() != Http::Http1::ParserStatus::Paused)) {
+      if (parser_->getStatus() != Http::Http1::ParserStatus::Ok &&
+          parser_->getStatus() != Http::Http1::ParserStatus::Paused) {
         return ParseState::Error;
       } else {
         return ParseState::Continue;

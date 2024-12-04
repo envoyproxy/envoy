@@ -51,8 +51,9 @@ enum class ParseState {
  */
 class Config {
 public:
-  Config(Stats::Scope& scope,
-         const envoy::extensions::filters::listener::http_inspector::v3::HttpInspector& proto_config);
+  Config(
+      Stats::Scope& scope,
+      const envoy::extensions::filters::listener::http_inspector::v3::HttpInspector& proto_config);
 
   const HttpInspectorStats& stats() const { return stats_; }
 
@@ -61,12 +62,10 @@ public:
 
   size_t initialReadBufferSize() const { return initial_read_buffer_size_; }
   size_t maxReadBufferSize() const { return max_read_buffer_size_; }
-  bool assumeHttp11ForLargeRequests() const { return assume_http11_for_large_requests_; }
 
 private:
   const uint32_t initial_read_buffer_size_;
   const uint32_t max_read_buffer_size_;
-  const bool assume_http11_for_large_requests_;
   HttpInspectorStats stats_;
 };
 
@@ -139,7 +138,6 @@ private:
   size_t requested_read_bytes_;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   size_t maxConfigReadBytes() const { return config_->maxReadBufferSize(); }
-  bool assumeHttp11ForLargeRequests() const { return config_->assumeHttp11ForLargeRequests(); }
 };
 
 } // namespace HttpInspector
