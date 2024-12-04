@@ -27,7 +27,7 @@ behavior_changes:
 - area: aws
   change: |
     Adds support for IAM Roles Anywhere to the AWS request signing credential provider configuration :ref:`credential_provider
-    <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>`
+    <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>`.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
