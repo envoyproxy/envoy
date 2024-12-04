@@ -858,10 +858,14 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // Return 401 unauthorized if the state query parameter does not contain the original request URL
   // or nonce.
   std::string state = Base64Url::decode(stateVal.value());
-  ProtobufWkt::Struct state_struct;
-
-  MessageUtil::loadFromJson(state, state_struct);
-  const auto& filed_value_pair = state_struct.fields();
+  bool has_unknown_field;
+  ProtobufWkt::Struct message;
+  auto status = MessageUtil::loadFromJsonNoThrow(state, message, has_unknown_field);
+  if (!status.ok()) {
+    ENVOY_LOG(error, "state query param is not a valid JSON: \n{}", state);
+    return {false, "", ""};
+  }
+  const auto& filed_value_pair = message.fields();
   if (!filed_value_pair.contains(stateParamsUrl) || !filed_value_pair.contains(stateParamsNonce)) {
     ENVOY_LOG(error, "state query param does not contain url or nonce: \n{}", state);
     return {false, "", ""};
