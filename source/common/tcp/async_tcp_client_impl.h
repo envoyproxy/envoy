@@ -68,7 +68,7 @@ public:
   }
 
 private:
-  // This implments the AsyncTcpClient::close but exists as non-virtual to avoid calling it in the
+  // This implements the AsyncTcpClient::close but exists as non-virtual to avoid calling it in the
   // destructor.
   void closeImpl(Network::ConnectionCloseType type);
 
