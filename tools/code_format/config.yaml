@@ -93,7 +93,6 @@ paths:
     - source/common/matcher/matcher.h
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
-    - source/common/upstream/upstream_impl.h
     - source/common/protobuf/utility.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
