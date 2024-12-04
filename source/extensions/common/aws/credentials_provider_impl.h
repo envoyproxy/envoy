@@ -26,8 +26,6 @@
 
 #include "absl/strings/string_view.h"
 
-// #include "sigv4_signer_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {

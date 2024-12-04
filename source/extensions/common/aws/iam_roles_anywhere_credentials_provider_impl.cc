@@ -33,7 +33,7 @@ namespace {
 constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
 
 // IAM Roles Anywhere credential strings
-constexpr char CREDENTIALSET[] = "credentialSet";
+constexpr char CREDENTIAL_SET[] = "credentialSet";
 constexpr char CREDENTIALS_LOWER[] = "credentials";
 constexpr char ACCESS_KEY_ID_LOWER[] = "accessKeyId";
 constexpr char SECRET_ACCESS_KEY_LOWER[] = "secretAccessKey";
@@ -394,7 +394,7 @@ void IAMRolesAnywhereCredentialsProvider::extractCredentials(
   }
 
   auto credentialset_object_or_error =
-      document_json_or_error.value()->getObjectArray(CREDENTIALSET, false);
+      document_json_or_error.value()->getObjectArray(CREDENTIAL_SET, false);
   if (!credentialset_object_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from rolesanywhere service: {}",
               credentialset_object_or_error.status().message());

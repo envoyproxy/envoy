@@ -134,7 +134,7 @@ using CredentialsConstUniquePtr = std::unique_ptr<const Credentials>;
 using CredentialsProviderSharedPtr = std::shared_ptr<CredentialsProvider>;
 
 /*
- * X509 Credentials used for IAM Roles Anywhere
+ * X509 credential provider used for IAM Roles Anywhere
  */
 class X509CredentialsProvider {
 public:
