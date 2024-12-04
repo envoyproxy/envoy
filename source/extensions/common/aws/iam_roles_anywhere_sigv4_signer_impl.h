@@ -24,14 +24,10 @@ public:
   static constexpr absl::string_view SigV4AuthorizationHeaderFormat{
       "{} Credential={}, SignedHeaders={}, Signature={}"};
   static constexpr absl::string_view SigV4CredentialScopeFormat{"{}/{}/{}/aws4_request"};
-  static constexpr absl::string_view SigV4SignatureVersion{"AWS4"};
   static constexpr absl::string_view SigV4StringToSignFormat{"{}\n{}\n{}\n{}"};
-  static constexpr absl::string_view SigV4Algorithm{"AWS4-HMAC-SHA256"};
   static constexpr absl::string_view X509SigV4RSA{"AWS4-X509-RSA-SHA256"};
   static constexpr absl::string_view X509SigV4ECDSA{"AWS4-X509-ECDSA-SHA256"};
 };
-
-using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;
 
 /**
  * Implementation of the Signature V4 signing process using X509 Credentials for IAM Roles Anywhere.
@@ -43,10 +39,8 @@ class IAMRolesAnywhereSigV4SignerImpl : public IAMRolesAnywhereSignerBaseImpl {
 public:
   IAMRolesAnywhereSigV4SignerImpl(absl::string_view service_name, absl::string_view region,
                                   const CredentialsProviderSharedPtr& credentials_provider,
-                                  Server::Configuration::CommonFactoryContext& context,
-                                  const AwsSigningHeaderExclusionVector& matcher_config)
-      : IAMRolesAnywhereSignerBaseImpl(service_name, region, credentials_provider, context,
-                                       matcher_config) {}
+                                  Server::Configuration::CommonFactoryContext& context)
+      : IAMRolesAnywhereSignerBaseImpl(service_name, region, credentials_provider, context) {}
 
   IAMRolesAnywhereSigV4SignerImpl(absl::string_view service_name, absl::string_view region,
                                   const X509CredentialsProviderSharedPtr& credentials_provider,
@@ -69,8 +63,6 @@ private:
                                  const absl::string_view canonical_request,
                                  const absl::string_view long_date,
                                  const absl::string_view credential_scope) const override;
-
-  absl::string_view getAlgorithmString() const override;
 };
 
 } // namespace Aws

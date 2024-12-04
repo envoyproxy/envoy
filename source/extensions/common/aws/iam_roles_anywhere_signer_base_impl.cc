@@ -83,7 +83,8 @@ absl::Status IAMRolesAnywhereSignerBaseImpl::sign(Http::RequestHeaderMap& header
   addRequiredHeaders(headers, long_date);
   addRequiredCertHeaders(headers, x509_credentials);
 
-  const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
+  const auto canonical_headers =
+      Utility::canonicalizeHeaders(headers, std::vector<Matchers::StringMatcherPtr>{});
 
   // Phase 1: Create a canonical request
   const auto credential_scope = createCredentialScope(short_date, override_region);

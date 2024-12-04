@@ -19,7 +19,6 @@ class IAMRolesAnywhereSignatureHeaderValues {
 public:
   const Http::LowerCaseString ContentSha256{"x-amz-content-sha256"};
   const Http::LowerCaseString Date{"x-amz-date"};
-  const Http::LowerCaseString SecurityToken{"x-amz-security-token"};
   const Http::LowerCaseString X509{"x-amz-x509"};
   const Http::LowerCaseString X509Chain{"x-amz-x509-chain"};
 };
@@ -28,7 +27,6 @@ using IAMRolesAnywhereSignatureHeaders = ConstSingleton<IAMRolesAnywhereSignatur
 
 class IAMRolesAnywhereSignatureConstants {
 public:
-  static constexpr absl::string_view Aws4Request = "aws4_request";
   static constexpr absl::string_view HashedEmptyString =
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
@@ -48,19 +46,11 @@ class IAMRolesAnywhereSignerBaseImpl : public Signer, public Logger::Loggable<Lo
 public:
   IAMRolesAnywhereSignerBaseImpl(absl::string_view service_name, absl::string_view region,
                                  const CredentialsProviderSharedPtr& credentials_provider,
-                                 Server::Configuration::CommonFactoryContext& context,
-                                 const AwsSigningHeaderExclusionVector& matcher_config)
-      : service_name_(service_name), region_(region),
-        excluded_header_matchers_(defaultMatchers(context)),
-        credentials_provider_(credentials_provider), time_source_(context.timeSource()),
+                                 Server::Configuration::CommonFactoryContext& context)
+      : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
+        time_source_(context.timeSource()),
         long_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::LongDateFormat)),
-        short_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::ShortDateFormat)) {
-    for (const auto& matcher : matcher_config) {
-      excluded_header_matchers_.emplace_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher, context));
-    }
-  }
+        short_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::ShortDateFormat)) {}
 
   IAMRolesAnywhereSignerBaseImpl(absl::string_view service_name, absl::string_view region,
                                  const X509CredentialsProviderSharedPtr& credentials_provider,
@@ -69,9 +59,7 @@ public:
       : service_name_(service_name), region_(region),
         x509_credentials_provider_(credentials_provider), time_source_(timesource),
         long_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::LongDateFormat)),
-        short_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::ShortDateFormat)) {
-    excluded_header_matchers_.clear();
-  }
+        short_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::ShortDateFormat)) {}
 
   absl::Status sign(Http::RequestMessage& message, bool sign_body = false,
                     const absl::string_view override_region = "") override;
@@ -84,8 +72,6 @@ public:
 
 protected:
   std::string createContentHash(Http::RequestMessage& message, bool sign_body) const;
-
-  virtual absl::string_view getAlgorithmString() const PURE;
 
   virtual std::string createCredentialScope(const absl::string_view short_date,
                                             const absl::string_view override_region) const PURE;
@@ -111,31 +97,13 @@ protected:
 
   void addRequiredCertHeaders(Http::RequestHeaderMap& headers, X509Credentials x509_credentials);
 
-  std::vector<Matchers::StringMatcherPtr>
-  defaultMatchers(Server::Configuration::CommonFactoryContext& context) const {
-    std::vector<Matchers::StringMatcherPtr> matcher_ptrs{};
-    for (const auto& header : default_excluded_headers_) {
-      envoy::type::matcher::v3::StringMatcher m;
-      m.set_exact(header);
-      matcher_ptrs.emplace_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              m, context));
-    }
-    return matcher_ptrs;
-  }
-
   const std::string service_name_;
   const std::string region_;
-  const std::vector<std::string> default_excluded_headers_ = {
-      Http::Headers::get().ForwardedFor.get(), Http::Headers::get().ForwardedProto.get(),
-      "x-amzn-trace-id"};
-  std::vector<Matchers::StringMatcherPtr> excluded_header_matchers_;
   CredentialsProviderSharedPtr credentials_provider_;
   X509CredentialsProviderSharedPtr x509_credentials_provider_;
   TimeSource& time_source_;
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
-  const std::string blank_str_;
 };
 
 } // namespace Aws

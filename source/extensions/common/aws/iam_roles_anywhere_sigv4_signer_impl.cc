@@ -28,10 +28,6 @@ IAMRolesAnywhereSigV4SignerImpl::createCredentialScope(absl::string_view short_d
                      service_name_);
 }
 
-absl::string_view IAMRolesAnywhereSigV4SignerImpl::getAlgorithmString() const {
-  return IAMRolesAnywhereSigV4SignatureConstants::SigV4Algorithm;
-}
-
 std::string IAMRolesAnywhereSigV4SignerImpl::createStringToSign(
     const X509Credentials x509_credentials, const absl::string_view canonical_request,
     const absl::string_view long_date, const absl::string_view credential_scope) const {
