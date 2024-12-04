@@ -730,7 +730,7 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
                            hosts_per_locality_, excluded_hosts_per_locality_, locality_weights_,
                            overprovisioning_factor_, seed);
 
-  runUpdateCallbacks(hosts_added, hosts_removed);
+  THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
 }
 
 void HostSetImpl::rebuildLocalityScheduler(
@@ -874,8 +874,7 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
       host_sets_priority_update_cbs_.push_back(
           host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
                                                const HostVector& hosts_removed) {
-            runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
-            return absl::OkStatus();
+            return runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
           }));
       host_sets_.push_back(std::move(host_set));
     }
@@ -902,7 +901,7 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
                     hosts_removed, seed, weighted_priority_health, overprovisioning_factor);
 
   if (!batch_update_) {
-    runUpdateCallbacks(hosts_added, hosts_removed);
+    THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
   }
 }
 
@@ -916,7 +915,7 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   HostVector net_hosts_added = filterHosts(scope.all_hosts_added_, scope.all_hosts_removed_);
   HostVector net_hosts_removed = filterHosts(scope.all_hosts_removed_, scope.all_hosts_added_);
 
-  runUpdateCallbacks(net_hosts_added, net_hosts_removed);
+  THROW_IF_NOT_OK(runUpdateCallbacks(net_hosts_added, net_hosts_removed));
 }
 
 void PrioritySetImpl::BatchUpdateScope::updateHosts(
