@@ -25,6 +25,10 @@ using CreateJwksFetcherCb = std::function<Common::JwksFetcherPtr(
  */
 using JwksDoneFetched = std::function<void(google::jwt_verify::JwksPtr&& jwks)>;
 
+using isRemoteJwksFetchAllowedCb = std::function<bool(void)>;
+
+using allowRemoteJwksFetchCb = std::function<void(absl::optional<bool>, bool)>;
+
 // This class handles fetching Jwks asynchronously.
 // It will be no-op if async_fetch is not enabled.
 // At its constructor, it will start to fetch Jwks, register with init_manager if not fast_listener.
@@ -35,7 +39,8 @@ class JwksAsyncFetcher : public Logger::Loggable<Logger::Id::jwt>,
 public:
   JwksAsyncFetcher(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
                    Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
-                   JwtAuthnFilterStats& stats, JwksDoneFetched done_fn);
+                   JwtAuthnFilterStats& stats, JwksDoneFetched done_fn,
+                   isRemoteJwksFetchAllowedCb is_fetch_allowed_fn,allowRemoteJwksFetchCb allow_fetch_fn);
 
   // Get the remote Jwks cache duration.
   static std::chrono::seconds
@@ -77,6 +82,10 @@ private:
 
   // The init target.
   std::unique_ptr<Init::TargetImpl> init_target_;
+
+  const isRemoteJwksFetchAllowedCb is_fetch_allowed_fn_;
+
+  const allowRemoteJwksFetchCb allow_fetch_fn_;
 
   // Used in logs.
   const std::string debug_name_;
