@@ -168,6 +168,9 @@ removed_config_or_runtime:
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
+- area: aws
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials``.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
