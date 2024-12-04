@@ -93,7 +93,7 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& per_route_config,
     Server::Configuration::ServerFactoryContext& server_context,

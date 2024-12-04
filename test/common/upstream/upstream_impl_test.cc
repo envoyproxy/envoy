@@ -4817,7 +4817,7 @@ public:
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
   ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override { PANIC("not implemented"); }
-  Router::RouteSpecificFilterConfigConstSharedPtr
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const Protobuf::Message&,
                                   Server::Configuration::ServerFactoryContext&,
                                   ProtobufMessage::ValidationVisitor&) override {
