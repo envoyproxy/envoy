@@ -1,6 +1,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
-#include "envoy/config/trace/v3/opencensus.pb.h"
+#include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
@@ -454,9 +454,9 @@ http_filters:
 
   // Simulate tracer provider configuration in the bootstrap config.
   envoy::config::trace::v3::Tracing bootstrap_tracing_config;
-  bootstrap_tracing_config.mutable_http()->set_name("opencensus");
+  bootstrap_tracing_config.mutable_http()->set_name("opentelemetry");
   bootstrap_tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
-      envoy::config::trace::v3::OpenCensusConfig{});
+      envoy::config::trace::v3::OpenTelemetryConfig{});
   context_.server_factory_context_.http_context_.setDefaultTracingConfig(bootstrap_tracing_config);
 
   // Set up expected tracer provider configuration.

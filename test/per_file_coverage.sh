@@ -42,7 +42,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/rate_limit_descriptors/expr:95.0"
 "source/extensions/stat_sinks/graphite_statsd:82.8" # Death tests don't report LCOV
 "source/extensions/stat_sinks/statsd:85.2" # Death tests don't report LCOV
-"source/extensions/tracers/opencensus:94.0"
 "source/extensions/tracers/zipkin:95.8"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
