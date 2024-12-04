@@ -160,7 +160,12 @@ paths:
     - source/extensions/clusters/redis
     - source/extensions/clusters/static
     - source/extensions/clusters/strict_dns
-    - source/extensions/common
+    - source/extensions/common/async_files
+    - source/extensions/common/aws
+    - source/extensions/common/dubbo
+    - source/extensions/common/matcher
+    - source/extensions/common/tap
+    - source/extensions/common/wasm
     - source/extensions/config/validators/minimum_clusters/minimum_clusters_validator.cc
     - source/extensions/config_subscription
     - source/extensions/compression/zstd/common/dictionary_manager.h
