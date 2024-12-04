@@ -1,0 +1,292 @@
+diff --git a/single-page-app/verify.sh b/single-page-app/verify.sh
+index 582917d..6b1547f 100755
+--- a/single-page-app/verify.sh
++++ b/single-page-app/verify.sh
+@@ -10,13 +10,11 @@ export PORT_PROXY="${SPA_PORT_PROXY:-11900}"
+ export PORT_MYHUB="${SPA_PORT_MYHUB:-11902}"
+ export MANUAL=true
+ 
+-
+ BACKUP_FILES=(
+-  "envoy.yml"
++    "envoy.yml"
+ )
+ 
+-
+-finally () {
++finally() {
+     rm -rf .local.ci
+     for file in "${BACKUP_FILES[@]}"; do
+         move_if_exists "${file}.bak" "${file}"
+@@ -32,9 +30,8 @@ export -f finally
+ # eg selenium or similar.
+ # Everything else should be tested.
+ 
+-
+ EXPECTED_USER_JQ=$(
+-cat << 'EOF'
++    cat <<'EOF'
+ {"avatar_url": "http://localhost:\($port)/images/users/envoy.svg",
+  "followers": 3,
+  "following": 2,
+@@ -47,10 +44,11 @@ EXPECTED_USER="$(
+     yq -c \
+         --arg port "$PORT_MYHUB" \
+         "$EXPECTED_USER_JQ" \
+-      < myhub/data.yml)"
++        <myhub/data.yml
++)"
+ 
+ EXPECTED_REPOS_JQ=$(
+-cat << 'EOF'
++    cat <<'EOF'
+ .users.envoydemo.public_repos as $user_repos
+ | .repos as $repos
+ | $user_repos
+@@ -64,10 +62,11 @@ EXPECTED_REPOS="$(
+     yq -c \
+         --arg port "$PORT_MYHUB" \
+         "$EXPECTED_REPOS_JQ" \
+-      < myhub/data.yml)"
++        <myhub/data.yml
++)"
+ 
+ EXPECTED_FOLLOWERS_JQ=$(
+-cat << 'EOF'
++    cat <<'EOF'
+ .users.envoydemo.followers as $followers
+ | .users as $users
+ | $followers
+@@ -82,10 +81,11 @@ EXPECTED_FOLLOWING="$(
+     yq -c \
+         --arg port "$PORT_MYHUB" \
+         "$EXPECTED_FOLLOWERS_JQ" \
+-      < myhub/data.yml)"
++        <myhub/data.yml
++)"
+ 
+ EXPECTED_FOLLOWING_JQ=$(
+-cat << 'EOF'
++    cat <<'EOF'
+ .users.envoydemo.following as $following
+ | .users as $users
+ | $following
+@@ -100,10 +100,10 @@ EXPECTED_FOLLOWING="$(
+     yq -c \
+         --arg port "$PORT_MYHUB" \
+         "$EXPECTED_FOLLOWING_JQ" \
+-      < myhub/data.yml)"
+-
++        <myhub/data.yml
++)"
+ 
+-test_auth () {
++test_auth() {
+     local proxy_port
+     proxy_scheme=$1
+     proxy_port=$2
+@@ -122,10 +122,12 @@ test_auth () {
+     # Nonce-less verification will remain for backward compatibility with previous releases.
+     # TODO: zhaohuabing - Remove the nonce-less verification after a reasonable transition period, such as one year.
+     run_log "Check whether the nonce is used in the OAuth2 filter"
+-    SUPPORT_NONCE="false"
++
++    BASE64URL_PREFIX="eyJ1cmwiOi" # The state is prefixed with this string when it is a base64url encoded json object ({"url":)
++    STATE_BASE64URL_ENCODE="false" # Whether the state is a base64url encoded json object
+     LOCATION=$(_curl "${curl_args[@]}" --head "${proxy_scheme}://localhost:${proxy_port}/login" | grep location)
+-    if [[ "$LOCATION" == *"nonce%3D"* ]]; then
+-        SUPPORT_NONCE="true"
++    if [[ "$LOCATION" == ${BASE64URL_PREFIX}* ]]; then
++        STATE_BASE64URL_ENCODE="true"
+     fi
+ 
+     run_log "Inititiate login"
+@@ -133,50 +135,52 @@ test_auth () {
+         "HTTP/1.1 302 Found" \
+         "${proxy_scheme}://localhost:${proxy_port}/login" \
+         "${curl_args[@]}"
+-    if [[ "$SUPPORT_NONCE" == "true" ]]; then
++    if [[ "$STATE_BASE64URL_ENCODE" == "true" ]]; then
+         responds_with_header \
+-            "location: http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3D${proxy_scheme}%253A%252F%252Flocalhost%253A${proxy_port}%252Flogin%26nonce%3D" \
+-            "${proxy_scheme}://localhost:${proxy_port}/login" \
+-            "${curl_args[@]}"
+-        responds_with_header \
+-            "set-cookie: OauthNonce=" \
++            "location: http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${BASE64URL_PREFIX}" \
+             "${proxy_scheme}://localhost:${proxy_port}/login" \
+             "${curl_args[@]}"
+     else
+         responds_with_header \
+-            "location: http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Flogin" \
++            "location: http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3D${proxy_scheme}%253A%252F%252Flocalhost%253A${proxy_port}%252Flogin%26nonce%3D" \
+             "${proxy_scheme}://localhost:${proxy_port}/login" \
+             "${curl_args[@]}"
+     fi
++    responds_with_header \
++        "set-cookie: OauthNonce=" \
++        "${proxy_scheme}://localhost:${proxy_port}/login" \
++        "${curl_args[@]}"
++
++    encoded_state=$(echo -n "{\"url\":\"${proxy_scheme}://localhost:${proxy_port}/login\",\"nonce\":\"12345678\"}" | basenc --base64url)
+ 
+     run_log "Fetch the myhub authorization page"
+-    if [[ "$SUPPORT_NONCE" == "true" ]]; then
++    if [[ "$STATE_BASE64URL_ENCODE" == "true" ]]; then
+         responds_with_header \
+             "HTTP/1.1 302 Found" \
+-            "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3D${proxy_scheme}%253A%252F%252Flocalhost%253A${proxy_port}%252Flogin%26nonce%3D12345678" \
++            "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${encoded_state}" \
+             "${curl_args[@]}"
+         responds_with_header \
+             "Location: ${proxy_scheme}://localhost:${proxy_port}/authorize?code=" \
+-            "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3D${proxy_scheme}%253A%252F%252Flocalhost%253A${proxy_port}%252Flogin%26nonce%3D12345678" \
++            "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${encoded_state}" \
+             "${curl_args[@]}"
+     else
+         responds_with_header \
+             "HTTP/1.1 302 Found" \
+-            "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Flogin" \
++            "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3D${proxy_scheme}%253A%252F%252Flocalhost%253A${proxy_port}%252Flogin%26nonce%3D12345678" \
+             "${curl_args[@]}"
+         responds_with_header \
+             "Location: ${proxy_scheme}://localhost:${proxy_port}/authorize?code=" \
+-            "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Flogin" \
++            "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3D${proxy_scheme}%253A%252F%252Flocalhost%253A${proxy_port}%252Flogin%26nonce%3D12345678" \
+             "${curl_args[@]}"
+     fi
+ 
+     run_log "Return to the app and receive creds"
+-    if [[ "$SUPPORT_NONCE" == "true" ]]; then
++    if [[ "$STATE_BASE64URL_ENCODE" == "true" ]]; then
++        CODE=$(_curl "${curl_args[@]}" --head "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${encoded_state}" | grep Location | cut -d= -f2 | cut -d\& -f1)
++        RESPONSE=$(_curl "${curl_args[@]}" --cookie "OauthNonce=12345678" --head "${proxy_scheme}://localhost:${proxy_port}/authorize?code=$CODE&state=${encoded_state}")
++    else
+         CODE=$(_curl "${curl_args[@]}" --head "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3D${proxy_scheme}%253A%252F%252Flocalhost%253A${proxy_port}%252Flogin%26nonce%3D12345678" | grep Location | cut -d= -f2 | cut -d\& -f1)
+         RESPONSE=$(_curl "${curl_args[@]}" --cookie "OauthNonce=12345678" --head "${proxy_scheme}://localhost:${proxy_port}/authorize?code=$CODE&state=url%3D${proxy_scheme}%253A%252F%252Flocalhost%253A${proxy_port}%252Flogin%26nonce%3D12345678")
+-    else
+-        CODE=$(_curl "${curl_args[@]}" --head "http://localhost:${PORT_MYHUB}/authorize?client_id=0123456789&redirect_uri=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Flogin" | grep Location | cut -d= -f2 | cut -d\& -f1)
+-        RESPONSE=$(_curl "${curl_args[@]}" --head "${proxy_scheme}://localhost:${proxy_port}/authorize?code=$CODE&state=${proxy_scheme}%3A%2F%2Flocalhost%3A${proxy_port}%2Flogin")
+     fi
+     echo "$RESPONSE" | grep "HTTP/1.1 302 Found"
+     echo "$RESPONSE" | grep "location: ${proxy_scheme}://localhost:${proxy_port}/login"
+@@ -200,7 +204,7 @@ test_auth () {
+     )
+ 
+     for endpoint in "${endpoints[@]}"; do
+-        IFS='|' read -r log_message expected_response path <<< "$endpoint"
++        IFS='|' read -r log_message expected_response path <<<"$endpoint"
+         run_log "$log_message"
+         responds_with \
+             "$expected_response" \
+@@ -217,12 +221,12 @@ test_auth () {
+     echo "$RESPONSE" | grep "set-cookie: BearerToken=deleted"
+ }
+ 
+-get_js () {
+-    _curl -k "https://localhost:${PORT_PROXY}" \
+-        | grep "assets/index" \
+-        | grep -oP '<script type="module" crossorigin src="/assets/[^"]+"></script>' \
+-        | grep -oP '/assets/[^"]+' \
+-        | sed 's/\/assets\///;s/".*//'
++get_js() {
++    _curl -k "https://localhost:${PORT_PROXY}" |
++        grep "assets/index" |
++        grep -oP '<script type="module" crossorigin src="/assets/[^"]+"></script>' |
++        grep -oP '/assets/[^"]+' |
++        sed 's/\/assets\///;s/".*//'
+ }
+ 
+ run_log "Adjust environment for CI"
+@@ -234,8 +238,8 @@ export UI_PATH=./.local.ci/ui
+ for file in "${BACKUP_FILES[@]}"; do
+     cp -a "${file}" "${file}.bak"
+ done
+-echo "VITE_APP_API_URL=https://localhost:${PORT_PROXY}" > ui/.env.production.local
+-echo "VITE_APP_API_URL=http://localhost:${PORT_DEV_PROXY}" > ui/.env.development.local
++echo "VITE_APP_API_URL=https://localhost:${PORT_PROXY}" >ui/.env.production.local
++echo "VITE_APP_API_URL=http://localhost:${PORT_DEV_PROXY}" >ui/.env.development.local
+ sed -i "s/localhost:7000/localhost:${PORT_MYHUB}/g" envoy.yml
+ export UID
+ 
+@@ -244,7 +248,7 @@ cp -a secrets/ .local.ci/
+ export SECRETS_PATH=./.local.ci/secrets/
+ HMAC_SECRET=$(echo "MY_HMAC_SECRET" | mkpasswd -s)
+ export HMAC_SECRET
+-envsubst < hmac-secret.tmpl.yml > .local.ci/secrets/hmac-secret.yml
++envsubst <hmac-secret.tmpl.yml >.local.ci/secrets/hmac-secret.yml
+ 
+ run_log "Start servers"
+ bring_up_example
+@@ -269,7 +273,7 @@ docker compose up --build -d envoy
+ docker compose run --rm ui build.sh
+ 
+ run_log "Check the created routes"
+-jq '.resources[0].filter_chains[0].filters[0].typed_config.route_config.virtual_hosts[0].routes' < .local.ci/production/xds/lds.yml
++jq '.resources[0].filter_chains[0].filters[0].typed_config.route_config.virtual_hosts[0].routes' <.local.ci/production/xds/lds.yml
+ 
+ test_auth https "${PORT_PROXY}"
+ 
+@@ -297,7 +301,7 @@ responds_with \
+ 
+ run_log "Update Envoy's configuration to use Github"
+ export TOKEN_SECRET=ZZZ
+-envsubst < token-secret.tmpl.yml > .local.ci/secrets/github-token-secret.yml
++envsubst <token-secret.tmpl.yml >.local.ci/secrets/github-token-secret.yml
+ GITHUB_PROVIDED_CLIENT_ID=XXX
+ cp -a envoy.yml .local.ci/
+ sed -i "s@cluster:\ hub@cluster:\ github@g" .local.ci/envoy.yml
+@@ -306,10 +310,10 @@ sed -i "s@authorization_endpoint:\ http://localhost:${PORT_MYHUB}/authorize@auth
+ sed -i "s@uri:\ http://myhub:${PORT_MYHUB}/authenticate@uri:\ https://github.com/login/oauth/access_token@g" .local.ci/envoy.yml
+ sed -i "s@path:\ /etc/envoy/secrets/myhub-token-secret.yml@path:\ /etc/envoy/secrets/github-token-secret.yml@g" .local.ci/envoy.yml
+ sed -i "s@host_rewrite_literal:\ api.myhub@host_rewrite_literal:\ api.github.com@g" .local.ci/envoy.yml
+-cat _github-clusters.yml >> .local.ci/envoy.yml
++cat _github-clusters.yml >>.local.ci/envoy.yml
+ 
+ run_log "Update the app configuration to use Github"
+-echo "VITE_APP_AUTH_PROVIDER=github" > .local.ci/ui/.env.local
++echo "VITE_APP_AUTH_PROVIDER=github" >.local.ci/ui/.env.local
+ 
+ run_log "Rebuild the app and restart Envoy (Github)"
+ export ENVOY_CONFIG=.local.ci/envoy.yml
+@@ -326,16 +330,16 @@ run_log "Inititiate dev login (Github)"
+ responds_with_header \
+     "HTTP/1.1 302 Found" \
+     "http://localhost:${PORT_DEV_PROXY}/login"
+-if [[ "$SUPPORT_NONCE" == "true" ]]; then
++if [[ "$STATE_BASE64URL_ENCODE" == "true" ]]; then
+     responds_with_header \
+-        "location: https://github.com/login/oauth/authorize?client_id=XXX&redirect_uri=http%3A%2F%2Flocalhost%3A${PORT_DEV_PROXY}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3Dhttp%253A%252F%252Flocalhost%253A${PORT_DEV_PROXY}%252Flogin%26nonce%3D" \
++        "location: https://github.com/login/oauth/authorize?client_id=XXX&redirect_uri=http%3A%2F%2Flocalhost%3A${PORT_DEV_PROXY}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${BASE64URL_PREFIX}" \
+         "http://localhost:${PORT_DEV_PROXY}/login"
+     responds_with_header \
+         "set-cookie: OauthNonce=" \
+         "http://localhost:${PORT_DEV_PROXY}/login"
+ else
+     responds_with_header \
+-        "location: https://github.com/login/oauth/authorize?client_id=XXX&redirect_uri=http%3A%2F%2Flocalhost%3A${PORT_DEV_PROXY}%2Fauthorize&response_type=code&scope=user%3Aemail&state=http%3A%2F%2Flocalhost%3A${PORT_DEV_PROXY}%2Flogin" \
++        "location: https://github.com/login/oauth/authorize?client_id=XXX&redirect_uri=http%3A%2F%2Flocalhost%3A${PORT_DEV_PROXY}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3Dhttp%253A%252F%252Flocalhost%253A${PORT_DEV_PROXY}%252Flogin%26nonce%3D" \
+         "http://localhost:${PORT_DEV_PROXY}/login"
+ fi
+ 
+@@ -344,9 +348,9 @@ responds_with \
+     "Envoy single page app example" \
+     "https://localhost:${PORT_PROXY}" \
+     -k
+-if [[ "$SUPPORT_NONCE" == "true" ]]; then
++if [[ "$STATE_BASE64URL_ENCODE" == "true" ]]; then
+     responds_with_header \
+-        "location: https://github.com/login/oauth/authorize?client_id=XXX&redirect_uri=https%3A%2F%2Flocalhost%3A${PORT_PROXY}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3Dhttps%253A%252F%252Flocalhost%253A${PORT_PROXY}%252Flogin%26nonce%3D" \
++        "location: https://github.com/login/oauth/authorize?client_id=XXX&redirect_uri=https%3A%2F%2Flocalhost%3A${PORT_PROXY}%2Fauthorize&response_type=code&scope=user%3Aemail&state=${BASE64URL_PREFIX}" \
+         "https://localhost:${PORT_PROXY}/login" \
+         -k
+     responds_with_header \
+@@ -355,7 +359,7 @@ if [[ "$SUPPORT_NONCE" == "true" ]]; then
+         -k
+ else
+     responds_with_header \
+-        "location: https://github.com/login/oauth/authorize?client_id=XXX&redirect_uri=https%3A%2F%2Flocalhost%3A${PORT_PROXY}%2Fauthorize&response_type=code&scope=user%3Aemail&state=https%3A%2F%2Flocalhost%3A${PORT_PROXY}%2Flogin" \
++        "location: https://github.com/login/oauth/authorize?client_id=XXX&redirect_uri=https%3A%2F%2Flocalhost%3A${PORT_PROXY}%2Fauthorize&response_type=code&scope=user%3Aemail&state=url%3Dhttps%253A%252F%252Flocalhost%253A${PORT_PROXY}%252Flogin%26nonce%3D" \
+         "https://localhost:${PORT_PROXY}/login" \
+         -k
+ fi
