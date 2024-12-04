@@ -6,12 +6,8 @@
 namespace Envoy {
 namespace Json {
 
-ObjectSharedPtr Factory::loadFromString(const std::string& json) {
+absl::StatusOr<ObjectSharedPtr> Factory::loadFromString(const std::string& json) {
   return Nlohmann::Factory::loadFromString(json);
-}
-
-absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string& json) {
-  return Nlohmann::Factory::loadFromStringNoThrow(json);
 }
 
 ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& protobuf_struct) {

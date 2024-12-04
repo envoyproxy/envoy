@@ -24,7 +24,7 @@ final class LoggerTests: XCTestCase {
     let logEventExpectation = self.expectation(
       description: "Run received log event via event tracker")
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
     let port = String(EnvoyTestServer.getHttpPort())
 
     let engine = EngineBuilder()

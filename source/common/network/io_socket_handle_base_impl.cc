@@ -63,7 +63,7 @@ Api::SysCallIntResult IoSocketHandleBaseImpl::setBlocking(bool blocking) {
 
 absl::optional<int> IoSocketHandleBaseImpl::domain() { return domain_; }
 
-Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::localAddress() {
+absl::StatusOr<Address::InstanceConstSharedPtr> IoSocketHandleBaseImpl::localAddress() {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof(ss);
   memset(&ss, 0, ss_len);
@@ -71,13 +71,13 @@ Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::localAddress() {
   Api::SysCallIntResult result =
       os_sys_calls.getsockname(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
-    throwEnvoyExceptionOrPanic(fmt::format("getsockname failed for '{}': ({}) {}", fd_,
-                                           result.errno_, errorDetails(result.errno_)));
+    return absl::InvalidArgumentError(fmt::format("getsockname failed for '{}': ({}) {}", fd_,
+                                                  result.errno_, errorDetails(result.errno_)));
   }
-  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
+  return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
 }
 
-Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::peerAddress() {
+absl::StatusOr<Address::InstanceConstSharedPtr> IoSocketHandleBaseImpl::peerAddress() {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof(ss);
   memset(&ss, 0, ss_len);
@@ -85,7 +85,7 @@ Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::peerAddress() {
   Api::SysCallIntResult result =
       os_sys_calls.getpeername(fd_, reinterpret_cast<sockaddr*>(&ss), &ss_len);
   if (result.return_value_ != 0) {
-    throwEnvoyExceptionOrPanic(
+    return absl::InvalidArgumentError(
         fmt::format("getpeername failed for '{}': {}", fd_, errorDetails(result.errno_)));
   }
 
@@ -102,7 +102,7 @@ Address::InstanceConstSharedPtr IoSocketHandleBaseImpl::peerAddress() {
           fmt::format("getsockname failed for '{}': {}", fd_, errorDetails(result.errno_)));
     }
   }
-  return Address::addressFromSockAddrOrThrow(ss, ss_len, socket_v6only_);
+  return Address::addressFromSockAddr(ss, ss_len, socket_v6only_);
 }
 
 absl::optional<std::chrono::milliseconds> IoSocketHandleBaseImpl::lastRoundTripTime() {
@@ -129,7 +129,11 @@ absl::optional<std::string> IoSocketHandleBaseImpl::interfaceName() {
     return absl::nullopt;
   }
 
-  Address::InstanceConstSharedPtr socket_address = localAddress();
+  auto address_or_error = localAddress();
+  if (!address_or_error.status().ok()) {
+    return absl::nullopt;
+  }
+  Address::InstanceConstSharedPtr& socket_address = *address_or_error;
   if (!socket_address || socket_address->type() != Address::Type::Ip) {
     return absl::nullopt;
   }

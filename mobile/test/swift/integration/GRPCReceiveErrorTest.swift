@@ -61,7 +61,7 @@ final class GRPCReceiveErrorTests: XCTestCase {
     filterNotCancelled.isInverted = true
     let expectations = [filterReceivedError, filterNotCancelled, callbackReceivedError]
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)

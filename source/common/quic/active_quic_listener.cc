@@ -119,7 +119,7 @@ ActiveQuicListener::ActiveQuicListener(
   if (listener_config.udpListenerConfig()) {
     const auto& save_cmsg_configs =
         listener_config.udpListenerConfig()->config().quic_options().save_cmsg_config();
-    if (save_cmsg_configs.size() > 0) {
+    if (!save_cmsg_configs.empty()) {
       // QUIC only supports a single cmsg config.
       const envoy::config::core::v3::SocketCmsgHeaders save_cmsg_config = save_cmsg_configs.at(0);
       if (save_cmsg_config.has_level()) {

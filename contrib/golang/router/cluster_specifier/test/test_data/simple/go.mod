@@ -15,7 +15,7 @@ require (
 require (
 	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	google.golang.org/protobuf v1.35.1
+	google.golang.org/protobuf v1.35.2
 )
 
 replace github.com/envoyproxy/envoy => ../../../../../../../

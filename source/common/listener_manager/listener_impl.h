@@ -315,9 +315,7 @@ public:
     return *balancer->second;
   }
   ResourceLimit& openConnections() override { return *open_connections_; }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
-    return access_logs_;
-  }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
   uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
     return max_connections_to_accept_per_socket_event_;
@@ -454,7 +452,7 @@ private:
   Filter::ListenerFilterFactoriesList listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   Filter::QuicListenerFilterFactoriesList quic_listener_filter_factories_;
-  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   const envoy::config::listener::v3::Listener config_;
   const std::string version_info_;
   // Using std::vector instead of hash map for supporting multiple zero port addresses.

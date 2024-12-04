@@ -163,6 +163,31 @@ TEST_F(AsyncClientImplTest, BasicStream) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
 
+  {
+    // Senseless but improves coverage.
+    Http::StreamDecoderFilterCallbacks* filter_callbacks =
+        dynamic_cast<Http::AsyncStreamImpl*>(stream);
+    filter_callbacks->continueDecoding(); // No-op.
+    Buffer::OwnedImpl buffer;
+    filter_callbacks->injectDecodedDataToFilterChain(buffer, true);   // No-op.
+    filter_callbacks->modifyDecodingBuffer([](Buffer::Instance&) {}); // No-op.
+    filter_callbacks->encodeMetadata(nullptr);                        // No-op.
+    EXPECT_EQ(false, filter_callbacks->recreateStream(nullptr));      // No-op.
+    filter_callbacks->getUpstreamSocketOptions();                     // No-op.
+    filter_callbacks->addUpstreamSocketOptions(nullptr);              // No-op.
+    filter_callbacks->mostSpecificPerFilterConfig();                  // No-op.
+    filter_callbacks->perFilterConfigs();                             // No-op.
+    filter_callbacks->http1StreamEncoderOptions();                    // No-op.
+    filter_callbacks->downstreamCallbacks();                          // No-op.
+    filter_callbacks->upstreamCallbacks();                            // No-op.
+    filter_callbacks->resetIdleTimer();                               // No-op.
+    filter_callbacks->setUpstreamOverrideHost({});                    // No-op.
+    filter_callbacks->filterConfigName();                             // No-op.
+    filter_callbacks->informationalHeaders();                         // No-op.
+    filter_callbacks->responseHeaders();                              // No-op.
+    filter_callbacks->responseTrailers();                             // No-op.
+  }
+
   response_decoder_->decode1xxHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
   response_decoder_->decodeHeaders(
@@ -472,6 +497,8 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   EXPECT_NE(request, nullptr);
 
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
+
   // Registering a new watermark callback should note that the high watermark has already been hit.
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   request->setWatermarkCallbacks(watermark_callbacks);
@@ -529,9 +556,9 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
       client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
 
-  // StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   request->setWatermarkCallbacks(watermark_callbacks);
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
   request->sendData(data, false);
@@ -908,8 +935,9 @@ TEST_F(AsyncClientImplTest, WithFilterState) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
       .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
                            Upstream::LoadBalancerContext* context) {
-        const StreamInfo::FilterState& filter_state = context->requestStreamInfo()->filterState();
-        const TestStateObject* state = filter_state.getDataReadOnly<TestStateObject>("test-filter");
+        StreamInfo::FilterStateSharedPtr filter_state = context->requestStreamInfo()->filterState();
+        const TestStateObject* state =
+            filter_state->getDataReadOnly<TestStateObject>("test-filter");
         EXPECT_NE(state, nullptr);
         EXPECT_EQ(state->value(), "stored-test-state");
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
@@ -2225,7 +2253,7 @@ public:
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
-    route_impl_ = std::make_unique<NullRouteImpl>(
+    route_impl_ = *NullRouteImpl::create(
         client_.cluster_->name(), *retry_policy_, regex_engine_, absl::nullopt,
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>());
   }

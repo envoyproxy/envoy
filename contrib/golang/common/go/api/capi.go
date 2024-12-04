@@ -23,6 +23,7 @@ type HttpCAPI interface {
 	/* These APIs are related to the decode/encode phase, use the pointer of processState. */
 	HttpContinue(s unsafe.Pointer, status uint64)
 	HttpSendLocalReply(s unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string)
+	HttpAddData(s unsafe.Pointer, data []byte, isStreaming bool)
 
 	// Send a specialized reply that indicates that the filter has failed on the go side. Internally this is used for
 	// when unhandled panics are detected.
@@ -43,7 +44,7 @@ type HttpCAPI interface {
 	HttpRemoveTrailer(s unsafe.Pointer, key string)
 
 	/* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
-	ClearRouteCache(r unsafe.Pointer)
+	ClearRouteCache(r unsafe.Pointer, refresh bool)
 
 	HttpGetStringValue(r unsafe.Pointer, id int) (string, bool)
 	HttpGetIntegerValue(r unsafe.Pointer, id int) (uint64, bool)

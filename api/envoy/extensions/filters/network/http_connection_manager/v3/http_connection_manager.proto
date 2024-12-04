@@ -691,7 +691,7 @@ message HttpConnectionManager {
   // information about internal/external addresses.
   //
   // .. warning::
-  //     In the next release, no IP addresses will be considered trusted. If you have tooling such as probes
+  //     As of Envoy 1.33.0 no IP addresses will be considered trusted. If you have tooling such as probes
   //     on your private network which need to be treated as trusted (e.g. changing arbitrary x-envoy headers)
   //     you will have to manually include those addresses or CIDR ranges like:
   //

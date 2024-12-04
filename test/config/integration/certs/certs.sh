@@ -88,6 +88,11 @@ generate_rsa_key server ca
 generate_x509_cert server ca
 generate_ocsp_response server ca
 generate_info_header server
+# Generate RSA cert for the server with extra data for a very large certificate
+generate_rsa_key long_server ca
+generate_x509_cert long_server ca
+generate_ocsp_response long_server ca
+generate_info_header long_server
 # Generate RSA cert for the server with different SAN
 generate_rsa_key server2 ca
 generate_x509_cert server2 ca

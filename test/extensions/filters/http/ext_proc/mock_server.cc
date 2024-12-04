@@ -19,7 +19,15 @@ MockClient::MockClient() {
 }
 MockClient::~MockClient() = default;
 
-MockStream::MockStream() = default;
+MockStream::MockStream() {
+  ON_CALL(*this, closeLocalStream()).WillByDefault(Invoke([this]() {
+    EXPECT_FALSE(local_closed_);
+    local_closed_ = true;
+    return local_closed_;
+  }));
+  ON_CALL(*this, remoteClosed()).WillByDefault(Invoke([this]() { return remote_closed_; }));
+  ON_CALL(*this, localClosed()).WillByDefault(Invoke([this]() { return local_closed_; }));
+}
 MockStream::~MockStream() = default;
 
 } // namespace ExternalProcessing

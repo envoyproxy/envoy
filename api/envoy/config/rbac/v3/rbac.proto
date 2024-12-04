@@ -28,6 +28,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
 
+enum MetadataSource {
+  // Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
+  DYNAMIC = 0;
+
+  // Query :ref:`route metadata <envoy_v3_api_field_config.route.v3.Route.metadata>`
+  ROUTE = 1;
+}
+
 // Role Based Access Control (RBAC) provides service-level and method-level access control for a
 // service. Requests are allowed or denied based on the ``action`` and whether a matching policy is
 // found. For instance, if the action is ALLOW and a matching policy is found the request should be
@@ -193,8 +201,27 @@ message Policy {
       [(udpa.annotations.field_migrate).oneof_promotion = "expression_specifier"];
 }
 
+// SourcedMetadata enables matching against metadata from different sources in the request processing
+// pipeline. It extends the base MetadataMatcher functionality by allowing specification of where the
+// metadata should be sourced from, rather than only matching against dynamic metadata.
+//
+// The matcher can be configured to look up metadata from:
+// * Dynamic metadata: Runtime metadata added by filters during request processing
+// * Route metadata: Static metadata configured on the route entry
+message SourcedMetadata {
+  // Metadata matcher configuration that defines what metadata to match against. This includes the filter name,
+  // metadata key path, and expected value.
+  type.matcher.v3.MetadataMatcher metadata_matcher = 1
+      [(validate.rules).message = {required: true}];
+
+  // Specifies which metadata source should be used for matching. If not set,
+  // defaults to DYNAMIC (dynamic metadata). Set to ROUTE to match against
+  // static metadata configured on the route entry.
+  MetadataSource metadata_source = 2 [(validate.rules).enum = {defined_only: true}];
+}
+
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Permission";
 
@@ -237,8 +264,10 @@ message Permission {
     // A port number range that describes a range of destination ports connecting to.
     type.v3.Int32Range destination_port_range = 11;
 
-    // Metadata that describes additional information about the action.
-    type.matcher.v3.MetadataMatcher metadata = 7;
+    // Metadata that describes additional information about the action. This field is deprecated; please use
+    // :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>` instead.
+    type.matcher.v3.MetadataMatcher metadata = 7
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Negates matching the provided permission. For instance, if the value of
     // ``not_rule`` would match, this permission would not match. Conversely, if
@@ -274,12 +303,16 @@ message Permission {
     // URI template path matching.
     // [#extension-category: envoy.path.match]
     core.v3.TypedExtensionConfig uri_template = 13;
+
+    // Matches against metadata from either dynamic state or route configuration. Preferred over the
+    // ``metadata`` field as it provides more flexibility in metadata source selection.
+    SourcedMetadata sourced_metadata = 14;
   }
 }
 
 // Principal defines an identity or a group of identities for a downstream
 // subject.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message Principal {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
 
@@ -356,8 +389,10 @@ message Principal {
     // A URL path on the incoming HTTP request. Only available for HTTP.
     type.matcher.v3.PathMatcher url_path = 9;
 
-    // Metadata that describes additional information about the principal.
-    type.matcher.v3.MetadataMatcher metadata = 7;
+    // Metadata that describes additional information about the principal. This field is deprecated; please use
+    // :ref:`sourced_metadata<envoy_v3_api_field_config.rbac.v3.Principal.sourced_metadata>` instead.
+    type.matcher.v3.MetadataMatcher metadata = 7
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // Identifies the principal using a filter state object.
     type.matcher.v3.FilterStateMatcher filter_state = 12;
@@ -366,6 +401,10 @@ message Principal {
     // ``not_id`` would match, this principal would not match. Conversely, if the
     // value of ``not_id`` would not match, this principal would match.
     Principal not_id = 8;
+
+    // Matches against metadata from either dynamic state or route configuration. Preferred over the
+    // ``metadata`` field as it provides more flexibility in metadata source selection.
+    SourcedMetadata sourced_metadata = 13;
   }
 }
 

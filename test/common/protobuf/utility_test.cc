@@ -1424,20 +1424,20 @@ TEST_F(ProtobufUtilityTest, AnyBytes) {
     source.set_value("abc");
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
-    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "abc");
+    EXPECT_EQ(*MessageUtil::anyToBytes(source_any), "abc");
   }
   {
     ProtobufWkt::BytesValue source;
     source.set_value("\x01\x02\x03");
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
-    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
+    EXPECT_EQ(*MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
   }
   {
     envoy::config::cluster::v3::Filter filter;
     ProtobufWkt::Any source_any;
     source_any.PackFrom(filter);
-    EXPECT_EQ(MessageUtil::anyToBytes(source_any), source_any.value());
+    EXPECT_EQ(*MessageUtil::anyToBytes(source_any), source_any.value());
   }
 }
 
@@ -1462,19 +1462,18 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
                ProtoValidationException);
 }
 
-// MessageUtility::unpackToOrThrow() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::unpackToOrThrow(source_any, dst), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
+  EXPECT_THAT(
+      MessageUtil::unpackTo(source_any, dst).message(),
+      testing::ContainsRegex(
+          R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)"));
 }
 
-// MessageUtility::unpackToOrThrow() with API message works at same version.
 TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
   {
     API_NO_BOOST(envoy::api::v2::Cluster) source;
@@ -1482,7 +1481,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
-    MessageUtil::unpackToOrThrow(source_any, dst);
+    ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
@@ -1491,7 +1490,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    MessageUtil::unpackToOrThrow(source_any, dst);
+    ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }

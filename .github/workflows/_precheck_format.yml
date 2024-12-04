@@ -5,13 +5,20 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      gcs-cache-key:
+        required: true
     inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
       request:
         type: string
         required: true
       trusted:
         type: boolean
         required: true
+
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}-format
@@ -20,6 +27,8 @@ concurrency:
 
 jobs:
   format:
+    secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
       contents: read
       packages: read
@@ -29,6 +38,7 @@ jobs:
       bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       request: ${{ inputs.request }}
       error-match: |
         ERROR

@@ -35,6 +35,7 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@envoy_api//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg_cc_proto",
     ],
 )
@@ -47,11 +48,28 @@ envoy_cc_library(
     ],
     deps = [
         ":filter_config_lib",
+        ":request_handler_lib",
         ":rewriter_lib",
         "//contrib/kafka/filters/network/source:kafka_metrics_lib",
         "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
         "//contrib/kafka/filters/network/source:kafka_response_codec_lib",
         "//envoy/buffer:buffer_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "request_handler_lib",
+    srcs = ["request_handler.cc"],
+    hdrs = [
+        "request_handler.h",
+    ],
+    deps = [
+        ":filter_config_lib",
+        "//contrib/kafka/filters/network/source:kafka_request_codec_lib",
+        "//contrib/kafka/filters/network/source:kafka_response_codec_lib",
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:minimal_logger_lib",

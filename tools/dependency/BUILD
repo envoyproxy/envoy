@@ -2,13 +2,10 @@ load("@base_pip3//:requirements.bzl", "requirement")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 envoy_py_namespace()
 
@@ -35,6 +32,7 @@ envoy_genjson(
     .[0]
     | del(.confluentinc_librdkafka)
     """,
+    visibility = ["//visibility:public"],
 )
 
 py_console_script_binary(
@@ -55,6 +53,7 @@ py_console_script_binary(
     }),
     pkg = "@base_pip3//envoy_dependency_check",
     script = "envoy.dependency.check",
+    visibility = ["//visibility:public"],
     deps = [requirement("orjson")],
 )
 

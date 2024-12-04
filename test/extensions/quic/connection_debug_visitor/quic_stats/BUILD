@@ -33,5 +33,6 @@ envoy_extension_cc_test(
         "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/extensions/quic/connection_debug_visitor/quic_stats/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
 )

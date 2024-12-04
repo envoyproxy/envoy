@@ -1,4 +1,5 @@
 #include <chrono>
+#include <limits>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -47,9 +48,11 @@ protected:
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
-  void setupFromV3Yaml(const std::string& yaml) {
+  void setupFromV3Yaml(const std::string& yaml, bool expect_success = true) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
-    resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+    if (expect_success) {
+      resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
+    }
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
@@ -642,6 +645,63 @@ TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
   EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000 + jitter_ms), _));
   ON_CALL(random_, random()).WillByDefault(Return(random_return));
 
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
+}
+
+TEST_F(LogicalDnsClusterTest, NegativeDnsJitter) {
+  const std::string yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_jitter: -1s
+  lb_policy: ROUND_ROBIN
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(yaml, false), EnvoyException,
+                            "Invalid duration: Expected positive duration: seconds: -1\n");
+}
+
+TEST_F(LogicalDnsClusterTest, ExtremeJitter) {
+  // When random returns large values, they were being reinterpreted as very negative values causing
+  // negative refresh rates.
+  const std::string jitter_yaml = R"EOF(
+  name: name
+  type: LOGICAL_DNS
+  dns_refresh_rate: 1s
+  dns_failure_refresh_rate:
+    base_interval: 7s
+    max_interval: 10s
+  connect_timeout: 0.25s
+  dns_jitter: 1000s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  dns_lookup_family: V4_ONLY
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  setupFromV3Yaml(jitter_yaml);
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(testing::Ge(std::chrono::milliseconds(4000)), _));
+  ON_CALL(random_, random()).WillByDefault(Return(std::numeric_limits<int64_t>::min()));
   dns_callback_(
       Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));

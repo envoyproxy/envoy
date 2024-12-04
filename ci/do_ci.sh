@@ -18,65 +18,6 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
 
-# Its better to fetch too little rather than too much, as whatever is
-# actually used is what will be cached.
-# Fetching is mostly for robustness rather than optimization.
-FETCH_TARGETS=(
-    @bazel_tools//tools/jdk:remote_jdk11
-    //bazel/rbe/toolchains/...
-    //tools/gsutil
-    //tools/zstd)
-FETCH_BUILD_TARGETS=(
-    //contrib/exe/...
-    //distribution/...
-    //source/exe/...)
-FETCH_GCC_TARGETS=(
-    //source/exe/...)
-# TODO(phlax): add this as a general cache
-#  this fetches a bit too much for some of the targets
-#  but its not really possible to filter their needs so move
-#  to a shared precache
-FETCH_TEST_TARGETS=(
-    @nodejs//...
-    //test/...)
-FETCH_ALL_TEST_TARGETS=(
-    @com_github_google_quiche//:ci_tests
-    "${FETCH_TEST_TARGETS[@]}")
-FETCH_API_TARGETS=(
-    @envoy_api//...
-    //tools/api_proto_plugin/...
-    //tools/protoprint/...
-    //tools/protoxform/...
-    //tools/type_whisperer/...
-    //tools/testdata/protoxform/...)
-FETCH_DOCS_TARGETS+=(
-    //docs/...)
-FETCH_FORMAT_TARGETS+=(
-    //tools/code_format/...)
-FETCH_PROTO_TARGETS=(
-    @com_github_bufbuild_buf//:bin/buf
-    //tools/proto_format/...)
-
-
-retry () {
-    local n wait iterations
-    wait="${1}"
-    iterations="${2}"
-    shift 2
-    n=0
-    until [ "$n" -ge "$iterations" ]; do
-        "${@}" \
-            && break
-        n=$((n+1))
-        if [[ "$n" -lt "$iterations" ]]; then
-            sleep "$wait"
-            echo "Retrying ..."
-        else
-            echo "Fetch failed"
-            exit 1
-        fi
-    done
-}
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
@@ -388,7 +329,7 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
         ;;
 
-    clang_tidy)
+    clang-tidy)
         # clang-tidy will warn on standard library issues with libc++
         ENVOY_STDLIB="libstdc++"
         setup_clang_toolchain
@@ -396,14 +337,19 @@ case $CI_TARGET in
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
-        CLANG_TIDY_TARGETS=(
-            //contrib/...
-            //source/...
-            //test/...
-            @envoy_api//...)
+        if [[ -n "$CLANG_TIDY_TARGETS" ]]; then
+            read -ra CLANG_TIDY_TARGETS <<< "${CLANG_TIDY_TARGETS}"
+        else
+            CLANG_TIDY_TARGETS=(
+                //contrib/...
+                //source/...
+                //test/...
+                @envoy_api//...)
+        fi
+        echo "Running clang-tidy on ${CLANG_TIDY_TARGETS[*]}"
         bazel build \
               "${BAZEL_BUILD_OPTIONS[@]}" \
-              --config clang-tidy \
+              --config=clang-tidy \
               "${CLANG_TIDY_TARGETS[@]}"
         ;;
 
@@ -480,25 +426,6 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
-        ;;
-
-    coverage-upload|fuzz_coverage-upload)
-        setup_clang_toolchain
-        if [[ "$CI_TARGET" == "fuzz_coverage-upload" ]]; then
-            TARGET=fuzz_coverage
-        else
-            TARGET=coverage
-        fi
-        GCS_LOCATION=$(
-            bazel run //tools/gcs:upload \
-                  "${GCS_ARTIFACT_BUCKET}" \
-                  "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-                  "/source/generated/${TARGET}" \
-                  "$TARGET" \
-                  "${GCS_REDIRECT_PATH}")
-        if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
-            echo "##vso[task.logissue type=error]Coverage failed, check artifact at: ${GCS_LOCATION}"
-        fi
         ;;
 
     debug)
@@ -658,16 +585,6 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/ci/docker_ci.sh"
         ;;
 
-    docker-upload)
-        setup_clang_toolchain
-        bazel run //tools/gcs:upload \
-              "${GCS_ARTIFACT_BUCKET}" \
-              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-              "${BUILD_DIR}/build_images" \
-              "docker" \
-              "${GCS_REDIRECT_PATH}"
-        ;;
-
     dockerhub-publish)
         setup_clang_toolchain
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -703,67 +620,6 @@ case $CI_TARGET in
               --//tools/tarball:target=//docs:html \
               //tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
-        ;;
-
-    docs-upload)
-        setup_clang_toolchain
-        bazel run //tools/gcs:upload \
-              "${GCS_ARTIFACT_BUCKET}" \
-              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-              /source/generated/docs \
-              docs \
-              "${GCS_REDIRECT_PATH}"
-        ;;
-
-    fetch|fetch-*)
-        case $CI_TARGET in
-            fetch)
-                targets=("${FETCH_TARGETS[@]}")
-                ;;
-            fetch-check_and_fix_proto_format)
-                targets=("${FETCH_PROTO_TARGETS[@]}")
-                ;;
-            fetch-docs)
-                targets=("${FETCH_DOCS_TARGETS[@]}")
-                ;;
-            fetch-format)
-                targets=("${FETCH_FORMAT_TARGETS[@]}")
-                ;;
-            fetch-gcc)
-                targets=("${FETCH_GCC_TARGETS[@]}")
-                ;;
-            fetch-release|fetch-release.test_only)
-                targets=(
-                    "${FETCH_BUILD_TARGETS[@]}"
-                    "${FETCH_ALL_TEST_TARGETS[@]}")
-                ;;
-            fetch-release.server_only)
-                targets=(
-                    "${FETCH_BUILD_TARGETS[@]}")
-                ;;
-            fetch-*coverage)
-                targets=("${FETCH_TEST_TARGETS[@]}")
-                ;;
-            fetch-*san|fetch-compile_time_options)
-                targets=("${FETCH_ALL_TEST_TARGETS[@]}")
-                ;;
-            fetch-api)
-                targets=("${FETCH_API_TARGETS[@]}")
-                ;;
-            *)
-                exit 0
-                ;;
-        esac
-        setup_clang_toolchain
-        FETCH_ARGS=(
-            --noshow_progress
-            --noshow_loading_progress)
-        echo "Fetching ${targets[*]} ..."
-        retry 15 10 bazel \
-              fetch \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-              "${FETCH_ARGS[@]}" \
-              "${targets[@]}"
         ;;
 
     fix_proto_format)
@@ -935,7 +791,9 @@ case $CI_TARGET in
     release.signed)
         echo "Signing binary packages..."
         setup_clang_toolchain
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
+        bazel build \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
         ;;
 

@@ -121,14 +121,16 @@ getCertificateValidationContextConfigProvider(
 
 ContextConfigImpl::ContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
-    const unsigned default_min_protocol_version, const unsigned default_max_protocol_version,
-    const std::string& default_cipher_suites, const std::string& default_curves,
+    bool auto_sni_san_match, const unsigned default_min_protocol_version,
+    const unsigned default_max_protocol_version, const std::string& default_cipher_suites,
+    const std::string& default_curves,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status)
     : api_(factory_context.serverFactoryContext().api()),
       options_(factory_context.serverFactoryContext().options()),
       singleton_manager_(factory_context.serverFactoryContext().singletonManager()),
       lifecycle_notifier_(factory_context.serverFactoryContext().lifecycleNotifier()),
+      auto_sni_san_match_(auto_sni_san_match),
       alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), default_cipher_suites)),
@@ -178,7 +180,7 @@ ContextConfigImpl::ContextConfigImpl(
         validation_context_config_ = std::move(*context_or_error);
       } else {
         auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
-            *certificate_validation_context_provider_->secret(), api_);
+            *certificate_validation_context_provider_->secret(), auto_sni_san_match, api_);
         SET_AND_RETURN_IF_NOT_OK(config_or_status.status(), creation_status);
         validation_context_config_ = std::move(config_or_status.value());
       }
@@ -225,8 +227,8 @@ ContextConfigImpl::getCombinedValidationContextConfig(
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext combined_cvc =
       *default_cvc_;
   combined_cvc.MergeFrom(dynamic_cvc);
-  auto config_or_status =
-      Envoy::Ssl::CertificateValidationContextConfigImpl::create(combined_cvc, api_);
+  auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
+      combined_cvc, auto_sni_san_match_, api_);
   RETURN_IF_NOT_OK(config_or_status.status());
   return std::move(config_or_status.value());
 }
@@ -270,7 +272,7 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> ca
       cvc_update_callback_handle_ =
           certificate_validation_context_provider_->addUpdateCallback([this, callback]() {
             auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
-                *certificate_validation_context_provider_->secret(), api_);
+                *certificate_validation_context_provider_->secret(), auto_sni_san_match_, api_);
             RETURN_IF_NOT_OK(config_or_status.status());
             validation_context_config_ = std::move(config_or_status.value());
             return callback();
@@ -337,9 +339,11 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status)
-    : ContextConfigImpl(config.common_tls_context(), DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION,
-                        DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context, creation_status),
-      server_name_indication_(config.sni()), allow_renegotiation_(config.allow_renegotiation()),
+    : ContextConfigImpl(config.common_tls_context(), config.auto_sni_san_validation(),
+                        DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION, DEFAULT_CIPHER_SUITES,
+                        DEFAULT_CURVES, factory_context, creation_status),
+      server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
+      allow_renegotiation_(config.allow_renegotiation()),
       enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, false)),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
   // BoringSSL treats this as a C string, so embedded NULL characters will not

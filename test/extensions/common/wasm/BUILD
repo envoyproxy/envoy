@@ -56,6 +56,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:test_context_cpp_plugin",
         "//test/extensions/common/wasm/test_data:test_cpp_plugin",
         "//test/extensions/common/wasm/test_data:test_restriction_cpp_plugin",
+        "//test/mocks/local_reply:local_reply_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
@@ -131,6 +132,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
@@ -143,19 +145,25 @@ envoy_cc_test(
             "-DWASM_USE_CEL_PARSER",
         ],
     }),
+    data = envoy_select_wasm_cpp_tests([
+        "//test/extensions/common/wasm/test_data:test_context_cpp.wasm",
+    ]),
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        ":wasm_runtime",
         "//source/common/network:filter_state_dst_address_lib",
         "//source/common/tcp_proxy",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",
+        "//test/extensions/common/wasm/test_data:test_context_cpp_plugin",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:wasm_lib",
         "@proxy_wasm_cpp_host//:base_lib",
     ],
 )

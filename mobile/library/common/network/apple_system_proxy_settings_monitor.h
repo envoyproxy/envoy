@@ -23,8 +23,11 @@ public:
    *
    * @param proxy_settings_read_callback The closure to call every time system proxy settings
    *                                     change. The closure is called on a non-main queue.
+   * @param proxy_settings_refresh_interval The refresh interval, in seconds, for fetching proxy
+   *                                        settings from the Apple APIs. Defaults to 10 seconds.
    */
-  AppleSystemProxySettingsMonitor(SystemProxySettingsReadCallback proxy_settings_read_callback);
+  AppleSystemProxySettingsMonitor(SystemProxySettingsReadCallback proxy_settings_read_callback,
+                                  CFTimeInterval proxy_settings_refresh_interval);
   virtual ~AppleSystemProxySettingsMonitor();
 
   /**
@@ -44,6 +47,7 @@ private:
   dispatch_queue_t queue_;
   bool started_ = false;
   SystemProxySettingsReadCallback proxy_settings_read_callback_;
+  CFTimeInterval proxy_settings_refresh_interval_;
 };
 
 } // namespace Network

@@ -72,7 +72,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
         *addrlen = sizeof(sockaddr_in6);
         return Api::SysCallIntResult{0, 0};
       }));
-  addr = wrapper_->localAddress();
+  addr = *wrapper_->localAddress();
 
   EXPECT_CALL(os_sys_calls_, getpeername(_, _, _))
       .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
@@ -80,7 +80,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
         *addrlen = sizeof(sockaddr_in6);
         return Api::SysCallIntResult{0, 0};
       }));
-  addr = wrapper_->peerAddress();
+  addr = *wrapper_->peerAddress();
 
   Network::IoHandle::RecvMsgOutput output(1, nullptr);
   EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, MSG_TRUNC))

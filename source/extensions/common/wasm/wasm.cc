@@ -66,22 +66,12 @@ inline Wasm* getWasm(WasmHandleSharedPtr& base_wasm_handle) {
 
 } // namespace
 
-void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifier) {
-  auto weak = std::weak_ptr<Wasm>(std::static_pointer_cast<Wasm>(shared_from_this()));
-  lifecycle_notifier.registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-                                      [this, weak](Event::PostCb post_cb) {
-                                        auto lock = weak.lock();
-                                        if (lock) { // See if we are still alive.
-                                          server_shutdown_post_cb_ = std::move(post_cb);
-                                        }
-                                      });
-}
-
 Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
            Api::Api& api, Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
     : WasmBase(
           createWasmVm(config.config().vm_config().runtime()), config.config().vm_config().vm_id(),
-          MessageUtil::anyToBytes(config.config().vm_config().configuration()),
+          THROW_OR_RETURN_VALUE(
+              MessageUtil::anyToBytes(config.config().vm_config().configuration()), std::string),
           toStdStringView(vm_key), config.environmentVariables(), config.allowedCapabilities()),
       scope_(scope), api_(api), stat_name_pool_(scope_->symbolTable()),
       custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
@@ -151,9 +141,6 @@ void Wasm::tickHandler(uint32_t root_context_id) {
 Wasm::~Wasm() {
   lifecycle_stats_handler_.onEvent(WasmEvent::VmShutDown);
   ENVOY_LOG(debug, "~Wasm {} remaining active", lifecycle_stats_handler_.getActiveVmCount());
-  if (server_shutdown_post_cb_) {
-    dispatcher_.post(std::move(server_shutdown_post_cb_));
-  }
 }
 
 // NOLINTNEXTLINE(readability-identifier-naming)
@@ -260,12 +247,11 @@ void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d) {
 static proxy_wasm::WasmHandleFactory
 getWasmHandleFactory(WasmConfig& wasm_config, const Stats::ScopeSharedPtr& scope, Api::Api& api,
                      Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
-                     Server::ServerLifecycleNotifier& lifecycle_notifier) {
-  return [&wasm_config, &scope, &api, &cluster_manager, &dispatcher,
-          &lifecycle_notifier](std::string_view vm_key) -> WasmHandleBaseSharedPtr {
+                     Server::ServerLifecycleNotifier&) {
+  return [&wasm_config, &scope, &api, &cluster_manager,
+          &dispatcher](std::string_view vm_key) -> WasmHandleBaseSharedPtr {
     auto wasm = std::make_shared<Wasm>(wasm_config, toAbslStringView(vm_key), scope, api,
                                        cluster_manager, dispatcher);
-    wasm->initializeLifecycle(lifecycle_notifier);
     return std::static_pointer_cast<WasmHandleBase>(std::make_shared<WasmHandle>(std::move(wasm)));
   };
 }
@@ -386,8 +372,9 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                  .value_or(code.empty() ? EMPTY_STRING : INLINE_STRING);
   }
 
-  auto vm_key = proxy_wasm::makeVmKey(vm_config.vm_id(),
-                                      MessageUtil::anyToBytes(vm_config.configuration()), code);
+  auto vm_key = proxy_wasm::makeVmKey(
+      vm_config.vm_id(),
+      THROW_OR_RETURN_VALUE(MessageUtil::anyToBytes(vm_config.configuration()), std::string), code);
   auto complete_cb = [cb, vm_key, plugin, scope, &api, &cluster_manager, &dispatcher,
                       &lifecycle_notifier, create_root_context_for_testing,
                       &stats_handler](std::string code) -> bool {

@@ -24,8 +24,8 @@ public:
 
   bool cancelled() { return cancelled_; }
 
-  static Cleanup Noop() {
-    return Cleanup([] {});
+  static Cleanup noop() {
+    return {[]() {}};
   }
 
 private:

@@ -20,7 +20,11 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
       no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
-      unknown_tag_(stat_name_set_->add("unknown_tag.hit")) {
+      unknown_tag_(stat_name_set_->add("unknown_tag.hit")),
+      ip_tag_header_(config.has_ip_tag_header() ? config.ip_tag_header().header() : ""),
+      ip_tag_header_action_(config.has_ip_tag_header()
+                                ? config.ip_tag_header().action()
+                                : HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE) {
 
   // Once loading IP tags from a file system is supported, the restriction on the size
   // of the set should be removed and observability into what tags are loaded needs
@@ -80,13 +84,8 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
   std::vector<std::string> tags =
       config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
 
+  applyTags(headers, tags);
   if (!tags.empty()) {
-    const std::string tags_join = absl::StrJoin(tags, ",");
-    headers.appendEnvoyIpTags(tags_join, ",");
-
-    // We must clear the route cache or else we can't match on x-envoy-ip-tags.
-    callbacks_->downstreamCallbacks()->clearRouteCache();
-
     // For a large number(ex > 1000) of tags, stats cardinality will be an issue.
     // If there are use cases with a large set of tags, a way to opt into these stats
     // should be exposed and other observability options like logging tags need to be implemented.
@@ -110,6 +109,46 @@ Http::FilterTrailersStatus IpTaggingFilter::decodeTrailers(Http::RequestTrailerM
 
 void IpTaggingFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
+}
+
+void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
+                                const std::vector<std::string>& tags) {
+  using HeaderAction = IpTaggingFilterConfig::HeaderAction;
+
+  OptRef<const Http::LowerCaseString> header_name = config_->ipTagHeader();
+
+  if (tags.empty()) {
+    bool maybe_sanitize =
+        config_->ipTagHeaderAction() == HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE;
+    if (header_name.has_value() && maybe_sanitize) {
+      if (headers.remove(header_name.value()) != 0) {
+        // We must clear the route cache in case it held a decision based on the now-removed header.
+        callbacks_->downstreamCallbacks()->clearRouteCache();
+      }
+    }
+    return;
+  }
+
+  const std::string tags_join = absl::StrJoin(tags, ",");
+  if (!header_name.has_value()) {
+    // The x-envoy-ip-tags header was cleared at the start of the filter chain.
+    // We only do append here, so that if multiple ip-tagging filters are run sequentially,
+    // the behaviour will be backwards compatible.
+    headers.appendEnvoyIpTags(tags_join, ",");
+  } else {
+    switch (config_->ipTagHeaderAction()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE:
+      headers.setCopy(header_name.value(), tags_join);
+      break;
+    case HeaderAction::IPTagging_IpTagHeader_HeaderAction_APPEND_IF_EXISTS_OR_ADD:
+      headers.appendCopy(header_name.value(), tags_join);
+      break;
+    }
+  }
+
+  // We must clear the route cache so it can match on the updated value of the header.
+  callbacks_->downstreamCallbacks()->clearRouteCache();
 }
 
 } // namespace IpTagging

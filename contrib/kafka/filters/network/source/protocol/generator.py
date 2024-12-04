@@ -3,42 +3,52 @@
 # Main library file containing all the protocol generation logic.
 
 
-def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_file, input_files):
+def generate_main_code(
+        type, main_h_file, main_cc_file, resolver_cc_file, metrics_header_file, input_files):
     """
-  Main code generator.
+    Main code generator.
 
-  Takes input files and processes them into structures representing a Kafka message (request or
-  response).
+    Takes input files and processes them into structures representing a Kafka message (request or
+    response).
 
-  These responses are then used to create:
-  - main_header_file - contains definitions of Kafka structures and their deserializers
-  - resolver_cc_file - contains request api key & version mapping to deserializer (from header file)
-  - metrics_header_file - contains metrics with names corresponding to messages
-  """
+    These responses are then used to create:
+    - main_h_file - header file for Kafka structures and their deserializers,
+    - main_cc_file - implementation code for the header above,
+    - resolver_cc_file - contains request api key & version mapping to deserializer (from header file),
+    - metrics_header_file - contains metrics with names corresponding to messages.
+    """
     processor = StatefulProcessor(type)
     # Parse provided input files.
     messages = processor.parse_messages(input_files)
 
-    complex_type_template = RenderingHelper.get_template('complex_type_template.j2')
+    complex_type_declaration_template = RenderingHelper.get_template('complex_type_h.j2')
+    complex_type_implementation_template = RenderingHelper.get_template('complex_type_cc.j2')
     parsers_template = RenderingHelper.get_template("%s_parser.j2" % type)
 
-    main_header_contents = ''
+    main_h_contents = ''
+    main_cc_contents = ''
 
     for message in messages:
         # For each child structure that is used by request/response, render its matching C++ code.
         dependencies = message.compute_declaration_chain()
         for dependency in dependencies:
-            main_header_contents += complex_type_template.render(complex_type=dependency)
+            main_h_contents += complex_type_declaration_template.render(complex_type=dependency)
+            main_cc_contents += complex_type_implementation_template.render(complex_type=dependency)
         # Each top-level structure (e.g. FetchRequest/FetchResponse) needs corresponding parsers.
-        main_header_contents += parsers_template.render(complex_type=message)
+        main_h_contents += parsers_template.render(complex_type=message)
 
-    # Full file with headers, namespace declaration etc.
-    template = RenderingHelper.get_template("%ss_h.j2" % type)
-    contents = template.render(contents=main_header_contents)
+    # Generate .h and .cc files
+    h_template = RenderingHelper.get_template("%ss_h.j2" % type)
+    cc_template = RenderingHelper.get_template("%ss_cc.j2" % type)
 
-    # Generate main header file.
-    with open(main_header_file, 'w') as fd:
-        fd.write(contents)
+    h_contents = h_template.render(contents=main_h_contents)
+    cc_contents = cc_template.render(contents=main_cc_contents)
+
+    # Generate main .h and .cc files.
+    with open(main_h_file, 'w') as fd:
+        fd.write(h_contents)
+    with open(main_cc_file, 'w') as fd:
+        fd.write(cc_contents)
 
     # Generate ...resolver.cc file.
     template = RenderingHelper.get_template("kafka_%s_resolver_cc.j2" % type)
@@ -725,12 +735,12 @@ class Complex(TypeSpecification):
             if constructor is None:
                 entry = {}
                 entry['versions'] = [field_list.version]
-                entry['signature'] = signature
+                entry['declaration'] = '%s(%s);' % (self.name, signature)
                 if (len(signature) > 0):
-                    entry['full_declaration'] = '%s(%s): %s {};' % (
+                    entry['implementation'] = '%s(%s): %s {};' % (
                         self.name, signature, field_list.constructor_init_list())
                 else:
-                    entry['full_declaration'] = '%s() {};' % self.name
+                    entry['implementation'] = '%s() {};' % self.name
                 signature_to_constructor[signature] = entry
             else:
                 constructor['versions'].append(field_list.version)

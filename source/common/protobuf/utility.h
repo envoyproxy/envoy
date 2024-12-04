@@ -278,8 +278,9 @@ public:
   // It has somewhat inconsistent handling of invalid file contents,
   // occasionally failing over to try another type of parsing, or silently
   // failing instead of throwing an exception.
-  static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  static absl::Status loadFromFile(const std::string& path, Protobuf::Message& message,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                                   Api::Api& api);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -396,17 +397,6 @@ public:
    * @param any_message source google.protobuf.Any message.
    * @param message destination to unpack to.
    *
-   * @throw EnvoyException if the message does not unpack.
-   */
-  static void unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
-
-  /**
-   * Convert from google.protobuf.Any to a typed message. This should be used
-   * instead of the inbuilt UnpackTo as it performs validation of results.
-   *
-   * @param any_message source google.protobuf.Any message.
-   * @param message destination to unpack to.
-   *
    * @return absl::Status
    */
   static absl::Status unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
@@ -415,17 +405,17 @@ public:
    * Convert from google.protobuf.Any to bytes as std::string
    * @param any source google.protobuf.Any message.
    *
-   * @return std::string consists of bytes in the input message.
+   * @return std::string consists of bytes in the input message or error status.
    */
-  static std::string anyToBytes(const ProtobufWkt::Any& any) {
+  static absl::StatusOr<std::string> anyToBytes(const ProtobufWkt::Any& any) {
     if (any.Is<ProtobufWkt::StringValue>()) {
       ProtobufWkt::StringValue s;
-      MessageUtil::unpackToOrThrow(any, s);
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, s));
       return s.value();
     }
     if (any.Is<ProtobufWkt::BytesValue>()) {
       Protobuf::BytesValue b;
-      MessageUtil::unpackToOrThrow(any, b);
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, b));
       return b.value();
     }
     return any.value();
@@ -439,7 +429,7 @@ public:
    */
   template <class MessageType>
   static inline void anyConvert(const ProtobufWkt::Any& message, MessageType& typed_message) {
-    unpackToOrThrow(message, typed_message);
+    THROW_IF_NOT_OK(unpackTo(message, typed_message));
   };
 
   template <class MessageType>
@@ -488,7 +478,6 @@ public:
     const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
     const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
     return reflection->GetString(*reflectable_message, name_field);
-    return name_field->name();
   }
 
 #ifdef ENVOY_ENABLE_YAML
@@ -595,17 +584,6 @@ public:
    * @param message message to redact.
    */
   static void redact(Protobuf::Message& message);
-
-  /**
-   * Reinterpret a Protobuf message as another Protobuf message by converting to wire format and
-   * back. This only works for messages that can be effectively duck typed this way, e.g. with a
-   * subtype relationship modulo field name.
-   *
-   * @param src source message.
-   * @param dst destination message.
-   * @throw EnvoyException if a conversion error occurs.
-   */
-  static void wireCast(const Protobuf::Message& src, Protobuf::Message& dst);
 
   /**
    * Sanitizes a string to contain only valid UTF-8. Invalid UTF-8 characters will be replaced. If

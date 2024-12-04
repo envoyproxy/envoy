@@ -15,6 +15,8 @@
 #include "test/extensions/filters/udp/udp_proxy/mocks.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.pb.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/socket.h"
@@ -279,8 +281,6 @@ public:
       factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
           {"fake_cluster"});
     }
-    EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
-                getThreadLocalCluster("fake_cluster"));
 
     if (config_->usingPerPacketLoadBalancing()) {
       filter_ = std::make_unique<TestPerPacketLoadBalancingUdpProxyFilter>(callbacks_, config_);
@@ -1707,6 +1707,96 @@ session_filters:
   filter_.reset();
   EXPECT_EQ(output_.size(), 1);
   EXPECT_THAT(output_.front(), testing::HasSubstr("session_complete"));
+}
+
+TEST_F(UdpProxyFilterTest, PerSessionClusterBasicFlow) {
+  InSequence s;
+
+  const std::string session_access_log_format =
+      "%DYNAMIC_METADATA(udp.proxy.session:cluster_name)%";
+
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: other_cluster
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.PerSessionClusterSetterFilterConfig
+    cluster: fake_cluster
+  )EOF",
+                        session_access_log_format, ""));
+  // Allow for two sessions.
+  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->resetResourceManager(2, 0, 0, 0, 0);
+
+  // Basic flow. Udp proxy doesn't have the cluster info yet.
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+
+  // Another basic flow. Udp proxy already has the cluster info.
+  expectSessionCreate(upstream_address_);
+  test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
+  recvDataFromDownstream("10.0.0.3:1000", "10.0.0.2:80", "hello2");
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(11 /*rx_bytes*/, 2 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+  test_sessions_[1].recvDataFromUpstream("world2");
+  checkTransferStats(11 /*rx_bytes*/, 2 /*rx_datagrams*/, 11 /*tx_bytes*/, 2 /*tx_datagrams*/);
+
+  filter_.reset();
+  EXPECT_EQ(output_.size(), 2);
+  EXPECT_EQ(output_.front(), "fake_cluster");
+  EXPECT_EQ(output_.back(), "fake_cluster");
+}
+
+TEST_F(UdpProxyFilterTest, PerSessionClusterNoClusterFound) {
+  InSequence s;
+
+  const std::string session_access_log_format = "%RESPONSE_FLAGS%";
+
+  const std::string proxy_access_log_format = "%DYNAMIC_METADATA(udp.proxy.proxy:no_route)%";
+
+  setup(accessLogConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: other_cluster
+session_filters:
+- name: foo
+  typed_config:
+    '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.PerSessionClusterSetterFilterConfig
+    cluster: fake_cluster
+  )EOF",
+                        session_access_log_format, proxy_access_log_format),
+        false /*has_cluster*/);
+
+  // We don't have "fake_cluster" cluster. We should not found the cluster for the session.
+  expectSessionCreate(upstream_address_, false);
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_no_route_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+
+  filter_.reset();
+  EXPECT_EQ(output_.size(), 2);
+  EXPECT_EQ(output_.front(), "NC");
+  EXPECT_EQ(output_.back(), "1");
 }
 
 using MockUdpTunnelingConfig = SessionFilters::MockUdpTunnelingConfig;

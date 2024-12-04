@@ -47,7 +47,7 @@ private:
   void* handle_;
 };
 
-using DynamicModuleSharedPtr = std::shared_ptr<DynamicModule>;
+using DynamicModulePtr = std::unique_ptr<DynamicModule>;
 
 /**
  * Creates a new DynamicModule. This is mainly exposed for testing purposes. Use
@@ -58,8 +58,8 @@ using DynamicModuleSharedPtr = std::shared_ptr<DynamicModule>;
  * terminated. For example, c-shared objects compiled by Go doesn't support dlclose
  * https://github.com/golang/go/issues/11100.
  */
-absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view object_file_path,
-                                                        const bool do_not_close);
+absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object_file_path,
+                                                  const bool do_not_close);
 
 /**
  * Creates a new DynamicModule by name under the search path specified by the environment variable
@@ -70,8 +70,8 @@ absl::StatusOr<DynamicModuleSharedPtr> newDynamicModule(const absl::string_view 
  * will not be destroyed. This is useful when an object has some global state that should not be
  * terminated.
  */
-absl::StatusOr<DynamicModuleSharedPtr> newDynamicModuleByName(const absl::string_view module_name,
-                                                              const bool do_not_close);
+absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view module_name,
+                                                        const bool do_not_close);
 
 } // namespace DynamicModules
 } // namespace Extensions

@@ -10,10 +10,6 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/win32_socket_handle_impl.h"
 
-#if defined(__linux__) && !defined(__ANDROID_API__)
-#include "source/common/network/io_uring_socket_handle_impl.h"
-#endif
-
 namespace Envoy {
 namespace Network {
 
@@ -31,15 +27,12 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
-#if defined(__linux__) && !defined(__ANDROID_API__)
   // Only create IoUringSocketHandleImpl when the IoUringWorkerFactory has been created and it has
   // been registered in the TLS, initialized. There are cases that test may create threads before
   // IoUringWorkerFactory has been added to the TLS and got initialized.
   if (hasIoUringWorkerFactory(io_uring_worker_factory)) {
-    return std::make_unique<IoUringSocketHandleImpl>(*io_uring_worker_factory, socket_fd,
-                                                     socket_v6only, domain);
+    return io_uring_worker_factory->createIoUringSocketHandle(socket_fd, socket_v6only, domain);
   }
-#endif
   return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain,
                                               options.max_addresses_cache_size_);
 }

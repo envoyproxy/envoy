@@ -30,8 +30,9 @@ std::string getHostAddress(const Host* host) {
 } // namespace
 
 ClientSideWeightedRoundRobinLbConfig::ClientSideWeightedRoundRobinLbConfig(
-    const ClientSideWeightedRoundRobinLbProto& lb_proto, Event::Dispatcher& main_thread_dispatcher)
-    : main_thread_dispatcher_(main_thread_dispatcher) {
+    const ClientSideWeightedRoundRobinLbProto& lb_proto, Event::Dispatcher& main_thread_dispatcher,
+    ThreadLocal::SlotAllocator& tls_slot_allocator)
+    : main_thread_dispatcher_(main_thread_dispatcher), tls_slot_allocator_(tls_slot_allocator) {
   ENVOY_LOG_MISC(trace, "ClientSideWeightedRoundRobinLbConfig config {}", lb_proto.DebugString());
   metric_names_for_computing_utilization =
       std::vector<std::string>(lb_proto.metric_names_for_computing_utilization().begin(),
@@ -50,12 +51,18 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
     Runtime::Loader& runtime, Random::RandomGenerator& random,
     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
     const ClientSideWeightedRoundRobinLbConfig& client_side_weighted_round_robin_config,
-    TimeSource& time_source)
+    TimeSource& time_source, OptRef<ThreadLocalShim> tls_shim)
     : RoundRobinLoadBalancer(priority_set, local_priority_set, stats, runtime, random,
                              common_config,
                              /*round_robin_config=*/std::nullopt, time_source) {
   orca_load_report_handler_ =
       std::make_shared<OrcaLoadReportHandler>(client_side_weighted_round_robin_config, time_source);
+  if (tls_shim.has_value()) {
+    apply_weights_cb_handle_ = tls_shim->apply_weights_cb_helper_.add([this](uint32_t priority) {
+      refresh(priority);
+      return absl::OkStatus();
+    });
+  }
 }
 
 HostConstSharedPtr
@@ -107,13 +114,17 @@ void ClientSideWeightedRoundRobinLoadBalancer::startWeightUpdatesOnMainThread(
 void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnMainThread() {
   ENVOY_LOG(trace, "updateWeightsOnMainThread");
   for (const HostSetPtr& host_set : priority_set_.hostSetsPerPriority()) {
-    updateWeightsOnHosts(host_set->hosts());
+    if (updateWeightsOnHosts(host_set->hosts())) {
+      // If weights have changed, then apply them to all workers.
+      factory_->applyWeightsToAllWorkers(host_set->priority());
+    }
   }
 }
 
-void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVector& hosts) {
+bool ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVector& hosts) {
   std::vector<uint32_t> weights;
   HostVector hosts_with_default_weight;
+  bool weights_updated = false;
   const MonotonicTime now = time_source_.monotonicTime();
   // Weight is considered invalid (too recent) if it was first updated within `blackout_period_`.
   const MonotonicTime max_non_empty_since = now - blackout_period_;
@@ -132,28 +143,48 @@ void ClientSideWeightedRoundRobinLoadBalancer::updateWeightsOnHosts(const HostVe
     // If `client_side_weight` is valid, then set it as the host weight and store it in
     // `weights` to calculate median valid weight across all hosts.
     if (client_side_weight.has_value()) {
-      weights.push_back(*client_side_weight);
-      host_ptr->weight(*client_side_weight);
-      ENVOY_LOG(trace, "updateWeights hostWeight {} = {}", getHostAddress(host_ptr.get()),
-                host_ptr->weight());
+      const uint32_t new_weight = client_side_weight.value();
+      weights.push_back(new_weight);
+      if (new_weight != host_ptr->weight()) {
+        host_ptr->weight(new_weight);
+        ENVOY_LOG(trace, "updateWeights hostWeight {} = {}", getHostAddress(host_ptr.get()),
+                  host_ptr->weight());
+        weights_updated = true;
+      }
     } else {
       // If `client_side_weight` is invalid, then set host to default (median) weight.
       hosts_with_default_weight.push_back(host_ptr);
     }
   }
-  // Calculate the default weight as median of all valid weights.
-  uint32_t default_weight = 1;
-  if (!weights.empty()) {
-    auto median_it = weights.begin() + weights.size() / 2;
-    std::nth_element(weights.begin(), median_it, weights.end());
-    default_weight = *median_it;
+  // If some hosts don't have valid weight, then update them with default weight.
+  if (!hosts_with_default_weight.empty()) {
+    // Calculate the default weight as median of all valid weights.
+    uint32_t default_weight = 1;
+    if (!weights.empty()) {
+      const auto median_it = weights.begin() + weights.size() / 2;
+      std::nth_element(weights.begin(), median_it, weights.end());
+      if (weights.size() % 2 == 1) {
+        default_weight = *median_it;
+      } else {
+        // If the number of weights is even, then the median is the average of the two middle
+        // elements.
+        const auto lower_median_it = std::max_element(weights.begin(), median_it);
+        // Use uint64_t to avoid potential overflow of the weights sum.
+        default_weight = static_cast<uint32_t>(
+            (static_cast<uint64_t>(*lower_median_it) + static_cast<uint64_t>(*median_it)) / 2);
+      }
+    }
+    // Update the hosts with default weight.
+    for (const auto& host_ptr : hosts_with_default_weight) {
+      if (default_weight != host_ptr->weight()) {
+        host_ptr->weight(default_weight);
+        ENVOY_LOG(trace, "updateWeights default hostWeight {} = {}", getHostAddress(host_ptr.get()),
+                  host_ptr->weight());
+        weights_updated = true;
+      }
+    }
   }
-  // Update the hosts with default weight.
-  for (const auto& host_ptr : hosts_with_default_weight) {
-    host_ptr->weight(default_weight);
-    ENVOY_LOG(trace, "updateWeights default hostWeight {} = {}", getHostAddress(host_ptr.get()),
-              host_ptr->weight());
-  }
+  return weights_updated;
 }
 
 void ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(
@@ -246,7 +277,16 @@ Upstream::LoadBalancerPtr ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalL
   ASSERT(typed_lb_config != nullptr);
   return std::make_unique<Upstream::ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb>(
       params.priority_set, params.local_priority_set, cluster_info_.lbStats(), runtime_, random_,
-      cluster_info_.lbConfig(), *typed_lb_config, time_source_);
+      cluster_info_.lbConfig(), *typed_lb_config, time_source_, tls_->get());
+}
+
+void ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::applyWeightsToAllWorkers(
+    uint32_t priority) {
+  tls_->runOnAllThreads([priority](OptRef<ThreadLocalShim> tls_shim) -> void {
+    if (tls_shim.has_value()) {
+      auto status = tls_shim->apply_weights_cb_helper_.runCallbacks(priority);
+    }
+  });
 }
 
 ClientSideWeightedRoundRobinLoadBalancer::ClientSideWeightedRoundRobinLoadBalancer(
@@ -265,8 +305,9 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::initialize() {
   }
   // Setup a callback to receive priority set updates.
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [](uint32_t, const HostVector& hosts_added, const HostVector&) -> absl::Status {
+      [this](uint32_t, const HostVector& hosts_added, const HostVector&) -> absl::Status {
         addClientSideLbPolicyDataToHosts(hosts_added);
+        updateWeightsOnMainThread();
         return absl::OkStatus();
       });
 

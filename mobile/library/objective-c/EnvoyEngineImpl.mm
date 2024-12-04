@@ -502,7 +502,7 @@ static envoy_data ios_get_string(const void *context) {
   }
 
   if (config.respectSystemProxySettings) {
-    registerAppleProxyResolver();
+    registerAppleProxyResolver(/*proxy_settings_refresh_interval_secs=*/10);
   }
 }
 

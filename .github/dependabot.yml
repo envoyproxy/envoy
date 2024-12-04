@@ -61,6 +61,16 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/add_data"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/basic"
   groups:
     contrib-golang:

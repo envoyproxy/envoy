@@ -76,7 +76,6 @@ public:
 
   virtual std::string buildVersion() { return BUILD_VERSION_NUMBER; }
 
-  void initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifier);
   uint32_t nextDnsToken() {
     do {
       dns_token_++;
@@ -105,7 +104,6 @@ protected:
   const Stats::StatName custom_stat_namespace_;
   Upstream::ClusterManager& cluster_manager_;
   Event::Dispatcher& dispatcher_;
-  Event::PostCb server_shutdown_post_cb_;
   absl::flat_hash_map<uint32_t, Event::TimerPtr> timer_; // per root_id.
   TimeSource& time_source_;
 
@@ -173,7 +171,7 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
                 Event::Dispatcher& dispatcher, Api::Api& api,
-                Envoy::Server::ServerLifecycleNotifier& lifecycle_notifier,
+                Server::ServerLifecycleNotifier& lifecycle_notifier,
                 RemoteAsyncDataProviderPtr& remote_data_provider, CreateWasmCallback&& callback,
                 CreateContextFn create_root_context_for_testing = nullptr);
 

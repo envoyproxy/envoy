@@ -77,6 +77,9 @@ public:
   }
 
   void initialize() override {
+    builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+    builder_.addRuntimeGuard("quic_no_tcp_delay", true);
+
     if (getCodecType() == Http::CodecType::HTTP3) {
       setUpstreamProtocol(Http::CodecType::HTTP3);
       builder_.enablePlatformCertificatesValidation(true);
@@ -106,7 +109,6 @@ public:
     } else if (getCodecType() == Http::CodecType::HTTP2) {
       default_request_headers_.setScheme("https");
     }
-    builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
   }
 
   void SetUp() override {

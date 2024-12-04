@@ -208,9 +208,9 @@ protected:
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-    auto entries = loader->getObject("entries");
+    auto entries = *loader->getObject("entries");
     if (entries->hasObject(key)) {
-      return entries->getObject(key)->getString("final_value");
+      return *(*entries->getObject(key))->getString("final_value");
     }
     return "";
   }

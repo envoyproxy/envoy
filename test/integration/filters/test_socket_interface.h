@@ -62,7 +62,7 @@ public:
   // HTTP/3 sockets won't have a bound peer address, but instead get peer
   // address from the argument in sendmsg. TestIoSocketHandle::sendmsg will
   // stash that in peer_address_override_.
-  Address::InstanceConstSharedPtr peerAddress() override {
+  absl::StatusOr<Address::InstanceConstSharedPtr> peerAddress() override {
     if (peer_address_override_.has_value()) {
       return Network::Utility::getAddressWithPort(
           peer_address_override_.value().get(), peer_address_override_.value().get().ip()->port());

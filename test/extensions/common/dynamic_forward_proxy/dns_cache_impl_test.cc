@@ -1926,6 +1926,156 @@ TEST(NoramlizeHost, NormalizeHost) {
   EXPECT_EQ("[fc00::1]:80", DnsHostInfo::normalizeHostForDfp("[fc00::1]", 80));
 }
 
+TEST_F(DnsCacheImplTest, SingleAddressCache) {
+  auto* time_source = new NiceMock<MockTimeSystem>();
+  context_.server_factory_context_.dispatcher_.time_system_.reset(time_source);
+
+  MockKeyValueStoreFactory factory;
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<
+        envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
+  }));
+
+  MockKeyValueStore* store{};
+  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {
+    auto ret = std::make_unique<NiceMock<MockKeyValueStore>>();
+    store = ret.get();
+
+    // Set up store with single address entry
+    EXPECT_CALL(*store, iterate(_)).WillOnce(Invoke([](KeyValueStore::ConstIterateCb fn) -> void {
+      fn("foo.com:80", "10.0.0.1:80|60|0");
+    }));
+
+    return ret;
+  }));
+
+  Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
+  auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
+  key_value_config->set_name("mock_key_value_store_factory");
+  key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
+
+  initialize();
+  ASSERT(store != nullptr);
+
+  // This will trigger the code path for a single address without address_list
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+  ASSERT_NE(absl::nullopt, result.host_info_);
+  EXPECT_EQ(1, result.host_info_.value()->addressList().size());
+}
+
+TEST_F(DnsCacheImplTest, CacheLoadParsingErrors) {
+  auto* time_source = new NiceMock<MockTimeSystem>();
+  context_.server_factory_context_.dispatcher_.time_system_.reset(time_source);
+
+  // Configure the cache
+  MockKeyValueStoreFactory factory;
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<
+        envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
+  }));
+
+  MockKeyValueStore* store{};
+  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {
+    auto ret = std::make_unique<NiceMock<MockKeyValueStore>>();
+    store = ret.get();
+
+    // Test different malformed cache entries
+    EXPECT_CALL(*store, iterate(_)).WillOnce(Invoke([](KeyValueStore::ConstIterateCb fn) -> void {
+      // Test wrong number of tokens (only 2 instead of 3)
+      EXPECT_LOG_CONTAINS("warning", "Incorrect number of tokens in the cache line",
+                          fn("foo.com:80", "10.0.0.1:80|6"));
+
+      // Test invalid TTL
+      EXPECT_LOG_CONTAINS("warning", "is not a valid ttl", fn("bar.com:80", "10.0.0.1:80|abc|0"));
+
+      // Test empty response list
+      fn("foobar.com:80", "");
+    }));
+
+    return ret;
+  }));
+
+  Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
+  auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
+  key_value_config->set_name("mock_key_value_store_factory");
+  key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
+
+  // Create the timers but let NiceMock handle all the expectations
+  new NiceMock<Event::MockTimer>(&context_.server_factory_context_.dispatcher_);
+  new NiceMock<Event::MockTimer>(&context_.server_factory_context_.dispatcher_);
+
+  initialize();
+  ASSERT(store != nullptr);
+
+  // Verify loading an entry triggers resolution since cache entries were invalid
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+
+  // Initial load attempt fails due to cache error
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+}
+
+TEST_F(DnsCacheImplTest, IterateHostMap) {
+  initialize();
+  InSequence s;
+
+  // Add multiple hosts
+  const std::vector<std::pair<std::string, uint32_t>> hosts = {
+      {"foo.com", 80}, {"bar.com", 443}, {"baz.com", 8080}};
+
+  std::vector<Network::DnsResolver::ResolveCb> resolve_cbs;
+  resolve_cbs.reserve(hosts.size());
+
+  // Setup resolution for all hosts
+  for (const auto& host : hosts) {
+    MockLoadDnsCacheEntryCallbacks callbacks;
+    Network::DnsResolver::ResolveCb resolve_cb;
+    EXPECT_CALL(*resolver_, resolve(host.first, _, _))
+        .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+
+    auto result = dns_cache_->loadDnsCacheEntry(host.first, host.second, false, callbacks);
+    EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+    resolve_cbs.push_back(resolve_cb);
+  }
+
+  // Resolve all hosts
+  for (size_t i = 0; i < hosts.size(); i++) {
+    const auto& host = hosts[i];
+    const std::string address = fmt::format("10.0.{}.{}:{}", i, i, host.second);
+
+    EXPECT_CALL(update_callbacks_,
+                onDnsHostAddOrUpdate(fmt::format("{}:{}", host.first, host.second),
+                                     DnsHostInfoEquals(address, host.first, false)));
+    EXPECT_CALL(update_callbacks_,
+                onDnsResolutionComplete(fmt::format("{}:{}", host.first, host.second),
+                                        DnsHostInfoEquals(address, host.first, false),
+                                        Network::DnsResolver::ResolutionStatus::Completed));
+
+    resolve_cbs[i](Network::DnsResolver::ResolutionStatus::Completed, "",
+                   TestUtility::makeDnsResponse({fmt::format("10.0.{}.{}", i, i)}));
+  }
+
+  // Verify iteration
+  std::set<std::string> iterated_hosts;
+  dns_cache_->iterateHostMap([&](absl::string_view host, const DnsHostInfoSharedPtr& info) {
+    iterated_hosts.insert(std::string(host));
+    EXPECT_NE(nullptr, info);
+  });
+
+  EXPECT_EQ(hosts.size(), iterated_hosts.size());
+  for (const auto& host : hosts) {
+    EXPECT_EQ(1, iterated_hosts.count(fmt::format("{}:{}", host.first, host.second)));
+  }
+}
+
 } // namespace
 } // namespace DynamicForwardProxy
 } // namespace Common

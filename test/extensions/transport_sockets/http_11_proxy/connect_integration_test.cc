@@ -125,7 +125,7 @@ typed_config:
     std::string prefix_data;
     const std::string hostname(default_request_headers_.getHostValue());
     const std::string port = Http::HeaderUtility::hostHasPort(hostname) ? "" : ":443";
-    ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", &prefix_data));
+    ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", prefix_data));
     EXPECT_EQ(absl::StrCat("CONNECT ", hostname, port, " HTTP/1.1\r\n\r\n"), prefix_data);
 
     absl::string_view content_length = include_content_length ? "Content-Length: 0\r\n" : "";

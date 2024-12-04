@@ -1252,6 +1252,38 @@ TEST_F(ClientContextConfigImplTest, EmptyServerNameIndication) {
             "SNI names containing NULL-byte are not allowed");
 }
 
+// Validate that it is an error configure `auto_sni_san_validation` without configuring
+// a validation context.
+TEST_F(ClientContextConfigImplTest, AutoSniSanValidationWithoutValidationContext) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.set_auto_sni_san_validation(true);
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_EQ(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+                .status()
+                .message(),
+            "'auto_sni_san_validation' was configured without a validation context");
+}
+
+// Validate that it is an error configure `auto_sni_san_validation` without configuring
+// a trusted CA.
+TEST_F(ClientContextConfigImplTest, AutoSniSanValidationWithoutTrustedCa) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.set_auto_sni_san_validation(true);
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->set_trust_chain_verification(envoy::extensions::transport_sockets::tls::v3::
+                                         CertificateValidationContext::ACCEPT_UNTRUSTED);
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_EQ(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
+                .status()
+                .message(),
+            "'auto_sni_san_validation' was configured without configuring a trusted CA");
+}
+
 // Validate that values other than a hex-encoded SHA-256 fail config validation.
 TEST_F(ClientContextConfigImplTest, InvalidCertificateHash) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;

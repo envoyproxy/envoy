@@ -565,7 +565,7 @@ public:
   bool send_xff_header_stream_option_{true};
   // Connection buffer limits, 0 means default limit from config is used.
   uint32_t connection_buffer_limits_{0};
-  testing::StrictMock<Http::MockSidestreamWatermarkCallbacks>* watermark_callbacks_{nullptr};
+  testing::NiceMock<Http::MockSidestreamWatermarkCallbacks>* watermark_callbacks_{nullptr};
 };
 
 // The integration test for Envoy gRPC and Google gRPC. It uses `TestRealTimeSystem`.

@@ -113,7 +113,10 @@ public:
   // use in reading and using the system proxy settings.
   // If/when we move Android system proxy registration to the C++ Engine Builder, we will make this
   // API available on all platforms.
-  EngineBuilder& respectSystemProxySettings(bool value);
+  // The optional `refresh_interval_secs` parameter determines how often the system proxy settings
+  // are polled by the operating system; defaults to 10 seconds. If the value is <= 0, the default
+  // value will be used.
+  EngineBuilder& respectSystemProxySettings(bool value, int refresh_interval_secs = 10);
   EngineBuilder& setIosNetworkServiceType(int ios_network_service_type);
 #else
   // Only android supports c_ares
@@ -184,6 +187,7 @@ private:
 #if defined(__APPLE__)
   // TODO(abeyad): once stable, consider setting the default to true.
   bool respect_system_proxy_settings_ = false;
+  int proxy_settings_refresh_interval_secs_ = 10;
   int ios_network_service_type_ = 0;
 #endif
   int dns_min_refresh_seconds_ = 60;

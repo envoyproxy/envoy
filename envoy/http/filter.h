@@ -310,7 +310,7 @@ public:
 class RouteConfigUpdateRequesterFactory : public Config::UntypedFactory {
 public:
   // UntypedFactory
-  virtual std::string category() const override { return "envoy.route_config_update_requester"; }
+  std::string category() const override { return "envoy.route_config_update_requester"; }
 
   virtual std::unique_ptr<RouteConfigUpdateRequester>
   createRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider) PURE;
@@ -643,6 +643,11 @@ public:
                               std::function<void(ResponseHeaderMap& headers)> modify_headers,
                               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                               absl::string_view details) PURE;
+
+  /**
+   * Attempt to send GOAWAY and close the connection, and no filter chain will move forward.
+   */
+  virtual void sendGoAwayAndClose() PURE;
 
   /**
    * Adds decoded metadata. This function can only be called in

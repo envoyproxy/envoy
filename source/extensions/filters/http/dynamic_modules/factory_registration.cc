@@ -1,5 +1,3 @@
-#pragma once
-
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

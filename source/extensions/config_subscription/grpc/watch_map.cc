@@ -208,8 +208,9 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   std::vector<DecodedResourcePtr> decoded_resources;
   decoded_resources.reserve(resources.size());
   for (const auto& r : resources) {
-    decoded_resources.emplace_back(
-        DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info));
+    decoded_resources.emplace_back(THROW_OR_RETURN_VALUE(
+        DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info),
+        DecodedResourceImplPtr));
   }
 
   onConfigUpdate(decoded_resources, version_info);

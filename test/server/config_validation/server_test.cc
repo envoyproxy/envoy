@@ -198,6 +198,9 @@ TEST_P(ValidationServerTest, DummyMethodsTest) {
   EXPECT_FALSE(server.processContext().has_value());
   server.timeSource();
   server.mutexTracer();
+  server.clusterManager();
+  server.hotRestart();
+  server.xdsManager();
   server.flushStats();
   server.statsConfig();
   server.transportSocketFactoryContext();

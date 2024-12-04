@@ -125,7 +125,7 @@ public:
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
     // Connect from io_uring handle.
-    io_uring_socket_handle_->connect(listener->localAddress());
+    io_uring_socket_handle_->connect(*listener->localAddress());
     while (error == -1) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
@@ -192,7 +192,7 @@ TEST_F(IoUringSocketHandleImplIntegrationTest, Accept) {
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
 
   // Connect from the socket handle.
-  io_socket_handle_->connect(io_uring_socket_handle_->localAddress());
+  io_socket_handle_->connect(*io_uring_socket_handle_->localAddress());
   while (!accepted) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }

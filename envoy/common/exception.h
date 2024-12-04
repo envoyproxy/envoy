@@ -55,7 +55,7 @@ public:
     return temp_status;                                                                            \
   }
 
-// Make sure this works for functions without calling the functoin twice as well.
+// Make sure this works for functions without calling the function twice as well.
 #define RETURN_IF_NOT_OK(status_fn)                                                                \
   if (absl::Status temp_status = (status_fn); !temp_status.ok()) {                                 \
     return temp_status;                                                                            \
@@ -66,6 +66,6 @@ template <class Type> Type returnOrThrow(absl::StatusOr<Type> type_or_error) {
   return std::move(type_or_error.value());
 }
 
-#define THROW_OR_RETURN_VALUE(expression, type) returnOrThrow<type>(expression)
+#define THROW_OR_RETURN_VALUE(expression, type) ::Envoy::returnOrThrow<type>(expression)
 
 } // namespace Envoy

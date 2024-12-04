@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/config/common/matcher/v3/matcher.pb.validate.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/registry/registry.h"
@@ -276,6 +277,24 @@ TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
   // The match was completed, no match found.
   EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
   EXPECT_EQ(result.on_match_, absl::nullopt);
+}
+
+TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
+  ::envoy::config::core::v3::Pipe pipe;
+  pipe.set_path("/foo/bar/baz.fads");
+  ProtobufWkt::Any typed_metadata;
+  typed_metadata.PackFrom(pipe);
+  stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
+      {std::string(kFilterNamespace), typed_metadata});
+  Envoy::Http::Matching::HttpMatchingDataImpl data =
+      Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
+  auto matcher_tree = buildMatcherTree(absl::StrFormat(
+      TypedDynamicMetadataCelString, kFilterNamespace, "path", "/foo/bar/baz.fads"));
+  const auto result = matcher_tree->match(data_);
+  // The match was complete, match found.
+  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
+  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatched) {

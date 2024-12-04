@@ -12,7 +12,9 @@ envoy_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
-        "//test/extensions/dynamic_modules/test_data/rust:no_op",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_config_destory",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
+        "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # factory_context_mocks needs this.
     rbe_pool = "6gig",

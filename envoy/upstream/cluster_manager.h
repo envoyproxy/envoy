@@ -202,6 +202,31 @@ struct ClusterConnectivityState {
 };
 
 /**
+ * An interface for on-demand CDS. Defined to allow mocking.
+ */
+class OdCdsApi {
+public:
+  virtual ~OdCdsApi() = default;
+
+  // Subscribe to a cluster with a given name. It's meant to eventually send a discovery request
+  // with the cluster name to the management server.
+  virtual void updateOnDemand(std::string cluster_name) PURE;
+};
+
+using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
+
+/**
+ * An interface used by OdCdsApiImpl for sending notifications about the missing cluster that was
+ * requested.
+ */
+class MissingClusterNotifier {
+public:
+  virtual ~MissingClusterNotifier() = default;
+
+  virtual void notifyMissingCluster(absl::string_view name) PURE;
+};
+
+/**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
  * persistent and shared among multiple ongoing requests/connections.
  * Cluster manager is initialized in two phases. In the first phase which begins at the construction
@@ -368,6 +393,15 @@ public:
   virtual Config::GrpcMuxSharedPtr adsMux() PURE;
 
   /**
+   * Replaces the current ADS mux with a new one based on the given config.
+   * Assumes that the given ads_config is syntactically valid (according to the PGV constraints).
+   * @param ads_config an ADS config source to use.
+   * @return the status of the operation.
+   */
+  virtual absl::Status
+  replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) PURE;
+
+  /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.
    */
   virtual Grpc::AsyncClientManager& grpcAsyncClientManager() PURE;
@@ -464,8 +498,16 @@ public:
    * @param validation_visitor
    * @return OdCdsApiHandlePtr the ODCDS handle.
    */
+
+  using OdCdsCreationFunction = std::function<std::shared_ptr<OdCdsApi>(
+      const envoy::config::core::v3::ConfigSource& odcds_config,
+      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
+      MissingClusterNotifier& notifier, Stats::Scope& scope,
+      ProtobufMessage::ValidationVisitor& validation_visitor)>;
+
   virtual OdCdsApiHandlePtr
-  allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+  allocateOdCdsApi(OdCdsCreationFunction creation_function,
+                   const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 

@@ -114,6 +114,11 @@ template <typename T> inline T* allocateLuaUserData(lua_State* state) {
   return alignAndCast<T>(mem);
 }
 
+class LuaLoggable : public Logger::Loggable<Logger::Id::lua> {
+public:
+  void scriptLog(spdlog::level::level_enum level, absl::string_view message);
+};
+
 /**
  * This is the base class for all C++ objects that we expose out to Lua. The goal is to hide as
  * much ugliness as possible. In general, to use this, do the following:
@@ -128,9 +133,10 @@ template <typename T> inline T* allocateLuaUserData(lua_State* state) {
  * owned by Lua*. Lua can GC it at any time. If you want to make sure that does not happen, you
  * must hold a ref to it in C++, generally via LuaRef or LuaDeathRef.
  */
-template <class T> class BaseLuaObject : protected Logger::Loggable<Logger::Id::lua> {
+template <class T> class BaseLuaObject : public LuaLoggable {
 public:
-  using ExportedFunctions = std::vector<std::pair<const char*, lua_CFunction>>;
+  using ExportedFunction = std::pair<const char*, lua_CFunction>;
+  using ExportedFunctions = std::vector<ExportedFunction>;
 
   virtual ~BaseLuaObject() = default;
 
@@ -155,12 +161,25 @@ public:
    * @param state supplies the state to register with.
    */
   static void registerType(lua_State* state) {
+    constexpr std::array log_functions{
+        ExportedFunction{"logTrace", static_luaLogTrace},
+        ExportedFunction{"logDebug", static_luaLogDebug},
+        ExportedFunction{"logInfo", static_luaLogInfo},
+        ExportedFunction{"logWarn", static_luaLogWarn},
+        ExportedFunction{"logErr", static_luaLogErr},
+        ExportedFunction{"logCritical", static_luaLogCritical},
+    };
+
     std::vector<luaL_Reg> to_register;
+
+    for (auto& function : log_functions) {
+      to_register.push_back({function.first, function.second});
+    }
 
     // Fetch all of the functions to be exported to Lua so that we can register them in the
     // metatable.
     ExportedFunctions functions = T::exportedFunctions();
-    for (auto function : functions) {
+    for (auto& function : functions) {
       to_register.push_back({function.first, function.second});
     }
 
@@ -236,8 +255,55 @@ protected:
   virtual void onMarkLive() {}
 
 private:
+  /**
+   * Log a message to the Envoy log.
+   * @param 1 (string): The log message.
+   */
+  DECLARE_LUA_FUNCTION(T, luaLogTrace);
+  DECLARE_LUA_FUNCTION(T, luaLogDebug);
+  DECLARE_LUA_FUNCTION(T, luaLogInfo);
+  DECLARE_LUA_FUNCTION(T, luaLogWarn);
+  DECLARE_LUA_FUNCTION(T, luaLogErr);
+  DECLARE_LUA_FUNCTION(T, luaLogCritical);
+
   bool dead_{};
 };
+
+template <class T> int BaseLuaObject<T>::luaLogTrace(lua_State* state) {
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  scriptLog(spdlog::level::trace, message);
+  return 0;
+}
+
+template <class T> int BaseLuaObject<T>::luaLogDebug(lua_State* state) {
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  scriptLog(spdlog::level::debug, message);
+  return 0;
+}
+
+template <class T> int BaseLuaObject<T>::luaLogInfo(lua_State* state) {
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  scriptLog(spdlog::level::info, message);
+  return 0;
+}
+
+template <class T> int BaseLuaObject<T>::luaLogWarn(lua_State* state) {
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  scriptLog(spdlog::level::warn, message);
+  return 0;
+}
+
+template <class T> int BaseLuaObject<T>::luaLogErr(lua_State* state) {
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  scriptLog(spdlog::level::err, message);
+  return 0;
+}
+
+template <class T> int BaseLuaObject<T>::luaLogCritical(lua_State* state) {
+  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  scriptLog(spdlog::level::critical, message);
+  return 0;
+}
 
 /**
  * This is basically a Lua smart pointer. The idea is that given a Lua object, if we want to
@@ -261,6 +327,15 @@ public:
    */
   LuaRef(const std::pair<T*, lua_State*>& object, bool leave_on_stack) {
     reset(object, leave_on_stack);
+  }
+
+  LuaRef(const LuaRef&) = delete;
+
+  LuaRef(LuaRef&& that) {
+    object_ = that.object_;
+    ref_ = that.ref_;
+    that.object_ = std::pair<T*, lua_State*>{};
+    that.ref_ = LUA_NOREF;
   }
 
   ~LuaRef() { unref(); }
@@ -317,6 +392,9 @@ protected:
 template <typename T> class LuaDeathRef : public LuaRef<T> {
 public:
   using LuaRef<T>::LuaRef;
+
+  LuaDeathRef(const LuaDeathRef&) = delete;
+  LuaDeathRef(LuaDeathRef&&) = default;
 
   ~LuaDeathRef() { markDead(); }
 

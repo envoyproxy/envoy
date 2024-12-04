@@ -27,7 +27,7 @@ final class SendTrailersTests: XCTestCase {
 
     let expectation = self.expectation(description: "Run called with expected http status")
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)

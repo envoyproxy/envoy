@@ -7,6 +7,7 @@ the use_category metadata in bazel/repository_locations.bzl.
 
 import asyncio
 import json
+import os
 import pathlib
 import re
 import sys
@@ -48,7 +49,8 @@ def test_only_ignore(dep):
     return False
 
 
-query = bazel.BazelEnv(envoy_repo.PATH).query
+query = bazel.BazelEnv(
+    envoy_repo.PATH, startup_options=os.environ.get("BAZEL_STARTUP_OPTION_LIST", "").split()).query
 
 
 class DependencyError(Exception):

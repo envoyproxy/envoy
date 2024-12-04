@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
-#include <list>
 #include <map>
 #include <memory>
 #include <string>
@@ -1333,7 +1332,7 @@ public:
    * Return a list of headers that will be cleaned from any requests that are not from an internal
    * (RFC1918) source.
    */
-  virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
+  virtual const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
 
   /**
    * @return const std::string the RouteConfiguration name.

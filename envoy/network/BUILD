@@ -106,6 +106,7 @@ envoy_cc_library(
     deps = [
         "//envoy/common:callback",
         "@com_google_absl//absl/base",
+        "@com_google_absl//absl/status",
     ],
 )
 

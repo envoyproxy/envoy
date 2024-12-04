@@ -39,7 +39,6 @@
 #include "source/common/upstream/cluster_discovery_manager.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/load_stats_reporter.h"
-#include "source/common/upstream/od_cds_api_impl.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -309,6 +308,7 @@ public:
   }
 
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
+  absl::Status replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) override;
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
   const absl::optional<std::string>& localClusterName() const override {
@@ -319,7 +319,8 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
   OdCdsApiHandlePtr
-  allocateOdCdsApi(const envoy::config::core::v3::ConfigSource& odcds_config,
+  allocateOdCdsApi(OdCdsCreationFunction creation_function,
+                   const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                    ProtobufMessage::ValidationVisitor& validation_visitor) override;
 

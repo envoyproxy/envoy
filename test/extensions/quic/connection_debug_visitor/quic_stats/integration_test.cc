@@ -1,4 +1,5 @@
 #include "envoy/extensions/quic/connection_debug_visitor/quic_stats/v3/quic_stats.pb.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -86,6 +87,45 @@ TEST_P(QuicStatsIntegrationTest, Basic) {
   validateHistogramRange("cx_rx_mtu", 500, 65535);
 }
 
+// Test that `cx_tx_amplification_throttling_total` is incremented when the certificate chain is
+// long enough to hit the amplification throttling limit.
+TEST_P(QuicStatsIntegrationTest, CertChainTooLong) {
+  // Configure the server to use a certificate that is roughly 9kb long. QUIC limits the server to
+  // sending at most 3 times as much data as it received from the client, before validating that the
+  // client is not spoofing it's source address. The client typically sends one MTU of data in the
+  // first packet, with a minimum size of 1280 bytes, meaning the server can send roughly 3800 bytes
+  // in the initial response before requiring an additional roundtrip to validate the client.
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* ts = bootstrap.mutable_static_resources()
+                   ->mutable_listeners(0)
+                   ->mutable_filter_chains(0)
+                   ->mutable_transport_socket();
+
+    auto quic_transport_socket_config = MessageUtil::anyConvert<
+        envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport>(
+        *ts->mutable_typed_config());
+    auto* common_tls =
+        quic_transport_socket_config.mutable_downstream_tls_context()->mutable_common_tls_context();
+
+    common_tls->clear_tls_certificates();
+    auto* cert = common_tls->add_tls_certificates();
+    cert->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/long_servercert.pem"));
+    cert->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/long_serverkey.pem"));
+
+    ts->mutable_typed_config()->PackFrom(quic_transport_socket_config);
+  });
+
+  testRouterHeaderOnlyRequestAndResponse();
+  codec_client_->goAway();
+  codec_client_->close(Network::ConnectionCloseType::FlushWrite);
+  test_server_->waitForCounterGe("listener.test.quic_stats.cx_tx_packets_total", 1);
+
+  EXPECT_GE(test_server_->counter("listener.test.quic_stats.cx_tx_amplification_throttling_total")
+                ->value(),
+            1);
+}
 } // namespace QuicStats
 } // namespace ConnectionDebugVisitors
 } // namespace Quic
