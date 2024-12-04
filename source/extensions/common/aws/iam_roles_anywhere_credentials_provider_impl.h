@@ -36,6 +36,11 @@ protected:
 /**
  * Retrieve IAM Roles Certificate for use in signing.
  *
+ * IAMRolesAnywhereX509CredentialsProvider purpose is to retrieve certificate, private key and chain from an Envoy DataSource
+ *
+ * This class is referenced via IAMRolesAnywhereCredentialsProvider, which is the provider that returns normal AWS Access Key Credentials
+ * to any of the other SigV4/SigV4A signing extension components
+ *
  */
 class IAMRolesAnywhereX509CredentialsProvider : public CachedX509CredentialsProviderBase {
 public:
@@ -68,6 +73,27 @@ private:
                                  std::string& serial, SystemTime& time);
   std::chrono::seconds getCacheDuration();
 };
+
+/**
+ * 
+ * IAMRolesAnywhereCredentialsProvider purpose is to Exchange X509 Credentials for Temporary AWS Credentials
+ *
+ * When instantiated via config, it will create an IAMRolesAnywhereX509CredentialsProvider, which manages the X509 Credentials.
+ * IAMRolesAnywhereCredentialsProvider works in the same way as WebIdentityCredentialsProvider, by using the async HTTP client
+ * to send requests to the AWS IAM Roles Anywhere service and retrieve temporary AWS Credentials. It is therefore as subclass of
+ * MetadataCredentialsProviderBase, which handles the async credential fetch and cluster creation for the IAM Roles Anywhere endpoint.
+ *
+ * The X509 SigV4 signing process is performed via IAMRolesAnywhereSigV4SignerImpl, which is a modification of standard SigV4 signing
+ * to use X509 credentials as the signing input. IAMRolesAnywhereCredentialsProvider is the only consumer of IAMRolesAnywhereSigV4SignerImpl.
+ *
+ * The logic is as follows:
+ *   - IAMRolesAnywhereX509CredentialsProvider retrieves X509 credentials and converts them to required format
+ *   - IAMRolesAnywhereCredentialsProvider uses credentials from IAMRolesAnywhereX509CredentialsProvider, and uses them as input
+ *     to IAMRolesAnywhereSigV4SignerImpl
+ *   - Once signing has completed, IAMRolesAnywhereCredentialsProvider requests temporary credentials from IAM Roles Anywhere endpoint
+ *   - Temporary credentials are returned, which then can be used in normal AWS SigV4/SigV4A signing
+ *
+ */
 
 class IAMRolesAnywhereCredentialsProvider : public MetadataCredentialsProviderBase,
                                             public Envoy::Singleton::Instance,
