@@ -782,6 +782,37 @@ UDP
 
 .. _config_access_log_format_connection_id:
 
+%TLS_JA3_FINGERPRINT%
+  HTTP/TCP/THRIFT
+    The JA3 fingerprint (MD5 hash) of the TLS Client Hello message from the downstream connection.
+    Provides a way to fingerprint TLS clients based on various Client Hello parameters like cipher suites,
+    extensions, elliptic curves, etc. Will be "-" if TLS is not used or the handshake is incomplete.
+
+  UDP
+    Not implemented ("-").
+
+%TLS_JA4_FINGERPRINT%
+  HTTP/TCP/THRIFT
+    The JA4 fingerprint of the TLS Client Hello message from the downstream connection. JA4 is an advanced TLS client
+    fingerprinting method that provides more granularity than JA3 by including the protocol version, cipher preference
+    order, and ALPN (Application-Layer Protocol Negotiation) protocols. This enhanced fingerprinting facilitates
+    improved threat hunting and security analysis.
+
+    The JA4 fingerprint follows the format `a_b_c`, where:
+
+    - **a**: Represents the TLS protocol version and cipher preference order.
+    - **b**: Encodes the list of cipher suites offered by the client.
+    - **c**: Contains the ALPN protocols advertised by the client.
+
+    This structured format allows for detailed analysis of client applications based on their TLS handshake
+    characteristics. It enables the identification of specific applications, underlying TLS libraries, and even
+    potential malicious activities by comparing fingerprints against known profiles.
+
+    If TLS is not used or the handshake is incomplete, the value of ``%TLS_JA4_FINGERPRINT%`` will be ``"-"`.
+
+  UDP
+    Not implemented ("-").
+
 %CONNECTION_ID%
   An identifier for the downstream connection. It can be used to
   cross-reference TCP access logs across multiple log sinks, or to

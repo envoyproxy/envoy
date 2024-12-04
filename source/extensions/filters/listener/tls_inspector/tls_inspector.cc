@@ -17,6 +17,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "openssl/md5.h"
@@ -27,6 +28,9 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 namespace {
+
+// First 12 hex characters (6 bytes)
+constexpr size_t JA4_HASH_LENGTH = 12;
 
 uint64_t computeClientHelloSize(const BIO* bio, uint64_t prior_bytes_read,
                                 size_t original_bio_length) {
@@ -333,53 +337,9 @@ void writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello,
   }
 }
 
-std::string getJA4TlsVersion(const SSL_CLIENT_HELLO* ssl_client_hello) {
-  // Check for supported_versions extension first
-  const uint8_t* data;
-  size_t size;
-  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_versions, &data,
-                                           &size)) {
-    CBS cbs;
-    CBS_init(&cbs, data, size);
-    uint8_t versions_len;
-    if (!CBS_get_u8(&cbs, &versions_len)) {
-      return "00";
-    }
-
-    uint16_t highest_version = 0;
-    while (CBS_len(&cbs) >= 2) {
-      uint16_t version;
-      if (!CBS_get_u16(&cbs, &version)) {
-        break;
-      }
-      if (isNotGrease(version) && version > highest_version) {
-        highest_version = version;
-      }
-    }
-
-    std::string version;
-    switch (highest_version) {
-    case TLS1_3_VERSION:
-      version = "13";
-      break;
-    case TLS1_2_VERSION:
-      version = "12";
-      break;
-    case TLS1_1_VERSION:
-      version = "11";
-      break;
-    case TLS1_VERSION:
-      version = "10";
-      break;
-    default:
-      version = "00";
-      break;
-    }
-    return version;
-  }
-
-  // Fall back to protocol version if supported_versions extension is not present
-  switch (ssl_client_hello->version) {
+// Maps a TLS version uint16_t to its string representation.
+absl::string_view mapVersionToString(uint16_t version) {
+  switch (version) {
   case TLS1_3_VERSION:
     return "13";
   case TLS1_2_VERSION:
@@ -391,6 +351,36 @@ std::string getJA4TlsVersion(const SSL_CLIENT_HELLO* ssl_client_hello) {
   default:
     return "00";
   }
+}
+
+absl::string_view getJA4TlsVersion(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  const uint8_t* data;
+  size_t size;
+  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_versions, &data,
+                                           &size)) {
+    CBS cbs;
+    CBS_init(&cbs, data, size);
+    CBS versions;
+
+    if (!CBS_get_u8_length_prefixed(&cbs, &versions)) {
+      return "00";
+    }
+
+    uint16_t highest_version = 0;
+    uint16_t version;
+    while (CBS_get_u16(&versions, &version)) {
+      if (isNotGrease(version) && version > highest_version) {
+        highest_version = version;
+      }
+    }
+
+    if (highest_version != 0) {
+      return mapVersionToString(highest_version);
+    }
+  }
+
+  // Fallback to the protocol version if the supported_versions extension is not present
+  return mapVersionToString(ssl_client_hello->version);
 }
 
 bool hasSNI(const SSL_CLIENT_HELLO* ssl_client_hello) {
@@ -460,24 +450,18 @@ std::string getJA4AlpnChars(const SSL_CLIENT_HELLO* ssl_client_hello) {
   }
 
   const uint8_t* proto_data = CBS_data(&cbs);
-  std::string proto(reinterpret_cast<const char*>(proto_data), proto_length);
+  absl::string_view proto(reinterpret_cast<const char*>(proto_data), proto_length);
 
   if (proto.empty()) {
     return "00";
   }
 
-  auto isAlphaNum = [](char c) {
-    return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-  };
-
   char first = proto[0];
   char last = proto[proto.length() - 1];
-
-  if (!isAlphaNum(first) || !isAlphaNum(last)) {
+  if (!absl::ascii_isalnum(first) || !absl::ascii_isalnum(last)) {
     // Convert to hex if non-alphanumeric
     return absl::StrFormat("%02x%02x", static_cast<uint8_t>(first), static_cast<uint8_t>(last));
   }
-
   return absl::StrFormat("%c%c", first, last);
 }
 
@@ -486,6 +470,8 @@ std::string getJA4CipherHash(const SSL_CLIENT_HELLO* ssl_client_hello) {
   CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
 
   std::vector<uint16_t> ciphers;
+  // Each cipher suite is 2 bytes long, so we reserve half the length of the buffer
+  ciphers.reserve(ssl_client_hello->cipher_suites_len / 2);
   while (CBS_len(&cipher_suites) > 0) {
     uint16_t cipher;
     if (!CBS_get_u16(&cipher_suites, &cipher)) {
@@ -513,7 +499,7 @@ std::string getJA4CipherHash(const SSL_CLIENT_HELLO* ssl_client_hello) {
   std::array<uint8_t, SHA256_DIGEST_LENGTH> hash;
   EVP_Digest(cipher_list.data(), cipher_list.length(), hash.data(), nullptr, EVP_sha256(), nullptr);
 
-  return Hex::encode(hash.data(), 6); // First 12 characters (6 bytes)
+  return Hex::encode(hash.data(), JA4_HASH_LENGTH / 2);
 }
 
 std::string getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_client_hello) {
@@ -579,7 +565,7 @@ std::string getJA4ExtensionHash(const SSL_CLIENT_HELLO* ssl_client_hello) {
   EVP_Digest(extension_list.data(), extension_list.length(), hash.data(), nullptr, EVP_sha256(),
              nullptr);
 
-  return Hex::encode(hash.data(), 6); // First 12 characters (6 bytes)
+  return Hex::encode(hash.data(), JA4_HASH_LENGTH / 2);
 }
 
 void Filter::createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
@@ -612,37 +598,37 @@ void Filter::createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
   }
 
   std::string fingerprint;
+  absl::StrAppend(&fingerprint,
+                  // Protocol type (t for TLS, q for QUIC, d for `DTLS`)
+                  // In this implementation, we only handle TLS
+                  "t",
 
-  // Protocol type (t for TLS, q for QUIC, d for `DTLS`)
-  // In this implementation we only handle TLS
-  absl::StrAppend(&fingerprint, "t");
+                  // TLS Version
+                  getJA4TlsVersion(ssl_client_hello),
 
-  // TLS Version
-  absl::StrAppend(&fingerprint, getJA4TlsVersion(ssl_client_hello));
+                  // SNI presence
+                  hasSNI(ssl_client_hello) ? "d" : "i",
 
-  // SNI presence
-  absl::StrAppend(&fingerprint, hasSNI(ssl_client_hello) ? "d" : "i");
+                  // Cipher count
+                  formatTwoDigits(countCiphers(ssl_client_hello)),
 
-  // Cipher count
-  absl::StrAppend(&fingerprint, formatTwoDigits(countCiphers(ssl_client_hello)));
+                  // Extension count
+                  formatTwoDigits(countExtensions(ssl_client_hello)),
 
-  // Extension count
-  absl::StrAppend(&fingerprint, formatTwoDigits(countExtensions(ssl_client_hello)));
+                  // ALPN first/last chars
+                  getJA4AlpnChars(ssl_client_hello),
 
-  // ALPN first/last chars
-  absl::StrAppend(&fingerprint, getJA4AlpnChars(ssl_client_hello));
+                  // Separator
+                  "_",
 
-  // Separator
-  absl::StrAppend(&fingerprint, "_");
+                  // Cipher hash
+                  getJA4CipherHash(ssl_client_hello),
 
-  // Cipher hash
-  absl::StrAppend(&fingerprint, getJA4CipherHash(ssl_client_hello));
+                  // Separator
+                  "_",
 
-  // Separator
-  absl::StrAppend(&fingerprint, "_");
-
-  // Extension and signature algorithm hash
-  absl::StrAppend(&fingerprint, getJA4ExtensionHash(ssl_client_hello));
+                  // Extension and signature algorithm hash
+                  getJA4ExtensionHash(ssl_client_hello));
 
   ENVOY_LOG(trace, "tls:createJA4Hash(), fingerprint: {}", fingerprint);
   cb_->socket().setJA4Hash(fingerprint);
