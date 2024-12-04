@@ -371,7 +371,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       if (config_->redirectPathMatcher().match(original_request_url.pathAndQueryParams())) {
         ENVOY_LOG(debug, "state url query params {} matches the redirect path matcher",
                   original_request_url.pathAndQueryParams());
-        // TODO(zhaohuabing): Should return 401 unauthorized or 400 bad request?
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -483,7 +482,6 @@ bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) con
 void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
-
   // Construct the correct scheme. We default to https since this is a requirement for OAuth to
   // succeed. However, if a downstream client explicitly declares the "http" scheme for whatever
   // reason, we also use "http" when constructing our redirect uri to the authorization server.
@@ -492,40 +490,44 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   if (Http::Utility::schemeIsHttp(headers.getSchemeValue())) {
     scheme = Http::Headers::get().SchemeValues.Http;
   }
-
-  // Generate a nonce to prevent CSRF attacks
-  std::string nonce;
-  bool nonce_cookie_exists = false;
-  const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
-    return key == config_->cookieNames().oauth_nonce_;
-  });
-  if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) != nonce_cookie.end()) {
-    nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
-    nonce_cookie_exists = true;
-  } else {
-    nonce = generateFixedLengthNonce(time_source_);
-  }
-
-  // Set the nonce cookie if it does not exist.
-  if (!nonce_cookie_exists) {
-    // Expire the nonce cookie in 10 minutes.
-    // This should be enough time for the user to complete the OAuth flow.
-    std::string expire_in = std::to_string(10 * 60);
-    std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
-    if (!config_->cookieDomain().empty()) {
-      cookie_tail_http_only = absl::StrCat(
-          fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
-    }
-    response_headers->addReferenceKey(
-        Http::Headers::get().SetCookie,
-        absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
-  }
-
   const std::string base_path = absl::StrCat(scheme, "://", host_);
   const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
 
+  std::string state;
   // Encode the original request URL and the nonce to the state parameter
-  const std::string state = encodeState(original_url, nonce);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_enable_state_nonce")) {
+    // Generate a nonce to prevent CSRF attacks
+    std::string nonce;
+    bool nonce_cookie_exists = false;
+    const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
+      return key == config_->cookieNames().oauth_nonce_;
+    });
+    if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) != nonce_cookie.end()) {
+      nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
+      nonce_cookie_exists = true;
+    } else {
+      nonce = generateFixedLengthNonce(time_source_);
+    }
+
+    // Set the nonce cookie if it does not exist.
+    if (!nonce_cookie_exists) {
+      // Expire the nonce cookie in 10 minutes.
+      // This should be enough time for the user to complete the OAuth flow.
+      std::string expire_in = std::to_string(10 * 60);
+      std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
+      if (!config_->cookieDomain().empty()) {
+        cookie_tail_http_only = absl::StrCat(
+            fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
+      }
+      response_headers->addReferenceKey(
+          Http::Headers::get().SetCookie,
+          absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
+    }
+    state = encodeState(original_url, nonce);
+  } else {
+    state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(original_url);
+  }
+
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
@@ -857,37 +859,44 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
 
   // Return 401 unauthorized if the state query parameter does not contain the original request URL
   // or nonce.
-  std::string state = Base64Url::decode(stateVal.value());
-  bool has_unknown_field;
-  ProtobufWkt::Struct message;
-  auto status = MessageUtil::loadFromJsonNoThrow(state, message, has_unknown_field);
-  if (!status.ok()) {
-    ENVOY_LOG(error, "state query param is not a valid JSON: \n{}", state);
-    return {false, "", ""};
-  }
-  const auto& filed_value_pair = message.fields();
-  if (!filed_value_pair.contains(stateParamsUrl) || !filed_value_pair.contains(stateParamsNonce)) {
-    ENVOY_LOG(error, "state query param does not contain url or nonce: \n{}", state);
-    return {false, "", ""};
+  std::string original_request_url;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_enable_state_nonce")) {
+    const std::string state = Base64Url::decode(stateVal.value());
+    bool has_unknown_field;
+    ProtobufWkt::Struct message;
+    auto status = MessageUtil::loadFromJsonNoThrow(state, message, has_unknown_field);
+    if (!status.ok()) {
+      ENVOY_LOG(error, "state query param is not a valid JSON: \n{}", state);
+      return {false, "", ""};
+    }
+    const auto& filed_value_pair = message.fields();
+    if (!filed_value_pair.contains(stateParamsUrl) ||
+        !filed_value_pair.contains(stateParamsNonce)) {
+      ENVOY_LOG(error, "state query param does not contain url or nonce: \n{}", state);
+      return {false, "", ""};
+    }
+
+    // Return 401 unauthorized if the nonce cookie does not match the nonce in the state.
+    //
+    // This is to prevent attackers from injecting their own access token into a victim's
+    // sessions via CSRF attack. The attack can result in victims saving their sensitive data
+    // in the attacker's account.
+    // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
+    std::string nonce = filed_value_pair.at(stateParamsNonce).string_value();
+    if (!validateNonce(headers, nonce)) {
+      ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonce);
+      return {false, "", ""};
+    }
+    original_request_url = filed_value_pair.at(stateParamsUrl).string_value();
+  } else {
+    original_request_url =
+        Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
   }
 
-  std::string original_request_url = filed_value_pair.at(stateParamsUrl).string_value();
   // Return 401 unauthorized if the URL in the state is not valid.
   Http::Utility::Url url;
   if (!url.initialize(original_request_url, false)) {
     ENVOY_LOG(error, "state url {} can not be initialized", original_request_url);
-    return {false, "", ""};
-  }
-
-  // Return 401 unauthorized if the nonce cookie does not match the nonce in the state.
-  //
-  // This is to prevent attackers from injecting their own access token into a victim's
-  // sessions via CSRF attack. The attack can result in victims saving their sensitive data
-  // in the attacker's account.
-  // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
-  std::string nonce = filed_value_pair.at(stateParamsNonce).string_value();
-  if (!validateNonce(headers, nonce)) {
-    ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonce);
     return {false, "", ""};
   }
 
