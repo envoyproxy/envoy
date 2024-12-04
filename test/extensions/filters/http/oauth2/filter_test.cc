@@ -779,8 +779,8 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE +
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
@@ -1399,8 +1399,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE +
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%"
            "3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
@@ -1483,8 +1483,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE +
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
@@ -1590,8 +1590,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE +
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
@@ -1649,6 +1649,98 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
        "IdToken=idToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=refreshToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://traffic.example.com/original_path?var1=1&var2=2"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
+
+  filter_->finishGetAccessTokenFlow();
+}
+
+/**
+ * Testing oauth state with nonce disabled.
+ *
+ * Expected behavior: state should not contain nonce and be url encoded.
+ */
+TEST_F(OAuth2Test, OAuthTestFullFlowPostWithNonceDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
+  });
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.oauth2_enable_state_nonce", "false"},
+  });
+  init();
+  // First construct the initial request to the oauth filter with URI parameters.
+  Http::TestRequestHeaderMapImpl first_request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // This is the immediate response - a redirect to the auth cluster.
+  Http::TestResponseHeaderMapImpl first_response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES +
+           "&state=https%3A%2F%2Ftraffic.example.com%2Foriginal_path%3Fvar1%3D1%26var2%3D2"
+           "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com" +
+           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
+           "3Fvar1%3D1%26var2%3D2"},
+  };
+
+  // Fail the validation to trigger the OAuth flow.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Check that the redirect includes URL encoded query parameter characters.
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
+
+  // This represents the beginning of the OAuth filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(first_request_headers, false));
+
+  // This represents the callback request from the authorization server.
+  Http::TestRequestHeaderMapImpl second_request_headers{
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=https%3A%2F%2Ftraffic.example.com%"
+                                        "2Foriginal_path%3Fvar1%3D1%26var2%3D2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+  // Deliberately fail the HMAC validation check.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  AuthType::UrlEncodedBody));
+
+  // Invoke the callback logic. As a side effect, state_ will be populated.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(second_request_headers, false));
+
+  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(config_->clusterName(), "auth.example.com");
+
+  // Expected response after the callback & validation is complete - verifying we kept the
+  // state and method of the original request, including the query string parameters.
+  Http::TestRequestHeaderMapImpl second_response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(), "OauthHMAC="
+                                             "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
+                                             "path=/;Max-Age=;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/original_path?var1=1&var2=2"},
   };
@@ -2373,8 +2465,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE +
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
@@ -2559,8 +2651,8 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE +
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
